@@ -16,38 +16,38 @@ public final class RelationalPersistenceAdapters implements AutoCloseable {
     private final HibernateEntityRepository&lt;CounterexampleEntity&gt; counterexamples;
     private final FacetedSearchIndex searchIndex;
 
-<span class="nc" id="L19">    private RelationalPersistenceAdapters(EntityManagerFactory entityManagerFactory) {</span>
-<span class="nc" id="L20">        this.entityManagerFactory = entityManagerFactory;</span>
-<span class="nc" id="L21">        this.hypotheses = new HibernateHypothesisRepository(entityManagerFactory);</span>
-<span class="nc" id="L22">        this.experiments = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, DiscoveryExperimentEntity.class);</span>
-<span class="nc" id="L23">        this.searchRuns = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, SearchRunEntity.class);</span>
-<span class="nc" id="L24">        this.proofJobs = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, ProofJobMetadataEntity.class);</span>
-<span class="nc" id="L25">        this.reports = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, ExportReportEntity.class);</span>
-<span class="nc" id="L26">        this.seeds = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, SeedExpressionEntity.class);</span>
-<span class="nc" id="L27">        this.benchmarks = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, BenchmarkResultEntity.class);</span>
-<span class="nc" id="L28">        this.counterexamples = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, CounterexampleEntity.class);</span>
-<span class="nc" id="L29">        this.searchIndex = new HibernateSearchFacetedSearchIndex(entityManagerFactory);</span>
-<span class="nc" id="L30">    }</span>
+<span class="fc" id="L19">    private RelationalPersistenceAdapters(EntityManagerFactory entityManagerFactory) {</span>
+<span class="fc" id="L20">        this.entityManagerFactory = entityManagerFactory;</span>
+<span class="fc" id="L21">        this.hypotheses = new HibernateHypothesisRepository(entityManagerFactory);</span>
+<span class="fc" id="L22">        this.experiments = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, DiscoveryExperimentEntity.class);</span>
+<span class="fc" id="L23">        this.searchRuns = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, SearchRunEntity.class);</span>
+<span class="fc" id="L24">        this.proofJobs = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, ProofJobMetadataEntity.class);</span>
+<span class="fc" id="L25">        this.reports = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, ExportReportEntity.class);</span>
+<span class="fc" id="L26">        this.seeds = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, SeedExpressionEntity.class);</span>
+<span class="fc" id="L27">        this.benchmarks = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, BenchmarkResultEntity.class);</span>
+<span class="fc" id="L28">        this.counterexamples = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, CounterexampleEntity.class);</span>
+<span class="fc" id="L29">        this.searchIndex = new HibernateSearchFacetedSearchIndex(entityManagerFactory);</span>
+<span class="fc" id="L30">    }</span>
 
     public static RelationalPersistenceAdapters of(EntityManagerFactory entityManagerFactory) {
-<span class="nc" id="L33">        return new RelationalPersistenceAdapters(entityManagerFactory);</span>
+<span class="fc" id="L33">        return new RelationalPersistenceAdapters(entityManagerFactory);</span>
     }
 
-<span class="nc" id="L36">    public Optional&lt;HypothesisRepository&gt; hypotheses() { return Optional.of(hypotheses); }</span>
-<span class="nc" id="L37">    public HibernateEntityRepository&lt;DiscoveryExperimentEntity&gt; experiments() { return experiments; }</span>
-<span class="nc" id="L38">    public HibernateEntityRepository&lt;SearchRunEntity&gt; searchRuns() { return searchRuns; }</span>
-<span class="nc" id="L39">    public HibernateEntityRepository&lt;ProofJobMetadataEntity&gt; proofJobs() { return proofJobs; }</span>
-<span class="nc" id="L40">    public HibernateEntityRepository&lt;ExportReportEntity&gt; reports() { return reports; }</span>
-<span class="nc" id="L41">    public HibernateEntityRepository&lt;SeedExpressionEntity&gt; seeds() { return seeds; }</span>
-<span class="nc" id="L42">    public HibernateEntityRepository&lt;BenchmarkResultEntity&gt; benchmarks() { return benchmarks; }</span>
-<span class="nc" id="L43">    public HibernateEntityRepository&lt;CounterexampleEntity&gt; counterexamples() { return counterexamples; }</span>
-<span class="nc" id="L44">    public FacetedSearchIndex searchIndex() { return searchIndex; }</span>
+<span class="fc" id="L36">    public Optional&lt;HypothesisRepository&gt; hypotheses() { return Optional.of(hypotheses); }</span>
+<span class="fc" id="L37">    public HibernateEntityRepository&lt;DiscoveryExperimentEntity&gt; experiments() { return experiments; }</span>
+<span class="fc" id="L38">    public HibernateEntityRepository&lt;SearchRunEntity&gt; searchRuns() { return searchRuns; }</span>
+<span class="fc" id="L39">    public HibernateEntityRepository&lt;ProofJobMetadataEntity&gt; proofJobs() { return proofJobs; }</span>
+<span class="fc" id="L40">    public HibernateEntityRepository&lt;ExportReportEntity&gt; reports() { return reports; }</span>
+<span class="fc" id="L41">    public HibernateEntityRepository&lt;SeedExpressionEntity&gt; seeds() { return seeds; }</span>
+<span class="fc" id="L42">    public HibernateEntityRepository&lt;BenchmarkResultEntity&gt; benchmarks() { return benchmarks; }</span>
+<span class="fc" id="L43">    public HibernateEntityRepository&lt;CounterexampleEntity&gt; counterexamples() { return counterexamples; }</span>
+<span class="fc" id="L44">    public FacetedSearchIndex searchIndex() { return searchIndex; }</span>
 
     @Override
     public void close() {
-<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (entityManagerFactory.isOpen()) {</span>
-<span class="nc" id="L49">            entityManagerFactory.close();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (entityManagerFactory.isOpen()) {</span>
+<span class="fc" id="L49">            entityManagerFactory.close();</span>
         }
-<span class="nc" id="L51">    }</span>
+<span class="fc" id="L51">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

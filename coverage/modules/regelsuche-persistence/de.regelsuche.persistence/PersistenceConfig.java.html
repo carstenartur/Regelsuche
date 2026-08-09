@@ -65,8 +65,8 @@ public record PersistenceConfig(
         String neo4jUser,
         String neo4jPassword
     ) {
-<span class="nc" id="L68">        this(mode, storagePath, neo4jUri, neo4jUser, neo4jPassword, null, null, null);</span>
-<span class="nc" id="L69">    }</span>
+<span class="fc" id="L68">        this(mode, storagePath, neo4jUri, neo4jUser, neo4jPassword, null, null, null);</span>
+<span class="fc" id="L69">    }</span>
 
 <span class="fc" id="L71">    public PersistenceConfig {</span>
 <span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (mode == null) {</span>
@@ -102,7 +102,7 @@ public record PersistenceConfig(
         String postgresUser,
         String postgresPassword
     ) {
-<span class="nc" id="L105">        return new PersistenceConfig(</span>
+<span class="fc" id="L105">        return new PersistenceConfig(</span>
             GraphPersistenceMode.POSTGRESQL_WITH_JSON_FALLBACK,
             path,
             null, null, null,
@@ -181,18 +181,22 @@ public record PersistenceConfig(
 <span class="fc" id="L181">        return null;</span>
     }
 
+    private static boolean present(String value) {
+<span class="fc bfc" id="L185" title="All 4 branches covered.">        return value != null &amp;&amp; !value.isBlank();</span>
+    }
+
     /** Convenience: whether all Neo4j credentials are set. */
     public boolean hasNeo4jCredentials() {
-<span class="pc bpc" id="L186" title="1 of 6 branches missed.">        return neo4jUri != null &amp;&amp; neo4jUser != null &amp;&amp; neo4jPassword != null;</span>
+<span class="fc bfc" id="L190" title="All 6 branches covered.">        return present(neo4jUri) &amp;&amp; present(neo4jUser) &amp;&amp; present(neo4jPassword);</span>
     }
 
     /** Convenience: whether all PostgreSQL connection settings are set. */
     public boolean hasPostgresCredentials() {
-<span class="pc bpc" id="L191" title="2 of 6 branches missed.">        return postgresUrl != null &amp;&amp; postgresUser != null &amp;&amp; postgresPassword != null;</span>
+<span class="pc bpc" id="L195" title="2 of 6 branches missed.">        return present(postgresUrl) &amp;&amp; present(postgresUser) &amp;&amp; present(postgresPassword);</span>
     }
 
     public Optional&lt;String&gt; neo4jUriOptional() {
-<span class="nc" id="L195">        return Optional.ofNullable(neo4jUri);</span>
+<span class="nc" id="L199">        return Optional.ofNullable(neo4jUri);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

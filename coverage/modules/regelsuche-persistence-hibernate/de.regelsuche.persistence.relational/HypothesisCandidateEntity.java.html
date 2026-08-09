@@ -73,7 +73,7 @@ public class HypothesisCandidateEntity {
     private double noveltyScore;
     @Column(name = &quot;created_at&quot;, nullable = false)
     private Instant createdAt;
-<span class="nc" id="L76">    @OneToMany(mappedBy = &quot;hypothesis&quot;, cascade = CascadeType.ALL, orphanRemoval = true)</span>
+<span class="pc" id="L76">    @OneToMany(mappedBy = &quot;hypothesis&quot;, cascade = CascadeType.ALL, orphanRemoval = true)</span>
     private List&lt;CounterexampleEntity&gt; counterexamples = new ArrayList&lt;&gt;();
 
 <span class="nc" id="L79">    protected HypothesisCandidateEntity() {</span>
@@ -84,80 +84,80 @@ public class HypothesisCandidateEntity {
         List&lt;HypothesisCandidate.ExpressionPair&gt; supportingExpressions, List&lt;String&gt; parameterRelations,
         java.util.Map&lt;String, List&lt;String&gt;&gt; expressionPlaceholders, String proofStatus,
         Boolean counterexampleFound, double noveltyScore, Instant createdAt) {
-<span class="nc" id="L87">        this(id, experimentId, leftPattern, rightPattern, assumptions, supportingPaths, supportingExpressions,</span>
+<span class="fc" id="L87">        this(id, experimentId, leftPattern, rightPattern, assumptions, supportingPaths, supportingExpressions,</span>
             parameterRelations, expressionPlaceholders, proofStatus, counterexampleFound,
-<span class="nc bnc" id="L89" title="All 4 branches missed.">            counterexampleFound == null ? null : (counterexampleFound</span>
-<span class="nc" id="L90">                ? CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND.name()</span>
+<span class="pc bpc" id="L89" title="1 of 4 branches missed.">            counterexampleFound == null ? null : (counterexampleFound</span>
+<span class="fc" id="L90">                ? CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND.name()</span>
 <span class="nc" id="L91">                : CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND.name()),</span>
-<span class="nc" id="L92">            List.of(), &quot;&quot;, noveltyScore, createdAt);</span>
-<span class="nc" id="L93">    }</span>
+<span class="fc" id="L92">            List.of(), &quot;&quot;, noveltyScore, createdAt);</span>
+<span class="fc" id="L93">    }</span>
 
     public HypothesisCandidateEntity(String id, String experimentId, String leftPattern, String rightPattern,
         List&lt;String&gt; assumptions, List&lt;String&gt; supportingPaths,
         List&lt;HypothesisCandidate.ExpressionPair&gt; supportingExpressions, List&lt;String&gt; parameterRelations,
         java.util.Map&lt;String, List&lt;String&gt;&gt; expressionPlaceholders, String proofStatus,
         Boolean counterexampleFound, String counterexampleStatus, List&lt;String&gt; counterexampleAttemptedSources,
-<span class="nc" id="L100">        String counterexampleExplanation, double noveltyScore, Instant createdAt) {</span>
-<span class="nc" id="L101">        this.id = SearchRunEntity.requireId(id, &quot;id&quot;);</span>
-<span class="nc bnc" id="L102" title="All 4 branches missed.">        this.experimentId = experimentId == null || experimentId.isBlank() ? null : experimentId;</span>
-<span class="nc bnc" id="L103" title="All 4 branches missed.">        if (leftPattern == null || rightPattern == null) {</span>
-<span class="nc" id="L104">            throw new IllegalArgumentException(&quot;patterns must not be null&quot;);</span>
+<span class="fc" id="L100">        String counterexampleExplanation, double noveltyScore, Instant createdAt) {</span>
+<span class="fc" id="L101">        this.id = SearchRunEntity.requireId(id, &quot;id&quot;);</span>
+<span class="fc bfc" id="L102" title="All 4 branches covered.">        this.experimentId = experimentId == null || experimentId.isBlank() ? null : experimentId;</span>
+<span class="pc bpc" id="L103" title="1 of 4 branches missed.">        if (leftPattern == null || rightPattern == null) {</span>
+<span class="fc" id="L104">            throw new IllegalArgumentException(&quot;patterns must not be null&quot;);</span>
         }
-<span class="nc" id="L106">        this.leftPattern = leftPattern;</span>
-<span class="nc" id="L107">        this.rightPattern = rightPattern;</span>
-<span class="nc" id="L108">        this.assumptionsJson = RelationalJson.array(assumptions);</span>
-<span class="nc" id="L109">        this.assumptionsText = RelationalJson.join(assumptions);</span>
-<span class="nc" id="L110">        this.supportingPathsJson = RelationalJson.array(supportingPaths);</span>
-<span class="nc" id="L111">        this.supportingExpressionsJson = RelationalJson.expressionPairs(supportingExpressions);</span>
-<span class="nc" id="L112">        this.parameterRelationsJson = RelationalJson.array(parameterRelations);</span>
-<span class="nc" id="L113">        this.expressionPlaceholdersJson = RelationalJson.placeholderEntries(expressionPlaceholders);</span>
-<span class="nc bnc" id="L114" title="All 2 branches missed.">        this.proofStatus = proofStatus == null ? CandidateProofStatus.OBSERVED.name() : proofStatus;</span>
-<span class="nc" id="L115">        this.counterexampleFound = counterexampleFound;</span>
-<span class="nc" id="L116">        this.counterexampleStatus = counterexampleStatus;</span>
-<span class="nc" id="L117">        this.counterexampleAttemptedSourcesJson = RelationalJson.array(counterexampleAttemptedSources);</span>
-<span class="nc bnc" id="L118" title="All 2 branches missed.">        this.counterexampleExplanation = counterexampleExplanation == null ? &quot;&quot; : counterexampleExplanation;</span>
-<span class="nc" id="L119">        this.noveltyScore = Math.max(0.0, Math.min(1.0, noveltyScore));</span>
-<span class="nc bnc" id="L120" title="All 2 branches missed.">        this.createdAt = createdAt == null ? Instant.now() : createdAt;</span>
-<span class="nc" id="L121">    }</span>
+<span class="fc" id="L106">        this.leftPattern = leftPattern;</span>
+<span class="fc" id="L107">        this.rightPattern = rightPattern;</span>
+<span class="fc" id="L108">        this.assumptionsJson = RelationalJson.array(assumptions);</span>
+<span class="fc" id="L109">        this.assumptionsText = RelationalJson.join(assumptions);</span>
+<span class="fc" id="L110">        this.supportingPathsJson = RelationalJson.array(supportingPaths);</span>
+<span class="fc" id="L111">        this.supportingExpressionsJson = RelationalJson.expressionPairs(supportingExpressions);</span>
+<span class="fc" id="L112">        this.parameterRelationsJson = RelationalJson.array(parameterRelations);</span>
+<span class="fc" id="L113">        this.expressionPlaceholdersJson = RelationalJson.placeholderEntries(expressionPlaceholders);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        this.proofStatus = proofStatus == null ? CandidateProofStatus.OBSERVED.name() : proofStatus;</span>
+<span class="fc" id="L115">        this.counterexampleFound = counterexampleFound;</span>
+<span class="fc" id="L116">        this.counterexampleStatus = counterexampleStatus;</span>
+<span class="fc" id="L117">        this.counterexampleAttemptedSourcesJson = RelationalJson.array(counterexampleAttemptedSources);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        this.counterexampleExplanation = counterexampleExplanation == null ? &quot;&quot; : counterexampleExplanation;</span>
+<span class="fc" id="L119">        this.noveltyScore = Math.max(0.0, Math.min(1.0, noveltyScore));</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        this.createdAt = createdAt == null ? Instant.now() : createdAt;</span>
+<span class="fc" id="L121">    }</span>
 
     public static HypothesisCandidateEntity from(HypothesisCandidate candidate) {
-<span class="nc" id="L124">        return new HypothesisCandidateEntity(candidate.id(), &quot;&quot;, candidate.leftPattern(), candidate.rightPattern(),</span>
-<span class="nc" id="L125">            candidate.assumptions(), candidate.supportingPaths(), candidate.supportingExpressions(),</span>
-<span class="nc" id="L126">            candidate.parameterRelations(), candidate.expressionPlaceholders(),</span>
-<span class="nc" id="L127">            candidate.proofStatus().name(), candidate.counterexampleStatus(),</span>
-<span class="nc bnc" id="L128" title="All 2 branches missed.">            candidate.counterexampleSearchStatus() == null ? null : candidate.counterexampleSearchStatus().name(),</span>
-<span class="nc" id="L129">            candidate.counterexampleAttemptedSources(), candidate.counterexampleExplanation(),</span>
-<span class="nc" id="L130">            candidate.noveltyScore(), candidate.createdAt());</span>
+<span class="fc" id="L124">        return new HypothesisCandidateEntity(candidate.id(), &quot;&quot;, candidate.leftPattern(), candidate.rightPattern(),</span>
+<span class="fc" id="L125">            candidate.assumptions(), candidate.supportingPaths(), candidate.supportingExpressions(),</span>
+<span class="fc" id="L126">            candidate.parameterRelations(), candidate.expressionPlaceholders(),</span>
+<span class="fc" id="L127">            candidate.proofStatus().name(), candidate.counterexampleStatus(),</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            candidate.counterexampleSearchStatus() == null ? null : candidate.counterexampleSearchStatus().name(),</span>
+<span class="fc" id="L129">            candidate.counterexampleAttemptedSources(), candidate.counterexampleExplanation(),</span>
+<span class="fc" id="L130">            candidate.noveltyScore(), candidate.createdAt());</span>
     }
 
     public HypothesisCandidate toHypothesisCandidate() {
-<span class="nc" id="L134">        return new HypothesisCandidate(id, leftPattern, rightPattern, supportingPaths(), supportingExpressions(), assumptions(),</span>
-<span class="nc" id="L135">            noveltyScore, CandidateProofStatus.valueOf(proofStatus), counterexampleFound,</span>
-<span class="nc bnc" id="L136" title="All 2 branches missed.">            counterexampleStatus == null ? null : CounterexampleSearchService.Status.valueOf(counterexampleStatus),</span>
-<span class="nc" id="L137">            counterexampleAttemptedSources(), counterexampleExplanation,</span>
-<span class="nc" id="L138">            parameterRelations(), expressionPlaceholders(), createdAt);</span>
+<span class="fc" id="L134">        return new HypothesisCandidate(id, leftPattern, rightPattern, supportingPaths(), supportingExpressions(), assumptions(),</span>
+<span class="fc" id="L135">            noveltyScore, CandidateProofStatus.valueOf(proofStatus), counterexampleFound,</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            counterexampleStatus == null ? null : CounterexampleSearchService.Status.valueOf(counterexampleStatus),</span>
+<span class="fc" id="L137">            counterexampleAttemptedSources(), counterexampleExplanation,</span>
+<span class="fc" id="L138">            parameterRelations(), expressionPlaceholders(), createdAt);</span>
     }
 
-<span class="nc" id="L141">    public String id() { return id; }</span>
-<span class="nc" id="L142">    public String experimentId() { return experimentId; }</span>
-<span class="nc" id="L143">    public String leftPattern() { return leftPattern; }</span>
-<span class="nc" id="L144">    public String rightPattern() { return rightPattern; }</span>
-<span class="nc" id="L145">    public List&lt;String&gt; assumptions() { return RelationalJson.arrayValues(assumptionsJson); }</span>
-<span class="nc" id="L146">    public List&lt;String&gt; supportingPaths() { return RelationalJson.arrayValues(supportingPathsJson); }</span>
+<span class="fc" id="L141">    public String id() { return id; }</span>
+<span class="fc" id="L142">    public String experimentId() { return experimentId; }</span>
+<span class="fc" id="L143">    public String leftPattern() { return leftPattern; }</span>
+<span class="fc" id="L144">    public String rightPattern() { return rightPattern; }</span>
+<span class="fc" id="L145">    public List&lt;String&gt; assumptions() { return RelationalJson.arrayValues(assumptionsJson); }</span>
+<span class="fc" id="L146">    public List&lt;String&gt; supportingPaths() { return RelationalJson.arrayValues(supportingPathsJson); }</span>
     public List&lt;HypothesisCandidate.ExpressionPair&gt; supportingExpressions() {
-<span class="nc" id="L148">        return RelationalJson.expressionPairsValues(supportingExpressionsJson);</span>
+<span class="fc" id="L148">        return RelationalJson.expressionPairsValues(supportingExpressionsJson);</span>
     }
-<span class="nc" id="L150">    public List&lt;String&gt; parameterRelations() { return RelationalJson.arrayValues(parameterRelationsJson); }</span>
+<span class="fc" id="L150">    public List&lt;String&gt; parameterRelations() { return RelationalJson.arrayValues(parameterRelationsJson); }</span>
     public java.util.Map&lt;String, List&lt;String&gt;&gt; expressionPlaceholders() {
-<span class="nc" id="L152">        return RelationalJson.placeholderEntriesValues(expressionPlaceholdersJson);</span>
+<span class="fc" id="L152">        return RelationalJson.placeholderEntriesValues(expressionPlaceholdersJson);</span>
     }
-<span class="nc" id="L154">    public String proofStatus() { return proofStatus; }</span>
-<span class="nc" id="L155">    public Boolean counterexampleFound() { return counterexampleFound; }</span>
-<span class="nc" id="L156">    public String counterexampleStatus() { return counterexampleStatus; }</span>
-<span class="nc" id="L157">    public List&lt;String&gt; counterexampleAttemptedSources() { return RelationalJson.arrayValues(counterexampleAttemptedSourcesJson); }</span>
-<span class="nc" id="L158">    public String counterexampleExplanation() { return counterexampleExplanation; }</span>
-<span class="nc" id="L159">    public double noveltyScore() { return noveltyScore; }</span>
-<span class="nc" id="L160">    public Instant createdAt() { return createdAt; }</span>
-<span class="nc" id="L161">    public List&lt;CounterexampleEntity&gt; counterexamples() { return List.copyOf(counterexamples); }</span>
+<span class="fc" id="L154">    public String proofStatus() { return proofStatus; }</span>
+<span class="fc" id="L155">    public Boolean counterexampleFound() { return counterexampleFound; }</span>
+<span class="fc" id="L156">    public String counterexampleStatus() { return counterexampleStatus; }</span>
+<span class="fc" id="L157">    public List&lt;String&gt; counterexampleAttemptedSources() { return RelationalJson.arrayValues(counterexampleAttemptedSourcesJson); }</span>
+<span class="fc" id="L158">    public String counterexampleExplanation() { return counterexampleExplanation; }</span>
+<span class="fc" id="L159">    public double noveltyScore() { return noveltyScore; }</span>
+<span class="fc" id="L160">    public Instant createdAt() { return createdAt; }</span>
+<span class="fc" id="L161">    public List&lt;CounterexampleEntity&gt; counterexamples() { return List.copyOf(counterexamples); }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

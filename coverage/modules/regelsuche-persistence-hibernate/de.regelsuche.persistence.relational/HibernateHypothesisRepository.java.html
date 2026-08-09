@@ -9,9 +9,9 @@ import java.util.Optional;
 public final class HibernateHypothesisRepository implements HypothesisRepository {
     private final HibernateEntityRepository&lt;HypothesisCandidateEntity&gt; entities;
 
-<span class="nc" id="L12">    public HibernateHypothesisRepository(EntityManagerFactory entityManagerFactory) {</span>
-<span class="nc" id="L13">        this.entities = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, HypothesisCandidateEntity.class);</span>
-<span class="nc" id="L14">    }</span>
+<span class="fc" id="L12">    public HibernateHypothesisRepository(EntityManagerFactory entityManagerFactory) {</span>
+<span class="fc" id="L13">        this.entities = new HibernateEntityRepository&lt;&gt;(entityManagerFactory, HypothesisCandidateEntity.class);</span>
+<span class="fc" id="L14">    }</span>
 
     @Override
     public void save(String hypothesisId, HypothesisCandidate hypothesis) {

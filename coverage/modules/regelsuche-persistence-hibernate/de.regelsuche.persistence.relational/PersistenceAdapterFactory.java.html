@@ -20,16 +20,16 @@ public final class PersistenceAdapterFactory {
     }
 
     public static Optional&lt;RelationalPersistenceAdapters&gt; create(PersistenceConfig config, PrintStream log) {
-<span class="nc bnc" id="L23" title="All 2 branches missed.">        if (config.mode() != GraphPersistenceMode.POSTGRESQL</span>
-<span class="nc bnc" id="L24" title="All 2 branches missed.">            &amp;&amp; config.mode() != GraphPersistenceMode.POSTGRESQL_WITH_JSON_FALLBACK) {</span>
-<span class="nc" id="L25">            return Optional.empty();</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (config.mode() != GraphPersistenceMode.POSTGRESQL</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">            &amp;&amp; config.mode() != GraphPersistenceMode.POSTGRESQL_WITH_JSON_FALLBACK) {</span>
+<span class="fc" id="L25">            return Optional.empty();</span>
         }
-<span class="nc bnc" id="L27" title="All 2 branches missed.">        if (!config.hasPostgresCredentials()) {</span>
-<span class="nc bnc" id="L28" title="All 2 branches missed.">            if (config.mode() == GraphPersistenceMode.POSTGRESQL) {</span>
-<span class="nc" id="L29">                throw new IllegalArgumentException(&quot;POSTGRESQL mode requires POSTGRES_URL, POSTGRES_USER and POSTGRES_PASSWORD&quot;);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (!config.hasPostgresCredentials()) {</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            if (config.mode() == GraphPersistenceMode.POSTGRESQL) {</span>
+<span class="fc" id="L29">                throw new IllegalArgumentException(&quot;POSTGRESQL mode requires POSTGRES_URL, POSTGRES_USER and POSTGRES_PASSWORD&quot;);</span>
             }
-<span class="nc" id="L31">            ensureJsonFallbackPath(config, log);</span>
-<span class="nc" id="L32">            return Optional.empty();</span>
+<span class="fc" id="L31">            ensureJsonFallbackPath(config, log);</span>
+<span class="fc" id="L32">            return Optional.empty();</span>
         }
 <span class="nc" id="L34">        try (Connection connection = DriverManager.getConnection(</span>
 <span class="nc" id="L35">            config.postgresUrl(), config.postgresUser(), config.postgresPassword())) {</span>
@@ -51,15 +51,15 @@ public final class PersistenceAdapterFactory {
 
     private static void ensureJsonFallbackPath(PersistenceConfig config, PrintStream log) {
         try {
-<span class="nc" id="L54">            Files.createDirectories(config.storagePath());</span>
-<span class="nc" id="L55">        } catch (IOException exception) {</span>
-<span class="nc" id="L56">            throw new IllegalStateException(&quot;Hybrid mode requires a writable JSON fallback path: &quot;</span>
-<span class="nc" id="L57">                + config.storagePath().toAbsolutePath(), exception);</span>
-<span class="nc" id="L58">        }</span>
-<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (log != null) {</span>
-<span class="nc" id="L60">            log.println(&quot;Persistence: hybrid PostgreSQL config incomplete; using JSON fallback at &quot;</span>
-<span class="nc" id="L61">                + config.storagePath().toAbsolutePath());</span>
+<span class="fc" id="L54">            Files.createDirectories(config.storagePath());</span>
+<span class="fc" id="L55">        } catch (IOException exception) {</span>
+<span class="fc" id="L56">            throw new IllegalStateException(&quot;Hybrid mode requires a writable JSON fallback path: &quot;</span>
+<span class="fc" id="L57">                + config.storagePath().toAbsolutePath(), exception);</span>
+<span class="fc" id="L58">        }</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (log != null) {</span>
+<span class="fc" id="L60">            log.println(&quot;Persistence: hybrid PostgreSQL config incomplete; using JSON fallback at &quot;</span>
+<span class="fc" id="L61">                + config.storagePath().toAbsolutePath());</span>
         }
-<span class="nc" id="L63">    }</span>
+<span class="fc" id="L63">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
