@@ -1,73 +1,206 @@
 # Proof-carrying self-improvement showcase
 
-Status: **Java pre-randomness architecture implemented; not run**  
-Tracked by: [#597](https://github.com/carstenartur/Regelsuche/issues/597)
+Status: **v1 ended at the TRAIN candidate-formation boundary; reusable preflight and Stage-C infrastructure are implemented for a separately preregistered future version**  
+Tracked by: [#597](https://github.com/carstenartur/Regelsuche/issues/597), [#609](https://github.com/carstenartur/Regelsuche/issues/609)
+
+The immutable v1 result is documented separately in
+[proof-carrying-self-improvement-showcase-v1-result.md](proof-carrying-self-improvement-showcase-v1-result.md).
 
 ## Purpose
 
-The showcase is intended to produce one result that is understandable before a
-reader studies the complete Regelsuche evidence architecture:
+The showcase asks a deliberately narrow systems-research question:
 
-> Regelsuche learns a human-readable executable rewrite/search program from
-> TRAIN-only observations. The complete program and configuration are frozen.
-> Only afterwards are concrete FINAL TEST cases generated from verifiable
-> public randomness. The learned program and every fixed baseline receive the
-> same cases, information and canonical mechanical-work budget.
+> Can Regelsuche learn a human-readable executable rewrite/search program from
+> TRAIN-only observations, freeze that program before any hidden test material
+> exists, and then outperform fixed baselines on a FINAL TEST generated from
+> externally verifiable future public randomness under the same information and
+> canonical work budgets?
 
-A successful run may receive only `SHOWCASE_CONFIRMED`. It does not establish
+A positive result may receive only `SHOWCASE_CONFIRMED`. It does not establish
 external mathematical novelty, expert-reviewed importance, publication-grade
 benchmark validity or universal superiority.
 
-The publication-grade experiment in #521/#533 and the expert-review paths in
-#389/#391 remain separate and deferred until qualified independent researchers
-can participate.
+The publication-grade experiment in #521/#533 and the independent-review paths
+in #389/#391 remain separate.
+
+## Current empirical status
+
+Showcase v1 was executed exactly once under its one-attempt authority.
+
+The checkout-owned `ciCheck` passed. The real TRAIN run then reached candidate
+selection but no terminal alternative satisfied the preregistered freeze
+eligibility policy. Selection therefore failed before the atomic TRAIN/freeze
+bundle was published.
+
+For v1:
+
+```text
+TRAIN:                 EXECUTED
+eligible selection:    NOT PRODUCED
+candidate freeze:      NOT CREATED
+public randomness:     NOT CONSUMED
+FINAL TEST seed:       NOT DERIVED
+FINAL TEST cases:      NOT GENERATED
+FINAL TEST execution:  NOT RUN
+showcase claim:         NOT ESTABLISHED
+```
+
+This is a **terminal candidate-formation null attempt**, not a failed hidden-test
+result. No hidden FINAL TEST material was generated or observed.
+
+The v1 authority is consumed and must not be rerun, recreated or replaced. See
+the immutable result page for the exact implementation commit, authority
+commit, workflow run and retained artifact digest.
+
+## Stage ordering
+
+A future showcase version must keep four different activities separate:
+
+```text
+0. deterministic TRAIN-only preflight / characterization
+   -> no authority consumption
+   -> no candidate freeze
+   -> no clock boundary
+   -> no public randomness
+   -> no FINAL TEST material
+
+1. one-attempt authority
+   -> exact production TRAIN
+   -> deterministic terminal selection
+   -> candidate freeze, if and only if an eligible candidate exists
+
+2. public-randomness stage
+   -> first eligible verified drand round after the frozen not-before boundary
+   -> domain-separated seed derivation
+   -> deterministic FINAL TEST generation
+
+3. paired FINAL TEST execution
+   -> fixed baselines and learned program receive identical cases and budgets
+   -> complete positive, negative, null and technical-failure accounting
+```
+
+The preflight exists to prevent another avoidable authority consumption when the
+production TRAIN configuration cannot reach the already declared candidate
+eligibility boundary. It is not a way to reconstruct or retry v1.
 
 ## Java-owned architecture
 
-Showcase semantics are implemented in the ordinary Java modules and exercised
-directly by JUnit. There is no Python verifier, Python generator, `ProcessBuilder`
-test bridge or special Gradle init script.
+Showcase semantics live in the ordinary Java modules and are exercised directly
+by JUnit. There is no Python verifier, Python generator, `ProcessBuilder` test
+bridge or special Gradle init-script semantics.
 
-The authoritative classes include:
+Important production classes include:
 
 ```text
 ProofCarryingShowcasePlan
 RetainedEvolutionRewriteProgramPopulationRun
 ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
 ProofCarryingShowcaseCandidateFreezer
+ProofCarryingShowcaseTrainSelectionEvidence
 ProofCarryingShowcaseCandidateFreeze
+ProofCarryingShowcaseTrainPreflightCommand
 ProofCarryingShowcaseTrainAndFreezeCommand
 ProofCarryingShowcaseTrainFreezeAuthorityCommand
+ProofCarryingShowcaseDrandVerificationEvidence
 ProofCarryingShowcasePublicRandomnessReceipt
 ProofCarryingShowcaseSeedReceipt
 ProofCarryingShowcaseCaseGenerator
-ProofCarryingShowcaseGeneratedCase
 ProofCarryingShowcaseGeneratedFinalTest
 ```
 
-The constructors and factories enforce schema identity, canonical content
-hashes, claim boundaries, stage ordering and cross-artifact bindings. Jackson
-is configured for duplicate-field detection, trailing-token rejection and
-unknown-field rejection. JUnit invokes these Java classes directly and sends
-every generated mathematical case through the production exact rational
-equivalence service.
+Constructors and factories enforce schema identity, canonical content hashes,
+claim boundaries, stage ordering and cross-artifact bindings. JSON parsing uses
+strict Jackson settings including duplicate-field, unknown-field and
+trailing-token rejection.
 
-JSON Schema files remain a language-neutral interchange description. They do
-not replace the Java invariants and do not own executable test semantics.
+JSON Schema files provide language-neutral interchange descriptions; the Java
+invariants remain authoritative executable semantics.
 
-## Ordering boundary
+## TRAIN retention and eligibility
 
-Concrete FINAL TEST cases must not exist while the candidate is selected:
+The TRAIN runner retains the terminal population and final TRAIN evaluations.
+Candidate selection is deterministic.
+
+A candidate is freeze-eligible only when:
+
+- the TRAIN evaluator reports no blocker;
+- it is not exact-equivalent to any seed;
+- it is not alpha-structurally equivalent to any seed;
+- composition topology is present;
+- decision topology is present;
+- the minimum structural primitive path depth meets the frozen threshold.
+
+Eligible alternatives are ranked by:
+
+1. maximum TRAIN scalar fitness;
+2. minimum program node count;
+3. lexicographically minimum candidate hash.
+
+`ProofCarryingShowcaseTrainSelectionEvidence` can represent both outcomes:
 
 ```text
-TRAIN execution
-  -> complete candidate and configuration freeze
-  -> finite not-before delay
-  -> first eligible verified public-randomness round
-  -> domain-separated seed derivation
-  -> deterministic FINAL TEST generation
-  -> one paired execution matrix
+ELIGIBLE_CANDIDATE_AVAILABLE_FINAL_TEST_UNSEEN
+NO_ELIGIBLE_TRAIN_ALTERNATIVE_FINAL_TEST_UNSEEN
 ```
+
+The artifact retains terminal identities, raw TRAIN fitness components,
+evaluator blockers, seed equivalence, structural facts and freeze blockers.
+The same production eligibility and ranking logic is shared with the candidate
+freezer so that preflight and authority selection cannot silently diverge.
+
+A null selection is distinct from population extinction. It means a terminal
+population exists, but none of its retained alternatives crosses the frozen
+eligibility boundary.
+
+## Deterministic TRAIN-only preflight
+
+For a **future preregistered showcase contract that explicitly permits TRAIN-only
+characterization before authority**, the ordinary application exposes:
+
+```bash
+./gradlew :app:run --args='showcase-train-preflight \
+  <future-showcase-plan.json> <new-output-directory>'
+```
+
+The command uses the same production `TrainConfiguration`, evaluator, mutator,
+population policy and seed definitions as the TRAIN/freeze path. It stops at
+terminal selection evidence and publishes no `candidate-freeze.json`, clock
+boundary, drand receipt, seed or FINAL TEST material.
+
+Do **not** use this command with the consumed v1 plan to reconstruct v1 terminal
+alternatives. That would be a new TRAIN execution after the one-attempt result
+and would not be valid v1 evidence.
+
+The preflight is intentionally not part of v1's historical `ciCheck`. A future
+showcase version must preregister whether and how preflight evidence is a gate
+before its authority is created.
+
+## Candidate-freeze boundary
+
+Only an eligible selection may produce `candidate-freeze.json`. The freeze
+binds at least:
+
+- repository commit;
+- complete protocol-bound TRAIN run and selection evidence;
+- candidate exact and alpha-structural identities;
+- human-readable program identity;
+- primitive inventory, work budget and evaluation protocol;
+- seed candidate identities;
+- structural facts;
+- freeze time and public-randomness not-before time.
+
+The status is:
+
+```text
+CANDIDATE_FROZEN_FINAL_TEST_UNSEEN
+```
+
+The ordinary Java TRAIN/freeze command obtains the freeze time only after TRAIN
+has completed. Successful output is first written into a private sibling
+staging directory and becomes visible only through an atomic directory move.
+A null selection therefore creates no partial candidate freeze.
+
+## Public randomness
 
 The frozen plan pins the League of Entropy drand `default` chain:
 
@@ -75,15 +208,28 @@ The frozen plan pins the League of Entropy drand `default` chain:
 8990e7a9aaed2ffed73dbd7092123d6f289930540d7651336225dc172e51b2ce
 ```
 
-A later receipt producer must use a pinned signature-verifying drand client and
-retain chain information, client identity and verification evidence. A raw HTTP
-response is not sufficient. No randomness round has been consumed.
+Reusable Stage-C infrastructure pins chain information and typed verification
+evidence before seed derivation. A future receipt producer must use the pinned,
+signature-verifying drand client and retain enough evidence to verify chain,
+client, round timing, signature verification and the derived randomness.
+
+A raw HTTP response is not sufficient.
+
+For v1 this infrastructure is **unused**: there is no candidate freeze, so no
+round is eligible to be consumed.
+
+After a valid freeze, the accepted round must be the first eligible verified
+round strictly after the frozen not-before boundary. The seed receipt then
+binds the showcase, plan, candidate freeze, drand chain and round, verified
+randomness and randomness-receipt identity using a versioned domain-separated
+SHA-256 derivation.
 
 ## Frozen positive threshold
 
-A positive result requires all of the following:
+A future experiment that reuses the v1 scientific objective should preregister
+its threshold before authority. The v1 threshold required all of the following:
 
-- a candidate that is not exact- or alpha-equivalent to a seed;
+- candidate not exact- or alpha-equivalent to a seed;
 - genuine composition and decision topology;
 - at least three primitive operations on a retained successful path;
 - improvement on at least four generated cases and two structural families;
@@ -93,18 +239,19 @@ A positive result requires all of the following:
 - zero hidden-assumption regressions;
 - zero technical failures in the counted positive route;
 - complete retention of null, losing, unsupported and budget-exhausted cases;
-- two clean checkout reproductions and one pinned-container reproduction.
+- two clean-checkout reproductions and one pinned-container reproduction.
 
-The stretch objective is either a hundredfold canonical-work reduction on a
+The stretch objective was either a hundredfold canonical-work reduction on a
 retained stress tier or two solved difficulty levels beyond every fixed
 baseline.
 
-Missing the threshold produces a complete `SHOWCASE_NULL_RESULT`. Thresholds,
-cases and retries may not be repaired after outcomes are visible.
+These thresholds must never be repaired after outcome visibility. A new version
+may change its contract only by preregistering a new plan **before** executing
+that version.
 
-## Frozen comparison matrix
+## Comparison matrix and generated families
 
-Every generated case is executed against exactly these configurations:
+The frozen comparison matrix is:
 
 1. primitive-only best-first search;
 2. preregistered hand-written program;
@@ -113,113 +260,38 @@ Every generated case is executed against exactly these configurations:
 5. no-decision ablation;
 6. learned rewrite program.
 
-Canonical primitive and total-work ledgers are authoritative. Wall-clock time
-is retained only as an environment-qualified engineering diagnostic.
+Canonical primitive and total-work ledgers are authoritative. Wall-clock time is
+only an environment-qualified engineering diagnostic.
 
-## Deterministic structural families
-
-`ProofCarryingShowcaseCaseGenerator` produces 24 cases, eight from each family:
+The deterministic generator defines 24 cases across three families:
 
 - nested rational cancellation and quotient composition;
 - factor-cancel-collect ordering;
 - multi-stage rational/polynomial normalization with explicit nonzero
   assumptions.
 
-Each family contains two variants at difficulty levels 3 through 6. Case
-coefficients, expressions, assumptions, topology fingerprints, IDs and content
-hashes are derived deterministically from the authorized seed receipt. Every
-configuration receives the same generated suite. Manual replacement, pruning
-and selective regeneration are forbidden.
+Each family contains two variants at difficulty levels 3 through 6. Concrete
+cases must not be materialized before the public-randomness stage.
 
-The generated artifact remains:
+## One-attempt authority
 
-```text
-FINAL_TEST_GENERATED_NOT_EXECUTED
-```
+The retained execution uses the existing central CI workflow only as a thin
+platform adapter. Repository semantics remain checkout-owned Gradle/Java/JUnit
+logic.
 
-Generation is not execution and authorizes no result claim.
+For v1, a single-parent authority commit added only the canonical authority
+manifest and the reserved authority branch was created exactly once. The
+checkout-owned verifier bound the event, attempt number, branch, implementation
+commit, authority commit and output constraints. Cancellation or technical
+failure consumes that authority version; retry requires a separately reviewed
+new version.
 
-## TRAIN retention and deterministic selection
-
-The TRAIN runner retains every terminal candidate, canonical genome and program,
-human-readable rendering and final TRAIN evaluation. The retained population is
-bound to the exact evaluator protocol and implementation class. Uninterrupted
-and checkpoint/resume execution must produce byte-identical terminal evidence.
-
-Every terminal alternative retains exact and alpha identities, raw TRAIN
-components, blockers, structural facts and seed-equivalence decisions. Eligible
-candidates are ranked deterministically by:
-
-1. maximum TRAIN scalar fitness;
-2. minimum program node count;
-3. lexicographically minimum candidate hash.
-
-No eligible candidate means terminal TRAIN extinction. The process fails before
-creating a public-randomness boundary.
-
-## Candidate-freeze boundary
-
-Before the public-randomness not-before time, `candidate-freeze.json` binds:
-
-- repository commit;
-- complete TRAIN run and selection evidence;
-- candidate exact and alpha-structural identities;
-- human-readable program rendering;
-- primitive inventory, work budget and evaluation protocol;
-- all seed candidate identities;
-- program node count;
-- composition, decision and primitive-path properties;
-- freeze time and public-randomness not-before time.
-
-Its status is fixed as:
-
-```text
-CANDIDATE_FROZEN_FINAL_TEST_UNSEEN
-```
-
-Exact seed equivalence, missing topology, inadequate path depth and an
-insufficient delay fail closed.
-
-The ordinary Java command accepts no clock, drand, VALIDATION or FINAL TEST
-input. It obtains the freeze time only after the complete retained TRAIN runner
-has returned. It writes every prerequisite into a private sibling staging
-directory, writes `candidate-freeze.json` last and publishes the complete set
-only through an atomic directory move.
-
-## Public-randomness and seed receipts
-
-`public-randomness-receipt.json` binds the plan, candidate freeze, network,
-chain, round, round time, randomness, signatures, chain information, pinned
-verifier and verification evidence. Only this status is accepted:
-
-```text
-VERIFIED_BY_PINNED_DRAND_CLIENT
-```
-
-The round time must be strictly later than the candidate's frozen not-before
-boundary.
-
-The seed-receipt factory derives the generator seed as SHA-256 over versioned
-domain-separated material binding:
-
-- showcase ID;
-- plan content hash;
-- candidate-freeze content hash;
-- drand chain and round;
-- verified randomness;
-- complete randomness-receipt content hash.
-
-The resulting receipt has status:
-
-```text
-FINAL_TEST_SEED_DERIVED_AFTER_CANDIDATE_FREEZE
-```
-
-Changing any bound input changes the derived seed.
+That rule remains important even though v1 ended in candidate formation: v1 is
+closed evidence, not a development run waiting for a retry.
 
 ## Verification from a checkout
 
-The ordinary lifecycle is authoritative:
+The ordinary lifecycle remains authoritative:
 
 ```bash
 ./gradlew test
@@ -227,7 +299,7 @@ The ordinary lifecycle is authoritative:
 ./gradlew --no-configuration-cache ciCheck
 ```
 
-Focused Java/JUnit execution:
+Focused showcase tests:
 
 ```bash
 ./gradlew :regelsuche-learning:test \
@@ -237,125 +309,31 @@ Focused Java/JUnit execution:
   --tests 'de.regelsuche.evolution.ProofCarryingShowcase*'
 ```
 
-The focused tests cover:
+The test surface covers strict artifact parsing, canonical hashes, retained
+TRAIN evidence, deterministic selection, candidate-freeze ordering, drand
+verification evidence, domain-separated seed derivation, deterministic case
+generation, mathematical confirmation and the one-attempt authority contract.
 
-- the committed plan and its exact content hash;
-- strict JSON roundtrips and rejection of duplicate, unknown and trailing data;
-- complete terminal TRAIN retention and deterministic candidate selection;
-- candidate-freeze and randomness ordering;
-- deterministic domain-separated seed derivation;
-- substitution sensitivity;
-- deterministic 24-case generation and complete family coverage;
-- case, family and suite content roots;
-- schema/Java vocabulary agreement;
-- exact mathematical confirmation and complete assumption coverage;
-- canonical one-attempt authority manifests and run-history rejection;
-- authority-commit parent/file binding and retained execution receipts;
-- the absence of Python showcase scripts and special init-script test paths.
+## Next admissible step
 
-After those gates are green, the reversible TRAIN-only stage can also be run
-through the ordinary application entry point for development and characterization:
+The next scientific attempt must **not** be a v1 rerun.
 
-```bash
-./gradlew :app:run --args='showcase-train-freeze \
-  research/showcase/proof-carrying-self-improvement/showcase-plan.json \
-  <repository-commit> <new-output-directory>'
-```
+Before any future authority is consumed:
 
-The output directory must not already exist. A successful invocation contains
-the plan, TRAIN-only split, suite, evaluator, seeds, study, protocol-bound
-terminal population, selection, selected candidate, readable program and the
-final candidate-freeze receipt. This development invocation is not the retained
-one-attempt authority run.
+1. finish the #609 engineering hardening and keep null-selection evidence
+   first-class;
+2. require a green post-merge `main` gate;
+3. define a new preregistered showcase version with a new plan/authority
+   identity;
+4. explicitly declare whether deterministic TRAIN-only preflight is permitted;
+5. if permitted, require byte-reproducible preflight evidence and at least one
+   freeze-eligible terminal alternative before authority creation;
+6. freeze the future version before any live public-randomness round is fetched;
+7. consume exactly the first eligible verified round after the not-before
+   boundary;
+8. generate and execute the paired FINAL TEST exactly once;
+9. publish the result whether positive, negative or null.
 
-## One-attempt execution authority
-
-The retained real execution reuses the existing central `CI` workflow rather
-than adding a showcase-specific workflow. GitHub Actions remains a thin
-platform adapter: for the exact reserved branch-creation event it chooses the
-checkout-owned Gradle task `authorizedShowcaseTrainFreeze`; for ordinary CI it
-chooses `ciCheck`. The workflow contains no authority validation, candidate
-selection or result interpretation.
-
-`authorizedShowcaseTrainFreeze` depends on the unchanged authoritative
-`ciCheck` lifecycle. Only after that lifecycle succeeds can the ordinary Java
-class `ProofCarryingShowcaseTrainFreezeAuthorityCommand` verify the authority
-and execute TRAIN/freeze. This preserves the repository rule that pass/fail
-semantics belong to checkout-owned Gradle/Java/JUnit code rather than GitHub
-Actions YAML.
-
-After the execution support is merged and the resulting `main` commit is green,
-an unreferenced single-parent authority commit is created whose only changed
-file is:
-
-```text
-research/showcase/proof-carrying-self-improvement/
-  train-freeze-authority-v1.json
-```
-
-The manifest binds the authority ID and branch, the reviewed implementation
-commit, the TRAIN-and-freeze operation, a maximum of one workflow attempt and
-the `AUTHORIZED_NOT_RUN` state. Creating the new branch
-`showcase/train-freeze-authority-v1` directly at that commit emits the one
-authorized GitHub `create` event. Later pushes to the branch are not execution
-triggers.
-
-The checkout-owned Java authority verifier fails closed unless all of the
-following hold:
-
-- the environment identifies a branch-creation `create` event for the exact
-  authority ref;
-- the workflow attempt number is one;
-- no earlier `create`-triggered workflow run exists for that authority branch;
-- the authority manifest is a bounded regular non-symlink file;
-- the manifest is canonical one-line JSON with one final newline and exactly
-  the fixed authority vocabulary;
-- the authority commit has exactly one parent;
-- that parent equals the manifest's reviewed implementation commit;
-- the authority manifest is the commit's only added file and its local Git blob
-  identity matches GitHub's commit evidence;
-- the authority commit equals the event-bound repository SHA supplied by the
-  thin workflow adapter;
-- the produced candidate freeze parses through the production Java contract,
-  remains compatible with the frozen plan and binds the same repository commit;
-- the retained output contains no public-randomness or FINAL TEST artifact.
-
-The verifier queries GitHub's read-only REST surface for immutable commit
-metadata and the create-event run history. The workflow grants only `actions:
-read`, `contents: read` and `packages: read`; neither the verifier nor the
-TRAIN/freeze run can write repository state.
-
-The special concurrency group never cancels an active authority run. Deleting
-and recreating the same branch emits another `create` event, which is rejected
-by the retained run-history check; GitHub's rerun action is rejected by the
-attempt-number check. Cancellation or technical failure therefore consumes
-authority version `v1`. Another attempt requires a newly reviewed authority
-version instead of a silent retry.
-
-A successful retained attempt writes the ordinary atomically published
-TRAIN/freeze directory plus checkout-owned execution evidence containing a
-deterministic SHA-256 file manifest, the authority-manifest hash and an
-execution receipt. The existing artifact-upload step only retains these files;
-it does not create their semantics. No drand round is selected or fetched and
-no FINAL TEST can be generated by this authority path.
-
-## Current boundary and next stage
-
-The Java contract, retained TRAIN population, deterministic selection, atomic
-TRAIN/freeze command and checkout-owned one-attempt authority are implemented
-on the current development stack. No real TRAIN run, candidate freeze, drand
-round or FINAL TEST has been consumed.
-
-The remaining sequence is:
-
-1. merge the one-attempt execution authority only after its normal checkout gate
-   is green;
-2. require the post-merge `main` gate to be green before creating the authority
-   commit;
-3. create the single authority commit and reserved branch exactly once, then
-   retain the resulting TRAIN population and candidate freeze;
-4. implement and verify the pinned Java drand adapter against official vectors;
-5. choose the first eligible round strictly after the frozen not-before time;
-6. derive the seed and generate the real suite exactly once;
-7. execute the complete paired comparison matrix;
-8. generate the result card and visual evidence from retained artifacts.
+The engineering objective is therefore no longer to make v1 succeed. It is to
+make the next experiment impossible to accidentally overclaim, silently retry
+or lose the evidence needed to explain a null result.

@@ -161,7 +161,7 @@ public final class ProofCarryingShowcaseCandidateFreezer {
         }
     }
 
-    private static CandidateSelection.Alternative alternative(
+    static CandidateSelection.Alternative alternative(
         RetainedEvolutionRewriteProgramPopulationRun.RetainedCandidate retained,
         CandidateEvaluation evaluation,
         Set<String> seedHashes,
@@ -171,6 +171,10 @@ public final class ProofCarryingShowcaseCandidateFreezer {
         if (evaluation == null) {
             throw new IllegalArgumentException(
                 "terminal candidate lacks retained TRAIN evaluation");
+        }
+        if (retained == null) {
+            throw new IllegalArgumentException(
+                "candidate alternative requires retained TRAIN candidate");
         }
         EvolutionRewriteProgramCandidate candidate = retained.candidate();
         ProgramFacts facts = analyze(candidate.plan().root());
@@ -454,7 +458,7 @@ public final class ProofCarryingShowcaseCandidateFreezer {
                     "candidate selection requires an eligible TRAIN alternative"));
         }
 
-        private static Comparator<Alternative> ranking() {
+        static Comparator<Alternative> ranking() {
             return Comparator
                 .comparingInt(Alternative::scalarFitness)
                 .reversed()
