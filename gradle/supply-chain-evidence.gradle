@@ -1,32 +1,144 @@
+import groovy.json.JsonOutput
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import java.util.SortedMap
+import java.util.SortedSet
+import java.util.TreeMap
+import java.util.TreeSet
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
+
 /*
  * Checkout-owned deterministic dependency inventory foundation for issue #514.
  *
- * The CycloneDX task resolves the actual multi-project dependency graph. The
- * repository verifier removes explicitly declared non-semantic timestamp data
- * before hashing and reports vulnerability scanning as NOT_EVALUATED until a
- * content-addressed advisory database is selected.
+ * This deliberately uses Gradle's own resolved-component graph instead of a
+ * second plugin-resolution path. The raw document is valid CycloneDX JSON and
+ * contains no generated UUID or timestamp, so identical dependency graphs
+ * produce identical bytes before the stricter repository normalizer runs.
  */
 
-buildscript {
-    repositories {
-        maven {
-            url = uri('https://plugins.gradle.org/m2/')
-        }
-    }
-    dependencies {
-        classpath 'org.cyclonedx.bom:org.cyclonedx.bom.gradle.plugin:3.3.0'
-    }
+def supplyChainReportDirectory = layout.buildDirectory.dir('reports/quality/supply-chain')
+def supplyChainBom = supplyChainReportDirectory.map { directory -> directory.file('bom.json') }
+
+def encodePurlPart = { String value ->
+    URLEncoder.encode(value, StandardCharsets.UTF_8)
+        .replace('+', '%20')
 }
 
-apply plugin: 'org.cyclonedx.bom'
+def moduleReference = { identifier ->
+    if (!(identifier instanceof ModuleComponentIdentifier)) {
+        return null
+    }
+    def group = encodePurlPart(identifier.group)
+    def module = encodePurlPart(identifier.module)
+    def version = encodePurlPart(identifier.version)
+    "pkg:maven/${group}/${module}@${version}"
+}
 
-def supplyChainReportDirectory = layout.buildDirectory.dir('reports/quality/supply-chain')
-
-tasks.named('cyclonedxBom') {
+tasks.register('cyclonedxBom') {
     group = 'reporting'
-    description = 'Generates the aggregate CycloneDX dependency inventory for the complete build.'
-    includeBomSerialNumber = false
-    includeBuildSystem = false
-    jsonOutput.set(supplyChainReportDirectory.map { directory -> directory.file('bom.json') })
-    xmlOutput.unsetConvention()
+    description = 'Generates a deterministic aggregate CycloneDX 1.6 inventory from Gradle resolution results.'
+    notCompatibleWithConfigurationCache(
+        'The task intentionally resolves every declared project graph at execution time.')
+    outputs.file(supplyChainBom)
+
+    doLast {
+        SortedMap<String, Map<String, Object>> components = new TreeMap<>()
+        SortedMap<String, SortedSet<String>> dependencyEdges = new TreeMap<>()
+        SortedSet<String> aggregateRootDependencies = new TreeSet<>()
+
+        rootProject.allprojects
+            .toList()
+            .sort { left, right -> left.path <=> right.path }
+            .each { candidateProject ->
+                candidateProject.configurations
+                    .findAll { configuration ->
+                        configuration.canBeResolved
+                            && !configuration.name.startsWith('detachedConfiguration')
+                    }
+                    .sort { left, right -> left.name <=> right.name }
+                    .each { configuration ->
+                        def resolutionResult = configuration.incoming.resolutionResult
+                        resolutionResult.allComponents.each { component ->
+                            def identifier = component.id
+                            def reference = moduleReference(identifier)
+                            if (reference == null) {
+                                return
+                            }
+                            components.putIfAbsent(reference, [
+                                type: 'library',
+                                'bom-ref': reference,
+                                group: identifier.group,
+                                name: identifier.module,
+                                version: identifier.version,
+                                purl: reference
+                            ])
+                            dependencyEdges.computeIfAbsent(reference) { new TreeSet<>() }
+                        }
+                        resolutionResult.allDependencies
+                            .findAll { dependency -> dependency instanceof ResolvedDependencyResult }
+                            .each { ResolvedDependencyResult dependency ->
+                                def sourceReference = moduleReference(dependency.from.id)
+                                def targetReference = moduleReference(dependency.selected.id)
+                                if (targetReference == null) {
+                                    return
+                                }
+                                if (sourceReference == null) {
+                                    aggregateRootDependencies.add(targetReference)
+                                } else if (sourceReference != targetReference) {
+                                    dependencyEdges
+                                        .computeIfAbsent(sourceReference) { new TreeSet<>() }
+                                        .add(targetReference)
+                                }
+                            }
+                    }
+            }
+
+        if (components.isEmpty()) {
+            throw new GradleException('resolved dependency inventory is empty')
+        }
+
+        def projectVersion = rootProject.version.toString()
+        if (projectVersion == 'unspecified') {
+            projectVersion = 'development'
+        }
+        def rootReference = "pkg:maven/de.regelsuche/Regelsuche@${encodePurlPart(projectVersion)}"
+        def dependencyEntries = [[
+            ref: rootReference,
+            dependsOn: aggregateRootDependencies.toList()
+        ]]
+        dependencyEntries.addAll(dependencyEdges.collect { reference, targets ->
+            [ref: reference, dependsOn: targets.toList()]
+        })
+
+        def bom = [
+            bomFormat: 'CycloneDX',
+            specVersion: '1.6',
+            version: 1,
+            metadata: [
+                component: [
+                    type: 'application',
+                    'bom-ref': rootReference,
+                    group: 'de.regelsuche',
+                    name: 'Regelsuche',
+                    version: projectVersion,
+                    purl: rootReference
+                ],
+                tools: [
+                    components: [[
+                        type: 'application',
+                        group: 'de.regelsuche',
+                        name: 'checkout-gradle-dependency-inventory',
+                        version: '1'
+                    ]]
+                ]
+            ],
+            components: components.values().toList(),
+            dependencies: dependencyEntries
+        ]
+
+        def outputFile = supplyChainBom.get().asFile
+        outputFile.parentFile.mkdirs()
+        outputFile.setText(JsonOutput.prettyPrint(JsonOutput.toJson(bom)) + '\n', 'UTF-8')
+    }
 }
