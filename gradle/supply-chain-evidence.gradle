@@ -11,7 +11,9 @@ import org.gradle.api.file.RegularFile
 
 buildscript {
     repositories {
-        gradlePluginPortal()
+        maven {
+            url = uri('https://plugins.gradle.org/m2/')
+        }
     }
     dependencies {
         classpath 'org.cyclonedx.bom:org.cyclonedx.bom.gradle.plugin:3.3.0'
