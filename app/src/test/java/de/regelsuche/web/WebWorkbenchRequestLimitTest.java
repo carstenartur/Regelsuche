@@ -80,7 +80,8 @@ class WebWorkbenchRequestLimitTest {
                 "/api/inventory",
                 "/api/inspect/tree/apply",
                 "/api/didactic/step-check",
-                "/api/proof-bridge")) {
+                "/api/proof-bridge",
+                "/api/rule-radar/inspect")) {
             assertPayloadTooLarge(postFixed(path, oversized));
         }
     }
