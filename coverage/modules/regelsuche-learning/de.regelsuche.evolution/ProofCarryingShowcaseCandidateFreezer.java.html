@@ -255,8 +255,8 @@ import java.util.Set;
 <span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (node instanceof Choice choice) {</span>
 <span class="nc" id="L256">            return decisionAlternatives(choice.alternatives());</span>
         }
-<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        if (node instanceof FirstApplicable firstApplicable) {</span>
-<span class="nc" id="L259">            return decisionAlternatives(firstApplicable.alternatives());</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc" id="L259">            return decisionAlternatives(firstApplicable.alternatives());</span>
         }
 <span class="fc bfc" id="L261" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
 <span class="fc" id="L262">            return decisionWrapper(analyze(require.body()));</span>
@@ -272,19 +272,19 @@ import java.util.Set;
     }
 
     private static ProgramFacts decisionAlternatives(List&lt;Node&gt; alternatives) {
-<span class="nc" id="L275">        List&lt;ProgramFacts&gt; children = alternatives.stream()</span>
-<span class="nc" id="L276">            .map(ProofCarryingShowcaseCandidateFreezer::analyze)</span>
-<span class="nc" id="L277">            .toList();</span>
-<span class="nc" id="L278">        return new ProgramFacts(</span>
-<span class="nc" id="L279">            onePlusNodeCounts(children),</span>
-<span class="nc" id="L280">            children.stream().anyMatch(</span>
+<span class="fc" id="L275">        List&lt;ProgramFacts&gt; children = alternatives.stream()</span>
+<span class="fc" id="L276">            .map(ProofCarryingShowcaseCandidateFreezer::analyze)</span>
+<span class="fc" id="L277">            .toList();</span>
+<span class="fc" id="L278">        return new ProgramFacts(</span>
+<span class="fc" id="L279">            onePlusNodeCounts(children),</span>
+<span class="fc" id="L280">            children.stream().anyMatch(</span>
                 ProgramFacts::containsCompositionTopology),
             true,
-<span class="nc" id="L283">            children.stream()</span>
-<span class="nc" id="L284">                .mapToInt(</span>
+<span class="fc" id="L283">            children.stream()</span>
+<span class="fc" id="L284">                .mapToInt(</span>
                     ProgramFacts::minimumStructuralPrimitivePathSteps)
-<span class="nc" id="L286">                .min()</span>
-<span class="nc" id="L287">                .orElseThrow());</span>
+<span class="fc" id="L286">                .min()</span>
+<span class="fc" id="L287">                .orElseThrow());</span>
     }
 
     private static ProgramFacts decisionWrapper(ProgramFacts child) {

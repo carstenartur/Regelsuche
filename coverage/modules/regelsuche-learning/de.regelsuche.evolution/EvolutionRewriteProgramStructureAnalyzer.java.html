@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramStructureAnalyzer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramStructureAnalyzer.java</span></div><h1>EvolutionRewriteProgramStructureAnalyzer.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Choice;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.FirstApplicable;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Node;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Prioritize;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Prune;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Repeat;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Require;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Sequence;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Source;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Computes representation-level facts for an executable rewrite-program plan.
+ *
+ * &lt;p&gt;The facts are descriptive only: they do not assign fitness, freeze a
+ * candidate, prove a mathematical statement or inspect VALIDATION/FINAL TEST
+ * evidence. Keeping the analysis generic lets TRAIN diagnostics and showcase
+ * selection use the same structural semantics without hard-coding a showcase
+ * acceptance predicate into the population engine.&lt;/p&gt;
+ */
+public final class EvolutionRewriteProgramStructureAnalyzer {
+    private EvolutionRewriteProgramStructureAnalyzer() {
+    }
+
+    public static ProgramFacts analyze(EvolutionRewriteProgramPlan plan) {
+<span class="fc" id="L29">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L30">        return analyze(plan.root());</span>
+    }
+
+    public static ProgramFacts analyze(Node node) {
+<span class="fc" id="L34">        Objects.requireNonNull(node, &quot;node&quot;);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (node instanceof Source) {</span>
+<span class="fc" id="L36">            return new ProgramFacts(1, false, false, 1);</span>
+        }
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
+<span class="fc" id="L39">            List&lt;ProgramFacts&gt; children = sequence.steps().stream()</span>
+<span class="fc" id="L40">                .map(EvolutionRewriteProgramStructureAnalyzer::analyze)</span>
+<span class="fc" id="L41">                .toList();</span>
+<span class="fc" id="L42">            return new ProgramFacts(</span>
+<span class="fc" id="L43">                onePlusNodeCounts(children),</span>
+                true,
+<span class="fc" id="L45">                children.stream().anyMatch(</span>
+                    ProgramFacts::containsDecisionTopology),
+<span class="fc" id="L47">                children.stream()</span>
+<span class="fc" id="L48">                    .mapToInt(</span>
+                        ProgramFacts::minimumStructuralPrimitivePathSteps)
+<span class="fc" id="L50">                    .reduce(0, EvolutionRewriteProgramStructureAnalyzer::safeAdd));</span>
+        }
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L53">            ProgramFacts child = analyze(repeat.body());</span>
+<span class="fc" id="L54">            return new ProgramFacts(</span>
+<span class="fc" id="L55">                safeAdd(1, child.nodeCount()),</span>
+                true,
+<span class="fc" id="L57">                child.containsDecisionTopology(),</span>
+<span class="fc" id="L58">                safeMultiply(</span>
+<span class="fc" id="L59">                    repeat.minIterations(),</span>
+<span class="fc" id="L60">                    child.minimumStructuralPrimitivePathSteps()));</span>
+        }
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (node instanceof Choice choice) {</span>
+<span class="nc" id="L63">            return decisionAlternatives(choice.alternatives());</span>
+        }
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc" id="L66">            return decisionAlternatives(firstApplicable.alternatives());</span>
+        }
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
+<span class="fc" id="L69">            return decisionWrapper(analyze(require.body()));</span>
+        }
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
+<span class="fc" id="L72">            return decisionWrapper(analyze(prioritize.body()));</span>
+        }
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (node instanceof Prune prune) {</span>
+<span class="fc" id="L75">            return decisionWrapper(analyze(prune.body()));</span>
+        }
+<span class="nc" id="L77">        throw new IllegalArgumentException(</span>
+<span class="nc" id="L78">            &quot;unsupported rewrite-program node: &quot; + node.getClass().getName());</span>
+    }
+
+    private static ProgramFacts decisionAlternatives(List&lt;Node&gt; alternatives) {
+<span class="fc" id="L82">        List&lt;ProgramFacts&gt; children = alternatives.stream()</span>
+<span class="fc" id="L83">            .map(EvolutionRewriteProgramStructureAnalyzer::analyze)</span>
+<span class="fc" id="L84">            .toList();</span>
+<span class="fc" id="L85">        return new ProgramFacts(</span>
+<span class="fc" id="L86">            onePlusNodeCounts(children),</span>
+<span class="fc" id="L87">            children.stream().anyMatch(</span>
+                ProgramFacts::containsCompositionTopology),
+            true,
+<span class="fc" id="L90">            children.stream()</span>
+<span class="fc" id="L91">                .mapToInt(</span>
+                    ProgramFacts::minimumStructuralPrimitivePathSteps)
+<span class="fc" id="L93">                .min()</span>
+<span class="fc" id="L94">                .orElseThrow());</span>
+    }
+
+    private static ProgramFacts decisionWrapper(ProgramFacts child) {
+<span class="fc" id="L98">        return new ProgramFacts(</span>
+<span class="fc" id="L99">            safeAdd(1, child.nodeCount()),</span>
+<span class="fc" id="L100">            child.containsCompositionTopology(),</span>
+            true,
+<span class="fc" id="L102">            child.minimumStructuralPrimitivePathSteps());</span>
+    }
+
+    private static int onePlusNodeCounts(List&lt;ProgramFacts&gt; children) {
+<span class="fc" id="L106">        int result = 1;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (ProgramFacts child : children) {</span>
+<span class="fc" id="L108">            result = safeAdd(result, child.nodeCount());</span>
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">        return result;</span>
+    }
+
+    private static int safeAdd(int left, int right) {
+<span class="fc" id="L114">        long result = (long) left + right;</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        return result &gt; Integer.MAX_VALUE</span>
+<span class="nc" id="L116">            ? Integer.MAX_VALUE</span>
+<span class="fc" id="L117">            : Math.toIntExact(result);</span>
+    }
+
+    private static int safeMultiply(int left, int right) {
+<span class="fc" id="L121">        long result = (long) left * right;</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        return result &gt; Integer.MAX_VALUE</span>
+<span class="nc" id="L123">            ? Integer.MAX_VALUE</span>
+<span class="fc" id="L124">            : Math.toIntExact(result);</span>
+    }
+
+    public record ProgramFacts(
+        int nodeCount,
+        boolean containsCompositionTopology,
+        boolean containsDecisionTopology,
+        int minimumStructuralPrimitivePathSteps
+    ) {
+<span class="fc" id="L133">        public ProgramFacts {</span>
+<span class="pc bpc" id="L134" title="2 of 4 branches missed.">            if (nodeCount &lt; 1 || minimumStructuralPrimitivePathSteps &lt; 1) {</span>
+<span class="nc" id="L135">                throw new IllegalArgumentException(</span>
+                    &quot;program facts require positive structural counters&quot;);
+            }
+<span class="fc" id="L138">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

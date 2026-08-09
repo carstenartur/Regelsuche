@@ -1,0 +1,641 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramTrainDiagnostics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramTrainDiagnostics.java</span></div><h1>EvolutionRewriteProgramTrainDiagnostics.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationAttempt;
+import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationBatch;
+import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationStatus;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.GenerationReport;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.LineageEdge;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.PopulationRun;
+import de.regelsuche.evolution.EvolutionRewriteProgramStructureAnalyzer.ProgramFacts;
+import de.regelsuche.evolution.StratifiedMutationKindRewriteProgramMutator.ObservedBatch;
+import de.regelsuche.json.JsonWriter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Content-addressed TRAIN-only diagnostics for rewrite-program population runs.
+ *
+ * &lt;p&gt;This artifact is deliberately separate from {@code PopulationRun/v1} so
+ * new observability cannot reinterpret historical evidence. It binds the
+ * execution identity and completed run, preserves every observed mutation batch
+ * as canonical JSON and derives only TRAIN-local structural/lineage facts.&lt;/p&gt;
+ */
+public record EvolutionRewriteProgramTrainDiagnostics(
+    String schema,
+    String studyPlanHash,
+    String executionPlanHash,
+    String executionProtocolHash,
+    String executionBoundRunHash,
+    String populationRunHash,
+    List&lt;ObservedMutationBatch&gt; mutationBatches,
+    List&lt;GenerationDiagnostics&gt; generations,
+    List&lt;CandidateStructureFacts&gt; candidateStructures,
+    String dataScope,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-train-diagnostics/v1&quot;;
+    public static final String DATA_SCOPE = &quot;TRAIN_ONLY&quot;;
+    private static final String MAX_ACCEPTED_BLOCKER =
+        &quot;ACCEPTED_BUDGET_EXHAUSTED:maxAccepted&quot;;
+
+<span class="fc" id="L49">    public EvolutionRewriteProgramTrainDiagnostics {</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L51">            throw new IllegalArgumentException(</span>
+                &quot;unsupported rewrite-program TRAIN diagnostics schema&quot;);
+        }
+<span class="fc" id="L54">        requireHash(studyPlanHash, &quot;studyPlanHash&quot;);</span>
+<span class="fc" id="L55">        requireHash(executionPlanHash, &quot;executionPlanHash&quot;);</span>
+<span class="fc" id="L56">        requireHash(executionProtocolHash, &quot;executionProtocolHash&quot;);</span>
+<span class="fc" id="L57">        requireHash(executionBoundRunHash, &quot;executionBoundRunHash&quot;);</span>
+<span class="fc" id="L58">        requireHash(populationRunHash, &quot;populationRunHash&quot;);</span>
+<span class="fc" id="L59">        mutationBatches = canonicalBatches(mutationBatches);</span>
+<span class="fc" id="L60">        generations = canonicalGenerations(generations);</span>
+<span class="fc" id="L61">        candidateStructures = canonicalCandidates(candidateStructures);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (!DATA_SCOPE.equals(dataScope)) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program diagnostics must remain TRAIN_ONLY&quot;);
+        }
+<span class="fc" id="L66">        requireHash(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L67">        String expected = EvolutionGenome.hash(render(</span>
+            studyPlanHash,
+            executionPlanHash,
+            executionProtocolHash,
+            executionBoundRunHash,
+            populationRunHash,
+            mutationBatches,
+            generations,
+            candidateStructures,
+            null));
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program TRAIN diagnostics contentHash mismatch&quot;);
+        }
+<span class="fc" id="L81">    }</span>
+
+    public static EvolutionRewriteProgramTrainDiagnostics create(
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
+        EvolutionRewriteProgramPopulationExecutionProtocol protocol,
+        ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun boundRun,
+        List&lt;EvolutionRewriteProgramCandidate&gt; seeds,
+        List&lt;ObservedBatch&gt; observedBatches
+    ) {
+<span class="fc" id="L90">        Objects.requireNonNull(executionPlan, &quot;executionPlan&quot;);</span>
+<span class="fc" id="L91">        Objects.requireNonNull(protocol, &quot;protocol&quot;);</span>
+<span class="fc" id="L92">        Objects.requireNonNull(boundRun, &quot;boundRun&quot;);</span>
+<span class="fc" id="L93">        Objects.requireNonNull(seeds, &quot;seeds&quot;);</span>
+<span class="fc" id="L94">        Objects.requireNonNull(observedBatches, &quot;observedBatches&quot;);</span>
+<span class="fc" id="L95">        boundRun.requireCompatible(executionPlan, protocol);</span>
+<span class="fc" id="L96">        PopulationRun populationRun = boundRun.retainedRun()</span>
+<span class="fc" id="L97">            .retainedPopulation().populationRun();</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (!executionPlan.studyPlanHash().equals(populationRun.studyPlanHash())) {</span>
+<span class="nc" id="L99">            throw new IllegalArgumentException(</span>
+                &quot;population run study differs from execution plan&quot;);
+        }
+
+<span class="fc" id="L103">        List&lt;ObservedMutationBatch&gt; batches = observedBatches.stream()</span>
+<span class="fc" id="L104">            .map(ObservedMutationBatch::from)</span>
+<span class="fc" id="L105">            .sorted(batchComparator())</span>
+<span class="fc" id="L106">            .toList();</span>
+<span class="fc" id="L107">        Map&lt;String, EvolutionRewriteProgramPlan&gt; plans = plansByHash(</span>
+            seeds, observedBatches);
+<span class="fc" id="L109">        Map&lt;String, CandidateStructureFacts&gt; structures = seedStructures(seeds);</span>
+<span class="fc" id="L110">        Map&lt;String, Integer&gt; lineageDepths = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L111">        seeds.forEach(seed -&gt; lineageDepths.put(seed.contentHash(), 0));</span>
+
+<span class="fc" id="L113">        List&lt;GenerationDiagnostics&gt; generationFacts = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (GenerationReport report : populationRun.generationReports()) {</span>
+<span class="fc" id="L115">            List&lt;ObservedBatch&gt; observedForGeneration = observedBatches.stream()</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                .filter(batch -&gt; batch.generation() == report.generation())</span>
+<span class="fc" id="L117">                .toList();</span>
+            Map&lt;EvolutionRewriteProgramMutationKind, Integer&gt; eligible =
+<span class="fc" id="L119">                emptyCounts();</span>
+            Map&lt;EvolutionRewriteProgramMutationKind, Integer&gt; budgetOnly =
+<span class="fc" id="L121">                emptyCounts();</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            for (ObservedBatch observed : observedForGeneration) {</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                for (MutationAttempt attempt : observed.batch().attempts()) {</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                    if (isEligibleProposal(attempt)) {</span>
+<span class="fc" id="L125">                        increment(eligible, attempt.kind());</span>
+                    }
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                    if (isMaxAcceptedOnlyRejection(attempt)) {</span>
+<span class="fc" id="L128">                        increment(budgetOnly, attempt.kind());</span>
+                    }
+<span class="fc" id="L130">                }</span>
+<span class="fc" id="L131">            }</span>
+
+            Map&lt;EvolutionRewriteProgramMutationKind, Integer&gt; accepted =
+<span class="fc" id="L134">                emptyCounts();</span>
+<span class="fc" id="L135">            Set&lt;String&gt; generatedAlpha = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L136">            Set&lt;String&gt; survivingAlpha = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L137">            Set&lt;String&gt; selected = Set.copyOf(report.selectedCandidateHashes());</span>
+<span class="fc" id="L138">            int maxDepth = 0;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            for (LineageEdge edge : report.lineage()) {</span>
+<span class="fc" id="L140">                increment(accepted, edge.mutationKind());</span>
+<span class="fc" id="L141">                generatedAlpha.add(edge.childAlphaStructuralHash());</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                if (selected.contains(edge.childCandidateHash())) {</span>
+<span class="fc" id="L143">                    survivingAlpha.add(edge.childAlphaStructuralHash());</span>
+                }
+<span class="fc" id="L145">                int childDepth = childDepth(lineageDepths, edge);</span>
+<span class="fc" id="L146">                maxDepth = Math.max(maxDepth, childDepth);</span>
+<span class="fc" id="L147">                EvolutionRewriteProgramPlan plan = plans.get(edge.childPlanHash());</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (plan == null) {</span>
+<span class="nc" id="L149">                    throw new IllegalArgumentException(</span>
+                        &quot;lineage child plan is absent from observed batches: &quot;
+<span class="nc" id="L151">                            + edge.childPlanHash());</span>
+                }
+<span class="fc" id="L153">                putCandidateFacts(</span>
+                    structures,
+<span class="fc" id="L155">                    CandidateStructureFacts.create(</span>
+<span class="fc" id="L156">                        edge.childCandidateHash(),</span>
+<span class="fc" id="L157">                        edge.childAlphaStructuralHash(),</span>
+<span class="fc" id="L158">                        edge.childPlanHash(),</span>
+<span class="fc" id="L159">                        report.generation(),</span>
+                        childDepth,
+                        plan));
+<span class="fc" id="L162">            }</span>
+<span class="fc" id="L163">            generationFacts.add(new GenerationDiagnostics(</span>
+<span class="fc" id="L164">                report.generation(),</span>
+                eligible,
+                accepted,
+                budgetOnly,
+<span class="fc" id="L168">                List.copyOf(generatedAlpha),</span>
+<span class="fc" id="L169">                List.copyOf(survivingAlpha),</span>
+                maxDepth));
+<span class="fc" id="L171">        }</span>
+
+<span class="fc" id="L173">        List&lt;CandidateStructureFacts&gt; candidateFacts = structures.values().stream()</span>
+<span class="fc" id="L174">            .sorted(Comparator.comparing(CandidateStructureFacts::candidateHash))</span>
+<span class="fc" id="L175">            .toList();</span>
+<span class="fc" id="L176">        String hash = EvolutionGenome.hash(render(</span>
+<span class="fc" id="L177">            populationRun.studyPlanHash(),</span>
+<span class="fc" id="L178">            executionPlan.contentHash(),</span>
+<span class="fc" id="L179">            protocol.contentHash(),</span>
+<span class="fc" id="L180">            boundRun.contentHash(),</span>
+<span class="fc" id="L181">            populationRun.contentHash(),</span>
+            batches,
+            generationFacts,
+            candidateFacts,
+            null));
+<span class="fc" id="L186">        return new EvolutionRewriteProgramTrainDiagnostics(</span>
+            SCHEMA,
+<span class="fc" id="L188">            populationRun.studyPlanHash(),</span>
+<span class="fc" id="L189">            executionPlan.contentHash(),</span>
+<span class="fc" id="L190">            protocol.contentHash(),</span>
+<span class="fc" id="L191">            boundRun.contentHash(),</span>
+<span class="fc" id="L192">            populationRun.contentHash(),</span>
+            batches,
+            generationFacts,
+            candidateFacts,
+            DATA_SCOPE,
+            hash);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L201">        return render(</span>
+            studyPlanHash,
+            executionPlanHash,
+            executionProtocolHash,
+            executionBoundRunHash,
+            populationRunHash,
+            mutationBatches,
+            generations,
+            candidateStructures,
+            contentHash);
+    }
+
+    private static int childDepth(
+        Map&lt;String, Integer&gt; lineageDepths,
+        LineageEdge edge
+    ) {
+<span class="fc" id="L217">        Integer parentDepth = lineageDepths.get(edge.parentCandidateHash());</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (parentDepth == null) {</span>
+<span class="nc" id="L219">            throw new IllegalArgumentException(</span>
+                &quot;lineage parent is not reachable from a seed: &quot;
+<span class="nc" id="L221">                    + edge.parentCandidateHash());</span>
+        }
+<span class="fc" id="L223">        int depth = Math.addExact(parentDepth, 1);</span>
+<span class="fc" id="L224">        lineageDepths.merge(edge.childCandidateHash(), depth, Math::min);</span>
+<span class="fc" id="L225">        return depth;</span>
+    }
+
+    private static Map&lt;String, EvolutionRewriteProgramPlan&gt; plansByHash(
+        List&lt;EvolutionRewriteProgramCandidate&gt; seeds,
+        List&lt;ObservedBatch&gt; observedBatches
+    ) {
+<span class="fc" id="L232">        Map&lt;String, EvolutionRewriteProgramPlan&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L233">        seeds.forEach(seed -&gt; putPlan(result, seed.plan()));</span>
+<span class="fc" id="L234">        observedBatches.forEach(observed -&gt; observed.batch().acceptedPlans()</span>
+<span class="fc" id="L235">            .forEach(plan -&gt; putPlan(result, plan)));</span>
+<span class="fc" id="L236">        return result;</span>
+    }
+
+    private static void putPlan(
+        Map&lt;String, EvolutionRewriteProgramPlan&gt; plans,
+        EvolutionRewriteProgramPlan plan
+    ) {
+<span class="fc" id="L243">        EvolutionRewriteProgramPlan previous = plans.putIfAbsent(</span>
+<span class="fc" id="L244">            plan.contentHash(), plan);</span>
+<span class="pc bpc" id="L245" title="1 of 4 branches missed.">        if (previous != null &amp;&amp; !previous.equals(plan)) {</span>
+<span class="nc" id="L246">            throw new IllegalArgumentException(</span>
+                &quot;plan hash identifies different payloads&quot;);
+        }
+<span class="fc" id="L249">    }</span>
+
+    private static Map&lt;String, CandidateStructureFacts&gt; seedStructures(
+        List&lt;EvolutionRewriteProgramCandidate&gt; seeds
+    ) {
+<span class="fc" id="L254">        Map&lt;String, CandidateStructureFacts&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (EvolutionRewriteProgramCandidate seed : seeds) {</span>
+<span class="fc" id="L256">            putCandidateFacts(</span>
+                result,
+<span class="fc" id="L258">                CandidateStructureFacts.create(</span>
+<span class="fc" id="L259">                    seed.contentHash(),</span>
+<span class="fc" id="L260">                    seed.alphaStructuralHash(),</span>
+<span class="fc" id="L261">                    seed.plan().contentHash(),</span>
+                    0,
+                    0,
+<span class="fc" id="L264">                    seed.plan()));</span>
+<span class="fc" id="L265">        }</span>
+<span class="fc" id="L266">        return result;</span>
+    }
+
+    private static void putCandidateFacts(
+        Map&lt;String, CandidateStructureFacts&gt; structures,
+        CandidateStructureFacts facts
+    ) {
+<span class="fc" id="L273">        structures.merge(</span>
+<span class="fc" id="L274">            facts.candidateHash(),</span>
+            facts,
+            CandidateStructureFacts::mergeObservation);
+<span class="fc" id="L277">    }</span>
+
+    private static boolean isEligibleProposal(MutationAttempt attempt) {
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        return attempt.status() == MutationStatus.ACCEPTED</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            || isMaxAcceptedOnlyRejection(attempt);</span>
+    }
+
+    private static boolean isMaxAcceptedOnlyRejection(MutationAttempt attempt) {
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        return attempt.status() == MutationStatus.REJECTED</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">            &amp;&amp; attempt.blockers().equals(List.of(MAX_ACCEPTED_BLOCKER));</span>
+    }
+
+    private static Map&lt;EvolutionRewriteProgramMutationKind, Integer&gt; emptyCounts() {
+<span class="fc" id="L290">        EnumMap&lt;EvolutionRewriteProgramMutationKind, Integer&gt; result =</span>
+            new EnumMap&lt;&gt;(EvolutionRewriteProgramMutationKind.class);
+        for (EvolutionRewriteProgramMutationKind kind
+<span class="fc bfc" id="L293" title="All 2 branches covered.">                : EvolutionRewriteProgramMutationKind.values()) {</span>
+<span class="fc" id="L294">            result.put(kind, 0);</span>
+        }
+<span class="fc" id="L296">        return result;</span>
+    }
+
+    private static void increment(
+        Map&lt;EvolutionRewriteProgramMutationKind, Integer&gt; counts,
+        EvolutionRewriteProgramMutationKind kind
+    ) {
+<span class="fc" id="L303">        counts.compute(kind, (ignored, value) -&gt; Math.addExact(value, 1));</span>
+<span class="fc" id="L304">    }</span>
+
+    private static Comparator&lt;ObservedMutationBatch&gt; batchComparator() {
+<span class="fc" id="L307">        return Comparator.comparingInt(ObservedMutationBatch::generation)</span>
+<span class="fc" id="L308">            .thenComparing(ObservedMutationBatch::parentCandidateHash)</span>
+<span class="fc" id="L309">            .thenComparing(ObservedMutationBatch::mutationBatchHash);</span>
+    }
+
+    private static List&lt;ObservedMutationBatch&gt; canonicalBatches(
+        List&lt;ObservedMutationBatch&gt; values
+    ) {
+<span class="fc" id="L315">        Objects.requireNonNull(values, &quot;mutationBatches&quot;);</span>
+<span class="fc" id="L316">        List&lt;ObservedMutationBatch&gt; result = values.stream()</span>
+<span class="fc" id="L317">            .map(value -&gt; Objects.requireNonNull(value, &quot;mutation batch&quot;))</span>
+<span class="fc" id="L318">            .sorted(batchComparator())</span>
+<span class="fc" id="L319">            .toList();</span>
+<span class="fc" id="L320">        if (result.stream().map(ObservedMutationBatch::identityKey).distinct().count()</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">                != result.size()) {</span>
+<span class="nc" id="L322">            throw new IllegalArgumentException(</span>
+                &quot;duplicate observed mutation batch identity&quot;);
+        }
+<span class="fc" id="L325">        return result;</span>
+    }
+
+    private static List&lt;GenerationDiagnostics&gt; canonicalGenerations(
+        List&lt;GenerationDiagnostics&gt; values
+    ) {
+<span class="fc" id="L331">        Objects.requireNonNull(values, &quot;generations&quot;);</span>
+<span class="fc" id="L332">        List&lt;GenerationDiagnostics&gt; result = values.stream()</span>
+<span class="fc" id="L333">            .map(value -&gt; Objects.requireNonNull(value, &quot;generation diagnostics&quot;))</span>
+<span class="fc" id="L334">            .sorted(Comparator.comparingInt(GenerationDiagnostics::generation))</span>
+<span class="fc" id="L335">            .toList();</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        for (int index = 0; index &lt; result.size(); index++) {</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            if (result.get(index).generation() != index + 1) {</span>
+<span class="nc" id="L338">                throw new IllegalArgumentException(</span>
+                    &quot;generation diagnostics are incomplete or reordered&quot;);
+            }
+        }
+<span class="fc" id="L342">        return result;</span>
+    }
+
+    private static List&lt;CandidateStructureFacts&gt; canonicalCandidates(
+        List&lt;CandidateStructureFacts&gt; values
+    ) {
+<span class="fc" id="L348">        Objects.requireNonNull(values, &quot;candidateStructures&quot;);</span>
+<span class="fc" id="L349">        List&lt;CandidateStructureFacts&gt; result = values.stream()</span>
+<span class="fc" id="L350">            .map(value -&gt; Objects.requireNonNull(value, &quot;candidate structure&quot;))</span>
+<span class="fc" id="L351">            .sorted(Comparator.comparing(CandidateStructureFacts::candidateHash))</span>
+<span class="fc" id="L352">            .toList();</span>
+<span class="fc" id="L353">        if (result.stream().map(CandidateStructureFacts::candidateHash)</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">                .distinct().count() != result.size()) {</span>
+<span class="nc" id="L355">            throw new IllegalArgumentException(</span>
+                &quot;duplicate candidate structure identity&quot;);
+        }
+<span class="fc" id="L358">        return result;</span>
+    }
+
+    private static String render(
+        String studyPlanHash,
+        String executionPlanHash,
+        String executionProtocolHash,
+        String executionBoundRunHash,
+        String populationRunHash,
+        List&lt;ObservedMutationBatch&gt; mutationBatches,
+        List&lt;GenerationDiagnostics&gt; generations,
+        List&lt;CandidateStructureFacts&gt; candidateStructures,
+        String contentHash
+    ) {
+<span class="fc" id="L372">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L373">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L374">            .property(&quot;studyPlanHash&quot;, studyPlanHash)</span>
+<span class="fc" id="L375">            .property(&quot;executionPlanHash&quot;, executionPlanHash)</span>
+<span class="fc" id="L376">            .property(&quot;executionProtocolHash&quot;, executionProtocolHash)</span>
+<span class="fc" id="L377">            .property(&quot;executionBoundRunHash&quot;, executionBoundRunHash)</span>
+<span class="fc" id="L378">            .property(&quot;populationRunHash&quot;, populationRunHash)</span>
+<span class="fc" id="L379">            .array(&quot;mutationBatches&quot;, array -&gt; mutationBatches.forEach(batch -&gt;</span>
+<span class="fc" id="L380">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L381">                    .property(&quot;generation&quot;, batch.generation())</span>
+<span class="fc" id="L382">                    .property(&quot;parentCandidateHash&quot;, batch.parentCandidateHash())</span>
+<span class="fc" id="L383">                    .property(&quot;mutationBatchHash&quot;, batch.mutationBatchHash())</span>
+<span class="fc" id="L384">                    .property(&quot;mutationBatchJsonHash&quot;, batch.mutationBatchJsonHash())</span>
+<span class="fc" id="L385">                    .property(&quot;mutationBatchJson&quot;, batch.mutationBatchJson()))))</span>
+<span class="fc" id="L386">            .array(&quot;generations&quot;, array -&gt; generations.forEach(generation -&gt;</span>
+<span class="fc" id="L387">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L388">                    .property(&quot;generation&quot;, generation.generation())</span>
+<span class="fc" id="L389">                    .object(&quot;eligibleProposalCountsByMutationKind&quot;, counts -&gt;</span>
+<span class="fc" id="L390">                        writeCounts(</span>
+                            counts,
+<span class="fc" id="L392">                            generation.eligibleProposalCountsByMutationKind()))</span>
+<span class="fc" id="L393">                    .object(&quot;acceptedOffspringCountsByMutationKind&quot;, counts -&gt;</span>
+<span class="fc" id="L394">                        writeCounts(</span>
+                            counts,
+<span class="fc" id="L396">                            generation.acceptedOffspringCountsByMutationKind()))</span>
+<span class="fc" id="L397">                    .object(&quot;maxAcceptedOnlyRejectionCountsByMutationKind&quot;, counts -&gt;</span>
+<span class="fc" id="L398">                        writeCounts(</span>
+                            counts,
+                            generation
+<span class="fc" id="L401">                                .maxAcceptedOnlyRejectionCountsByMutationKind()))</span>
+<span class="fc" id="L402">                    .stringArray(</span>
+                        &quot;generatedAlphaStructuralHashes&quot;,
+<span class="fc" id="L404">                        generation.generatedAlphaStructuralHashes())</span>
+<span class="fc" id="L405">                    .stringArray(</span>
+                        &quot;survivingGeneratedAlphaStructuralHashes&quot;,
+<span class="fc" id="L407">                        generation.survivingGeneratedAlphaStructuralHashes())</span>
+<span class="fc" id="L408">                    .property(</span>
+                        &quot;maxLineageDepthFromSeed&quot;,
+<span class="fc" id="L410">                        generation.maxLineageDepthFromSeed()))))</span>
+<span class="fc" id="L411">            .array(&quot;candidateStructures&quot;, array -&gt; candidateStructures.forEach(facts -&gt;</span>
+<span class="fc" id="L412">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L413">                    .property(&quot;candidateHash&quot;, facts.candidateHash())</span>
+<span class="fc" id="L414">                    .property(&quot;alphaStructuralHash&quot;, facts.alphaStructuralHash())</span>
+<span class="fc" id="L415">                    .property(&quot;planHash&quot;, facts.planHash())</span>
+<span class="fc" id="L416">                    .property(&quot;firstSeenGeneration&quot;, facts.firstSeenGeneration())</span>
+<span class="fc" id="L417">                    .property(&quot;lineageDepthFromSeed&quot;, facts.lineageDepthFromSeed())</span>
+<span class="fc" id="L418">                    .property(&quot;nodeCount&quot;, facts.nodeCount())</span>
+<span class="fc" id="L419">                    .property(</span>
+                        &quot;containsCompositionTopology&quot;,
+<span class="fc" id="L421">                        facts.containsCompositionTopology())</span>
+<span class="fc" id="L422">                    .property(</span>
+                        &quot;containsDecisionTopology&quot;,
+<span class="fc" id="L424">                        facts.containsDecisionTopology())</span>
+<span class="fc" id="L425">                    .property(</span>
+                        &quot;minimumStructuralPrimitivePathSteps&quot;,
+<span class="fc" id="L427">                        facts.minimumStructuralPrimitivePathSteps()))))</span>
+<span class="fc" id="L428">            .property(&quot;dataScope&quot;, DATA_SCOPE);</span>
+<span class="fc bfc" id="L429" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L430">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L432">        return json.endObject().toString();</span>
+    }
+
+    private static void writeCounts(
+        JsonWriter object,
+        Map&lt;EvolutionRewriteProgramMutationKind, Integer&gt; counts
+    ) {
+        for (EvolutionRewriteProgramMutationKind kind
+<span class="fc bfc" id="L440" title="All 2 branches covered.">                : EvolutionRewriteProgramMutationKind.values()) {</span>
+<span class="fc" id="L441">            object.property(kind.name(), counts.get(kind));</span>
+        }
+<span class="fc" id="L443">    }</span>
+
+    private static void requireHash(String value, String name) {
+<span class="fc" id="L446">        EvolutionGenome.requireSha256(value, name);</span>
+<span class="fc" id="L447">    }</span>
+
+    public record ObservedMutationBatch(
+        int generation,
+        String parentCandidateHash,
+        String mutationBatchHash,
+        String mutationBatchJsonHash,
+        String mutationBatchJson
+    ) {
+<span class="fc" id="L456">        public ObservedMutationBatch {</span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">            if (generation &lt; 1) {</span>
+<span class="nc" id="L458">                throw new IllegalArgumentException(&quot;generation must be positive&quot;);</span>
+            }
+<span class="fc" id="L460">            requireHash(parentCandidateHash, &quot;parentCandidateHash&quot;);</span>
+<span class="fc" id="L461">            requireHash(mutationBatchHash, &quot;mutationBatchHash&quot;);</span>
+<span class="fc" id="L462">            requireHash(mutationBatchJsonHash, &quot;mutationBatchJsonHash&quot;);</span>
+<span class="pc bpc" id="L463" title="2 of 4 branches missed.">            if (mutationBatchJson == null || mutationBatchJson.isBlank()) {</span>
+<span class="nc" id="L464">                throw new IllegalArgumentException(</span>
+                    &quot;mutationBatchJson must not be blank&quot;);
+            }
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">            if (!EvolutionGenome.hash(mutationBatchJson).equals(</span>
+                    mutationBatchJsonHash)) {
+<span class="nc" id="L469">                throw new IllegalArgumentException(</span>
+                    &quot;mutationBatchJsonHash does not match canonical batch bytes&quot;);
+            }
+<span class="fc" id="L472">        }</span>
+
+        private static ObservedMutationBatch from(ObservedBatch observed) {
+<span class="fc" id="L475">            MutationBatch batch = observed.batch();</span>
+<span class="fc" id="L476">            String json = batch.toCanonicalJson();</span>
+<span class="fc" id="L477">            return new ObservedMutationBatch(</span>
+<span class="fc" id="L478">                observed.generation(),</span>
+<span class="fc" id="L479">                observed.parentCandidateHash(),</span>
+<span class="fc" id="L480">                batch.contentHash(),</span>
+<span class="fc" id="L481">                EvolutionGenome.hash(json),</span>
+                json);
+        }
+
+        private String identityKey() {
+<span class="fc" id="L486">            return generation + &quot;\n&quot; + parentCandidateHash + &quot;\n&quot;</span>
+                + mutationBatchHash;
+        }
+    }
+
+    public record GenerationDiagnostics(
+        int generation,
+        Map&lt;EvolutionRewriteProgramMutationKind, Integer&gt;
+            eligibleProposalCountsByMutationKind,
+        Map&lt;EvolutionRewriteProgramMutationKind, Integer&gt;
+            acceptedOffspringCountsByMutationKind,
+        Map&lt;EvolutionRewriteProgramMutationKind, Integer&gt;
+            maxAcceptedOnlyRejectionCountsByMutationKind,
+        List&lt;String&gt; generatedAlphaStructuralHashes,
+        List&lt;String&gt; survivingGeneratedAlphaStructuralHashes,
+        int maxLineageDepthFromSeed
+    ) {
+<span class="fc" id="L503">        public GenerationDiagnostics {</span>
+<span class="pc bpc" id="L504" title="2 of 4 branches missed.">            if (generation &lt; 1 || maxLineageDepthFromSeed &lt; 0) {</span>
+<span class="nc" id="L505">                throw new IllegalArgumentException(</span>
+                    &quot;invalid generation diagnostic counters&quot;);
+            }
+<span class="fc" id="L508">            eligibleProposalCountsByMutationKind = canonicalCounts(</span>
+                eligibleProposalCountsByMutationKind);
+<span class="fc" id="L510">            acceptedOffspringCountsByMutationKind = canonicalCounts(</span>
+                acceptedOffspringCountsByMutationKind);
+<span class="fc" id="L512">            maxAcceptedOnlyRejectionCountsByMutationKind = canonicalCounts(</span>
+                maxAcceptedOnlyRejectionCountsByMutationKind);
+<span class="fc" id="L514">            generatedAlphaStructuralHashes = canonicalHashes(</span>
+                generatedAlphaStructuralHashes);
+<span class="fc" id="L516">            survivingGeneratedAlphaStructuralHashes = canonicalHashes(</span>
+                survivingGeneratedAlphaStructuralHashes);
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">            if (!generatedAlphaStructuralHashes.containsAll(</span>
+                    survivingGeneratedAlphaStructuralHashes)) {
+<span class="nc" id="L520">                throw new IllegalArgumentException(</span>
+                    &quot;surviving generated alpha structures were not generated&quot;);
+            }
+<span class="fc" id="L523">        }</span>
+
+        private static Map&lt;EvolutionRewriteProgramMutationKind, Integer&gt;
+                canonicalCounts(
+                    Map&lt;EvolutionRewriteProgramMutationKind, Integer&gt; values
+                ) {
+<span class="fc" id="L529">            Objects.requireNonNull(values, &quot;mutation-kind counts&quot;);</span>
+<span class="fc" id="L530">            EnumMap&lt;EvolutionRewriteProgramMutationKind, Integer&gt; result =</span>
+                new EnumMap&lt;&gt;(EvolutionRewriteProgramMutationKind.class);
+            for (EvolutionRewriteProgramMutationKind kind
+<span class="fc bfc" id="L533" title="All 2 branches covered.">                    : EvolutionRewriteProgramMutationKind.values()) {</span>
+<span class="fc" id="L534">                Integer count = values.get(kind);</span>
+<span class="pc bpc" id="L535" title="2 of 4 branches missed.">                if (count == null || count &lt; 0) {</span>
+<span class="nc" id="L536">                    throw new IllegalArgumentException(</span>
+                        &quot;mutation-kind counts require every non-negative kind&quot;);
+                }
+<span class="fc" id="L539">                result.put(kind, count);</span>
+            }
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">            if (values.size() != result.size()) {</span>
+<span class="nc" id="L542">                throw new IllegalArgumentException(</span>
+                    &quot;mutation-kind counts contain unknown entries&quot;);
+            }
+<span class="fc" id="L545">            return Map.copyOf(result);</span>
+        }
+
+        private static List&lt;String&gt; canonicalHashes(List&lt;String&gt; values) {
+<span class="fc" id="L549">            Objects.requireNonNull(values, &quot;alpha structural hashes&quot;);</span>
+<span class="fc" id="L550">            return values.stream()</span>
+<span class="fc" id="L551">                .map(value -&gt; {</span>
+<span class="fc" id="L552">                    requireHash(value, &quot;alphaStructuralHash&quot;);</span>
+<span class="fc" id="L553">                    return value;</span>
+                })
+<span class="fc" id="L555">                .distinct()</span>
+<span class="fc" id="L556">                .sorted()</span>
+<span class="fc" id="L557">                .toList();</span>
+        }
+    }
+
+    public record CandidateStructureFacts(
+        String candidateHash,
+        String alphaStructuralHash,
+        String planHash,
+        int firstSeenGeneration,
+        int lineageDepthFromSeed,
+        int nodeCount,
+        boolean containsCompositionTopology,
+        boolean containsDecisionTopology,
+        int minimumStructuralPrimitivePathSteps
+    ) {
+<span class="fc" id="L572">        public CandidateStructureFacts {</span>
+<span class="fc" id="L573">            requireHash(candidateHash, &quot;candidateHash&quot;);</span>
+<span class="fc" id="L574">            requireHash(alphaStructuralHash, &quot;alphaStructuralHash&quot;);</span>
+<span class="fc" id="L575">            requireHash(planHash, &quot;planHash&quot;);</span>
+<span class="pc bpc" id="L576" title="4 of 8 branches missed.">            if (firstSeenGeneration &lt; 0 || lineageDepthFromSeed &lt; 0</span>
+                    || nodeCount &lt; 1
+                    || minimumStructuralPrimitivePathSteps &lt; 1) {
+<span class="nc" id="L579">                throw new IllegalArgumentException(</span>
+                    &quot;invalid candidate structure counters&quot;);
+            }
+<span class="pc bpc" id="L582" title="1 of 4 branches missed.">            if (firstSeenGeneration == 0 &amp;&amp; lineageDepthFromSeed != 0) {</span>
+<span class="nc" id="L583">                throw new IllegalArgumentException(</span>
+                    &quot;seed candidate must have zero lineage depth&quot;);
+            }
+<span class="fc" id="L586">        }</span>
+
+        CandidateStructureFacts mergeObservation(
+            CandidateStructureFacts observation
+        ) {
+<span class="fc" id="L591">            Objects.requireNonNull(observation, &quot;candidate structure observation&quot;);</span>
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">            if (!candidateHash.equals(observation.candidateHash())</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">                    || !alphaStructuralHash.equals(</span>
+<span class="fc" id="L594">                        observation.alphaStructuralHash())</span>
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">                    || !planHash.equals(observation.planHash())</span>
+<span class="fc bfc" id="L596" title="All 2 branches covered.">                    || nodeCount != observation.nodeCount()</span>
+                    || containsCompositionTopology
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">                        != observation.containsCompositionTopology()</span>
+                    || containsDecisionTopology
+<span class="pc bpc" id="L600" title="1 of 2 branches missed.">                        != observation.containsDecisionTopology()</span>
+                    || minimumStructuralPrimitivePathSteps
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">                        != observation.minimumStructuralPrimitivePathSteps()) {</span>
+<span class="fc" id="L603">                throw new IllegalArgumentException(</span>
+                    &quot;candidate identity maps to different structural facts&quot;);
+            }
+<span class="fc" id="L606">            return new CandidateStructureFacts(</span>
+                candidateHash,
+                alphaStructuralHash,
+                planHash,
+<span class="fc" id="L610">                Math.min(firstSeenGeneration, observation.firstSeenGeneration()),</span>
+<span class="fc" id="L611">                Math.min(lineageDepthFromSeed, observation.lineageDepthFromSeed()),</span>
+                nodeCount,
+                containsCompositionTopology,
+                containsDecisionTopology,
+                minimumStructuralPrimitivePathSteps);
+        }
+
+        private static CandidateStructureFacts create(
+            String candidateHash,
+            String alphaStructuralHash,
+            String planHash,
+            int firstSeenGeneration,
+            int lineageDepth,
+            EvolutionRewriteProgramPlan plan
+        ) {
+<span class="fc" id="L626">            ProgramFacts facts = EvolutionRewriteProgramStructureAnalyzer.analyze(</span>
+                plan);
+<span class="fc" id="L628">            return new CandidateStructureFacts(</span>
+                candidateHash,
+                alphaStructuralHash,
+                planHash,
+                firstSeenGeneration,
+                lineageDepth,
+<span class="fc" id="L634">                facts.nodeCount(),</span>
+<span class="fc" id="L635">                facts.containsCompositionTopology(),</span>
+<span class="fc" id="L636">                facts.containsDecisionTopology(),</span>
+<span class="fc" id="L637">                facts.minimumStructuralPrimitivePathSteps());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

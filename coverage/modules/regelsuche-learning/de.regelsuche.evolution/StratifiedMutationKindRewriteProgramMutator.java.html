@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StratifiedMutationKindRewriteProgramMutator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">StratifiedMutationKindRewriteProgramMutator.java</span></div><h1>StratifiedMutationKindRewriteProgramMutator.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationBatch;
+import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationCatalog;
+import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationLimits;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Protocol-specific mutator adapter for mutation-kind-stratified offspring
+ * scheduling.
+ *
+ * &lt;p&gt;The legacy {@link DeterministicRewriteProgramMutator} remains the exact
+ * implementation used by {@code ROTATED_PREFIX_V1}. This subtype gives the v2
+ * protocol a distinct implementation identity while reusing the same proposal
+ * generation and preflight logic.&lt;/p&gt;
+ */
+public final class StratifiedMutationKindRewriteProgramMutator
+        extends DeterministicRewriteProgramMutator {
+    private final Set&lt;EvolutionRewriteProgramMutationKind&gt; permittedKinds;
+    private final EvolutionRewriteProgramStudyPlan diagnosticsStudyPlan;
+<span class="fc" id="L24">    private final List&lt;ObservedBatch&gt; observedBatches = new ArrayList&lt;&gt;();</span>
+
+    public StratifiedMutationKindRewriteProgramMutator(
+        Set&lt;EvolutionRewriteProgramMutationKind&gt; permittedKinds
+    ) {
+<span class="fc" id="L29">        this(permittedKinds, null);</span>
+<span class="fc" id="L30">    }</span>
+
+    public StratifiedMutationKindRewriteProgramMutator(
+        EvolutionRewriteProgramStudyPlan studyPlan
+    ) {
+<span class="fc" id="L35">        this(</span>
+<span class="fc" id="L36">            Objects.requireNonNull(studyPlan, &quot;studyPlan&quot;).mutationOperators()</span>
+<span class="fc" id="L37">                .stream().collect(java.util.stream.Collectors.toSet()),</span>
+            studyPlan);
+<span class="fc" id="L39">    }</span>
+
+    private StratifiedMutationKindRewriteProgramMutator(
+        Set&lt;EvolutionRewriteProgramMutationKind&gt; permittedKinds,
+        EvolutionRewriteProgramStudyPlan diagnosticsStudyPlan
+<span class="fc" id="L44">    ) {</span>
+<span class="fc" id="L45">        Objects.requireNonNull(permittedKinds, &quot;permittedKinds&quot;);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (permittedKinds.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(</span>
+                &quot;permittedKinds must not contain null&quot;);
+        }
+<span class="fc" id="L50">        this.permittedKinds = Set.copyOf(permittedKinds);</span>
+<span class="fc" id="L51">        this.diagnosticsStudyPlan = diagnosticsStudyPlan;</span>
+<span class="fc" id="L52">    }</span>
+
+    @Override
+    public MutationBatch mutate(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan parent,
+        MutationCatalog catalog,
+        long seed,
+        MutationLimits limits
+    ) {
+<span class="fc" id="L62">        MutationBatch batch = mutateStratifiedByMutationKind(</span>
+            genome,
+            parent,
+            catalog,
+            seed,
+            limits,
+            permittedKinds);
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (diagnosticsStudyPlan != null) {</span>
+<span class="fc" id="L70">            String parentCandidateHash = EvolutionRewriteProgramCandidate.create(</span>
+<span class="fc" id="L71">                genome, parent).contentHash();</span>
+<span class="fc" id="L72">            observedBatches.add(new ObservedBatch(</span>
+<span class="fc" id="L73">                resolveGeneration(parentCandidateHash, seed),</span>
+                parentCandidateHash,
+                batch));
+        }
+<span class="fc" id="L77">        return batch;</span>
+    }
+
+    public Set&lt;EvolutionRewriteProgramMutationKind&gt; permittedKinds() {
+<span class="nc" id="L81">        return permittedKinds;</span>
+    }
+
+    public List&lt;ObservedBatch&gt; observedBatches() {
+<span class="fc" id="L85">        return List.copyOf(observedBatches);</span>
+    }
+
+    private int resolveGeneration(String parentCandidateHash, long observedSeed) {
+<span class="fc" id="L89">        int resolved = 0;</span>
+<span class="fc" id="L90">        for (int generation = 1;</span>
+<span class="fc" id="L91">                generation &lt;= diagnosticsStudyPlan.populationPolicy()</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                    .generationCount();</span>
+<span class="fc" id="L93">                generation++) {</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (mutationSeed(</span>
+<span class="fc" id="L95">                    diagnosticsStudyPlan.contentHash(),</span>
+                    generation,
+                    parentCandidateHash) == observedSeed) {
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                if (resolved != 0) {</span>
+<span class="nc" id="L99">                    throw new IllegalStateException(</span>
+                        &quot;mutation seed maps to multiple generations&quot;);
+                }
+<span class="fc" id="L102">                resolved = generation;</span>
+            }
+        }
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (resolved == 0) {</span>
+<span class="nc" id="L106">            throw new IllegalStateException(</span>
+                &quot;mutation seed does not match the bound study plan&quot;);
+        }
+<span class="fc" id="L109">        return resolved;</span>
+    }
+
+    private static long mutationSeed(
+        String studyHash,
+        int generation,
+        String parentHash
+    ) {
+<span class="fc" id="L117">        String digest = EvolutionGenome.hash(</span>
+            studyHash + &quot;\n&quot; + generation + &quot;\n&quot; + parentHash);
+<span class="fc" id="L119">        return Long.parseUnsignedLong(</span>
+<span class="fc" id="L120">            digest.substring(&quot;sha256:&quot;.length(), &quot;sha256:&quot;.length() + 16),</span>
+            16);
+    }
+
+    public record ObservedBatch(
+        int generation,
+        String parentCandidateHash,
+        MutationBatch batch
+    ) {
+<span class="fc" id="L129">        public ObservedBatch {</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            if (generation &lt; 1) {</span>
+<span class="nc" id="L131">                throw new IllegalArgumentException(&quot;generation must be positive&quot;);</span>
+            }
+<span class="fc" id="L133">            EvolutionGenome.requireSha256(</span>
+                parentCandidateHash, &quot;parentCandidateHash&quot;);
+<span class="fc" id="L135">            Objects.requireNonNull(batch, &quot;batch&quot;);</span>
+<span class="fc" id="L136">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
