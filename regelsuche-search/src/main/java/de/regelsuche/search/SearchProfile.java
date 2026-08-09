@@ -8,6 +8,7 @@ import de.regelsuche.search.strategy.EqualitySaturationStrategy;
 import de.regelsuche.search.strategy.HybridSearchStrategy;
 import de.regelsuche.search.strategy.MonteCarloTreeSearchStrategy;
 import de.regelsuche.search.strategy.SearchStrategy;
+import de.regelsuche.search.strategy.StructuralDiversitySearchStrategy;
 
 /**
  * Pre-defined search profiles bundling a {@link SearchHeuristic} preset and a
@@ -30,6 +31,17 @@ public enum SearchProfile {
         @Override
         public SearchStrategy newStrategy() {
             return new HybridSearchStrategy();
+        }
+    },
+    /**
+     * Target-blind quality-diversity control retaining one elite per frozen
+     * structural cell instead of collapsing every survivor into one scalar
+     * ranking.
+     */
+    DIVERSITY_DISCOVERY(new SearchHeuristic(6, 2000, 1, 6, 80, 24), TransformationGoal.SIMPLIFY) {
+        @Override
+        public SearchStrategy newStrategy() {
+            return new StructuralDiversitySearchStrategy();
         }
     },
     /** Mid-sized search that prefers small, easy to explain steps. */
@@ -118,4 +130,3 @@ public enum SearchProfile {
         return false;
     }
 }
-
