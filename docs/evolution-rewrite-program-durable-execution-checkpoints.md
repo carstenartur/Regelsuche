@@ -44,6 +44,8 @@ The outer `execution-checkpoint-binding.json` is written **last** and binds:
 - the frozen population execution-protocol root;
 - commit protocol `OUTER_MANIFEST_LAST_ATOMIC_RENAME_V1`.
 
+The canonical contract identifier is
+`regelsuche.evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact/v1`.
 The strict language-neutral schema is
 [`regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact-v1.schema.json`](schemas/regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact-v1.schema.json).
 
