@@ -270,12 +270,10 @@ public record EvolutionRewriteProgramTrainDiagnostics(
         Map<String, CandidateStructureFacts> structures,
         CandidateStructureFacts facts
     ) {
-        CandidateStructureFacts previous = structures.putIfAbsent(
-            facts.candidateHash(), facts);
-        if (previous != null && !previous.equals(facts)) {
-            throw new IllegalArgumentException(
-                "candidate identity maps to different structure facts");
-        }
+        structures.merge(
+            facts.candidateHash(),
+            facts,
+            CandidateStructureFacts::mergeObservation);
     }
 
     private static boolean isEligibleProposal(MutationAttempt attempt) {
@@ -585,6 +583,36 @@ public record EvolutionRewriteProgramTrainDiagnostics(
                 throw new IllegalArgumentException(
                     "seed candidate must have zero lineage depth");
             }
+        }
+
+        CandidateStructureFacts mergeObservation(
+            CandidateStructureFacts observation
+        ) {
+            Objects.requireNonNull(observation, "candidate structure observation");
+            if (!candidateHash.equals(observation.candidateHash())
+                    || !alphaStructuralHash.equals(
+                        observation.alphaStructuralHash())
+                    || !planHash.equals(observation.planHash())
+                    || nodeCount != observation.nodeCount()
+                    || containsCompositionTopology
+                        != observation.containsCompositionTopology()
+                    || containsDecisionTopology
+                        != observation.containsDecisionTopology()
+                    || minimumStructuralPrimitivePathSteps
+                        != observation.minimumStructuralPrimitivePathSteps()) {
+                throw new IllegalArgumentException(
+                    "candidate identity maps to different structural facts");
+            }
+            return new CandidateStructureFacts(
+                candidateHash,
+                alphaStructuralHash,
+                planHash,
+                Math.min(firstSeenGeneration, observation.firstSeenGeneration()),
+                Math.min(lineageDepthFromSeed, observation.lineageDepthFromSeed()),
+                nodeCount,
+                containsCompositionTopology,
+                containsDecisionTopology,
+                minimumStructuralPrimitivePathSteps);
         }
 
         private static CandidateStructureFacts create(
