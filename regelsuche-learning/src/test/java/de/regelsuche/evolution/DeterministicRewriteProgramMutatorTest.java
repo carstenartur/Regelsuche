@@ -330,6 +330,44 @@ class DeterministicRewriteProgramMutatorTest {
                     "MUTATION_KIND_NOT_PREREGISTERED:" + attempt.kind())));
     }
 
+    @Test
+    void unpermittedAlphaEquivalentProposalCannotPoisonPermittedSelection() {
+        EvolutionGenome genome = genome();
+        EvolutionRewriteProgramPlan parent = EvolutionRewriteProgramPlan.create(
+            genome,
+            new Source("initial_zero_source", List.of("add_zero")),
+            8,
+            8);
+        MutationCatalog catalog = new MutationCatalog(
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of("add_zero"));
+
+        var batch = new DeterministicRewriteProgramMutator()
+            .mutateStratifiedByMutationKind(
+                genome,
+                parent,
+                catalog,
+                0L,
+                new MutationLimits(2, 1),
+                Set.of(EvolutionRewriteProgramMutationKind.PREPEND_SOURCE));
+
+        assertEquals(
+            Set.of(EvolutionRewriteProgramMutationKind.PREPEND_SOURCE),
+            acceptedKinds(batch));
+        assertTrue(batch.attempts().stream().anyMatch(attempt ->
+            attempt.kind() == EvolutionRewriteProgramMutationKind.APPEND_SOURCE
+                && attempt.status() == MutationStatus.REJECTED
+                && attempt.blockers().contains(
+                    "MUTATION_KIND_NOT_PREREGISTERED:APPEND_SOURCE")));
+        assertTrue(batch.attempts().stream().noneMatch(attempt ->
+            attempt.kind() == EvolutionRewriteProgramMutationKind.PREPEND_SOURCE
+                && attempt.blockers().contains(
+                    "STRUCTURAL_DIVERSITY_DUPLICATE:alphaStructuralHash")));
+    }
+
     private static MutationCatalog richCatalog() {
         return new MutationCatalog(
             List.of(new RepeatBounds(1, 2), new RepeatBounds(1, 3)),
