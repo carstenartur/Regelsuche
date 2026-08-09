@@ -127,8 +127,14 @@ program facts:
 - composition topology present/absent;
 - decision topology present/absent;
 - conservative minimum structural primitive-path depth;
-- first-seen generation;
-- lineage depth from a seed.
+- earliest observed generation;
+- minimum observed lineage depth from a seed.
+
+A content-addressed candidate may be reached again in a later generation or by
+a different lineage. Repeated observations therefore merge only the two
+observation fields above by their minima. Candidate hash, alpha-structural hash,
+plan hash and all structural facts must remain identical; any disagreement
+fails diagnostic construction closed.
 
 These facts come from `EvolutionRewriteProgramStructureAnalyzer`, the same
 representation-level analysis used by the showcase freezer after extraction.
