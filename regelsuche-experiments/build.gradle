@@ -41,6 +41,22 @@ tasks.named('jacocoTestReport') {
     }
 }
 
+def historicalRediscoveryReportDirectory = layout.buildDirectory.dir(
+    'reports/historical-rediscovery')
+
+tasks.register('generateHistoricalRediscoveryAtlas', JavaExec) {
+    group = 'verification'
+    description = 'Executes the frozen historical reachability and search-policy atlas.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.HistoricalRediscoveryAtlasMain'
+    args historicalRediscoveryReportDirectory.get().asFile.absolutePath
+    inputs.file(layout.projectDirectory.file(
+        'src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json'))
+    outputs.dir(historicalRediscoveryReportDirectory)
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
+    dependsOn tasks.named('generateHistoricalRediscoveryAtlas')
 }
