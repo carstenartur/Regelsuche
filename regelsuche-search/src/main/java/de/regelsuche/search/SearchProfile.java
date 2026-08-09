@@ -10,14 +10,7 @@ import de.regelsuche.search.strategy.MonteCarloTreeSearchStrategy;
 import de.regelsuche.search.strategy.SearchStrategy;
 import de.regelsuche.search.strategy.StructuralDiversitySearchStrategy;
 
-/**
- * Pre-defined search profiles bundling a {@link SearchHeuristic} preset and a
- * matching {@link SearchStrategy}.
- *
- * <p>The profiles exist so callers can pick a high-level intent (fast
- * simplification, discovery, teaching, exhaustive small searches, ...) instead
- * of tuning individual heuristic knobs.</p>
- */
+/** Search profiles bind a heuristic preset, strategy and default goal. */
 public enum SearchProfile {
     /** Quick, depth-limited search aimed at returning a result fast. */
     FAST_SIMPLIFY(new SearchHeuristic(4, 200, 1, 2, 32, 4), TransformationGoal.SIMPLIFY) {
@@ -33,11 +26,7 @@ public enum SearchProfile {
             return new HybridSearchStrategy();
         }
     },
-    /**
-     * Target-blind quality-diversity control retaining one elite per frozen
-     * structural cell instead of collapsing every survivor into one scalar
-     * ranking.
-     */
+    /** Target-blind one-elite-per-structural-cell diagnostic. */
     DIVERSITY_DISCOVERY(new SearchHeuristic(6, 2000, 1, 6, 80, 24), TransformationGoal.SIMPLIFY) {
         @Override
         public SearchStrategy newStrategy() {
@@ -65,12 +54,7 @@ public enum SearchProfile {
             return new MonteCarloTreeSearchStrategy(42L);
         }
     },
-    /**
-     * Search-intelligence profile: activates the mathematical transposition
-     * table, keeps non-improving paths that bring new rule combinations and
-     * applies stricter cycle detection. Used to demonstrate learning
-     * macro-rules across multiple runs.
-     */
+    /** Best-first discovery with the mathematical transposition table. */
     DISCOVERY_PLUS(new SearchHeuristic(6, 2000, 1, 6, 80, 16), TransformationGoal.SIMPLIFY) {
         @Override
         public SearchStrategy newStrategy() {
@@ -82,16 +66,7 @@ public enum SearchProfile {
             return true;
         }
     },
-    /**
-     * Equality-saturation profile: builds an {@link
-     * de.regelsuche.egraph.EGraph} of the input, applies every rewrite
-     * rule egg-style until fix-point or budget, then extracts the
-     * cheapest representative. Unlike the path-based strategies, every
-     * order of rewrites collapses into a single shared graph — no
-     * combinatorial explosion of permutations. Surfaces detailed
-     * {@link de.regelsuche.egraph.SaturationStats} via
-     * {@link EqualitySaturationStrategy#lastStats()}.
-     */
+    /** Equality saturation followed by cheapest-representative extraction. */
     EQUALITY_SATURATION(new SearchHeuristic(4, 100, 1, 6, 200, 32), TransformationGoal.SIMPLIFY) {
         @Override
         public SearchStrategy newStrategy() {
@@ -111,21 +86,12 @@ public enum SearchProfile {
         return heuristic;
     }
 
-    /**
-     * Default {@link TransformationGoal} for this profile. The UI may
-     * override this with an explicit selection from the goal dropdown.
-     */
     public TransformationGoal defaultGoal() {
         return defaultGoal;
     }
 
     public abstract SearchStrategy newStrategy();
 
-    /**
-     * Whether this profile activates the mathematical transposition table by
-     * default. Only {@link #DISCOVERY_PLUS} returns {@code true}; the other
-     * profiles preserve their pre-PR behaviour so existing tests stay green.
-     */
     public boolean usesTranspositionTable() {
         return false;
     }
