@@ -161,7 +161,7 @@ public final class ProofCarryingShowcaseCandidateFreezer {
         }
     }
 
-    private static CandidateSelection.Alternative alternative(
+    static CandidateSelection.Alternative alternative(
         RetainedEvolutionRewriteProgramPopulationRun.RetainedCandidate retained,
         CandidateEvaluation evaluation,
         Set<String> seedHashes,
@@ -454,7 +454,7 @@ public final class ProofCarryingShowcaseCandidateFreezer {
                     "candidate selection requires an eligible TRAIN alternative"));
         }
 
-        private static Comparator<Alternative> ranking() {
+        static Comparator<Alternative> ranking() {
             return Comparator
                 .comparingInt(Alternative::scalarFitness)
                 .reversed()
