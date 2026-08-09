@@ -1,8 +1,8 @@
 package de.regelsuche.persistence.relational;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import jakarta.persistence.EntityManagerFactory;
@@ -45,10 +45,10 @@ class RelationalPersistenceAdaptersTest {
 
         adapters.close();
         assertFalse(open.get());
-        assertSame(1, closeCalls.get());
+        assertEquals(1, closeCalls.get());
 
         adapters.close();
-        assertSame(1, closeCalls.get());
+        assertEquals(1, closeCalls.get());
     }
 
     private static Object defaultValue(Class<?> type) {
