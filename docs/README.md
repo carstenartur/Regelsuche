@@ -12,6 +12,7 @@ sind bewusst von Handbüchern und Architekturtexten getrennt.
 | die Web-Workbench bedienen | [Web-Workbench](web-workbench.md) und [Benutzerhandbuch](web-ui-user-guide.md) |
 | einen vollständigen Anwendungsfall nachvollziehen | [User Workflows](user-workflows.md) und [Demo Gallery](demo-gallery.md) |
 | den aktuellen Forschungsstand verstehen | [Discovery- und Forschungsstand](discovery-status.md) |
+| den ausgeführten öffentlichen Showcase v1 prüfen | [Showcase-v1-Ergebnis](proof-carrying-self-improvement-showcase-v1-result.md) und [Showcase-Architektur](proof-carrying-self-improvement-showcase.md) |
 | Claims und Evidence korrekt einordnen | [Capability-Status](generated/capability-status.md), [Glossar](glossary.md) und [Release Readiness](release-readiness.md) |
 | die Architektur verstehen oder Code ändern | [Architektur](architecture.md) und [Developer Guide](developer-guide.md) |
 | einen Release durchführen | [Release-Betrieb](release-operations.md) |
@@ -62,6 +63,8 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 ### Status und Claim-Grenzen
 
 - [Aktueller Discovery- und Forschungsstand](discovery-status.md)
+- [Proof-carrying Showcase v1: unveränderliches Ergebnis](proof-carrying-self-improvement-showcase-v1-result.md)
+- [Proof-carrying Self-Improvement Showcase: Architektur und Stage-Grenzen](proof-carrying-self-improvement-showcase.md)
 - [Generierte Capability- und Claim-Matrix](generated/capability-status.md)
 - [Release Readiness](release-readiness.md)
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md)
