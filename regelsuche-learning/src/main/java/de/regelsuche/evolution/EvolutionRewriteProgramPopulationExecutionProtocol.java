@@ -15,7 +15,9 @@ import java.util.Objects;
 public record EvolutionRewriteProgramPopulationExecutionProtocol(
     String schema,
     String populationEngineImplementationClass,
+    PopulationEngineSemanticsVersion populationEngineSemanticsVersion,
     String mutatorImplementationClass,
+    MutatorSemanticsVersion mutatorSemanticsVersion,
     ProposalOrderingPolicy proposalOrderingPolicy,
     OffspringSchedulingPolicy offspringSchedulingPolicy,
     int generatedPoolMultiplier,
@@ -27,6 +29,16 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
     public static final String SCHEMA =
         "regelsuche.evolution-rewrite-program-population-execution-protocol/v1";
     public static final String STATUS = "FROZEN_NOT_RUN";
+
+    public enum PopulationEngineSemanticsVersion {
+        LEGACY_POPULATION_ENGINE_V1,
+        PROTOCOL_DRIVEN_POPULATION_ENGINE_V2
+    }
+
+    public enum MutatorSemanticsVersion {
+        ROTATED_PREFIX_MUTATOR_V1,
+        STRATIFIED_MUTATION_KIND_MUTATOR_V2
+    }
 
     public enum ProposalOrderingPolicy {
         KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1
@@ -53,9 +65,15 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
         populationEngineImplementationClass = requireText(
             populationEngineImplementationClass,
             "populationEngineImplementationClass");
+        Objects.requireNonNull(
+            populationEngineSemanticsVersion,
+            "populationEngineSemanticsVersion");
         mutatorImplementationClass = requireText(
             mutatorImplementationClass,
             "mutatorImplementationClass");
+        Objects.requireNonNull(
+            mutatorSemanticsVersion,
+            "mutatorSemanticsVersion");
         Objects.requireNonNull(proposalOrderingPolicy, "proposalOrderingPolicy");
         Objects.requireNonNull(
             offspringSchedulingPolicy, "offspringSchedulingPolicy");
@@ -76,7 +94,9 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
         EvolutionGenome.requireSha256(contentHash, "contentHash");
         String expected = EvolutionGenome.hash(render(
             populationEngineImplementationClass,
+            populationEngineSemanticsVersion,
             mutatorImplementationClass,
+            mutatorSemanticsVersion,
             proposalOrderingPolicy,
             offspringSchedulingPolicy,
             generatedPoolMultiplier,
@@ -93,7 +113,9 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
     public static EvolutionRewriteProgramPopulationExecutionProtocol legacyV1() {
         return create(
             EvolutionRewriteProgramPopulationEngine.class,
+            PopulationEngineSemanticsVersion.LEGACY_POPULATION_ENGINE_V1,
             DeterministicRewriteProgramMutator.class,
+            MutatorSemanticsVersion.ROTATED_PREFIX_MUTATOR_V1,
             ProposalOrderingPolicy.KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1,
             OffspringSchedulingPolicy.ROTATED_PREFIX_V1,
             2,
@@ -105,7 +127,9 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
 
     public static EvolutionRewriteProgramPopulationExecutionProtocol create(
         Class<?> populationEngineClass,
+        PopulationEngineSemanticsVersion populationEngineSemanticsVersion,
         Class<?> mutatorClass,
+        MutatorSemanticsVersion mutatorSemanticsVersion,
         ProposalOrderingPolicy proposalOrderingPolicy,
         OffspringSchedulingPolicy offspringSchedulingPolicy,
         int generatedPoolMultiplier,
@@ -116,7 +140,9 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
         Objects.requireNonNull(mutatorClass, "mutatorClass");
         String hash = EvolutionGenome.hash(render(
             populationEngineClass.getName(),
+            populationEngineSemanticsVersion,
             mutatorClass.getName(),
+            mutatorSemanticsVersion,
             proposalOrderingPolicy,
             offspringSchedulingPolicy,
             generatedPoolMultiplier,
@@ -126,7 +152,9 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
         return new EvolutionRewriteProgramPopulationExecutionProtocol(
             SCHEMA,
             populationEngineClass.getName(),
+            populationEngineSemanticsVersion,
             mutatorClass.getName(),
+            mutatorSemanticsVersion,
             proposalOrderingPolicy,
             offspringSchedulingPolicy,
             generatedPoolMultiplier,
@@ -156,7 +184,9 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
     public String toCanonicalJson() {
         return render(
             populationEngineImplementationClass,
+            populationEngineSemanticsVersion,
             mutatorImplementationClass,
+            mutatorSemanticsVersion,
             proposalOrderingPolicy,
             offspringSchedulingPolicy,
             generatedPoolMultiplier,
@@ -167,7 +197,9 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
 
     private static String render(
         String populationEngineImplementationClass,
+        PopulationEngineSemanticsVersion populationEngineSemanticsVersion,
         String mutatorImplementationClass,
+        MutatorSemanticsVersion mutatorSemanticsVersion,
         ProposalOrderingPolicy proposalOrderingPolicy,
         OffspringSchedulingPolicy offspringSchedulingPolicy,
         int generatedPoolMultiplier,
@@ -180,7 +212,13 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
             .property(
                 "populationEngineImplementationClass",
                 populationEngineImplementationClass)
+            .property(
+                "populationEngineSemanticsVersion",
+                populationEngineSemanticsVersion.name())
             .property("mutatorImplementationClass", mutatorImplementationClass)
+            .property(
+                "mutatorSemanticsVersion",
+                mutatorSemanticsVersion.name())
             .property("proposalOrderingPolicy", proposalOrderingPolicy.name())
             .property("offspringSchedulingPolicy", offspringSchedulingPolicy.name())
             .property("generatedPoolMultiplier", generatedPoolMultiplier)
