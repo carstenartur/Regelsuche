@@ -131,7 +131,11 @@ class ProofDockerImageIntegrationTest {
         AtomicReference<JsonNode> latest = new AtomicReference<>();
         AtomicReference<Throwable> failure = new AtomicReference<>();
         CountDownLatch terminal = new CountDownLatch(1);
-        ScheduledExecutorService poller = Executors.newSingleThreadScheduledExecutor();
+        ScheduledExecutorService poller = Executors.newSingleThreadScheduledExecutor(
+            runnable -> Thread.ofPlatform()
+                .daemon()
+                .name("proof-job-poller")
+                .unstarted(runnable));
         ScheduledFuture<?> polling = poller.scheduleWithFixedDelay(() -> {
             try {
                 JsonNode snapshot = getJson("/api/proof/jobs/" + jobId);
