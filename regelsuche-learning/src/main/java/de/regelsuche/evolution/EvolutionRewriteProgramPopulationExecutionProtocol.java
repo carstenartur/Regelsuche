@@ -118,6 +118,23 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
                 .FITNESS_DESC_NODES_ASC_HASH_ASC_UNIQUE_ALPHA_ELITES_V1);
     }
 
+    /** Exact v2 identity for mutation-kind stratification under legacy budgets. */
+    public static EvolutionRewriteProgramPopulationExecutionProtocol
+            stratifiedMutationKindV1() {
+        return create(
+            EvolutionRewriteProgramPopulationEngine.class,
+            PopulationEngineSemanticsVersion.PROTOCOL_DRIVEN_POPULATION_ENGINE_V2,
+            DeterministicRewriteProgramMutator.class,
+            MutatorSemanticsVersion.STRATIFIED_MUTATION_KIND_MUTATOR_V2,
+            ProposalOrderingPolicy.KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1,
+            OffspringSchedulingPolicy.STRATIFIED_MUTATION_KIND_V1,
+            2,
+            MutationSeedDerivationPolicy
+                .STUDY_HASH_GENERATION_PARENT_HASH_SHA256_PREFIX64_V1,
+            SurvivorSelectionPolicy
+                .FITNESS_DESC_NODES_ASC_HASH_ASC_UNIQUE_ALPHA_ELITES_V1);
+    }
+
     /**
      * Convenience factory for one of the explicitly versioned scheduling
      * families. The semantic version is derived from the scheduling policy so a
