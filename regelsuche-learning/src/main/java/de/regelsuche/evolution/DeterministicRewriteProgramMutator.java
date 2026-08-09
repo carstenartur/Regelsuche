@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
  * Deterministic, bounded mutation enumeration for executable rewrite-program
  * topology. Every proposal is retained as accepted or rejected evidence.
  */
-public final class DeterministicRewriteProgramMutator {
+public class DeterministicRewriteProgramMutator {
     public static final String SCHEMA =
         "regelsuche.evolution-rewrite-program-mutation-batch/v1";
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_-]{2,127}");
