@@ -111,9 +111,9 @@ public record ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
 
     /**
      * Rebinds a deserialized retained run to the actual execution artifacts a
-     * consumer intends to trust. The redundant implementation/version fields
-     * are checked as well as the content-addressed plan/protocol identities so
-     * a valid outer hash cannot be mistaken for semantic protocol agreement.
+     * consumer intends to trust. The study, redundant implementation/version
+     * fields and content-addressed plan/protocol identities are checked so a
+     * valid outer hash cannot be mistaken for semantic protocol agreement.
      */
     public void requireCompatible(
         EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
@@ -125,6 +125,9 @@ public record ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
                 || !executionProtocolHash.equals(executionProtocol.contentHash())
                 || !executionPlan.executionProtocolHash().equals(
                     executionProtocol.contentHash())
+                || !executionPlan.studyPlanHash().equals(
+                    retainedRun.retainedPopulation().populationRun()
+                        .studyPlanHash())
                 || !populationEngineImplementationClass.equals(
                     executionProtocol.populationEngineImplementationClass())
                 || populationEngineSemanticsVersion
