@@ -3,11 +3,13 @@ package de.regelsuche.evolution;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.TerminalOutcome;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class ProofCarryingShowcaseTrainSelectionEvidenceTest {
@@ -79,6 +81,22 @@ class ProofCarryingShowcaseTrainSelectionEvidenceTest {
             winner.alphaStructuralHash(),
             evidence.selectedCandidateAlphaStructuralHash());
         assertEquals(winner.planHash(), evidence.selectedPlanHash());
+    }
+
+    @Test
+    void missingTerminalEvaluationUsesTheProductionFreezerDiagnostic() {
+        var failure = assertThrows(
+            IllegalArgumentException.class,
+            () -> ProofCarryingShowcaseCandidateFreezer.alternative(
+                null,
+                null,
+                Set.of(),
+                Set.of(),
+                3));
+
+        assertEquals(
+            "terminal candidate lacks retained TRAIN evaluation",
+            failure.getMessage());
     }
 
     private static ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative
