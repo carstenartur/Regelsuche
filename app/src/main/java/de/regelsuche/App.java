@@ -3,6 +3,7 @@ package de.regelsuche;
 import de.regelsuche.app.transform.SymPyTransformationEngine;
 import de.regelsuche.cli.CliRouter;
 import de.regelsuche.evolution.ProofCarryingShowcaseTrainAndFreezeCommand;
+import de.regelsuche.evolution.ProofCarryingShowcaseTrainPreflightCommand;
 import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.graph.GraphSnapshot;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
@@ -25,6 +26,11 @@ public class App {
         }
 
         String firstArg = args[0].trim();
+        if ("showcase-train-preflight".equals(firstArg)) {
+            ProofCarryingShowcaseTrainPreflightCommand.main(
+                Arrays.copyOfRange(args, 1, args.length));
+            return;
+        }
         if ("showcase-train-freeze".equals(firstArg)) {
             ProofCarryingShowcaseTrainAndFreezeCommand.main(
                 Arrays.copyOfRange(args, 1, args.length));
@@ -97,6 +103,9 @@ public class App {
                 + "[--export json,markdown,mermaid,latex,inventory] "
                 + "[--dir PATH]");
         System.out.println("  transform <expression>");
+        System.out.println(
+            "  showcase-train-preflight <showcase-plan.json> "
+                + "<output-directory>");
         System.out.println(
             "  showcase-train-freeze <showcase-plan.json> "
                 + "<repository-commit> <output-directory>");
