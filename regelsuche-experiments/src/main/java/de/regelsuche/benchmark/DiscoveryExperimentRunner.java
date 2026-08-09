@@ -1,5 +1,6 @@
 package de.regelsuche.benchmark;
 
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -23,6 +24,36 @@ public interface DiscoveryExperimentRunner {
      *     the input list.
      */
     List<ExperimentResult> run(List<String> seedExpressions);
+
+    /**
+     * Checkout-owned command entry point for retained discovery experiments.
+     *
+     * <p>The first command is deliberately explicit so additional experiments
+     * can share the entry point without inventing one public launcher class per
+     * report.</p>
+     */
+    static void main(String[] args) {
+        if (args.length == 0 || !"historical-rediscovery".equals(args[0])) {
+            throw new IllegalArgumentException(
+                "expected command: historical-rediscovery [output-directory]");
+        }
+        Path output = args.length >= 2
+            ? Path.of(args[1])
+            : Path.of("build/reports/historical-rediscovery");
+        HistoricalRediscoveryCorpus.Corpus corpus =
+            HistoricalRediscoveryCorpus.load();
+        HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();
+        HistoricalRediscoveryAtlas.AtlasReport report = atlas.run(corpus);
+        HistoricalRediscoveryAtlas.WrittenArtifacts artifacts =
+            atlas.write(output, report);
+        System.out.println("historicalRediscoveryAssessment="
+            + report.assessment().decision());
+        System.out.println("historicalRediscoveryCases=" + report.cases().size());
+        System.out.println("historicalRediscoveryJson="
+            + artifacts.json().toAbsolutePath().normalize());
+        System.out.println("historicalRediscoveryMarkdown="
+            + artifacts.markdown().toAbsolutePath().normalize());
+    }
 
     /**
      * Outcome of a single seed run.
