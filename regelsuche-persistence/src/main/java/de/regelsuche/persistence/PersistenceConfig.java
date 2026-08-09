@@ -181,14 +181,18 @@ public record PersistenceConfig(
         return null;
     }
 
+    private static boolean present(String value) {
+        return value != null && !value.isBlank();
+    }
+
     /** Convenience: whether all Neo4j credentials are set. */
     public boolean hasNeo4jCredentials() {
-        return neo4jUri != null && neo4jUser != null && neo4jPassword != null;
+        return present(neo4jUri) && present(neo4jUser) && present(neo4jPassword);
     }
 
     /** Convenience: whether all PostgreSQL connection settings are set. */
     public boolean hasPostgresCredentials() {
-        return postgresUrl != null && postgresUser != null && postgresPassword != null;
+        return present(postgresUrl) && present(postgresUser) && present(postgresPassword);
     }
 
     public Optional<String> neo4jUriOptional() {
