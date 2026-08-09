@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-rewrite-program-train-diagnostics/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "studyPlanHash",
+    "executionPlanHash",
+    "executionProtocolHash",
+    "executionBoundRunHash",
+    "populationRunHash",
+    "mutationBatches",
+    "generations",
+    "candidateStructures",
+    "dataScope",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-train-diagnostics/v1"
+    },
+    "studyPlanHash": { "$ref": "#/$defs/hash" },
+    "executionPlanHash": { "$ref": "#/$defs/hash" },
+    "executionProtocolHash": { "$ref": "#/$defs/hash" },
+    "executionBoundRunHash": { "$ref": "#/$defs/hash" },
+    "populationRunHash": { "$ref": "#/$defs/hash" },
+    "mutationBatches": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/mutationBatch" }
+    },
+    "generations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/generation" }
+    },
+    "candidateStructures": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/candidateStructure" }
+    },
+    "dataScope": { "const": "TRAIN_ONLY" },
+    "contentHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "mutationCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "WRAP_REPEAT",
+        "WRAP_REQUIRE",
+        "WRAP_PRIORITY",
+        "WRAP_PRUNE",
+        "PREPEND_SOURCE",
+        "APPEND_SOURCE",
+        "SWAP_ADJACENT_CHILDREN",
+        "REMOVE_WRAPPER",
+        "CHOICE_TO_FIRST_APPLICABLE",
+        "FIRST_APPLICABLE_TO_CHOICE"
+      ],
+      "properties": {
+        "WRAP_REPEAT": { "type": "integer", "minimum": 0 },
+        "WRAP_REQUIRE": { "type": "integer", "minimum": 0 },
+        "WRAP_PRIORITY": { "type": "integer", "minimum": 0 },
+        "WRAP_PRUNE": { "type": "integer", "minimum": 0 },
+        "PREPEND_SOURCE": { "type": "integer", "minimum": 0 },
+        "APPEND_SOURCE": { "type": "integer", "minimum": 0 },
+        "SWAP_ADJACENT_CHILDREN": { "type": "integer", "minimum": 0 },
+        "REMOVE_WRAPPER": { "type": "integer", "minimum": 0 },
+        "CHOICE_TO_FIRST_APPLICABLE": { "type": "integer", "minimum": 0 },
+        "FIRST_APPLICABLE_TO_CHOICE": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "hashArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/hash" }
+    },
+    "mutationBatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "parentCandidateHash",
+        "mutationBatchHash",
+        "mutationBatchJsonHash",
+        "mutationBatchJson"
+      ],
+      "properties": {
+        "generation": { "type": "integer", "minimum": 1 },
+        "parentCandidateHash": { "$ref": "#/$defs/hash" },
+        "mutationBatchHash": { "$ref": "#/$defs/hash" },
+        "mutationBatchJsonHash": { "$ref": "#/$defs/hash" },
+        "mutationBatchJson": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "eligibleProposalCountsByMutationKind",
+        "acceptedOffspringCountsByMutationKind",
+        "maxAcceptedOnlyRejectionCountsByMutationKind",
+        "generatedAlphaStructuralHashes",
+        "survivingGeneratedAlphaStructuralHashes",
+        "maxLineageDepthFromSeed"
+      ],
+      "properties": {
+        "generation": { "type": "integer", "minimum": 1 },
+        "eligibleProposalCountsByMutationKind": {
+          "$ref": "#/$defs/mutationCounts"
+        },
+        "acceptedOffspringCountsByMutationKind": {
+          "$ref": "#/$defs/mutationCounts"
+        },
+        "maxAcceptedOnlyRejectionCountsByMutationKind": {
+          "$ref": "#/$defs/mutationCounts"
+        },
+        "generatedAlphaStructuralHashes": { "$ref": "#/$defs/hashArray" },
+        "survivingGeneratedAlphaStructuralHashes": {
+          "$ref": "#/$defs/hashArray"
+        },
+        "maxLineageDepthFromSeed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "candidateStructure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateHash",
+        "alphaStructuralHash",
+        "planHash",
+        "firstSeenGeneration",
+        "lineageDepthFromSeed",
+        "nodeCount",
+        "containsCompositionTopology",
+        "containsDecisionTopology",
+        "minimumStructuralPrimitivePathSteps"
+      ],
+      "properties": {
+        "candidateHash": { "$ref": "#/$defs/hash" },
+        "alphaStructuralHash": { "$ref": "#/$defs/hash" },
+        "planHash": { "$ref": "#/$defs/hash" },
+        "firstSeenGeneration": { "type": "integer", "minimum": 0 },
+        "lineageDepthFromSeed": { "type": "integer", "minimum": 0 },
+        "nodeCount": { "type": "integer", "minimum": 1 },
+        "containsCompositionTopology": { "type": "boolean" },
+        "containsDecisionTopology": { "type": "boolean" },
+        "minimumStructuralPrimitivePathSteps": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
