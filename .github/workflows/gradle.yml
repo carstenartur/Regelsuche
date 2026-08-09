@@ -27,7 +27,10 @@ permissions:
 
 jobs:
   verification:
-    name: Checkout-local ciCheck
+    name: >-
+      ${{ github.event_name == 'create'
+          && 'Showcase train-freeze authority v1'
+          || 'Checkout-local ciCheck' }}
     if: >-
       github.event_name != 'create'
       || (github.event.ref_type == 'branch'
