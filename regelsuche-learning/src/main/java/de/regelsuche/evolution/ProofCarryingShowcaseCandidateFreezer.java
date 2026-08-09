@@ -172,6 +172,10 @@ public final class ProofCarryingShowcaseCandidateFreezer {
             throw new IllegalArgumentException(
                 "terminal candidate lacks retained TRAIN evaluation");
         }
+        if (retained == null) {
+            throw new IllegalArgumentException(
+                "candidate alternative requires retained TRAIN candidate");
+        }
         EvolutionRewriteProgramCandidate candidate = retained.candidate();
         ProgramFacts facts = analyze(candidate.plan().root());
         boolean seedExact = seedHashes.contains(candidate.contentHash());
