@@ -96,10 +96,11 @@ public final class StructuralDiversitySearchStrategy implements SearchStrategy {
             .comparing(Transformation::rule)
             .thenComparing(Transformation::transformedExpression)
             .thenComparing(Transformation::applicationKey));
+        Comparator<SearchState> comparator = eliteComparator(problem);
 
-        int generated = 0;
+        int retained = 0;
         for (Transformation transformation : transformations) {
-            if (generated >= problem.heuristic().maxCandidatesPerState()) {
+            if (retained >= problem.heuristic().maxCandidatesPerState()) {
                 break;
             }
             if (current.appliedRuleApplications().contains(
@@ -125,13 +126,11 @@ public final class StructuralDiversitySearchStrategy implements SearchStrategy {
                 continue;
             }
             StructuralCell cell = StructuralCell.of(problem, next);
-            nextElites.merge(
-                cell,
-                next,
-                (left, right) -> eliteComparator(problem).compare(left, right) <= 0
-                    ? left
-                    : right);
-            generated++;
+            SearchState previous = nextElites.get(cell);
+            if (previous == null || comparator.compare(next, previous) < 0) {
+                nextElites.put(cell, next);
+                retained++;
+            }
         }
     }
 
