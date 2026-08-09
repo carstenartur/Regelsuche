@@ -13,6 +13,12 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -122,21 +128,49 @@ class ProofDockerImageIntegrationTest {
     }
 
     private static JsonNode awaitTerminalJob(String jobId) throws Exception {
-        long deadline = System.nanoTime() + PROOF_TIMEOUT.toNanos();
-        JsonNode latest = null;
-        while (System.nanoTime() < deadline) {
-            latest = getJson("/api/proof/jobs/" + jobId);
-            String status = latest.path("status").asText();
-            if ("DONE".equals(status)
-                    || "FAILED".equals(status)
-                    || "CANCELLED".equals(status)) {
-                return latest;
+        AtomicReference<JsonNode> latest = new AtomicReference<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        CountDownLatch terminal = new CountDownLatch(1);
+        ScheduledExecutorService poller = Executors.newSingleThreadScheduledExecutor();
+        ScheduledFuture<?> polling = poller.scheduleWithFixedDelay(() -> {
+            try {
+                JsonNode snapshot = getJson("/api/proof/jobs/" + jobId);
+                latest.set(snapshot);
+                String status = snapshot.path("status").asText();
+                if ("DONE".equals(status)
+                        || "FAILED".equals(status)
+                        || "CANCELLED".equals(status)) {
+                    terminal.countDown();
+                }
+            } catch (Throwable throwable) {
+                failure.compareAndSet(null, throwable);
+                terminal.countDown();
             }
-            Thread.sleep(250L);
+        }, 0L, 250L, TimeUnit.MILLISECONDS);
+        try {
+            if (!terminal.await(PROOF_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
+                JsonNode snapshot = latest.get();
+                throw new AssertionError(
+                    "proof job did not finish within " + PROOF_TIMEOUT
+                        + ": " + (snapshot == null
+                            ? "no response"
+                            : snapshot.toPrettyString()));
+            }
+            Throwable throwable = failure.get();
+            if (throwable != null) {
+                if (throwable instanceof Exception exception) {
+                    throw exception;
+                }
+                if (throwable instanceof Error error) {
+                    throw error;
+                }
+                throw new AssertionError("proof polling failed", throwable);
+            }
+            return latest.get();
+        } finally {
+            polling.cancel(true);
+            poller.shutdownNow();
         }
-        JsonNode snapshot = latest;
-        throw new AssertionError("proof job did not finish within " + PROOF_TIMEOUT
-            + ": " + (snapshot == null ? "no response" : snapshot.toPrettyString()));
     }
 
     private static JsonNode getJson(String path) throws Exception {
