@@ -1,110 +1,263 @@
-/*
- * Finite checkout-owned non-visual quality gates for issue #514.
- *
- * GitHub Actions only provisions tools and calls ciCheck. Baselines,
- * thresholds, reports and failure decisions remain versioned in the checkout.
- */
+import org.gradle.api.tasks.testing.Test
 
 def qualityRepositoryRoot = layout.projectDirectory
-def qualityVerificationVenv = layout.buildDirectory.dir('verification-venv')
-def qualityVerificationPython = providers.provider {
-    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
-        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
-    new File(qualityVerificationVenv.get().asFile, executable)
+apply from: qualityRepositoryRoot.file('gradle/supply-chain-evidence.gradle')
+
+def verificationEnvironmentDir = qualityRepositoryRoot.dir('.gradle/verification-python')
+def verificationVenvDir = verificationEnvironmentDir.dir('venv')
+def verificationRequirements = qualityRepositoryRoot.file('scripts/requirements-verification.txt')
+def verificationConstraints = qualityRepositoryRoot.file('scripts/constraints-verification.txt')
+def verificationStamp = verificationEnvironmentDir.file('environment.json')
+
+def verificationPython = {
+    def windowsPython = verificationVenvDir.file('Scripts/python.exe').asFile
+    windowsPython.exists()
+        ? windowsPython.absolutePath
+        : verificationVenvDir.file('bin/python').asFile.absolutePath
 }
 
-def verifyCoverageRegression = tasks.register('verifyCoverageRegression', Exec) {
+def prepareVerificationEnvironment = tasks.register('prepareVerificationEnvironment', Exec) {
+    group = 'verification setup'
+    description = 'Creates the pinned checkout-local Python verification environment.'
+    inputs.files(verificationRequirements, verificationConstraints)
+    outputs.files(
+        verificationVenvDir.file('pyvenv.cfg'),
+        verificationStamp
+    )
+    doFirst {
+        verificationEnvironmentDir.asFile.mkdirs()
+    }
+    commandLine(
+        'python3',
+        qualityRepositoryRoot.file('scripts/prepare-verification-environment.py').asFile.absolutePath,
+        '--venv', verificationVenvDir.asFile.absolutePath,
+        '--requirements', verificationRequirements.asFile.absolutePath,
+        '--constraints', verificationConstraints.asFile.absolutePath,
+        '--stamp', verificationStamp.asFile.absolutePath
+    )
+}
+
+// Avoid every Test task acquiring a dependency on the external Python
+// environment. This is added only to the focused tests that explicitly need it.
+def applyVerificationPython = { Test test ->
+    test.dependsOn(prepareVerificationEnvironment)
+    test.doFirst {
+        test.systemProperty('regelsuche.verification.python', verificationPython())
+    }
+}
+
+def benchmarkContainerPath = qualityRepositoryRoot.file(
+    'build/reports/comparative-benchmarks-container-1/benchmark/benchmark-run.json'
+)
+def independentReproductionExpectedPath = qualityRepositoryRoot.file(
+    'build/reports/independent-reproduction/artifact-a/artifact/expected/qualified-walkthrough.json'
+)
+
+tasks.register('generateQualityPages', Exec) {
+    group = 'documentation'
+    description = 'Generates the README badge endpoint and static quality dashboard from checkout-owned evidence.'
+    dependsOn(prepareVerificationEnvironment)
+    inputs.file(qualityRepositoryRoot.file('scripts/generate-quality-pages.py'))
+    inputs.file(qualityRepositoryRoot.file('config/quality/coverage-policy.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/coverage/coverage-report.json'))
+    inputs.file(qualityRepositoryRoot.file('config/quality/jmh-regression-policy-v2.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/jmh/jmh-regression-report.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/ai-knowledge/ai-knowledge-regression-report.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/complexity/complexity-trend-report.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/slow-tests/slowest-tests-report.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/visual-regression/visual-regression-report.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/visual-regression/visual-regression-policy.json'))
+    inputs.file(benchmarkContainerPath)
+        .withPropertyName('comparativeBenchmarkContainerReport')
+        .optional()
+    inputs.file(independentReproductionExpectedPath)
+        .withPropertyName('independentReproductionExpectedReport')
+        .optional()
+    inputs.file(qualityRepositoryRoot.file('build/reports/release-readiness-run-1/release-readiness-run.json'))
+        .withPropertyName('releaseReadinessReport')
+        .optional()
+    outputs.files(
+        qualityRepositoryRoot.file('build/reports/quality-pages/badge/quality.json'),
+        qualityRepositoryRoot.file('build/reports/quality-pages/index.html')
+    )
+    doFirst {
+        qualityRepositoryRoot.file('build/reports/quality-pages/badge').asFile.mkdirs()
+    }
+    commandLine(
+        verificationPython(),
+        qualityRepositoryRoot.file('scripts/generate-quality-pages.py').asFile.absolutePath,
+        '--root', qualityRepositoryRoot.asFile.absolutePath
+    )
+}
+
+tasks.register('verifyQualityPageInputs', Exec) {
     group = 'verification'
-    description = 'Fails when aggregate/module JaCoCo floors regress or a covered module disappears.'
-    dependsOn 'prepareVerificationEnvironment', 'test'
-    mustRunAfter 'test'
-    workingDir qualityRepositoryRoot
-    inputs.file qualityRepositoryRoot.file('config/quality/coverage-policy.json')
-    inputs.file qualityRepositoryRoot.file('scripts/verify-coverage-regression.py')
-    outputs.file layout.buildDirectory.file('reports/quality/coverage-report.json')
-    outputs.file layout.buildDirectory.file('reports/quality/coverage-report.md')
-    outputs.upToDateWhen { false }
+    description = 'Fails if the quality page inputs are incomplete, stale or contain unresolved placeholder evidence.'
+    dependsOn(
+        prepareVerificationEnvironment,
+        'verifyCoverageRegression',
+        'verifyJmhRegression',
+        'verifyAiKnowledgeRegression',
+        'verifyCognitiveComplexityTrend',
+        'reportSlowestTests',
+        'verifyVisualRegressionEnvironment'
+    )
+    inputs.file(qualityRepositoryRoot.file('scripts/verify-quality-page-inputs.py'))
+    inputs.file(qualityRepositoryRoot.file('config/quality/coverage-policy.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/coverage/coverage-report.json'))
+    inputs.file(qualityRepositoryRoot.file('config/quality/jmh-regression-policy-v2.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/jmh/jmh-regression-report.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/ai-knowledge/ai-knowledge-regression-report.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/complexity/complexity-trend-report.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/slow-tests/slowest-tests-report.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/visual-regression/visual-regression-report.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/quality/visual-regression/visual-regression-policy.json'))
+    inputs.file(benchmarkContainerPath)
+        .withPropertyName('comparativeBenchmarkContainerReport')
+        .optional()
+    inputs.file(independentReproductionExpectedPath)
+        .withPropertyName('independentReproductionExpectedReport')
+        .optional()
+    inputs.file(qualityRepositoryRoot.file('build/reports/release-readiness-run-1/release-readiness-run.json'))
+        .withPropertyName('releaseReadinessReport')
+        .optional()
+    outputs.file(qualityRepositoryRoot.file('build/reports/quality/quality-page-inputs.json'))
     doFirst {
-        commandLine qualityVerificationPython.get().absolutePath,
-            'scripts/verify-coverage-regression.py',
-            '--root', qualityRepositoryRoot.asFile.absolutePath
+        qualityRepositoryRoot.file('build/reports/quality').asFile.mkdirs()
     }
+    commandLine(
+        verificationPython(),
+        qualityRepositoryRoot.file('scripts/verify-quality-page-inputs.py').asFile.absolutePath,
+        '--root', qualityRepositoryRoot.asFile.absolutePath,
+        '--output', qualityRepositoryRoot.file('build/reports/quality/quality-page-inputs.json').asFile.absolutePath
+    )
 }
 
-def verifyContainerImagePolicy = tasks.register('verifyContainerImagePolicy', Exec) {
+// Required by the AI Knowledge trend gate. On a fresh clone the generated
+// reports may not yet exist, so bind them to their producing tasks explicitly.
+// When inputs are absent Gradle will run the producer before evaluating the
+// verifier, ensuring deterministic ordering in the ciCheck graph.
+tasks.named('verifyAiKnowledgeRegression') {
+    dependsOn('generateCognitiveComplexityReport', 'verifyKnowledgeBase')
+    inputs.file(qualityRepositoryRoot.file('build/reports/cognitive-complexity/cognitive-complexity.json'))
+    inputs.file(qualityRepositoryRoot.file('build/reports/ai-knowledge/ai-knowledge-report.json'))
+}
+
+// Run lightweight script tests before the report-producing tasks that rely on them.
+tasks.named('verifyCognitiveComplexityTrend') {
+    dependsOn('testQualityScriptVerifiers')
+}
+tasks.named('verifyAiKnowledgeRegression') {
+    dependsOn('testQualityScriptVerifiers')
+}
+
+tasks.register('testQualityScriptVerifiers', Exec) {
     group = 'verification'
-    description = 'Rejects undeclared Dockerfiles and floating or unapproved base images.'
-    dependsOn 'prepareVerificationEnvironment'
-    workingDir qualityRepositoryRoot
-    inputs.file qualityRepositoryRoot.file('config/quality/container-image-policy.json')
-    inputs.file qualityRepositoryRoot.file('scripts/verify-container-image-policy.py')
-    outputs.file layout.buildDirectory.file('reports/quality/container-image-report.json')
-    outputs.upToDateWhen { false }
-    doFirst {
-        commandLine qualityVerificationPython.get().absolutePath,
-            'scripts/verify-container-image-policy.py',
-            '--root', qualityRepositoryRoot.asFile.absolutePath
-    }
+    description = 'Runs synthetic fail-closed tests for the checkout-owned quality verifier scripts.'
+    dependsOn(prepareVerificationEnvironment)
+    inputs.files(
+        qualityRepositoryRoot.file('scripts/verify-cognitive-complexity-trend.py'),
+        qualityRepositoryRoot.file('scripts/verify-ai-knowledge-regression.py'),
+        qualityRepositoryRoot.file('scripts/test-quality-verifiers.py')
+    )
+    commandLine(
+        verificationPython(),
+        qualityRepositoryRoot.file('scripts/test-quality-verifiers.py').asFile.absolutePath
+    )
 }
 
-def testJmhRegressionVerifier = tasks.register('testJmhRegressionVerifier', Exec) {
+def supplyChainReportDirectory = qualityRepositoryRoot.dir('build/reports/quality/supply-chain')
+def supplyChainBom = supplyChainReportDirectory.file('bom.json')
+
+tasks.register('testSupplyChainEvidenceVerifier', Exec) {
     group = 'verification'
-    description = 'Characterizes the JMH regression verifier with positive and fail-closed synthetic cases.'
-    dependsOn 'prepareVerificationEnvironment'
-    workingDir qualityRepositoryRoot
-    inputs.file qualityRepositoryRoot.file('scripts/verify-jmh-regression-v2.py')
-    inputs.file qualityRepositoryRoot.file('scripts/test-verify-jmh-regression-v2.py')
-    outputs.upToDateWhen { false }
-    doFirst {
-        commandLine qualityVerificationPython.get().absolutePath,
-            'scripts/test-verify-jmh-regression-v2.py',
-            '--verifier', qualityRepositoryRoot.file('scripts/verify-jmh-regression-v2.py').asFile.absolutePath
-    }
+    description = 'Runs synthetic fail-closed tests for the supply-chain evidence verifier.'
+    dependsOn(prepareVerificationEnvironment)
+    inputs.files(
+        qualityRepositoryRoot.file('config/quality/supply-chain-policy.json'),
+        qualityRepositoryRoot.file('scripts/verify-supply-chain-evidence.py'),
+        qualityRepositoryRoot.file('scripts/test-supply-chain-evidence.py')
+    )
+    commandLine(
+        verificationPython(),
+        qualityRepositoryRoot.file('scripts/test-supply-chain-evidence.py').asFile.absolutePath
+    )
 }
 
-def verifyJmhRegression = tasks.register('verifyJmhRegression', Exec) {
+tasks.register('verifySupplyChainInventory', Exec) {
     group = 'verification'
-    description = 'Fails on missing, undeclared, contract-drifted or materially slower JMH benchmarks.'
-    dependsOn 'prepareVerificationEnvironment', ':app:jmh', testJmhRegressionVerifier
-    mustRunAfter ':app:jmh'
-    workingDir qualityRepositoryRoot
-    inputs.file qualityRepositoryRoot.file('config/quality/jmh-regression-policy-v2.json')
-    inputs.file qualityRepositoryRoot.file('scripts/verify-jmh-regression-v2.py')
-    inputs.file qualityRepositoryRoot.file('app/build/reports/jmh/result.json')
-    outputs.file layout.buildDirectory.file('reports/quality/jmh-regression-report.json')
-    outputs.file layout.buildDirectory.file('reports/quality/jmh-regression-report.md')
-    outputs.upToDateWhen { false }
-    doFirst {
-        commandLine qualityVerificationPython.get().absolutePath,
-            'scripts/verify-jmh-regression-v2.py',
-            '--result', qualityRepositoryRoot.file('app/build/reports/jmh/result.json').asFile.absolutePath,
-            '--policy', qualityRepositoryRoot.file('config/quality/jmh-regression-policy-v2.json').asFile.absolutePath,
-            '--json-output', qualityRepositoryRoot.file('build/reports/quality/jmh-regression-report.json').asFile.absolutePath,
-            '--markdown-output', qualityRepositoryRoot.file('build/reports/quality/jmh-regression-report.md').asFile.absolutePath
-    }
+    description = 'Verifies and normalizes the aggregate CycloneDX dependency inventory.'
+    dependsOn(
+        prepareVerificationEnvironment,
+        'testSupplyChainEvidenceVerifier',
+        'cyclonedxBom'
+    )
+    inputs.files(
+        qualityRepositoryRoot.file('config/quality/supply-chain-policy.json'),
+        qualityRepositoryRoot.file('scripts/verify-supply-chain-evidence.py'),
+        supplyChainBom
+    )
+    outputs.files(
+        supplyChainReportDirectory.file('dependency-inventory.json'),
+        supplyChainReportDirectory.file('supply-chain-evidence.json'),
+        supplyChainReportDirectory.file('supply-chain-evidence.md')
+    )
+    commandLine(
+        verificationPython(),
+        qualityRepositoryRoot.file('scripts/verify-supply-chain-evidence.py').asFile.absolutePath,
+        '--repository-root', qualityRepositoryRoot.asFile.absolutePath,
+        '--bom', supplyChainBom.asFile.absolutePath,
+        '--output', supplyChainReportDirectory.asFile.absolutePath
+    )
 }
 
-def reportSlowTests = tasks.register('reportSlowTests', Exec) {
-    group = 'reporting'
-    description = 'Renders deterministic slow-test evidence from all checkout JUnit XML reports.'
-    dependsOn 'prepareVerificationEnvironment', 'test'
-    mustRunAfter 'test'
-    workingDir qualityRepositoryRoot
-    inputs.file qualityRepositoryRoot.file('scripts/report-slowest-tests.py')
-    outputs.file layout.buildDirectory.file('reports/quality/slow-tests.json')
-    outputs.file layout.buildDirectory.file('reports/quality/slow-tests.md')
-    outputs.upToDateWhen { false }
-    doFirst {
-        commandLine qualityVerificationPython.get().absolutePath,
-            'scripts/report-slowest-tests.py',
-            '--root', qualityRepositoryRoot.asFile.absolutePath
-    }
+def qualityGateReportTasks = [
+    'verifyCoverageRegression',
+    'verifyJmhRegression',
+    'verifyAiKnowledgeRegression',
+    'verifyCognitiveComplexityTrend',
+    'reportSlowestTests',
+    'verifyVisualRegressionEnvironment',
+    'verifySupplyChainInventory'
+]
+
+tasks.register('qualityGateEvidence') {
+    group = 'verification'
+    description = 'Produces all checkout-owned quality-gate reports for artifact retention.'
+    dependsOn(qualityGateReportTasks)
+    outputs.files(
+        qualityRepositoryRoot.file('build/reports/quality/coverage/coverage-report.json'),
+        qualityRepositoryRoot.file('build/reports/jmh/jmh-regression-report.json'),
+        qualityRepositoryRoot.file('build/reports/quality/ai-knowledge/ai-knowledge-regression-report.json'),
+        qualityRepositoryRoot.file('build/reports/quality/complexity/complexity-trend-report.json'),
+        qualityRepositoryRoot.file('build/reports/quality/slow-tests/slowest-tests-report.json'),
+        qualityRepositoryRoot.file('build/reports/quality/visual-regression/visual-regression-report.json'),
+        qualityRepositoryRoot.file('build/reports/quality/visual-regression/visual-regression-policy.json'),
+        supplyChainReportDirectory.file('bom.json'),
+        supplyChainReportDirectory.file('dependency-inventory.json'),
+        supplyChainReportDirectory.file('supply-chain-evidence.json'),
+        supplyChainReportDirectory.file('supply-chain-evidence.md')
+    )
 }
 
-tasks.matching { candidate -> candidate.name == 'check' }.configureEach {
-    dependsOn verifyCoverageRegression, verifyContainerImagePolicy, verifyJmhRegression
+tasks.named('check') {
+    dependsOn('verifyCoverageRegression')
+    dependsOn('verifyJmhRegression')
+    dependsOn('verifyAiKnowledgeRegression')
+    dependsOn('verifyCognitiveComplexityTrend')
+    dependsOn('verifyVisualRegressionEnvironment')
+    dependsOn('verifySupplyChainInventory')
+    finalizedBy('reportSlowestTests')
 }
 
-tasks.matching { candidate -> candidate.name == 'ciCheck' }.configureEach {
-    dependsOn reportSlowTests
+tasks.named('ciCheck') {
+    dependsOn(
+        'verifyQualityPageInputs',
+        'qualityGateEvidence',
+        'generateQualityPages'
+    )
+}
+
+tasks.named('generateQualityPages') {
+    mustRunAfter('verifyQualityPageInputs')
 }

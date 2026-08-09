@@ -1,0 +1,32 @@
+{
+  "schema": "regelsuche.supply-chain-policy/v1",
+  "inventory": {
+    "format": "CycloneDX",
+    "specVersion": "1.6",
+    "generator": "org.cyclonedx.bom",
+    "generatorVersion": "3.3.0",
+    "includeBomSerialNumber": false,
+    "includeBuildSystem": false,
+    "rawTimestampTreatment": "EXCLUDED_FROM_SEMANTIC_IDENTITY"
+  },
+  "vulnerabilityPolicy": {
+    "status": "DEFERRED_UNTIL_CONTENT_ADDRESSED_DATABASE",
+    "requiredDatabaseProperties": [
+      "provider",
+      "revision",
+      "createdAt",
+      "sha256",
+      "license"
+    ],
+    "failOnCvssAtOrAbove": 7.0,
+    "unknownSeverity": "FAIL_CLOSED",
+    "scannerFailure": "FAIL_CLOSED",
+    "suppressionRequirements": [
+      "exact advisory identity",
+      "affected component identity",
+      "finite rationale",
+      "ISO expiry date"
+    ]
+  },
+  "claimBoundary": "The dependency inventory describes resolved build components. Until a content-addressed advisory database and scanner output are bound, vulnerability status remains NOT_EVALUATED and no security certification is claimed."
+}

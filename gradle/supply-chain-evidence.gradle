@@ -1,0 +1,32 @@
+/*
+ * Checkout-owned deterministic dependency inventory foundation for issue #514.
+ *
+ * The CycloneDX task resolves the actual multi-project dependency graph. The
+ * repository verifier removes explicitly declared non-semantic timestamp data
+ * before hashing and reports vulnerability scanning as NOT_EVALUATED until a
+ * content-addressed advisory database is selected.
+ */
+
+buildscript {
+    repositories {
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath 'org.cyclonedx.bom:org.cyclonedx.bom.gradle.plugin:3.3.0'
+    }
+}
+
+apply plugin: 'org.cyclonedx.bom'
+
+import org.gradle.api.file.RegularFile
+
+def supplyChainReportDirectory = layout.buildDirectory.dir('reports/quality/supply-chain')
+
+tasks.named('cyclonedxBom') {
+    group = 'reporting'
+    description = 'Generates the aggregate CycloneDX dependency inventory for the complete build.'
+    includeBomSerialNumber = false
+    includeBuildSystem = false
+    jsonOutput = supplyChainReportDirectory.map { directory -> directory.file('bom.json') }
+    xmlOutput.convention((RegularFile) null)
+}
