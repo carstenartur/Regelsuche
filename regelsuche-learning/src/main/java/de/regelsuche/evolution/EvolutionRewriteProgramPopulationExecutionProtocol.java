@@ -74,19 +74,12 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
         Objects.requireNonNull(
             mutatorSemanticsVersion,
             "mutatorSemanticsVersion");
-        Objects.requireNonNull(proposalOrderingPolicy, "proposalOrderingPolicy");
-        Objects.requireNonNull(
-            offspringSchedulingPolicy, "offspringSchedulingPolicy");
-        if (generatedPoolMultiplier < 1 || generatedPoolMultiplier > 64) {
-            throw new IllegalArgumentException(
-                "generatedPoolMultiplier must be in [1,64]");
-        }
-        Objects.requireNonNull(
+        requirePolicyInputs(
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
             mutationSeedDerivationPolicy,
-            "mutationSeedDerivationPolicy");
-        Objects.requireNonNull(
-            survivorSelectionPolicy,
-            "survivorSelectionPolicy");
+            survivorSelectionPolicy);
         if (!STATUS.equals(status)) {
             throw new IllegalArgumentException(
                 "execution protocol must remain frozen and unexecuted");
@@ -139,8 +132,12 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
         MutationSeedDerivationPolicy mutationSeedDerivationPolicy,
         SurvivorSelectionPolicy survivorSelectionPolicy
     ) {
-        Objects.requireNonNull(
-            offspringSchedulingPolicy, "offspringSchedulingPolicy");
+        requirePolicyInputs(
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
+            mutationSeedDerivationPolicy,
+            survivorSelectionPolicy);
         PopulationEngineSemanticsVersion engineVersion;
         MutatorSemanticsVersion mutatorVersion;
         switch (offspringSchedulingPolicy) {
@@ -188,6 +185,12 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
             "populationEngineSemanticsVersion");
         Objects.requireNonNull(mutatorClass, "mutatorClass");
         Objects.requireNonNull(mutatorSemanticsVersion, "mutatorSemanticsVersion");
+        requirePolicyInputs(
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
+            mutationSeedDerivationPolicy,
+            survivorSelectionPolicy);
         String hash = EvolutionGenome.hash(render(
             populationEngineClass.getName(),
             populationEngineSemanticsVersion,
@@ -243,6 +246,28 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
             mutationSeedDerivationPolicy,
             survivorSelectionPolicy,
             contentHash);
+    }
+
+    private static void requirePolicyInputs(
+        ProposalOrderingPolicy proposalOrderingPolicy,
+        OffspringSchedulingPolicy offspringSchedulingPolicy,
+        int generatedPoolMultiplier,
+        MutationSeedDerivationPolicy mutationSeedDerivationPolicy,
+        SurvivorSelectionPolicy survivorSelectionPolicy
+    ) {
+        Objects.requireNonNull(proposalOrderingPolicy, "proposalOrderingPolicy");
+        Objects.requireNonNull(
+            offspringSchedulingPolicy, "offspringSchedulingPolicy");
+        if (generatedPoolMultiplier < 1 || generatedPoolMultiplier > 64) {
+            throw new IllegalArgumentException(
+                "generatedPoolMultiplier must be in [1,64]");
+        }
+        Objects.requireNonNull(
+            mutationSeedDerivationPolicy,
+            "mutationSeedDerivationPolicy");
+        Objects.requireNonNull(
+            survivorSelectionPolicy,
+            "survivorSelectionPolicy");
     }
 
     private static String render(
