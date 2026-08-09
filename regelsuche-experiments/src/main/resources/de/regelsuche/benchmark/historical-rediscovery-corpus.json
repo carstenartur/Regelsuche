@@ -15,12 +15,12 @@
       "provenance": "STANDARD_CLASSICAL_ALGEBRA_IDENTITY",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 4,
-      "oracleMaxVisitedStates": 2000,
+      "oracleMaxVisitedStates": 300,
       "searchMaxDepth": 4,
-      "searchMaxVisitedStates": 400,
-      "maxCandidatesPerState": 100,
+      "searchMaxVisitedStates": 80,
+      "maxCandidatesPerState": 48,
       "maxExpandingSteps": 4,
-      "beamWidth": 24
+      "beamWidth": 12
     },
     {
       "id": "reordered-square",
@@ -33,12 +33,12 @@
       "provenance": "STANDARD_CLASSICAL_ALGEBRA_IDENTITY",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 4,
-      "oracleMaxVisitedStates": 2000,
+      "oracleMaxVisitedStates": 300,
       "searchMaxDepth": 4,
-      "searchMaxVisitedStates": 400,
-      "maxCandidatesPerState": 100,
+      "searchMaxVisitedStates": 80,
+      "maxCandidatesPerState": 48,
       "maxExpandingSteps": 4,
-      "beamWidth": 24
+      "beamWidth": 12
     },
     {
       "id": "regrouped-square",
@@ -51,12 +51,12 @@
       "provenance": "STANDARD_CLASSICAL_ALGEBRA_IDENTITY",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 4,
-      "oracleMaxVisitedStates": 2000,
+      "oracleMaxVisitedStates": 300,
       "searchMaxDepth": 4,
-      "searchMaxVisitedStates": 400,
-      "maxCandidatesPerState": 100,
+      "searchMaxVisitedStates": 80,
+      "maxCandidatesPerState": 48,
       "maxExpandingSteps": 4,
-      "beamWidth": 24
+      "beamWidth": 12
     },
     {
       "id": "scaled-square",
@@ -69,12 +69,12 @@
       "provenance": "STANDARD_CLASSICAL_ALGEBRA_IDENTITY",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 4,
-      "oracleMaxVisitedStates": 2000,
+      "oracleMaxVisitedStates": 300,
       "searchMaxDepth": 4,
-      "searchMaxVisitedStates": 400,
-      "maxCandidatesPerState": 100,
+      "searchMaxVisitedStates": 80,
+      "maxCandidatesPerState": 48,
       "maxExpandingSteps": 4,
-      "beamWidth": 24
+      "beamWidth": 12
     },
     {
       "id": "fractional-square",
@@ -87,12 +87,12 @@
       "provenance": "STANDARD_CLASSICAL_ALGEBRA_IDENTITY",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 4,
-      "oracleMaxVisitedStates": 2500,
+      "oracleMaxVisitedStates": 400,
       "searchMaxDepth": 4,
-      "searchMaxVisitedStates": 500,
-      "maxCandidatesPerState": 120,
+      "searchMaxVisitedStates": 100,
+      "maxCandidatesPerState": 60,
       "maxExpandingSteps": 4,
-      "beamWidth": 24
+      "beamWidth": 12
     },
     {
       "id": "difference-of-squares",
@@ -105,12 +105,12 @@
       "provenance": "STANDARD_DIFFERENCE_OF_SQUARES_IDENTITY",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 3,
-      "oracleMaxVisitedStates": 800,
+      "oracleMaxVisitedStates": 160,
       "searchMaxDepth": 3,
-      "searchMaxVisitedStates": 120,
-      "maxCandidatesPerState": 80,
+      "searchMaxVisitedStates": 60,
+      "maxCandidatesPerState": 48,
       "maxExpandingSteps": 3,
-      "beamWidth": 16
+      "beamWidth": 10
     },
     {
       "id": "difference-of-squares-powers",
@@ -123,12 +123,12 @@
       "provenance": "STANDARD_DIFFERENCE_OF_SQUARES_IDENTITY",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 2,
-      "oracleMaxVisitedStates": 400,
+      "oracleMaxVisitedStates": 80,
       "searchMaxDepth": 2,
-      "searchMaxVisitedStates": 80,
-      "maxCandidatesPerState": 80,
+      "searchMaxVisitedStates": 40,
+      "maxCandidatesPerState": 48,
       "maxExpandingSteps": 2,
-      "beamWidth": 12
+      "beamWidth": 8
     },
     {
       "id": "factor-common-left",
@@ -141,12 +141,12 @@
       "provenance": "DISTRIBUTIVE_LAW_REVERSED",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 2,
-      "oracleMaxVisitedStates": 400,
+      "oracleMaxVisitedStates": 80,
       "searchMaxDepth": 2,
-      "searchMaxVisitedStates": 80,
-      "maxCandidatesPerState": 80,
+      "searchMaxVisitedStates": 40,
+      "maxCandidatesPerState": 48,
       "maxExpandingSteps": 2,
-      "beamWidth": 12
+      "beamWidth": 8
     },
     {
       "id": "factor-common-right",
@@ -159,12 +159,12 @@
       "provenance": "DISTRIBUTIVE_LAW_REVERSED",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 2,
-      "oracleMaxVisitedStates": 400,
+      "oracleMaxVisitedStates": 80,
       "searchMaxDepth": 2,
-      "searchMaxVisitedStates": 80,
-      "maxCandidatesPerState": 80,
+      "searchMaxVisitedStates": 40,
+      "maxCandidatesPerState": 48,
       "maxExpandingSteps": 2,
-      "beamWidth": 12
+      "beamWidth": 8
     },
     {
       "id": "expand-binomial-square",
@@ -177,12 +177,12 @@
       "provenance": "BINOMIAL_SQUARE_EXPANSION",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 6,
-      "oracleMaxVisitedStates": 4000,
+      "oracleMaxVisitedStates": 600,
       "searchMaxDepth": 6,
-      "searchMaxVisitedStates": 600,
-      "maxCandidatesPerState": 120,
+      "searchMaxVisitedStates": 120,
+      "maxCandidatesPerState": 64,
       "maxExpandingSteps": 6,
-      "beamWidth": 32
+      "beamWidth": 16
     },
     {
       "id": "reverse-difference-of-squares",
@@ -195,12 +195,12 @@
       "provenance": "DIFFERENCE_OF_SQUARES_EXPANSION",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 6,
-      "oracleMaxVisitedStates": 4000,
+      "oracleMaxVisitedStates": 600,
       "searchMaxDepth": 6,
-      "searchMaxVisitedStates": 600,
-      "maxCandidatesPerState": 120,
+      "searchMaxVisitedStates": 120,
+      "maxCandidatesPerState": 64,
       "maxExpandingSteps": 6,
-      "beamWidth": 32
+      "beamWidth": 16
     },
     {
       "id": "sophie-germain",
@@ -213,12 +213,12 @@
       "provenance": "STANDARD_NAMED_SOPHIE_GERMAIN_IDENTITY",
       "targetRelation": "VALUE_EQUIVALENT",
       "oracleMaxDepth": 5,
-      "oracleMaxVisitedStates": 5000,
+      "oracleMaxVisitedStates": 800,
       "searchMaxDepth": 5,
-      "searchMaxVisitedStates": 1000,
-      "maxCandidatesPerState": 160,
+      "searchMaxVisitedStates": 160,
+      "maxCandidatesPerState": 80,
       "maxExpandingSteps": 8,
-      "beamWidth": 40
+      "beamWidth": 20
     },
     {
       "id": "distribution-fitness-valley-control",
@@ -231,10 +231,10 @@
       "provenance": "SYNTHETIC_INFORMATION_PARITY_CONTROL",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 2,
-      "oracleMaxVisitedStates": 200,
+      "oracleMaxVisitedStates": 120,
       "searchMaxDepth": 2,
       "searchMaxVisitedStates": 3,
-      "maxCandidatesPerState": 80,
+      "maxCandidatesPerState": 48,
       "maxExpandingSteps": 2,
       "beamWidth": 2
     },
@@ -249,12 +249,12 @@
       "provenance": "NEGATIVE_CONTROL_DERIVED_FROM_COMPLETING_THE_SQUARE",
       "targetRelation": "SYNTAX_EXACT",
       "oracleMaxDepth": 4,
-      "oracleMaxVisitedStates": 2000,
+      "oracleMaxVisitedStates": 300,
       "searchMaxDepth": 4,
-      "searchMaxVisitedStates": 400,
-      "maxCandidatesPerState": 100,
+      "searchMaxVisitedStates": 80,
+      "maxCandidatesPerState": 48,
       "maxExpandingSteps": 4,
-      "beamWidth": 24
+      "beamWidth": 12
     }
   ]
 }
