@@ -6,6 +6,7 @@ import static de.regelsuche.ast.BinaryOperator.POW;
 import static de.regelsuche.ast.BinaryOperator.SUB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,6 +20,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -101,16 +103,24 @@ class KnownDerivationBenchmarkTest {
             assertEquals(
                 Set.of("schema", "evidenceStatus", "claimBoundary", "cases"),
                 root.keySet());
-            assertEquals("regelsuche.known-derivation-corpus/v1", root.get("schema"));
-            assertEquals("DEVELOPMENT_FIXTURE", root.get("evidenceStatus"));
-            assertFalse(String.valueOf(root.get("claimBoundary")).isBlank());
+            assertEquals(
+                "regelsuche.known-derivation-corpus/v1",
+                requiredString(root, "schema"));
+            assertEquals("DEVELOPMENT_FIXTURE", requiredString(root, "evidenceStatus"));
+            requiredString(root, "claimBoundary");
 
-            List<?> rawCases = (List<?>) root.get("cases");
+            List<?> rawCases = assertInstanceOf(
+                List.class,
+                root.get("cases"),
+                "cases must be a JSON array");
             Set<String> ids = new LinkedHashSet<>();
             List<Case> cases = new ArrayList<>();
             for (Object rawCase : rawCases) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> values = (Map<String, Object>) rawCase;
+                Map<?, ?> rawValues = assertInstanceOf(
+                    Map.class,
+                    rawCase,
+                    "each benchmark case must be a JSON object");
+                Map<String, Object> values = stringKeyedMap(rawValues);
                 assertEquals(
                     Set.of("id", "source", "target", "maxDepth", "relation",
                         "provenance", "control"),
@@ -124,11 +134,16 @@ class KnownDerivationBenchmarkTest {
                 if (control.equals("NEGATIVE")) {
                     assertEquals("NOT_EQUIVALENT", relation, id);
                 }
+                Number maxDepth = assertInstanceOf(
+                    Number.class,
+                    values.get("maxDepth"),
+                    "maxDepth must be numeric in " + values);
+                assertTrue(maxDepth.intValue() >= 0, "negative maxDepth in " + values);
                 cases.add(new Case(
                     id,
                     requiredString(values, "source"),
                     requiredString(values, "target"),
-                    ((Number) values.get("maxDepth")).intValue(),
+                    maxDepth.intValue(),
                     relation,
                     requiredString(values, "provenance"),
                     control
@@ -141,8 +156,19 @@ class KnownDerivationBenchmarkTest {
         }
     }
 
+    private Map<String, Object> stringKeyedMap(Map<?, ?> values) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        values.forEach((key, value) -> result.put(
+            assertInstanceOf(String.class, key, "case object keys must be strings"),
+            value));
+        return result;
+    }
+
     private String requiredString(Map<String, Object> values, String key) {
-        String value = String.valueOf(values.get(key));
+        String value = assertInstanceOf(
+            String.class,
+            values.get(key),
+            "missing or non-string " + key + " in " + values);
         assertFalse(value.isBlank(), "blank " + key + " in " + values);
         return value;
     }
