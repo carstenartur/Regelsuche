@@ -13,7 +13,15 @@ final class RelationalJson {
 
     static String array(List<String> values) {
         List<String> safe = values == null ? List.of() : values;
-        return safe.stream().map(RelationalJson::quote).collect(Collectors.joining(",", "[", "]"));
+        return safe.stream()
+            .map(value -> {
+                if (value == null) {
+                    throw new IllegalArgumentException(
+                        "relational JSON string arrays must not contain null elements");
+                }
+                return quote(value);
+            })
+            .collect(Collectors.joining(",", "[", "]"));
     }
 
     static List<String> arrayValues(String json) {
