@@ -161,156 +161,160 @@ import java.util.Set;
         }
 <span class="fc" id="L162">    }</span>
 
-    private static CandidateSelection.Alternative alternative(
+    static CandidateSelection.Alternative alternative(
         RetainedEvolutionRewriteProgramPopulationRun.RetainedCandidate retained,
         CandidateEvaluation evaluation,
         Set&lt;String&gt; seedHashes,
         Set&lt;String&gt; seedAlphaHashes,
         int minimumPrimitivePathSteps
     ) {
-<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (evaluation == null) {</span>
-<span class="nc" id="L172">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (evaluation == null) {</span>
+<span class="fc" id="L172">            throw new IllegalArgumentException(</span>
                 &quot;terminal candidate lacks retained TRAIN evaluation&quot;);
         }
-<span class="fc" id="L175">        EvolutionRewriteProgramCandidate candidate = retained.candidate();</span>
-<span class="fc" id="L176">        ProgramFacts facts = analyze(candidate.plan().root());</span>
-<span class="fc" id="L177">        boolean seedExact = seedHashes.contains(candidate.contentHash());</span>
-<span class="fc" id="L178">        boolean seedAlpha = seedAlphaHashes.contains(</span>
-<span class="fc" id="L179">            candidate.alphaStructuralHash());</span>
-<span class="fc" id="L180">        List&lt;String&gt; freezeBlockers = new ArrayList&lt;&gt;();</span>
-<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (seedExact) {</span>
-<span class="nc" id="L182">            freezeBlockers.add(&quot;SEED_EXACT_EQUIVALENT&quot;);</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (retained == null) {</span>
+<span class="nc" id="L176">            throw new IllegalArgumentException(</span>
+                &quot;candidate alternative requires retained TRAIN candidate&quot;);
         }
-<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (seedAlpha) {</span>
-<span class="nc" id="L185">            freezeBlockers.add(&quot;SEED_ALPHA_EQUIVALENT&quot;);</span>
+<span class="fc" id="L179">        EvolutionRewriteProgramCandidate candidate = retained.candidate();</span>
+<span class="fc" id="L180">        ProgramFacts facts = analyze(candidate.plan().root());</span>
+<span class="fc" id="L181">        boolean seedExact = seedHashes.contains(candidate.contentHash());</span>
+<span class="fc" id="L182">        boolean seedAlpha = seedAlphaHashes.contains(</span>
+<span class="fc" id="L183">            candidate.alphaStructuralHash());</span>
+<span class="fc" id="L184">        List&lt;String&gt; freezeBlockers = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (seedExact) {</span>
+<span class="nc" id="L186">            freezeBlockers.add(&quot;SEED_EXACT_EQUIVALENT&quot;);</span>
         }
-<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (!facts.containsCompositionTopology()) {</span>
-<span class="nc" id="L188">            freezeBlockers.add(&quot;MISSING_COMPOSITION_TOPOLOGY&quot;);</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (seedAlpha) {</span>
+<span class="nc" id="L189">            freezeBlockers.add(&quot;SEED_ALPHA_EQUIVALENT&quot;);</span>
         }
-<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (!facts.containsDecisionTopology()) {</span>
-<span class="nc" id="L191">            freezeBlockers.add(&quot;MISSING_DECISION_TOPOLOGY&quot;);</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (!facts.containsCompositionTopology()) {</span>
+<span class="nc" id="L192">            freezeBlockers.add(&quot;MISSING_COMPOSITION_TOPOLOGY&quot;);</span>
         }
-<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (facts.minimumStructuralPrimitivePathSteps()</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (!facts.containsDecisionTopology()) {</span>
+<span class="nc" id="L195">            freezeBlockers.add(&quot;MISSING_DECISION_TOPOLOGY&quot;);</span>
+        }
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (facts.minimumStructuralPrimitivePathSteps()</span>
                 &lt; minimumPrimitivePathSteps) {
-<span class="nc" id="L195">            freezeBlockers.add(&quot;PRIMITIVE_PATH_DEPTH_BELOW_&quot;</span>
+<span class="nc" id="L199">            freezeBlockers.add(&quot;PRIMITIVE_PATH_DEPTH_BELOW_&quot;</span>
                 + minimumPrimitivePathSteps);
         }
-<span class="fc" id="L198">        List&lt;String&gt; canonicalFreezeBlockers = freezeBlockers.stream()</span>
-<span class="fc" id="L199">            .distinct()</span>
-<span class="fc" id="L200">            .sorted()</span>
-<span class="fc" id="L201">            .toList();</span>
-<span class="fc" id="L202">        return new CandidateSelection.Alternative(</span>
-<span class="fc" id="L203">            candidate.contentHash(),</span>
-<span class="fc" id="L204">            candidate.alphaStructuralHash(),</span>
-<span class="fc" id="L205">            candidate.genome().contentHash(),</span>
-<span class="fc" id="L206">            candidate.plan().contentHash(),</span>
-<span class="fc" id="L207">            evaluation.contentHash(),</span>
-<span class="fc" id="L208">            evaluation.scalarFitness(),</span>
-<span class="fc" id="L209">            evaluation.rawComponents(),</span>
-<span class="fc" id="L210">            evaluation.blockers(),</span>
+<span class="fc" id="L202">        List&lt;String&gt; canonicalFreezeBlockers = freezeBlockers.stream()</span>
+<span class="fc" id="L203">            .distinct()</span>
+<span class="fc" id="L204">            .sorted()</span>
+<span class="fc" id="L205">            .toList();</span>
+<span class="fc" id="L206">        return new CandidateSelection.Alternative(</span>
+<span class="fc" id="L207">            candidate.contentHash(),</span>
+<span class="fc" id="L208">            candidate.alphaStructuralHash(),</span>
+<span class="fc" id="L209">            candidate.genome().contentHash(),</span>
+<span class="fc" id="L210">            candidate.plan().contentHash(),</span>
+<span class="fc" id="L211">            evaluation.contentHash(),</span>
+<span class="fc" id="L212">            evaluation.scalarFitness(),</span>
+<span class="fc" id="L213">            evaluation.rawComponents(),</span>
+<span class="fc" id="L214">            evaluation.blockers(),</span>
             seedExact,
             seedAlpha,
-<span class="fc" id="L213">            facts.nodeCount(),</span>
-<span class="fc" id="L214">            facts.containsCompositionTopology(),</span>
-<span class="fc" id="L215">            facts.containsDecisionTopology(),</span>
-<span class="fc" id="L216">            facts.minimumStructuralPrimitivePathSteps(),</span>
+<span class="fc" id="L217">            facts.nodeCount(),</span>
+<span class="fc" id="L218">            facts.containsCompositionTopology(),</span>
+<span class="fc" id="L219">            facts.containsDecisionTopology(),</span>
+<span class="fc" id="L220">            facts.minimumStructuralPrimitivePathSteps(),</span>
             canonicalFreezeBlockers,
-<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            evaluation.blockers().isEmpty()</span>
-<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                &amp;&amp; canonicalFreezeBlockers.isEmpty());</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            evaluation.blockers().isEmpty()</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">                &amp;&amp; canonicalFreezeBlockers.isEmpty());</span>
     }
 
     static ProgramFacts analyze(Node node) {
-<span class="fc" id="L223">        Objects.requireNonNull(node, &quot;node&quot;);</span>
-<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (node instanceof Source) {</span>
-<span class="fc" id="L225">            return new ProgramFacts(1, false, false, 1);</span>
+<span class="fc" id="L227">        Objects.requireNonNull(node, &quot;node&quot;);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (node instanceof Source) {</span>
+<span class="fc" id="L229">            return new ProgramFacts(1, false, false, 1);</span>
         }
-<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
-<span class="fc" id="L228">            List&lt;ProgramFacts&gt; children = sequence.steps().stream()</span>
-<span class="fc" id="L229">                .map(ProofCarryingShowcaseCandidateFreezer::analyze)</span>
-<span class="fc" id="L230">                .toList();</span>
-<span class="fc" id="L231">            return new ProgramFacts(</span>
-<span class="fc" id="L232">                onePlusNodeCounts(children),</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
+<span class="fc" id="L232">            List&lt;ProgramFacts&gt; children = sequence.steps().stream()</span>
+<span class="fc" id="L233">                .map(ProofCarryingShowcaseCandidateFreezer::analyze)</span>
+<span class="fc" id="L234">                .toList();</span>
+<span class="fc" id="L235">            return new ProgramFacts(</span>
+<span class="fc" id="L236">                onePlusNodeCounts(children),</span>
                 true,
-<span class="fc" id="L234">                children.stream().anyMatch(</span>
+<span class="fc" id="L238">                children.stream().anyMatch(</span>
                     ProgramFacts::containsDecisionTopology),
-<span class="fc" id="L236">                children.stream()</span>
-<span class="fc" id="L237">                    .mapToInt(</span>
+<span class="fc" id="L240">                children.stream()</span>
+<span class="fc" id="L241">                    .mapToInt(</span>
                         ProgramFacts::minimumStructuralPrimitivePathSteps)
-<span class="fc" id="L239">                    .reduce(0, ProofCarryingShowcaseCandidateFreezer::safeAdd));</span>
+<span class="fc" id="L243">                    .reduce(0, ProofCarryingShowcaseCandidateFreezer::safeAdd));</span>
         }
-<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
-<span class="fc" id="L242">            ProgramFacts child = analyze(repeat.body());</span>
-<span class="fc" id="L243">            return new ProgramFacts(</span>
-<span class="fc" id="L244">                safeAdd(1, child.nodeCount()),</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L246">            ProgramFacts child = analyze(repeat.body());</span>
+<span class="fc" id="L247">            return new ProgramFacts(</span>
+<span class="fc" id="L248">                safeAdd(1, child.nodeCount()),</span>
                 true,
-<span class="fc" id="L246">                child.containsDecisionTopology(),</span>
-<span class="fc" id="L247">                safeMultiply(</span>
-<span class="fc" id="L248">                    repeat.minIterations(),</span>
-<span class="fc" id="L249">                    child.minimumStructuralPrimitivePathSteps()));</span>
+<span class="fc" id="L250">                child.containsDecisionTopology(),</span>
+<span class="fc" id="L251">                safeMultiply(</span>
+<span class="fc" id="L252">                    repeat.minIterations(),</span>
+<span class="fc" id="L253">                    child.minimumStructuralPrimitivePathSteps()));</span>
         }
-<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (node instanceof Choice choice) {</span>
-<span class="nc" id="L252">            return decisionAlternatives(choice.alternatives());</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (node instanceof Choice choice) {</span>
+<span class="nc" id="L256">            return decisionAlternatives(choice.alternatives());</span>
         }
-<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (node instanceof FirstApplicable firstApplicable) {</span>
-<span class="nc" id="L255">            return decisionAlternatives(firstApplicable.alternatives());</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="nc" id="L259">            return decisionAlternatives(firstApplicable.alternatives());</span>
         }
-<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
-<span class="fc" id="L258">            return decisionWrapper(analyze(require.body()));</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
+<span class="fc" id="L262">            return decisionWrapper(analyze(require.body()));</span>
         }
-<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
-<span class="fc" id="L261">            return decisionWrapper(analyze(prioritize.body()));</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
+<span class="fc" id="L265">            return decisionWrapper(analyze(prioritize.body()));</span>
         }
-<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (node instanceof Prune prune) {</span>
-<span class="fc" id="L264">            return decisionWrapper(analyze(prune.body()));</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (node instanceof Prune prune) {</span>
+<span class="fc" id="L268">            return decisionWrapper(analyze(prune.body()));</span>
         }
-<span class="nc" id="L266">        throw new IllegalArgumentException(</span>
-<span class="nc" id="L267">            &quot;unsupported rewrite-program node: &quot; + node.getClass().getName());</span>
+<span class="nc" id="L270">        throw new IllegalArgumentException(</span>
+<span class="nc" id="L271">            &quot;unsupported rewrite-program node: &quot; + node.getClass().getName());</span>
     }
 
     private static ProgramFacts decisionAlternatives(List&lt;Node&gt; alternatives) {
-<span class="nc" id="L271">        List&lt;ProgramFacts&gt; children = alternatives.stream()</span>
-<span class="nc" id="L272">            .map(ProofCarryingShowcaseCandidateFreezer::analyze)</span>
-<span class="nc" id="L273">            .toList();</span>
-<span class="nc" id="L274">        return new ProgramFacts(</span>
-<span class="nc" id="L275">            onePlusNodeCounts(children),</span>
-<span class="nc" id="L276">            children.stream().anyMatch(</span>
+<span class="nc" id="L275">        List&lt;ProgramFacts&gt; children = alternatives.stream()</span>
+<span class="nc" id="L276">            .map(ProofCarryingShowcaseCandidateFreezer::analyze)</span>
+<span class="nc" id="L277">            .toList();</span>
+<span class="nc" id="L278">        return new ProgramFacts(</span>
+<span class="nc" id="L279">            onePlusNodeCounts(children),</span>
+<span class="nc" id="L280">            children.stream().anyMatch(</span>
                 ProgramFacts::containsCompositionTopology),
             true,
-<span class="nc" id="L279">            children.stream()</span>
-<span class="nc" id="L280">                .mapToInt(</span>
+<span class="nc" id="L283">            children.stream()</span>
+<span class="nc" id="L284">                .mapToInt(</span>
                     ProgramFacts::minimumStructuralPrimitivePathSteps)
-<span class="nc" id="L282">                .min()</span>
-<span class="nc" id="L283">                .orElseThrow());</span>
+<span class="nc" id="L286">                .min()</span>
+<span class="nc" id="L287">                .orElseThrow());</span>
     }
 
     private static ProgramFacts decisionWrapper(ProgramFacts child) {
-<span class="fc" id="L287">        return new ProgramFacts(</span>
-<span class="fc" id="L288">            safeAdd(1, child.nodeCount()),</span>
-<span class="fc" id="L289">            child.containsCompositionTopology(),</span>
+<span class="fc" id="L291">        return new ProgramFacts(</span>
+<span class="fc" id="L292">            safeAdd(1, child.nodeCount()),</span>
+<span class="fc" id="L293">            child.containsCompositionTopology(),</span>
             true,
-<span class="fc" id="L291">            child.minimumStructuralPrimitivePathSteps());</span>
+<span class="fc" id="L295">            child.minimumStructuralPrimitivePathSteps());</span>
     }
 
     private static int onePlusNodeCounts(List&lt;ProgramFacts&gt; children) {
-<span class="fc" id="L295">        int result = 1;</span>
-<span class="fc bfc" id="L296" title="All 2 branches covered.">        for (ProgramFacts child : children) {</span>
-<span class="fc" id="L297">            result = safeAdd(result, child.nodeCount());</span>
-<span class="fc" id="L298">        }</span>
-<span class="fc" id="L299">        return result;</span>
+<span class="fc" id="L299">        int result = 1;</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        for (ProgramFacts child : children) {</span>
+<span class="fc" id="L301">            result = safeAdd(result, child.nodeCount());</span>
+<span class="fc" id="L302">        }</span>
+<span class="fc" id="L303">        return result;</span>
     }
 
     private static int safeAdd(int left, int right) {
-<span class="fc" id="L303">        long result = (long) left + right;</span>
-<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        return result &gt; Integer.MAX_VALUE</span>
-<span class="nc" id="L305">            ? Integer.MAX_VALUE</span>
-<span class="fc" id="L306">            : Math.toIntExact(result);</span>
+<span class="fc" id="L307">        long result = (long) left + right;</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">        return result &gt; Integer.MAX_VALUE</span>
+<span class="nc" id="L309">            ? Integer.MAX_VALUE</span>
+<span class="fc" id="L310">            : Math.toIntExact(result);</span>
     }
 
     private static int safeMultiply(int left, int right) {
-<span class="fc" id="L310">        long result = (long) left * right;</span>
-<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        return result &gt; Integer.MAX_VALUE</span>
-<span class="nc" id="L312">            ? Integer.MAX_VALUE</span>
-<span class="fc" id="L313">            : Math.toIntExact(result);</span>
+<span class="fc" id="L314">        long result = (long) left * right;</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        return result &gt; Integer.MAX_VALUE</span>
+<span class="nc" id="L316">            ? Integer.MAX_VALUE</span>
+<span class="fc" id="L317">            : Math.toIntExact(result);</span>
     }
 
     public static record CandidateSelection(
@@ -337,54 +341,54 @@ import java.util.Set;
             &quot;MAX_TRAIN_SCALAR_THEN_MIN_PROGRAM_NODES_THEN_CANDIDATE_HASH_&quot;
                 + &quot;AMONG_NON_SEED_COMPOSITE_DECISION_CANDIDATES&quot;;
 
-<span class="fc" id="L340">        public CandidateSelection {</span>
-<span class="pc bpc" id="L341" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L342">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L344">        public CandidateSelection {</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L346">                throw new IllegalArgumentException(</span>
                     &quot;unsupported showcase candidate-selection schema&quot;);
             }
-<span class="fc" id="L345">            ProofCarryingShowcaseJsonSupport.requireText(</span>
+<span class="fc" id="L349">            ProofCarryingShowcaseJsonSupport.requireText(</span>
                 showcaseId, &quot;showcaseId&quot;);
-<span class="fc" id="L347">            EvolutionGenome.requireSha256(</span>
-                planContentHash, &quot;planContentHash&quot;);
-<span class="fc" id="L349">            EvolutionGenome.requireSha256(</span>
-                retainedPopulationRunHash, &quot;retainedPopulationRunHash&quot;);
 <span class="fc" id="L351">            EvolutionGenome.requireSha256(</span>
-                populationRunHash, &quot;populationRunHash&quot;);
+                planContentHash, &quot;planContentHash&quot;);
 <span class="fc" id="L353">            EvolutionGenome.requireSha256(</span>
+                retainedPopulationRunHash, &quot;retainedPopulationRunHash&quot;);
+<span class="fc" id="L355">            EvolutionGenome.requireSha256(</span>
+                populationRunHash, &quot;populationRunHash&quot;);
+<span class="fc" id="L357">            EvolutionGenome.requireSha256(</span>
                 finalGenerationReportHash, &quot;finalGenerationReportHash&quot;);
-<span class="fc" id="L355">            Objects.requireNonNull(</span>
+<span class="fc" id="L359">            Objects.requireNonNull(</span>
                 populationTerminalOutcome, &quot;populationTerminalOutcome&quot;);
-<span class="pc bpc" id="L357" title="1 of 2 branches missed.">            if (populationTerminalOutcome == TerminalOutcome.EXTINCT) {</span>
-<span class="nc" id="L358">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">            if (populationTerminalOutcome == TerminalOutcome.EXTINCT) {</span>
+<span class="nc" id="L362">                throw new IllegalArgumentException(</span>
                     &quot;an extinct TRAIN population cannot freeze a candidate&quot;);
             }
-<span class="pc bpc" id="L361" title="1 of 2 branches missed.">            if (!SELECTION_POLICY.equals(selectionPolicy)) {</span>
-<span class="nc" id="L362">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">            if (!SELECTION_POLICY.equals(selectionPolicy)) {</span>
+<span class="nc" id="L366">                throw new IllegalArgumentException(</span>
                     &quot;unsupported showcase candidate-selection policy&quot;);
             }
-<span class="fc" id="L365">            alternatives = canonicalAlternatives(alternatives);</span>
-<span class="fc" id="L366">            EvolutionGenome.requireSha256(</span>
+<span class="fc" id="L369">            alternatives = canonicalAlternatives(alternatives);</span>
+<span class="fc" id="L370">            EvolutionGenome.requireSha256(</span>
                 selectedCandidateHash, &quot;selectedCandidateHash&quot;);
-<span class="fc" id="L368">            EvolutionGenome.requireSha256(</span>
+<span class="fc" id="L372">            EvolutionGenome.requireSha256(</span>
                 selectedCandidateAlphaStructuralHash,
                 &quot;selectedCandidateAlphaStructuralHash&quot;);
-<span class="fc" id="L371">            EvolutionGenome.requireSha256(</span>
+<span class="fc" id="L375">            EvolutionGenome.requireSha256(</span>
                 selectedPlanHash, &quot;selectedPlanHash&quot;);
-<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            if (!STATUS.equals(status)) {</span>
-<span class="nc" id="L374">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">            if (!STATUS.equals(status)) {</span>
+<span class="nc" id="L378">                throw new IllegalArgumentException(</span>
                     &quot;candidate selection must keep FINAL TEST unseen&quot;);
             }
-<span class="fc" id="L377">            Alternative selected = selected(alternatives);</span>
-<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            if (!selected.candidateHash().equals(selectedCandidateHash)</span>
-<span class="pc bpc" id="L379" title="1 of 2 branches missed.">                    || !selected.alphaStructuralHash().equals(</span>
+<span class="fc" id="L381">            Alternative selected = selected(alternatives);</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">            if (!selected.candidateHash().equals(selectedCandidateHash)</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">                    || !selected.alphaStructuralHash().equals(</span>
                         selectedCandidateAlphaStructuralHash)
-<span class="pc bpc" id="L381" title="1 of 2 branches missed.">                    || !selected.planHash().equals(selectedPlanHash)) {</span>
-<span class="nc" id="L382">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">                    || !selected.planHash().equals(selectedPlanHash)) {</span>
+<span class="nc" id="L386">                throw new IllegalArgumentException(</span>
                     &quot;selected candidate differs from frozen deterministic ranking&quot;);
             }
-<span class="fc" id="L385">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L386">            String expected = ProofCarryingShowcaseJsonSupport.hashPayload(</span>
-<span class="fc" id="L387">                payload(</span>
+<span class="fc" id="L389">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L390">            String expected = ProofCarryingShowcaseJsonSupport.hashPayload(</span>
+<span class="fc" id="L391">                payload(</span>
                     showcaseId,
                     planContentHash,
                     retainedPopulationRunHash,
@@ -395,11 +399,11 @@ import java.util.Set;
                     selectedCandidateHash,
                     selectedCandidateAlphaStructuralHash,
                     selectedPlanHash));
-<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
-<span class="nc" id="L399">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L403">                throw new IllegalArgumentException(</span>
                     &quot;showcase candidate-selection contentHash mismatch&quot;);
             }
-<span class="fc" id="L402">        }</span>
+<span class="fc" id="L406">        }</span>
 
         static CandidateSelection create(
             String showcaseId,
@@ -407,81 +411,81 @@ import java.util.Set;
             RetainedEvolutionRewriteProgramPopulationRun retained,
             List&lt;Alternative&gt; alternatives
         ) {
-<span class="fc" id="L410">            Objects.requireNonNull(retained, &quot;retained&quot;);</span>
-<span class="fc" id="L411">            List&lt;Alternative&gt; canonical = canonicalAlternatives(alternatives);</span>
-<span class="fc" id="L412">            Alternative selected = selected(canonical);</span>
-<span class="fc" id="L413">            var run = retained.populationRun();</span>
-<span class="fc" id="L414">            String finalGenerationHash = run.generationReports().getLast()</span>
-<span class="fc" id="L415">                .contentHash();</span>
-<span class="fc" id="L416">            String hash = ProofCarryingShowcaseJsonSupport.hashPayload(payload(</span>
+<span class="fc" id="L414">            Objects.requireNonNull(retained, &quot;retained&quot;);</span>
+<span class="fc" id="L415">            List&lt;Alternative&gt; canonical = canonicalAlternatives(alternatives);</span>
+<span class="fc" id="L416">            Alternative selected = selected(canonical);</span>
+<span class="fc" id="L417">            var run = retained.populationRun();</span>
+<span class="fc" id="L418">            String finalGenerationHash = run.generationReports().getLast()</span>
+<span class="fc" id="L419">                .contentHash();</span>
+<span class="fc" id="L420">            String hash = ProofCarryingShowcaseJsonSupport.hashPayload(payload(</span>
                 showcaseId,
                 planContentHash,
-<span class="fc" id="L419">                retained.contentHash(),</span>
-<span class="fc" id="L420">                run.contentHash(),</span>
+<span class="fc" id="L423">                retained.contentHash(),</span>
+<span class="fc" id="L424">                run.contentHash(),</span>
                 finalGenerationHash,
-<span class="fc" id="L422">                run.terminalOutcome(),</span>
+<span class="fc" id="L426">                run.terminalOutcome(),</span>
                 canonical,
-<span class="fc" id="L424">                selected.candidateHash(),</span>
-<span class="fc" id="L425">                selected.alphaStructuralHash(),</span>
-<span class="fc" id="L426">                selected.planHash()));</span>
-<span class="fc" id="L427">            return new CandidateSelection(</span>
+<span class="fc" id="L428">                selected.candidateHash(),</span>
+<span class="fc" id="L429">                selected.alphaStructuralHash(),</span>
+<span class="fc" id="L430">                selected.planHash()));</span>
+<span class="fc" id="L431">            return new CandidateSelection(</span>
                 SCHEMA,
                 showcaseId,
                 planContentHash,
-<span class="fc" id="L431">                retained.contentHash(),</span>
-<span class="fc" id="L432">                run.contentHash(),</span>
+<span class="fc" id="L435">                retained.contentHash(),</span>
+<span class="fc" id="L436">                run.contentHash(),</span>
                 finalGenerationHash,
-<span class="fc" id="L434">                run.terminalOutcome(),</span>
+<span class="fc" id="L438">                run.terminalOutcome(),</span>
                 SELECTION_POLICY,
                 canonical,
-<span class="fc" id="L437">                selected.candidateHash(),</span>
-<span class="fc" id="L438">                selected.alphaStructuralHash(),</span>
-<span class="fc" id="L439">                selected.planHash(),</span>
+<span class="fc" id="L441">                selected.candidateHash(),</span>
+<span class="fc" id="L442">                selected.alphaStructuralHash(),</span>
+<span class="fc" id="L443">                selected.planHash(),</span>
                 STATUS,
                 hash);
         }
 
         public String toCanonicalJson() {
-<span class="nc" id="L445">            return ProofCarryingShowcaseJsonSupport.toCanonicalJson(this);</span>
+<span class="nc" id="L449">            return ProofCarryingShowcaseJsonSupport.toCanonicalJson(this);</span>
         }
 
         private static Alternative selected(List&lt;Alternative&gt; alternatives) {
-<span class="fc" id="L449">            return alternatives.stream()</span>
-<span class="fc" id="L450">                .filter(Alternative::eligibleForFreeze)</span>
-<span class="fc" id="L451">                .sorted(ranking())</span>
-<span class="fc" id="L452">                .findFirst()</span>
-<span class="pc" id="L453">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+<span class="fc" id="L453">            return alternatives.stream()</span>
+<span class="fc" id="L454">                .filter(Alternative::eligibleForFreeze)</span>
+<span class="fc" id="L455">                .sorted(ranking())</span>
+<span class="fc" id="L456">                .findFirst()</span>
+<span class="pc" id="L457">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
                     &quot;candidate selection requires an eligible TRAIN alternative&quot;));
         }
 
-        private static Comparator&lt;Alternative&gt; ranking() {
-<span class="fc" id="L458">            return Comparator</span>
-<span class="fc" id="L459">                .comparingInt(Alternative::scalarFitness)</span>
-<span class="fc" id="L460">                .reversed()</span>
-<span class="fc" id="L461">                .thenComparingInt(Alternative::programNodeCount)</span>
-<span class="fc" id="L462">                .thenComparing(Alternative::candidateHash);</span>
+        static Comparator&lt;Alternative&gt; ranking() {
+<span class="fc" id="L462">            return Comparator</span>
+<span class="fc" id="L463">                .comparingInt(Alternative::scalarFitness)</span>
+<span class="fc" id="L464">                .reversed()</span>
+<span class="fc" id="L465">                .thenComparingInt(Alternative::programNodeCount)</span>
+<span class="fc" id="L466">                .thenComparing(Alternative::candidateHash);</span>
         }
 
         private static List&lt;Alternative&gt; canonicalAlternatives(
             List&lt;Alternative&gt; values
         ) {
-<span class="fc" id="L468">            Objects.requireNonNull(values, &quot;alternatives&quot;);</span>
-<span class="fc" id="L469">            List&lt;Alternative&gt; result = values.stream()</span>
-<span class="fc" id="L470">                .map(value -&gt; Objects.requireNonNull(</span>
+<span class="fc" id="L472">            Objects.requireNonNull(values, &quot;alternatives&quot;);</span>
+<span class="fc" id="L473">            List&lt;Alternative&gt; result = values.stream()</span>
+<span class="fc" id="L474">                .map(value -&gt; Objects.requireNonNull(</span>
                     value, &quot;candidate alternative&quot;))
-<span class="fc" id="L472">                .sorted(Comparator.comparing(Alternative::candidateHash))</span>
-<span class="fc" id="L473">                .toList();</span>
-<span class="pc bpc" id="L474" title="1 of 2 branches missed.">            if (result.isEmpty()) {</span>
-<span class="nc" id="L475">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L476">                .sorted(Comparator.comparing(Alternative::candidateHash))</span>
+<span class="fc" id="L477">                .toList();</span>
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">            if (result.isEmpty()) {</span>
+<span class="nc" id="L479">                throw new IllegalArgumentException(</span>
                     &quot;candidate selection requires terminal alternatives&quot;);
             }
-<span class="fc" id="L478">            if (new HashSet&lt;&gt;(result.stream()</span>
-<span class="fc" id="L479">                    .map(Alternative::candidateHash).toList()).size()</span>
-<span class="pc bpc" id="L480" title="1 of 2 branches missed.">                    != result.size()) {</span>
-<span class="nc" id="L481">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L482">            if (new HashSet&lt;&gt;(result.stream()</span>
+<span class="fc" id="L483">                    .map(Alternative::candidateHash).toList()).size()</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">                    != result.size()) {</span>
+<span class="nc" id="L485">                throw new IllegalArgumentException(</span>
                     &quot;candidate alternatives require unique identities&quot;);
             }
-<span class="fc" id="L484">            return result;</span>
+<span class="fc" id="L488">            return result;</span>
         }
 
         private static Map&lt;String, Object&gt; payload(
@@ -496,7 +500,7 @@ import java.util.Set;
             String selectedCandidateAlphaStructuralHash,
             String selectedPlanHash
         ) {
-<span class="fc" id="L499">            return ProofCarryingShowcaseJsonSupport.payload(</span>
+<span class="fc" id="L503">            return ProofCarryingShowcaseJsonSupport.payload(</span>
                 &quot;schema&quot;, SCHEMA,
                 &quot;showcaseId&quot;, showcaseId,
                 &quot;planContentHash&quot;, planContentHash,
@@ -531,62 +535,62 @@ import java.util.Set;
             List&lt;String&gt; freezeBlockers,
             boolean eligibleForFreeze
         ) {
-<span class="fc" id="L534">            public Alternative {</span>
-<span class="fc" id="L535">                EvolutionGenome.requireSha256(candidateHash, &quot;candidateHash&quot;);</span>
-<span class="fc" id="L536">                EvolutionGenome.requireSha256(</span>
-                    alphaStructuralHash, &quot;alphaStructuralHash&quot;);
-<span class="fc" id="L538">                EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
-<span class="fc" id="L539">                EvolutionGenome.requireSha256(planHash, &quot;planHash&quot;);</span>
+<span class="fc" id="L538">            public Alternative {</span>
+<span class="fc" id="L539">                EvolutionGenome.requireSha256(candidateHash, &quot;candidateHash&quot;);</span>
 <span class="fc" id="L540">                EvolutionGenome.requireSha256(</span>
+                    alphaStructuralHash, &quot;alphaStructuralHash&quot;);
+<span class="fc" id="L542">                EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
+<span class="fc" id="L543">                EvolutionGenome.requireSha256(planHash, &quot;planHash&quot;);</span>
+<span class="fc" id="L544">                EvolutionGenome.requireSha256(</span>
                     evaluationHash, &quot;evaluationHash&quot;);
-<span class="pc bpc" id="L542" title="2 of 4 branches missed.">                if (scalarFitness &lt; -1000 || scalarFitness &gt; 1000) {</span>
-<span class="nc" id="L543">                    throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L546" title="2 of 4 branches missed.">                if (scalarFitness &lt; -1000 || scalarFitness &gt; 1000) {</span>
+<span class="nc" id="L547">                    throw new IllegalArgumentException(</span>
                         &quot;scalarFitness must be in [-1000,1000]&quot;);
                 }
-<span class="fc" id="L546">                rawComponents = canonicalComponents(rawComponents);</span>
-<span class="fc" id="L547">                trainBlockers = canonicalBlockers(</span>
+<span class="fc" id="L550">                rawComponents = canonicalComponents(rawComponents);</span>
+<span class="fc" id="L551">                trainBlockers = canonicalBlockers(</span>
                     trainBlockers, &quot;trainBlockers&quot;);
-<span class="pc bpc" id="L549" title="2 of 4 branches missed.">                if (programNodeCount &lt; 1</span>
+<span class="pc bpc" id="L553" title="2 of 4 branches missed.">                if (programNodeCount &lt; 1</span>
                         || minimumStructuralPrimitivePathSteps &lt; 1) {
-<span class="nc" id="L551">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L555">                    throw new IllegalArgumentException(</span>
                         &quot;candidate structural counters must be positive&quot;);
                 }
-<span class="fc" id="L554">                freezeBlockers = canonicalBlockers(</span>
+<span class="fc" id="L558">                freezeBlockers = canonicalBlockers(</span>
                     freezeBlockers, &quot;freezeBlockers&quot;);
-<span class="pc bpc" id="L556" title="1 of 2 branches missed.">                boolean expectedEligible = trainBlockers.isEmpty()</span>
-<span class="fc bfc" id="L557" title="All 2 branches covered.">                    &amp;&amp; freezeBlockers.isEmpty();</span>
-<span class="pc bpc" id="L558" title="1 of 2 branches missed.">                if (eligibleForFreeze != expectedEligible) {</span>
-<span class="nc" id="L559">                    throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L560" title="1 of 2 branches missed.">                boolean expectedEligible = trainBlockers.isEmpty()</span>
+<span class="fc bfc" id="L561" title="All 2 branches covered.">                    &amp;&amp; freezeBlockers.isEmpty();</span>
+<span class="pc bpc" id="L562" title="1 of 2 branches missed.">                if (eligibleForFreeze != expectedEligible) {</span>
+<span class="nc" id="L563">                    throw new IllegalArgumentException(</span>
                         &quot;eligibleForFreeze differs from retained blockers&quot;);
                 }
-<span class="fc" id="L562">            }</span>
+<span class="fc" id="L566">            }</span>
 
             private static Map&lt;FitnessComponent, Integer&gt; canonicalComponents(
                 Map&lt;FitnessComponent, Integer&gt; values
             ) {
-<span class="fc" id="L567">                EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
+<span class="fc" id="L571">                EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
                     new EnumMap&lt;&gt;(FitnessComponent.class);
-<span class="pc bpc" id="L569" title="1 of 2 branches missed.">                if (values != null) {</span>
-<span class="fc" id="L570">                    values.forEach((component, value) -&gt; {</span>
-<span class="fc" id="L571">                        Objects.requireNonNull(</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">                if (values != null) {</span>
+<span class="fc" id="L574">                    values.forEach((component, value) -&gt; {</span>
+<span class="fc" id="L575">                        Objects.requireNonNull(</span>
                             component, &quot;fitness component&quot;);
-<span class="fc" id="L573">                        Objects.requireNonNull(value, &quot;fitness value&quot;);</span>
-<span class="pc bpc" id="L574" title="2 of 4 branches missed.">                        if (value &lt; -1000 || value &gt; 1000) {</span>
-<span class="nc" id="L575">                            throw new IllegalArgumentException(</span>
+<span class="fc" id="L577">                        Objects.requireNonNull(value, &quot;fitness value&quot;);</span>
+<span class="pc bpc" id="L578" title="2 of 4 branches missed.">                        if (value &lt; -1000 || value &gt; 1000) {</span>
+<span class="nc" id="L579">                            throw new IllegalArgumentException(</span>
                                 &quot;fitness value must be in [-1000,1000]&quot;);
                         }
-<span class="fc" id="L578">                        result.put(component, value);</span>
-<span class="fc" id="L579">                    });</span>
+<span class="fc" id="L582">                        result.put(component, value);</span>
+<span class="fc" id="L583">                    });</span>
                 }
-<span class="fc" id="L581">                return Collections.unmodifiableMap(result);</span>
+<span class="fc" id="L585">                return Collections.unmodifiableMap(result);</span>
             }
 
             private static List&lt;String&gt; canonicalBlockers(
                 List&lt;String&gt; values,
                 String name
             ) {
-<span class="fc" id="L588">                return ProofCarryingShowcaseJsonSupport.immutableStrings(</span>
-<span class="pc bpc" id="L589" title="1 of 2 branches missed.">                    values == null ? List.of() : values,</span>
+<span class="fc" id="L592">                return ProofCarryingShowcaseJsonSupport.immutableStrings(</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">                    values == null ? List.of() : values,</span>
                     name,
                     true,
                     false);
@@ -600,12 +604,12 @@ import java.util.Set;
         boolean containsDecisionTopology,
         int minimumStructuralPrimitivePathSteps
     ) {
-<span class="fc" id="L603">        public ProgramFacts {</span>
-<span class="pc bpc" id="L604" title="2 of 4 branches missed.">            if (nodeCount &lt; 1 || minimumStructuralPrimitivePathSteps &lt; 1) {</span>
-<span class="nc" id="L605">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L607">        public ProgramFacts {</span>
+<span class="pc bpc" id="L608" title="2 of 4 branches missed.">            if (nodeCount &lt; 1 || minimumStructuralPrimitivePathSteps &lt; 1) {</span>
+<span class="nc" id="L609">                throw new IllegalArgumentException(</span>
                     &quot;program facts require positive structural counters&quot;);
             }
-<span class="fc" id="L608">        }</span>
+<span class="fc" id="L612">        }</span>
     }
 
     public record FreezeBundle(
@@ -614,20 +618,20 @@ import java.util.Set;
         RetainedEvolutionRewriteProgramPopulationRun.RetainedCandidate
             selectedCandidate
     ) {
-<span class="fc" id="L617">        public FreezeBundle {</span>
-<span class="fc" id="L618">            Objects.requireNonNull(selection, &quot;selection&quot;);</span>
-<span class="fc" id="L619">            Objects.requireNonNull(candidateFreeze, &quot;candidateFreeze&quot;);</span>
-<span class="fc" id="L620">            Objects.requireNonNull(selectedCandidate, &quot;selectedCandidate&quot;);</span>
-<span class="pc bpc" id="L621" title="1 of 2 branches missed.">            if (!selection.selectedCandidateHash().equals(</span>
-<span class="fc" id="L622">                    selectedCandidate.candidateHash())</span>
-<span class="pc bpc" id="L623" title="1 of 2 branches missed.">                    || !candidateFreeze.candidateContentHash().equals(</span>
-<span class="fc" id="L624">                    selectedCandidate.candidateHash())</span>
-<span class="pc bpc" id="L625" title="1 of 2 branches missed.">                    || !candidateFreeze.selectionEvidenceHash().equals(</span>
-<span class="fc" id="L626">                    selection.contentHash())) {</span>
-<span class="nc" id="L627">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L621">        public FreezeBundle {</span>
+<span class="fc" id="L622">            Objects.requireNonNull(selection, &quot;selection&quot;);</span>
+<span class="fc" id="L623">            Objects.requireNonNull(candidateFreeze, &quot;candidateFreeze&quot;);</span>
+<span class="fc" id="L624">            Objects.requireNonNull(selectedCandidate, &quot;selectedCandidate&quot;);</span>
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">            if (!selection.selectedCandidateHash().equals(</span>
+<span class="fc" id="L626">                    selectedCandidate.candidateHash())</span>
+<span class="pc bpc" id="L627" title="1 of 2 branches missed.">                    || !candidateFreeze.candidateContentHash().equals(</span>
+<span class="fc" id="L628">                    selectedCandidate.candidateHash())</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">                    || !candidateFreeze.selectionEvidenceHash().equals(</span>
+<span class="fc" id="L630">                    selection.contentHash())) {</span>
+<span class="nc" id="L631">                throw new IllegalArgumentException(</span>
                     &quot;showcase freeze bundle identities differ&quot;);
             }
-<span class="fc" id="L630">        }</span>
+<span class="fc" id="L634">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
