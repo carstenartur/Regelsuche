@@ -80,6 +80,10 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
             generatedPoolMultiplier,
             mutationSeedDerivationPolicy,
             survivorSelectionPolicy);
+        requireSemanticVersions(
+            populationEngineSemanticsVersion,
+            mutatorSemanticsVersion,
+            offspringSchedulingPolicy);
         if (!STATUS.equals(status)) {
             throw new IllegalArgumentException(
                 "execution protocol must remain frozen and unexecuted");
@@ -208,6 +212,10 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
             generatedPoolMultiplier,
             mutationSeedDerivationPolicy,
             survivorSelectionPolicy);
+        requireSemanticVersions(
+            populationEngineSemanticsVersion,
+            mutatorSemanticsVersion,
+            offspringSchedulingPolicy);
         String hash = EvolutionGenome.hash(render(
             populationEngineClass.getName(),
             populationEngineSemanticsVersion,
@@ -285,6 +293,31 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
         Objects.requireNonNull(
             survivorSelectionPolicy,
             "survivorSelectionPolicy");
+    }
+
+    private static void requireSemanticVersions(
+        PopulationEngineSemanticsVersion engineVersion,
+        MutatorSemanticsVersion mutatorVersion,
+        OffspringSchedulingPolicy schedulingPolicy
+    ) {
+        boolean valid = switch (schedulingPolicy) {
+            case ROTATED_PREFIX_V1 ->
+                engineVersion
+                    == PopulationEngineSemanticsVersion.LEGACY_POPULATION_ENGINE_V1
+                && mutatorVersion
+                    == MutatorSemanticsVersion.ROTATED_PREFIX_MUTATOR_V1;
+            case STRATIFIED_MUTATION_KIND_V1 ->
+                engineVersion
+                    == PopulationEngineSemanticsVersion
+                        .PROTOCOL_DRIVEN_POPULATION_ENGINE_V2
+                && mutatorVersion
+                    == MutatorSemanticsVersion
+                        .STRATIFIED_MUTATION_KIND_MUTATOR_V2;
+        };
+        if (!valid) {
+            throw new IllegalArgumentException(
+                "execution semantic versions do not match scheduling policy");
+        }
     }
 
     private static String render(
