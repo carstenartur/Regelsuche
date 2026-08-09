@@ -62,6 +62,7 @@ beschrieben.
 
 | Vertrag | Zweck |
 | --- | --- |
+| [`regelsuche-historical-rediscovery-corpus-v1`](schemas/regelsuche-historical-rediscovery-corpus-v1.schema.json) | Eingefrorener Korpus für Reachability-, Richtungs- und Suchpolitikdiagnosen mit Negativkontrollen |
 | [`regelsuche-comparative-benchmark-v1`](schemas/regelsuche-comparative-benchmark-v1.schema.json) | Track-spezifische Vergleiche unter Informationsparität |
 | [`regelsuche-candidate-independent-benchmark-run-v1`](schemas/regelsuche-candidate-independent-benchmark-run-v1.schema.json) | Kandidatenunabhängiger Benchmarklauf |
 | [`regelsuche-discovery-cost-ledger-v1`](schemas/regelsuche-discovery-cost-ledger-v1.schema.json) | Vollständige Discovery- und Qualifikationskosten |
