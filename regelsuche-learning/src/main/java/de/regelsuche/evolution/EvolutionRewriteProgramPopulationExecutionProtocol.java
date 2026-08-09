@@ -125,6 +125,52 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
                 .FITNESS_DESC_NODES_ASC_HASH_ASC_UNIQUE_ALPHA_ELITES_V1);
     }
 
+    /**
+     * Convenience factory for one of the explicitly versioned scheduling
+     * families. The semantic version is derived from the scheduling policy so a
+     * future policy cannot accidentally reuse the legacy implementation version.
+     */
+    public static EvolutionRewriteProgramPopulationExecutionProtocol create(
+        Class<?> populationEngineClass,
+        Class<?> mutatorClass,
+        ProposalOrderingPolicy proposalOrderingPolicy,
+        OffspringSchedulingPolicy offspringSchedulingPolicy,
+        int generatedPoolMultiplier,
+        MutationSeedDerivationPolicy mutationSeedDerivationPolicy,
+        SurvivorSelectionPolicy survivorSelectionPolicy
+    ) {
+        Objects.requireNonNull(
+            offspringSchedulingPolicy, "offspringSchedulingPolicy");
+        PopulationEngineSemanticsVersion engineVersion;
+        MutatorSemanticsVersion mutatorVersion;
+        switch (offspringSchedulingPolicy) {
+            case ROTATED_PREFIX_V1 -> {
+                engineVersion = PopulationEngineSemanticsVersion
+                    .LEGACY_POPULATION_ENGINE_V1;
+                mutatorVersion = MutatorSemanticsVersion
+                    .ROTATED_PREFIX_MUTATOR_V1;
+            }
+            case STRATIFIED_MUTATION_KIND_V1 -> {
+                engineVersion = PopulationEngineSemanticsVersion
+                    .PROTOCOL_DRIVEN_POPULATION_ENGINE_V2;
+                mutatorVersion = MutatorSemanticsVersion
+                    .STRATIFIED_MUTATION_KIND_MUTATOR_V2;
+            }
+            default -> throw new IllegalArgumentException(
+                "unsupported offspring scheduling policy");
+        }
+        return create(
+            populationEngineClass,
+            engineVersion,
+            mutatorClass,
+            mutatorVersion,
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
+            mutationSeedDerivationPolicy,
+            survivorSelectionPolicy);
+    }
+
     public static EvolutionRewriteProgramPopulationExecutionProtocol create(
         Class<?> populationEngineClass,
         PopulationEngineSemanticsVersion populationEngineSemanticsVersion,
@@ -137,7 +183,11 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
         SurvivorSelectionPolicy survivorSelectionPolicy
     ) {
         Objects.requireNonNull(populationEngineClass, "populationEngineClass");
+        Objects.requireNonNull(
+            populationEngineSemanticsVersion,
+            "populationEngineSemanticsVersion");
         Objects.requireNonNull(mutatorClass, "mutatorClass");
+        Objects.requireNonNull(mutatorSemanticsVersion, "mutatorSemanticsVersion");
         String hash = EvolutionGenome.hash(render(
             populationEngineClass.getName(),
             populationEngineSemanticsVersion,
