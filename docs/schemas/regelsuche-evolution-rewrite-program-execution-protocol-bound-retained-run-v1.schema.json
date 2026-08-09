@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-rewrite-program-execution-protocol-bound-retained-run/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "retainedRunHash",
+    "retainedRunJson",
+    "executionPlanHash",
+    "executionProtocolHash",
+    "populationEngineImplementationClass",
+    "populationEngineSemanticsVersion",
+    "mutatorImplementationClass",
+    "mutatorSemanticsVersion",
+    "status",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-execution-protocol-bound-retained-run/v1"
+    },
+    "retainedRunHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "retainedRunJson": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 33554432
+    },
+    "executionPlanHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "executionProtocolHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "populationEngineImplementationClass": {
+      "type": "string",
+      "pattern": "^[A-Za-z_$][A-Za-z0-9_$.]{2,511}$"
+    },
+    "populationEngineSemanticsVersion": {
+      "enum": [
+        "LEGACY_POPULATION_ENGINE_V1",
+        "PROTOCOL_DRIVEN_POPULATION_ENGINE_V2"
+      ]
+    },
+    "mutatorImplementationClass": {
+      "type": "string",
+      "pattern": "^[A-Za-z_$][A-Za-z0-9_$.]{2,511}$"
+    },
+    "mutatorSemanticsVersion": {
+      "enum": [
+        "ROTATED_PREFIX_MUTATOR_V1",
+        "STRATIFIED_MUTATION_KIND_MUTATOR_V2"
+      ]
+    },
+    "status": {
+      "const": "EVALUATOR_AND_POPULATION_EXECUTION_PROTOCOL_BOUND_TRAIN_RETAINED"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

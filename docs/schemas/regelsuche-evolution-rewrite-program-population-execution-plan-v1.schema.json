@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-rewrite-program-population-execution-plan/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "studyPlanHash",
+    "executionProtocolHash",
+    "status",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-population-execution-plan/v1"
+    },
+    "studyPlanHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "executionProtocolHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "status": {
+      "const": "FROZEN_NOT_RUN"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
