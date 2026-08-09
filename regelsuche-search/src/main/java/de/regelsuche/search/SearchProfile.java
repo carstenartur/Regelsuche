@@ -8,6 +8,7 @@ import de.regelsuche.search.strategy.EqualitySaturationStrategy;
 import de.regelsuche.search.strategy.HybridSearchStrategy;
 import de.regelsuche.search.strategy.MonteCarloTreeSearchStrategy;
 import de.regelsuche.search.strategy.SearchStrategy;
+import de.regelsuche.search.strategy.StructuralDiversitySearchStrategy;
 
 /**
  * Pre-defined search profiles bundling a {@link SearchHeuristic} preset and a
@@ -40,7 +41,7 @@ public enum SearchProfile {
     DIVERSITY_DISCOVERY(new SearchHeuristic(6, 2000, 1, 6, 80, 24), TransformationGoal.SIMPLIFY) {
         @Override
         public SearchStrategy newStrategy() {
-            return new BeamSearchStrategy.StructuralDiversity();
+            return new StructuralDiversitySearchStrategy();
         }
     },
     /** Mid-sized search that prefers small, easy to explain steps. */
