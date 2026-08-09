@@ -1,6 +1,6 @@
 # Claims and evidence registry
 
-This registry is normative for the working manuscript. A central claim may appear in the Abstract, Results, or Conclusion only when its required evidence is retained and its status is `SUPPORTED`.
+This registry is normative for the working manuscript. A central claim may appear in the Abstract, Results, or Conclusion only when its required evidence is retained and its status is `SUPPORTED` or an explicitly bounded supported-null status below.
 
 | ID | Proposed claim | Required evidence | Current foundation status |
 |---|---|---|---|
@@ -15,11 +15,13 @@ This registry is normative for the working manuscript. A central claim may appea
 | C9 | The archival result is independently reproducible. | External receipt from #387. | `PENDING_387` |
 | C10 | Expert judgments agree with the interestingness ranking. | Real blinded study from #332/#389. | `OPTIONAL_PENDING_389` |
 | C11 | A candidate is externally novel mathematics. | Complete external novelty protocol and decision from #391. | `NOT_AUTHORIZED` |
+| C12 | The one-attempt public proof-carrying showcase v1 terminated at candidate formation because no terminal TRAIN alternative met the frozen eligibility policy; consequently no candidate freeze, public randomness, FINAL TEST seed/cases, or held-out result was produced. | Consumed authority run `31283046296`; retained workflow artifact/digest; immutable v1 result page; absence of candidate-freeze and later-stage artifacts. | `SUPPORTED_NULL_SYSTEMS_RESULT` |
 
 ## Rules
 
 1. `SUPPORTED_EXISTING_METHOD` authorizes a methods description, not a new broad empirical conclusion.
-2. `PENDING_*` claims may be discussed as hypotheses or evaluation questions only.
-3. `NOT_AUTHORIZED` claims must not appear as positive findings.
-4. A negative or null result can satisfy an evaluation dependency when the preregistered protocol is complete and the null result is reported transparently.
-5. Every final quantitative sentence must identify its generated table, figure, or artifact root.
+2. `SUPPORTED_NULL_SYSTEMS_RESULT` authorizes only the exact terminal null outcome and its fail-closed stage boundary. It does not authorize a self-improvement, baseline-superiority, held-out-utility, novelty, or importance claim.
+3. `PENDING_*` claims may be discussed as hypotheses or evaluation questions only.
+4. `NOT_AUTHORIZED` claims must not appear as positive findings.
+5. A negative or null result can satisfy an evaluation dependency when the preregistered protocol is complete and the null result is reported transparently.
+6. Every final quantitative sentence must identify its generated table, figure, or artifact root.
