@@ -24,7 +24,7 @@ class ExecutionProtocolBoundCheckpointDocumentationContractTest {
         for (String schema : List.of(
                 "regelsuche-evolution-rewrite-program-population-execution-protocol-v1.schema.json",
                 "regelsuche-evolution-rewrite-program-population-execution-plan-v1.schema.json",
-                "regelsuche-evolution-rewrite-program-execution-protocol-bound-run-v1.schema.json",
+                "regelsuche-evolution-rewrite-program-execution-protocol-bound-retained-run-v1.schema.json",
                 "regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-v1.schema.json",
                 "regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact-v1.schema.json")) {
             assertTrue(catalog.contains(schema), () -> "schema missing from catalog: " + schema);
