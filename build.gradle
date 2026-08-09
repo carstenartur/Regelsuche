@@ -99,6 +99,7 @@ tasks.register('verifyWorkflowSemantics', Exec) {
     commandLine pythonExecutable, 'scripts/verify-workflow-semantics.py'
     inputs.dir('.github/workflows')
     inputs.file('config/workflow-semantics-policy.json')
+    inputs.file('config/github-merge-governance-policy.json')
     inputs.file('scripts/verify-workflow-semantics.py')
 }
 

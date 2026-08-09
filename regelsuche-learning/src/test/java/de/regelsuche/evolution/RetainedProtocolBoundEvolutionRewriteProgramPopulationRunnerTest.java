@@ -173,6 +173,8 @@ class RetainedProtocolBoundEvolutionRewriteProgramPopulationRunnerTest {
                 evaluator(fixture.suite()),
                 checkpoint);
 
+        uninterrupted.requireCompatible(executionPlan, protocol);
+        resumed.requireCompatible(executionPlan, protocol);
         assertEquals(
             historical.toCanonicalJson(),
             uninterrupted.retainedRun().toCanonicalJson());
@@ -190,6 +192,53 @@ class RetainedProtocolBoundEvolutionRewriteProgramPopulationRunnerTest {
             "EVALUATOR_AND_POPULATION_EXECUTION_PROTOCOL_BOUND_TRAIN_RETAINED"));
         assertFalse(uninterrupted.toCanonicalJson().contains("validationCases"));
         assertFalse(uninterrupted.toCanonicalJson().contains("finalTestOutcome"));
+    }
+
+    @Test
+    void retainedExecutionBindingRejectsPlanOrProtocolSubstitution() {
+        Fixture fixture = fixture();
+        EvolutionRewriteProgramPopulationExecutionProtocol protocol =
+            EvolutionRewriteProgramPopulationExecutionProtocol.legacyV1();
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan =
+            EvolutionRewriteProgramPopulationExecutionPlan.create(
+                fixture.study(), protocol);
+        var bound =
+            new ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner(
+                protocol).run(
+                    executionPlan,
+                    fixture.study(),
+                    fixture.manifest(),
+                    fixture.suite(),
+                    fixture.seeds(),
+                    fixture.catalog(),
+                    evaluator(fixture.suite()));
+
+        EvolutionRewriteProgramPopulationExecutionProtocol substitutedProtocol =
+            EvolutionRewriteProgramPopulationExecutionProtocol.create(
+                EvolutionRewriteProgramPopulationEngine.class,
+                DeterministicRewriteProgramMutator.class,
+                ProposalOrderingPolicy
+                    .KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1,
+                OffspringSchedulingPolicy.ROTATED_PREFIX_V1,
+                3,
+                MutationSeedDerivationPolicy
+                    .STUDY_HASH_GENERATION_PARENT_HASH_SHA256_PREFIX64_V1,
+                SurvivorSelectionPolicy
+                    .FITNESS_DESC_NODES_ASC_HASH_ASC_UNIQUE_ALPHA_ELITES_V1);
+        EvolutionRewriteProgramPopulationExecutionPlan substitutedPlan =
+            EvolutionRewriteProgramPopulationExecutionPlan.create(
+                fixture.study(), substitutedProtocol);
+
+        assertNotEquals(protocol.contentHash(), substitutedProtocol.contentHash());
+        assertNotEquals(executionPlan.contentHash(), substitutedPlan.contentHash());
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> bound.requireCompatible(
+                executionPlan, substitutedProtocol));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> bound.requireCompatible(
+                substitutedPlan, substitutedProtocol));
     }
 
     @Test
