@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCarryingShowcaseTrainPreflightCommand.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProofCarryingShowcaseTrainPreflightCommand.java</span></div><h1>ProofCarryingShowcaseTrainPreflightCommand.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Set;
+
+/**
+ * Checkout-local TRAIN-only characterization for a future showcase authority.
+ *
+ * &lt;p&gt;The command deliberately stops at terminal selection evidence. It creates
+ * no candidate freeze, clock boundary, public randomness, seed, or FINAL TEST
+ * material. The consumed v1 authority must never be reconstructed by invoking
+ * this command after the fact.&lt;/p&gt;
+ */
+public final class ProofCarryingShowcaseTrainPreflightCommand {
+    public static final String STATUS =
+        &quot;TRAIN_PREFLIGHT_COMPLETE_FINAL_TEST_UNSEEN&quot;;
+
+    private ProofCarryingShowcaseTrainPreflightCommand() {
+    }
+
+    public static void main(String[] arguments) {
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (arguments.length != 2) {</span>
+<span class="fc" id="L25">            throw new IllegalArgumentException(</span>
+                &quot;usage: &lt;showcase-plan.json&gt; &lt;output-directory&gt;&quot;);
+        }
+<span class="nc" id="L28">        WrittenPreflight result = execute(</span>
+<span class="nc" id="L29">            Path.of(arguments[0]), Path.of(arguments[1]));</span>
+<span class="nc" id="L30">        System.out.println(&quot;showcaseTrainPreflightStatus=&quot; + STATUS);</span>
+<span class="nc" id="L31">        System.out.println(</span>
+            &quot;showcaseTrainPreflightSelectionStatus=&quot;
+<span class="nc" id="L33">                + result.selectionStatus());</span>
+<span class="nc" id="L34">        System.out.println(</span>
+            &quot;showcaseTrainPreflightSelectionHash=&quot;
+<span class="nc" id="L36">                + result.selectionEvidenceHash());</span>
+<span class="nc" id="L37">        System.out.println(</span>
+<span class="nc" id="L38">            &quot;showcaseTrainPreflightOutput=&quot; + result.outputDirectory());</span>
+<span class="nc" id="L39">    }</span>
+
+    public static WrittenPreflight execute(
+        Path showcasePlanPath,
+        Path outputDirectory
+    ) {
+<span class="nc" id="L45">        ProofCarryingShowcasePlan showcasePlan =</span>
+<span class="nc" id="L46">            ProofCarryingShowcasePlan.read(showcasePlanPath);</span>
+<span class="nc" id="L47">        var configuration =</span>
+<span class="nc" id="L48">            ProofCarryingShowcaseTrainAndFreezeCommand.configuration(showcasePlan);</span>
+<span class="nc" id="L49">        Set&lt;FitnessComponent&gt; requiredComponents = Set.copyOf(</span>
+<span class="nc" id="L50">            configuration.study().fitnessWeights().stream()</span>
+<span class="nc" id="L51">                .map(value -&gt; value.component())</span>
+<span class="nc" id="L52">                .toList());</span>
+<span class="nc" id="L53">        var evaluator = RewriteProgramFitnessComposition</span>
+<span class="nc" id="L54">            .exactRationalTrainEvaluator(</span>
+<span class="nc" id="L55">                configuration.trainSuite(), requiredComponents);</span>
+<span class="nc" id="L56">        var retained =</span>
+            new RetainedProtocolBoundEvolutionRewriteProgramPopulationRunner()
+<span class="nc" id="L58">                .run(</span>
+<span class="nc" id="L59">                    configuration.study(),</span>
+<span class="nc" id="L60">                    configuration.splitManifest(),</span>
+<span class="nc" id="L61">                    configuration.trainSuite(),</span>
+<span class="nc" id="L62">                    configuration.seeds(),</span>
+<span class="nc" id="L63">                    configuration.mutationCatalog(),</span>
+                    evaluator);
+<span class="nc" id="L65">        var selection = ProofCarryingShowcaseTrainSelectionEvidence.create(</span>
+            showcasePlan,
+            retained,
+<span class="nc" id="L68">            configuration.study(),</span>
+<span class="nc" id="L69">            configuration.seeds());</span>
+<span class="nc" id="L70">        return write(</span>
+            outputDirectory,
+            showcasePlan,
+            configuration,
+            retained,
+            selection);
+    }
+
+    private static WrittenPreflight write(
+        Path outputDirectory,
+        ProofCarryingShowcasePlan showcasePlan,
+        ProofCarryingShowcaseTrainAndFreezeCommand.TrainConfiguration configuration,
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun retained,
+        ProofCarryingShowcaseTrainSelectionEvidence selection
+    ) {
+<span class="nc" id="L85">        LinkedHashMap&lt;String, String&gt; artifacts = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L86">        artifacts.put(&quot;showcase-plan.json&quot;, showcasePlan.toCanonicalJson());</span>
+<span class="nc" id="L87">        artifacts.put(</span>
+            &quot;train-split-manifest.json&quot;,
+<span class="nc" id="L89">            configuration.splitManifest().toCanonicalJson());</span>
+<span class="nc" id="L90">        artifacts.put(</span>
+            &quot;train-suite.json&quot;,
+<span class="nc" id="L92">            configuration.trainSuite().toCanonicalJson());</span>
+<span class="nc" id="L93">        artifacts.put(</span>
+            &quot;evaluation-protocol.json&quot;,
+<span class="nc" id="L95">            configuration.protocol().toCanonicalJson());</span>
+<span class="nc" id="L96">        artifacts.put(</span>
+            &quot;seed-genome.json&quot;,
+<span class="nc" id="L98">            configuration.genome().toCanonicalJson());</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        for (int index = 0; index &lt; configuration.seeds().size(); index++) {</span>
+<span class="nc" id="L100">            EvolutionRewriteProgramCandidate seed = configuration.seeds().get(index);</span>
+<span class="nc" id="L101">            artifacts.put(</span>
+                &quot;seed-candidate-&quot; + (index + 1) + &quot;.json&quot;,
+<span class="nc" id="L103">                seed.toCanonicalJson());</span>
+<span class="nc" id="L104">            artifacts.put(</span>
+                &quot;seed-plan-&quot; + (index + 1) + &quot;.json&quot;,
+<span class="nc" id="L106">                seed.plan().toCanonicalJson());</span>
+        }
+<span class="nc" id="L108">        artifacts.put(</span>
+            &quot;population-study-plan.json&quot;,
+<span class="nc" id="L110">            configuration.study().toCanonicalJson());</span>
+<span class="nc" id="L111">        artifacts.put(</span>
+            &quot;protocol-bound-train-run.json&quot;,
+<span class="nc" id="L113">            retained.toCanonicalJson());</span>
+<span class="nc" id="L114">        Path output = ProofCarryingShowcaseTrainAndFreezeCommand.publishAtomically(</span>
+            outputDirectory,
+            artifacts,
+            &quot;train-selection-evidence.json&quot;,
+<span class="nc" id="L118">            selection.toCanonicalJson());</span>
+<span class="nc" id="L119">        return new WrittenPreflight(</span>
+            output,
+<span class="nc" id="L121">            selection.status(),</span>
+<span class="nc" id="L122">            selection.contentHash());</span>
+    }
+
+    public record WrittenPreflight(
+        Path outputDirectory,
+        String selectionStatus,
+        String selectionEvidenceHash
+    ) {
+<span class="pc" id="L130">        public WrittenPreflight {</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            if (outputDirectory == null) {</span>
+<span class="nc" id="L132">                throw new IllegalArgumentException(</span>
+                    &quot;preflight output directory is required&quot;);
+            }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (!ProofCarryingShowcaseTrainSelectionEvidence.ELIGIBLE.equals(</span>
+                    selectionStatus)
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">                    &amp;&amp; !ProofCarryingShowcaseTrainSelectionEvidence.NONE.equals(</span>
+                        selectionStatus)) {
+<span class="fc" id="L139">                throw new IllegalArgumentException(</span>
+                    &quot;invalid preflight selection status&quot;);
+            }
+<span class="nc" id="L142">            EvolutionGenome.requireSha256(</span>
+                selectionEvidenceHash, &quot;selectionEvidenceHash&quot;);
+<span class="nc" id="L144">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

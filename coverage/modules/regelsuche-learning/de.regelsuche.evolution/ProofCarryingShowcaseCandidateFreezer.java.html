@@ -554,7 +554,7 @@ import java.util.Set;
 <span class="fc" id="L554">                freezeBlockers = canonicalBlockers(</span>
                     freezeBlockers, &quot;freezeBlockers&quot;);
 <span class="pc bpc" id="L556" title="1 of 2 branches missed.">                boolean expectedEligible = trainBlockers.isEmpty()</span>
-<span class="pc bpc" id="L557" title="1 of 2 branches missed.">                    &amp;&amp; freezeBlockers.isEmpty();</span>
+<span class="fc bfc" id="L557" title="All 2 branches covered.">                    &amp;&amp; freezeBlockers.isEmpty();</span>
 <span class="pc bpc" id="L558" title="1 of 2 branches missed.">                if (eligibleForFreeze != expectedEligible) {</span>
 <span class="nc" id="L559">                    throw new IllegalArgumentException(</span>
                         &quot;eligibleForFreeze differs from retained blockers&quot;);
