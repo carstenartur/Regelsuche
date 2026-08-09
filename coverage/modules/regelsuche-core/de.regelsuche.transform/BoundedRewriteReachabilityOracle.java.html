@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BoundedRewriteReachabilityOracle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">BoundedRewriteReachabilityOracle.java</span></div><h1>BoundedRewriteReachabilityOracle.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.UnaryOperator;
+
+/**
+ * Deterministic breadth-first oracle for bounded rewrite-space reachability.
+ *
+ * &lt;p&gt;The oracle deliberately distinguishes a target that is absent from a
+ * completely exhausted finite closure from a search that stopped at a depth
+ * or visited-state bound. It is target-aware diagnostic infrastructure, not
+ * autonomous discovery evidence.&lt;/p&gt;
+ */
+public final class BoundedRewriteReachabilityOracle {
+<span class="fc" id="L21">    private static final Comparator&lt;Transformation&gt; TRANSFORMATION_ORDER =</span>
+<span class="fc" id="L22">        Comparator.comparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L23">            .thenComparing(Transformation::rule)</span>
+<span class="fc" id="L24">            .thenComparing(Transformation::applicationKey)</span>
+<span class="fc" id="L25">            .thenComparing(transformation -&gt;</span>
+<span class="nc" id="L26">                String.join(&quot;\u0000&quot;, transformation.assumptions()))</span>
+<span class="fc" id="L27">            .thenComparing(transformation -&gt;</span>
+<span class="nc" id="L28">                String.join(&quot;\u0000&quot;, transformation.primitiveRuleIds()));</span>
+
+    private final TransformationEngine engine;
+    private final UnaryOperator&lt;String&gt; canonicalizer;
+
+    public BoundedRewriteReachabilityOracle(TransformationEngine engine) {
+<span class="fc" id="L34">        this(engine, String::trim);</span>
+<span class="fc" id="L35">    }</span>
+
+    public BoundedRewriteReachabilityOracle(
+        TransformationEngine engine,
+        UnaryOperator&lt;String&gt; canonicalizer
+<span class="fc" id="L40">    ) {</span>
+<span class="fc" id="L41">        this.engine = Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="fc" id="L42">        this.canonicalizer = Objects.requireNonNull(canonicalizer, &quot;canonicalizer&quot;);</span>
+<span class="fc" id="L43">    }</span>
+
+    public Result search(String sourceExpression, String targetExpression, Budget budget) {
+<span class="fc" id="L46">        String source = requireExpression(sourceExpression, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L47">        String target = requireExpression(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="fc" id="L48">        Budget safeBudget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L49">        String sourceKey = canonicalize(source);</span>
+<span class="fc" id="L50">        String targetKey = canonicalize(target);</span>
+
+<span class="fc" id="L52">        Map&lt;String, Node&gt; visited = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L53">        visited.put(sourceKey, new Node(source, sourceKey, 0, null, null));</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (sourceKey.equals(targetKey)) {</span>
+<span class="fc" id="L55">            return Result.reachable(List.of(), 1, 0, 0);</span>
+        }
+
+<span class="fc" id="L58">        ArrayDeque&lt;Node&gt; frontier = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L59">        frontier.addLast(visited.get(sourceKey));</span>
+<span class="fc" id="L60">        long generatedTransitions = 0;</span>
+<span class="fc" id="L61">        int maximumDepthReached = 0;</span>
+<span class="fc" id="L62">        boolean depthLimitReached = false;</span>
+
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        while (!frontier.isEmpty()) {</span>
+<span class="fc" id="L65">            Node current = frontier.removeFirst();</span>
+<span class="fc" id="L66">            maximumDepthReached = Math.max(maximumDepthReached, current.depth());</span>
+<span class="fc" id="L67">            List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L68">                engine.transform(current.expression()));</span>
+<span class="fc" id="L69">            transformations.sort(TRANSFORMATION_ORDER);</span>
+
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            for (Transformation transformation : transformations) {</span>
+<span class="fc" id="L72">                generatedTransitions++;</span>
+<span class="fc" id="L73">                String nextExpression = requireExpression(</span>
+<span class="fc" id="L74">                    transformation.transformedExpression(),</span>
+                    &quot;transformation.transformedExpression&quot;);
+<span class="fc" id="L76">                String nextKey = canonicalize(nextExpression);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                if (visited.containsKey(nextKey)) {</span>
+<span class="fc" id="L78">                    continue;</span>
+                }
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                if (current.depth() &gt;= safeBudget.maxDepth()) {</span>
+<span class="fc" id="L81">                    depthLimitReached = true;</span>
+<span class="fc" id="L82">                    continue;</span>
+                }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                if (visited.size() &gt;= safeBudget.maxVisitedStates()) {</span>
+<span class="fc" id="L85">                    return Result.inconclusive(</span>
+<span class="fc" id="L86">                        visited.size(),</span>
+                        generatedTransitions,
+                        maximumDepthReached,
+                        depthLimitReached,
+                        true);
+                }
+
+<span class="fc" id="L93">                Step step = Step.from(current.expression(), transformation);</span>
+<span class="fc" id="L94">                Node next = new Node(</span>
+                    nextExpression,
+                    nextKey,
+<span class="fc" id="L97">                    current.depth() + 1,</span>
+<span class="fc" id="L98">                    current.key(),</span>
+                    step);
+<span class="fc" id="L100">                visited.put(nextKey, next);</span>
+<span class="fc" id="L101">                maximumDepthReached = Math.max(maximumDepthReached, next.depth());</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                if (nextKey.equals(targetKey)) {</span>
+<span class="fc" id="L103">                    return Result.reachable(</span>
+<span class="fc" id="L104">                        reconstructWitness(visited, next),</span>
+<span class="fc" id="L105">                        visited.size(),</span>
+                        generatedTransitions,
+                        maximumDepthReached);
+                }
+<span class="fc" id="L109">                frontier.addLast(next);</span>
+<span class="fc" id="L110">            }</span>
+<span class="fc" id="L111">        }</span>
+
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (depthLimitReached) {</span>
+<span class="fc" id="L114">            return Result.inconclusive(</span>
+<span class="fc" id="L115">                visited.size(),</span>
+                generatedTransitions,
+                maximumDepthReached,
+                true,
+                false);
+        }
+<span class="fc" id="L121">        return Result.exhausted(</span>
+<span class="fc" id="L122">            visited.size(),</span>
+            generatedTransitions,
+            maximumDepthReached);
+    }
+
+    private List&lt;Step&gt; reconstructWitness(Map&lt;String, Node&gt; visited, Node target) {
+<span class="fc" id="L128">        ArrayDeque&lt;Step&gt; reverse = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L129">        Node current = target;</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        while (current.parentKey() != null) {</span>
+<span class="fc" id="L131">            reverse.addFirst(current.incomingStep());</span>
+<span class="fc" id="L132">            current = visited.get(current.parentKey());</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (current == null) {</span>
+<span class="nc" id="L134">                throw new IllegalStateException(&quot;reachability parent chain is incomplete&quot;);</span>
+            }
+        }
+<span class="fc" id="L137">        return List.copyOf(reverse);</span>
+    }
+
+    private String canonicalize(String expression) {
+<span class="fc" id="L141">        String canonical = canonicalizer.apply(expression);</span>
+<span class="fc" id="L142">        return requireExpression(canonical, &quot;canonical expression&quot;);</span>
+    }
+
+    private static String requireExpression(String value, String name) {
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L147">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L149">        return value.trim();</span>
+    }
+
+<span class="fc" id="L152">    public enum Status {</span>
+<span class="fc" id="L153">        REACHABLE,</span>
+<span class="fc" id="L154">        UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE,</span>
+<span class="fc" id="L155">        BUDGET_INCONCLUSIVE</span>
+    }
+
+    public record Budget(int maxDepth, int maxVisitedStates) {
+<span class="fc" id="L159">        public Budget {</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (maxDepth &lt; 0) {</span>
+<span class="fc" id="L161">                throw new IllegalArgumentException(&quot;maxDepth must not be negative&quot;);</span>
+            }
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            if (maxVisitedStates &lt; 1) {</span>
+<span class="fc" id="L164">                throw new IllegalArgumentException(&quot;maxVisitedStates must be positive&quot;);</span>
+            }
+<span class="fc" id="L166">        }</span>
+    }
+
+    public record Step(
+        String expressionBefore,
+        String expressionAfter,
+        String rule,
+        List&lt;String&gt; assumptions,
+        String applicationKey,
+        List&lt;String&gt; primitiveRuleIds,
+        int primitiveStepCount
+    ) {
+<span class="fc" id="L178">        public Step {</span>
+<span class="fc" id="L179">            expressionBefore = requireExpression(expressionBefore, &quot;expressionBefore&quot;);</span>
+<span class="fc" id="L180">            expressionAfter = requireExpression(expressionAfter, &quot;expressionAfter&quot;);</span>
+<span class="fc" id="L181">            rule = requireExpression(rule, &quot;rule&quot;);</span>
+<span class="fc" id="L182">            assumptions = List.copyOf(Objects.requireNonNull(assumptions, &quot;assumptions&quot;));</span>
+<span class="fc" id="L183">            applicationKey = requireExpression(applicationKey, &quot;applicationKey&quot;);</span>
+<span class="fc" id="L184">            primitiveRuleIds = List.copyOf(</span>
+<span class="fc" id="L185">                Objects.requireNonNull(primitiveRuleIds, &quot;primitiveRuleIds&quot;));</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            if (primitiveStepCount &lt; 1) {</span>
+<span class="nc" id="L187">                throw new IllegalArgumentException(&quot;primitiveStepCount must be positive&quot;);</span>
+            }
+<span class="fc" id="L189">        }</span>
+
+        private static Step from(String expressionBefore, Transformation transformation) {
+<span class="fc" id="L192">            return new Step(</span>
+                expressionBefore,
+<span class="fc" id="L194">                transformation.transformedExpression(),</span>
+<span class="fc" id="L195">                transformation.rule(),</span>
+<span class="fc" id="L196">                transformation.assumptions(),</span>
+<span class="fc" id="L197">                transformation.applicationKey(),</span>
+<span class="fc" id="L198">                transformation.primitiveRuleIds(),</span>
+<span class="fc" id="L199">                transformation.primitiveStepCount());</span>
+        }
+    }
+
+    public record Result(
+        Status status,
+        List&lt;Step&gt; witness,
+        int visitedStates,
+        long generatedTransitions,
+        int maximumDepthReached,
+        boolean depthLimitReached,
+        boolean stateLimitReached
+    ) {
+<span class="fc" id="L212">        public Result {</span>
+<span class="fc" id="L213">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L214">            witness = List.copyOf(Objects.requireNonNull(witness, &quot;witness&quot;));</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (visitedStates &lt; 1) {</span>
+<span class="nc" id="L216">                throw new IllegalArgumentException(&quot;visitedStates must be positive&quot;);</span>
+            }
+<span class="pc bpc" id="L218" title="2 of 4 branches missed.">            if (generatedTransitions &lt; 0 || maximumDepthReached &lt; 0) {</span>
+<span class="nc" id="L219">                throw new IllegalArgumentException(&quot;reachability counters must not be negative&quot;);</span>
+            }
+<span class="pc bpc" id="L221" title="2 of 6 branches missed.">            if (status == Status.REACHABLE &amp;&amp; (depthLimitReached || stateLimitReached)) {</span>
+<span class="nc" id="L222">                throw new IllegalArgumentException(&quot;reachable result must not report a limit&quot;);</span>
+            }
+<span class="pc bpc" id="L224" title="2 of 6 branches missed.">            if (status == Status.UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE</span>
+                &amp;&amp; (depthLimitReached || stateLimitReached)) {
+<span class="nc" id="L226">                throw new IllegalArgumentException(&quot;complete closure must not report a limit&quot;);</span>
+            }
+<span class="pc bpc" id="L228" title="1 of 6 branches missed.">            if (status == Status.BUDGET_INCONCLUSIVE</span>
+                &amp;&amp; !depthLimitReached &amp;&amp; !stateLimitReached) {
+<span class="nc" id="L230">                throw new IllegalArgumentException(&quot;inconclusive result requires a reached limit&quot;);</span>
+            }
+<span class="fc" id="L232">        }</span>
+
+        private static Result reachable(
+            List&lt;Step&gt; witness,
+            int visitedStates,
+            long generatedTransitions,
+            int maximumDepthReached
+        ) {
+<span class="fc" id="L240">            return new Result(</span>
+                Status.REACHABLE,
+                witness,
+                visitedStates,
+                generatedTransitions,
+                maximumDepthReached,
+                false,
+                false);
+        }
+
+        private static Result exhausted(
+            int visitedStates,
+            long generatedTransitions,
+            int maximumDepthReached
+        ) {
+<span class="fc" id="L255">            return new Result(</span>
+                Status.UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE,
+<span class="fc" id="L257">                List.of(),</span>
+                visitedStates,
+                generatedTransitions,
+                maximumDepthReached,
+                false,
+                false);
+        }
+
+        private static Result inconclusive(
+            int visitedStates,
+            long generatedTransitions,
+            int maximumDepthReached,
+            boolean depthLimitReached,
+            boolean stateLimitReached
+        ) {
+<span class="fc" id="L272">            return new Result(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L274">                List.of(),</span>
+                visitedStates,
+                generatedTransitions,
+                maximumDepthReached,
+                depthLimitReached,
+                stateLimitReached);
+        }
+    }
+
+<span class="fc" id="L283">    private record Node(</span>
+        String expression,
+        String key,
+        int depth,
+        String parentKey,
+        Step incomingStep
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

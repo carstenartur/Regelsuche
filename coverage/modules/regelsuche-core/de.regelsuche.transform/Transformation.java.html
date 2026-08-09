@@ -17,7 +17,7 @@ public record Transformation(
     List&lt;String&gt; primitiveRuleIds
 ) {
     public Transformation(String rule, String transformedExpression) {
-<span class="nc" id="L20">        this(</span>
+<span class="fc" id="L20">        this(</span>
             rule,
             transformedExpression,
             RewriteKind.NORMALIZE,
@@ -25,7 +25,7 @@ public record Transformation(
             0,
             true,
             rule + &quot;:&quot; + transformedExpression);
-<span class="nc" id="L28">    }</span>
+<span class="fc" id="L28">    }</span>
 
     public Transformation(
         String rule,
