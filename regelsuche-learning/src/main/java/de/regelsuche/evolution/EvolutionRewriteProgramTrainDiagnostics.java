@@ -22,11 +22,10 @@ import java.util.TreeSet;
 /**
  * Content-addressed TRAIN-only diagnostics for rewrite-program population runs.
  *
- * <p>The artifact is intentionally separate from {@code PopulationRun/v1}. It
- * therefore adds observability for a new execution protocol without changing
- * the bytes or meaning of historical population evidence. The artifact binds
- * the execution plan, execution protocol and completed execution-bound run and
- * embeds every observed mutation batch as canonical JSON.</p>
+ * <p>This artifact is deliberately separate from {@code PopulationRun/v1} so
+ * new observability cannot reinterpret historical evidence. It binds the
+ * execution identity and completed run, preserves every observed mutation batch
+ * as canonical JSON and derives only TRAIN-local structural/lineage facts.</p>
  */
 public record EvolutionRewriteProgramTrainDiagnostics(
     String schema,
@@ -52,13 +51,11 @@ public record EvolutionRewriteProgramTrainDiagnostics(
             throw new IllegalArgumentException(
                 "unsupported rewrite-program TRAIN diagnostics schema");
         }
-        EvolutionGenome.requireSha256(studyPlanHash, "studyPlanHash");
-        EvolutionGenome.requireSha256(executionPlanHash, "executionPlanHash");
-        EvolutionGenome.requireSha256(
-            executionProtocolHash, "executionProtocolHash");
-        EvolutionGenome.requireSha256(
-            executionBoundRunHash, "executionBoundRunHash");
-        EvolutionGenome.requireSha256(populationRunHash, "populationRunHash");
+        requireHash(studyPlanHash, "studyPlanHash");
+        requireHash(executionPlanHash, "executionPlanHash");
+        requireHash(executionProtocolHash, "executionProtocolHash");
+        requireHash(executionBoundRunHash, "executionBoundRunHash");
+        requireHash(populationRunHash, "populationRunHash");
         mutationBatches = canonicalBatches(mutationBatches);
         generations = canonicalGenerations(generations);
         candidateStructures = canonicalCandidates(candidateStructures);
@@ -66,7 +63,7 @@ public record EvolutionRewriteProgramTrainDiagnostics(
             throw new IllegalArgumentException(
                 "rewrite-program diagnostics must remain TRAIN_ONLY");
         }
-        EvolutionGenome.requireSha256(contentHash, "contentHash");
+        requireHash(contentHash, "contentHash");
         String expected = EvolutionGenome.hash(render(
             studyPlanHash,
             executionPlanHash,
@@ -105,27 +102,24 @@ public record EvolutionRewriteProgramTrainDiagnostics(
 
         List<ObservedMutationBatch> batches = observedBatches.stream()
             .map(ObservedMutationBatch::from)
-            .sorted(Comparator
-                .comparingInt(ObservedMutationBatch::generation)
-                .thenComparing(ObservedMutationBatch::parentCandidateHash)
-                .thenComparing(ObservedMutationBatch::mutationBatchHash))
+            .sorted(batchComparator())
             .toList();
-        Map<String, EvolutionRewriteProgramPlan> plansByHash = plansByHash(
+        Map<String, EvolutionRewriteProgramPlan> plans = plansByHash(
             seeds, observedBatches);
         Map<String, CandidateStructureFacts> structures = seedStructures(seeds);
         Map<String, Integer> lineageDepths = new LinkedHashMap<>();
         seeds.forEach(seed -> lineageDepths.put(seed.contentHash(), 0));
 
-        List<GenerationDiagnostics> generationDiagnostics = new ArrayList<>();
+        List<GenerationDiagnostics> generationFacts = new ArrayList<>();
         for (GenerationReport report : populationRun.generationReports()) {
-            List<ObservedBatch> generationBatches = observedBatches.stream()
+            List<ObservedBatch> observedForGeneration = observedBatches.stream()
                 .filter(batch -> batch.generation() == report.generation())
                 .toList();
             Map<EvolutionRewriteProgramMutationKind, Integer> eligible =
                 emptyCounts();
             Map<EvolutionRewriteProgramMutationKind, Integer> budgetOnly =
                 emptyCounts();
-            for (ObservedBatch observed : generationBatches) {
+            for (ObservedBatch observed : observedForGeneration) {
                 for (MutationAttempt attempt : observed.batch().attempts()) {
                     if (isEligibleProposal(attempt)) {
                         increment(eligible, attempt.kind());
@@ -139,54 +133,41 @@ public record EvolutionRewriteProgramTrainDiagnostics(
             Map<EvolutionRewriteProgramMutationKind, Integer> accepted =
                 emptyCounts();
             Set<String> generatedAlpha = new TreeSet<>();
-            Set<String> survivingGeneratedAlpha = new TreeSet<>();
+            Set<String> survivingAlpha = new TreeSet<>();
             Set<String> selected = Set.copyOf(report.selectedCandidateHashes());
-            int generationMaxDepth = 0;
+            int maxDepth = 0;
             for (LineageEdge edge : report.lineage()) {
                 increment(accepted, edge.mutationKind());
                 generatedAlpha.add(edge.childAlphaStructuralHash());
                 if (selected.contains(edge.childCandidateHash())) {
-                    survivingGeneratedAlpha.add(edge.childAlphaStructuralHash());
+                    survivingAlpha.add(edge.childAlphaStructuralHash());
                 }
-                Integer parentDepth = lineageDepths.get(edge.parentCandidateHash());
-                if (parentDepth == null) {
-                    throw new IllegalArgumentException(
-                        "lineage parent is not reachable from a seed: "
-                            + edge.parentCandidateHash());
-                }
-                int childDepth = Math.addExact(parentDepth, 1);
-                lineageDepths.merge(
-                    edge.childCandidateHash(), childDepth, Math::min);
-                generationMaxDepth = Math.max(generationMaxDepth, childDepth);
-                EvolutionRewriteProgramPlan plan = plansByHash.get(
-                    edge.childPlanHash());
+                int childDepth = childDepth(lineageDepths, edge);
+                maxDepth = Math.max(maxDepth, childDepth);
+                EvolutionRewriteProgramPlan plan = plans.get(edge.childPlanHash());
                 if (plan == null) {
                     throw new IllegalArgumentException(
-                        "lineage child plan is absent from observed mutation batches: "
+                        "lineage child plan is absent from observed batches: "
                             + edge.childPlanHash());
                 }
-                CandidateStructureFacts facts = CandidateStructureFacts.create(
-                    edge.childCandidateHash(),
-                    edge.childAlphaStructuralHash(),
-                    edge.childPlanHash(),
-                    report.generation(),
-                    childDepth,
-                    plan);
-                CandidateStructureFacts previous = structures.putIfAbsent(
-                    facts.candidateHash(), facts);
-                if (previous != null && !previous.equals(facts)) {
-                    throw new IllegalArgumentException(
-                        "candidate identity maps to different structure facts");
-                }
+                putCandidateFacts(
+                    structures,
+                    CandidateStructureFacts.create(
+                        edge.childCandidateHash(),
+                        edge.childAlphaStructuralHash(),
+                        edge.childPlanHash(),
+                        report.generation(),
+                        childDepth,
+                        plan));
             }
-            generationDiagnostics.add(GenerationDiagnostics.create(
+            generationFacts.add(new GenerationDiagnostics(
                 report.generation(),
                 eligible,
                 accepted,
                 budgetOnly,
                 List.copyOf(generatedAlpha),
-                List.copyOf(survivingGeneratedAlpha),
-                generationMaxDepth));
+                List.copyOf(survivingAlpha),
+                maxDepth));
         }
 
         List<CandidateStructureFacts> candidateFacts = structures.values().stream()
@@ -199,7 +180,7 @@ public record EvolutionRewriteProgramTrainDiagnostics(
             boundRun.contentHash(),
             populationRun.contentHash(),
             batches,
-            generationDiagnostics,
+            generationFacts,
             candidateFacts,
             null));
         return new EvolutionRewriteProgramTrainDiagnostics(
@@ -210,7 +191,7 @@ public record EvolutionRewriteProgramTrainDiagnostics(
             boundRun.contentHash(),
             populationRun.contentHash(),
             batches,
-            generationDiagnostics,
+            generationFacts,
             candidateFacts,
             DATA_SCOPE,
             hash);
@@ -229,18 +210,30 @@ public record EvolutionRewriteProgramTrainDiagnostics(
             contentHash);
     }
 
+    private static int childDepth(
+        Map<String, Integer> lineageDepths,
+        LineageEdge edge
+    ) {
+        Integer parentDepth = lineageDepths.get(edge.parentCandidateHash());
+        if (parentDepth == null) {
+            throw new IllegalArgumentException(
+                "lineage parent is not reachable from a seed: "
+                    + edge.parentCandidateHash());
+        }
+        int depth = Math.addExact(parentDepth, 1);
+        lineageDepths.merge(edge.childCandidateHash(), depth, Math::min);
+        return depth;
+    }
+
     private static Map<String, EvolutionRewriteProgramPlan> plansByHash(
         List<EvolutionRewriteProgramCandidate> seeds,
         List<ObservedBatch> observedBatches
     ) {
-        Map<String, EvolutionRewriteProgramPlan> plans = new LinkedHashMap<>();
-        for (EvolutionRewriteProgramCandidate seed : seeds) {
-            putPlan(plans, seed.plan());
-        }
-        for (ObservedBatch observed : observedBatches) {
-            observed.batch().acceptedPlans().forEach(plan -> putPlan(plans, plan));
-        }
-        return plans;
+        Map<String, EvolutionRewriteProgramPlan> result = new LinkedHashMap<>();
+        seeds.forEach(seed -> putPlan(result, seed.plan()));
+        observedBatches.forEach(observed -> observed.batch().acceptedPlans()
+            .forEach(plan -> putPlan(result, plan)));
+        return result;
     }
 
     private static void putPlan(
@@ -260,21 +253,29 @@ public record EvolutionRewriteProgramTrainDiagnostics(
     ) {
         Map<String, CandidateStructureFacts> result = new LinkedHashMap<>();
         for (EvolutionRewriteProgramCandidate seed : seeds) {
-            CandidateStructureFacts facts = CandidateStructureFacts.create(
-                seed.contentHash(),
-                seed.alphaStructuralHash(),
-                seed.plan().contentHash(),
-                0,
-                0,
-                seed.plan());
-            CandidateStructureFacts previous = result.putIfAbsent(
-                facts.candidateHash(), facts);
-            if (previous != null && !previous.equals(facts)) {
-                throw new IllegalArgumentException(
-                    "seed candidate identity maps to different structure facts");
-            }
+            putCandidateFacts(
+                result,
+                CandidateStructureFacts.create(
+                    seed.contentHash(),
+                    seed.alphaStructuralHash(),
+                    seed.plan().contentHash(),
+                    0,
+                    0,
+                    seed.plan()));
         }
         return result;
+    }
+
+    private static void putCandidateFacts(
+        Map<String, CandidateStructureFacts> structures,
+        CandidateStructureFacts facts
+    ) {
+        CandidateStructureFacts previous = structures.putIfAbsent(
+            facts.candidateHash(), facts);
+        if (previous != null && !previous.equals(facts)) {
+            throw new IllegalArgumentException(
+                "candidate identity maps to different structure facts");
+        }
     }
 
     private static boolean isEligibleProposal(MutationAttempt attempt) {
@@ -304,16 +305,19 @@ public record EvolutionRewriteProgramTrainDiagnostics(
         counts.compute(kind, (ignored, value) -> Math.addExact(value, 1));
     }
 
+    private static Comparator<ObservedMutationBatch> batchComparator() {
+        return Comparator.comparingInt(ObservedMutationBatch::generation)
+            .thenComparing(ObservedMutationBatch::parentCandidateHash)
+            .thenComparing(ObservedMutationBatch::mutationBatchHash);
+    }
+
     private static List<ObservedMutationBatch> canonicalBatches(
         List<ObservedMutationBatch> values
     ) {
         Objects.requireNonNull(values, "mutationBatches");
         List<ObservedMutationBatch> result = values.stream()
             .map(value -> Objects.requireNonNull(value, "mutation batch"))
-            .sorted(Comparator
-                .comparingInt(ObservedMutationBatch::generation)
-                .thenComparing(ObservedMutationBatch::parentCandidateHash)
-                .thenComparing(ObservedMutationBatch::mutationBatchHash))
+            .sorted(batchComparator())
             .toList();
         if (result.stream().map(ObservedMutationBatch::identityKey).distinct().count()
                 != result.size()) {
@@ -379,21 +383,32 @@ public record EvolutionRewriteProgramTrainDiagnostics(
                     .property("generation", batch.generation())
                     .property("parentCandidateHash", batch.parentCandidateHash())
                     .property("mutationBatchHash", batch.mutationBatchHash())
+                    .property("mutationBatchJsonHash", batch.mutationBatchJsonHash())
                     .property("mutationBatchJson", batch.mutationBatchJson()))))
             .array("generations", array -> generations.forEach(generation ->
                 array.objectValue(object -> object
                     .property("generation", generation.generation())
                     .object("eligibleProposalCountsByMutationKind", counts ->
-                        writeCounts(counts, generation.eligibleProposalCountsByMutationKind()))
+                        writeCounts(
+                            counts,
+                            generation.eligibleProposalCountsByMutationKind()))
                     .object("acceptedOffspringCountsByMutationKind", counts ->
-                        writeCounts(counts, generation.acceptedOffspringCountsByMutationKind()))
+                        writeCounts(
+                            counts,
+                            generation.acceptedOffspringCountsByMutationKind()))
                     .object("maxAcceptedOnlyRejectionCountsByMutationKind", counts ->
-                        writeCounts(counts, generation.maxAcceptedOnlyRejectionCountsByMutationKind()))
-                    .stringArray("generatedAlphaStructuralHashes",
+                        writeCounts(
+                            counts,
+                            generation
+                                .maxAcceptedOnlyRejectionCountsByMutationKind()))
+                    .stringArray(
+                        "generatedAlphaStructuralHashes",
                         generation.generatedAlphaStructuralHashes())
-                    .stringArray("survivingGeneratedAlphaStructuralHashes",
+                    .stringArray(
+                        "survivingGeneratedAlphaStructuralHashes",
                         generation.survivingGeneratedAlphaStructuralHashes())
-                    .property("maxLineageDepthFromSeed",
+                    .property(
+                        "maxLineageDepthFromSeed",
                         generation.maxLineageDepthFromSeed()))))
             .array("candidateStructures", array -> candidateStructures.forEach(facts ->
                 array.objectValue(object -> object
@@ -403,11 +418,14 @@ public record EvolutionRewriteProgramTrainDiagnostics(
                     .property("firstSeenGeneration", facts.firstSeenGeneration())
                     .property("lineageDepthFromSeed", facts.lineageDepthFromSeed())
                     .property("nodeCount", facts.nodeCount())
-                    .property("containsCompositionTopology",
+                    .property(
+                        "containsCompositionTopology",
                         facts.containsCompositionTopology())
-                    .property("containsDecisionTopology",
+                    .property(
+                        "containsDecisionTopology",
                         facts.containsDecisionTopology())
-                    .property("minimumStructuralPrimitivePathSteps",
+                    .property(
+                        "minimumStructuralPrimitivePathSteps",
                         facts.minimumStructuralPrimitivePathSteps()))))
             .property("dataScope", DATA_SCOPE);
         if (contentHash != null) {
@@ -426,33 +444,44 @@ public record EvolutionRewriteProgramTrainDiagnostics(
         }
     }
 
+    private static void requireHash(String value, String name) {
+        EvolutionGenome.requireSha256(value, name);
+    }
+
     public record ObservedMutationBatch(
         int generation,
         String parentCandidateHash,
         String mutationBatchHash,
+        String mutationBatchJsonHash,
         String mutationBatchJson
     ) {
         public ObservedMutationBatch {
             if (generation < 1) {
                 throw new IllegalArgumentException("generation must be positive");
             }
-            EvolutionGenome.requireSha256(
-                parentCandidateHash, "parentCandidateHash");
-            EvolutionGenome.requireSha256(
-                mutationBatchHash, "mutationBatchHash");
+            requireHash(parentCandidateHash, "parentCandidateHash");
+            requireHash(mutationBatchHash, "mutationBatchHash");
+            requireHash(mutationBatchJsonHash, "mutationBatchJsonHash");
             if (mutationBatchJson == null || mutationBatchJson.isBlank()) {
                 throw new IllegalArgumentException(
                     "mutationBatchJson must not be blank");
+            }
+            if (!EvolutionGenome.hash(mutationBatchJson).equals(
+                    mutationBatchJsonHash)) {
+                throw new IllegalArgumentException(
+                    "mutationBatchJsonHash does not match canonical batch bytes");
             }
         }
 
         private static ObservedMutationBatch from(ObservedBatch observed) {
             MutationBatch batch = observed.batch();
+            String json = batch.toCanonicalJson();
             return new ObservedMutationBatch(
                 observed.generation(),
                 observed.parentCandidateHash(),
                 batch.contentHash(),
-                batch.toCanonicalJson());
+                EvolutionGenome.hash(json),
+                json);
         }
 
         private String identityKey() {
@@ -495,25 +524,6 @@ public record EvolutionRewriteProgramTrainDiagnostics(
             }
         }
 
-        private static GenerationDiagnostics create(
-            int generation,
-            Map<EvolutionRewriteProgramMutationKind, Integer> eligible,
-            Map<EvolutionRewriteProgramMutationKind, Integer> accepted,
-            Map<EvolutionRewriteProgramMutationKind, Integer> budgetOnly,
-            List<String> generatedAlpha,
-            List<String> survivingAlpha,
-            int maxDepth
-        ) {
-            return new GenerationDiagnostics(
-                generation,
-                eligible,
-                accepted,
-                budgetOnly,
-                generatedAlpha,
-                survivingAlpha,
-                maxDepth);
-        }
-
         private static Map<EvolutionRewriteProgramMutationKind, Integer>
                 canonicalCounts(
                     Map<EvolutionRewriteProgramMutationKind, Integer> values
@@ -526,7 +536,7 @@ public record EvolutionRewriteProgramTrainDiagnostics(
                 Integer count = values.get(kind);
                 if (count == null || count < 0) {
                     throw new IllegalArgumentException(
-                        "mutation-kind counts must contain non-negative values for every kind");
+                        "mutation-kind counts require every non-negative kind");
                 }
                 result.put(kind, count);
             }
@@ -541,8 +551,7 @@ public record EvolutionRewriteProgramTrainDiagnostics(
             Objects.requireNonNull(values, "alpha structural hashes");
             return values.stream()
                 .map(value -> {
-                    EvolutionGenome.requireSha256(
-                        value, "alphaStructuralHash");
+                    requireHash(value, "alphaStructuralHash");
                     return value;
                 })
                 .distinct()
@@ -563,10 +572,9 @@ public record EvolutionRewriteProgramTrainDiagnostics(
         int minimumStructuralPrimitivePathSteps
     ) {
         public CandidateStructureFacts {
-            EvolutionGenome.requireSha256(candidateHash, "candidateHash");
-            EvolutionGenome.requireSha256(
-                alphaStructuralHash, "alphaStructuralHash");
-            EvolutionGenome.requireSha256(planHash, "planHash");
+            requireHash(candidateHash, "candidateHash");
+            requireHash(alphaStructuralHash, "alphaStructuralHash");
+            requireHash(planHash, "planHash");
             if (firstSeenGeneration < 0 || lineageDepthFromSeed < 0
                     || nodeCount < 1
                     || minimumStructuralPrimitivePathSteps < 1) {
