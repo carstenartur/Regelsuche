@@ -10,6 +10,7 @@ import de.regelsuche.knowledge.RuleProfile;
 import de.regelsuche.plugin.PluginRuntimeConfig;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.web.BoundedRequestBody;
+import de.regelsuche.web.HttpJsonErrorResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -67,7 +68,8 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
                 default -> sendError(exchange, 404, "NOT_FOUND", "unknown rule-radar endpoint");
             }
         } catch (BoundedRequestBody.PayloadTooLargeException exception) {
-            sendPayloadTooLarge(exchange, exception.limitBytes());
+            HttpJsonErrorResponse.sendPayloadTooLarge(
+                exchange, exception.limitBytes());
         } catch (IllegalArgumentException exception) {
             sendError(exchange, 400, "INVALID_REQUEST", safeMessage(exception));
         } catch (RuntimeException exception) {
@@ -220,16 +222,6 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
             return Map.of();
         }
         return new JsonReader(new String(bytes, StandardCharsets.UTF_8)).readObject();
-    }
-
-    private void sendPayloadTooLarge(HttpExchange exchange, int limitBytes) throws IOException {
-        JsonWriter writer = new JsonWriter().beginObject()
-            .property("error", true)
-            .property("code", "PAYLOAD_TOO_LARGE")
-            .property("message", "request body exceeds configured limit")
-            .property("limitBytes", limitBytes)
-            .endObject();
-        sendJson(exchange, 413, writer.toString());
     }
 
     private void sendError(HttpExchange exchange, int status, String code, String message) throws IOException {
