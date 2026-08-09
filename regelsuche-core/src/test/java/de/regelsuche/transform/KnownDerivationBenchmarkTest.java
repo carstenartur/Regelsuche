@@ -4,15 +4,24 @@ import static de.regelsuche.ast.BinaryOperator.ADD;
 import static de.regelsuche.ast.BinaryOperator.MUL;
 import static de.regelsuche.ast.BinaryOperator.POW;
 import static de.regelsuche.ast.BinaryOperator.SUB;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.json.JsonReader;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,6 +36,8 @@ import org.junit.jupiter.api.Test;
  */
 class KnownDerivationBenchmarkTest {
     private static final int MAX_VISITED_STATES = 1_000;
+    private static final String CORPUS_RESOURCE =
+        "/de/regelsuche/transform/known-derivation-corpus.json";
     private final ExpressionParser parser = new ExpressionParser();
 
     @Test
@@ -84,18 +95,82 @@ class KnownDerivationBenchmarkTest {
     }
 
     private List<Case> corpus() {
-        return List.of(
-            new Case("complete-square", "x*x + 2*x*y + y*y", "(x+y)^2", 3),
-            new Case("reordered-square", "x*x + y*y + 2*y*x", "(x+y)^2", 3),
-            new Case("regrouped-square", "y*y + (2*x)*y + x*x", "(x+y)^2", 3),
-            new Case("scaled-square", "x*x + 3*x*a + 2.25*a*a", "(x+1.5*a)^2", 3),
-            new Case("fractional-square", "x*x + (4/3)*x*y + (4/9)*y*y", "(x+(2/3)*y)^2", 3),
-            new Case("difference-of-squares", "a*a - b*b", "(a-b)*(a+b)", 3),
-            new Case("difference-of-squares-powers", "m^2 - n^2", "(m-n)*(m+n)", 1),
-            new Case("factor-common-left", "a*x + a*y", "a*(x+y)", 1),
-            new Case("factor-common-right", "x*a + y*a", "(x+y)*a", 1),
-            new Case("inconsistent-near-miss", "x*x + 3*x*a + a*a", "(x+1.5*a)^2", 3)
-        );
+        try (InputStream input = KnownDerivationBenchmarkTest.class
+            .getResourceAsStream(CORPUS_RESOURCE)) {
+            assertNotNull(input, "missing " + CORPUS_RESOURCE);
+            Map<String, Object> root = new JsonReader(
+                new String(input.readAllBytes(), StandardCharsets.UTF_8)).readObject();
+            assertEquals(
+                Set.of("schema", "evidenceStatus", "claimBoundary", "cases"),
+                root.keySet());
+            assertEquals(
+                "regelsuche.known-derivation-corpus/v1",
+                requiredString(root, "schema"));
+            assertEquals("DEVELOPMENT_FIXTURE", requiredString(root, "evidenceStatus"));
+            requiredString(root, "claimBoundary");
+
+            List<?> rawCases = assertInstanceOf(
+                List.class,
+                root.get("cases"),
+                "cases must be a JSON array");
+            Set<String> ids = new LinkedHashSet<>();
+            List<Case> cases = new ArrayList<>();
+            for (Object rawCase : rawCases) {
+                Map<?, ?> rawValues = assertInstanceOf(
+                    Map.class,
+                    rawCase,
+                    "each benchmark case must be a JSON object");
+                Map<String, Object> values = stringKeyedMap(rawValues);
+                assertEquals(
+                    Set.of("id", "source", "target", "maxDepth", "relation",
+                        "provenance", "control"),
+                    values.keySet());
+                String id = requiredString(values, "id");
+                assertTrue(ids.add(id), "duplicate benchmark case " + id);
+                String relation = requiredString(values, "relation");
+                String control = requiredString(values, "control");
+                assertTrue(Set.of("EQUIVALENT", "NOT_EQUIVALENT").contains(relation), id);
+                assertTrue(Set.of("POSITIVE", "NEGATIVE").contains(control), id);
+                if (control.equals("NEGATIVE")) {
+                    assertEquals("NOT_EQUIVALENT", relation, id);
+                }
+                Number maxDepth = assertInstanceOf(
+                    Number.class,
+                    values.get("maxDepth"),
+                    "maxDepth must be numeric in " + values);
+                assertTrue(maxDepth.intValue() >= 0, "negative maxDepth in " + values);
+                cases.add(new Case(
+                    id,
+                    requiredString(values, "source"),
+                    requiredString(values, "target"),
+                    maxDepth.intValue(),
+                    relation,
+                    requiredString(values, "provenance"),
+                    control
+                ));
+            }
+            assertFalse(cases.isEmpty());
+            return List.copyOf(cases);
+        } catch (IOException exception) {
+            throw new IllegalStateException("cannot read " + CORPUS_RESOURCE, exception);
+        }
+    }
+
+    private Map<String, Object> stringKeyedMap(Map<?, ?> values) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        values.forEach((key, value) -> result.put(
+            assertInstanceOf(String.class, key, "case object keys must be strings"),
+            value));
+        return result;
+    }
+
+    private String requiredString(Map<String, Object> values, String key) {
+        String value = assertInstanceOf(
+            String.class,
+            values.get(key),
+            "missing or non-string " + key + " in " + values);
+        assertFalse(value.isBlank(), "blank " + key + " in " + values);
+        return value;
     }
 
     private Derivation derive(String source, String target, RecognitionProfile profile, int maxDepth) {
@@ -227,7 +302,15 @@ class KnownDerivationBenchmarkTest {
         }
     }
 
-    private record Case(String id, String source, String target, int maxDepth) {
+    private record Case(
+        String id,
+        String source,
+        String target,
+        int maxDepth,
+        String relation,
+        String provenance,
+        String control
+    ) {
     }
 
     private record SearchNode(String expression, List<String> rules) {
