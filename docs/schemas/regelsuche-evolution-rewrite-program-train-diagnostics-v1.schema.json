@@ -152,8 +152,16 @@
         "candidateHash": { "$ref": "#/$defs/hash" },
         "alphaStructuralHash": { "$ref": "#/$defs/hash" },
         "planHash": { "$ref": "#/$defs/hash" },
-        "firstSeenGeneration": { "type": "integer", "minimum": 0 },
-        "lineageDepthFromSeed": { "type": "integer", "minimum": 0 },
+        "firstSeenGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Earliest observed generation for this candidate identity; 0 denotes a seed."
+        },
+        "lineageDepthFromSeed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum observed lineage depth from any seed for this candidate identity."
+        },
         "nodeCount": { "type": "integer", "minimum": 1 },
         "containsCompositionTopology": { "type": "boolean" },
         "containsDecisionTopology": { "type": "boolean" },
