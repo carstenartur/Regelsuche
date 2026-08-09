@@ -46,6 +46,10 @@ fachlich gruppierten Einstieg; der vollständige Bestand liegt unter
 | [`regelsuche-evolution-train-fitness-v1`](schemas/regelsuche-evolution-train-fitness-v1.schema.json) | Rohwerte und Blocker der TRAIN-Fitness |
 | [`regelsuche-evolution-generation-report-v1`](schemas/regelsuche-evolution-generation-report-v1.schema.json) | Generation, Lineage, Diversität und Rejects |
 | [`regelsuche-evolution-population-run-v1`](schemas/regelsuche-evolution-population-run-v1.schema.json) | Vollständiger Populationslauf und Terminalstatus |
+| [`regelsuche-evolution-rewrite-program-population-execution-protocol-v1`](schemas/regelsuche-evolution-rewrite-program-population-execution-protocol-v1.schema.json) | Versionierte Identität von Population-Engine-, Mutator-, Proposal-Scheduling-, Seed- und Survivor-Semantik |
+| [`regelsuche-evolution-rewrite-program-population-execution-plan-v1`](schemas/regelsuche-evolution-rewrite-program-population-execution-plan-v1.schema.json) | Bindung eines unveränderten Study-Plans an ein Population-Execution-Protokoll |
+| [`regelsuche-evolution-rewrite-program-execution-protocol-bound-retained-run-v1`](schemas/regelsuche-evolution-rewrite-program-execution-protocol-bound-retained-run-v1.schema.json) | Retained TRAIN-Lauf mit Evaluator- und Population-Execution-Bindung |
+| [`regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-v1`](schemas/regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-v1.schema.json) | TRAIN-Checkpoint, der Resume an dieselbe Population-Execution-Identität bindet |
 
 Weitere Flagship-Verträge für Freeze, Reveal, Baselines und Work Accounting
 liegen ebenfalls im Schema-Verzeichnis und sind in

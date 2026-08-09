@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramPopulationExecutionPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramPopulationExecutionPlan.java</span></div><h1>EvolutionRewriteProgramPopulationExecutionPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Objects;
+
+/**
+ * Pre-execution binding between an immutable rewrite-program study and the
+ * mechanics used to execute its TRAIN population.
+ *
+ * &lt;p&gt;This additive artifact deliberately leaves the historical study-plan v1
+ * schema untouched. A new execution protocol therefore receives a new identity
+ * without reinterpreting old study hashes.&lt;/p&gt;
+ */
+public record EvolutionRewriteProgramPopulationExecutionPlan(
+    String schema,
+    String studyPlanHash,
+    String executionProtocolHash,
+    String status,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-population-execution-plan/v1&quot;;
+    public static final String STATUS = &quot;FROZEN_NOT_RUN&quot;;
+
+<span class="fc" id="L25">    public EvolutionRewriteProgramPopulationExecutionPlan {</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(</span>
+                &quot;unsupported rewrite-program population execution plan&quot;);
+        }
+<span class="fc" id="L30">        EvolutionGenome.requireSha256(studyPlanHash, &quot;studyPlanHash&quot;);</span>
+<span class="fc" id="L31">        EvolutionGenome.requireSha256(</span>
+            executionProtocolHash, &quot;executionProtocolHash&quot;);
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (!STATUS.equals(status)) {</span>
+<span class="nc" id="L34">            throw new IllegalArgumentException(</span>
+                &quot;population execution plan must remain frozen and unexecuted&quot;);
+        }
+<span class="fc" id="L37">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L38">        String expected = EvolutionGenome.hash(render(</span>
+            studyPlanHash,
+            executionProtocolHash,
+            null));
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(</span>
+                &quot;population execution plan contentHash mismatch&quot;);
+        }
+<span class="fc" id="L46">    }</span>
+
+    public static EvolutionRewriteProgramPopulationExecutionPlan create(
+        EvolutionRewriteProgramStudyPlan studyPlan,
+        EvolutionRewriteProgramPopulationExecutionProtocol executionProtocol
+    ) {
+<span class="fc" id="L52">        Objects.requireNonNull(studyPlan, &quot;studyPlan&quot;);</span>
+<span class="fc" id="L53">        Objects.requireNonNull(executionProtocol, &quot;executionProtocol&quot;);</span>
+<span class="fc" id="L54">        String hash = EvolutionGenome.hash(render(</span>
+<span class="fc" id="L55">            studyPlan.contentHash(),</span>
+<span class="fc" id="L56">            executionProtocol.contentHash(),</span>
+            null));
+<span class="fc" id="L58">        return new EvolutionRewriteProgramPopulationExecutionPlan(</span>
+            SCHEMA,
+<span class="fc" id="L60">            studyPlan.contentHash(),</span>
+<span class="fc" id="L61">            executionProtocol.contentHash(),</span>
+            STATUS,
+            hash);
+    }
+
+    public void requireInputs(
+        EvolutionRewriteProgramStudyPlan studyPlan,
+        EvolutionRewriteProgramPopulationExecutionProtocol executionProtocol
+    ) {
+<span class="fc" id="L70">        Objects.requireNonNull(studyPlan, &quot;studyPlan&quot;);</span>
+<span class="fc" id="L71">        Objects.requireNonNull(executionProtocol, &quot;executionProtocol&quot;);</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (!studyPlanHash.equals(studyPlan.contentHash())</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                || !executionProtocolHash.equals(</span>
+<span class="fc" id="L74">                    executionProtocol.contentHash())) {</span>
+<span class="nc" id="L75">            throw new IllegalArgumentException(</span>
+                &quot;population execution plan input identity mismatch&quot;);
+        }
+<span class="fc" id="L78">    }</span>
+
+    public String toCanonicalJson() {
+<span class="nc" id="L81">        return render(studyPlanHash, executionProtocolHash, contentHash);</span>
+    }
+
+    private static String render(
+        String studyPlanHash,
+        String executionProtocolHash,
+        String contentHash
+    ) {
+<span class="fc" id="L89">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L90">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L91">            .property(&quot;studyPlanHash&quot;, studyPlanHash)</span>
+<span class="fc" id="L92">            .property(&quot;executionProtocolHash&quot;, executionProtocolHash)</span>
+<span class="fc" id="L93">            .property(&quot;status&quot;, STATUS);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (contentHash != null) {</span>
+<span class="nc" id="L95">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L97">        return json.endObject().toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

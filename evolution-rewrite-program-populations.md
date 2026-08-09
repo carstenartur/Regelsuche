@@ -1,6 +1,6 @@
 # Populations of evolved rewrite programs
 
-Status: TRAIN population with durable checkpoint/resume boundary for #220/#521
+Status: TRAIN population with durable checkpoint/resume boundary and explicit execution-protocol identity for #220/#521/#613
 
 ## Combined candidate boundary
 
@@ -41,6 +41,68 @@ The plan additionally fails before execution when:
 
 The strict schema is
 [`regelsuche-evolution-rewrite-program-study-plan-v1.schema.json`](schemas/regelsuche-evolution-rewrite-program-study-plan-v1.schema.json).
+
+## Population execution protocol
+
+The study plan describes **what** is evaluated. It historically did not identify
+all implementation mechanics that decide **how** a bounded proposal set becomes
+accepted offspring and survivors. That distinction matters because a scheduling
+change can alter a deterministic population even when the study, seed and
+mutation catalog stay unchanged.
+
+`EvolutionRewriteProgramPopulationExecutionProtocol` therefore gives these
+mechanics a separate, content-addressed identity without changing the historical
+`EvolutionRewriteProgramStudyPlan/v1` schema. It binds:
+
+- population-engine implementation class;
+- deterministic mutator implementation class;
+- proposal ordering policy;
+- offspring scheduling policy;
+- generated-pool multiplier;
+- mutation-seed derivation policy;
+- survivor-selection and tie-breaking policy.
+
+`EvolutionRewriteProgramPopulationExecutionPlan` binds one immutable study-plan
+hash to one execution-protocol hash before execution. A retained run and a
+checkpoint can then be wrapped by
+`ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun` and
+`ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint` so neither
+an uninterrupted run nor resume can silently switch execution semantics.
+
+### Legacy identity
+
+`legacyV1()` names the exact mechanics used before #613:
+
+```text
+proposal ordering: KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1
+offspring scheduling: ROTATED_PREFIX_V1
+generated pool multiplier: 2
+mutation seed: STUDY_HASH_GENERATION_PARENT_HASH_SHA256_PREFIX64_V1
+survivor selection: FITNESS_DESC_NODES_ASC_HASH_ASC_UNIQUE_ALPHA_ELITES_V1
+```
+
+The first #613 tranche does **not** alter those mechanics. The ordinary historical
+runner remains unchanged, and the new execution-bound legacy runner delegates to
+that same engine/mutator path. Tests require the inner retained run from both
+paths to be byte-identical and require uninterrupted versus checkpoint/resume
+execution-bound results to be identical.
+
+A future policy identifier, `STRATIFIED_MUTATION_KIND_V1`, is declared so a later
+reviewed tranche can receive a distinct protocol hash. It is deliberately not
+executable yet: the execution-bound runner rejects every protocol other than the
+exact `legacyV1()` identity. Declaring a policy name is not permission to execute
+unfinished semantics.
+
+The strict schemas are:
+
+- [`regelsuche-evolution-rewrite-program-population-execution-protocol-v1.schema.json`](schemas/regelsuche-evolution-rewrite-program-population-execution-protocol-v1.schema.json)
+- [`regelsuche-evolution-rewrite-program-population-execution-plan-v1.schema.json`](schemas/regelsuche-evolution-rewrite-program-population-execution-plan-v1.schema.json)
+- [`regelsuche-evolution-rewrite-program-execution-protocol-bound-retained-run-v1.schema.json`](schemas/regelsuche-evolution-rewrite-program-execution-protocol-bound-retained-run-v1.schema.json)
+- [`regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-v1.schema.json`](schemas/regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-v1.schema.json)
+
+Historical v1 artifacts retain their original meaning and need no rewritten hash.
+A future showcase may use a new scheduling protocol only when its execution plan
+is frozen before that version's TRAIN/preflight/authority execution.
 
 ## Deterministic population execution
 
@@ -116,6 +178,11 @@ require uninterrupted and resumed runs to produce the same canonical population
 run and require the sum of pre-checkpoint and post-resume evaluator calls to
 equal the uninterrupted count.
 
+For execution-protocol-bound studies, the additive checkpoint wrapper also binds
+the execution plan and protocol. A checkpoint produced under one scheduling
+identity cannot be resumed through another execution-bound runner even if the
+historical checkpoint's study hash is unchanged.
+
 ### Durable process-independent artifact
 
 `EvolutionRewriteProgramCheckpointArtifact` persists that existing checkpoint
@@ -170,14 +237,12 @@ The strict checkpoint, durable-artifact/state and run schemas are:
 
 ## Claim boundary
 
-This layer establishes deterministic TRAIN-only population mechanics for
-combined rule/program candidates and process-independent checkpoint/resume
-semantics. It does not establish fair work-accounted self-improvement,
-VALIDATION selection, exactly-once FINAL TEST utility, formal proof or external
-novelty.
+This layer establishes deterministic TRAIN-only population mechanics, explicit
+execution-protocol identity for new experiments and process-independent
+checkpoint/resume semantics. It does not establish fair work-accounted
+self-improvement, VALIDATION selection, exactly-once FINAL TEST utility, formal
+proof or external novelty.
 
-After this slice and its protocol/work-accounting successors are green, the next
-scientifically irreversible step is to freeze the concrete assumption-sensitive
-rational/polynomial TRAIN, VALIDATION and FINAL TEST corpus, grammar, baselines,
-metrics and numerical success thresholds before any evaluated flagship campaign
-runs.
+Binding legacy execution semantics is not evidence that a future scheduling
+policy is better. Such a policy needs a separate reviewed implementation and
+TRAIN-only characterization before a future held-out experiment is frozen.

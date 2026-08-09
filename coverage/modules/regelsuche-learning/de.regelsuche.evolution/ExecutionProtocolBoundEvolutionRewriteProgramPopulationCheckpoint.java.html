@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint.java</span></div><h1>ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.PopulationCheckpoint;
+import de.regelsuche.json.JsonWriter;
+import java.util.Objects;
+
+/**
+ * TRAIN-only checkpoint wrapper that prevents resume under different population
+ * execution semantics.
+ */
+public record ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint(
+    String schema,
+    PopulationCheckpoint checkpoint,
+    String executionPlanHash,
+    String executionProtocolHash,
+    String status,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-execution-protocol-bound-checkpoint/v1&quot;;
+    public static final String STATUS =
+        &quot;POPULATION_EXECUTION_PROTOCOL_BOUND_TRAIN_CHECKPOINT&quot;;
+
+<span class="fc" id="L24">    public ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint {</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L26">            throw new IllegalArgumentException(</span>
+                &quot;unsupported execution-protocol-bound checkpoint schema&quot;);
+        }
+<span class="fc" id="L29">        Objects.requireNonNull(checkpoint, &quot;checkpoint&quot;);</span>
+<span class="fc" id="L30">        EvolutionGenome.requireSha256(executionPlanHash, &quot;executionPlanHash&quot;);</span>
+<span class="fc" id="L31">        EvolutionGenome.requireSha256(</span>
+            executionProtocolHash, &quot;executionProtocolHash&quot;);
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (!STATUS.equals(status)) {</span>
+<span class="nc" id="L34">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint lacks population execution protocol binding&quot;);
+        }
+<span class="fc" id="L37">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L38">        String expected = EvolutionGenome.hash(render(</span>
+            checkpoint,
+            executionPlanHash,
+            executionProtocolHash,
+            null));
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L44">            throw new IllegalArgumentException(</span>
+                &quot;execution-protocol-bound checkpoint contentHash mismatch&quot;);
+        }
+<span class="fc" id="L47">    }</span>
+
+    public static ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint
+            create(
+        PopulationCheckpoint checkpoint,
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
+        EvolutionRewriteProgramPopulationExecutionProtocol executionProtocol
+    ) {
+<span class="fc" id="L55">        Objects.requireNonNull(checkpoint, &quot;checkpoint&quot;);</span>
+<span class="fc" id="L56">        Objects.requireNonNull(executionPlan, &quot;executionPlan&quot;);</span>
+<span class="fc" id="L57">        Objects.requireNonNull(executionProtocol, &quot;executionProtocol&quot;);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (!executionPlan.studyPlanHash().equals(checkpoint.studyPlanHash())</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                || !executionPlan.executionProtocolHash().equals(</span>
+<span class="fc" id="L60">                    executionProtocol.contentHash())) {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint differs from population execution plan&quot;);
+        }
+<span class="fc" id="L64">        String hash = EvolutionGenome.hash(render(</span>
+            checkpoint,
+<span class="fc" id="L66">            executionPlan.contentHash(),</span>
+<span class="fc" id="L67">            executionProtocol.contentHash(),</span>
+            null));
+<span class="fc" id="L69">        return new ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint(</span>
+            SCHEMA,
+            checkpoint,
+<span class="fc" id="L72">            executionPlan.contentHash(),</span>
+<span class="fc" id="L73">            executionProtocol.contentHash(),</span>
+            STATUS,
+            hash);
+    }
+
+    /**
+     * Rebinds a potentially deserialized checkpoint to the actual execution
+     * artifacts supplied by the caller. The outer identities alone are not
+     * sufficient: the plan must itself name the protocol and the nested
+     * historical checkpoint must belong to the plan's study.
+     */
+    public void requireCompatible(
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
+        EvolutionRewriteProgramPopulationExecutionProtocol executionProtocol
+    ) {
+<span class="fc" id="L88">        Objects.requireNonNull(executionPlan, &quot;executionPlan&quot;);</span>
+<span class="fc" id="L89">        Objects.requireNonNull(executionProtocol, &quot;executionProtocol&quot;);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (!executionPlanHash.equals(executionPlan.contentHash())</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                || !executionProtocolHash.equals(</span>
+<span class="fc" id="L92">                    executionProtocol.contentHash())</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                || !executionPlan.executionProtocolHash().equals(</span>
+<span class="fc" id="L94">                    executionProtocol.contentHash())</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                || !executionPlan.studyPlanHash().equals(</span>
+<span class="fc" id="L96">                    checkpoint.studyPlanHash())) {</span>
+<span class="nc" id="L97">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint population execution identity mismatch&quot;);
+        }
+<span class="fc" id="L100">    }</span>
+
+    public String toCanonicalJson() {
+<span class="nc" id="L103">        return render(</span>
+            checkpoint,
+            executionPlanHash,
+            executionProtocolHash,
+            contentHash);
+    }
+
+    private static String render(
+        PopulationCheckpoint checkpoint,
+        String executionPlanHash,
+        String executionProtocolHash,
+        String contentHash
+    ) {
+<span class="fc" id="L116">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L117">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L118">            .property(&quot;checkpointHash&quot;, checkpoint.contentHash())</span>
+<span class="fc" id="L119">            .property(&quot;checkpointJson&quot;, checkpoint.toCanonicalJson())</span>
+<span class="fc" id="L120">            .property(&quot;executionPlanHash&quot;, executionPlanHash)</span>
+<span class="fc" id="L121">            .property(&quot;executionProtocolHash&quot;, executionProtocolHash)</span>
+<span class="fc" id="L122">            .property(&quot;status&quot;, STATUS);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (contentHash != null) {</span>
+<span class="nc" id="L124">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L126">        return json.endObject().toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

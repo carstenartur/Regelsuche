@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner.java</span></div><h1>ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationCatalog;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Retained TRAIN runner that binds the previously implicit population mechanics
+ * without changing the historical execution algorithm.
+ *
+ * &lt;p&gt;This first protocol tranche deliberately supports only the exact legacy
+ * scheduler. A future scheduling policy must receive a separate implementation
+ * and protocol identity before it becomes executable.&lt;/p&gt;
+ */
+public final class ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner {
+    private final EvolutionRewriteProgramPopulationExecutionProtocol protocol;
+    private final RetainedProtocolBoundEvolutionRewriteProgramPopulationRunner
+        delegate;
+
+    public ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner() {
+<span class="nc" id="L21">        this(EvolutionRewriteProgramPopulationExecutionProtocol.legacyV1());</span>
+<span class="nc" id="L22">    }</span>
+
+    public ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner(
+        EvolutionRewriteProgramPopulationExecutionProtocol protocol
+<span class="fc" id="L26">    ) {</span>
+<span class="fc" id="L27">        this.protocol = Objects.requireNonNull(protocol, &quot;protocol&quot;);</span>
+<span class="fc" id="L28">        requireImplementedProtocol(protocol);</span>
+<span class="fc" id="L29">        protocol.requireImplementations(</span>
+            EvolutionRewriteProgramPopulationEngine.class,
+            DeterministicRewriteProgramMutator.class);
+<span class="fc" id="L32">        this.delegate =</span>
+            new RetainedProtocolBoundEvolutionRewriteProgramPopulationRunner(
+                new EvolutionRewriteProgramPopulationEngine(
+                    new DeterministicRewriteProgramMutator()));
+<span class="fc" id="L36">    }</span>
+
+    public ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun run(
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
+        EvolutionRewriteProgramStudyPlan studyPlan,
+        EvolutionSplitManifest splitManifest,
+        EvolutionRewriteProgramTrainSuite suite,
+        List&lt;EvolutionRewriteProgramCandidate&gt; seeds,
+        MutationCatalog catalog,
+        EvolutionRewriteProgramFitnessEvaluator evaluator
+    ) {
+<span class="fc" id="L47">        requirePlan(executionPlan, studyPlan);</span>
+<span class="fc" id="L48">        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun retained =</span>
+<span class="fc" id="L49">            delegate.run(</span>
+                studyPlan,
+                splitManifest,
+                suite,
+                seeds,
+                catalog,
+                evaluator);
+<span class="fc" id="L56">        return ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun</span>
+<span class="fc" id="L57">            .create(retained, executionPlan, protocol);</span>
+    }
+
+    public ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint
+            checkpoint(
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
+        EvolutionRewriteProgramStudyPlan studyPlan,
+        EvolutionSplitManifest splitManifest,
+        EvolutionRewriteProgramTrainSuite suite,
+        List&lt;EvolutionRewriteProgramCandidate&gt; seeds,
+        MutationCatalog catalog,
+        EvolutionRewriteProgramFitnessEvaluator evaluator,
+        int completedGeneration
+    ) {
+<span class="fc" id="L71">        requirePlan(executionPlan, studyPlan);</span>
+<span class="fc" id="L72">        var checkpoint = delegate.checkpoint(</span>
+            studyPlan,
+            splitManifest,
+            suite,
+            seeds,
+            catalog,
+            evaluator,
+            completedGeneration);
+<span class="fc" id="L80">        return ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint</span>
+<span class="fc" id="L81">            .create(checkpoint, executionPlan, protocol);</span>
+    }
+
+    public ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun resume(
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
+        EvolutionRewriteProgramStudyPlan studyPlan,
+        EvolutionSplitManifest splitManifest,
+        EvolutionRewriteProgramTrainSuite suite,
+        List&lt;EvolutionRewriteProgramCandidate&gt; seeds,
+        MutationCatalog catalog,
+        EvolutionRewriteProgramFitnessEvaluator evaluator,
+        ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint
+            checkpoint
+    ) {
+<span class="fc" id="L95">        requirePlan(executionPlan, studyPlan);</span>
+<span class="fc" id="L96">        Objects.requireNonNull(checkpoint, &quot;checkpoint&quot;);</span>
+<span class="fc" id="L97">        checkpoint.requireCompatible(executionPlan, protocol);</span>
+<span class="fc" id="L98">        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun retained =</span>
+<span class="fc" id="L99">            delegate.resume(</span>
+                studyPlan,
+                splitManifest,
+                suite,
+                seeds,
+                catalog,
+                evaluator,
+<span class="fc" id="L106">                checkpoint.checkpoint());</span>
+<span class="fc" id="L107">        return ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun</span>
+<span class="fc" id="L108">            .create(retained, executionPlan, protocol);</span>
+    }
+
+    public EvolutionRewriteProgramPopulationExecutionProtocol protocol() {
+<span class="nc" id="L112">        return protocol;</span>
+    }
+
+    private void requirePlan(
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
+        EvolutionRewriteProgramStudyPlan studyPlan
+    ) {
+<span class="fc" id="L119">        Objects.requireNonNull(executionPlan, &quot;executionPlan&quot;)</span>
+<span class="fc" id="L120">            .requireInputs(studyPlan, protocol);</span>
+<span class="fc" id="L121">    }</span>
+
+    private static void requireImplementedProtocol(
+        EvolutionRewriteProgramPopulationExecutionProtocol protocol
+    ) {
+<span class="fc" id="L126">        var legacy = EvolutionRewriteProgramPopulationExecutionProtocol.legacyV1();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (!legacy.contentHash().equals(protocol.contentHash())) {</span>
+<span class="fc" id="L128">            throw new IllegalArgumentException(</span>
+                &quot;population execution protocol is not implemented by this runner: &quot;
+<span class="fc" id="L130">                    + &quot;expectedHash=&quot; + legacy.contentHash()</span>
+<span class="fc" id="L131">                    + &quot;, actualHash=&quot; + protocol.contentHash()</span>
+                    + &quot;, engineSemantics=&quot;
+<span class="fc" id="L133">                    + protocol.populationEngineSemanticsVersion()</span>
+                    + &quot;, mutatorSemantics=&quot;
+<span class="fc" id="L135">                    + protocol.mutatorSemanticsVersion()</span>
+                    + &quot;, scheduling=&quot;
+<span class="fc" id="L137">                    + protocol.offspringSchedulingPolicy());</span>
+        }
+<span class="fc" id="L139">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
