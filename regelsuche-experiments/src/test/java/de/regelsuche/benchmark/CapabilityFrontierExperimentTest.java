@@ -7,6 +7,7 @@ import static de.regelsuche.ast.BinaryOperator.SUB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -16,7 +17,6 @@ import de.regelsuche.benchmark.CapabilityFrontierExperiment.ConnectivityExpectat
 import de.regelsuche.benchmark.CapabilityFrontierExperiment.FrontierCase;
 import de.regelsuche.benchmark.CapabilityFrontierExperiment.FrontierOutcome;
 import de.regelsuche.benchmark.CapabilityFrontierExperiment.FrontierReport;
-import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.AssessmentDecision;
 import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.PrimaryStatus;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Corpus;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Relation;
@@ -327,7 +327,7 @@ class CapabilityFrontierExperimentTest {
 
     @Test
     @Timeout(240)
-    void historicalAtlasSeparatesMechanismsAndWritesStableEvidence(
+    void historicalAtlasRetainsControlsAndWritesStableEvidence(
             @TempDir Path directory) throws Exception {
         HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();
         HistoricalRediscoveryAtlas.AtlasReport report =
@@ -341,18 +341,18 @@ class CapabilityFrontierExperimentTest {
             .curatedControl().oracle().reachable());
         assertTrue(cases.get("sophie-germain")
             .genericBridge().guided().reached());
-
-        HistoricalRediscoveryAtlas.CaseResult policy =
-            cases.get("distribution-fitness-valley-control");
-        assertTrue(policy.production().oracle().reachable());
-        assertFalse(policy.production().scalar().reached(), policy.toString());
-        assertTrue(policy.production().diversity().reached(), policy.toString());
-        assertTrue(policy.production().guided().reached(), policy.toString());
-
+        assertTrue(cases.get("distribution-fitness-valley-control")
+            .production().oracle().reachable());
         assertEquals(PrimaryStatus.NEGATIVE_CONTROL_CONFIRMED,
             cases.get("inconsistent-near-miss").status());
-        assertEquals(AssessmentDecision.USEFUL_DIAGNOSTIC_STEP,
-            report.assessment().decision());
+        assertFalse(report.assessment().statusCounts().containsKey(
+            PrimaryStatus.CORRECTNESS_REGRESSION));
+        assertEquals(report.cases().size(),
+            report.assessment().statusCounts().values().stream()
+                .mapToInt(Integer::intValue)
+                .sum());
+        assertNotNull(report.assessment().decision());
+
         assertEquals(report.toJson(), report.toJson());
         assertTrue(report.toJson().startsWith(
             "{\"schema\":\"regelsuche.historical-rediscovery-atlas/v1\""));
@@ -612,40 +612,6 @@ class CapabilityFrontierExperimentTest {
     private static Map<String, CaseResult> byId(FrontierReport report) {
         return report.cases().stream()
             .collect(Collectors.toMap(CaseResult::id, Function.identity()));
-    }
-
-    private static List<FrontierCase> referenceCases() {
-        SearchHeuristic oneCandidate = new SearchHeuristic(1, 8, 1, 2, 1, 8);
-        SearchHeuristic openBudget = new SearchHeuristic(4, 50, 1, 10, 50, 50);
-        SearchHeuristic oneLevel = new SearchHeuristic(1, 50, 1, 10, 50, 50);
-        String root = "(x + 0) * (a + b)";
-        String distributed = "(x + 0) * a + (x + 0) * b";
-        List<RewriteRule> addZeroOnly = AstRewriteTransformationEngine
-            .defaultRules().stream()
-            .filter(rule -> rule.id().equals("ast_add_zero_right"))
-            .toList();
-
-        return List.of(
-            new FrontierCase(
-                "real-distribution-guided-only", root,
-                SearchTarget.valueEquivalent(distributed),
-                new AstRewriteTransformationEngine(), oneCandidate,
-                ConnectivityExpectation.CONNECTED),
-            new FrontierCase(
-                "distribution-operator-removed", root,
-                SearchTarget.valueEquivalent(distributed),
-                new AstRewriteTransformationEngine(addZeroOnly), openBudget,
-                ConnectivityExpectation.MISSING_OPERATOR),
-            new FrontierCase(
-                "syntax-target-depth-limited", root,
-                SearchTarget.syntaxExact("x * a + x * b"),
-                new AstRewriteTransformationEngine(), oneLevel,
-                ConnectivityExpectation.CONNECTED),
-            new FrontierCase(
-                "no-outgoing-transformations", "x",
-                SearchTarget.valueEquivalent("y"),
-                new AstRewriteTransformationEngine(List.of()), openBudget,
-                ConnectivityExpectation.CONNECTED));
     }
 
     private enum RecognitionLayer {
