@@ -180,6 +180,10 @@ public final class ExecutionProtocolBoundEvolutionRewriteProgramCheckpointArtifa
                 "execution-bound checkpoint manifest size is out of bounds");
         }
         byte[] bytes = Files.readAllBytes(path);
+        if (bytes.length != size) {
+            throw new IllegalArgumentException(
+                "execution-bound checkpoint manifest changed while being read");
+        }
         try {
             return StandardCharsets.UTF_8.newDecoder()
                 .onMalformedInput(CodingErrorAction.REPORT)
