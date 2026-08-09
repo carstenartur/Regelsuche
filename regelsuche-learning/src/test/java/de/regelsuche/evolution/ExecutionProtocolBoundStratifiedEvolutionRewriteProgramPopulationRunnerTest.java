@@ -154,6 +154,53 @@ class ExecutionProtocolBoundStratifiedEvolutionRewriteProgramPopulationRunnerTes
     }
 
     @Test
+    void repeatedCandidateObservationsKeepEarliestAndShortestEvidence() {
+        var first = new EvolutionRewriteProgramTrainDiagnostics
+            .CandidateStructureFacts(
+                hash("repeated-candidate"),
+                hash("repeated-alpha"),
+                hash("repeated-plan"),
+                4,
+                3,
+                5,
+                true,
+                false,
+                2);
+        var earlierShorter = new EvolutionRewriteProgramTrainDiagnostics
+            .CandidateStructureFacts(
+                first.candidateHash(),
+                first.alphaStructuralHash(),
+                first.planHash(),
+                2,
+                1,
+                5,
+                true,
+                false,
+                2);
+
+        var merged = first.mergeObservation(earlierShorter);
+
+        assertEquals(2, merged.firstSeenGeneration());
+        assertEquals(1, merged.lineageDepthFromSeed());
+        assertEquals(merged, earlierShorter.mergeObservation(first));
+
+        var structurallyDifferent = new EvolutionRewriteProgramTrainDiagnostics
+            .CandidateStructureFacts(
+                first.candidateHash(),
+                first.alphaStructuralHash(),
+                first.planHash(),
+                5,
+                4,
+                6,
+                true,
+                false,
+                2);
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> merged.mergeObservation(structurallyDifferent));
+    }
+
+    @Test
     void legacyProtocolCannotRequestStratifiedDiagnostics() {
         Fixture fixture = fixture();
         EvolutionRewriteProgramPopulationExecutionProtocol protocol =
