@@ -223,9 +223,10 @@ def scan_verification_workflow(
 ) -> list[Violation]:
     path = WORKFLOW_DIR / workflow
     text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
     violations: list[Violation] = []
 
-    for line_number, line in enumerate(text.splitlines(), start=1):
+    for line_number, line in enumerate(lines, start=1):
         for category, pattern in TEXT_PATTERNS:
             if pattern.search(line):
                 violations.append(
@@ -275,10 +276,18 @@ def scan_verification_workflow(
         + "' }}"
     )
     if expected_job_name not in compact:
+        job_name_line = next(
+            (
+                line_number
+                for line_number, line in enumerate(lines, start=1)
+                if line.startswith("    name:")
+            ),
+            1,
+        )
         violations.append(
             Violation(
                 workflow,
-                1,
+                job_name_line,
                 "required-check-create-collision",
                 "verification job must give create events a distinct check name: "
                 + expected_job_name,
