@@ -50,6 +50,7 @@ fachlich gruppierten Einstieg; der vollständige Bestand liegt unter
 | [`regelsuche-evolution-rewrite-program-population-execution-plan-v1`](schemas/regelsuche-evolution-rewrite-program-population-execution-plan-v1.schema.json) | Bindung eines unveränderten Study-Plans an ein Population-Execution-Protokoll |
 | [`regelsuche-evolution-rewrite-program-execution-protocol-bound-retained-run-v1`](schemas/regelsuche-evolution-rewrite-program-execution-protocol-bound-retained-run-v1.schema.json) | Retained TRAIN-Lauf mit Evaluator- und Population-Execution-Bindung |
 | [`regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-v1`](schemas/regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-v1.schema.json) | TRAIN-Checkpoint, der Resume an dieselbe Population-Execution-Identität bindet |
+| [`regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact-v1`](schemas/regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact-v1.schema.json) | Process-independent Manifest-last-Checkpoint, der nested TRAIN-State an Execution Plan und Protocol bindet |
 
 Weitere Flagship-Verträge für Freeze, Reveal, Baselines und Work Accounting
 liegen ebenfalls im Schema-Verzeichnis und sind in

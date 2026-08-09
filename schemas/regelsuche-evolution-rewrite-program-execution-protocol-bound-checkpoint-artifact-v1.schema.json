@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "boundCheckpointHash",
+    "checkpointHash",
+    "checkpointArtifactManifestHash",
+    "executionPlanHash",
+    "executionProtocolHash",
+    "commitProtocol",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact/v1"
+    },
+    "boundCheckpointHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "checkpointHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "checkpointArtifactManifestHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "executionPlanHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "executionProtocolHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "commitProtocol": {
+      "const": "OUTER_MANIFEST_LAST_ATOMIC_RENAME_V1"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

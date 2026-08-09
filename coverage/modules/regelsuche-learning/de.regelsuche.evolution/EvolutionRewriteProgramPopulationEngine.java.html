@@ -275,8 +275,8 @@ public final class EvolutionRewriteProgramPopulationEngine {
 <span class="nc" id="L275">                    blockers.add(&quot;MUTATION_KIND_NOT_PREREGISTERED:&quot;</span>
 <span class="nc" id="L276">                        + attempt.kind());</span>
                 }
-<span class="pc bpc" id="L278" title="1 of 2 branches missed.">                if (contentHashes.contains(child.contentHash())) {</span>
-<span class="nc" id="L279">                    blockers.add(&quot;DUPLICATE_CANDIDATE:contentHash&quot;);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                if (contentHashes.contains(child.contentHash())) {</span>
+<span class="fc" id="L279">                    blockers.add(&quot;DUPLICATE_CANDIDATE:contentHash&quot;);</span>
                 }
 <span class="fc bfc" id="L281" title="All 2 branches covered.">                if (alphaHashes.contains(child.alphaStructuralHash())) {</span>
 <span class="fc" id="L282">                    blockers.add(</span>

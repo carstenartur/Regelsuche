@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExecutionProtocolBoundEvolutionRewriteProgramCheckpointArtifact.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExecutionProtocolBoundEvolutionRewriteProgramCheckpointArtifact.java</span></div><h1>ExecutionProtocolBoundEvolutionRewriteProgramCheckpointArtifact.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.evolution.EvolutionRewriteProgramCheckpointArtifact.CheckpointArtifactManifest;
+import de.regelsuche.evolution.EvolutionRewriteProgramCheckpointArtifact.LoadedCheckpoint;
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * Durable outer commit boundary for a TRAIN checkpoint plus the execution plan
+ * and population-execution protocol under which it may be resumed.
+ *
+ * &lt;p&gt;The existing {@link EvolutionRewriteProgramCheckpointArtifact} remains the
+ * authority for checkpoint bytes. This class stores that artifact unchanged in
+ * a child directory and commits a small outer manifest last. A missing outer
+ * manifest therefore never authorizes resume.&lt;/p&gt;
+ */
+public final class ExecutionProtocolBoundEvolutionRewriteProgramCheckpointArtifact {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact/v1&quot;;
+    public static final String COMMIT_PROTOCOL =
+        &quot;OUTER_MANIFEST_LAST_ATOMIC_RENAME_V1&quot;;
+    public static final String MANIFEST_FILE_NAME =
+        &quot;execution-checkpoint-binding.json&quot;;
+    public static final String CHECKPOINT_DIRECTORY_NAME = &quot;checkpoint&quot;;
+    private static final long MAX_MANIFEST_BYTES = 256L * 1024L;
+<span class="fc" id="L46">    private static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="fc" id="L47">        JsonFactory.builder()</span>
+<span class="fc" id="L48">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L49">            .build())</span>
+<span class="fc" id="L50">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L51">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);</span>
+
+    private final EvolutionRewriteProgramCheckpointArtifact checkpointArtifact;
+
+    public ExecutionProtocolBoundEvolutionRewriteProgramCheckpointArtifact() {
+<span class="fc" id="L56">        this(new EvolutionRewriteProgramCheckpointArtifact());</span>
+<span class="fc" id="L57">    }</span>
+
+    ExecutionProtocolBoundEvolutionRewriteProgramCheckpointArtifact(
+        EvolutionRewriteProgramCheckpointArtifact checkpointArtifact
+<span class="fc" id="L61">    ) {</span>
+<span class="fc" id="L62">        this.checkpointArtifact = Objects.requireNonNull(</span>
+            checkpointArtifact, &quot;checkpointArtifact&quot;);
+<span class="fc" id="L64">    }</span>
+
+    public BoundCheckpointArtifactManifest write(
+        Path outputDirectory,
+        ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint checkpoint
+    ) {
+<span class="fc" id="L70">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L71">        Objects.requireNonNull(checkpoint, &quot;checkpoint&quot;);</span>
+<span class="fc" id="L72">        Path directory = outputDirectory.toAbsolutePath().normalize();</span>
+        try {
+<span class="fc" id="L74">            requireSafeAncestry(directory);</span>
+<span class="fc" id="L75">            Files.createDirectories(directory);</span>
+<span class="fc" id="L76">            requireSafeAncestry(directory);</span>
+<span class="fc" id="L77">            requireOnlyKnownEntries(directory, false);</span>
+<span class="fc" id="L78">            Files.deleteIfExists(directory.resolve(MANIFEST_FILE_NAME));</span>
+
+<span class="fc" id="L80">            CheckpointArtifactManifest nested = checkpointArtifact.write(</span>
+<span class="fc" id="L81">                directory.resolve(CHECKPOINT_DIRECTORY_NAME),</span>
+<span class="fc" id="L82">                checkpoint.checkpoint());</span>
+<span class="fc" id="L83">            BoundCheckpointArtifactManifest manifest =</span>
+<span class="fc" id="L84">                BoundCheckpointArtifactManifest.create(</span>
+<span class="fc" id="L85">                    checkpoint.contentHash(),</span>
+<span class="fc" id="L86">                    checkpoint.checkpoint().contentHash(),</span>
+<span class="fc" id="L87">                    nested.contentHash(),</span>
+<span class="fc" id="L88">                    checkpoint.executionPlanHash(),</span>
+<span class="fc" id="L89">                    checkpoint.executionProtocolHash());</span>
+<span class="fc" id="L90">            atomicWrite(</span>
+<span class="fc" id="L91">                directory.resolve(MANIFEST_FILE_NAME),</span>
+<span class="fc" id="L92">                manifest.toCanonicalJson());</span>
+<span class="fc" id="L93">            requireOnlyKnownEntries(directory, true);</span>
+<span class="fc" id="L94">            return manifest;</span>
+<span class="nc" id="L95">        } catch (IOException exception) {</span>
+<span class="nc" id="L96">            throw new UncheckedIOException(</span>
+                &quot;Could not commit execution-bound checkpoint artifact&quot;,
+                exception);
+        }
+    }
+
+    public LoadedBoundCheckpoint read(
+        Path inputDirectory,
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
+        EvolutionRewriteProgramPopulationExecutionProtocol executionProtocol
+    ) {
+<span class="fc" id="L107">        Objects.requireNonNull(inputDirectory, &quot;inputDirectory&quot;);</span>
+<span class="fc" id="L108">        Objects.requireNonNull(executionPlan, &quot;executionPlan&quot;);</span>
+<span class="fc" id="L109">        Objects.requireNonNull(executionProtocol, &quot;executionProtocol&quot;);</span>
+<span class="fc" id="L110">        Path directory = inputDirectory.toAbsolutePath().normalize();</span>
+        try {
+<span class="fc" id="L112">            requireSafeAncestry(directory);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="nc" id="L114">                throw new IllegalArgumentException(</span>
+                    &quot;execution-bound checkpoint directory does not exist&quot;);
+            }
+<span class="fc" id="L117">            requireOnlyKnownEntries(directory, true);</span>
+<span class="fc" id="L118">            String manifestJson = readUtf8Bounded(</span>
+<span class="fc" id="L119">                directory.resolve(MANIFEST_FILE_NAME));</span>
+<span class="fc" id="L120">            BoundCheckpointArtifactManifest manifest = parse(manifestJson);</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            if (!manifest.toCanonicalJson().equals(manifestJson)) {</span>
+<span class="nc" id="L122">                throw new IllegalArgumentException(</span>
+                    &quot;execution-bound checkpoint manifest is not canonical&quot;);
+            }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (!manifest.executionPlanHash().equals(executionPlan.contentHash())</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                    || !manifest.executionProtocolHash().equals(</span>
+<span class="fc" id="L127">                        executionProtocol.contentHash())) {</span>
+<span class="fc" id="L128">                throw new IllegalArgumentException(</span>
+                    &quot;execution-bound checkpoint manifest differs from requested execution identity&quot;);
+            }
+
+<span class="fc" id="L132">            LoadedCheckpoint nested = checkpointArtifact.read(</span>
+<span class="fc" id="L133">                directory.resolve(CHECKPOINT_DIRECTORY_NAME));</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            if (!manifest.checkpointHash().equals(</span>
+<span class="fc" id="L135">                    nested.checkpoint().contentHash())</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                    || !manifest.checkpointArtifactManifestHash().equals(</span>
+<span class="fc" id="L137">                        nested.manifest().contentHash())) {</span>
+<span class="nc" id="L138">                throw new IllegalArgumentException(</span>
+                    &quot;nested checkpoint artifact differs from outer execution binding&quot;);
+            }
+            ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint
+<span class="fc" id="L142">                reconstructed =</span>
+                    ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint
+<span class="fc" id="L144">                        .create(</span>
+<span class="fc" id="L145">                            nested.checkpoint(),</span>
+                            executionPlan,
+                            executionProtocol);
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (!manifest.boundCheckpointHash().equals(</span>
+<span class="fc" id="L149">                    reconstructed.contentHash())) {</span>
+<span class="nc" id="L150">                throw new IllegalArgumentException(</span>
+                    &quot;reconstructed execution-bound checkpoint differs from outer manifest&quot;);
+            }
+<span class="fc" id="L153">            return new LoadedBoundCheckpoint(reconstructed, manifest);</span>
+<span class="nc" id="L154">        } catch (IOException exception) {</span>
+<span class="nc" id="L155">            throw new IllegalArgumentException(</span>
+                &quot;Could not read execution-bound checkpoint artifact&quot;,
+                exception);
+        }
+    }
+
+    private static BoundCheckpointArtifactManifest parse(String json) {
+        try {
+<span class="fc" id="L163">            return JSON.readValue(json, BoundCheckpointArtifactManifest.class);</span>
+<span class="nc" id="L164">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L165">            throw new IllegalArgumentException(</span>
+                &quot;Invalid execution-bound checkpoint manifest JSON&quot;,
+                exception);
+        }
+    }
+
+    private static String readUtf8Bounded(Path path) throws IOException {
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                || Files.isSymbolicLink(path)) {</span>
+<span class="nc" id="L174">            throw new IllegalArgumentException(</span>
+                &quot;execution-bound checkpoint manifest must be a regular file&quot;);
+        }
+<span class="fc" id="L177">        long size = Files.size(path);</span>
+<span class="pc bpc" id="L178" title="2 of 4 branches missed.">        if (size &lt; 1 || size &gt; MAX_MANIFEST_BYTES) {</span>
+<span class="nc" id="L179">            throw new IllegalArgumentException(</span>
+                &quot;execution-bound checkpoint manifest size is out of bounds&quot;);
+        }
+<span class="fc" id="L182">        byte[] bytes = Files.readAllBytes(path);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (bytes.length != size) {</span>
+<span class="nc" id="L184">            throw new IllegalArgumentException(</span>
+                &quot;execution-bound checkpoint manifest changed while being read&quot;);
+        }
+        try {
+<span class="fc" id="L188">            return StandardCharsets.UTF_8.newDecoder()</span>
+<span class="fc" id="L189">                .onMalformedInput(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L190">                .onUnmappableCharacter(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L191">                .decode(ByteBuffer.wrap(bytes))</span>
+<span class="fc" id="L192">                .toString();</span>
+<span class="nc" id="L193">        } catch (CharacterCodingException exception) {</span>
+<span class="nc" id="L194">            throw new IllegalArgumentException(</span>
+                &quot;execution-bound checkpoint manifest is not valid UTF-8&quot;,
+                exception);
+        }
+    }
+
+    private static void requireSafeAncestry(Path path) {
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        for (Path current = path; current != null; current = current.getParent()) {</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                    &amp;&amp; Files.isSymbolicLink(current)) {</span>
+<span class="nc" id="L204">                throw new IllegalArgumentException(</span>
+                    &quot;execution-bound checkpoint ancestry must not contain symbolic links&quot;);
+            }
+        }
+<span class="fc" id="L208">    }</span>
+
+    private static void requireOnlyKnownEntries(
+        Path directory,
+        boolean requireManifest
+    ) throws IOException {
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (Files.isSymbolicLink(directory)) {</span>
+<span class="nc" id="L215">            throw new IllegalArgumentException(</span>
+                &quot;execution-bound checkpoint directory must not be a symbolic link&quot;);
+        }
+<span class="fc" id="L218">        Set&lt;String&gt; names = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L219">        try (var entries = Files.list(directory)) {</span>
+<span class="fc" id="L220">            entries.forEach(entry -&gt; names.add(entry.getFileName().toString()));</span>
+        }
+<span class="fc" id="L222">        Set&lt;String&gt; allowed = Set.of(</span>
+            MANIFEST_FILE_NAME,
+            CHECKPOINT_DIRECTORY_NAME);
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (!allowed.containsAll(names)) {</span>
+<span class="nc" id="L226">            throw new IllegalArgumentException(</span>
+                &quot;execution-bound checkpoint directory contains unexpected entries&quot;);
+        }
+<span class="fc" id="L229">        Path checkpointDirectory = directory.resolve(CHECKPOINT_DIRECTORY_NAME);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (names.contains(CHECKPOINT_DIRECTORY_NAME)</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                &amp;&amp; (!Files.isDirectory(</span>
+                    checkpointDirectory,
+                    LinkOption.NOFOLLOW_LINKS)
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">                    || Files.isSymbolicLink(checkpointDirectory))) {</span>
+<span class="nc" id="L235">            throw new IllegalArgumentException(</span>
+                &quot;nested checkpoint entry must be a regular directory&quot;);
+        }
+<span class="fc" id="L238">        Path manifest = directory.resolve(MANIFEST_FILE_NAME);</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (names.contains(MANIFEST_FILE_NAME)</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                &amp;&amp; (!Files.isRegularFile(manifest, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                    || Files.isSymbolicLink(manifest))) {</span>
+<span class="nc" id="L242">            throw new IllegalArgumentException(</span>
+                &quot;execution binding manifest must be a regular file&quot;);
+        }
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (requireManifest</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">                &amp;&amp; (!names.contains(MANIFEST_FILE_NAME)</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                    || !names.contains(CHECKPOINT_DIRECTORY_NAME))) {</span>
+<span class="fc" id="L248">            throw new IllegalArgumentException(</span>
+                &quot;execution-bound checkpoint artifact is incomplete&quot;);
+        }
+<span class="fc" id="L251">    }</span>
+
+    private static void atomicWrite(Path target, String content)
+            throws IOException {
+<span class="fc" id="L255">        Objects.requireNonNull(content, &quot;content&quot;);</span>
+<span class="fc" id="L256">        Path directory = target.getParent();</span>
+<span class="fc" id="L257">        Path temporary = directory.resolve(</span>
+<span class="fc" id="L258">            &quot;.&quot; + target.getFileName() + &quot;.tmp-&quot; + UUID.randomUUID());</span>
+        try {
+<span class="fc" id="L260">            byte[] bytes = content.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L261">            try (FileChannel channel = FileChannel.open(</span>
+                    temporary,
+                    StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE)) {
+<span class="fc" id="L265">                channel.write(ByteBuffer.wrap(bytes));</span>
+<span class="fc" id="L266">                channel.force(true);</span>
+            }
+<span class="fc" id="L268">            Files.move(</span>
+                temporary,
+                target,
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+<span class="fc" id="L274">            Files.deleteIfExists(temporary);</span>
+        }
+<span class="fc" id="L276">    }</span>
+
+    public record BoundCheckpointArtifactManifest(
+        String schema,
+        String boundCheckpointHash,
+        String checkpointHash,
+        String checkpointArtifactManifestHash,
+        String executionPlanHash,
+        String executionProtocolHash,
+        String commitProtocol,
+        String contentHash
+    ) {
+<span class="fc" id="L288">        public BoundCheckpointArtifactManifest {</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L290">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported execution-bound checkpoint artifact schema&quot;);
+            }
+<span class="fc" id="L293">            EvolutionGenome.requireSha256(</span>
+                boundCheckpointHash, &quot;boundCheckpointHash&quot;);
+<span class="fc" id="L295">            EvolutionGenome.requireSha256(checkpointHash, &quot;checkpointHash&quot;);</span>
+<span class="fc" id="L296">            EvolutionGenome.requireSha256(</span>
+                checkpointArtifactManifestHash,
+                &quot;checkpointArtifactManifestHash&quot;);
+<span class="fc" id="L299">            EvolutionGenome.requireSha256(</span>
+                executionPlanHash, &quot;executionPlanHash&quot;);
+<span class="fc" id="L301">            EvolutionGenome.requireSha256(</span>
+                executionProtocolHash, &quot;executionProtocolHash&quot;);
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            if (!COMMIT_PROTOCOL.equals(commitProtocol)) {</span>
+<span class="nc" id="L304">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported execution-bound checkpoint commit protocol&quot;);
+            }
+<span class="fc" id="L307">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L308">            String expected = EvolutionGenome.hash(render(</span>
+                boundCheckpointHash,
+                checkpointHash,
+                checkpointArtifactManifestHash,
+                executionPlanHash,
+                executionProtocolHash,
+                null));
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L316">                throw new IllegalArgumentException(</span>
+                    &quot;execution-bound checkpoint artifact contentHash mismatch&quot;);
+            }
+<span class="fc" id="L319">        }</span>
+
+        static BoundCheckpointArtifactManifest create(
+            String boundCheckpointHash,
+            String checkpointHash,
+            String checkpointArtifactManifestHash,
+            String executionPlanHash,
+            String executionProtocolHash
+        ) {
+<span class="fc" id="L328">            String hash = EvolutionGenome.hash(render(</span>
+                boundCheckpointHash,
+                checkpointHash,
+                checkpointArtifactManifestHash,
+                executionPlanHash,
+                executionProtocolHash,
+                null));
+<span class="fc" id="L335">            return new BoundCheckpointArtifactManifest(</span>
+                SCHEMA,
+                boundCheckpointHash,
+                checkpointHash,
+                checkpointArtifactManifestHash,
+                executionPlanHash,
+                executionProtocolHash,
+                COMMIT_PROTOCOL,
+                hash);
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L347">            return render(</span>
+                boundCheckpointHash,
+                checkpointHash,
+                checkpointArtifactManifestHash,
+                executionPlanHash,
+                executionProtocolHash,
+                contentHash);
+        }
+
+        private static String render(
+            String boundCheckpointHash,
+            String checkpointHash,
+            String checkpointArtifactManifestHash,
+            String executionPlanHash,
+            String executionProtocolHash,
+            String contentHash
+        ) {
+<span class="fc" id="L364">            JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L365">                .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L366">                .property(&quot;boundCheckpointHash&quot;, boundCheckpointHash)</span>
+<span class="fc" id="L367">                .property(&quot;checkpointHash&quot;, checkpointHash)</span>
+<span class="fc" id="L368">                .property(</span>
+                    &quot;checkpointArtifactManifestHash&quot;,
+                    checkpointArtifactManifestHash)
+<span class="fc" id="L371">                .property(&quot;executionPlanHash&quot;, executionPlanHash)</span>
+<span class="fc" id="L372">                .property(&quot;executionProtocolHash&quot;, executionProtocolHash)</span>
+<span class="fc" id="L373">                .property(&quot;commitProtocol&quot;, COMMIT_PROTOCOL);</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">            if (contentHash != null) {</span>
+<span class="fc" id="L375">                json.property(&quot;contentHash&quot;, contentHash);</span>
+            }
+<span class="fc" id="L377">            return json.endObject().toString();</span>
+        }
+    }
+
+    public record LoadedBoundCheckpoint(
+        ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint checkpoint,
+        BoundCheckpointArtifactManifest manifest
+    ) {
+<span class="fc" id="L385">        public LoadedBoundCheckpoint {</span>
+<span class="fc" id="L386">            Objects.requireNonNull(checkpoint, &quot;checkpoint&quot;);</span>
+<span class="fc" id="L387">            Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">            if (!checkpoint.contentHash().equals(</span>
+<span class="fc" id="L389">                    manifest.boundCheckpointHash())) {</span>
+<span class="nc" id="L390">                throw new IllegalArgumentException(</span>
+                    &quot;loaded execution-bound checkpoint differs from manifest&quot;);
+            }
+<span class="fc" id="L393">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
