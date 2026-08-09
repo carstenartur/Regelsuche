@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-rewrite-program-execution-protocol-bound-checkpoint/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "checkpointHash",
+    "checkpointJson",
+    "executionPlanHash",
+    "executionProtocolHash",
+    "status",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-execution-protocol-bound-checkpoint/v1"
+    },
+    "checkpointHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "checkpointJson": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 33554432
+    },
+    "executionPlanHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "executionProtocolHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "status": {
+      "const": "POPULATION_EXECUTION_PROTOCOL_BOUND_TRAIN_CHECKPOINT"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
