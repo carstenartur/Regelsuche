@@ -11,9 +11,11 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -40,6 +42,20 @@ class MavenBuildContractTest {
     private static final Set<String> FORBIDDEN_BUILD_PLUGINS = Set.of(
         "org.codehaus.mojo:exec-maven-plugin",
         "com.github.eirslett:frontend-maven-plugin"
+    );
+
+    private static final Map<String, String> REQUIRED_PLUGIN_VERSIONS = Map.ofEntries(
+        Map.entry("org.apache.maven.plugins:maven-clean-plugin", "${maven.clean.plugin.version}"),
+        Map.entry("org.apache.maven.plugins:maven-resources-plugin", "${maven.resources.plugin.version}"),
+        Map.entry("org.apache.maven.plugins:maven-compiler-plugin", "${maven.compiler.plugin.version}"),
+        Map.entry("org.apache.maven.plugins:maven-surefire-plugin", "${maven.surefire.plugin.version}"),
+        Map.entry("org.apache.maven.plugins:maven-failsafe-plugin", "${maven.failsafe.plugin.version}"),
+        Map.entry("org.apache.maven.plugins:maven-jar-plugin", "${maven.jar.plugin.version}"),
+        Map.entry("org.apache.maven.plugins:maven-install-plugin", "${maven.install.plugin.version}"),
+        Map.entry("org.apache.maven.plugins:maven-deploy-plugin", "${maven.deploy.plugin.version}"),
+        Map.entry("org.apache.maven.plugins:maven-site-plugin", "${maven.site.plugin.version}"),
+        Map.entry("org.apache.maven.plugins:maven-enforcer-plugin", "${maven.enforcer.plugin.version}"),
+        Map.entry("org.jacoco:jacoco-maven-plugin", "${jacoco.version}")
     );
 
     private static final Set<String> FORBIDDEN_HOST_RUNTIMES = Set.of(
@@ -91,7 +107,7 @@ class MavenBuildContractTest {
     }
 
     @Test
-    void reactorPinsJavaAndMavenAndRunsJUnitThroughSurefire() throws Exception {
+    void reactorPinsJavaMavenJUnitAndEveryDefaultLifecyclePlugin() throws Exception {
         Document parent = parse(repositoryRoot().resolve("pom.xml"));
         Element project = parent.getDocumentElement();
         Element properties = directChild(project, "properties");
@@ -100,13 +116,17 @@ class MavenBuildContractTest {
         assertEquals("3.9.9", directChildText(properties, "maven.minimum.version"));
         assertEquals("4.0.0", directChildText(properties, "maven.maximum.exclusive.version"));
         assertEquals("6.1.3", directChildText(properties, "junit.version"));
+        assertEquals("3.5.0", directChildText(properties, "maven.clean.plugin.version"));
+        assertEquals("3.5.0", directChildText(properties, "maven.resources.plugin.version"));
+        assertEquals("3.15.0", directChildText(properties, "maven.compiler.plugin.version"));
         assertEquals("3.5.4", directChildText(properties, "maven.surefire.plugin.version"));
+        assertEquals("3.5.4", directChildText(properties, "maven.failsafe.plugin.version"));
+        assertEquals("3.5.1", directChildText(properties, "maven.jar.plugin.version"));
+        assertEquals("3.1.4", directChildText(properties, "maven.install.plugin.version"));
+        assertEquals("3.1.4", directChildText(properties, "maven.deploy.plugin.version"));
+        assertEquals("3.22.0", directChildText(properties, "maven.site.plugin.version"));
 
-        Set<String> buildPlugins = buildPluginCoordinates(project);
-        assertTrue(buildPlugins.contains("org.apache.maven.plugins:maven-enforcer-plugin"));
-        assertTrue(buildPlugins.contains("org.apache.maven.plugins:maven-compiler-plugin"));
-        assertTrue(buildPlugins.contains("org.apache.maven.plugins:maven-surefire-plugin"));
-        assertTrue(buildPlugins.contains("org.jacoco:jacoco-maven-plugin"));
+        assertEquals(REQUIRED_PLUGIN_VERSIONS, buildPluginVersions(project));
     }
 
     @Test
@@ -229,7 +249,11 @@ class MavenBuildContractTest {
     }
 
     private static Set<String> buildPluginCoordinates(Element project) {
-        Set<String> coordinates = new LinkedHashSet<>();
+        return buildPluginVersions(project).keySet();
+    }
+
+    private static Map<String, String> buildPluginVersions(Element project) {
+        Map<String, String> pluginsByCoordinate = new LinkedHashMap<>();
         NodeList plugins = project.getElementsByTagNameNS("*", "plugin");
         for (int index = 0; index < plugins.getLength(); index++) {
             Element plugin = (Element) plugins.item(index);
@@ -241,9 +265,13 @@ class MavenBuildContractTest {
             if (groupId == null || groupId.isBlank()) {
                 groupId = "org.apache.maven.plugins";
             }
-            coordinates.add(groupId + ":" + artifactId);
+            String coordinate = groupId + ":" + artifactId;
+            String version = directChildText(plugin, "version");
+            if (version != null) {
+                pluginsByCoordinate.put(coordinate, version);
+            }
         }
-        return coordinates;
+        return Map.copyOf(pluginsByCoordinate);
     }
 
     private static Element directChild(Element parent, String localName) {
