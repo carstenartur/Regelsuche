@@ -118,11 +118,11 @@ public final class WebSecurityConfig {
         }
 
         public Builder maxRequestBytes(int max) {
-<span class="nc bnc" id="L121" title="All 2 branches missed.">            if (max &lt; 1024) {</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            if (max &lt; 1024) {</span>
 <span class="nc" id="L122">                throw new IllegalArgumentException(&quot;maxRequestBytes must be &gt;= 1024&quot;);</span>
             }
-<span class="nc" id="L124">            this.maxRequestBytes = max;</span>
-<span class="nc" id="L125">            return this;</span>
+<span class="fc" id="L124">            this.maxRequestBytes = max;</span>
+<span class="fc" id="L125">            return this;</span>
         }
 
         public WebSecurityConfig build() {

@@ -37,8 +37,8 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
         ExpressionGraphStore graphStore,
         PluginRuntimeConfig pluginRuntimeConfig
     ) {
-<span class="fc" id="L40">        this(inventory, graphStore, pluginRuntimeConfig, DEFAULT_MAX_REQUEST_BYTES);</span>
-<span class="fc" id="L41">    }</span>
+<span class="nc" id="L40">        this(inventory, graphStore, pluginRuntimeConfig, DEFAULT_MAX_REQUEST_BYTES);</span>
+<span class="nc" id="L41">    }</span>
 
     public RuleRadarHttpHandler(
         RuleInventoryRepository inventory,
@@ -97,9 +97,9 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
 <span class="fc" id="L97">        Map&lt;String, Object&gt; body = readObject(exchange);</span>
 <span class="fc" id="L98">        String expression = string(body, &quot;expression&quot;, &quot;&quot;);</span>
 <span class="fc" id="L99">        String candidateId = string(body, &quot;candidateId&quot;, &quot;&quot;);</span>
-<span class="pc bpc" id="L100" title="2 of 4 branches missed.">        if (expression.isBlank() || candidateId.isBlank()) {</span>
-<span class="nc" id="L101">            sendError(exchange, 400, &quot;MISSING_FIELD&quot;, &quot;expression and candidateId are required&quot;);</span>
-<span class="nc" id="L102">            return;</span>
+<span class="pc bpc" id="L100" title="1 of 4 branches missed.">        if (expression.isBlank() || candidateId.isBlank()) {</span>
+<span class="fc" id="L101">            sendError(exchange, 400, &quot;MISSING_FIELD&quot;, &quot;expression and candidateId are required&quot;);</span>
+<span class="fc" id="L102">            return;</span>
         }
 <span class="fc" id="L104">        Context context = context(body);</span>
 <span class="fc" id="L105">        ApplicableMove candidate = radar.resolve(expression, candidateId, context).orElse(null);</span>
@@ -233,13 +233,13 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
 <span class="fc" id="L233">    }</span>
 
     private void sendError(HttpExchange exchange, int status, String code, String message) throws IOException {
-<span class="nc" id="L236">        JsonWriter writer = new JsonWriter().beginObject()</span>
-<span class="nc" id="L237">            .property(&quot;error&quot;, true)</span>
-<span class="nc" id="L238">            .property(&quot;code&quot;, code)</span>
-<span class="nc" id="L239">            .property(&quot;message&quot;, message)</span>
-<span class="nc" id="L240">            .endObject();</span>
-<span class="nc" id="L241">        sendJson(exchange, status, writer.toString());</span>
-<span class="nc" id="L242">    }</span>
+<span class="fc" id="L236">        JsonWriter writer = new JsonWriter().beginObject()</span>
+<span class="fc" id="L237">            .property(&quot;error&quot;, true)</span>
+<span class="fc" id="L238">            .property(&quot;code&quot;, code)</span>
+<span class="fc" id="L239">            .property(&quot;message&quot;, message)</span>
+<span class="fc" id="L240">            .endObject();</span>
+<span class="fc" id="L241">        sendJson(exchange, status, writer.toString());</span>
+<span class="fc" id="L242">    }</span>
 
     private void sendJson(HttpExchange exchange, int status, String json) throws IOException {
 <span class="fc" id="L245">        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);</span>
