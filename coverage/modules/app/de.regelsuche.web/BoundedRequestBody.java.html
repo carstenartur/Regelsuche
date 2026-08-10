@@ -1,59 +1,187 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BoundedRequestBody.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">BoundedRequestBody.java</span></div><h1>BoundedRequestBody.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
 
 import com.sun.net.httpserver.HttpExchange;
-import java.io.ByteArrayOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Objects;
 
 /**
- * Reads one HTTP request body without ever buffering more than the configured
- * limit. The limit is enforced independently of {@code Content-Length}, so
- * chunked requests and incorrect length headers are handled identically.
+ * Opens one HTTP request body as a byte-counting stream.
+ *
+ * &lt;p&gt;The wrapper never materializes the complete body. It rejects a declared
+ * {@code Content-Length} above the configured limit immediately and still
+ * enforces the same boundary while consuming the stream, so chunked requests,
+ * missing headers and incorrect length headers cannot bypass the limit.&lt;/p&gt;
  */
 public final class BoundedRequestBody {
-    private static final int BUFFER_SIZE = 8192;
+    private static final int SKIP_BUFFER_SIZE = 8192;
 
     private BoundedRequestBody() {
     }
 
-    public static byte[] read(HttpExchange exchange, int maxBytes) throws IOException {
-<span class="fc" id="L21">        Objects.requireNonNull(exchange, &quot;exchange&quot;);</span>
-<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (maxBytes &lt;= 0) {</span>
-<span class="nc" id="L23">            throw new IllegalArgumentException(&quot;maxBytes must be positive&quot;);</span>
+    /**
+     * Opens the exchange body with an exact maximum number of readable bytes.
+     * The returned stream owns the exchange request body and must be closed.
+     */
+    public static InputStream open(HttpExchange exchange, int maxBytes)
+            throws IOException {
+<span class="fc" id="L30">        Objects.requireNonNull(exchange, &quot;exchange&quot;);</span>
+<span class="fc" id="L31">        validateLimit(maxBytes);</span>
+<span class="fc" id="L32">        rejectDeclaredOversize(exchange, maxBytes);</span>
+<span class="fc" id="L33">        return open(exchange.getRequestBody(), maxBytes);</span>
+    }
+
+    static InputStream open(InputStream input, int maxBytes) {
+<span class="fc" id="L37">        Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L38">        validateLimit(maxBytes);</span>
+<span class="fc" id="L39">        return new LimitedInputStream(input, maxBytes);</span>
+    }
+
+    private static void validateLimit(int maxBytes) {
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (maxBytes &lt;= 0) {</span>
+<span class="nc" id="L44">            throw new IllegalArgumentException(&quot;maxBytes must be positive&quot;);</span>
+        }
+<span class="fc" id="L46">    }</span>
+
+    private static void rejectDeclaredOversize(
+        HttpExchange exchange,
+        int maxBytes
+    ) throws PayloadTooLargeException {
+<span class="fc" id="L52">        List&lt;String&gt; values = exchange.getRequestHeaders().get(&quot;Content-Length&quot;);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (values == null) {</span>
+<span class="fc" id="L54">            return;</span>
+        }
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (String value : values) {</span>
+            try {
+<span class="fc" id="L58">                long declared = Long.parseLong(value.trim());</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                if (declared &gt; maxBytes) {</span>
+<span class="fc" id="L60">                    throw new PayloadTooLargeException(maxBytes);</span>
+                }
+<span class="fc" id="L62">            } catch (NumberFormatException ignored) {</span>
+                // The bounded stream remains authoritative for malformed headers.
+<span class="fc" id="L64">            }</span>
+<span class="fc" id="L65">        }</span>
+<span class="fc" id="L66">    }</span>
+
+    private static final class LimitedInputStream extends FilterInputStream {
+        private final int maxBytes;
+        private int consumed;
+        private boolean eof;
+
+        private LimitedInputStream(InputStream input, int maxBytes) {
+<span class="fc" id="L74">            super(input);</span>
+<span class="fc" id="L75">            this.maxBytes = maxBytes;</span>
+<span class="fc" id="L76">        }</span>
+
+        @Override
+        public int read() throws IOException {
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (eof) {</span>
+<span class="fc" id="L81">                return -1;</span>
+            }
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (consumed &gt;= maxBytes) {</span>
+<span class="nc" id="L84">                return verifyEof();</span>
+            }
+<span class="nc" id="L86">            int value = super.read();</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (value &lt; 0) {</span>
+<span class="nc" id="L88">                eof = true;</span>
+<span class="nc" id="L89">                return -1;</span>
+            }
+<span class="nc" id="L91">            consumed++;</span>
+<span class="nc" id="L92">            return value;</span>
         }
 
-<span class="fc" id="L26">        try (InputStream input = exchange.getRequestBody();</span>
-<span class="fc" id="L27">             ByteArrayOutputStream output = new ByteArrayOutputStream(Math.min(maxBytes, BUFFER_SIZE))) {</span>
-<span class="fc" id="L28">            byte[] buffer = new byte[BUFFER_SIZE];</span>
-<span class="fc" id="L29">            int total = 0;</span>
-            while (true) {
-<span class="fc" id="L31">                int remaining = maxBytes - total;</span>
-<span class="fc bfc" id="L32" title="All 2 branches covered.">                int requested = remaining &gt;= buffer.length ? buffer.length : remaining + 1;</span>
-<span class="fc" id="L33">                int read = input.read(buffer, 0, requested);</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">                if (read &lt; 0) {</span>
-<span class="fc" id="L35">                    return output.toByteArray();</span>
+        @Override
+        public int read(byte[] buffer, int offset, int length)
+                throws IOException {
+<span class="fc" id="L98">            Objects.checkFromIndexSize(offset, length, buffer.length);</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (length == 0) {</span>
+<span class="nc" id="L100">                return 0;</span>
+            }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (eof) {</span>
+<span class="fc" id="L103">                return -1;</span>
+            }
+<span class="fc" id="L105">            int remaining = maxBytes - consumed;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (remaining &lt;= 0) {</span>
+<span class="fc" id="L107">                return verifyEof();</span>
+            }
+<span class="fc" id="L109">            int read = super.read(buffer, offset, Math.min(length, remaining));</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (read &lt; 0) {</span>
+<span class="fc" id="L111">                eof = true;</span>
+<span class="fc" id="L112">                return -1;</span>
+            }
+<span class="fc" id="L114">            consumed += read;</span>
+<span class="fc" id="L115">            return read;</span>
+        }
+
+        @Override
+        public long skip(long requested) throws IOException {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            if (requested &lt;= 0L) {</span>
+<span class="nc" id="L121">                return 0L;</span>
+            }
+<span class="fc" id="L123">            byte[] buffer = new byte[(int) Math.min(SKIP_BUFFER_SIZE, requested)];</span>
+<span class="fc" id="L124">            long skipped = 0L;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            while (skipped &lt; requested) {</span>
+<span class="fc" id="L126">                int chunk = (int) Math.min(buffer.length, requested - skipped);</span>
+<span class="fc" id="L127">                int read = read(buffer, 0, chunk);</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                if (read &lt; 0) {</span>
+<span class="nc" id="L129">                    break;</span>
                 }
-<span class="fc bfc" id="L37" title="All 2 branches covered.">                if (read &gt; remaining) {</span>
-<span class="fc" id="L38">                    throw new PayloadTooLargeException(maxBytes);</span>
-                }
-<span class="fc" id="L40">                output.write(buffer, 0, read);</span>
-<span class="fc" id="L41">                total += read;</span>
-<span class="fc" id="L42">            }</span>
+<span class="fc" id="L131">                skipped += read;</span>
+<span class="fc" id="L132">            }</span>
+<span class="fc" id="L133">            return skipped;</span>
+        }
+
+        @Override
+        public int available() throws IOException {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            if (eof) {</span>
+<span class="nc" id="L139">                return 0;</span>
+            }
+<span class="nc" id="L141">            return Math.min(super.available(), Math.max(0, maxBytes - consumed));</span>
+        }
+
+        @Override
+        public boolean markSupported() {
+<span class="fc" id="L146">            return false;</span>
+        }
+
+        @Override
+        public synchronized void mark(int readLimit) {
+            // Deliberately unsupported: resetting would invalidate byte accounting.
+<span class="fc" id="L152">        }</span>
+
+        @Override
+        public synchronized void reset() throws IOException {
+<span class="fc" id="L156">            throw new IOException(&quot;mark/reset is not supported by bounded request bodies&quot;);</span>
+        }
+
+        private int verifyEof() throws IOException {
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            if (eof) {</span>
+<span class="nc" id="L161">                return -1;</span>
+            }
+<span class="fc" id="L163">            int extra = super.read();</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            if (extra &lt; 0) {</span>
+<span class="fc" id="L165">                eof = true;</span>
+<span class="fc" id="L166">                return -1;</span>
+            }
+<span class="fc" id="L168">            throw new PayloadTooLargeException(maxBytes);</span>
         }
     }
 
     /** Checked signal used by the HTTP boundary to render the stable 413 contract. */
     public static final class PayloadTooLargeException extends IOException {
+        private static final long serialVersionUID = 1L;
+
         private final int limitBytes;
 
         public PayloadTooLargeException(int limitBytes) {
-<span class="fc" id="L51">            super(&quot;request body exceeds configured limit of &quot; + limitBytes + &quot; bytes&quot;);</span>
-<span class="fc" id="L52">            this.limitBytes = limitBytes;</span>
-<span class="fc" id="L53">        }</span>
+<span class="fc" id="L179">            super(&quot;request body exceeds configured limit of &quot; + limitBytes + &quot; bytes&quot;);</span>
+<span class="fc" id="L180">            this.limitBytes = limitBytes;</span>
+<span class="fc" id="L181">        }</span>
 
         public int limitBytes() {
-<span class="fc" id="L56">            return limitBytes;</span>
+<span class="fc" id="L184">            return limitBytes;</span>
         }
     }
 }

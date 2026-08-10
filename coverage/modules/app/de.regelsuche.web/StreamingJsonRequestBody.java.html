@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StreamingJsonRequestBody.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">StreamingJsonRequestBody.java</span></div><h1>StreamingJsonRequestBody.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.sun.net.httpserver.HttpExchange;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Strict streaming decoder for untrusted Workbench JSON request bodies.
+ *
+ * &lt;p&gt;The decoder consumes the byte-limited request stream directly with
+ * Jackson Core. It therefore avoids an intermediate complete {@code byte[]}
+ * and {@code String}. Duplicate object keys, malformed UTF-8, non-object roots,
+ * trailing root values and configured structural limits fail closed.&lt;/p&gt;
+ *
+ * &lt;p&gt;HTTP handlers can decode fields directly into a typed request record via
+ * {@link #readObject(HttpExchange, ObjectDecoder)}. The compatibility overload
+ * returning a map remains available for routes that have not yet migrated, but
+ * it still streams transport and parsing rather than buffering the raw body.&lt;/p&gt;
+ */
+public final class StreamingJsonRequestBody {
+    private static final int MAX_NESTING_DEPTH = 128;
+    private static final int MAX_PROPERTY_NAME_LENGTH = 4096;
+    private static final int MAX_NUMBER_LENGTH = 1024;
+
+    private final int maxBytes;
+    private final JsonFactory jsonFactory;
+
+<span class="fc" id="L40">    public StreamingJsonRequestBody(int maxBytes) {</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (maxBytes &lt;= 0) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;maxBytes must be positive&quot;);</span>
+        }
+<span class="fc" id="L44">        this.maxBytes = maxBytes;</span>
+<span class="fc" id="L45">        StreamReadConstraints constraints = StreamReadConstraints.builder()</span>
+<span class="fc" id="L46">            .maxDocumentLength(maxBytes)</span>
+<span class="fc" id="L47">            .maxTokenCount(Math.max(1024L, (long) maxBytes * 2L))</span>
+<span class="fc" id="L48">            .maxNestingDepth(MAX_NESTING_DEPTH)</span>
+<span class="fc" id="L49">            .maxNumberLength(Math.min(MAX_NUMBER_LENGTH, maxBytes))</span>
+<span class="fc" id="L50">            .maxStringLength(maxBytes)</span>
+<span class="fc" id="L51">            .maxNameLength(Math.min(MAX_PROPERTY_NAME_LENGTH, maxBytes))</span>
+<span class="fc" id="L52">            .build();</span>
+<span class="fc" id="L53">        this.jsonFactory = JsonFactory.builder()</span>
+<span class="fc" id="L54">            .streamReadConstraints(constraints)</span>
+<span class="fc" id="L55">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L56">            .disable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)</span>
+<span class="fc" id="L57">            .build();</span>
+<span class="fc" id="L58">    }</span>
+
+    /**
+     * Reads one complete JSON object into an immutable generic tree.
+     *
+     * &lt;p&gt;Prefer the typed decoder overload for HTTP handlers. An empty or
+     * whitespace-only body is represented as an empty map for compatibility
+     * with existing optional request bodies.&lt;/p&gt;
+     */
+    public Map&lt;String, Object&gt; readObject(HttpExchange exchange) throws IOException {
+<span class="nc" id="L68">        return readObject(exchange, ObjectCursor::readRemainingObject);</span>
+    }
+
+    /**
+     * Streams one complete JSON object into a route-specific typed decoder.
+     * Unknown fields can be discarded without materializing them through
+     * {@link ObjectCursor#skipValue()}.
+     */
+    public &lt;T&gt; T readObject(HttpExchange exchange, ObjectDecoder&lt;T&gt; decoder)
+            throws IOException {
+<span class="fc" id="L78">        Objects.requireNonNull(exchange, &quot;exchange&quot;);</span>
+<span class="fc" id="L79">        try (InputStream input = BoundedRequestBody.open(exchange, maxBytes)) {</span>
+<span class="fc" id="L80">            return decodeBounded(input, decoder);</span>
+        }
+    }
+
+    /**
+     * Decodes a non-HTTP stream with the same byte and JSON limits.
+     * Primarily useful for focused adapter tests and checkout-owned tools.
+     */
+    public Map&lt;String, Object&gt; readObject(InputStream input) throws IOException {
+<span class="fc" id="L89">        return readObject(input, ObjectCursor::readRemainingObject);</span>
+    }
+
+    /**
+     * Decodes a non-HTTP stream directly into a typed object while retaining
+     * the same byte and JSON limits as the HTTP overload.
+     */
+    public &lt;T&gt; T readObject(InputStream input, ObjectDecoder&lt;T&gt; decoder)
+            throws IOException {
+<span class="fc" id="L98">        Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L99">        Objects.requireNonNull(decoder, &quot;decoder&quot;);</span>
+<span class="fc" id="L100">        try (InputStream bounded = BoundedRequestBody.open(input, maxBytes)) {</span>
+<span class="fc" id="L101">            return decodeBounded(bounded, decoder);</span>
+        }
+    }
+
+    private &lt;T&gt; T decodeBounded(InputStream bounded, ObjectDecoder&lt;T&gt; decoder)
+            throws IOException {
+<span class="fc" id="L107">        Objects.requireNonNull(decoder, &quot;decoder&quot;);</span>
+<span class="fc" id="L108">        try (JsonParser parser = jsonFactory.createParser(bounded)) {</span>
+<span class="fc" id="L109">            JsonToken first = parser.nextToken();</span>
+            ObjectCursor cursor;
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (first == null) {</span>
+<span class="fc" id="L112">                cursor = ObjectCursor.empty();</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            } else if (first == JsonToken.START_OBJECT) {</span>
+<span class="fc" id="L114">                cursor = new ObjectCursor(parser);</span>
+            } else {
+<span class="fc" id="L116">                throw malformed(&quot;JSON request body must contain one object&quot;, null);</span>
+            }
+
+<span class="fc" id="L119">            T result = decoder.decode(cursor);</span>
+<span class="fc" id="L120">            cursor.requireFinished();</span>
+<span class="fc bfc" id="L121" title="All 4 branches covered.">            if (first != null &amp;&amp; parser.nextToken() != null) {</span>
+<span class="fc" id="L122">                throw malformed(&quot;JSON request body contains trailing content&quot;, null);</span>
+            }
+<span class="fc" id="L124">            return result;</span>
+<span class="fc" id="L125">        } catch (BoundedRequestBody.PayloadTooLargeException exception) {</span>
+<span class="fc" id="L126">            throw exception;</span>
+<span class="fc" id="L127">        } catch (MalformedJsonRequestException exception) {</span>
+<span class="fc" id="L128">            throw exception;</span>
+<span class="fc" id="L129">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L130">            BoundedRequestBody.PayloadTooLargeException oversized =</span>
+<span class="fc" id="L131">                findCause(exception, BoundedRequestBody.PayloadTooLargeException.class);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (oversized != null) {</span>
+<span class="nc" id="L133">                throw oversized;</span>
+            }
+<span class="fc" id="L135">            throw malformed(&quot;invalid JSON request body&quot;, exception);</span>
+        }
+    }
+
+    /** Decodes one top-level object without exposing Jackson to route code. */
+    @FunctionalInterface
+    public interface ObjectDecoder&lt;T&gt; {
+        T decode(ObjectCursor object) throws IOException;
+    }
+
+    /** Decodes one string element inside a heterogeneous typed array. */
+    @FunctionalInterface
+    public interface StringDecoder&lt;T&gt; {
+        T decode(String value) throws IOException;
+    }
+
+    /**
+     * Forward-only cursor over one JSON object.
+     *
+     * &lt;p&gt;A decoder must consume or skip every announced field and iterate until
+     * {@link #nextField()} returns {@code false}. This makes accidental partial
+     * parsing fail closed.&lt;/p&gt;
+     */
+    public static final class ObjectCursor {
+        private final JsonParser parser;
+        private boolean finished;
+        private boolean valuePending;
+        private String fieldName;
+        private JsonToken valueToken;
+
+<span class="fc" id="L165">        private ObjectCursor(JsonParser parser) {</span>
+<span class="fc" id="L166">            this.parser = Objects.requireNonNull(parser, &quot;parser&quot;);</span>
+<span class="fc" id="L167">        }</span>
+
+<span class="fc" id="L169">        private ObjectCursor() {</span>
+<span class="fc" id="L170">            this.parser = null;</span>
+<span class="fc" id="L171">            this.finished = true;</span>
+<span class="fc" id="L172">        }</span>
+
+        private static ObjectCursor empty() {
+<span class="fc" id="L175">            return new ObjectCursor();</span>
+        }
+
+        /** Advances to the next field. */
+        public boolean nextField() throws IOException {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            if (valuePending) {</span>
+<span class="nc" id="L181">                throw malformed(&quot;JSON field '&quot; + fieldName + &quot;' was not consumed&quot;, null);</span>
+            }
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (finished) {</span>
+<span class="fc" id="L184">                return false;</span>
+            }
+<span class="fc" id="L186">            JsonToken token = parser.nextToken();</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (token == JsonToken.END_OBJECT) {</span>
+<span class="fc" id="L188">                finished = true;</span>
+<span class="fc" id="L189">                return false;</span>
+            }
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if (token != JsonToken.FIELD_NAME) {</span>
+<span class="nc" id="L192">                throw malformed(&quot;expected a JSON object field&quot;, null);</span>
+            }
+<span class="fc" id="L194">            fieldName = parser.currentName();</span>
+<span class="fc" id="L195">            valueToken = parser.nextToken();</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            if (valueToken == null) {</span>
+<span class="nc" id="L197">                throw malformed(&quot;unexpected end of JSON request body&quot;, null);</span>
+            }
+<span class="fc" id="L199">            valuePending = true;</span>
+<span class="fc" id="L200">            return true;</span>
+        }
+
+        public String fieldName() {
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            if (!valuePending) {</span>
+<span class="nc" id="L205">                throw new IllegalStateException(&quot;no current JSON field&quot;);</span>
+            }
+<span class="fc" id="L207">            return fieldName;</span>
+        }
+
+        /** Reads a string or JSON {@code null}; other token types are rejected. */
+        public String readNullableString() throws IOException {
+<span class="fc" id="L212">            requirePending();</span>
+<span class="fc" id="L213">            JsonToken token = consumeToken();</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (token == JsonToken.VALUE_NULL) {</span>
+<span class="fc" id="L215">                return null;</span>
+            }
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            if (token != JsonToken.VALUE_STRING) {</span>
+<span class="fc" id="L218">                throw typeMismatch(&quot;string&quot;, token);</span>
+            }
+<span class="fc" id="L220">            return parser.getText();</span>
+        }
+
+        /** Reads an integral JSON number or {@code null}. */
+        public Integer readNullableInt() throws IOException {
+<span class="fc" id="L225">            requirePending();</span>
+<span class="fc" id="L226">            JsonToken token = consumeToken();</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            if (token == JsonToken.VALUE_NULL) {</span>
+<span class="fc" id="L228">                return null;</span>
+            }
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            if (token != JsonToken.VALUE_NUMBER_INT) {</span>
+<span class="fc" id="L231">                throw typeMismatch(&quot;integer&quot;, token);</span>
+            }
+            try {
+<span class="fc" id="L234">                return parser.getIntValue();</span>
+<span class="nc" id="L235">            } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L236">                throw malformed(&quot;JSON field '&quot; + fieldName</span>
+                    + &quot;' is outside the 32-bit integer range&quot;, exception);
+            }
+        }
+
+        /** Reads a JSON boolean or {@code null}. */
+        public Boolean readNullableBoolean() throws IOException {
+<span class="fc" id="L243">            requirePending();</span>
+<span class="fc" id="L244">            JsonToken token = consumeToken();</span>
+<span class="pc bpc" id="L245" title="3 of 4 branches missed.">            return switch (token) {</span>
+<span class="nc" id="L246">                case VALUE_TRUE -&gt; Boolean.TRUE;</span>
+<span class="fc" id="L247">                case VALUE_FALSE -&gt; Boolean.FALSE;</span>
+<span class="nc" id="L248">                case VALUE_NULL -&gt; null;</span>
+<span class="nc" id="L249">                default -&gt; throw typeMismatch(&quot;boolean&quot;, token);</span>
+            };
+        }
+
+        /** Reads an array containing only strings and nulls. */
+        public List&lt;String&gt; readStringArray() throws IOException {
+<span class="fc" id="L255">            requirePending();</span>
+<span class="fc" id="L256">            JsonToken token = consumeToken();</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            if (token == JsonToken.VALUE_NULL) {</span>
+<span class="nc" id="L258">                return List.of();</span>
+            }
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (token != JsonToken.START_ARRAY) {</span>
+<span class="nc" id="L261">                throw typeMismatch(&quot;array of strings&quot;, token);</span>
+            }
+<span class="fc" id="L263">            List&lt;String&gt; values = new ArrayList&lt;&gt;();</span>
+            while (true) {
+<span class="fc" id="L265">                JsonToken item = parser.nextToken();</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">                if (item == JsonToken.END_ARRAY) {</span>
+<span class="fc" id="L267">                    return List.copyOf(values);</span>
+                }
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                if (item == null) {</span>
+<span class="nc" id="L270">                    throw malformed(&quot;unexpected end of JSON request body&quot;, null);</span>
+                }
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                if (item == JsonToken.VALUE_NULL) {</span>
+<span class="fc" id="L273">                    continue;</span>
+                }
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                if (item != JsonToken.VALUE_STRING) {</span>
+<span class="nc" id="L276">                    throw malformed(&quot;JSON field '&quot; + fieldName</span>
+                        + &quot;' must contain only strings&quot;, null);
+                }
+<span class="fc" id="L279">                values.add(parser.getText());</span>
+<span class="fc" id="L280">            }</span>
+        }
+
+        /**
+         * Reads an array whose non-null elements are either strings or
+         * objects. Each object is consumed directly through the supplied
+         * typed decoder; no generic map or intermediate JSON tree is built.
+         */
+        public &lt;T&gt; List&lt;T&gt; readStringOrObjectArray(
+            StringDecoder&lt;T&gt; stringDecoder,
+            ObjectDecoder&lt;T&gt; objectDecoder
+        ) throws IOException {
+<span class="fc" id="L292">            Objects.requireNonNull(stringDecoder, &quot;stringDecoder&quot;);</span>
+<span class="fc" id="L293">            Objects.requireNonNull(objectDecoder, &quot;objectDecoder&quot;);</span>
+<span class="fc" id="L294">            requirePending();</span>
+<span class="fc" id="L295">            JsonToken token = consumeToken();</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">            if (token == JsonToken.VALUE_NULL) {</span>
+<span class="nc" id="L297">                return List.of();</span>
+            }
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">            if (token != JsonToken.START_ARRAY) {</span>
+<span class="nc" id="L300">                throw typeMismatch(&quot;array of strings or objects&quot;, token);</span>
+            }
+<span class="fc" id="L302">            List&lt;T&gt; values = new ArrayList&lt;&gt;();</span>
+            while (true) {
+<span class="fc" id="L304">                JsonToken item = parser.nextToken();</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">                if (item == JsonToken.END_ARRAY) {</span>
+<span class="fc" id="L306">                    return List.copyOf(values);</span>
+                }
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">                if (item == null) {</span>
+<span class="nc" id="L309">                    throw malformed(&quot;unexpected end of JSON request body&quot;, null);</span>
+                }
+<span class="fc bfc" id="L311" title="All 2 branches covered.">                if (item == JsonToken.VALUE_NULL) {</span>
+<span class="fc" id="L312">                    continue;</span>
+                }
+                T decoded;
+<span class="fc bfc" id="L315" title="All 2 branches covered.">                if (item == JsonToken.VALUE_STRING) {</span>
+<span class="fc" id="L316">                    decoded = stringDecoder.decode(parser.getText());</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">                } else if (item == JsonToken.START_OBJECT) {</span>
+<span class="fc" id="L318">                    ObjectCursor nested = new ObjectCursor(parser);</span>
+<span class="fc" id="L319">                    decoded = objectDecoder.decode(nested);</span>
+<span class="fc" id="L320">                    nested.requireFinished();</span>
+<span class="fc" id="L321">                } else {</span>
+<span class="fc" id="L322">                    throw malformed(&quot;JSON field '&quot; + fieldName</span>
+                        + &quot;' must contain only strings or objects&quot;, null);
+                }
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">                if (decoded == null) {</span>
+<span class="nc" id="L326">                    throw malformed(&quot;JSON field '&quot; + fieldName</span>
+                        + &quot;' decoder returned null&quot;, null);
+                }
+<span class="fc" id="L329">                values.add(decoded);</span>
+<span class="fc" id="L330">            }</span>
+        }
+
+        /** Reads an object containing only string values and JSON nulls. */
+        public Map&lt;String, String&gt; readStringMap() throws IOException {
+<span class="fc" id="L335">            requirePending();</span>
+<span class="fc" id="L336">            JsonToken token = consumeToken();</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            if (token == JsonToken.VALUE_NULL) {</span>
+<span class="nc" id="L338">                return Map.of();</span>
+            }
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">            if (token != JsonToken.START_OBJECT) {</span>
+<span class="nc" id="L341">                throw typeMismatch(&quot;object with string values&quot;, token);</span>
+            }
+<span class="fc" id="L343">            Map&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
+            while (true) {
+<span class="fc" id="L345">                JsonToken entry = parser.nextToken();</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">                if (entry == JsonToken.END_OBJECT) {</span>
+<span class="fc" id="L347">                    return Collections.unmodifiableMap(values);</span>
+                }
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">                if (entry != JsonToken.FIELD_NAME) {</span>
+<span class="nc" id="L350">                    throw malformed(&quot;expected a JSON object field&quot;, null);</span>
+                }
+<span class="fc" id="L352">                String name = parser.currentName();</span>
+<span class="fc" id="L353">                JsonToken value = parser.nextToken();</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">                if (value == null) {</span>
+<span class="nc" id="L355">                    throw malformed(&quot;unexpected end of JSON request body&quot;, null);</span>
+                }
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                if (value == JsonToken.VALUE_NULL) {</span>
+<span class="fc" id="L358">                    continue;</span>
+                }
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">                if (value != JsonToken.VALUE_STRING) {</span>
+<span class="nc" id="L361">                    throw malformed(&quot;JSON field '&quot; + fieldName</span>
+                        + &quot;' must contain only string values&quot;, null);
+                }
+<span class="fc" id="L364">                values.put(name, parser.getText());</span>
+<span class="fc" id="L365">            }</span>
+        }
+
+        /**
+         * Reads an object value directly through another typed decoder. JSON
+         * {@code null} is returned as {@code null}.
+         */
+        public &lt;T&gt; T readNullableObject(ObjectDecoder&lt;T&gt; decoder)
+                throws IOException {
+<span class="fc" id="L374">            Objects.requireNonNull(decoder, &quot;decoder&quot;);</span>
+<span class="fc" id="L375">            requirePending();</span>
+<span class="fc" id="L376">            JsonToken token = consumeToken();</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">            if (token == JsonToken.VALUE_NULL) {</span>
+<span class="fc" id="L378">                return null;</span>
+            }
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">            if (token != JsonToken.START_OBJECT) {</span>
+<span class="nc" id="L381">                throw typeMismatch(&quot;object&quot;, token);</span>
+            }
+<span class="fc" id="L383">            ObjectCursor nested = new ObjectCursor(parser);</span>
+<span class="fc" id="L384">            T value = decoder.decode(nested);</span>
+<span class="fc" id="L385">            nested.requireFinished();</span>
+<span class="fc" id="L386">            return value;</span>
+        }
+
+        /** Reads the current value as an immutable JSON-compatible Java tree. */
+        public Object readValue() throws IOException {
+<span class="fc" id="L391">            requirePending();</span>
+<span class="fc" id="L392">            return StreamingJsonRequestBody.readValue(parser, consumeToken());</span>
+        }
+
+        /** Discards the current field value without constructing a Java tree. */
+        public void skipValue() throws IOException {
+<span class="fc" id="L397">            requirePending();</span>
+<span class="fc" id="L398">            JsonToken token = consumeToken();</span>
+<span class="fc bfc" id="L399" title="All 4 branches covered.">            if (token == JsonToken.START_OBJECT || token == JsonToken.START_ARRAY) {</span>
+<span class="fc" id="L400">                parser.skipChildren();</span>
+            }
+<span class="fc" id="L402">        }</span>
+
+        private Map&lt;String, Object&gt; readRemainingObject() throws IOException {
+<span class="fc" id="L405">            Map&lt;String, Object&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">            while (nextField()) {</span>
+<span class="fc" id="L407">                String name = fieldName();</span>
+<span class="fc" id="L408">                values.put(name, readValue());</span>
+<span class="fc" id="L409">            }</span>
+<span class="fc" id="L410">            return Collections.unmodifiableMap(values);</span>
+        }
+
+        private void requireFinished() throws IOException {
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">            if (valuePending) {</span>
+<span class="nc" id="L415">                throw malformed(&quot;JSON field '&quot; + fieldName + &quot;' was not consumed&quot;, null);</span>
+            }
+<span class="fc bfc" id="L417" title="All 2 branches covered.">            if (!finished) {</span>
+<span class="fc" id="L418">                throw malformed(&quot;JSON request decoder stopped before the object ended&quot;, null);</span>
+            }
+<span class="fc" id="L420">        }</span>
+
+        private void requirePending() {
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">            if (!valuePending) {</span>
+<span class="nc" id="L424">                throw new IllegalStateException(&quot;no current JSON field value&quot;);</span>
+            }
+<span class="fc" id="L426">        }</span>
+
+        private JsonToken consumeToken() {
+<span class="fc" id="L429">            JsonToken token = valueToken;</span>
+<span class="fc" id="L430">            valuePending = false;</span>
+<span class="fc" id="L431">            valueToken = null;</span>
+<span class="fc" id="L432">            return token;</span>
+        }
+
+        private MalformedJsonRequestException typeMismatch(
+            String expected,
+            JsonToken actual
+        ) {
+<span class="fc" id="L439">            return malformed(&quot;JSON field '&quot; + fieldName + &quot;' must be &quot;</span>
+                + expected + &quot;, found &quot; + actual, null);
+        }
+    }
+
+    private static Object readValue(JsonParser parser, JsonToken token)
+            throws IOException {
+<span class="pc bpc" id="L446" title="1 of 9 branches missed.">        return switch (token) {</span>
+<span class="fc" id="L447">            case START_OBJECT -&gt; readObjectTree(parser);</span>
+<span class="fc" id="L448">            case START_ARRAY -&gt; readArrayTree(parser);</span>
+<span class="fc" id="L449">            case VALUE_STRING -&gt; parser.getText();</span>
+<span class="fc" id="L450">            case VALUE_NUMBER_INT -&gt; parser.getNumberValue();</span>
+<span class="fc" id="L451">            case VALUE_NUMBER_FLOAT -&gt; parser.getDecimalValue();</span>
+<span class="fc" id="L452">            case VALUE_TRUE -&gt; Boolean.TRUE;</span>
+<span class="fc" id="L453">            case VALUE_FALSE -&gt; Boolean.FALSE;</span>
+<span class="fc" id="L454">            case VALUE_NULL -&gt; null;</span>
+<span class="nc" id="L455">            default -&gt; throw malformed(&quot;unsupported JSON token &quot; + token, null);</span>
+        };
+    }
+
+    private static Map&lt;String, Object&gt; readObjectTree(JsonParser parser)
+            throws IOException {
+<span class="fc" id="L461">        Map&lt;String, Object&gt; values = new LinkedHashMap&lt;&gt;();</span>
+        while (true) {
+<span class="fc" id="L463">            JsonToken token = parser.nextToken();</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">            if (token == JsonToken.END_OBJECT) {</span>
+<span class="fc" id="L465">                return Collections.unmodifiableMap(values);</span>
+            }
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">            if (token != JsonToken.FIELD_NAME) {</span>
+<span class="nc" id="L468">                throw malformed(&quot;expected a JSON object field&quot;, null);</span>
+            }
+<span class="fc" id="L470">            String name = parser.currentName();</span>
+<span class="fc" id="L471">            JsonToken valueToken = parser.nextToken();</span>
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">            if (valueToken == null) {</span>
+<span class="nc" id="L473">                throw malformed(&quot;unexpected end of JSON request body&quot;, null);</span>
+            }
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">            if (values.containsKey(name)) {</span>
+                // Jackson's strict duplicate detector is authoritative. This is
+                // a defensive check that also covers future factory changes.
+<span class="nc" id="L478">                throw malformed(&quot;duplicate JSON object field&quot;, null);</span>
+            }
+<span class="fc" id="L480">            values.put(name, readValue(parser, valueToken));</span>
+<span class="fc" id="L481">        }</span>
+    }
+
+    private static List&lt;Object&gt; readArrayTree(JsonParser parser)
+            throws IOException {
+<span class="fc" id="L486">        List&lt;Object&gt; values = new ArrayList&lt;&gt;();</span>
+        while (true) {
+<span class="fc" id="L488">            JsonToken token = parser.nextToken();</span>
+<span class="fc bfc" id="L489" title="All 2 branches covered.">            if (token == JsonToken.END_ARRAY) {</span>
+<span class="fc" id="L490">                return Collections.unmodifiableList(values);</span>
+            }
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">            if (token == null) {</span>
+<span class="nc" id="L493">                throw malformed(&quot;unexpected end of JSON request body&quot;, null);</span>
+            }
+<span class="fc" id="L495">            values.add(readValue(parser, token));</span>
+<span class="fc" id="L496">        }</span>
+    }
+
+    private static MalformedJsonRequestException malformed(
+        String message,
+        Throwable cause
+    ) {
+<span class="fc bfc" id="L503" title="All 2 branches covered.">        return cause == null</span>
+<span class="fc" id="L504">            ? new MalformedJsonRequestException(message)</span>
+<span class="fc" id="L505">            : new MalformedJsonRequestException(message, cause);</span>
+    }
+
+    private static &lt;T extends Throwable&gt; T findCause(
+        Throwable throwable,
+        Class&lt;T&gt; type
+    ) {
+<span class="fc" id="L512">        Throwable current = throwable;</span>
+<span class="fc bfc" id="L513" title="All 2 branches covered.">        while (current != null) {</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">            if (type.isInstance(current)) {</span>
+<span class="nc" id="L515">                return type.cast(current);</span>
+            }
+<span class="fc" id="L517">            current = current.getCause();</span>
+        }
+<span class="fc" id="L519">        return null;</span>
+    }
+
+    /** Checked signal rendered as a stable HTTP 400 response at the boundary. */
+    public static final class MalformedJsonRequestException extends IOException {
+        private static final long serialVersionUID = 1L;
+
+        public MalformedJsonRequestException(String message) {
+<span class="fc" id="L527">            super(message);</span>
+<span class="fc" id="L528">        }</span>
+
+        public MalformedJsonRequestException(String message, Throwable cause) {
+<span class="fc" id="L531">            super(message, cause);</span>
+<span class="fc" id="L532">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

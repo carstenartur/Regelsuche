@@ -72,7 +72,7 @@ public final class AstRuleRadar {
 <span class="fc" id="L72">            maxCandidatesPerPosition = bounded(maxCandidatesPerPosition, DEFAULT_PER_POSITION, MAX_PER_POSITION);</span>
 <span class="fc" id="L73">            maxCandidatesTotal = bounded(maxCandidatesTotal, DEFAULT_TOTAL, MAX_TOTAL);</span>
 <span class="pc bpc" id="L74" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : assumptions.stream()</span>
-<span class="pc bnc" id="L75" title="All 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
 <span class="fc" id="L76">                .map(String::trim)</span>
 <span class="fc" id="L77">                .distinct()</span>
 <span class="fc" id="L78">                .sorted()</span>

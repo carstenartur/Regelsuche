@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleRadarRequestBody.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.radar</a> &gt; <span class="el_source">RuleRadarRequestBody.java</span></div><h1>RuleRadarRequestBody.java</h1><pre class="source lang-java linenums">package de.regelsuche.radar;
+
+import com.sun.net.httpserver.HttpExchange;
+import de.regelsuche.knowledge.RuleProfile;
+import de.regelsuche.radar.AstRuleRadar.CandidateOutcome;
+import de.regelsuche.radar.AstRuleRadar.Context;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.web.StreamingJsonRequestBody;
+import de.regelsuche.web.StreamingJsonRequestBody.ObjectCursor;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+/** Typed request envelope shared by the three rule-radar POST operations. */
+record RuleRadarRequestBody(
+    String expression,
+    String candidateId,
+    String targetExpression,
+    Context context,
+    int maxDepth,
+    int maxStates,
+    int maxMovesPerState
+) {
+<span class="fc" id="L29">    RuleRadarRequestBody {</span>
+<span class="fc" id="L30">        expression = normalize(expression);</span>
+<span class="fc" id="L31">        candidateId = normalize(candidateId);</span>
+<span class="fc" id="L32">        targetExpression = normalize(targetExpression);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        context = context == null ? Context.defaults() : context;</span>
+<span class="fc" id="L34">    }</span>
+
+    static RuleRadarRequestBody read(
+        StreamingJsonRequestBody json,
+        HttpExchange exchange
+    ) throws IOException {
+<span class="fc" id="L40">        return json.readObject(exchange, RuleRadarRequestBody::decode);</span>
+    }
+
+    static RuleRadarRequestBody read(
+        StreamingJsonRequestBody json,
+        InputStream input
+    ) throws IOException {
+<span class="fc" id="L47">        return json.readObject(input, RuleRadarRequestBody::decode);</span>
+    }
+
+    private static RuleRadarRequestBody decode(ObjectCursor object)
+            throws IOException {
+<span class="fc" id="L52">        String expression = &quot;&quot;;</span>
+<span class="fc" id="L53">        String candidateId = &quot;&quot;;</span>
+<span class="fc" id="L54">        String targetExpression = &quot;&quot;;</span>
+<span class="fc" id="L55">        int maxDepth = 4;</span>
+<span class="fc" id="L56">        int maxStates = 120;</span>
+<span class="fc" id="L57">        int maxMovesPerState = 60;</span>
+<span class="fc" id="L58">        ContextBuilder topLevelContext = new ContextBuilder();</span>
+<span class="fc" id="L59">        ContextBuilder nestedContext = null;</span>
+
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        while (object.nextField()) {</span>
+<span class="fc" id="L62">            String field = object.fieldName();</span>
+<span class="fc bfc" id="L63" title="All 8 branches covered.">            switch (field) {</span>
+<span class="fc" id="L64">                case &quot;expression&quot; -&gt; expression = valueOr(</span>
+<span class="fc" id="L65">                    object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L66">                case &quot;candidateId&quot; -&gt; candidateId = valueOr(</span>
+<span class="fc" id="L67">                    object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L68">                case &quot;targetExpression&quot; -&gt; targetExpression = valueOr(</span>
+<span class="fc" id="L69">                    object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L70">                case &quot;maxDepth&quot; -&gt; maxDepth = valueOr(</span>
+<span class="fc" id="L71">                    object.readNullableInt(), 4);</span>
+<span class="fc" id="L72">                case &quot;maxStates&quot; -&gt; maxStates = valueOr(</span>
+<span class="fc" id="L73">                    object.readNullableInt(), 120);</span>
+<span class="fc" id="L74">                case &quot;maxMovesPerState&quot; -&gt; maxMovesPerState = valueOr(</span>
+<span class="fc" id="L75">                    object.readNullableInt(), 60);</span>
+<span class="fc" id="L76">                case &quot;context&quot; -&gt; nestedContext = object.readNullableObject(</span>
+                    ContextBuilder::decode);
+                default -&gt; {
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                    if (!topLevelContext.readField(field, object)) {</span>
+<span class="fc" id="L80">                        object.skipValue();</span>
+                    }
+                }
+            }
+<span class="fc" id="L84">        }</span>
+
+<span class="fc bfc" id="L86" title="All 4 branches covered.">        ContextBuilder source = nestedContext != null &amp;&amp; nestedContext.hasFields()</span>
+<span class="fc" id="L87">            ? nestedContext</span>
+<span class="fc" id="L88">            : topLevelContext;</span>
+<span class="fc" id="L89">        return new RuleRadarRequestBody(</span>
+            expression,
+            candidateId,
+            targetExpression,
+<span class="fc" id="L93">            source.toContext(),</span>
+            maxDepth,
+            maxStates,
+            maxMovesPerState
+        );
+    }
+
+    private static final class ContextBuilder {
+        private boolean hasFields;
+        private String knowledgeProfile;
+        private List&lt;String&gt; enabledPacks;
+        private List&lt;String&gt; disabledPacks;
+        private Boolean includePlugins;
+        private Boolean includeLearnedMacros;
+        private String minMacroProofStatus;
+        private String searchProfile;
+        private String goalExpression;
+        private Integer maxCandidatesPerPosition;
+        private Integer maxCandidatesTotal;
+        private List&lt;String&gt; assumptions;
+        private Boolean includeRejectedCandidates;
+        private String selectedCandidateId;
+        private Map&lt;String, String&gt; outcomeByCandidateId;
+
+        private static ContextBuilder decode(ObjectCursor object)
+                throws IOException {
+<span class="fc" id="L119">            ContextBuilder builder = new ContextBuilder();</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            while (object.nextField()) {</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                if (builder.readField(object.fieldName(), object)) {</span>
+<span class="fc" id="L122">                    builder.hasFields = true;</span>
+                } else {
+<span class="fc" id="L124">                    object.skipValue();</span>
+                }
+            }
+<span class="fc" id="L127">            return builder;</span>
+        }
+
+        private boolean readField(String field, ObjectCursor object)
+                throws IOException {
+<span class="fc bfc" id="L132" title="All 15 branches covered.">            switch (field) {</span>
+<span class="fc" id="L133">                case &quot;knowledgeProfile&quot; -&gt; knowledgeProfile =</span>
+<span class="fc" id="L134">                    object.readNullableString();</span>
+<span class="fc" id="L135">                case &quot;enabledPacks&quot; -&gt; enabledPacks = object.readStringArray();</span>
+<span class="fc" id="L136">                case &quot;disabledPacks&quot; -&gt; disabledPacks = object.readStringArray();</span>
+<span class="fc" id="L137">                case &quot;includePlugins&quot; -&gt; includePlugins =</span>
+<span class="fc" id="L138">                    object.readNullableBoolean();</span>
+<span class="fc" id="L139">                case &quot;includeLearnedMacros&quot; -&gt; includeLearnedMacros =</span>
+<span class="fc" id="L140">                    object.readNullableBoolean();</span>
+<span class="fc" id="L141">                case &quot;minMacroProofStatus&quot; -&gt; minMacroProofStatus =</span>
+<span class="fc" id="L142">                    object.readNullableString();</span>
+<span class="fc" id="L143">                case &quot;searchProfile&quot; -&gt; searchProfile =</span>
+<span class="fc" id="L144">                    object.readNullableString();</span>
+<span class="fc" id="L145">                case &quot;goalExpression&quot; -&gt; goalExpression =</span>
+<span class="fc" id="L146">                    object.readNullableString();</span>
+<span class="fc" id="L147">                case &quot;maxCandidatesPerPosition&quot; -&gt; maxCandidatesPerPosition =</span>
+<span class="fc" id="L148">                    object.readNullableInt();</span>
+<span class="fc" id="L149">                case &quot;maxCandidatesTotal&quot; -&gt; maxCandidatesTotal =</span>
+<span class="fc" id="L150">                    object.readNullableInt();</span>
+<span class="fc" id="L151">                case &quot;assumptions&quot; -&gt; assumptions = object.readStringArray();</span>
+<span class="fc" id="L152">                case &quot;includeRejectedCandidates&quot; -&gt; includeRejectedCandidates =</span>
+<span class="fc" id="L153">                    object.readNullableBoolean();</span>
+<span class="fc" id="L154">                case &quot;selectedCandidateId&quot; -&gt; selectedCandidateId =</span>
+<span class="fc" id="L155">                    object.readNullableString();</span>
+<span class="fc" id="L156">                case &quot;outcomeByCandidateId&quot; -&gt; outcomeByCandidateId =</span>
+<span class="fc" id="L157">                    object.readStringMap();</span>
+                default -&gt; {
+<span class="fc" id="L159">                    return false;</span>
+                }
+            }
+<span class="fc" id="L162">            return true;</span>
+        }
+
+        private boolean hasFields() {
+<span class="fc" id="L166">            return hasFields;</span>
+        }
+
+        private Context toContext() {
+<span class="fc" id="L170">            Map&lt;String, CandidateOutcome&gt; outcomes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (outcomeByCandidateId != null) {</span>
+                for (Map.Entry&lt;String, String&gt; entry
+<span class="fc bfc" id="L173" title="All 2 branches covered.">                        : outcomeByCandidateId.entrySet()) {</span>
+<span class="fc" id="L174">                    String id = normalize(entry.getKey());</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                    if (!id.isEmpty()) {</span>
+<span class="fc" id="L176">                        outcomes.put(id, enumValue(</span>
+                            CandidateOutcome.class,
+<span class="fc" id="L178">                            entry.getValue(),</span>
+                            null,
+                            &quot;candidate outcome&quot;
+                        ));
+                    }
+<span class="fc" id="L183">                }</span>
+            }
+<span class="fc" id="L185">            return new Context(</span>
+<span class="fc" id="L186">                ruleProfile(knowledgeProfile),</span>
+<span class="fc" id="L187">                normalizedSet(enabledPacks),</span>
+<span class="fc" id="L188">                normalizedSet(disabledPacks),</span>
+<span class="fc" id="L189">                valueOr(includePlugins, true),</span>
+<span class="fc" id="L190">                valueOr(includeLearnedMacros, true),</span>
+<span class="fc" id="L191">                enumValue(</span>
+                    CandidateProofStatus.class,
+                    minMacroProofStatus,
+                    CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+                    &quot;candidate proof status&quot;
+                ),
+<span class="fc" id="L197">                valueOr(searchProfile, &quot;DISCOVERY&quot;),</span>
+<span class="fc" id="L198">                valueOr(goalExpression, &quot;&quot;),</span>
+<span class="fc" id="L199">                valueOr(maxCandidatesPerPosition, 24),</span>
+<span class="fc" id="L200">                valueOr(maxCandidatesTotal, 240),</span>
+<span class="fc" id="L201">                normalizedList(assumptions),</span>
+<span class="fc" id="L202">                valueOr(includeRejectedCandidates, true),</span>
+<span class="fc" id="L203">                valueOr(selectedCandidateId, &quot;&quot;),</span>
+                outcomes
+            );
+        }
+    }
+
+    private static RuleProfile ruleProfile(String value) {
+<span class="pc bpc" id="L210" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L211">            return RuleProfile.CORE;</span>
+        }
+<span class="fc" id="L213">        String normalized = enumName(value);</span>
+        try {
+<span class="fc" id="L215">            return RuleProfile.valueOf(normalized);</span>
+<span class="fc" id="L216">        } catch (IllegalArgumentException exception) {</span>
+            try {
+<span class="nc" id="L218">                return RuleProfile.fromId(value);</span>
+<span class="fc" id="L219">            } catch (IllegalArgumentException ignored) {</span>
+<span class="fc" id="L220">                throw new IllegalArgumentException(</span>
+                    &quot;unknown rule profile: &quot; + value,
+                    exception
+                );
+            }
+        }
+    }
+
+    private static &lt;E extends Enum&lt;E&gt;&gt; E enumValue(
+        Class&lt;E&gt; type,
+        String value,
+        E fallback,
+        String owner
+    ) {
+<span class="pc bpc" id="L234" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L235">            return fallback;</span>
+        }
+        try {
+<span class="fc" id="L238">            return Enum.valueOf(type, enumName(value));</span>
+<span class="fc" id="L239">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L240">            throw new IllegalArgumentException(</span>
+                &quot;unknown &quot; + owner + &quot;: &quot; + value,
+                exception
+            );
+        }
+    }
+
+    private static String enumName(String value) {
+<span class="fc" id="L248">        return value.trim()</span>
+<span class="fc" id="L249">            .toUpperCase(Locale.ROOT)</span>
+<span class="fc" id="L250">            .replace('-', '_');</span>
+    }
+
+    private static List&lt;String&gt; normalizedList(List&lt;String&gt; values) {
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        if (values == null) {</span>
+<span class="fc" id="L255">            return List.of();</span>
+        }
+<span class="fc" id="L257">        return values.stream()</span>
+<span class="pc bpc" id="L258" title="1 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L259">            .map(String::trim)</span>
+<span class="fc" id="L260">            .distinct()</span>
+<span class="fc" id="L261">            .sorted()</span>
+<span class="fc" id="L262">            .toList();</span>
+    }
+
+    private static Set&lt;String&gt; normalizedSet(List&lt;String&gt; values) {
+<span class="fc" id="L266">        return Set.copyOf(new LinkedHashSet&lt;&gt;(normalizedList(values)));</span>
+    }
+
+    private static String normalize(String value) {
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim();</span>
+    }
+
+    private static String valueOr(String value, String fallback) {
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        return value == null ? fallback : value;</span>
+    }
+
+    private static int valueOr(Integer value, int fallback) {
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        return value == null ? fallback : value;</span>
+    }
+
+    private static boolean valueOr(Boolean value, boolean fallback) {
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        return value == null ? fallback : value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
