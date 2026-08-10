@@ -111,8 +111,8 @@ corpus is still a known historical benchmark. A case may say that a bridge was
 required or a production primitive was missing only after the production
 oracle exhausted the complete frozen closure; a stopped budget remains
 `BUDGET_INCONCLUSIVE`. The aggregate search-policy signal requires a
- target-blind structural-diversity result and is never inferred solely from the
- target-guided control. Results establish only bounded reachability and
+target-blind structural-diversity result and is never inferred solely from the
+target-guided control. Results establish only bounded reachability and
 search-policy behavior for the frozen representation, inventory and budgets.
 They do not establish external novelty, autonomous rediscovery or publication
 priority.
