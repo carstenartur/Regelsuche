@@ -7,6 +7,7 @@
 
 def qualityRepositoryRoot = layout.projectDirectory
 apply from: qualityRepositoryRoot.file('gradle/supply-chain-evidence.gradle')
+apply from: qualityRepositoryRoot.file('gradle/jmh-history.gradle')
 
 def qualityVerificationVenv = layout.buildDirectory.dir('verification-venv')
 def qualityVerificationPython = providers.provider {
