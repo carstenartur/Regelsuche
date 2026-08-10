@@ -21,6 +21,7 @@
     <module>regelsuche-math-jas</module>
     <module>regelsuche-persistence</module>
     <module>regelsuche-solver-ir</module>
+    <module>regelsuche-solver-portfolio</module>
     <module>regelsuche-learning</module>
     <module>regelsuche-discovery</module>
     <module>regelsuche-experiments</module>
@@ -106,6 +107,11 @@
       <dependency>
         <groupId>de.regelsuche</groupId>
         <artifactId>regelsuche-solver-ir</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>de.regelsuche</groupId>
+        <artifactId>regelsuche-solver-portfolio</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
