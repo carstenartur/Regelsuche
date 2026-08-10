@@ -39,6 +39,7 @@ class MavenBuildContractTest {
         "regelsuche-math-jas",
         "regelsuche-persistence",
         "regelsuche-solver-ir",
+        "regelsuche-solver-portfolio",
         "regelsuche-learning",
         "regelsuche-discovery",
         "regelsuche-experiments",
