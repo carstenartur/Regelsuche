@@ -33,14 +33,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo '47b6feb53612845c4ce2a5b67055741b276060bdfc895531f2bb9d072f526a25  .github/bootstrap/streaming-json-followup/part-0' | sha256sum --check --strict
-          echo 'd36d3ec38b0934a9ecbae114cb47928458134f818ee142a13d6c55800444d851  .github/bootstrap/streaming-json-followup/part-1' | sha256sum --check --strict
+          echo 'c60447e12df9f43089da98ab4a7af0411ac7f197cf3c8ad6898bcfcb1497426b  .github/bootstrap/streaming-json-followup/part-0' | sha256sum --check --strict
+          echo '3caf724b6d07963ecbc9f71584b6f05805aa0271ab29cb7c160b200808a361a0  .github/bootstrap/streaming-json-followup/part-1' | sha256sum --check --strict
           cat \
             .github/bootstrap/streaming-json-followup/part-0 \
             .github/bootstrap/streaming-json-followup/part-1 \
             | base64 --decode \
             | gzip --decompress > /tmp/streaming-json-followup.patch
-          echo 'f02f5f195c67f82e412beb64e875e835bf40ef2360240d916e9af1db360104e0  /tmp/streaming-json-followup.patch' | sha256sum --check --strict
+          echo 'c8ccfa91e4b1979ed1b70e9031b144371be06787585b124818d80af7576729d1  /tmp/streaming-json-followup.patch' | sha256sum --check --strict
           git apply --check /tmp/streaming-json-followup.patch
           git apply --index /tmp/streaming-json-followup.patch
           git diff --cached --check
