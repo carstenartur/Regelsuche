@@ -1,10 +1,12 @@
 package de.regelsuche.quality.jmh;
 
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -45,12 +47,41 @@ final class JmhHistoryLoader {
         "jmhVersion",
         "jdkMajor"
     );
+    private static final Set<String> POLICY_FIELDS = Set.of(
+        "schema",
+        "claimBoundary",
+        "lowerIsBetter",
+        "normalizedUnit",
+        "snapshots"
+    );
+    private static final Set<String> SNAPSHOT_SPECIFICATION_FIELDS = Set.of(
+        "path",
+        "sha256"
+    );
+    private static final Set<String> SNAPSHOT_FIELDS = Set.of(
+        "schema",
+        "label",
+        "recordedAt",
+        "sourceRevision",
+        "sourceArtifactDigest",
+        "jmhResultDigest",
+        "execution",
+        "benchmarks"
+    );
+    private static final Set<String> BENCHMARK_FIELDS = Set.of(
+        "benchmark",
+        "family",
+        "unit",
+        "score",
+        "scoreError"
+    );
 
     private final ObjectMapper mapper;
 
     JmhHistoryLoader() {
         mapper = new ObjectMapper();
         mapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+        mapper.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     }
 
     JmhHistory load(Path historyPolicyPath, Path regressionPolicyPath)
@@ -80,6 +111,7 @@ final class JmhHistoryLoader {
     }
 
     private void validatePolicy(JsonNode policy) {
+        rejectUnknownFields(policy, POLICY_FIELDS, "history policy");
         require(
             POLICY_SCHEMA.equals(text(policy, "schema", "history policy")),
             "history policy schema must be " + POLICY_SCHEMA
@@ -183,6 +215,11 @@ final class JmhHistoryLoader {
         Map<String, JmhHistory.BenchmarkContract> contracts
     ) throws IOException {
         require(specification.isObject(), "snapshot specification must be an object");
+        rejectUnknownFields(
+            specification,
+            SNAPSHOT_SPECIFICATION_FIELDS,
+            "snapshot specification"
+        );
         String relativePath = text(
             specification,
             "path",
@@ -205,6 +242,7 @@ final class JmhHistoryLoader {
             "snapshot digest mismatch for " + relativePath
         );
         JsonNode snapshot = readObject(bytes, relativePath);
+        rejectUnknownFields(snapshot, SNAPSHOT_FIELDS, relativePath);
         require(
             SNAPSHOT_SCHEMA.equals(text(snapshot, "schema", relativePath)),
             "snapshot schema must be " + SNAPSHOT_SCHEMA + ": "
@@ -226,6 +264,17 @@ final class JmhHistoryLoader {
             SHA256.matcher(artifactDigest).matches(),
             "sourceArtifactDigest is invalid: " + relativePath
         );
+        if (snapshot.has("jmhResultDigest")) {
+            String resultDigest = text(
+                snapshot,
+                "jmhResultDigest",
+                relativePath
+            );
+            require(
+                SHA256.matcher(resultDigest).matches(),
+                "jmhResultDigest is invalid: " + relativePath
+            );
+        }
         Map<String, String> execution = execution(snapshot.path("execution"));
         Map<String, JmhHistory.Measurement> measurements = measurements(
             snapshot.path("benchmarks"),
@@ -255,6 +304,7 @@ final class JmhHistoryLoader {
         Map<String, JsonNode> observed = new HashMap<>();
         for (JsonNode entry : entries) {
             require(entry.isObject(), "benchmark entry must be an object: " + source);
+            rejectUnknownFields(entry, BENCHMARK_FIELDS, source + " benchmark");
             String name = text(entry, "benchmark", source);
             require(
                 observed.put(name, entry) == null,
@@ -293,6 +343,11 @@ final class JmhHistoryLoader {
 
     private static Map<String, String> execution(JsonNode execution) {
         require(execution.isObject(), "snapshot execution must be an object");
+        rejectUnknownFields(
+            execution,
+            Set.copyOf(EXECUTION_FIELDS),
+            "snapshot execution"
+        );
         Map<String, String> result = new TreeMap<>();
         for (String field : EXECUTION_FIELDS) {
             JsonNode value = execution.get(field);
@@ -340,14 +395,27 @@ final class JmhHistoryLoader {
         require(!relative.normalize().startsWith(".."), "snapshot escapes checkout: " + relativePath);
         Path candidate = root.resolve(relative).normalize();
         require(candidate.startsWith(root), "snapshot escapes checkout: " + relativePath);
-        require(!Files.isSymbolicLink(candidate), "snapshot must not be symbolic: " + relativePath);
-        return requireRegularFile(candidate, "snapshot");
+        Path current = root;
+        for (Path part : root.relativize(candidate)) {
+            current = current.resolve(part);
+            require(
+                !Files.isSymbolicLink(current),
+                "snapshot path contains a symbolic component: " + relativePath
+            );
+        }
+        Path real = requireRegularFile(candidate, "snapshot");
+        require(real.startsWith(root), "snapshot escapes checkout: " + relativePath);
+        return real;
     }
 
     private static Path requireRegularFile(Path path, String owner)
             throws IOException {
         Path absolute = path.toAbsolutePath().normalize();
-        require(Files.isRegularFile(absolute), owner + " must be a regular file: " + path);
+        require(!Files.isSymbolicLink(absolute), owner + " must not be symbolic: " + path);
+        require(
+            Files.isRegularFile(absolute, LinkOption.NOFOLLOW_LINKS),
+            owner + " must be a regular file: " + path
+        );
         return absolute.toRealPath();
     }
 
@@ -377,6 +445,17 @@ final class JmhHistoryLoader {
             location + "." + field + " must be finite and non-negative"
         );
         return result;
+    }
+
+    private static void rejectUnknownFields(
+        JsonNode object,
+        Set<String> allowed,
+        String owner
+    ) {
+        object.fieldNames().forEachRemaining(field -> require(
+            allowed.contains(field),
+            owner + " contains unknown field: " + field
+        ));
     }
 
     static String sha256(byte[] bytes) {
