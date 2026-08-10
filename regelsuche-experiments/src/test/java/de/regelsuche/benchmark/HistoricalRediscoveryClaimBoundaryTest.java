@@ -9,6 +9,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+/** Guards fail-closed capability-gap classification for bounded closures. */
 class HistoricalRediscoveryClaimBoundaryTest {
 
     @Test
