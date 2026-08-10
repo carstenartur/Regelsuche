@@ -473,6 +473,11 @@ public final class HistoricalRediscoveryAtlas {
             }
             return PrimaryStatus.REACHABLE_BUT_PRODUCTION_SEARCH_MISSED;
         }
+        // A bridge or curated-control hit identifies a missing production
+        // capability only after the frozen production closure was exhausted.
+        if (!production.oracle().completeClosureExhausted()) {
+            return PrimaryStatus.BUDGET_INCONCLUSIVE;
+        }
         if (genericBridge.executed() && anyReached(genericBridge)) {
             return PrimaryStatus.GENERIC_BRIDGE_REQUIRED_AND_FOUND;
         }
@@ -481,10 +486,7 @@ public final class HistoricalRediscoveryAtlas {
             return PrimaryStatus
                 .CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE;
         }
-        if (production.oracle().completeClosureExhausted()) {
-            return PrimaryStatus.UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE;
-        }
-        return PrimaryStatus.BUDGET_INCONCLUSIVE;
+        return PrimaryStatus.UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE;
     }
 
     private boolean anyReached(EngineEvidence... evidence) {
