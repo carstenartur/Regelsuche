@@ -5,6 +5,7 @@ This tranche extends the reactor introduced by #633 with another dependency-clos
 - `regelsuche-math-jas`;
 - `regelsuche-persistence`;
 - `regelsuche-solver-ir`;
+- `regelsuche-solver-portfolio`;
 - `regelsuche-learning`;
 - `regelsuche-discovery`;
 - `regelsuche-experiments`;
@@ -20,16 +21,18 @@ A focused example is:
 
 ```bash
 mvn --batch-mode --no-transfer-progress \
-  -pl regelsuche-learning -am test
+  -pl regelsuche-solver-portfolio -am test
 ```
 
 These module test paths use Java 21, Maven Surefire and JUnit Jupiter. They introduce no host-side Python, Bash, Perl, Node/npm, Gradle invocation or GitHub dependency.
 
-## Deliberate exclusions
+## Solver boundary
 
-`regelsuche-solver-portfolio` is not included yet because one current test detects and executes a host-installed Z3 binary. That external boundary must first move to Maven Failsafe plus JUnit/Testcontainers and a pinned solver image; machine-dependent `assumeTrue` behavior is not an acceptable final build contract.
+The ordinary `Z3SmtSolverBackendTest` uses injected process outcomes to characterize translation, proof-object, model and failure semantics. Its former `detectSystemZ3()` test was removed because a locally installed executable plus `assumeTrue` makes the result machine-dependent.
 
-Hibernate persistence, browser tests, external solvers, SymPy and other genuine foreign runtimes remain later Docker/Testcontainers phases. Their implementation language is allowed inside pinned containers, not as a host prerequisite.
+The real external-solver obligation is already covered by `ProofDockerImageIntegrationTest`: JUnit/Testcontainers starts the pinned proof image, verifies Z3 and cvc5, submits a real proof job and validates the retained SMT artifacts. Thus the implementation languages of the solvers stay inside Docker; no solver installation is required on the developer host.
+
+Hibernate persistence, browser tests, other solver profiles, SymPy and other genuine foreign runtimes remain later Maven Failsafe/Testcontainers phases. Their implementation language is allowed inside pinned containers, not as a host prerequisite.
 
 The Java generators and the current Python evidence verifiers in learning/discovery remain separate concerns. This phase proves that their production code and JUnit tests build under Maven; it does **not** authorize the Python verifiers as part of the final toolchain. Those verifier paths still have to be reimplemented in Java/JUnit before Gradle and Python can be removed.
 
