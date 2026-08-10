@@ -44,6 +44,7 @@ public interface DiscoveryExperimentRunner {
             HistoricalRediscoveryCorpus.load();
         HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();
         HistoricalRediscoveryAtlas.AtlasReport report = atlas.run(corpus);
+        verifyRetainedClaims(report);
         HistoricalRediscoveryAtlas.WrittenArtifacts artifacts =
             atlas.write(output, report);
         System.out.println("historicalRediscoveryAssessment="
@@ -53,6 +54,41 @@ public interface DiscoveryExperimentRunner {
             + artifacts.json().toAbsolutePath().normalize());
         System.out.println("historicalRediscoveryMarkdown="
             + artifacts.markdown().toAbsolutePath().normalize());
+    }
+
+    /**
+     * Prevents aggregate or per-case claims that are stronger than the
+     * retained evidence used to derive them.
+     */
+    private static void verifyRetainedClaims(
+        HistoricalRediscoveryAtlas.AtlasReport report
+    ) {
+        boolean targetBlindDiversitySignal = false;
+        for (HistoricalRediscoveryAtlas.CaseResult result : report.cases()) {
+            switch (result.status()) {
+                case GENERIC_BRIDGE_REQUIRED_AND_FOUND,
+                     CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE -> {
+                    if (!result.production().oracle().completeClosureExhausted()) {
+                        throw new IllegalStateException(
+                            "claim requires complete production closure: "
+                                + result.benchmarkCase().id()
+                                + " has production oracle status "
+                                + result.production().oracle().status());
+                    }
+                }
+                case REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND ->
+                    targetBlindDiversitySignal = true;
+                default -> {
+                    // No additional cross-case claim invariant.
+                }
+            }
+        }
+        if (report.assessment().searchPolicyDifferenceIdentified()
+                != targetBlindDiversitySignal) {
+            throw new IllegalStateException(
+                "search-policy claim must be backed by a target-blind "
+                    + "structural-diversity result");
+        }
     }
 
     /**
