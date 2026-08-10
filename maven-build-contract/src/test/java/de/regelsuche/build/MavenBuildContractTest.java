@@ -3,6 +3,7 @@ package de.regelsuche.build;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -18,6 +19,7 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -127,6 +129,37 @@ class MavenBuildContractTest {
                 );
             }
         }
+    }
+
+    @Test
+    void commandScannerRejectsWhitespaceAndPathWrappedRuntime(@TempDir Path temporary)
+            throws Exception {
+        Path syntheticPom = temporary.resolve("pom.xml");
+        Files.writeString(syntheticPom, """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0">
+              <modelVersion>4.0.0</modelVersion>
+              <build>
+                <plugins>
+                  <plugin>
+                    <groupId>example</groupId>
+                    <artifactId>example-plugin</artifactId>
+                    <configuration>
+                      <executable>
+                        /usr/bin/python3
+                      </executable>
+                    </configuration>
+                  </plugin>
+                </plugins>
+              </build>
+            </project>
+            """);
+
+        AssertionError failure = assertThrows(
+            AssertionError.class,
+            () -> assertNoForbiddenCommandElements(parse(syntheticPom), syntheticPom)
+        );
+        assertTrue(failure.getMessage().contains("python3"));
     }
 
     private static void assertNoForbiddenCommandElements(Document document, Path pom) {
