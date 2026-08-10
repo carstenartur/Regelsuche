@@ -146,6 +146,7 @@ class OpenApiStaticReferenceTest {
         Set<String> usedTags = new LinkedHashSet<>();
         Set<String> documentedContexts = new LinkedHashSet<>();
         int operationCount = 0;
+        int requestBodyOperationCount = 0;
 
         for (Map.Entry<String, Object> pathEntry : paths.entrySet()) {
             Map<String, Object> pathItem = object(pathEntry.getValue());
@@ -164,8 +165,13 @@ class OpenApiStaticReferenceTest {
                 List<Object> tags = list(operation.get("tags"));
                 assertFalse(tags.isEmpty(), () -> "missing tag for " + operationId);
                 tags.forEach(tag -> usedTags.add(String.valueOf(tag)));
-                assertFalse(object(operation.get("responses")).isEmpty(),
-                    () -> "missing responses for " + operationId);
+                Map<String, Object> responses = object(operation.get("responses"));
+                assertFalse(responses.isEmpty(), () -> "missing responses for " + operationId);
+                if (!object(operation.get("requestBody")).isEmpty()) {
+                    requestBodyOperationCount++;
+                    assertTrue(responses.containsKey("413"),
+                        () -> "missing documented 413 response for " + operationId);
+                }
 
                 String context = String.valueOf(operation.getOrDefault("x-regelsuche-context", ""));
                 assertFalse(context.isBlank(), () -> "missing x-regelsuche-context for " + operationId);
@@ -176,6 +182,8 @@ class OpenApiStaticReferenceTest {
         }
 
         assertTrue(operationCount >= 45, "the first public contract must cover the complete workbench surface");
+        assertEquals(11, requestBodyOperationCount,
+            "all documented JSON request-body operations must retain the common 413 contract");
         assertTrue(usedTags.containsAll(Set.of(
             "Search", "Paths", "Search Graph", "Proof Jobs", "Didactics", "Rule Radar")));
         assertEquals(OpenApiRouteRegistry.load().contexts(), documentedContexts,
