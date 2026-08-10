@@ -36,6 +36,13 @@ class MavenBuildContractTest {
         "regelsuche-search",
         "regelsuche-validation",
         "regelsuche-math-algorithms",
+        "regelsuche-math-jas",
+        "regelsuche-persistence",
+        "regelsuche-solver-ir",
+        "regelsuche-learning",
+        "regelsuche-discovery",
+        "regelsuche-experiments",
+        "regelsuche-cli",
         "maven-build-contract"
     );
 
@@ -84,7 +91,7 @@ class MavenBuildContractTest {
     );
 
     @Test
-    void reactorContainsTheDeclaredJavaCoreSlice() throws Exception {
+    void reactorContainsTheDeclaredJavaModuleSlice() throws Exception {
         Path root = repositoryRoot();
         Document parent = parse(root.resolve("pom.xml"));
 
