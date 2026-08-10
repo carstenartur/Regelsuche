@@ -141,13 +141,7 @@ class MavenBuildContractTest {
         for (Path pom : poms) {
             Document document = parse(pom);
             assertNoForbiddenCommandElements(document, pom);
-
-            for (String coordinate : buildPluginCoordinates(document.getDocumentElement())) {
-                assertFalse(
-                    FORBIDDEN_BUILD_PLUGINS.contains(coordinate),
-                    () -> pom + " activates forbidden build plugin " + coordinate
-                );
-            }
+            assertNoForbiddenPlugins(document, pom);
         }
     }
 
@@ -182,6 +176,32 @@ class MavenBuildContractTest {
         assertTrue(failure.getMessage().contains("python3"));
     }
 
+    @Test
+    void pluginScannerRejectsUnversionedExecPlugin(@TempDir Path temporary)
+            throws Exception {
+        Path syntheticPom = temporary.resolve("pom.xml");
+        Files.writeString(syntheticPom, """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0">
+              <modelVersion>4.0.0</modelVersion>
+              <build>
+                <plugins>
+                  <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>exec-maven-plugin</artifactId>
+                  </plugin>
+                </plugins>
+              </build>
+            </project>
+            """);
+
+        AssertionError failure = assertThrows(
+            AssertionError.class,
+            () -> assertNoForbiddenPlugins(parse(syntheticPom), syntheticPom)
+        );
+        assertTrue(failure.getMessage().contains("exec-maven-plugin"));
+    }
+
     private static void assertNoForbiddenCommandElements(Document document, Path pom) {
         for (String elementName : COMMAND_ELEMENT_NAMES) {
             NodeList elements = document.getElementsByTagNameNS("*", elementName);
@@ -195,6 +215,15 @@ class MavenBuildContractTest {
                     );
                 }
             }
+        }
+    }
+
+    private static void assertNoForbiddenPlugins(Document document, Path pom) {
+        for (String coordinate : buildPluginCoordinates(document.getDocumentElement())) {
+            assertFalse(
+                FORBIDDEN_BUILD_PLUGINS.contains(coordinate),
+                () -> pom + " activates forbidden build plugin " + coordinate
+            );
         }
     }
 
@@ -249,7 +278,21 @@ class MavenBuildContractTest {
     }
 
     private static Set<String> buildPluginCoordinates(Element project) {
-        return buildPluginVersions(project).keySet();
+        Set<String> coordinates = new LinkedHashSet<>();
+        NodeList plugins = project.getElementsByTagNameNS("*", "plugin");
+        for (int index = 0; index < plugins.getLength(); index++) {
+            Element plugin = (Element) plugins.item(index);
+            String artifactId = directChildText(plugin, "artifactId");
+            if (artifactId == null || artifactId.isBlank()) {
+                continue;
+            }
+            String groupId = directChildText(plugin, "groupId");
+            if (groupId == null || groupId.isBlank()) {
+                groupId = "org.apache.maven.plugins";
+            }
+            coordinates.add(groupId + ":" + artifactId);
+        }
+        return Set.copyOf(coordinates);
     }
 
     private static Map<String, String> buildPluginVersions(Element project) {
