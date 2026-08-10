@@ -25,6 +25,16 @@ dependency identities and rejects unknown graph references.
 Synthetic verifier tests additionally prove that even an externally supplied raw
 CycloneDX timestamp cannot alter the canonical inventory or evidence identity.
 
+## Checkout path trust boundary
+
+The policy file, raw BOM and generated report directory must remain inside the
+selected checkout. The verifier checks the lexical checkout-relative path before
+canonicalization, rejects symbolic path components for every input and output
+directory, and refuses to replace symbolic output files. This prevents a tracked
+or locally introduced symlink from redirecting evidence reads or writes outside
+the checkout. The synthetic verifier suite covers repository-root, BOM, policy,
+output-directory and output-file symlink cases.
+
 ## Vulnerability boundary
 
 This tranche does **not** claim that the listed dependencies are free of known
