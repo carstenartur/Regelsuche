@@ -6,6 +6,8 @@
  */
 
 def qualityRepositoryRoot = layout.projectDirectory
+apply from: qualityRepositoryRoot.file('gradle/supply-chain-evidence.gradle')
+
 def qualityVerificationVenv = layout.buildDirectory.dir('verification-venv')
 def qualityVerificationPython = providers.provider {
     def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
@@ -101,8 +103,53 @@ def reportSlowTests = tasks.register('reportSlowTests', Exec) {
     }
 }
 
+def supplyChainReportDirectory = qualityRepositoryRoot.dir('build/reports/quality/supply-chain')
+def supplyChainBom = supplyChainReportDirectory.file('bom.json')
+
+def testSupplyChainEvidenceVerifier = tasks.register('testSupplyChainEvidenceVerifier', Exec) {
+    group = 'verification'
+    description = 'Characterizes the supply-chain evidence verifier with positive and fail-closed synthetic cases.'
+    dependsOn 'prepareVerificationEnvironment'
+    workingDir qualityRepositoryRoot
+    inputs.file qualityRepositoryRoot.file('config/quality/supply-chain-policy.json')
+    inputs.file qualityRepositoryRoot.file('scripts/verify-supply-chain-evidence.py')
+    inputs.file qualityRepositoryRoot.file('scripts/test-supply-chain-evidence.py')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine qualityVerificationPython.get().absolutePath,
+            '-B',
+            'scripts/test-supply-chain-evidence.py'
+    }
+}
+
+def verifySupplyChainInventory = tasks.register('verifySupplyChainInventory', Exec) {
+    group = 'verification'
+    description = 'Verifies and normalizes the aggregate CycloneDX dependency inventory.'
+    dependsOn 'prepareVerificationEnvironment', 'cyclonedxBom', testSupplyChainEvidenceVerifier
+    mustRunAfter 'cyclonedxBom'
+    workingDir qualityRepositoryRoot
+    inputs.file qualityRepositoryRoot.file('config/quality/supply-chain-policy.json')
+    inputs.file qualityRepositoryRoot.file('scripts/verify-supply-chain-evidence.py')
+    inputs.file supplyChainBom
+    outputs.file supplyChainReportDirectory.file('dependency-inventory.json')
+    outputs.file supplyChainReportDirectory.file('supply-chain-evidence.json')
+    outputs.file supplyChainReportDirectory.file('supply-chain-evidence.md')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine qualityVerificationPython.get().absolutePath,
+            '-B',
+            'scripts/verify-supply-chain-evidence.py',
+            '--repository-root', qualityRepositoryRoot.asFile.absolutePath,
+            '--bom', supplyChainBom.asFile.absolutePath,
+            '--output', supplyChainReportDirectory.asFile.absolutePath
+    }
+}
+
 tasks.matching { candidate -> candidate.name == 'check' }.configureEach {
-    dependsOn verifyCoverageRegression, verifyContainerImagePolicy, verifyJmhRegression
+    dependsOn verifyCoverageRegression,
+        verifyContainerImagePolicy,
+        verifyJmhRegression,
+        verifySupplyChainInventory
 }
 
 tasks.matching { candidate -> candidate.name == 'ciCheck' }.configureEach {
