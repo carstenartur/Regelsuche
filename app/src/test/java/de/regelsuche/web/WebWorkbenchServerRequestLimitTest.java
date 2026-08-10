@@ -135,6 +135,142 @@ class WebWorkbenchServerRequestLimitTest {
         assertTrue(readBody(followUp).contains("sample-derivation-id"));
     }
 
+    @Test
+    void rejectsAmbiguousOrMalformedJsonAndKeeps413Authoritative() throws IOException {
+        HttpURLConnection duplicate = postFixed(
+            "/api/search",
+            "{\"expression\":\"x\",\"expression\":\"y\"}"
+                .getBytes(StandardCharsets.UTF_8)
+        );
+        assertEquals(400, duplicate.getResponseCode());
+        assertEquals("invalid JSON request body", readBody(duplicate));
+
+        HttpURLConnection trailing = postChunked(
+            "/api/search",
+            "{\"expression\":\"x\"} {\"other\":true}"
+                .getBytes(StandardCharsets.UTF_8)
+        );
+        assertEquals(400, trailing.getResponseCode());
+        assertEquals("invalid JSON request body", readBody(trailing));
+
+        HttpURLConnection wrongType = postFixed(
+            "/api/search",
+            "{\"expression\":7}".getBytes(StandardCharsets.UTF_8)
+        );
+        assertEquals(400, wrongType.getResponseCode());
+        assertEquals("invalid JSON request body", readBody(wrongType));
+
+        byte[] prefix = "{\"expression\":\"".getBytes(StandardCharsets.UTF_8);
+        byte[] suffix = "\"}".getBytes(StandardCharsets.UTF_8);
+        byte[] malformedUtf8 = new byte[prefix.length + 2 + suffix.length];
+        System.arraycopy(prefix, 0, malformedUtf8, 0, prefix.length);
+        malformedUtf8[prefix.length] = (byte) 0xC3;
+        malformedUtf8[prefix.length + 1] = 0x28;
+        System.arraycopy(suffix, 0, malformedUtf8, prefix.length + 2, suffix.length);
+        HttpURLConnection malformed = postChunked("/api/search", malformedUtf8);
+        assertEquals(400, malformed.getResponseCode());
+        assertEquals("invalid JSON request body", readBody(malformed));
+
+        HttpURLConnection radarNullContext = postFixed(
+            "/api/rule-radar/inspect",
+            "{\"expression\":\"x\",\"context\":{\"goalExpression\":null}}"
+                .getBytes(StandardCharsets.UTF_8)
+        );
+        assertEquals(200, radarNullContext.getResponseCode());
+        assertFalse(readBody(radarNullContext).contains("RADAR_FAILURE"));
+
+        HttpURLConnection radarDuplicate = postFixed(
+            "/api/rule-radar/inspect",
+            "{\"expression\":\"x\",\"expression\":\"y\"}"
+                .getBytes(StandardCharsets.UTF_8)
+        );
+        assertEquals(400, radarDuplicate.getResponseCode());
+        assertEquals(
+            "{\"error\":true,\"code\":\"INVALID_JSON\","
+                + "\"message\":\"invalid JSON request body\"}",
+            readBody(radarDuplicate)
+        );
+
+        byte[] oversizedMalformed = ("{\"expression\":\""
+            + "x".repeat(REQUEST_LIMIT * 2)).getBytes(StandardCharsets.UTF_8);
+        assertPayloadTooLarge(
+            postChunked("/api/search", oversizedMalformed),
+            "oversized malformed JSON"
+        );
+
+        HttpURLConnection followUp = open("/api/paths");
+        assertEquals(200, followUp.getResponseCode());
+        assertTrue(readBody(followUp).contains("sample-derivation-id"));
+    }
+
+    @Test
+    void rejectsWrongKnownFieldTypesAcrossEveryTypedJsonPostSurface()
+            throws IOException {
+        List<InvalidRequest> workbenchRequests = List.of(
+            new InvalidRequest("/api/search", "{\"expression\":7}"),
+            new InvalidRequest("/api/discover", "{\"min\":\"1\"}"),
+            new InvalidRequest("/api/inventory", "{\"json\":1}"),
+            new InvalidRequest(
+                "/api/inspect/tree/apply",
+                "{\"matchIndex\":\"0\"}"
+            ),
+            new InvalidRequest(
+                "/api/didactic/step-check",
+                "{\"currentExpression\":1}"
+            ),
+            new InvalidRequest(
+                "/api/didactic/hint/sample-derivation-id",
+                "{\"pedagogyProfile\":false}"
+            ),
+            new InvalidRequest(
+                "/api/proof-bridge",
+                "{\"assumptions\":[{\"expression\":\"x > 0\"}]}"
+            ),
+            new InvalidRequest(
+                "/api/proof/jobs",
+                "{\"assumptions\":[7]}"
+            )
+        );
+        for (InvalidRequest request : workbenchRequests) {
+            HttpURLConnection connection = postFixed(
+                request.path(),
+                request.body().getBytes(StandardCharsets.UTF_8)
+            );
+            assertEquals(400, connection.getResponseCode(), request.path());
+            assertEquals(
+                "invalid JSON request body",
+                readBody(connection),
+                request.path()
+            );
+        }
+
+        List<InvalidRequest> radarRequests = List.of(
+            new InvalidRequest(
+                "/api/rule-radar/inspect",
+                "{\"expression\":7}"
+            ),
+            new InvalidRequest(
+                "/api/rule-radar/apply",
+                "{\"candidateId\":false}"
+            ),
+            new InvalidRequest(
+                "/api/rule-radar/search",
+                "{\"maxDepth\":\"4\"}"
+            )
+        );
+        String expectedRadarError = "{\"error\":true,"
+            + "\"code\":\"INVALID_JSON\","
+            + "\"message\":\"invalid JSON request body\"}";
+        for (InvalidRequest request : radarRequests) {
+            HttpURLConnection connection = postChunked(
+                request.path(),
+                request.body().getBytes(StandardCharsets.UTF_8)
+            );
+            assertEquals(400, connection.getResponseCode(), request.path());
+            assertEquals(expectedRadarError, readBody(connection), request.path());
+        }
+    }
+
     private void assertPayloadTooLarge(HttpURLConnection connection, String owner) throws IOException {
         assertEquals(413, connection.getResponseCode(), owner);
         assertEquals("application/json; charset=utf-8", connection.getHeaderField("Content-Type"), owner);
@@ -275,6 +411,9 @@ class WebWorkbenchServerRequestLimitTest {
             Instant.EPOCH,
             "hash"
         );
+    }
+
+    private record InvalidRequest(String path, String body) {
     }
 
     private record Endpoint(

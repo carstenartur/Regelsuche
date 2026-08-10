@@ -169,6 +169,8 @@ class OpenApiStaticReferenceTest {
                 assertFalse(responses.isEmpty(), () -> "missing responses for " + operationId);
                 if (!object(operation.get("requestBody")).isEmpty()) {
                     requestBodyOperationCount++;
+                    assertTrue(responses.containsKey("400"),
+                        () -> "missing documented 400 response for " + operationId);
                     assertTrue(responses.containsKey("413"),
                         () -> "missing documented 413 response for " + operationId);
                 }
@@ -215,7 +217,7 @@ class OpenApiStaticReferenceTest {
     private Map<String, Object> specification() throws IOException {
         try (InputStream stream = getClass().getResourceAsStream("/web/openapi/openapi.json")) {
             assertNotNull(stream, "packaged OpenAPI specification must exist");
-            return new JsonReader(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).readObject();
+            return new StreamingJsonRequestBody(2 << 20).readObject(stream);
         }
     }
 

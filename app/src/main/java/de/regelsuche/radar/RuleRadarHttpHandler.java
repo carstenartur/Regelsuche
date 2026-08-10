@@ -4,20 +4,14 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.inventory.RuleInventoryRepository;
-import de.regelsuche.json.JsonReader;
 import de.regelsuche.json.JsonWriter;
-import de.regelsuche.knowledge.RuleProfile;
 import de.regelsuche.plugin.PluginRuntimeConfig;
-import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.web.BoundedRequestBody;
+import de.regelsuche.web.StreamingJsonRequestBody;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 import static de.regelsuche.radar.AstRuleRadar.ApplicableMove;
 import static de.regelsuche.radar.AstRuleRadar.CandidateOutcome;
@@ -30,7 +24,7 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
     private static final int DEFAULT_MAX_REQUEST_BYTES = 1 << 20;
     private final AstRuleRadarService radar;
     private final RuleRadarSearchService search;
-    private final int maxRequestBytes;
+    private final StreamingJsonRequestBody jsonRequestBody;
 
     public RuleRadarHttpHandler(
         RuleInventoryRepository inventory,
@@ -51,7 +45,7 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
         }
         this.radar = new AstRuleRadarService(inventory, graphStore, pluginRuntimeConfig);
         this.search = new RuleRadarSearchService(radar);
-        this.maxRequestBytes = maxRequestBytes;
+        this.jsonRequestBody = new StreamingJsonRequestBody(maxRequestBytes);
     }
 
     @Override
@@ -68,6 +62,8 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
             }
         } catch (BoundedRequestBody.PayloadTooLargeException exception) {
             sendPayloadTooLarge(exchange, exception.limitBytes());
+        } catch (StreamingJsonRequestBody.MalformedJsonRequestException exception) {
+            sendError(exchange, 400, "INVALID_JSON", "invalid JSON request body");
         } catch (IllegalArgumentException exception) {
             sendError(exchange, 400, "INVALID_REQUEST", safeMessage(exception));
         } catch (RuntimeException exception) {
@@ -80,10 +76,8 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
             sendError(exchange, 405, "METHOD_NOT_ALLOWED", "POST required");
             return;
         }
-        Map<String, Object> body = readObject(exchange);
-        String expression = string(body, "expression", "");
-        Context context = context(body);
-        Snapshot snapshot = radar.inspect(expression, context);
+        RuleRadarRequestBody body = readRequest(exchange);
+        Snapshot snapshot = radar.inspect(body.expression(), body.context());
         // Invalid expressions are a normal, structured inspection result rather
         // than an uncaught server error.
         sendJson(exchange, 200, RuleRadarJson.snapshot(snapshot));
@@ -94,15 +88,14 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
             sendError(exchange, 405, "METHOD_NOT_ALLOWED", "POST required");
             return;
         }
-        Map<String, Object> body = readObject(exchange);
-        String expression = string(body, "expression", "");
-        String candidateId = string(body, "candidateId", "");
-        if (expression.isBlank() || candidateId.isBlank()) {
+        RuleRadarRequestBody body = readRequest(exchange);
+        if (body.expression().isBlank() || body.candidateId().isBlank()) {
             sendError(exchange, 400, "MISSING_FIELD", "expression and candidateId are required");
             return;
         }
-        Context context = context(body);
-        ApplicableMove candidate = radar.resolve(expression, candidateId, context).orElse(null);
+        Context context = body.context();
+        ApplicableMove candidate = radar.resolve(
+            body.expression(), body.candidateId(), context).orElse(null);
         if (candidate == null) {
             sendError(exchange, 409, "STALE_CANDIDATE",
                 "candidate is no longer present for the frozen expression and context");
@@ -126,56 +119,16 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
             sendError(exchange, 405, "METHOD_NOT_ALLOWED", "POST required");
             return;
         }
-        Map<String, Object> body = readObject(exchange);
+        RuleRadarRequestBody body = readRequest(exchange);
         RuleRadarSearchService.SearchRequest request = new RuleRadarSearchService.SearchRequest(
-            string(body, "expression", ""),
-            string(body, "targetExpression", ""),
-            context(body),
-            integer(body, "maxDepth", 4),
-            integer(body, "maxStates", 120),
-            integer(body, "maxMovesPerState", 60)
+            body.expression(),
+            body.targetExpression(),
+            body.context(),
+            body.maxDepth(),
+            body.maxStates(),
+            body.maxMovesPerState()
         );
         sendJson(exchange, 200, RuleRadarJson.searchResult(search.search(request)));
-    }
-
-    private Context context(Map<String, Object> body) {
-        Map<String, Object> source = map(body.get("context"));
-        if (source.isEmpty()) {
-            source = body;
-        }
-        RuleProfile knowledgeProfile = enumValue(
-            RuleProfile.class,
-            string(source, "knowledgeProfile", RuleProfile.CORE.name()),
-            RuleProfile.CORE
-        );
-        CandidateProofStatus minStatus = enumValue(
-            CandidateProofStatus.class,
-            string(source, "minMacroProofStatus", CandidateProofStatus.VALIDATED_BY_EXAMPLES.name()),
-            CandidateProofStatus.VALIDATED_BY_EXAMPLES
-        );
-        Map<String, CandidateOutcome> outcomes = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : map(source.get("outcomeByCandidateId")).entrySet()) {
-            CandidateOutcome parsed = enumValue(CandidateOutcome.class, String.valueOf(entry.getValue()), null);
-            if (parsed != null && entry.getKey() != null && !entry.getKey().isBlank()) {
-                outcomes.put(entry.getKey(), parsed);
-            }
-        }
-        return new Context(
-            knowledgeProfile,
-            stringSet(source.get("enabledPacks")),
-            stringSet(source.get("disabledPacks")),
-            bool(source, "includePlugins", true),
-            bool(source, "includeLearnedMacros", true),
-            minStatus,
-            string(source, "searchProfile", "DISCOVERY"),
-            string(source, "goalExpression", ""),
-            integer(source, "maxCandidatesPerPosition", 24),
-            integer(source, "maxCandidatesTotal", 240),
-            stringList(source.get("assumptions")),
-            bool(source, "includeRejectedCandidates", true),
-            string(source, "selectedCandidateId", ""),
-            outcomes
-        );
     }
 
     private Context withoutSelectionAndOutcomes(Context context) {
@@ -214,12 +167,9 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
         return writer.endObject().toString();
     }
 
-    private Map<String, Object> readObject(HttpExchange exchange) throws IOException {
-        byte[] bytes = BoundedRequestBody.read(exchange, maxRequestBytes);
-        if (bytes.length == 0) {
-            return Map.of();
-        }
-        return new JsonReader(new String(bytes, StandardCharsets.UTF_8)).readObject();
+    private RuleRadarRequestBody readRequest(HttpExchange exchange)
+            throws IOException {
+        return RuleRadarRequestBody.read(jsonRequestBody, exchange);
     }
 
     private void sendPayloadTooLarge(HttpExchange exchange, int limitBytes) throws IOException {
@@ -248,79 +198,6 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
         exchange.sendResponseHeaders(status, bytes.length);
         try (var output = exchange.getResponseBody()) {
             output.write(bytes);
-        }
-    }
-
-    private String string(Map<String, Object> source, String key, String fallback) {
-        Object value = source.get(key);
-        return value == null ? fallback : String.valueOf(value).trim();
-    }
-
-    private int integer(Map<String, Object> source, String key, int fallback) {
-        Object value = source.get(key);
-        if (value instanceof Number number) {
-            return number.intValue();
-        }
-        if (value == null) {
-            return fallback;
-        }
-        try {
-            return Integer.parseInt(String.valueOf(value).trim());
-        } catch (NumberFormatException exception) {
-            return fallback;
-        }
-    }
-
-    private boolean bool(Map<String, Object> source, String key, boolean fallback) {
-        Object value = source.get(key);
-        if (value instanceof Boolean bool) {
-            return bool;
-        }
-        if (value == null) {
-            return fallback;
-        }
-        String text = String.valueOf(value).trim().toLowerCase(Locale.ROOT);
-        return switch (text) {
-            case "true", "1", "yes", "on" -> true;
-            case "false", "0", "no", "off" -> false;
-            default -> fallback;
-        };
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> map(Object value) {
-        if (!(value instanceof Map<?, ?> raw)) {
-            return Map.of();
-        }
-        Map<String, Object> result = new LinkedHashMap<>();
-        raw.forEach((key, item) -> result.put(String.valueOf(key), item));
-        return result;
-    }
-
-    private List<String> stringList(Object value) {
-        if (!(value instanceof List<?> list)) {
-            return List.of();
-        }
-        return list.stream()
-            .filter(item -> item != null && !String.valueOf(item).isBlank())
-            .map(item -> String.valueOf(item).trim())
-            .distinct()
-            .sorted()
-            .toList();
-    }
-
-    private Set<String> stringSet(Object value) {
-        return Set.copyOf(new LinkedHashSet<>(stringList(value)));
-    }
-
-    private <E extends Enum<E>> E enumValue(Class<E> type, String value, E fallback) {
-        if (value == null || value.isBlank()) {
-            return fallback;
-        }
-        try {
-            return Enum.valueOf(type, value.trim().toUpperCase(Locale.ROOT).replace('-', '_'));
-        } catch (IllegalArgumentException exception) {
-            return fallback;
         }
     }
 
