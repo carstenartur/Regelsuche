@@ -38,7 +38,7 @@
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SearchRequest"}}}},
         "responses": {
           "200": {"description": "Suchzusammenfassung", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SearchResult"}}}},
-          "400": {"$ref": "#/components/responses/BadRequest"},
+          "400": {"$ref": "#/components/responses/BadRequestText"},
           "405": {"$ref": "#/components/responses/MethodNotAllowed"},
           "413": {"$ref": "#/components/responses/PayloadTooLarge"}
         }
@@ -53,7 +53,7 @@
         "requestBody": {"required": false, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DiscoveryRequest"}}}},
         "responses": {
           "200": {"description": "Anzahl gefundener Kandidaten und Transformationen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
-          "400": {"$ref": "#/components/responses/BadRequest"},
+          "400": {"$ref": "#/components/responses/BadRequestText"},
           "405": {"$ref": "#/components/responses/MethodNotAllowed"},
           "413": {"$ref": "#/components/responses/PayloadTooLarge"}
         }
@@ -84,7 +84,7 @@
         ],
         "responses": {
           "200": {"description": "Vergleich von Regeln, Schritten, Scores und Annahmen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
-          "400": {"$ref": "#/components/responses/BadRequest"},
+          "400": {"$ref": "#/components/responses/BadRequestText"},
           "404": {"$ref": "#/components/responses/NotFound"}
         }
       }
@@ -208,7 +208,7 @@
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["json"], "properties": {"json": {"type": "string"}}}}}},
         "responses": {
           "200": {"description": "Anzahl importierter Regeln", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
-          "400": {"$ref": "#/components/responses/BadRequest"},
+          "400": {"$ref": "#/components/responses/BadRequestText"},
           "413": {"$ref": "#/components/responses/PayloadTooLarge"}
         }
       }
@@ -278,7 +278,7 @@
         ],
         "responses": {
           "200": {"description": "Erklärung", "content": {"text/plain": {"schema": {"type": "string"}}}},
-          "400": {"$ref": "#/components/responses/BadRequest"},
+          "400": {"$ref": "#/components/responses/BadRequestText"},
           "404": {"$ref": "#/components/responses/NotFound"}
         }
       }
@@ -292,7 +292,7 @@
         "parameters": [{"name": "expression", "in": "query", "required": true, "schema": {"type": "string"}}],
         "responses": {
           "200": {"description": "Bester Zug, Alternativen und Sackgassen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
-          "400": {"$ref": "#/components/responses/BadRequest"}
+          "400": {"$ref": "#/components/responses/BadRequestText"}
         }
       }
     },
@@ -414,7 +414,7 @@
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProofRequest"}}}},
         "responses": {
           "200": {"description": "Proof-Artefakt und Ausführungsstatus", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
-          "400": {"$ref": "#/components/responses/BadRequest"},
+          "400": {"$ref": "#/components/responses/BadRequestText"},
           "413": {"$ref": "#/components/responses/PayloadTooLarge"}
         }
       }
@@ -435,7 +435,7 @@
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProofJobRequest"}}}},
         "responses": {
           "201": {"description": "Job wurde in die Queue aufgenommen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
-          "400": {"$ref": "#/components/responses/BadRequest"},
+          "400": {"$ref": "#/components/responses/BadRequestText"},
           "413": {"$ref": "#/components/responses/PayloadTooLarge"},
           "503": {"$ref": "#/components/responses/Unavailable"}
         }
@@ -506,7 +506,7 @@
         "summary": "Einen eingegebenen Rechenschritt prüfen",
         "x-regelsuche-context": "/api/didactic",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DidacticStepRequest"}}}},
-        "responses": {"200": {"description": "Korrektheit, didaktische Eignung und mögliche Fehlvorstellung", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
+        "responses": {"200": {"description": "Korrektheit, didaktische Eignung und mögliche Fehlvorstellung", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequestText"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
       }
     },
     "/api/didactic/hint/{pathId}": {
@@ -517,7 +517,7 @@
         "x-regelsuche-context": "/api/didactic",
         "parameters": [{"$ref": "#/components/parameters/PathId"}],
         "requestBody": {"required": false, "content": {"application/json": {"schema": {"type": "object", "properties": {"currentExpression": {"type": "string"}, "pedagogyProfile": {"type": "string", "default": "SCHOOL"}}}}}},
-        "responses": {"200": {"description": "Hinweisfolge", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}, "404": {"$ref": "#/components/responses/NotFound"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
+        "responses": {"200": {"description": "Hinweisfolge", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequestText"}, "404": {"$ref": "#/components/responses/NotFound"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
       }
     },
     "/api/didactic/misconceptions": {
@@ -571,7 +571,7 @@
           {"name": "expression", "in": "query", "required": true, "schema": {"type": "string"}},
           {"name": "selectedPathKey", "in": "query", "required": false, "schema": {"type": "string"}}
         ],
-        "responses": {"200": {"description": "Positionen, Matches, Bindungen und Vorschauen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}}
+        "responses": {"200": {"description": "Positionen, Matches, Bindungen und Vorschauen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequestText"}}
       }
     },
     "/api/inspect/tree/apply": {
@@ -581,7 +581,7 @@
         "summary": "Ein zuvor inspiziertes lokales Regelmatch anwenden",
         "x-regelsuche-context": "/api/inspect",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/InspectApplyRequest"}}}},
-        "responses": {"200": {"description": "Folgeausdruck und aktualisierte Inspektion", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}, "409": {"$ref": "#/components/responses/Conflict"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
+        "responses": {"200": {"description": "Folgeausdruck und aktualisierte Inspektion", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequestText"}, "409": {"$ref": "#/components/responses/Conflict"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
       }
     },
     "/api/rule-radar": {
@@ -600,7 +600,7 @@
         "summary": "AST und positionsgebundene Regelanwendungen berechnen",
         "x-regelsuche-context": "/api/rule-radar",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuleRadarRequest"}}}},
-        "responses": {"200": {"description": "Regelradar-Snapshot", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
+        "responses": {"200": {"description": "Regelradar-Snapshot", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequestJson"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
       }
     },
     "/api/rule-radar/apply": {
@@ -610,7 +610,7 @@
         "summary": "Exakt angezeigten Radar-Kandidaten anwenden",
         "x-regelsuche-context": "/api/rule-radar",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuleRadarApplyRequest"}}}},
-        "responses": {"200": {"description": "Anwendung und aktualisierter Snapshot", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"description": "Kandidat ist sichtbar, aber im Kontext nicht ausführbar"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
+        "responses": {"200": {"description": "Anwendung und aktualisierter Snapshot", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequestJson"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"description": "Kandidat ist sichtbar, aber im Kontext nicht ausführbar"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
       }
     },
     "/api/rule-radar/search": {
@@ -620,7 +620,7 @@
         "summary": "Begrenzten Suchgraph mit Kandidatenkorrelation erzeugen",
         "x-regelsuche-context": "/api/rule-radar",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuleRadarSearchRequest"}}}},
-        "responses": {"200": {"description": "Korrelierter Suchgraph und Ereignisse", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
+        "responses": {"200": {"description": "Korrelierter Suchgraph und Ereignisse", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequestJson"}, "413": {"$ref": "#/components/responses/PayloadTooLarge"}}
       }
     }
   },
@@ -632,12 +632,13 @@
       "JobId": {"name": "jobId", "in": "path", "required": true, "schema": {"type": "string"}}
     },
     "responses": {
-      "BadRequest": {
-        "description": "Ungültige, unvollständige oder syntaktisch mehrdeutige Eingabe",
-        "content": {
-          "text/plain": {"schema": {"type": "string"}},
-          "application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}
-        }
+      "BadRequestText": {
+        "description": "Ungültige, unvollständige oder syntaktisch mehrdeutige Workbench-Eingabe",
+        "content": {"text/plain": {"schema": {"type": "string"}}}
+      },
+      "BadRequestJson": {
+        "description": "Ungültige, unvollständige oder syntaktisch mehrdeutige Rule-Radar-Eingabe",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}
       },
       "NotFound": {"description": "Ressource wurde nicht gefunden", "content": {"text/plain": {"schema": {"type": "string"}}}},
       "Conflict": {"description": "Der angeforderte Zustand ist veraltet oder nicht mehr anwendbar", "content": {"text/plain": {"schema": {"type": "string"}}}},
