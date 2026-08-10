@@ -12,8 +12,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
 final class JmhHistoryReportWriter {
     static final String OUTPUT_SCHEMA =
@@ -337,12 +335,12 @@ final class JmhHistoryReportWriter {
             .append("</text>\n");
     }
 
-    private static Set<String> families(JmhHistory history) {
-        Set<String> families = new TreeSet<>();
-        history.benchmarks().values().forEach(
-            contract -> families.add(contract.family())
-        );
-        return Set.copyOf(families);
+    private static List<String> families(JmhHistory history) {
+        return history.benchmarks().values().stream()
+            .map(JmhHistory.BenchmarkContract::family)
+            .distinct()
+            .sorted()
+            .toList();
     }
 
     private static List<String> benchmarksInFamily(
