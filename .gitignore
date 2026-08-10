@@ -4,6 +4,10 @@
 # Ignore Gradle build output directory
 build
 
+# Ignore Maven reactor output directories. These are reproducible build/test
+# products and must not make a clean checkout appear dirty to evidence freezes.
+**/target/
+
 # Generated coverage, test and benchmark pages are CI outputs. They are
 # uploaded and published from the central Gradle lifecycle, not source inputs.
 public/
