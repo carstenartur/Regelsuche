@@ -118,6 +118,27 @@ class ProofJobsApiTest {
     }
 
     @Test
+    void submitAcceptsUiStructuredAndLegacyStringAssumptions() throws IOException {
+        HttpURLConnection submit = open("/api/proof/jobs", "POST");
+        submit.setDoOutput(true);
+        submit.setRequestProperty("Content-Type", "application/json");
+        try (OutputStream os = submit.getOutputStream()) {
+            os.write("""
+                {
+                  "leftPattern":"a / b",
+                  "rightPattern":"a * (1 / b)",
+                  "assumptions":[
+                    {"kind":"NON_ZERO","expression":"b != 0","symbols":["b"]},
+                    "a is real"
+                  ]
+                }
+                """.getBytes(StandardCharsets.UTF_8));
+        }
+        assertEquals(201, submit.getResponseCode());
+        assertTrue(read(submit).contains("\"jobId\""));
+    }
+
+    @Test
     void submitWithoutPatternsIs400() throws IOException {
         HttpURLConnection submit = open("/api/proof/jobs", "POST");
         submit.setDoOutput(true);

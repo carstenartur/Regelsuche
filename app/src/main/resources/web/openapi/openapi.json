@@ -695,14 +695,31 @@
         }
       },
       "DiscoveryRequest": {"type": "object", "properties": {"min": {"type": "integer", "default": 1}, "max": {"type": "integer", "default": 3}}},
+      "AssumptionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["expression"],
+        "properties": {
+          "kind": {"type": "string", "default": "CUSTOM_PREDICATE"},
+          "expression": {"type": "string", "minLength": 1},
+          "symbols": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "AssumptionValue": {
+        "oneOf": [
+          {"type": "string", "minLength": 1},
+          {"$ref": "#/components/schemas/AssumptionInput"}
+        ]
+      },
       "ProofRequest": {
         "type": "object",
         "required": ["leftPattern", "rightPattern"],
         "properties": {
           "leftPattern": {"type": "string"},
           "rightPattern": {"type": "string"},
-          "assumptions": {"type": "array", "items": {"type": "string"}},
-          "backend": {"type": "string", "enum": ["lean", "smt"]}
+          "assumptions": {"type": "array", "items": {"$ref": "#/components/schemas/AssumptionValue"}},
+          "tool": {"type": "string", "enum": ["lean", "lean4", "smt"], "default": "lean4"},
+          "backend": {"type": "string", "enum": ["lean", "lean4", "smt"]}
         }
       },
       "ProofJobRequest": {
@@ -711,7 +728,7 @@
         "properties": {
           "leftPattern": {"type": "string"},
           "rightPattern": {"type": "string"},
-          "assumptions": {"type": "array", "items": {"type": "string"}},
+          "assumptions": {"type": "array", "items": {"$ref": "#/components/schemas/AssumptionValue"}},
           "priority": {"type": "integer", "default": 0}
         }
       },

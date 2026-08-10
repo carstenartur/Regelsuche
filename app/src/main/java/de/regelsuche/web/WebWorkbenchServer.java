@@ -2397,11 +2397,7 @@ public class WebWorkbenchServer {
         String tool = body.tool().toLowerCase(java.util.Locale.ROOT);
         de.regelsuche.proof.ProofBridgeService service =
             "smt".equals(tool) ? smtProofBridgeService : leanProofBridgeService;
-        List<de.regelsuche.assumption.Assumption> assumptions = new java.util.ArrayList<>();
-        for (String item : body.assumptions()) {
-            assumptions.add(new de.regelsuche.assumption.Assumption(
-                de.regelsuche.assumption.Assumption.Kind.CUSTOM, item));
-        }
+        List<de.regelsuche.assumption.Assumption> assumptions = body.assumptions();
         de.regelsuche.mining.RuleCandidate candidate = new de.regelsuche.mining.RuleCandidate(
             left, right, 1, 1.0, 1, true, true, false,
             List.of(),
@@ -2543,11 +2539,7 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 400, "worker selection is not supported");
             return;
         }
-        List<de.regelsuche.assumption.Assumption> assumptions = new java.util.ArrayList<>();
-        for (String item : body.assumptions()) {
-            assumptions.add(new de.regelsuche.assumption.Assumption(
-                de.regelsuche.assumption.Assumption.Kind.CUSTOM, item));
-        }
+        List<de.regelsuche.assumption.Assumption> assumptions = body.assumptions();
         String jobId = proofWorkbenchService.submit(left, right, assumptions, priority);
         var job = proofWorkbenchService.getJob(jobId).orElse(null);
         JsonWriter writer = new JsonWriter();
@@ -2637,6 +2629,7 @@ public class WebWorkbenchServer {
             arr.objectValue(o -> {
                 o.property("kind", a.kind().name());
                 o.property("expression", a.expression());
+                o.stringArray("symbols", a.symbols());
             })));
     }
 

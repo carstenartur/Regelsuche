@@ -190,6 +190,12 @@ class OpenApiStaticReferenceTest {
             "Search", "Paths", "Search Graph", "Proof Jobs", "Didactics", "Rule Radar")));
         assertEquals(OpenApiRouteRegistry.load().contexts(), documentedContexts,
             "OpenAPI context extensions must exactly match the executable route registry");
+
+        Map<String, Object> schemas = object(object(specification().get("components")).get("schemas"));
+        assertTrue(schemas.containsKey("AssumptionInput"));
+        assertTrue(schemas.containsKey("AssumptionValue"));
+        Map<String, Object> proofRequest = object(schemas.get("ProofRequest"));
+        assertTrue(object(proofRequest.get("properties")).containsKey("tool"));
     }
 
     @Test

@@ -224,7 +224,7 @@ class WebWorkbenchServerRequestLimitTest {
             ),
             new InvalidRequest(
                 "/api/proof-bridge",
-                "{\"assumptions\":[{\"expression\":\"x > 0\"}]}"
+                "{\"assumptions\":[{\"expression\":7}]}"
             ),
             new InvalidRequest(
                 "/api/proof/jobs",

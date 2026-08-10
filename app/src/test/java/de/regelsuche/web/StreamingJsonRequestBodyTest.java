@@ -95,6 +95,54 @@ class StreamingJsonRequestBodyTest {
     }
 
     @Test
+    void heterogeneousTypedArraysStreamStringsAndObjectsWithoutMaps()
+            throws IOException {
+        StreamingJsonRequestBody reader = new StreamingJsonRequestBody(1024);
+        List<AssumptionValue> values = reader.readObject(
+            new ByteArrayInputStream("""
+                {
+                  "assumptions":[
+                    "x != 0",
+                    null,
+                    {"kind":"POSITIVE","expression":"y > 0","ignored":[1,2]}
+                  ]
+                }
+                """.getBytes(StandardCharsets.UTF_8)),
+            root -> {
+                List<AssumptionValue> assumptions = List.of();
+                while (root.nextField()) {
+                    if (!root.fieldName().equals("assumptions")) {
+                        root.skipValue();
+                        continue;
+                    }
+                    assumptions = root.readStringOrObjectArray(
+                        value -> new AssumptionValue("CUSTOM", value),
+                        object -> {
+                            String kind = "CUSTOM";
+                            String expression = "";
+                            while (object.nextField()) {
+                                switch (object.fieldName()) {
+                                    case "kind" -> kind = object.readNullableString();
+                                    case "expression" ->
+                                        expression = object.readNullableString();
+                                    default -> object.skipValue();
+                                }
+                            }
+                            return new AssumptionValue(kind, expression);
+                        }
+                    );
+                }
+                return assumptions;
+            }
+        );
+
+        assertEquals(List.of(
+            new AssumptionValue("CUSTOM", "x != 0"),
+            new AssumptionValue("POSITIVE", "y > 0")
+        ), values);
+    }
+
+    @Test
     void emptyAndWhitespaceBodiesRemainCompatibleWithOptionalObjects()
             throws IOException {
         StreamingJsonRequestBody reader = new StreamingJsonRequestBody(64);
@@ -270,6 +318,9 @@ class StreamingJsonRequestBodyTest {
         String goalExpression,
         Map<String, String> outcomes
     ) {
+    }
+
+    private record AssumptionValue(String kind, String expression) {
     }
 
     private static final class SmallChunkInputStream extends InputStream {

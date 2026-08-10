@@ -142,6 +142,12 @@ public final class StreamingJsonRequestBody {
         T decode(ObjectCursor object) throws IOException;
     }
 
+    /** Decodes one string element inside a heterogeneous typed array. */
+    @FunctionalInterface
+    public interface StringDecoder<T> {
+        T decode(String value) throws IOException;
+    }
+
     /**
      * Forward-only cursor over one JSON object.
      *
@@ -271,6 +277,56 @@ public final class StreamingJsonRequestBody {
                         + "' must contain only strings", null);
                 }
                 values.add(parser.getText());
+            }
+        }
+
+        /**
+         * Reads an array whose non-null elements are either strings or
+         * objects. Each object is consumed directly through the supplied
+         * typed decoder; no generic map or intermediate JSON tree is built.
+         */
+        public <T> List<T> readStringOrObjectArray(
+            StringDecoder<T> stringDecoder,
+            ObjectDecoder<T> objectDecoder
+        ) throws IOException {
+            Objects.requireNonNull(stringDecoder, "stringDecoder");
+            Objects.requireNonNull(objectDecoder, "objectDecoder");
+            requirePending();
+            JsonToken token = consumeToken();
+            if (token == JsonToken.VALUE_NULL) {
+                return List.of();
+            }
+            if (token != JsonToken.START_ARRAY) {
+                throw typeMismatch("array of strings or objects", token);
+            }
+            List<T> values = new ArrayList<>();
+            while (true) {
+                JsonToken item = parser.nextToken();
+                if (item == JsonToken.END_ARRAY) {
+                    return List.copyOf(values);
+                }
+                if (item == null) {
+                    throw malformed("unexpected end of JSON request body", null);
+                }
+                if (item == JsonToken.VALUE_NULL) {
+                    continue;
+                }
+                T decoded;
+                if (item == JsonToken.VALUE_STRING) {
+                    decoded = stringDecoder.decode(parser.getText());
+                } else if (item == JsonToken.START_OBJECT) {
+                    ObjectCursor nested = new ObjectCursor(parser);
+                    decoded = objectDecoder.decode(nested);
+                    nested.requireFinished();
+                } else {
+                    throw malformed("JSON field '" + fieldName
+                        + "' must contain only strings or objects", null);
+                }
+                if (decoded == null) {
+                    throw malformed("JSON field '" + fieldName
+                        + "' decoder returned null", null);
+                }
+                values.add(decoded);
             }
         }
 

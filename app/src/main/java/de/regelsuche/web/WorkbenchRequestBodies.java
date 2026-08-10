@@ -1,10 +1,13 @@
 package de.regelsuche.web;
 
 import com.sun.net.httpserver.HttpExchange;
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.input.InputType;
 import de.regelsuche.search.SearchProfile;
 import java.io.IOException;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -147,23 +150,29 @@ final class WorkbenchRequestBodies {
         return json.readObject(exchange, object -> {
             String leftPattern = "";
             String rightPattern = "";
-            String tool = "lean4";
-            List<String> assumptions = List.of();
+            String tool = "";
+            String backend = "";
+            List<Assumption> assumptions = List.of();
             while (object.nextField()) {
                 switch (object.fieldName()) {
                     case "leftPattern" -> leftPattern = stringOr(
                         object.readNullableString(), "");
                     case "rightPattern" -> rightPattern = stringOr(
                         object.readNullableString(), "");
-                    case "tool", "backend" -> tool = stringOr(
-                        object.readNullableString(), "lean4");
-                    case "assumptions" -> assumptions =
-                        object.readStringArray();
+                    case "tool" -> tool = stringOr(
+                        object.readNullableString(), "");
+                    case "backend" -> backend = stringOr(
+                        object.readNullableString(), "");
+                    case "assumptions" -> assumptions = readAssumptions(object);
                     default -> object.skipValue();
                 }
             }
             return new ProofBridgeRequest(
-                leftPattern, rightPattern, tool, assumptions);
+                leftPattern,
+                rightPattern,
+                firstNonBlank(tool, backend, "lean4"),
+                assumptions
+            );
         });
     }
 
@@ -174,7 +183,7 @@ final class WorkbenchRequestBodies {
             String rightPattern = "";
             int priority = 0;
             String worker = "";
-            List<String> assumptions = List.of();
+            List<Assumption> assumptions = List.of();
             while (object.nextField()) {
                 switch (object.fieldName()) {
                     case "leftPattern" -> leftPattern = stringOr(
@@ -185,8 +194,7 @@ final class WorkbenchRequestBodies {
                         object.readNullableInt(), 0);
                     case "worker" -> worker = stringOr(
                         object.readNullableString(), "");
-                    case "assumptions" -> assumptions =
-                        object.readStringArray();
+                    case "assumptions" -> assumptions = readAssumptions(object);
                     default -> object.skipValue();
                 }
             }
@@ -201,6 +209,78 @@ final class WorkbenchRequestBodies {
 
     private static int intOr(Integer value, int fallback) {
         return value == null ? fallback : value;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private static List<Assumption> readAssumptions(
+        StreamingJsonRequestBody.ObjectCursor object
+    ) throws IOException {
+        return object.readStringOrObjectArray(
+            value -> createAssumption("CUSTOM_PREDICATE", value, List.of()),
+            WorkbenchRequestBodies::decodeAssumption
+        );
+    }
+
+    private static Assumption decodeAssumption(
+        StreamingJsonRequestBody.ObjectCursor object
+    ) throws IOException {
+        String kind = "CUSTOM_PREDICATE";
+        String expression = "";
+        List<String> symbols = List.of();
+        while (object.nextField()) {
+            switch (object.fieldName()) {
+                case "kind" -> kind = stringOr(
+                    object.readNullableString(), "CUSTOM_PREDICATE");
+                case "expression" -> expression = stringOr(
+                    object.readNullableString(), "");
+                case "symbols" -> symbols = object.readStringArray();
+                default -> object.skipValue();
+            }
+        }
+        return createAssumption(kind, expression, symbols);
+    }
+
+    private static Assumption createAssumption(
+        String rawKind,
+        String rawExpression,
+        List<String> rawSymbols
+    ) throws StreamingJsonRequestBody.MalformedJsonRequestException {
+        String expression = rawExpression == null ? "" : rawExpression.trim();
+        if (expression.isEmpty()) {
+            throw new StreamingJsonRequestBody.MalformedJsonRequestException(
+                "assumption expression must not be blank");
+        }
+        String kindName = rawKind == null || rawKind.isBlank()
+            ? "CUSTOM_PREDICATE"
+            : rawKind.trim().toUpperCase(Locale.ROOT).replace('-', '_');
+        kindName = switch (kindName) {
+            case "CUSTOM" -> "CUSTOM_PREDICATE";
+            case "DOMAIN" -> "DOMAIN_MEMBERSHIP";
+            default -> kindName;
+        };
+        Assumption.Kind kind;
+        try {
+            kind = Assumption.Kind.valueOf(kindName);
+        } catch (IllegalArgumentException exception) {
+            // Retain the historical API behaviour: unknown custom labels are
+            // accepted as free-form predicates instead of becoming 500s.
+            kind = Assumption.Kind.CUSTOM_PREDICATE;
+        }
+        List<String> symbols = rawSymbols == null
+            ? List.of()
+            : List.copyOf(new LinkedHashSet<>(rawSymbols.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .toList()));
+        return new Assumption(kind, expression, symbols);
     }
 
     record SearchRequest(
@@ -242,7 +322,7 @@ final class WorkbenchRequestBodies {
         String leftPattern,
         String rightPattern,
         String tool,
-        List<String> assumptions
+        List<Assumption> assumptions
     ) {
         ProofBridgeRequest {
             assumptions = List.copyOf(assumptions);
@@ -254,7 +334,7 @@ final class WorkbenchRequestBodies {
         String rightPattern,
         int priority,
         String worker,
-        List<String> assumptions
+        List<Assumption> assumptions
     ) {
         ProofJobCreateRequest {
             assumptions = List.copyOf(assumptions);
