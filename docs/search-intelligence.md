@@ -117,10 +117,12 @@ oracle exhausted the complete frozen closure; a stopped budget remains
 `BUDGET_INCONCLUSIVE`. The `regrouped-square` case is retained as an executable
 regression for this fail-closed distinction. The aggregate search-policy signal
 requires a target-blind structural-diversity result and is never inferred solely
-from the target-guided control. Results establish only bounded reachability and
-search-policy behavior for the frozen representation, inventory and budgets.
-They do not establish external novelty, autonomous rediscovery or publication
-priority.
+from the target-guided control. The aggregate equivalence-discrimination signal
+requires at least one retained negative control; an empty negative-control
+subset cannot pass by vacuous truth. Results establish only bounded reachability
+and search-policy behavior for the frozen representation, inventory and
+budgets. They do not establish external novelty, autonomous rediscovery or
+publication priority.
 
 ## Universal patterns
 
