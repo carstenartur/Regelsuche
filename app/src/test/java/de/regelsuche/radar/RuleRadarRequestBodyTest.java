@@ -111,6 +111,23 @@ class RuleRadarRequestBodyTest {
     }
 
     @Test
+    void unknownOnlyNestedContextFallsBackToLegacyTopLevelFields() throws Exception {
+        RuleRadarRequestBody body = decode("""
+            {
+              "expression":"x",
+              "includePlugins":false,
+              "enabledPacks":["legacy-pack"],
+              "goalExpression":"legacy-goal",
+              "context":{"unknown":{"deep":[1,2,3]}}
+            }
+            """);
+
+        assertFalse(body.context().includePlugins());
+        assertEquals(Set.of("legacy-pack"), body.context().enabledPacks());
+        assertEquals("legacy-goal", body.context().goalExpression());
+    }
+
+    @Test
     void defaultsRemainStableForMissingAndNullValues() throws Exception {
         RuleRadarRequestBody body = decode("""
             {
