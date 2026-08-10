@@ -42,6 +42,8 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
   Full Mode, Sicherheit und erste Schritte.
 - [Web-Workbench](web-workbench.md) — fachliche Bereiche und sichtbare
   Ergebnisse der Oberfläche.
+- [Streaming-JSON-Request-Bodies](streaming-json-request-bodies.md) —
+  bytebegrenztes Token-Parsing und Fail-Closed-Regeln für HTTP-Eingaben.
 - [Web-Workbench-Benutzerhandbuch](web-ui-user-guide.md) — vollständige
   Beschreibung der aktuellen Tabs und Bedienelemente.
 - [User Workflows](user-workflows.md) — geführte Abläufe für Suche, Replay,

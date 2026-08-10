@@ -24,7 +24,6 @@ import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.inventory.RuleInventoryRepository;
-import de.regelsuche.json.JsonReader;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.mining.DiscoverySettings;
 import de.regelsuche.mining.KnownRuleRepository;
@@ -76,6 +75,7 @@ public class WebWorkbenchServer {
     private final RuleInventoryRepository inventoryRepository;
     private final TransformationExportService exportService;
     private final WebSecurityConfig securityConfig;
+    private final WorkbenchRequestBodies requestBodies;
     private final PluginRuntimeConfig pluginRuntimeConfig;
     private final de.regelsuche.radar.RuleRadarHttpHandler ruleRadarHandler;
 
@@ -195,6 +195,8 @@ public class WebWorkbenchServer {
         this.inventoryRepository = inventoryRepository;
         this.exportService = exportService;
         this.securityConfig = securityConfig == null ? WebSecurityConfig.none() : securityConfig;
+        this.requestBodies = new WorkbenchRequestBodies(
+            new StreamingJsonRequestBody(this.securityConfig.maxRequestBytes()));
         this.pluginRuntimeConfig = pluginRuntimeConfig == null ? PluginRuntimeConfig.defaults() : pluginRuntimeConfig;
         this.searchMemory = searchMemory == null ? new de.regelsuche.search.memory.SearchMemory() : searchMemory;
         this.leanProofBridgeService = leanProofBridgeService == null
@@ -332,6 +334,8 @@ public class WebWorkbenchServer {
                 delegate.handle(exchange);
             } catch (BoundedRequestBody.PayloadTooLargeException exception) {
                 sendPayloadTooLarge(exchange, exception.limitBytes());
+            } catch (StreamingJsonRequestBody.MalformedJsonRequestException exception) {
+                sendStatus(exchange, 400, "invalid JSON request body");
             }
         };
     }
@@ -403,11 +407,11 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 405, "method not allowed");
             return;
         }
-        Map<String, Object> body = readJsonObject(exchange);
-        String expression = stringValue(body, "expression", "");
-        String typeName = stringValue(body, "type", InputType.TERM.name()).toUpperCase(Locale.ROOT);
-        String profileName = stringValue(body, "profile", SearchProfile.FAST_SIMPLIFY.name()).toUpperCase(Locale.ROOT);
-        String goalName = stringValue(body, "goal", "").toUpperCase(Locale.ROOT);
+        WorkbenchRequestBodies.SearchRequest body = requestBodies.readSearch(exchange);
+        String expression = body.expression();
+        String typeName = body.type().toUpperCase(Locale.ROOT);
+        String profileName = body.profile().toUpperCase(Locale.ROOT);
+        String goalName = body.goal().toUpperCase(Locale.ROOT);
         if (expression.isBlank()) {
             sendStatus(exchange, 400, "expression must not be blank");
             return;
@@ -460,9 +464,9 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 405, "method not allowed");
             return;
         }
-        Map<String, Object> body = readJsonObject(exchange);
-        int min = intValue(body, "min", 1);
-        int max = intValue(body, "max", 3);
+        WorkbenchRequestBodies.DiscoverRequest body = requestBodies.readDiscover(exchange);
+        int min = body.min();
+        int max = body.max();
         RuleDiscoveryService discovery = new RuleDiscoveryService(
             new AlgebraicExampleGenerator(),
             new AstRewriteTransformationEngine(),
@@ -999,8 +1003,9 @@ public class WebWorkbenchServer {
         }
         if ("POST".equalsIgnoreCase(method)) {
             // POST /api/inventory with JSON body { "json": "..." } imports a bundle.
-            Map<String, Object> body = readJsonObject(exchange);
-            String bundleJson = stringValue(body, "json", "");
+            WorkbenchRequestBodies.InventoryImportRequest body =
+                requestBodies.readInventoryImport(exchange);
+            String bundleJson = body.json();
             if (bundleJson.isBlank()) {
                 sendStatus(exchange, 400, "missing 'json' field");
                 return;
@@ -1468,11 +1473,12 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 405, "method not allowed");
             return;
         }
-        Map<String, Object> body = readJsonObject(exchange);
-        String expression = stringValue(body, "expression", "");
-        String pathKey = stringValue(body, "pathKey", "");
-        String matchId = stringValue(body, "matchId", "");
-        int matchIndex = intValue(body, "matchIndex", -1);
+        WorkbenchRequestBodies.InspectApplyRequest body =
+            requestBodies.readInspectApply(exchange);
+        String expression = body.expression();
+        String pathKey = body.pathKey();
+        String matchId = body.matchId();
+        int matchIndex = body.matchIndex();
         if (expression.isBlank() || pathKey.isBlank() || (matchId.isBlank() && matchIndex < 0)) {
             sendStatus(exchange, 400, "expression, pathKey and matchId (or legacy matchIndex) are required");
             return;
@@ -1645,10 +1651,11 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 405, "method not allowed");
             return;
         }
-        Map<String, Object> body = readJsonObject(exchange);
-        String currentExpression = stringValue(body, "currentExpression", "");
-        String studentStep       = stringValue(body, "studentStep", "");
-        String difficulty        = stringValue(body, "difficulty", "MITTELSTUFE");
+        WorkbenchRequestBodies.DidacticStepRequest body =
+            requestBodies.readDidacticStep(exchange);
+        String currentExpression = body.currentExpression();
+        String studentStep = body.studentStep();
+        String difficulty = body.difficulty();
         if (currentExpression.isBlank() || studentStep.isBlank()) {
             sendStatus(exchange, 400,
                 "currentExpression and studentStep are required");
@@ -1706,9 +1713,10 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 404, "path not found");
             return;
         }
-        Map<String, Object> body = readJsonObject(exchange);
-        String currentExpression = stringValue(body, "currentExpression", "");
-        String profile = stringValue(body, "pedagogyProfile", "SCHOOL");
+        WorkbenchRequestBodies.DidacticHintRequest body =
+            requestBodies.readDidacticHint(exchange);
+        String currentExpression = body.currentExpression();
+        String profile = body.pedagogyProfile();
 
         de.regelsuche.didactic.PedagogyProfile profileEnum;
         try {
@@ -2378,26 +2386,18 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 405, "method not allowed");
             return;
         }
-        Map<String, Object> body = readJsonObject(exchange);
-        String left = stringValue(body, "leftPattern", "");
-        String right = stringValue(body, "rightPattern", "");
+        WorkbenchRequestBodies.ProofBridgeRequest body =
+            requestBodies.readProofBridge(exchange);
+        String left = body.leftPattern();
+        String right = body.rightPattern();
         if (left.isBlank() || right.isBlank()) {
             sendStatus(exchange, 400, "leftPattern and rightPattern are required");
             return;
         }
-        String tool = stringValue(body, "tool", "lean4").toLowerCase(java.util.Locale.ROOT);
+        String tool = body.tool().toLowerCase(java.util.Locale.ROOT);
         de.regelsuche.proof.ProofBridgeService service =
             "smt".equals(tool) ? smtProofBridgeService : leanProofBridgeService;
-        List<de.regelsuche.assumption.Assumption> assumptions = new java.util.ArrayList<>();
-        Object raw = body.get("assumptions");
-        if (raw instanceof List<?> list) {
-            for (Object item : list) {
-                if (item != null) {
-                    assumptions.add(new de.regelsuche.assumption.Assumption(
-                        de.regelsuche.assumption.Assumption.Kind.CUSTOM, item.toString()));
-                }
-            }
-        }
+        List<de.regelsuche.assumption.Assumption> assumptions = body.assumptions();
         de.regelsuche.mining.RuleCandidate candidate = new de.regelsuche.mining.RuleCandidate(
             left, right, 1, 1.0, 1, true, true, false,
             List.of(),
@@ -2521,49 +2521,25 @@ public class WebWorkbenchServer {
     }
 
     private void handleProofJobCreate(HttpExchange exchange) throws IOException {
-        Map<String, Object> body = readJsonObject(exchange);
-        String left = stringValue(body, "leftPattern", "").trim();
-        String right = stringValue(body, "rightPattern", "").trim();
+        WorkbenchRequestBodies.ProofJobCreateRequest body =
+            requestBodies.readProofJobCreate(exchange);
+        String left = body.leftPattern().trim();
+        String right = body.rightPattern().trim();
         if (left.isBlank() || right.isBlank()) {
             sendStatus(exchange, 400, "leftPattern and rightPattern are required");
             return;
         }
-        int priority = intValue(body, "priority", 0);
+        int priority = body.priority();
         if (priority < 0) {
             sendStatus(exchange, 400, "priority must be >= 0");
             return;
         }
-        String worker = stringValue(body, "worker", "").trim();
+        String worker = body.worker().trim();
         if (!worker.isEmpty()) {
             sendStatus(exchange, 400, "worker selection is not supported");
             return;
         }
-        List<de.regelsuche.assumption.Assumption> assumptions = new java.util.ArrayList<>();
-        Object raw = body.get("assumptions");
-        if (raw instanceof List<?> list) {
-            for (Object item : list) {
-                if (item == null) {
-                    continue;
-                }
-                if (item instanceof Map<?, ?> map) {
-                    Object exprRaw = map.get("expression");
-                    String expr = exprRaw == null ? "" : String.valueOf(exprRaw);
-                    Object kindObj = map.get("kind");
-                    String kindRaw = kindObj == null ? "CUSTOM" : String.valueOf(kindObj);
-                    de.regelsuche.assumption.Assumption.Kind kind;
-                    try {
-                        kind = de.regelsuche.assumption.Assumption.Kind.valueOf(
-                            kindRaw.toUpperCase(Locale.ROOT));
-                    } catch (IllegalArgumentException ex) {
-                        kind = de.regelsuche.assumption.Assumption.Kind.CUSTOM;
-                    }
-                    assumptions.add(new de.regelsuche.assumption.Assumption(kind, expr));
-                } else {
-                    assumptions.add(new de.regelsuche.assumption.Assumption(
-                        de.regelsuche.assumption.Assumption.Kind.CUSTOM, item.toString()));
-                }
-            }
-        }
+        List<de.regelsuche.assumption.Assumption> assumptions = body.assumptions();
         String jobId = proofWorkbenchService.submit(left, right, assumptions, priority);
         var job = proofWorkbenchService.getJob(jobId).orElse(null);
         JsonWriter writer = new JsonWriter();
@@ -2653,6 +2629,7 @@ public class WebWorkbenchServer {
             arr.objectValue(o -> {
                 o.property("kind", a.kind().name());
                 o.property("expression", a.expression());
+                o.stringArray("symbols", a.symbols());
             })));
     }
 
@@ -2881,35 +2858,6 @@ public class WebWorkbenchServer {
             return writer.toString();
         }
         return "{}";
-    }
-
-    private Map<String, Object> readJsonObject(HttpExchange exchange) throws IOException {
-        byte[] buffer = BoundedRequestBody.read(exchange, securityConfig.maxRequestBytes());
-        String text = new String(buffer, StandardCharsets.UTF_8);
-        if (text.isBlank()) {
-            return Map.of();
-        }
-        return new JsonReader(text).readObject();
-    }
-
-    private String stringValue(Map<String, Object> body, String key, String fallback) {
-        Object raw = body.get(key);
-        return raw == null ? fallback : String.valueOf(raw);
-    }
-
-    private int intValue(Map<String, Object> body, String key, int fallback) {
-        Object raw = body.get(key);
-        if (raw == null) {
-            return fallback;
-        }
-        if (raw instanceof Number number) {
-            return number.intValue();
-        }
-        try {
-            return Integer.parseInt(String.valueOf(raw));
-        } catch (NumberFormatException ex) {
-            return fallback;
-        }
     }
 
     private String queryParam(HttpExchange exchange, String name, String fallback) {

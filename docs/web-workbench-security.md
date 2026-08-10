@@ -20,13 +20,21 @@ Standard-Keystore-Typ ist `PKCS12`. Andere Typen können mit `--keystore-type JK
 
 ## Body-Limit
 
-Das Limit für JSON-POST-Bodies liegt standardmäßig bei 1 MiB und gilt einheitlich für alle dokumentierten Workbench- und Regelradar-Endpunkte. Die Grenze wird unabhängig von `Content-Length` auch für chunked Requests beim Lesen durchgesetzt. Ein Body mit exakt der konfigurierten Größe ist zulässig; ein weiteres Byte führt zu HTTP 413 und dem stabilen JSON-Vertrag:
+Das Limit für JSON-POST-Bodies liegt standardmäßig bei 1 MiB und gilt einheitlich für alle dokumentierten Workbench- und Regelradar-Endpunkte. Ein zu großer gültiger `Content-Length`-Header wird sofort abgewiesen; maßgeblich bleibt jedoch der bytezählende Eingabestream, sodass auch chunked Requests, fehlende Header und falsch zu kleine Längenangaben das Limit nicht umgehen. Der Body wird nicht zunächst vollständig als `byte[]` und anschließend noch einmal als `String` materialisiert. Ein Body mit exakt der konfigurierten Größe ist zulässig; ein weiteres Byte führt zu HTTP 413 und dem stabilen JSON-Vertrag:
 
 ```json
 {"error":true,"code":"PAYLOAD_TOO_LARGE","message":"request body exceeds configured limit","limitBytes":1048576}
 ```
 
 Die Antwort verwendet `Content-Type: application/json; charset=utf-8` und `Cache-Control: no-store`. Das Limit lässt sich beispielsweise mit `--max-request-bytes 2097152` anpassen.
+
+Untrusted JSON wird anschließend tokenbasiert und strikt verarbeitet. Doppelte
+Objektschlüssel, weitere JSON-Dokumente nach dem ersten Objekt, ungültiges UTF-8,
+übermäßige Verschachtelung und falsche skalare Feldtypen führen fail-closed zu
+HTTP 400. Route-spezifische Felder werden direkt in typisierte Request-Records
+dekodiert; unbekannte Felder werden ohne Aufbau eines vollständigen Objektbaums
+übersprungen. Details und reproduzierbare Testgrenzen stehen unter
+[Streaming-JSON-Request-Bodies](streaming-json-request-bodies.md).
 
 ## Kombination
 
