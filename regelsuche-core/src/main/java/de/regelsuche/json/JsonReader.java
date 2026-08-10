@@ -19,7 +19,35 @@ public final class JsonReader {
     }
 
     public Map<String, Object> readObject() {
+        Object value = readDocument();
+        if (value instanceof Map<?, ?> raw) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            raw.forEach((key, item) -> result.put((String) key, item));
+            return result;
+        }
+        throw new IllegalArgumentException("Expected JSON object at document root");
+    }
+
+    public List<Object> readArray() {
+        Object value = readDocument();
+        if (value instanceof List<?> raw) {
+            return new ArrayList<>(raw);
+        }
+        throw new IllegalArgumentException("Expected JSON array at document root");
+    }
+
+    private Object readDocument() {
         skipWhitespace();
+        Object value = readValue();
+        skipWhitespace();
+        if (index != source.length()) {
+            throw new IllegalArgumentException(
+                "Unexpected trailing JSON content at position " + index);
+        }
+        return value;
+    }
+
+    private Map<String, Object> readObjectValue() {
         expect('{');
         Map<String, Object> values = new LinkedHashMap<>();
         skipWhitespace();
@@ -29,6 +57,10 @@ public final class JsonReader {
         }
         do {
             String key = readString();
+            if (values.containsKey(key)) {
+                throw new IllegalArgumentException(
+                    "Duplicate JSON object key '" + key + "'");
+            }
             skipWhitespace();
             expect(':');
             values.put(key, readValue());
@@ -38,8 +70,7 @@ public final class JsonReader {
         return values;
     }
 
-    public List<Object> readArray() {
-        skipWhitespace();
+    private List<Object> readArrayValue() {
         expect('[');
         List<Object> values = new ArrayList<>();
         skipWhitespace();
@@ -58,10 +89,10 @@ public final class JsonReader {
     private Object readValue() {
         skipWhitespace();
         if (peek('{')) {
-            return readObject();
+            return readObjectValue();
         }
         if (peek('[')) {
-            return readArray();
+            return readArrayValue();
         }
         if (peek('"')) {
             return readString();
@@ -123,7 +154,8 @@ public final class JsonReader {
         }
         while (index < source.length()) {
             char current = source.charAt(index);
-            if (!Character.isDigit(current) && current != '.' && current != 'e' && current != 'E' && current != '+' && current != '-') {
+            if (!Character.isDigit(current) && current != '.' && current != 'e'
+                    && current != 'E' && current != '+' && current != '-') {
                 break;
             }
             index++;
@@ -155,13 +187,16 @@ public final class JsonReader {
     private void expect(char expected) {
         skipWhitespace();
         if (!peek(expected)) {
-            throw new IllegalArgumentException("Expected " + expected + " at position " + index + " in " + source);
+            throw new IllegalArgumentException(
+                "Expected " + expected + " at position " + index
+                    + " in " + source);
         }
         index++;
     }
 
     private void skipWhitespace() {
-        while (index < source.length() && Character.isWhitespace(source.charAt(index))) {
+        while (index < source.length()
+                && Character.isWhitespace(source.charAt(index))) {
             index++;
         }
     }
