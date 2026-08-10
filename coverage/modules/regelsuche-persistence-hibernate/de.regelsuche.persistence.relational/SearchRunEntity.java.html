@@ -43,38 +43,38 @@ public class SearchRunEntity {
 <span class="nc" id="L43">    }</span>
 
     public SearchRunEntity(String id, String sourceExpression, String targetExpression, String strategy, String status,
-<span class="nc" id="L46">        int visitedStates, int frontierSize, List&lt;String&gt; bestPathIds, Instant startedAt, Instant finishedAt) {</span>
-<span class="nc" id="L47">        this.id = requireId(id, &quot;id&quot;);</span>
-<span class="nc bnc" id="L48" title="All 2 branches missed.">        this.sourceExpression = sourceExpression == null ? &quot;&quot; : sourceExpression;</span>
-<span class="nc bnc" id="L49" title="All 2 branches missed.">        this.targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
-<span class="nc bnc" id="L50" title="All 2 branches missed.">        this.strategy = strategy == null ? &quot;&quot; : strategy;</span>
-<span class="nc bnc" id="L51" title="All 2 branches missed.">        this.status = status == null ? &quot;CREATED&quot; : status;</span>
-<span class="nc bnc" id="L52" title="All 4 branches missed.">        if (visitedStates &lt; 0 || frontierSize &lt; 0) {</span>
-<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;search counters must not be negative&quot;);</span>
+<span class="fc" id="L46">        int visitedStates, int frontierSize, List&lt;String&gt; bestPathIds, Instant startedAt, Instant finishedAt) {</span>
+<span class="fc" id="L47">        this.id = requireId(id, &quot;id&quot;);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        this.sourceExpression = sourceExpression == null ? &quot;&quot; : sourceExpression;</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        this.targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        this.strategy = strategy == null ? &quot;&quot; : strategy;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        this.status = status == null ? &quot;CREATED&quot; : status;</span>
+<span class="fc bfc" id="L52" title="All 4 branches covered.">        if (visitedStates &lt; 0 || frontierSize &lt; 0) {</span>
+<span class="fc" id="L53">            throw new IllegalArgumentException(&quot;search counters must not be negative&quot;);</span>
         }
-<span class="nc" id="L55">        this.visitedStates = visitedStates;</span>
-<span class="nc" id="L56">        this.frontierSize = frontierSize;</span>
-<span class="nc" id="L57">        this.bestPathIdsJson = RelationalJson.array(bestPathIds);</span>
-<span class="nc bnc" id="L58" title="All 2 branches missed.">        this.startedAt = startedAt == null ? Instant.now() : startedAt;</span>
-<span class="nc" id="L59">        this.finishedAt = finishedAt;</span>
-<span class="nc" id="L60">    }</span>
+<span class="fc" id="L55">        this.visitedStates = visitedStates;</span>
+<span class="fc" id="L56">        this.frontierSize = frontierSize;</span>
+<span class="fc" id="L57">        this.bestPathIdsJson = RelationalJson.array(bestPathIds);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        this.startedAt = startedAt == null ? Instant.now() : startedAt;</span>
+<span class="fc" id="L59">        this.finishedAt = finishedAt;</span>
+<span class="fc" id="L60">    }</span>
 
     static String requireId(String value, String name) {
-<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L64">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L64">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
 <span class="fc" id="L66">        return value;</span>
     }
 
-<span class="nc" id="L69">    public String id() { return id; }</span>
-<span class="nc" id="L70">    public String sourceExpression() { return sourceExpression; }</span>
-<span class="nc" id="L71">    public String targetExpression() { return targetExpression; }</span>
-<span class="nc" id="L72">    public String strategy() { return strategy; }</span>
-<span class="nc" id="L73">    public String status() { return status; }</span>
-<span class="nc" id="L74">    public int visitedStates() { return visitedStates; }</span>
-<span class="nc" id="L75">    public int frontierSize() { return frontierSize; }</span>
-<span class="nc" id="L76">    public List&lt;String&gt; bestPathIds() { return RelationalJson.arrayValues(bestPathIdsJson); }</span>
-<span class="nc" id="L77">    public Instant startedAt() { return startedAt; }</span>
-<span class="nc" id="L78">    public Instant finishedAt() { return finishedAt; }</span>
+<span class="fc" id="L69">    public String id() { return id; }</span>
+<span class="fc" id="L70">    public String sourceExpression() { return sourceExpression; }</span>
+<span class="fc" id="L71">    public String targetExpression() { return targetExpression; }</span>
+<span class="fc" id="L72">    public String strategy() { return strategy; }</span>
+<span class="fc" id="L73">    public String status() { return status; }</span>
+<span class="fc" id="L74">    public int visitedStates() { return visitedStates; }</span>
+<span class="fc" id="L75">    public int frontierSize() { return frontierSize; }</span>
+<span class="fc" id="L76">    public List&lt;String&gt; bestPathIds() { return RelationalJson.arrayValues(bestPathIdsJson); }</span>
+<span class="fc" id="L77">    public Instant startedAt() { return startedAt; }</span>
+<span class="fc" id="L78">    public Instant finishedAt() { return finishedAt; }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

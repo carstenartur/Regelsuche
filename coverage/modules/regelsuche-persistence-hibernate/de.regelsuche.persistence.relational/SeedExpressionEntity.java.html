@@ -40,21 +40,21 @@ public class SeedExpressionEntity {
 <span class="nc" id="L40">    protected SeedExpressionEntity() {</span>
 <span class="nc" id="L41">    }</span>
 
-<span class="nc" id="L43">    public SeedExpressionEntity(String id, String expression, String domain, String difficulty, List&lt;String&gt; tags, Instant createdAt) {</span>
-<span class="nc" id="L44">        this.id = SearchRunEntity.requireId(id, &quot;id&quot;);</span>
-<span class="nc" id="L45">        this.expression = SearchRunEntity.requireId(expression, &quot;expression&quot;);</span>
-<span class="nc bnc" id="L46" title="All 2 branches missed.">        this.domain = domain == null ? &quot;general&quot; : domain;</span>
-<span class="nc bnc" id="L47" title="All 2 branches missed.">        this.difficulty = difficulty == null ? &quot;unknown&quot; : difficulty;</span>
-<span class="nc" id="L48">        this.tagsJson = RelationalJson.array(tags);</span>
-<span class="nc" id="L49">        this.tagsText = RelationalJson.join(tags);</span>
-<span class="nc bnc" id="L50" title="All 2 branches missed.">        this.createdAt = createdAt == null ? Instant.now() : createdAt;</span>
-<span class="nc" id="L51">    }</span>
+<span class="fc" id="L43">    public SeedExpressionEntity(String id, String expression, String domain, String difficulty, List&lt;String&gt; tags, Instant createdAt) {</span>
+<span class="fc" id="L44">        this.id = SearchRunEntity.requireId(id, &quot;id&quot;);</span>
+<span class="fc" id="L45">        this.expression = SearchRunEntity.requireId(expression, &quot;expression&quot;);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        this.domain = domain == null ? &quot;general&quot; : domain;</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        this.difficulty = difficulty == null ? &quot;unknown&quot; : difficulty;</span>
+<span class="fc" id="L48">        this.tagsJson = RelationalJson.array(tags);</span>
+<span class="fc" id="L49">        this.tagsText = RelationalJson.join(tags);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        this.createdAt = createdAt == null ? Instant.now() : createdAt;</span>
+<span class="fc" id="L51">    }</span>
 
-<span class="nc" id="L53">    public String id() { return id; }</span>
-<span class="nc" id="L54">    public String expression() { return expression; }</span>
-<span class="nc" id="L55">    public String domain() { return domain; }</span>
-<span class="nc" id="L56">    public String difficulty() { return difficulty; }</span>
-<span class="nc" id="L57">    public List&lt;String&gt; tags() { return RelationalJson.arrayValues(tagsJson); }</span>
-<span class="nc" id="L58">    public Instant createdAt() { return createdAt; }</span>
+<span class="fc" id="L53">    public String id() { return id; }</span>
+<span class="fc" id="L54">    public String expression() { return expression; }</span>
+<span class="fc" id="L55">    public String domain() { return domain; }</span>
+<span class="fc" id="L56">    public String difficulty() { return difficulty; }</span>
+<span class="fc" id="L57">    public List&lt;String&gt; tags() { return RelationalJson.arrayValues(tagsJson); }</span>
+<span class="fc" id="L58">    public Instant createdAt() { return createdAt; }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

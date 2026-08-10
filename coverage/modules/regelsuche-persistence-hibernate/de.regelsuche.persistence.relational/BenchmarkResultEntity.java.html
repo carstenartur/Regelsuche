@@ -48,29 +48,29 @@ public class BenchmarkResultEntity {
 <span class="nc" id="L48">    }</span>
 
     public BenchmarkResultEntity(String id, String experimentId, String benchmarkName, long durationMillis,
-<span class="nc" id="L51">        int solvedCount, int totalCount, double qualityScore, Instant measuredAt) {</span>
-<span class="nc" id="L52">        this.id = SearchRunEntity.requireId(id, &quot;id&quot;);</span>
-<span class="nc bnc" id="L53" title="All 2 branches missed.">        this.experimentId = experimentId == null ? &quot;&quot; : experimentId;</span>
-<span class="nc bnc" id="L54" title="All 2 branches missed.">        this.benchmarkName = benchmarkName == null ? id : benchmarkName;</span>
-<span class="nc bnc" id="L55" title="All 6 branches missed.">        if (durationMillis &lt; 0 || solvedCount &lt; 0 || totalCount &lt; 0) {</span>
-<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;benchmark counters must not be negative&quot;);</span>
+<span class="fc" id="L51">        int solvedCount, int totalCount, double qualityScore, Instant measuredAt) {</span>
+<span class="fc" id="L52">        this.id = SearchRunEntity.requireId(id, &quot;id&quot;);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        this.experimentId = experimentId == null ? &quot;&quot; : experimentId;</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        this.benchmarkName = benchmarkName == null ? id : benchmarkName;</span>
+<span class="fc bfc" id="L55" title="All 6 branches covered.">        if (durationMillis &lt; 0 || solvedCount &lt; 0 || totalCount &lt; 0) {</span>
+<span class="fc" id="L56">            throw new IllegalArgumentException(&quot;benchmark counters must not be negative&quot;);</span>
         }
-<span class="nc" id="L58">        this.durationMillis = durationMillis;</span>
-<span class="nc" id="L59">        this.solvedCount = solvedCount;</span>
-<span class="nc" id="L60">        this.totalCount = totalCount;</span>
-<span class="nc" id="L61">        this.qualityScore = Math.max(0.0, Math.min(1.0, qualityScore));</span>
-<span class="nc bnc" id="L62" title="All 2 branches missed.">        this.measuredAt = measuredAt == null ? Instant.now() : measuredAt;</span>
-<span class="nc" id="L63">        this.metricsText = &quot;duration &quot; + durationMillis + &quot; solved &quot; + solvedCount + &quot; total &quot; + totalCount</span>
+<span class="fc" id="L58">        this.durationMillis = durationMillis;</span>
+<span class="fc" id="L59">        this.solvedCount = solvedCount;</span>
+<span class="fc" id="L60">        this.totalCount = totalCount;</span>
+<span class="fc" id="L61">        this.qualityScore = Math.max(0.0, Math.min(1.0, qualityScore));</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        this.measuredAt = measuredAt == null ? Instant.now() : measuredAt;</span>
+<span class="fc" id="L63">        this.metricsText = &quot;duration &quot; + durationMillis + &quot; solved &quot; + solvedCount + &quot; total &quot; + totalCount</span>
             + &quot; quality &quot; + this.qualityScore;
-<span class="nc" id="L65">    }</span>
+<span class="fc" id="L65">    }</span>
 
-<span class="nc" id="L67">    public String id() { return id; }</span>
-<span class="nc" id="L68">    public String experimentId() { return experimentId; }</span>
-<span class="nc" id="L69">    public String benchmarkName() { return benchmarkName; }</span>
-<span class="nc" id="L70">    public long durationMillis() { return durationMillis; }</span>
-<span class="nc" id="L71">    public int solvedCount() { return solvedCount; }</span>
-<span class="nc" id="L72">    public int totalCount() { return totalCount; }</span>
-<span class="nc" id="L73">    public double qualityScore() { return qualityScore; }</span>
-<span class="nc" id="L74">    public Instant measuredAt() { return measuredAt; }</span>
+<span class="fc" id="L67">    public String id() { return id; }</span>
+<span class="fc" id="L68">    public String experimentId() { return experimentId; }</span>
+<span class="fc" id="L69">    public String benchmarkName() { return benchmarkName; }</span>
+<span class="fc" id="L70">    public long durationMillis() { return durationMillis; }</span>
+<span class="fc" id="L71">    public int solvedCount() { return solvedCount; }</span>
+<span class="fc" id="L72">    public int totalCount() { return totalCount; }</span>
+<span class="fc" id="L73">    public double qualityScore() { return qualityScore; }</span>
+<span class="fc" id="L74">    public Instant measuredAt() { return measuredAt; }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

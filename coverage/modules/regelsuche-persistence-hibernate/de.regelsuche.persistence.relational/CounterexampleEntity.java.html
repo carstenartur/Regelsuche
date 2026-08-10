@@ -39,27 +39,27 @@ public class CounterexampleEntity {
 <span class="nc" id="L39">    }</span>
 
     public CounterexampleEntity(String id, String hypothesisId, String inputExpression, String expectedExpression,
-<span class="nc" id="L42">        String actualExpression, List&lt;String&gt; assumptions, Instant foundAt) {</span>
-<span class="nc" id="L43">        this.id = SearchRunEntity.requireId(id, &quot;id&quot;);</span>
-<span class="nc" id="L44">        this.hypothesisId = SearchRunEntity.requireId(hypothesisId, &quot;hypothesisId&quot;);</span>
-<span class="nc bnc" id="L45" title="All 2 branches missed.">        this.inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
-<span class="nc bnc" id="L46" title="All 2 branches missed.">        this.expectedExpression = expectedExpression == null ? &quot;&quot; : expectedExpression;</span>
-<span class="nc bnc" id="L47" title="All 2 branches missed.">        this.actualExpression = actualExpression == null ? &quot;&quot; : actualExpression;</span>
-<span class="nc" id="L48">        this.assumptionsJson = RelationalJson.array(assumptions);</span>
-<span class="nc bnc" id="L49" title="All 2 branches missed.">        this.foundAt = foundAt == null ? Instant.now() : foundAt;</span>
-<span class="nc" id="L50">    }</span>
+<span class="fc" id="L42">        String actualExpression, List&lt;String&gt; assumptions, Instant foundAt) {</span>
+<span class="fc" id="L43">        this.id = SearchRunEntity.requireId(id, &quot;id&quot;);</span>
+<span class="fc" id="L44">        this.hypothesisId = SearchRunEntity.requireId(hypothesisId, &quot;hypothesisId&quot;);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        this.inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        this.expectedExpression = expectedExpression == null ? &quot;&quot; : expectedExpression;</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        this.actualExpression = actualExpression == null ? &quot;&quot; : actualExpression;</span>
+<span class="fc" id="L48">        this.assumptionsJson = RelationalJson.array(assumptions);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        this.foundAt = foundAt == null ? Instant.now() : foundAt;</span>
+<span class="fc" id="L50">    }</span>
 
     void attach(HypothesisCandidateEntity hypothesis) {
-<span class="nc" id="L53">        this.hypothesis = hypothesis;</span>
-<span class="nc" id="L54">        this.hypothesisId = hypothesis.id();</span>
-<span class="nc" id="L55">    }</span>
+<span class="fc" id="L53">        this.hypothesis = hypothesis;</span>
+<span class="fc" id="L54">        this.hypothesisId = hypothesis.id();</span>
+<span class="fc" id="L55">    }</span>
 
-<span class="nc" id="L57">    public String id() { return id; }</span>
-<span class="nc" id="L58">    public String hypothesisId() { return hypothesisId; }</span>
-<span class="nc" id="L59">    public String inputExpression() { return inputExpression; }</span>
-<span class="nc" id="L60">    public String expectedExpression() { return expectedExpression; }</span>
-<span class="nc" id="L61">    public String actualExpression() { return actualExpression; }</span>
-<span class="nc" id="L62">    public List&lt;String&gt; assumptions() { return RelationalJson.arrayValues(assumptionsJson); }</span>
-<span class="nc" id="L63">    public Instant foundAt() { return foundAt; }</span>
+<span class="fc" id="L57">    public String id() { return id; }</span>
+<span class="fc" id="L58">    public String hypothesisId() { return hypothesisId; }</span>
+<span class="fc" id="L59">    public String inputExpression() { return inputExpression; }</span>
+<span class="fc" id="L60">    public String expectedExpression() { return expectedExpression; }</span>
+<span class="fc" id="L61">    public String actualExpression() { return actualExpression; }</span>
+<span class="fc" id="L62">    public List&lt;String&gt; assumptions() { return RelationalJson.arrayValues(assumptionsJson); }</span>
+<span class="fc" id="L63">    public Instant foundAt() { return foundAt; }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
