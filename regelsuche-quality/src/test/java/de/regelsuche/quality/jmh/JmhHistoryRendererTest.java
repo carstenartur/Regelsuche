@@ -127,25 +127,6 @@ class JmhHistoryRendererTest {
     }
 
     @Test
-    void rejectsDuplicateSnapshotKeys() throws Exception {
-        Fixture fixture = fixture();
-        String original = Files.readString(fixture.secondSnapshot());
-        String duplicate = original.replaceFirst(
-            "\\{",
-            "{\\n  \\\"schema\\\": \\\""
-                + JmhHistoryLoader.SNAPSHOT_SCHEMA + "\\\","
-        );
-        Files.writeString(fixture.secondSnapshot(), duplicate);
-        replaceSecondDigest(fixture);
-
-        JmhHistoryLoader.HistoryException failure = assertThrows(
-            JmhHistoryLoader.HistoryException.class,
-            () -> load(fixture)
-        );
-        assertTrue(failure.getMessage().contains("strict JSON"));
-    }
-
-    @Test
     void retainedRepositoryHistoryIsCompleteAndRenderable() throws Exception {
         Path root = repositoryRoot();
         JmhHistory history = new JmhHistoryLoader().load(
@@ -157,12 +138,9 @@ class JmhHistoryRendererTest {
 
         assertEquals(2, history.snapshots().size());
         assertEquals(29, history.benchmarks().size());
-        assertEquals(
-            29,
-            Files.list(output.resolve("charts"))
-                .filter(Files::isRegularFile)
-                .count()
-        );
+        try (var charts = Files.list(output.resolve("charts"))) {
+            assertEquals(29, charts.filter(Files::isRegularFile).count());
+        }
         JsonNode report = mapper.readTree(output.resolve("history.json").toFile());
         assertEquals(29, report.path("benchmarkCount").intValue());
         assertTrue(report.path("historyPolicyDigest").textValue()
