@@ -117,6 +117,7 @@ def testSupplyChainEvidenceVerifier = tasks.register('testSupplyChainEvidenceVer
     outputs.upToDateWhen { false }
     doFirst {
         commandLine qualityVerificationPython.get().absolutePath,
+            '-B',
             'scripts/test-supply-chain-evidence.py'
     }
 }
@@ -136,6 +137,7 @@ def verifySupplyChainInventory = tasks.register('verifySupplyChainInventory', Ex
     outputs.upToDateWhen { false }
     doFirst {
         commandLine qualityVerificationPython.get().absolutePath,
+            '-B',
             'scripts/verify-supply-chain-evidence.py',
             '--repository-root', qualityRepositoryRoot.asFile.absolutePath,
             '--bom', supplyChainBom.asFile.absolutePath,
