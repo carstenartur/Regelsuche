@@ -169,6 +169,8 @@ class OpenApiStaticReferenceTest {
                 assertFalse(responses.isEmpty(), () -> "missing responses for " + operationId);
                 if (!object(operation.get("requestBody")).isEmpty()) {
                     requestBodyOperationCount++;
+                    assertTrue(responses.containsKey("400"),
+                        () -> "missing documented 400 response for " + operationId);
                     assertTrue(responses.containsKey("413"),
                         () -> "missing documented 413 response for " + operationId);
                 }
@@ -188,6 +190,12 @@ class OpenApiStaticReferenceTest {
             "Search", "Paths", "Search Graph", "Proof Jobs", "Didactics", "Rule Radar")));
         assertEquals(OpenApiRouteRegistry.load().contexts(), documentedContexts,
             "OpenAPI context extensions must exactly match the executable route registry");
+
+        Map<String, Object> schemas = object(object(specification().get("components")).get("schemas"));
+        assertTrue(schemas.containsKey("AssumptionInput"));
+        assertTrue(schemas.containsKey("AssumptionValue"));
+        Map<String, Object> proofRequest = object(schemas.get("ProofRequest"));
+        assertTrue(object(proofRequest.get("properties")).containsKey("tool"));
     }
 
     @Test
@@ -215,7 +223,7 @@ class OpenApiStaticReferenceTest {
     private Map<String, Object> specification() throws IOException {
         try (InputStream stream = getClass().getResourceAsStream("/web/openapi/openapi.json")) {
             assertNotNull(stream, "packaged OpenAPI specification must exist");
-            return new JsonReader(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).readObject();
+            return new StreamingJsonRequestBody(2 << 20).readObject(stream);
         }
     }
 
