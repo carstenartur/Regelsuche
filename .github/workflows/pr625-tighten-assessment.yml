@@ -26,103 +26,132 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
+          def replace_between(
+              text: str,
+              start_marker: str,
+              end_marker: str,
+              replacement: str,
+              label: str,
+          ) -> str:
+              start = text.find(start_marker)
+              end = text.find(end_marker, start + len(start_marker))
+              if start < 0 or end < 0:
+                  raise SystemExit(
+                      f"cannot locate {label}: start={start}, end={end}"
+                  )
+              return text[:start] + replacement + text[end:]
+
           source = Path(
               "regelsuche-experiments/src/main/java/de/regelsuche/benchmark/"
               "HistoricalRediscoveryAtlas.java"
           )
           text = source.read_text(encoding="utf-8")
 
-          old_equivalence = '''            boolean equivalence = results.stream()
-                  .filter(result ->
-                      result.benchmarkCase().role() == Role.NEGATIVE_CONTROL)
-                  .allMatch(result -> result.equivalence().evaluated()
-                      && !result.equivalence().equivalent())
-                  && results.stream()
-                      .filter(result -> result.benchmarkCase().relation()
-                          == Relation.EQUIVALENT)
-                      .anyMatch(result -> result.equivalence().equivalent());
-          '''.replace("\n          ", "\n")
-          new_equivalence = '''            boolean hasNegativeEquivalenceControl = results.stream()
-                  .anyMatch(result ->
-                      result.benchmarkCase().role() == Role.NEGATIVE_CONTROL);
-              boolean equivalence = hasNegativeEquivalenceControl
-                  && results.stream()
-                      .filter(result ->
-                          result.benchmarkCase().role() == Role.NEGATIVE_CONTROL)
-                      .allMatch(result -> result.equivalence().evaluated()
-                          && !result.equivalence().equivalent())
-                  && results.stream()
-                      .filter(result -> result.benchmarkCase().relation()
-                          == Relation.EQUIVALENT)
-                      .anyMatch(result -> result.equivalence().equivalent());
-          '''.replace("\n          ", "\n")
-          if text.count(old_equivalence) != 1:
-              raise SystemExit(
-                  f"expected one equivalence block, found {text.count(old_equivalence)}"
-              )
-          text = text.replace(old_equivalence, new_equivalence)
-
-          old_policy = '''            boolean searchPolicy = counts.getOrDefault(
-                  PrimaryStatus.REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,
-                  0) > 0
-                  || counts.getOrDefault(
-                      PrimaryStatus
-                          .REACHABLE_BUT_SCALAR_MISSED_GUIDANCE_FOUND,
-                      0) > 0;
-          '''.replace("\n          ", "\n")
-          new_policy = '''            boolean searchPolicy = counts.getOrDefault(
-                  PrimaryStatus.REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,
-                  0) > 0;
-          '''.replace("\n          ", "\n")
-          if text.count(old_policy) != 1:
-              raise SystemExit(
-                  f"expected one search-policy block, found {text.count(old_policy)}"
-              )
-          text = text.replace(old_policy, new_policy)
-          text = text.replace(
-              '"matched-work search policies produce different reachability outcomes"',
-              '"target-blind scalar and structural-diversity searches differ under the same declared heuristic budget"',
+          equivalence_replacement = (
+              "            boolean hasNegativeEquivalenceControl = results.stream()\n"
+              "                .anyMatch(result ->\n"
+              "                    result.benchmarkCase().role()\n"
+              "                        == Role.NEGATIVE_CONTROL);\n"
+              "            boolean equivalence = hasNegativeEquivalenceControl\n"
+              "                && results.stream()\n"
+              "                    .filter(result ->\n"
+              "                        result.benchmarkCase().role()\n"
+              "                            == Role.NEGATIVE_CONTROL)\n"
+              "                    .allMatch(result ->\n"
+              "                        result.equivalence().evaluated()\n"
+              "                            && !result.equivalence().equivalent())\n"
+              "                && results.stream()\n"
+              "                    .filter(result ->\n"
+              "                        result.benchmarkCase().relation()\n"
+              "                            == Relation.EQUIVALENT)\n"
+              "                    .anyMatch(result ->\n"
+              "                        result.equivalence().equivalent());\n"
           )
-          source.write_text(text, encoding="utf-8")
+          text = replace_between(
+              text,
+              "            boolean equivalence = results.stream()\n",
+              "            boolean productionPositive = results.stream()\n",
+              equivalence_replacement,
+              "equivalence assessment block",
+          )
+
+          policy_replacement = (
+              "            boolean searchPolicy = counts.getOrDefault(\n"
+              "                PrimaryStatus\n"
+              "                    .REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,\n"
+              "                0) > 0;\n"
+          )
+          text = replace_between(
+              text,
+              "            boolean searchPolicy = counts.getOrDefault(\n",
+              "            boolean genericBridge = counts.getOrDefault(\n",
+              policy_replacement,
+              "search-policy assessment block",
+          )
+
+          old_reason = (
+              '"matched-work search policies produce different '
+              'reachability outcomes"'
+          )
+          new_reason = (
+              '"target-blind scalar and structural-diversity searches differ '
+              'under the same declared heuristic budget"'
+          )
+          if text.count(old_reason) != 1:
+              raise SystemExit(
+                  f"expected one search-policy reason, found {text.count(old_reason)}"
+              )
+          source.write_text(
+              text.replace(old_reason, new_reason),
+              encoding="utf-8",
+          )
 
           test = Path(
               "regelsuche-experiments/src/test/java/de/regelsuche/benchmark/"
               "HistoricalRediscoveryAtlasTest.java"
           )
           test_text = test.read_text(encoding="utf-8")
-          marker = '''    @Test
-              @Timeout(240)
-              void curatedHitDoesNotBecomeCapabilityGapBeforeProductionClosureCompletes() {
-          '''.replace("\n              ", "\n    ")
+          marker = (
+              "    @Test\n"
+              "    @Timeout(240)\n"
+              "    void curatedHitDoesNotBecomeCapabilityGapBeforeProductionClosureCompletes() {\n"
+          )
           if test_text.count(marker) != 1:
               raise SystemExit(
                   f"expected one test insertion marker, found {test_text.count(marker)}"
               )
-          method = '''    @Test
-              @Timeout(240)
-              void equivalenceDiscriminationRequiresANegativeControl() {
-                  Corpus full = HistoricalRediscoveryCorpus.load();
-                  HistoricalRediscoveryCorpus.Case positive = full.cases().stream()
-                      .filter(value -> value.id().equals("difference-of-squares-powers"))
-                      .findFirst()
-                      .orElseThrow();
-                  Corpus positiveOnly = new Corpus(
-                      full.schema(),
-                      full.evidenceStatus(),
-                      full.inventoryRevision(),
-                      full.claimBoundary(),
-                      full.contentSha256(),
-                      List.of(positive));
-
-                  HistoricalRediscoveryAtlas.AtlasReport report =
-                      new HistoricalRediscoveryAtlas().run(positiveOnly);
-
-                  assertTrue(report.cases().get(0).equivalence().equivalent());
-                  assertFalse(report.assessment().equivalenceLayerDiscriminates());
-              }
-
-          '''.replace("\n              ", "\n    ")
-          test.write_text(test_text.replace(marker, method + marker), encoding="utf-8")
+          method = (
+              "    @Test\n"
+              "    @Timeout(240)\n"
+              "    void equivalenceDiscriminationRequiresANegativeControl() {\n"
+              "        Corpus full = HistoricalRediscoveryCorpus.load();\n"
+              "        HistoricalRediscoveryCorpus.Case positive =\n"
+              "            full.cases().stream()\n"
+              "                .filter(value -> value.id().equals(\n"
+              "                    \"difference-of-squares-powers\"))\n"
+              "                .findFirst()\n"
+              "                .orElseThrow();\n"
+              "        Corpus positiveOnly = new Corpus(\n"
+              "            full.schema(),\n"
+              "            full.evidenceStatus(),\n"
+              "            full.inventoryRevision(),\n"
+              "            full.claimBoundary(),\n"
+              "            full.contentSha256(),\n"
+              "            List.of(positive));\n"
+              "\n"
+              "        HistoricalRediscoveryAtlas.AtlasReport report =\n"
+              "            new HistoricalRediscoveryAtlas().run(positiveOnly);\n"
+              "\n"
+              "        assertTrue(report.cases().get(0).equivalence().equivalent());\n"
+              "        assertFalse(\n"
+              "            report.assessment().equivalenceLayerDiscriminates());\n"
+              "    }\n"
+              "\n"
+          )
+          test.write_text(
+              test_text.replace(marker, method + marker),
+              encoding="utf-8",
+          )
           PY
 
           git diff --check
