@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StructuralDiversitySearchStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.strategy</a> &gt; <span class="el_source">StructuralDiversitySearchStrategy.java</span></div><h1>StructuralDiversitySearchStrategy.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.strategy;
+
+import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.Transformation;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Deterministic target-blind quality-diversity control for bounded searches.
+ *
+ * &lt;p&gt;The strategy keeps at most one elite per structural cell at each depth.
+ * Cells are defined only by observable expression and path structure: AST-size
+ * band, expansion debt, last rewrite kind, denominator count and power count.
+ * No target expression, historical identity or held-out property is used for
+ * retention. This makes the strategy suitable as a diagnostic control for
+ * scalar-fitness valleys without presenting it as a full MAP-Elites
+ * implementation.&lt;/p&gt;
+ */
+<span class="fc" id="L26">public final class StructuralDiversitySearchStrategy implements SearchStrategy {</span>
+    @Override
+    public List&lt;SearchState&gt; search(SearchProblem problem) {
+<span class="nc" id="L29">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
+<span class="nc" id="L30">        String root = normalize(problem.rootExpression());</span>
+<span class="nc" id="L31">        SearchState rootState = rootState(problem, root);</span>
+<span class="nc" id="L32">        List&lt;SearchState&gt; explored = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L33">        List&lt;SearchState&gt; frontier = List.of(rootState);</span>
+<span class="nc" id="L34">        Set&lt;String&gt; visited = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L35">        int rootAstSize = problem.canonicalizer().astNodeCount(root);</span>
+
+<span class="nc" id="L37">        for (int depth = 0;</span>
+<span class="nc bnc" id="L38" title="All 4 branches missed.">                depth &lt;= problem.heuristic().maxDepth() &amp;&amp; !frontier.isEmpty();</span>
+<span class="nc" id="L39">                depth++) {</span>
+<span class="nc" id="L40">            Map&lt;StructuralCell, SearchState&gt; nextElites = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">            for (SearchState current : frontier) {</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">                if (explored.size() &gt;= problem.heuristic().maxVisitedExpressions()) {</span>
+<span class="nc" id="L43">                    return List.copyOf(explored);</span>
+                }
+<span class="nc bnc" id="L45" title="All 2 branches missed.">                if (!visited.add(stateKey(current))) {</span>
+<span class="nc" id="L46">                    continue;</span>
+                }
+<span class="nc bnc" id="L48" title="All 2 branches missed.">                if (current.depth() &gt; 0</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">                        &amp;&amp; TranspositionGate.evaluate(</span>
+<span class="nc" id="L50">                            problem.memory(),</span>
+                            current,
+<span class="nc" id="L52">                            current.canonicalHash() + &quot;#&quot; + current.depth())</span>
+                        == TranspositionGate.Verdict.PRUNE) {
+<span class="nc" id="L54">                    continue;</span>
+                }
+<span class="nc" id="L56">                explored.add(current);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">                if (current.depth() &gt;= problem.heuristic().maxDepth()) {</span>
+<span class="nc" id="L58">                    continue;</span>
+                }
+<span class="nc" id="L60">                retainSuccessors(problem, current, nextElites, visited);</span>
+<span class="nc" id="L61">            }</span>
+<span class="nc" id="L62">            frontier = selectFrontier(problem, nextElites, rootAstSize);</span>
+        }
+<span class="nc" id="L64">        return List.copyOf(explored);</span>
+    }
+
+    private SearchState rootState(SearchProblem problem, String root) {
+<span class="nc" id="L68">        return new SearchState(</span>
+            root,
+            0,
+<span class="nc" id="L71">            problem.scorer().score(root),</span>
+<span class="nc" id="L72">            List.of(root),</span>
+<span class="nc" id="L73">            List.of(),</span>
+<span class="nc" id="L74">            Set.of(),</span>
+            0,
+<span class="nc" id="L76">            problem.canonicalizer().stableHash(root),</span>
+            null,
+            null,
+            RewriteKind.NORMALIZE,
+            false,
+            0,
+            true,
+            0
+        );
+    }
+
+    private void retainSuccessors(
+        SearchProblem problem,
+        SearchState current,
+        Map&lt;StructuralCell, SearchState&gt; nextElites,
+        Set&lt;String&gt; visited
+    ) {
+<span class="nc" id="L93">        List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(</span>
+<span class="nc" id="L94">            problem.engine().transform(current.expression()));</span>
+<span class="nc" id="L95">        transformations.sort(Comparator</span>
+<span class="nc" id="L96">            .comparing(Transformation::rule)</span>
+<span class="nc" id="L97">            .thenComparing(Transformation::transformedExpression)</span>
+<span class="nc" id="L98">            .thenComparing(Transformation::applicationKey));</span>
+<span class="nc" id="L99">        Comparator&lt;SearchState&gt; comparator = eliteComparator(problem);</span>
+
+<span class="nc" id="L101">        int retained = 0;</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        for (Transformation transformation : transformations) {</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (retained &gt;= problem.heuristic().maxCandidatesPerState()) {</span>
+<span class="nc" id="L104">                break;</span>
+            }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (current.appliedRuleApplications().contains(</span>
+<span class="nc" id="L107">                    transformation.applicationKey())) {</span>
+<span class="nc" id="L108">                continue;</span>
+            }
+<span class="nc" id="L110">            int expandedSteps = current.expandedStepCount()</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (expandedSteps &gt; problem.heuristic().maxExpandingSteps()) {</span>
+<span class="nc" id="L113">                continue;</span>
+            }
+<span class="nc" id="L115">            String nextExpression = transformation.transformedExpression();</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            if (nextExpression.equals(current.expression())) {</span>
+<span class="nc" id="L117">                continue;</span>
+            }
+<span class="nc" id="L119">            SearchState next = nextState(</span>
+                problem,
+                current,
+                transformation,
+                nextExpression,
+                expandedSteps);
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            if (visited.contains(stateKey(next))) {</span>
+<span class="nc" id="L126">                continue;</span>
+            }
+<span class="nc" id="L128">            StructuralCell cell = StructuralCell.of(problem, next);</span>
+<span class="nc" id="L129">            SearchState previous = nextElites.get(cell);</span>
+<span class="nc bnc" id="L130" title="All 4 branches missed.">            if (previous == null || comparator.compare(next, previous) &lt; 0) {</span>
+<span class="nc" id="L131">                nextElites.put(cell, next);</span>
+<span class="nc" id="L132">                retained++;</span>
+            }
+<span class="nc" id="L134">        }</span>
+<span class="nc" id="L135">    }</span>
+
+    private SearchState nextState(
+        SearchProblem problem,
+        SearchState current,
+        Transformation transformation,
+        String nextExpression,
+        int expandedSteps
+    ) {
+<span class="nc" id="L144">        ExpressionScore nextScore = problem.scorer().score(nextExpression);</span>
+<span class="nc" id="L145">        int improvement = current.score().weightedTotal()</span>
+<span class="nc" id="L146">            - nextScore.weightedTotal();</span>
+<span class="nc" id="L147">        List&lt;String&gt; path = appended(current.path(), nextExpression);</span>
+<span class="nc" id="L148">        List&lt;String&gt; ruleIds = appended(</span>
+<span class="nc" id="L149">            current.appliedRuleIds(),</span>
+<span class="nc" id="L150">            transformation.rule());</span>
+<span class="nc" id="L151">        Set&lt;String&gt; applications = new HashSet&lt;&gt;(</span>
+<span class="nc" id="L152">            current.appliedRuleApplications());</span>
+<span class="nc" id="L153">        applications.add(transformation.applicationKey());</span>
+<span class="nc" id="L154">        List&lt;RewriteKind&gt; kinds = appended(</span>
+<span class="nc" id="L155">            current.appliedRuleKinds(),</span>
+<span class="nc" id="L156">            transformation.kind());</span>
+<span class="nc" id="L157">        List&lt;Boolean&gt; equivalenceFlags = appended(</span>
+<span class="nc" id="L158">            current.equivalencePreservingFlags(),</span>
+<span class="nc" id="L159">            transformation.equivalencePreservingByConstruction());</span>
+<span class="nc" id="L160">        List&lt;String&gt; assumptions = new ArrayList&lt;&gt;(current.assumptions());</span>
+<span class="nc" id="L161">        assumptions.addAll(transformation.assumptions());</span>
+
+<span class="nc" id="L163">        return new SearchState(</span>
+            nextExpression,
+<span class="nc" id="L165">            current.depth() + 1,</span>
+            nextScore,
+            path,
+            ruleIds,
+            applications,
+            expandedSteps,
+<span class="nc" id="L171">            problem.canonicalizer().stableHash(nextExpression),</span>
+<span class="nc" id="L172">            current.expression(),</span>
+<span class="nc" id="L173">            transformation.rule(),</span>
+<span class="nc" id="L174">            transformation.kind(),</span>
+<span class="nc" id="L175">            transformation.mayIncreaseComplexity(),</span>
+<span class="nc" id="L176">            transformation.estimatedCostDelta(),</span>
+<span class="nc" id="L177">            transformation.equivalencePreservingByConstruction(),</span>
+            improvement,
+            kinds,
+            equivalenceFlags,
+            assumptions
+        );
+    }
+
+    private List&lt;SearchState&gt; selectFrontier(
+        SearchProblem problem,
+        Map&lt;StructuralCell, SearchState&gt; elites,
+        int rootAstSize
+    ) {
+<span class="nc" id="L190">        return elites.entrySet().stream()</span>
+<span class="nc" id="L191">            .sorted(Comparator</span>
+<span class="nc" id="L192">                .&lt;Map.Entry&lt;StructuralCell, SearchState&gt;&gt;comparingInt(entry -&gt;</span>
+<span class="nc" id="L193">                    entry.getKey().noveltyFrom(rootAstSize))</span>
+<span class="nc" id="L194">                .reversed()</span>
+<span class="nc" id="L195">                .thenComparing(entry -&gt; entry.getKey().stableKey())</span>
+<span class="nc" id="L196">                .thenComparing(Map.Entry::getValue, eliteComparator(problem)))</span>
+<span class="nc" id="L197">            .limit(problem.heuristic().beamWidth())</span>
+<span class="nc" id="L198">            .map(Map.Entry::getValue)</span>
+<span class="nc" id="L199">            .toList();</span>
+    }
+
+    private Comparator&lt;SearchState&gt; eliteComparator(SearchProblem problem) {
+<span class="nc" id="L203">        return Comparator</span>
+<span class="nc" id="L204">            .comparingInt((SearchState state) -&gt; priority(state, problem))</span>
+<span class="nc" id="L205">            .thenComparingInt(SearchState::depth)</span>
+<span class="nc" id="L206">            .thenComparing(SearchState::canonicalHash)</span>
+<span class="nc" id="L207">            .thenComparing(SearchState::expression)</span>
+<span class="nc" id="L208">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds()))</span>
+<span class="nc" id="L209">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.path()));</span>
+    }
+
+    private int priority(SearchState state, SearchProblem problem) {
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        int modelCost = problem.costModel() == null</span>
+<span class="nc" id="L214">            ? state.score().weightedTotal()</span>
+<span class="nc" id="L215">            : problem.costModel().cost(</span>
+<span class="nc" id="L216">                state.expression(),</span>
+<span class="nc" id="L217">                problem.canonicalizer(),</span>
+<span class="nc" id="L218">                state.score());</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (modelCost == Integer.MAX_VALUE) {</span>
+<span class="nc" id="L220">            return Integer.MAX_VALUE / 2;</span>
+        }
+<span class="nc" id="L222">        return modelCost</span>
+<span class="nc" id="L223">            + state.depth() * 2</span>
+<span class="nc" id="L224">            + state.expandedStepCount() * 5</span>
+<span class="nc bnc" id="L225" title="All 4 branches missed.">            + (state.improvement() &lt;= 0 &amp;&amp; state.depth() &gt; 0 ? 4 : 0);</span>
+    }
+
+    private String stateKey(SearchState state) {
+<span class="nc" id="L229">        return state.canonicalHash() + &quot;:&quot;</span>
+<span class="nc" id="L230">            + String.join(&quot;,&quot;, state.appliedRuleApplications().stream()</span>
+<span class="nc" id="L231">                .sorted()</span>
+<span class="nc" id="L232">                .toList());</span>
+    }
+
+    private static String normalize(String expression) {
+<span class="nc" id="L236">        return Objects.requireNonNull(expression, &quot;expression&quot;)</span>
+<span class="nc" id="L237">            .trim()</span>
+<span class="nc" id="L238">            .replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    private static &lt;T&gt; List&lt;T&gt; appended(List&lt;T&gt; values, T value) {
+<span class="nc" id="L242">        List&lt;T&gt; result = new ArrayList&lt;&gt;(values);</span>
+<span class="nc" id="L243">        result.add(value);</span>
+<span class="nc" id="L244">        return result;</span>
+    }
+
+<span class="nc" id="L247">    private record StructuralCell(</span>
+        int astSizeBand,
+        int expansionDebt,
+        RewriteKind lastKind,
+        int denominatorBand,
+        int powerBand
+    ) {
+        private static StructuralCell of(
+            SearchProblem problem,
+            SearchState state
+        ) {
+<span class="nc" id="L258">            String expression = state.expression();</span>
+<span class="nc" id="L259">            return new StructuralCell(</span>
+<span class="nc" id="L260">                Math.min(24,</span>
+<span class="nc" id="L261">                    problem.canonicalizer().astNodeCount(expression) / 3),</span>
+<span class="nc" id="L262">                Math.min(8, state.expandedStepCount()),</span>
+<span class="nc" id="L263">                state.appliedRuleKind(),</span>
+<span class="nc" id="L264">                Math.min(4, occurrences(expression, '/')),</span>
+<span class="nc" id="L265">                Math.min(6, occurrences(expression, '^'))</span>
+            );
+        }
+
+        private int noveltyFrom(int rootAstSize) {
+<span class="nc" id="L270">            int rootBand = Math.min(24, rootAstSize / 3);</span>
+<span class="nc" id="L271">            return Math.abs(astSizeBand - rootBand) * 4</span>
+                + expansionDebt * 5
+<span class="nc bnc" id="L273" title="All 2 branches missed.">                + (lastKind == RewriteKind.EXPAND ? 4 : 0)</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">                + (lastKind == RewriteKind.FACTOR ? 3 : 0)</span>
+                + denominatorBand * 2
+                + powerBand;
+        }
+
+        private String stableKey() {
+<span class="nc" id="L280">            return astSizeBand + &quot;:&quot; + expansionDebt + &quot;:&quot; + lastKind.name()</span>
+                + &quot;:&quot; + denominatorBand + &quot;:&quot; + powerBand;
+        }
+
+        private static int occurrences(String expression, char marker) {
+<span class="nc" id="L285">            int count = 0;</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            for (int index = 0; index &lt; expression.length(); index++) {</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                if (expression.charAt(index) == marker) {</span>
+<span class="nc" id="L288">                    count++;</span>
+                }
+            }
+<span class="nc" id="L291">            return count;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

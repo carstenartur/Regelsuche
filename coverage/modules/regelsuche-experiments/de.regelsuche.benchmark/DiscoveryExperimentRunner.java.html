@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryExperimentRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">DiscoveryExperimentRunner.java</span></div><h1>DiscoveryExperimentRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
 
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -25,13 +26,79 @@ public interface DiscoveryExperimentRunner {
     List&lt;ExperimentResult&gt; run(List&lt;String&gt; seedExpressions);
 
     /**
+     * Checkout-owned command entry point for retained discovery experiments.
+     *
+     * &lt;p&gt;The first command is deliberately explicit so additional experiments
+     * can share the entry point without inventing one public launcher class per
+     * report.&lt;/p&gt;
+     */
+    static void main(String[] args) {
+<span class="nc bnc" id="L36" title="All 4 branches missed.">        if (args.length == 0 || !&quot;historical-rediscovery&quot;.equals(args[0])) {</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(</span>
+                &quot;expected command: historical-rediscovery [output-directory]&quot;);
+        }
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        Path output = args.length &gt;= 2</span>
+<span class="nc" id="L41">            ? Path.of(args[1])</span>
+<span class="nc" id="L42">            : Path.of(&quot;build/reports/historical-rediscovery&quot;);</span>
+        HistoricalRediscoveryCorpus.Corpus corpus =
+<span class="nc" id="L44">            HistoricalRediscoveryCorpus.load();</span>
+<span class="nc" id="L45">        HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();</span>
+<span class="nc" id="L46">        HistoricalRediscoveryAtlas.AtlasReport report = atlas.run(corpus);</span>
+<span class="nc" id="L47">        verifyRetainedClaims(report);</span>
+<span class="nc" id="L48">        HistoricalRediscoveryAtlas.WrittenArtifacts artifacts =</span>
+<span class="nc" id="L49">            atlas.write(output, report);</span>
+<span class="nc" id="L50">        System.out.println(&quot;historicalRediscoveryAssessment=&quot;</span>
+<span class="nc" id="L51">            + report.assessment().decision());</span>
+<span class="nc" id="L52">        System.out.println(&quot;historicalRediscoveryCases=&quot; + report.cases().size());</span>
+<span class="nc" id="L53">        System.out.println(&quot;historicalRediscoveryJson=&quot;</span>
+<span class="nc" id="L54">            + artifacts.json().toAbsolutePath().normalize());</span>
+<span class="nc" id="L55">        System.out.println(&quot;historicalRediscoveryMarkdown=&quot;</span>
+<span class="nc" id="L56">            + artifacts.markdown().toAbsolutePath().normalize());</span>
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * Prevents aggregate or per-case claims that are stronger than the
+     * retained evidence used to derive them.
+     */
+    private static void verifyRetainedClaims(
+        HistoricalRediscoveryAtlas.AtlasReport report
+    ) {
+<span class="nc" id="L66">        boolean targetBlindDiversitySignal = false;</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        for (HistoricalRediscoveryAtlas.CaseResult result : report.cases()) {</span>
+<span class="nc bnc" id="L68" title="All 3 branches missed.">            switch (result.status()) {</span>
+                case GENERIC_BRIDGE_REQUIRED_AND_FOUND,
+                     CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE -&gt; {
+<span class="nc bnc" id="L71" title="All 2 branches missed.">                    if (!result.production().oracle().completeClosureExhausted()) {</span>
+<span class="nc" id="L72">                        throw new IllegalStateException(</span>
+                            &quot;claim requires complete production closure: &quot;
+<span class="nc" id="L74">                                + result.benchmarkCase().id()</span>
+                                + &quot; has production oracle status &quot;
+<span class="nc" id="L76">                                + result.production().oracle().status());</span>
+                    }
+                }
+                case REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND -&gt;
+<span class="nc" id="L80">                    targetBlindDiversitySignal = true;</span>
+                default -&gt; {
+                    // No additional cross-case claim invariant.
+                }
+            }
+<span class="nc" id="L85">        }</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (report.assessment().searchPolicyDifferenceIdentified()</span>
+                != targetBlindDiversitySignal) {
+<span class="nc" id="L88">            throw new IllegalStateException(</span>
+                &quot;search-policy claim must be backed by a target-blind &quot;
+                    + &quot;structural-diversity result&quot;);
+        }
+<span class="nc" id="L92">    }</span>
+
+    /**
      * Outcome of a single seed run.
      *
      * @param seedExpression the input the runner was started with
      * @param success whether the run reached a useful terminal state
      * @param summary short, human-readable result description
      */
-<span class="fc" id="L34">    record ExperimentResult(String seedExpression, boolean success, String summary) {</span>
+<span class="fc" id="L101">    record ExperimentResult(String seedExpression, boolean success, String summary) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

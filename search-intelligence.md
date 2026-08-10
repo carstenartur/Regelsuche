@@ -1,82 +1,156 @@
 # Search Intelligence
 
-This page is the entry point for everything that makes Regelsuche's
-search "smart": profiles, goals, the transposition table that powers
-DISCOVERY_PLUS, and the universal-patterns surface.
+This page is the entry point for the mechanisms that make Regelsuche's search
+selective and diagnosable: profiles, goals, transposition memory, structural
+diversity, bounded reachability and universal patterns.
 
-For the long-form roadmap and historical context see
-[`search-intelligence-roadmap.md`](search-intelligence-roadmap.md);
-this page focuses on the **currently shipped** capabilities.
+For roadmap and historical context see
+[`search-intelligence-roadmap.md`](search-intelligence-roadmap.md). This page
+describes the currently shipped behavior.
 
 ## Profile + Goal
 
-A `SearchProfile` bundles a `SearchHeuristic` preset, a strategy and a
-default `TransformationGoal`. The two axes are independent:
-
-```
-SearchProfile  →  picks strategy + heuristic knobs
-TransformationGoal  →  picks the cost model used to compare candidates
-```
+A `SearchProfile` selects a strategy and heuristic preset. A
+`TransformationGoal` independently selects the cost model used to compare
+candidates.
 
 | Profile | Strategy | Default goal |
 | --- | --- | --- |
 | `FAST_SIMPLIFY` | BestFirst | `SIMPLIFY` |
 | `DISCOVERY` | Hybrid | `SIMPLIFY` |
+| `DIVERSITY_DISCOVERY` | target-blind structural quality-diversity | `SIMPLIFY` |
 | `TEACHING` | Beam | `TEACHING_FRIENDLY` |
 | `PROOF_ORIENTED` | A* | `PROOF_FRIENDLY` |
 | `EXHAUSTIVE_SMALL` | MCTS | `SIMPLIFY` |
 | `DISCOVERY_PLUS` | BestFirst + transposition table | `SIMPLIFY` |
 | `EQUALITY_SATURATION` | EGraph saturation | `SIMPLIFY` |
 
-The web UI exposes both as separate dropdowns. `POST /api/search`
-accepts both fields; if `goal` is omitted the profile's default applies.
+The web UI exposes profile and goal separately. `POST /api/search` accepts both;
+when `goal` is omitted, the profile default applies. Usage guidance is in
+[`user-workflows.md`](user-workflows.md#goal-dropdown).
 
-See [`docs/user-workflows.md`](user-workflows.md#goal-dropdown) for
-when to pick which goal.
+## Transposition table
 
-## Transposition table (DISCOVERY_PLUS)
+`DISCOVERY_PLUS` activates the `TranspositionTable`. It recognizes canonical
+states, prunes already-known-better paths and may retain a non-improving path
+when it introduces a new rule combination. Decisions are exposed at
+`/api/memory/pruning`.
 
-`SearchProfile.DISCOVERY_PLUS` activates the
-`TranspositionTable` so the search can:
+## Structural diversity
 
-- recognise canonical states it has seen before,
-- prune already-known-better paths (`PruningReason.ALREADY_KNOWN_BETTER`),
-- keep paths that introduce a **new rule combination** even when they
-  don't improve the score (`PruningReason.KEPT_NEW_RULE_COMBO`).
+`DIVERSITY_DISCOVERY` is a deterministic target-blind diagnostic profile. At
+each depth it retains at most one elite per structural cell instead of reducing
+all survivors to one scalar ranking. Cells use only observable TRAIN-side
+structure:
 
-The pruning decisions are exposed at `/api/memory/pruning`.
+- AST-size band;
+- expansion debt;
+- last rewrite kind;
+- denominator-count band;
+- power-count band.
+
+No target identity is inspected. The profile is a bounded
+MAP-Elites-style control for scalar-fitness valleys, not a claim to implement
+the complete MAP-Elites algorithm.
+
+## Bounded reachability and historical atlas
+
+`BoundedRewriteReachabilityOracle` performs deterministic breadth-first
+traversal over the directed successors of a frozen `TransformationEngine`. It
+retains a shortest witness and reports exactly one of:
+
+- `REACHABLE`;
+- `UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE`, only after complete finite-closure
+  exhaustion;
+- `BUDGET_INCONCLUSIVE`, when a depth or visited-state bound blocks an unseen
+  successor.
+
+The historical rediscovery atlas applies this boundary to a versioned 14-case
+corpus and compares four explicitly separated layers:
+
+1. production-inventory reachability;
+2. target-blind scalar best-first search;
+3. target-blind structural-diversity search;
+4. target-guided search as a diagnostic control.
+
+Preregistered controls add the generic
+`DifferenceOfSquaresPreparationOperator` for the Sophie-Germain case and one
+curated completing-the-square recognition rule. These controls distinguish a
+missing production edge from representation or matcher failure; they never
+count as autonomous rediscovery.
+
+The source corpus and strict schema are:
+
+- `regelsuche-experiments/src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json`;
+- `docs/schemas/regelsuche-historical-rediscovery-corpus-v1.schema.json`.
+
+Generated JSON and Markdown retain the corpus hash, witnesses, rule IDs,
+primitive work, search metrics, directionality and one evidence-derived primary
+diagnosis per case. The aggregate assessment is one of
+`USEFUL_DIAGNOSTIC_STEP`, `USEFUL_BUT_INCOMPLETE` or `INSUFFICIENT_SIGNAL`.
+
+The dedicated `regelsuche-core` oracle and known-derivation tests remain the
+authoritative unit-level contracts. Atlas tests add only corpus, policy and
+cross-layer integration evidence; they do not replace those focused tests.
+
+Generate the atlas with:
+
+```bash
+./gradlew :regelsuche-experiments:generateHistoricalRediscoveryAtlas
+```
+
+The output is written under
+`regelsuche-experiments/build/reports/historical-rediscovery/`. The ordinary
+checkout-owned merge gate remains:
+
+```bash
+./gradlew --no-configuration-cache ciCheck
+```
+
+### Claim boundary
+
+The oracle and guided control receive published targets and are therefore
+strictly diagnostic. Scalar and diversity searches are target-blind, but the
+corpus is still a known historical benchmark. A case may say that a bridge was
+required or a production primitive was missing only after the production
+oracle exhausted the complete frozen closure; a stopped budget remains
+`BUDGET_INCONCLUSIVE`. The `regrouped-square` case is retained as an executable
+regression for this fail-closed distinction. The aggregate search-policy signal
+requires a target-blind structural-diversity result and is never inferred solely
+from the target-guided control. The aggregate equivalence-discrimination signal
+requires at least one retained negative control; an empty negative-control
+subset cannot pass by vacuous truth. Results establish only bounded reachability
+and search-policy behavior for the frozen representation, inventory and
+budgets. They do not establish external novelty, autonomous rediscovery or
+publication priority.
 
 ## Universal patterns
 
-`GlobalMemoryService` scores every canonical state by a small
-universality function (visit count, distinct rule combinations that
-reached it, age). The top entries are surfaced at:
+`GlobalMemoryService` scores canonical states by visit count, distinct rule
+combinations and age. The leading entries are exposed through:
 
 | Surface | Use |
 | --- | --- |
-| `GET /api/memory/universal` | JSON list of `patterns[]` and `ruleCoverage[]`. |
-| Suchgedächtnis tab → *Universelle Muster* | Renders the same data with a link to the supporting best path. |
+| `GET /api/memory/universal` | JSON list of `patterns[]` and `ruleCoverage[]` |
+| Suchgedächtnis → *Universelle Muster* | supporting best path and promotion context |
 
-Patterns with a high universality score are the candidates the project
-calls **macro-rule promotion targets** —
-see [`macro-rules.md`](macro-rules.md) for how they're promoted.
+High-universality states are macro-rule promotion targets. Promotion rules are
+documented in [`macro-rules.md`](macro-rules.md).
 
 ## Related docs
 
-- [`search-strategies.md`](search-strategies.md) — every strategy in detail.
+- [`search-strategies.md`](search-strategies.md) — strategy details.
 - [`equality-saturation.md`](equality-saturation.md) — the EGraph layer.
-- [`didactic-ranking.md`](didactic-ranking.md) — how `TEACHING_FRIENDLY`
-  ranks alternative paths.
+- [`didactic-ranking.md`](didactic-ranking.md) — `TEACHING_FRIENDLY` ranking.
 
-## Equality-Saturation Runtime-Metriken
+## Equality-saturation runtime metrics
 
-Für `EQUALITY_SATURATION` werden zusätzlich zu den klassischen
-Suchmetriken auch Matching-/Saturation-Metriken reportet:
+`EQUALITY_SATURATION` additionally reports:
 
-- `classesScanned`, `nodesScanned`, `candidateClassesSkipped`
-- `matchesFound`
-- `matcherCacheHits`, `matcherCacheMisses`
-- `saturationIterations`, `rulesFired`
+- `classesScanned`, `nodesScanned`, `candidateClassesSkipped`;
+- `matchesFound`;
+- `matcherCacheHits`, `matcherCacheMisses`;
+- `saturationIterations`, `rulesFired`.
 
-Diese Felder sind in `SaturationStats` sowie in den Benchmark-JSON/MD
-Artefakten enthalten.
+The fields are available in `SaturationStats` and the benchmark JSON/Markdown
+artifacts.

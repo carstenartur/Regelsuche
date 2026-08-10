@@ -8,6 +8,7 @@ import de.regelsuche.search.strategy.EqualitySaturationStrategy;
 import de.regelsuche.search.strategy.HybridSearchStrategy;
 import de.regelsuche.search.strategy.MonteCarloTreeSearchStrategy;
 import de.regelsuche.search.strategy.SearchStrategy;
+import de.regelsuche.search.strategy.StructuralDiversitySearchStrategy;
 
 /**
  * Pre-defined search profiles bundling a {@link SearchHeuristic} preset and a
@@ -17,40 +18,50 @@ import de.regelsuche.search.strategy.SearchStrategy;
  * simplification, discovery, teaching, exhaustive small searches, ...) instead
  * of tuning individual heuristic knobs.&lt;/p&gt;
  */
-<span class="fc" id="L20">public enum SearchProfile {</span>
+<span class="fc" id="L21">public enum SearchProfile {</span>
     /** Quick, depth-limited search aimed at returning a result fast. */
-<span class="fc" id="L22">    FAST_SIMPLIFY(new SearchHeuristic(4, 200, 1, 2, 32, 4), TransformationGoal.SIMPLIFY) {</span>
+<span class="fc" id="L23">    FAST_SIMPLIFY(new SearchHeuristic(4, 200, 1, 2, 32, 4), TransformationGoal.SIMPLIFY) {</span>
         @Override
         public SearchStrategy newStrategy() {
-<span class="fc" id="L25">            return new BestFirstSearchStrategy();</span>
+<span class="fc" id="L26">            return new BestFirstSearchStrategy();</span>
         }
     },
     /** Wide search optimised for discovering new rule candidates. */
-<span class="fc" id="L29">    DISCOVERY(new SearchHeuristic(6, 1500, 1, 6, 80, 16), TransformationGoal.SIMPLIFY) {</span>
+<span class="fc" id="L30">    DISCOVERY(new SearchHeuristic(6, 1500, 1, 6, 80, 16), TransformationGoal.SIMPLIFY) {</span>
         @Override
         public SearchStrategy newStrategy() {
-<span class="fc" id="L32">            return new HybridSearchStrategy();</span>
+<span class="fc" id="L33">            return new HybridSearchStrategy();</span>
+        }
+    },
+    /**
+     * Target-blind quality-diversity diagnostic that retains one elite per
+     * structural cell at each depth.
+     */
+<span class="fc" id="L40">    DIVERSITY_DISCOVERY(new SearchHeuristic(6, 2000, 1, 6, 80, 24), TransformationGoal.SIMPLIFY) {</span>
+        @Override
+        public SearchStrategy newStrategy() {
+<span class="fc" id="L43">            return new StructuralDiversitySearchStrategy();</span>
         }
     },
     /** Mid-sized search that prefers small, easy to explain steps. */
-<span class="fc" id="L36">    TEACHING(new SearchHeuristic(5, 600, 1, 3, 40, 8), TransformationGoal.TEACHING_FRIENDLY) {</span>
+<span class="fc" id="L47">    TEACHING(new SearchHeuristic(5, 600, 1, 3, 40, 8), TransformationGoal.TEACHING_FRIENDLY) {</span>
         @Override
         public SearchStrategy newStrategy() {
-<span class="fc" id="L39">            return new BeamSearchStrategy();</span>
+<span class="fc" id="L50">            return new BeamSearchStrategy();</span>
         }
     },
     /** A* driven search that prefers paths plausibly leading to a proof. */
-<span class="fc" id="L43">    PROOF_ORIENTED(new SearchHeuristic(8, 2000, 1, 4, 60, 8), TransformationGoal.PROOF_FRIENDLY) {</span>
+<span class="fc" id="L54">    PROOF_ORIENTED(new SearchHeuristic(8, 2000, 1, 4, 60, 8), TransformationGoal.PROOF_FRIENDLY) {</span>
         @Override
         public SearchStrategy newStrategy() {
-<span class="fc" id="L46">            return new AStarSearchStrategy();</span>
+<span class="fc" id="L57">            return new AStarSearchStrategy();</span>
         }
     },
     /** Exhaustive randomised search for small expressions. */
-<span class="fc" id="L50">    EXHAUSTIVE_SMALL(new SearchHeuristic(5, 3000, 1, 6, 80, 24), TransformationGoal.SIMPLIFY) {</span>
+<span class="fc" id="L61">    EXHAUSTIVE_SMALL(new SearchHeuristic(5, 3000, 1, 6, 80, 24), TransformationGoal.SIMPLIFY) {</span>
         @Override
         public SearchStrategy newStrategy() {
-<span class="fc" id="L53">            return new MonteCarloTreeSearchStrategy(42L);</span>
+<span class="fc" id="L64">            return new MonteCarloTreeSearchStrategy(42L);</span>
         }
     },
     /**
@@ -59,15 +70,15 @@ import de.regelsuche.search.strategy.SearchStrategy;
      * applies stricter cycle detection. Used to demonstrate learning
      * macro-rules across multiple runs.
      */
-<span class="fc" id="L62">    DISCOVERY_PLUS(new SearchHeuristic(6, 2000, 1, 6, 80, 16), TransformationGoal.SIMPLIFY) {</span>
+<span class="fc" id="L73">    DISCOVERY_PLUS(new SearchHeuristic(6, 2000, 1, 6, 80, 16), TransformationGoal.SIMPLIFY) {</span>
         @Override
         public SearchStrategy newStrategy() {
-<span class="fc" id="L65">            return new BestFirstSearchStrategy();</span>
+<span class="fc" id="L76">            return new BestFirstSearchStrategy();</span>
         }
 
         @Override
         public boolean usesTranspositionTable() {
-<span class="nc" id="L70">            return true;</span>
+<span class="nc" id="L81">            return true;</span>
         }
     },
     /**
@@ -80,23 +91,23 @@ import de.regelsuche.search.strategy.SearchStrategy;
      * {@link de.regelsuche.egraph.SaturationStats} via
      * {@link EqualitySaturationStrategy#lastStats()}.
      */
-<span class="fc" id="L83">    EQUALITY_SATURATION(new SearchHeuristic(4, 100, 1, 6, 200, 32), TransformationGoal.SIMPLIFY) {</span>
+<span class="fc" id="L94">    EQUALITY_SATURATION(new SearchHeuristic(4, 100, 1, 6, 200, 32), TransformationGoal.SIMPLIFY) {</span>
         @Override
         public SearchStrategy newStrategy() {
-<span class="fc" id="L86">            return new EqualitySaturationStrategy();</span>
+<span class="fc" id="L97">            return new EqualitySaturationStrategy();</span>
         }
     };
 
     private final SearchHeuristic heuristic;
     private final TransformationGoal defaultGoal;
 
-<span class="fc" id="L93">    SearchProfile(SearchHeuristic heuristic, TransformationGoal defaultGoal) {</span>
-<span class="fc" id="L94">        this.heuristic = heuristic;</span>
-<span class="fc" id="L95">        this.defaultGoal = defaultGoal;</span>
-<span class="fc" id="L96">    }</span>
+<span class="fc" id="L104">    SearchProfile(SearchHeuristic heuristic, TransformationGoal defaultGoal) {</span>
+<span class="fc" id="L105">        this.heuristic = heuristic;</span>
+<span class="fc" id="L106">        this.defaultGoal = defaultGoal;</span>
+<span class="fc" id="L107">    }</span>
 
     public SearchHeuristic heuristic() {
-<span class="fc" id="L99">        return heuristic;</span>
+<span class="fc" id="L110">        return heuristic;</span>
     }
 
     /**
@@ -104,7 +115,7 @@ import de.regelsuche.search.strategy.SearchStrategy;
      * override this with an explicit selection from the goal dropdown.
      */
     public TransformationGoal defaultGoal() {
-<span class="nc" id="L107">        return defaultGoal;</span>
+<span class="nc" id="L118">        return defaultGoal;</span>
     }
 
     public abstract SearchStrategy newStrategy();
@@ -115,8 +126,7 @@ import de.regelsuche.search.strategy.SearchStrategy;
      * profiles preserve their pre-PR behaviour so existing tests stay green.
      */
     public boolean usesTranspositionTable() {
-<span class="fc" id="L118">        return false;</span>
+<span class="fc" id="L129">        return false;</span>
     }
 }
-
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,1309 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HistoricalRediscoveryAtlas.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">HistoricalRediscoveryAtlas.java</span></div><h1>HistoricalRediscoveryAtlas.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import static de.regelsuche.ast.BinaryOperator.ADD;
+import static de.regelsuche.ast.BinaryOperator.MUL;
+import static de.regelsuche.ast.BinaryOperator.POW;
+
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Case;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Corpus;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Relation;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Role;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.TargetRelation;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalMetrics;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.search.strategy.StructuralDiversitySearchStrategy;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.AstRewriteTransformationEngines;
+import de.regelsuche.transform.BoundedRewriteReachabilityOracle;
+import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Supplier;
+
+/**
+ * Layered diagnostic atlas for historical identities and search-policy controls.
+ *
+ * &lt;p&gt;Target-aware reachability and guidance are retained separately from the
+ * target-blind scalar and structural-diversity searches. Every primary diagnosis
+ * is therefore derived from explicit evidence rather than inferred from one
+ * aggregate success flag.&lt;/p&gt;
+ */
+<span class="fc" id="L60">public final class HistoricalRediscoveryAtlas {</span>
+    public static final String SCHEMA =
+        &quot;regelsuche.historical-rediscovery-atlas/v1&quot;;
+
+<span class="fc" id="L64">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L65">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+<span class="fc" id="L67">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+<span class="fc" id="L68">    private final SymPyEquivalenceService equivalence =</span>
+        new SymPyEquivalenceService();
+
+    public AtlasReport run(Corpus corpus) {
+<span class="fc" id="L72">        Objects.requireNonNull(corpus, &quot;corpus&quot;);</span>
+<span class="fc" id="L73">        List&lt;CaseResult&gt; results = corpus.cases().stream()</span>
+<span class="fc" id="L74">            .sorted(Comparator.comparing(Case::id))</span>
+<span class="fc" id="L75">            .map(this::runCase)</span>
+<span class="fc" id="L76">            .toList();</span>
+<span class="fc" id="L77">        return new AtlasReport(</span>
+            SCHEMA,
+<span class="fc" id="L79">            corpus.schema(),</span>
+<span class="fc" id="L80">            corpus.contentSha256(),</span>
+<span class="fc" id="L81">            corpus.inventoryRevision(),</span>
+<span class="fc" id="L82">            corpus.claimBoundary(),</span>
+            results,
+<span class="fc" id="L84">            directionality(results),</span>
+<span class="fc" id="L85">            Assessment.derive(results)</span>
+        );
+    }
+
+    public WrittenArtifacts write(Path directory, AtlasReport report) {
+<span class="fc" id="L90">        Objects.requireNonNull(directory, &quot;directory&quot;);</span>
+<span class="fc" id="L91">        Objects.requireNonNull(report, &quot;report&quot;);</span>
+        try {
+<span class="fc" id="L93">            Files.createDirectories(directory);</span>
+<span class="fc" id="L94">            Path json = directory.resolve(&quot;historical-rediscovery-atlas.json&quot;);</span>
+<span class="fc" id="L95">            Path markdown = directory.resolve(&quot;historical-rediscovery-atlas.md&quot;);</span>
+<span class="fc" id="L96">            Files.writeString(json, report.toJson(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L97">            Files.writeString(markdown, report.toMarkdown(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L98">            return new WrittenArtifacts(json, markdown);</span>
+<span class="nc" id="L99">        } catch (IOException exception) {</span>
+<span class="nc" id="L100">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private CaseResult runCase(Case benchmarkCase) {
+<span class="fc" id="L105">        RepresentationEvidence representation = represent(benchmarkCase);</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (!representation.supported()) {</span>
+<span class="nc" id="L107">            String detail = &quot;representation unsupported&quot;;</span>
+<span class="nc" id="L108">            return new CaseResult(</span>
+                benchmarkCase,
+                representation,
+<span class="nc" id="L111">                EquivalenceEvidence.notEvaluated(),</span>
+<span class="nc" id="L112">                EngineEvidence.notEvaluated(</span>
+                    EngineProfile.PRODUCTION_PRIMITIVES, detail),
+<span class="nc" id="L114">                EngineEvidence.notEvaluated(</span>
+                    EngineProfile.GENERIC_HYPOTHESIS_BRIDGE, detail),
+<span class="nc" id="L116">                EngineEvidence.notEvaluated(</span>
+                    EngineProfile.CURATED_RECOGNITION_CONTROL, detail),
+                PrimaryStatus.REPRESENTATION_UNSUPPORTED
+            );
+        }
+
+<span class="fc" id="L122">        EquivalenceEvidence equivalenceEvidence = new EquivalenceEvidence(</span>
+            true,
+<span class="fc" id="L124">            equivalence.areEquivalent(</span>
+<span class="fc" id="L125">                representation.formattedSource(),</span>
+<span class="fc" id="L126">                representation.formattedTarget()),</span>
+<span class="fc" id="L127">            equivalence.evidence(</span>
+<span class="fc" id="L128">                representation.formattedSource(),</span>
+<span class="fc" id="L129">                representation.formattedTarget())</span>
+        );
+<span class="fc" id="L131">        EngineEvidence production = runEngine(</span>
+            benchmarkCase,
+            representation,
+            EngineProfile.PRODUCTION_PRIMITIVES,
+<span class="fc" id="L135">            () -&gt; productionEngine(benchmarkCase),</span>
+            true
+        );
+<span class="fc" id="L138">        EngineEvidence genericBridge = benchmarkCase.diagnosticPurpose()</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                .equals(&quot;GENERIC_HYPOTHESIS_BRIDGE&quot;)</span>
+<span class="fc" id="L140">            ? runEngine(</span>
+                benchmarkCase,
+                representation,
+                EngineProfile.GENERIC_HYPOTHESIS_BRIDGE,
+<span class="fc" id="L144">                () -&gt; hypothesisEngine(benchmarkCase),</span>
+                true)
+<span class="fc" id="L146">            : EngineEvidence.notApplicable(</span>
+                EngineProfile.GENERIC_HYPOTHESIS_BRIDGE);
+<span class="fc" id="L148">        EngineEvidence curatedControl = benchmarkCase.family()</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                .equals(&quot;COMPLETING_THE_SQUARE&quot;)</span>
+<span class="fc" id="L150">            ? runEngine(</span>
+                benchmarkCase,
+                representation,
+                EngineProfile.CURATED_RECOGNITION_CONTROL,
+<span class="fc" id="L154">                () -&gt; curatedControlEngine(benchmarkCase),</span>
+                false)
+<span class="fc" id="L156">            : EngineEvidence.notApplicable(</span>
+                EngineProfile.CURATED_RECOGNITION_CONTROL);
+
+<span class="fc" id="L159">        return new CaseResult(</span>
+            benchmarkCase,
+            representation,
+            equivalenceEvidence,
+            production,
+            genericBridge,
+            curatedControl,
+<span class="fc" id="L166">            classify(</span>
+                benchmarkCase,
+                equivalenceEvidence,
+                production,
+                genericBridge,
+                curatedControl)
+        );
+    }
+
+    private RepresentationEvidence represent(Case benchmarkCase) {
+        try {
+<span class="fc" id="L177">            return new RepresentationEvidence(</span>
+                true,
+<span class="fc" id="L179">                format(benchmarkCase.source()),</span>
+<span class="fc" id="L180">                format(benchmarkCase.target()),</span>
+                &quot;&quot;
+            );
+<span class="nc" id="L183">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L184">            return new RepresentationEvidence(</span>
+                false,
+                &quot;&quot;,
+                &quot;&quot;,
+<span class="nc" id="L188">                safeMessage(exception)</span>
+            );
+        }
+    }
+
+    private EngineEvidence runEngine(
+        Case benchmarkCase,
+        RepresentationEvidence representation,
+        EngineProfile profile,
+        Supplier&lt;TransformationEngine&gt; engineFactory,
+        boolean runSearchControls
+    ) {
+<span class="fc" id="L200">        OracleEvidence oracle = runOracle(</span>
+            benchmarkCase,
+            representation,
+<span class="fc" id="L203">            engineFactory.get());</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (!runSearchControls) {</span>
+<span class="fc" id="L205">            SearchEvidence omitted = SearchEvidence.notEvaluated(</span>
+                &quot;curated oracle control only&quot;);
+<span class="fc" id="L207">            return new EngineEvidence(</span>
+                profile,
+                EvidenceExecution.EXECUTED,
+                &quot;&quot;,
+                oracle,
+                omitted,
+                omitted,
+                omitted
+            );
+        }
+<span class="fc" id="L217">        return new EngineEvidence(</span>
+            profile,
+            EvidenceExecution.EXECUTED,
+            &quot;&quot;,
+            oracle,
+<span class="fc" id="L222">            runScalarSearch(</span>
+                benchmarkCase,
+                representation,
+<span class="fc" id="L225">                engineFactory.get()),</span>
+<span class="fc" id="L226">            runGuidedSearch(</span>
+                benchmarkCase,
+                representation,
+<span class="fc" id="L229">                engineFactory.get()),</span>
+<span class="fc" id="L230">            runDiversitySearch(</span>
+                benchmarkCase,
+                representation,
+<span class="fc" id="L233">                engineFactory.get())</span>
+        );
+    }
+
+    private OracleEvidence runOracle(
+        Case benchmarkCase,
+        RepresentationEvidence representation,
+        TransformationEngine engine
+    ) {
+<span class="fc" id="L242">        BoundedRewriteReachabilityOracle.Result result =</span>
+            new BoundedRewriteReachabilityOracle(engine, this::format)
+<span class="fc" id="L244">                .search(</span>
+<span class="fc" id="L245">                    representation.formattedSource(),</span>
+<span class="fc" id="L246">                    representation.formattedTarget(),</span>
+                    new BoundedRewriteReachabilityOracle.Budget(
+<span class="fc" id="L248">                        benchmarkCase.oracleMaxDepth(),</span>
+<span class="fc" id="L249">                        benchmarkCase.oracleMaxVisitedStates()));</span>
+<span class="fc" id="L250">        return new OracleEvidence(</span>
+            EvidenceExecution.EXECUTED,
+<span class="fc" id="L252">            result.status().name(),</span>
+<span class="fc" id="L253">            result.witness().stream()</span>
+<span class="fc" id="L254">                .map(BoundedRewriteReachabilityOracle.Step::expressionAfter)</span>
+<span class="fc" id="L255">                .toList(),</span>
+<span class="fc" id="L256">            result.witness().stream()</span>
+<span class="fc" id="L257">                .map(BoundedRewriteReachabilityOracle.Step::rule)</span>
+<span class="fc" id="L258">                .toList(),</span>
+<span class="fc" id="L259">            result.witness().stream()</span>
+<span class="fc" id="L260">                .mapToInt(BoundedRewriteReachabilityOracle.Step::primitiveStepCount)</span>
+<span class="fc" id="L261">                .sum(),</span>
+<span class="fc" id="L262">            result.visitedStates(),</span>
+<span class="fc" id="L263">            result.generatedTransitions(),</span>
+<span class="fc" id="L264">            result.maximumDepthReached(),</span>
+<span class="fc" id="L265">            result.depthLimitReached(),</span>
+<span class="fc" id="L266">            result.stateLimitReached(),</span>
+            &quot;&quot;
+        );
+    }
+
+    private SearchEvidence runScalarSearch(
+        Case benchmarkCase,
+        RepresentationEvidence representation,
+        TransformationEngine engine
+    ) {
+<span class="fc" id="L276">        CountingEngine counting = new CountingEngine(engine);</span>
+<span class="fc" id="L277">        GoalSearchResult result = new BestFirstSearchStrategy()</span>
+<span class="fc" id="L278">            .searchWithDiagnostics(searchProblem(</span>
+                benchmarkCase,
+<span class="fc" id="L280">                representation.formattedSource(),</span>
+                counting));
+<span class="fc" id="L282">        Optional&lt;SearchState&gt; match = findMatch(</span>
+            benchmarkCase,
+<span class="fc" id="L284">            representation.formattedTarget(),</span>
+<span class="fc" id="L285">            result.states());</span>
+<span class="fc" id="L286">        return SearchEvidence.fromGoalResult(</span>
+            &quot;SCALAR_BEST_FIRST_TARGET_BLIND&quot;,
+            match,
+            result,
+            counting
+        );
+    }
+
+    private SearchEvidence runGuidedSearch(
+        Case benchmarkCase,
+        RepresentationEvidence representation,
+        TransformationEngine engine
+    ) {
+<span class="fc" id="L299">        CountingEngine counting = new CountingEngine(engine);</span>
+<span class="fc" id="L300">        GoalSearchResult result = new BestFirstSearchStrategy()</span>
+<span class="fc" id="L301">            .searchWithDiagnostics(searchProblem(</span>
+                benchmarkCase,
+<span class="fc" id="L303">                representation.formattedSource(),</span>
+<span class="fc" id="L304">                counting).withTarget(searchTarget(</span>
+                    benchmarkCase,
+<span class="fc" id="L306">                    representation.formattedTarget())));</span>
+<span class="fc" id="L307">        return SearchEvidence.fromGoalResult(</span>
+            &quot;TARGET_GUIDED_BEST_FIRST_DIAGNOSTIC&quot;,
+<span class="fc" id="L309">            Optional.ofNullable(result.reachedState()),</span>
+            result,
+            counting
+        );
+    }
+
+    private SearchEvidence runDiversitySearch(
+        Case benchmarkCase,
+        RepresentationEvidence representation,
+        TransformationEngine engine
+    ) {
+<span class="fc" id="L320">        CountingEngine counting = new CountingEngine(engine);</span>
+<span class="fc" id="L321">        List&lt;SearchState&gt; states = new StructuralDiversitySearchStrategy()</span>
+<span class="fc" id="L322">            .search(searchProblem(</span>
+                benchmarkCase,
+<span class="fc" id="L324">                representation.formattedSource(),</span>
+                counting));
+<span class="fc" id="L326">        return SearchEvidence.fromStates(</span>
+            &quot;STRUCTURAL_DIVERSITY_TARGET_BLIND&quot;,
+<span class="fc" id="L328">            findMatch(</span>
+                benchmarkCase,
+<span class="fc" id="L330">                representation.formattedTarget(),</span>
+                states),
+            states,
+            counting
+        );
+    }
+
+    private SearchProblem searchProblem(
+        Case benchmarkCase,
+        String source,
+        TransformationEngine engine
+    ) {
+<span class="fc" id="L342">        return new SearchProblem(</span>
+            source,
+            engine,
+            scorer,
+            canonicalizer,
+            new SearchHeuristic(
+<span class="fc" id="L348">                benchmarkCase.searchMaxDepth(),</span>
+<span class="fc" id="L349">                benchmarkCase.searchMaxVisitedStates(),</span>
+                1,
+<span class="fc" id="L351">                benchmarkCase.maxExpandingSteps(),</span>
+<span class="fc" id="L352">                benchmarkCase.maxCandidatesPerState(),</span>
+<span class="fc" id="L353">                benchmarkCase.beamWidth())</span>
+        );
+    }
+
+    private SearchTarget searchTarget(Case benchmarkCase, String target) {
+<span class="fc bfc" id="L358" title="All 2 branches covered.">        return benchmarkCase.targetRelation() == TargetRelation.SYNTAX_EXACT</span>
+<span class="fc" id="L359">            ? SearchTarget.syntaxExact(target)</span>
+<span class="fc" id="L360">            : SearchTarget.valueEquivalent(target);</span>
+    }
+
+    private Optional&lt;SearchState&gt; findMatch(
+        Case benchmarkCase,
+        String target,
+        List&lt;SearchState&gt; states
+    ) {
+<span class="fc" id="L368">        return states.stream()</span>
+<span class="fc" id="L369">            .filter(state -&gt; matches(</span>
+                benchmarkCase,
+<span class="fc" id="L371">                state.expression(),</span>
+                target))
+<span class="fc" id="L373">            .min(Comparator</span>
+<span class="fc" id="L374">                .comparingInt(SearchState::depth)</span>
+<span class="fc" id="L375">                .thenComparing(SearchState::expression)</span>
+<span class="fc" id="L376">                .thenComparing(state -&gt;</span>
+<span class="fc" id="L377">                    String.join(&quot;-&gt;&quot;, state.appliedRuleIds())));</span>
+    }
+
+    private boolean matches(Case benchmarkCase, String expression, String target) {
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        if (benchmarkCase.targetRelation() == TargetRelation.SYNTAX_EXACT) {</span>
+            try {
+<span class="fc" id="L383">                return format(expression).equals(target);</span>
+<span class="nc" id="L384">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L385">                return false;</span>
+            }
+        }
+<span class="fc" id="L388">        return equivalence.areEquivalent(expression, target);</span>
+    }
+
+    private TransformationEngine productionEngine(Case benchmarkCase) {
+<span class="fc" id="L392">        return AstRewriteTransformationEngines.production(</span>
+<span class="fc" id="L393">            AstRewriteTransformationEngine.defaultRules(),</span>
+            128,
+<span class="fc" id="L395">            Math.max(200, benchmarkCase.maxCandidatesPerState() * 2)</span>
+        );
+    }
+
+    private TransformationEngine hypothesisEngine(Case benchmarkCase) {
+<span class="fc" id="L400">        return new HypothesisTransformationEngine(</span>
+<span class="fc" id="L401">            productionEngine(benchmarkCase),</span>
+<span class="fc" id="L402">            List.of(new DifferenceOfSquaresPreparationOperator(8)),</span>
+            16
+        );
+    }
+
+    private TransformationEngine curatedControlEngine(Case benchmarkCase) {
+<span class="fc" id="L408">        List&lt;RewriteRule&gt; rules = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L409">            AstRewriteTransformationEngine.defaultRules());</span>
+<span class="fc" id="L410">        rules.add(completeSquareControl());</span>
+<span class="fc" id="L411">        return AstRewriteTransformationEngines.reference(</span>
+            rules,
+            128,
+<span class="fc" id="L414">            Math.max(200, benchmarkCase.maxCandidatesPerState() * 2)</span>
+        );
+    }
+
+    private PatternRewriteRule completeSquareControl() {
+<span class="fc" id="L419">        PatternExpr x = PatternExpr.var(&quot;X&quot;);</span>
+<span class="fc" id="L420">        PatternExpr a = PatternExpr.var(&quot;A&quot;);</span>
+<span class="fc" id="L421">        PatternExpr source = PatternExpr.op(</span>
+            ADD,
+<span class="fc" id="L423">            PatternExpr.op(</span>
+                ADD,
+<span class="fc" id="L425">                PatternExpr.op(POW, x, PatternExpr.num(2)),</span>
+<span class="fc" id="L426">                PatternExpr.op(</span>
+                    MUL,
+<span class="fc" id="L428">                    PatternExpr.op(MUL, PatternExpr.num(2), x),</span>
+                    a)
+            ),
+<span class="fc" id="L431">            PatternExpr.op(POW, a, PatternExpr.num(2))</span>
+        );
+<span class="fc" id="L433">        PatternExpr target = PatternExpr.op(</span>
+            POW,
+<span class="fc" id="L435">            PatternExpr.op(ADD, x, a),</span>
+<span class="fc" id="L436">            PatternExpr.num(2)</span>
+        );
+<span class="fc" id="L438">        return new PatternRewriteRule(</span>
+            &quot;historical-control-complete-square&quot;,
+            source,
+            target,
+<span class="fc" id="L442">            RecognitionProfile.algebraicAc()</span>
+        );
+    }
+
+    private PrimaryStatus classify(
+        Case benchmarkCase,
+        EquivalenceEvidence equivalenceEvidence,
+        EngineEvidence production,
+        EngineEvidence genericBridge,
+        EngineEvidence curatedControl
+    ) {
+<span class="fc bfc" id="L453" title="All 2 branches covered.">        if (benchmarkCase.relation() == Relation.NOT_EQUIVALENT) {</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            return equivalenceEvidence.equivalent()</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">                    || anyReached(production, genericBridge, curatedControl)</span>
+<span class="nc" id="L456">                ? PrimaryStatus.CORRECTNESS_REGRESSION</span>
+<span class="fc" id="L457">                : PrimaryStatus.NEGATIVE_CONTROL_CONFIRMED;</span>
+        }
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">        if (!equivalenceEvidence.equivalent()) {</span>
+<span class="nc" id="L460">            return PrimaryStatus.EQUIVALENCE_NOT_CONFIRMED;</span>
+        }
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (production.oracle().reachable()) {</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">            if (production.scalar().reached()) {</span>
+<span class="fc" id="L464">                return PrimaryStatus.REACHABLE_AND_SCALAR_FOUND;</span>
+            }
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">            if (production.diversity().reached()) {</span>
+<span class="fc" id="L467">                return PrimaryStatus</span>
+                    .REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND;
+            }
+<span class="nc bnc" id="L470" title="All 2 branches missed.">            if (production.guided().reached()) {</span>
+<span class="nc" id="L471">                return PrimaryStatus</span>
+                    .REACHABLE_BUT_SCALAR_MISSED_GUIDANCE_FOUND;
+            }
+<span class="nc" id="L474">            return PrimaryStatus.REACHABLE_BUT_PRODUCTION_SEARCH_MISSED;</span>
+        }
+        // A bridge or curated-control hit identifies a missing production
+        // capability only after the frozen production closure was exhausted.
+<span class="fc bfc" id="L478" title="All 2 branches covered.">        if (!production.oracle().completeClosureExhausted()) {</span>
+<span class="fc" id="L479">            return PrimaryStatus.BUDGET_INCONCLUSIVE;</span>
+        }
+<span class="pc bpc" id="L481" title="1 of 4 branches missed.">        if (genericBridge.executed() &amp;&amp; anyReached(genericBridge)) {</span>
+<span class="fc" id="L482">            return PrimaryStatus.GENERIC_BRIDGE_REQUIRED_AND_FOUND;</span>
+        }
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (curatedControl.executed()</span>
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">                &amp;&amp; curatedControl.oracle().reachable()) {</span>
+<span class="fc" id="L486">            return PrimaryStatus</span>
+                .CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE;
+        }
+<span class="nc" id="L489">        return PrimaryStatus.UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE;</span>
+    }
+
+    private boolean anyReached(EngineEvidence... evidence) {
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        for (EngineEvidence item : evidence) {</span>
+<span class="pc bpc" id="L494" title="1 of 4 branches missed.">            if (item.executed() &amp;&amp; anyReached(item)) {</span>
+<span class="nc" id="L495">                return true;</span>
+            }
+        }
+<span class="fc" id="L498">        return false;</span>
+    }
+
+    private boolean anyReached(EngineEvidence evidence) {
+<span class="fc bfc" id="L502" title="All 2 branches covered.">        return evidence.oracle().reachable()</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">            || evidence.scalar().reached()</span>
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">            || evidence.guided().reached()</span>
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">            || evidence.diversity().reached();</span>
+    }
+
+    private List&lt;DirectionalityResult&gt; directionality(List&lt;CaseResult&gt; results) {
+<span class="fc" id="L509">        Map&lt;String, CaseResult&gt; byId = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L510">        results.forEach(result -&gt;</span>
+<span class="fc" id="L511">            byId.put(result.benchmarkCase().id(), result));</span>
+<span class="fc" id="L512">        List&lt;DirectionalityResult&gt; pairs = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L513">        addDirectionality(</span>
+            pairs,
+            byId,
+            &quot;binomial-square&quot;,
+            &quot;complete-square&quot;,
+            &quot;expand-binomial-square&quot;);
+<span class="fc" id="L519">        addDirectionality(</span>
+            pairs,
+            byId,
+            &quot;difference-of-squares&quot;,
+            &quot;difference-of-squares&quot;,
+            &quot;reverse-difference-of-squares&quot;);
+<span class="fc" id="L525">        return List.copyOf(pairs);</span>
+    }
+
+    private void addDirectionality(
+        List&lt;DirectionalityResult&gt; pairs,
+        Map&lt;String, CaseResult&gt; byId,
+        String id,
+        String forwardId,
+        String reverseId
+    ) {
+<span class="fc" id="L535">        CaseResult forward = byId.get(forwardId);</span>
+<span class="fc" id="L536">        CaseResult reverse = byId.get(reverseId);</span>
+<span class="pc bpc" id="L537" title="1 of 4 branches missed.">        if (forward == null || reverse == null) {</span>
+<span class="fc" id="L538">            return;</span>
+        }
+<span class="fc" id="L540">        boolean forwardReachable = forward.production().oracle().reachable();</span>
+<span class="fc" id="L541">        boolean reverseReachable = reverse.production().oracle().reachable();</span>
+<span class="pc bpc" id="L542" title="1 of 2 branches missed.">        boolean inconclusive = forward.production().oracle().inconclusive()</span>
+<span class="pc bpc" id="L543" title="1 of 2 branches missed.">            || reverse.production().oracle().inconclusive();</span>
+        DirectionalityStatus status;
+<span class="pc bpc" id="L545" title="1 of 4 branches missed.">        if (forwardReachable &amp;&amp; reverseReachable) {</span>
+<span class="fc" id="L546">            status = DirectionalityStatus.BIDIRECTIONAL;</span>
+<span class="pc bpc" id="L547" title="1 of 2 branches missed.">        } else if (inconclusive) {</span>
+<span class="nc" id="L548">            status = DirectionalityStatus.INCONCLUSIVE;</span>
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">        } else if (forwardReachable) {</span>
+<span class="nc" id="L550">            status = DirectionalityStatus.FORWARD_ONLY;</span>
+<span class="pc bpc" id="L551" title="1 of 2 branches missed.">        } else if (reverseReachable) {</span>
+<span class="fc" id="L552">            status = DirectionalityStatus.REVERSE_ONLY;</span>
+        } else {
+<span class="nc" id="L554">            status = DirectionalityStatus.NEITHER_REACHABLE;</span>
+        }
+<span class="fc" id="L556">        pairs.add(new DirectionalityResult(</span>
+            id,
+            forwardId,
+            reverseId,
+            status,
+            forwardReachable,
+            reverseReachable
+        ));
+<span class="fc" id="L564">    }</span>
+
+    private String format(String expression) {
+<span class="fc" id="L567">        return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+    }
+
+    private static String safeMessage(Throwable throwable) {
+<span class="nc" id="L571">        String message = throwable.getMessage();</span>
+<span class="nc bnc" id="L572" title="All 4 branches missed.">        return message == null || message.isBlank()</span>
+<span class="nc" id="L573">            ? throwable.getClass().getSimpleName()</span>
+<span class="nc" id="L574">            : message.replace('\n', ' ').replace('\r', ' ');</span>
+    }
+
+<span class="fc" id="L577">    public enum EngineProfile {</span>
+<span class="fc" id="L578">        PRODUCTION_PRIMITIVES,</span>
+<span class="fc" id="L579">        GENERIC_HYPOTHESIS_BRIDGE,</span>
+<span class="fc" id="L580">        CURATED_RECOGNITION_CONTROL</span>
+    }
+
+<span class="fc" id="L583">    public enum EvidenceExecution {</span>
+<span class="fc" id="L584">        EXECUTED,</span>
+<span class="fc" id="L585">        NOT_APPLICABLE,</span>
+<span class="fc" id="L586">        NOT_EVALUATED</span>
+    }
+
+<span class="fc" id="L589">    public enum PrimaryStatus {</span>
+<span class="fc" id="L590">        REPRESENTATION_UNSUPPORTED,</span>
+<span class="fc" id="L591">        EQUIVALENCE_NOT_CONFIRMED,</span>
+<span class="fc" id="L592">        REACHABLE_AND_SCALAR_FOUND,</span>
+<span class="fc" id="L593">        REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,</span>
+<span class="fc" id="L594">        REACHABLE_BUT_SCALAR_MISSED_GUIDANCE_FOUND,</span>
+<span class="fc" id="L595">        REACHABLE_BUT_PRODUCTION_SEARCH_MISSED,</span>
+<span class="fc" id="L596">        GENERIC_BRIDGE_REQUIRED_AND_FOUND,</span>
+<span class="fc" id="L597">        CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE,</span>
+<span class="fc" id="L598">        UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE,</span>
+<span class="fc" id="L599">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L600">        NEGATIVE_CONTROL_CONFIRMED,</span>
+<span class="fc" id="L601">        CORRECTNESS_REGRESSION</span>
+    }
+
+<span class="fc" id="L604">    public enum DirectionalityStatus {</span>
+<span class="fc" id="L605">        BIDIRECTIONAL,</span>
+<span class="fc" id="L606">        FORWARD_ONLY,</span>
+<span class="fc" id="L607">        REVERSE_ONLY,</span>
+<span class="fc" id="L608">        NEITHER_REACHABLE,</span>
+<span class="fc" id="L609">        INCONCLUSIVE</span>
+    }
+
+<span class="fc" id="L612">    public enum AssessmentDecision {</span>
+<span class="fc" id="L613">        USEFUL_DIAGNOSTIC_STEP,</span>
+<span class="fc" id="L614">        USEFUL_BUT_INCOMPLETE,</span>
+<span class="fc" id="L615">        INSUFFICIENT_SIGNAL</span>
+    }
+
+    public record RepresentationEvidence(
+        boolean supported,
+        String formattedSource,
+        String formattedTarget,
+        String detail
+    ) {
+<span class="fc" id="L624">        public RepresentationEvidence {</span>
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">            formattedSource = formattedSource == null ? &quot;&quot; : formattedSource;</span>
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">            formattedTarget = formattedTarget == null ? &quot;&quot; : formattedTarget;</span>
+<span class="pc bpc" id="L627" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L628">        }</span>
+    }
+
+    public record EquivalenceEvidence(
+        boolean evaluated,
+        boolean equivalent,
+        String detail
+    ) {
+<span class="fc" id="L636">        public EquivalenceEvidence {</span>
+<span class="pc bpc" id="L637" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L638">        }</span>
+
+        private static EquivalenceEvidence notEvaluated() {
+<span class="nc" id="L641">            return new EquivalenceEvidence(false, false, &quot;not evaluated&quot;);</span>
+        }
+    }
+
+    public record OracleEvidence(
+        EvidenceExecution execution,
+        String status,
+        List&lt;String&gt; witnessExpressions,
+        List&lt;String&gt; witnessRuleIds,
+        int primitiveSteps,
+        int visitedStates,
+        long generatedTransitions,
+        int maximumDepthReached,
+        boolean depthLimitReached,
+        boolean stateLimitReached,
+        String detail
+    ) {
+<span class="fc" id="L658">        public OracleEvidence {</span>
+<span class="fc" id="L659">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="pc bpc" id="L660" title="1 of 2 branches missed.">            status = status == null ? &quot;&quot; : status;</span>
+<span class="fc" id="L661">            witnessExpressions = List.copyOf(witnessExpressions);</span>
+<span class="fc" id="L662">            witnessRuleIds = List.copyOf(witnessRuleIds);</span>
+<span class="pc bpc" id="L663" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L664">        }</span>
+
+        private static OracleEvidence notEvaluated(String detail) {
+<span class="nc" id="L667">            return new OracleEvidence(</span>
+                EvidenceExecution.NOT_EVALUATED,
+                &quot;NOT_EVALUATED&quot;,
+<span class="nc" id="L670">                List.of(),</span>
+<span class="nc" id="L671">                List.of(),</span>
+                0,
+                0,
+                0,
+                0,
+                false,
+                false,
+                detail
+            );
+        }
+
+        private static OracleEvidence notApplicable() {
+<span class="fc" id="L683">            return new OracleEvidence(</span>
+                EvidenceExecution.NOT_APPLICABLE,
+                &quot;NOT_APPLICABLE&quot;,
+<span class="fc" id="L686">                List.of(),</span>
+<span class="fc" id="L687">                List.of(),</span>
+                0,
+                0,
+                0,
+                0,
+                false,
+                false,
+                &quot;&quot;
+            );
+        }
+
+        public boolean reachable() {
+<span class="pc bpc" id="L699" title="1 of 2 branches missed.">            return execution == EvidenceExecution.EXECUTED</span>
+<span class="fc bfc" id="L700" title="All 2 branches covered.">                &amp;&amp; status.equals(&quot;REACHABLE&quot;);</span>
+        }
+
+        public boolean completeClosureExhausted() {
+<span class="pc bpc" id="L704" title="1 of 2 branches missed.">            return execution == EvidenceExecution.EXECUTED</span>
+<span class="fc bfc" id="L705" title="All 2 branches covered.">                &amp;&amp; status.equals(&quot;UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE&quot;);</span>
+        }
+
+        public boolean inconclusive() {
+<span class="pc bpc" id="L709" title="1 of 2 branches missed.">            return execution == EvidenceExecution.EXECUTED</span>
+<span class="fc bfc" id="L710" title="All 2 branches covered.">                &amp;&amp; status.equals(&quot;BUDGET_INCONCLUSIVE&quot;);</span>
+        }
+    }
+
+    public record SearchEvidence(
+        EvidenceExecution execution,
+        String policy,
+        boolean reached,
+        String terminalStatus,
+        int exploredStates,
+        int engineCalls,
+        long generatedTransformations,
+        int depth,
+        List&lt;String&gt; path,
+        List&lt;String&gt; ruleIds,
+        GoalMetrics metrics,
+        String detail
+    ) {
+<span class="fc" id="L728">        public SearchEvidence {</span>
+<span class="fc" id="L729">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">            policy = policy == null ? &quot;&quot; : policy;</span>
+<span class="pc bpc" id="L731" title="1 of 2 branches missed.">            terminalStatus = terminalStatus == null ? &quot;&quot; : terminalStatus;</span>
+<span class="fc" id="L732">            path = List.copyOf(path);</span>
+<span class="fc" id="L733">            ruleIds = List.copyOf(ruleIds);</span>
+<span class="pc bpc" id="L734" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L735">        }</span>
+
+        private static SearchEvidence fromGoalResult(
+            String policy,
+            Optional&lt;SearchState&gt; match,
+            GoalSearchResult result,
+            CountingEngine counting
+        ) {
+<span class="fc" id="L743">            SearchState state = match.orElse(null);</span>
+<span class="fc bfc" id="L744" title="All 2 branches covered.">            return new SearchEvidence(</span>
+                EvidenceExecution.EXECUTED,
+                policy,
+                state != null,
+<span class="fc" id="L748">                result.status().name(),</span>
+<span class="fc" id="L749">                result.states().size(),</span>
+<span class="fc" id="L750">                counting.calls(),</span>
+<span class="fc" id="L751">                counting.generated(),</span>
+<span class="fc bfc" id="L752" title="All 2 branches covered.">                state == null ? -1 : state.depth(),</span>
+<span class="fc bfc" id="L753" title="All 2 branches covered.">                state == null ? List.of() : state.path(),</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">                state == null ? List.of() : state.appliedRuleIds(),</span>
+<span class="fc" id="L755">                result.metrics(),</span>
+                &quot;&quot;
+            );
+        }
+
+        private static SearchEvidence fromStates(
+            String policy,
+            Optional&lt;SearchState&gt; match,
+            List&lt;SearchState&gt; states,
+            CountingEngine counting
+        ) {
+<span class="fc" id="L766">            SearchState state = match.orElse(null);</span>
+<span class="fc bfc" id="L767" title="All 2 branches covered.">            return new SearchEvidence(</span>
+                EvidenceExecution.EXECUTED,
+                policy,
+                state != null,
+<span class="pc bpc" id="L771" title="1 of 2 branches missed.">                states.isEmpty() ? &quot;NO_STATES&quot; : &quot;COMPLETED_BOUNDED_SEARCH&quot;,</span>
+<span class="fc" id="L772">                states.size(),</span>
+<span class="fc" id="L773">                counting.calls(),</span>
+<span class="fc" id="L774">                counting.generated(),</span>
+<span class="fc bfc" id="L775" title="All 2 branches covered.">                state == null ? -1 : state.depth(),</span>
+<span class="fc bfc" id="L776" title="All 2 branches covered.">                state == null ? List.of() : state.path(),</span>
+<span class="fc bfc" id="L777" title="All 2 branches covered.">                state == null ? List.of() : state.appliedRuleIds(),</span>
+                null,
+                &quot;&quot;
+            );
+        }
+
+        private static SearchEvidence notEvaluated(String detail) {
+<span class="fc" id="L784">            return new SearchEvidence(</span>
+                EvidenceExecution.NOT_EVALUATED,
+                &quot;&quot;,
+                false,
+                &quot;NOT_EVALUATED&quot;,
+                0,
+                0,
+                0,
+                -1,
+<span class="fc" id="L793">                List.of(),</span>
+<span class="fc" id="L794">                List.of(),</span>
+                null,
+                detail
+            );
+        }
+
+        private static SearchEvidence notApplicable() {
+<span class="fc" id="L801">            return new SearchEvidence(</span>
+                EvidenceExecution.NOT_APPLICABLE,
+                &quot;&quot;,
+                false,
+                &quot;NOT_APPLICABLE&quot;,
+                0,
+                0,
+                0,
+                -1,
+<span class="fc" id="L810">                List.of(),</span>
+<span class="fc" id="L811">                List.of(),</span>
+                null,
+                &quot;&quot;
+            );
+        }
+    }
+
+    public record EngineEvidence(
+        EngineProfile profile,
+        EvidenceExecution execution,
+        String detail,
+        OracleEvidence oracle,
+        SearchEvidence scalar,
+        SearchEvidence guided,
+        SearchEvidence diversity
+    ) {
+<span class="fc" id="L827">        public EngineEvidence {</span>
+<span class="fc" id="L828">            Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L829">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="pc bpc" id="L830" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L831">            Objects.requireNonNull(oracle, &quot;oracle&quot;);</span>
+<span class="fc" id="L832">            Objects.requireNonNull(scalar, &quot;scalar&quot;);</span>
+<span class="fc" id="L833">            Objects.requireNonNull(guided, &quot;guided&quot;);</span>
+<span class="fc" id="L834">            Objects.requireNonNull(diversity, &quot;diversity&quot;);</span>
+<span class="fc" id="L835">        }</span>
+
+        private static EngineEvidence notApplicable(EngineProfile profile) {
+<span class="fc" id="L838">            return new EngineEvidence(</span>
+                profile,
+                EvidenceExecution.NOT_APPLICABLE,
+                &quot;&quot;,
+<span class="fc" id="L842">                OracleEvidence.notApplicable(),</span>
+<span class="fc" id="L843">                SearchEvidence.notApplicable(),</span>
+<span class="fc" id="L844">                SearchEvidence.notApplicable(),</span>
+<span class="fc" id="L845">                SearchEvidence.notApplicable()</span>
+            );
+        }
+
+        private static EngineEvidence notEvaluated(
+            EngineProfile profile,
+            String detail
+        ) {
+<span class="nc" id="L853">            return new EngineEvidence(</span>
+                profile,
+                EvidenceExecution.NOT_EVALUATED,
+                detail,
+<span class="nc" id="L857">                OracleEvidence.notEvaluated(detail),</span>
+<span class="nc" id="L858">                SearchEvidence.notEvaluated(detail),</span>
+<span class="nc" id="L859">                SearchEvidence.notEvaluated(detail),</span>
+<span class="nc" id="L860">                SearchEvidence.notEvaluated(detail)</span>
+            );
+        }
+
+        public boolean executed() {
+<span class="fc bfc" id="L865" title="All 2 branches covered.">            return execution == EvidenceExecution.EXECUTED;</span>
+        }
+    }
+
+    public record CaseResult(
+        Case benchmarkCase,
+        RepresentationEvidence representation,
+        EquivalenceEvidence equivalence,
+        EngineEvidence production,
+        EngineEvidence genericBridge,
+        EngineEvidence curatedControl,
+        PrimaryStatus status
+    ) {
+<span class="fc" id="L878">        public CaseResult {</span>
+<span class="fc" id="L879">            Objects.requireNonNull(benchmarkCase, &quot;benchmarkCase&quot;);</span>
+<span class="fc" id="L880">            Objects.requireNonNull(representation, &quot;representation&quot;);</span>
+<span class="fc" id="L881">            Objects.requireNonNull(equivalence, &quot;equivalence&quot;);</span>
+<span class="fc" id="L882">            Objects.requireNonNull(production, &quot;production&quot;);</span>
+<span class="fc" id="L883">            Objects.requireNonNull(genericBridge, &quot;genericBridge&quot;);</span>
+<span class="fc" id="L884">            Objects.requireNonNull(curatedControl, &quot;curatedControl&quot;);</span>
+<span class="fc" id="L885">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L886">        }</span>
+    }
+
+<span class="fc" id="L889">    public record DirectionalityResult(</span>
+        String id,
+        String forwardCaseId,
+        String reverseCaseId,
+        DirectionalityStatus status,
+        boolean forwardReachable,
+        boolean reverseReachable
+    ) {
+    }
+
+    public record Assessment(
+        AssessmentDecision decision,
+        boolean representationLayerWorks,
+        boolean equivalenceLayerDiscriminates,
+        boolean productionPositiveControlWorks,
+        boolean missingInventoryLayerIdentified,
+        boolean searchPolicyDifferenceIdentified,
+        boolean genericBridgeDifferenceIdentified,
+        boolean negativeControlPassed,
+        int distinctPrimaryStatuses,
+        Map&lt;PrimaryStatus, Integer&gt; statusCounts,
+        List&lt;String&gt; reasons
+    ) {
+<span class="fc" id="L912">        public Assessment {</span>
+<span class="fc" id="L913">            Objects.requireNonNull(decision, &quot;decision&quot;);</span>
+<span class="fc" id="L914">            statusCounts = Map.copyOf(statusCounts);</span>
+<span class="fc" id="L915">            reasons = List.copyOf(reasons);</span>
+<span class="fc" id="L916">        }</span>
+
+        private static Assessment derive(List&lt;CaseResult&gt; results) {
+<span class="fc" id="L919">            Map&lt;PrimaryStatus, Integer&gt; counts =</span>
+                new EnumMap&lt;&gt;(PrimaryStatus.class);
+<span class="fc" id="L921">            results.forEach(result -&gt;</span>
+<span class="fc" id="L922">                counts.merge(result.status(), 1, Integer::sum));</span>
+<span class="fc" id="L923">            boolean representation = results.stream()</span>
+<span class="fc" id="L924">                .allMatch(result -&gt; result.representation().supported());</span>
+<span class="fc" id="L925">            boolean hasNegativeEquivalenceControl = results.stream()</span>
+<span class="fc" id="L926">                .anyMatch(result -&gt;</span>
+<span class="fc bfc" id="L927" title="All 2 branches covered.">                    result.benchmarkCase().role()</span>
+                        == Role.NEGATIVE_CONTROL);
+<span class="fc bfc" id="L929" title="All 2 branches covered.">            boolean equivalence = hasNegativeEquivalenceControl</span>
+<span class="fc" id="L930">                &amp;&amp; results.stream()</span>
+<span class="fc" id="L931">                    .filter(result -&gt;</span>
+<span class="fc bfc" id="L932" title="All 2 branches covered.">                        result.benchmarkCase().role()</span>
+                            == Role.NEGATIVE_CONTROL)
+<span class="pc bpc" id="L934" title="1 of 2 branches missed.">                    .allMatch(result -&gt;</span>
+<span class="pc bpc" id="L935" title="1 of 2 branches missed.">                        result.equivalence().evaluated()</span>
+<span class="pc bpc" id="L936" title="1 of 2 branches missed.">                            &amp;&amp; !result.equivalence().equivalent())</span>
+<span class="fc" id="L937">                &amp;&amp; results.stream()</span>
+<span class="fc" id="L938">                    .filter(result -&gt;</span>
+<span class="pc bpc" id="L939" title="1 of 2 branches missed.">                        result.benchmarkCase().relation()</span>
+                            == Relation.EQUIVALENT)
+<span class="pc bpc" id="L941" title="1 of 2 branches missed.">                    .anyMatch(result -&gt;</span>
+<span class="fc" id="L942">                        result.equivalence().equivalent());</span>
+<span class="fc" id="L943">            boolean productionPositive = results.stream()</span>
+<span class="fc" id="L944">                .anyMatch(result -&gt; result.production().oracle().reachable());</span>
+<span class="fc bfc" id="L945" title="All 2 branches covered.">            boolean missingInventory = counts.getOrDefault(</span>
+                PrimaryStatus
+                    .CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE,
+<span class="fc" id="L948">                0) &gt; 0;</span>
+<span class="fc bfc" id="L949" title="All 2 branches covered.">            boolean searchPolicy = counts.getOrDefault(</span>
+                PrimaryStatus
+                    .REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,
+<span class="fc" id="L952">                0) &gt; 0;</span>
+<span class="fc bfc" id="L953" title="All 2 branches covered.">            boolean genericBridge = counts.getOrDefault(</span>
+                PrimaryStatus.GENERIC_BRIDGE_REQUIRED_AND_FOUND,
+<span class="fc" id="L955">                0) &gt; 0;</span>
+<span class="fc bfc" id="L956" title="All 2 branches covered.">            boolean negative = counts.getOrDefault(</span>
+                PrimaryStatus.NEGATIVE_CONTROL_CONFIRMED,
+<span class="fc" id="L958">                0) &gt; 0</span>
+<span class="pc bpc" id="L959" title="1 of 2 branches missed.">                &amp;&amp; counts.getOrDefault(</span>
+                    PrimaryStatus.CORRECTNESS_REGRESSION,
+<span class="fc" id="L961">                    0) == 0;</span>
+<span class="fc" id="L962">            int distinct = counts.size();</span>
+<span class="fc bfc" id="L963" title="All 2 branches covered.">            int strongSignals = (missingInventory ? 1 : 0)</span>
+<span class="fc bfc" id="L964" title="All 2 branches covered.">                + (searchPolicy ? 1 : 0)</span>
+<span class="fc bfc" id="L965" title="All 2 branches covered.">                + (genericBridge ? 1 : 0);</span>
+            AssessmentDecision decision;
+<span class="pc bpc" id="L967" title="5 of 12 branches missed.">            if (representation &amp;&amp; equivalence &amp;&amp; productionPositive &amp;&amp; negative</span>
+                    &amp;&amp; strongSignals &gt;= 2 &amp;&amp; distinct &gt;= 4) {
+<span class="fc" id="L969">                decision = AssessmentDecision.USEFUL_DIAGNOSTIC_STEP;</span>
+<span class="pc bpc" id="L970" title="8 of 10 branches missed.">            } else if (representation &amp;&amp; equivalence &amp;&amp; productionPositive</span>
+                    &amp;&amp; negative &amp;&amp; distinct &gt;= 3) {
+<span class="nc" id="L972">                decision = AssessmentDecision.USEFUL_BUT_INCOMPLETE;</span>
+            } else {
+<span class="fc" id="L974">                decision = AssessmentDecision.INSUFFICIENT_SIGNAL;</span>
+            }
+<span class="fc" id="L976">            List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L977" title="All 2 branches covered.">            if (productionPositive) {</span>
+<span class="fc" id="L978">                reasons.add(</span>
+                    &quot;production primitives recover at least one frozen identity&quot;);
+            }
+<span class="fc bfc" id="L981" title="All 2 branches covered.">            if (missingInventory) {</span>
+<span class="fc" id="L982">                reasons.add(</span>
+                    &quot;curated control separates a missing production primitive from representation failure&quot;);
+            }
+<span class="fc bfc" id="L985" title="All 2 branches covered.">            if (searchPolicy) {</span>
+<span class="fc" id="L986">                reasons.add(</span>
+                    &quot;target-blind scalar and structural-diversity searches differ under the same declared heuristic budget&quot;);
+            }
+<span class="fc bfc" id="L989" title="All 2 branches covered.">            if (genericBridge) {</span>
+<span class="fc" id="L990">                reasons.add(</span>
+                    &quot;a generic hypothesis bridge moves the reachable capability frontier&quot;);
+            }
+<span class="fc bfc" id="L993" title="All 2 branches covered.">            if (negative) {</span>
+<span class="fc" id="L994">                reasons.add(&quot;the false near-miss remains rejected&quot;);</span>
+            }
+<span class="fc" id="L996">            return new Assessment(</span>
+                decision,
+                representation,
+                equivalence,
+                productionPositive,
+                missingInventory,
+                searchPolicy,
+                genericBridge,
+                negative,
+                distinct,
+                counts,
+                reasons
+            );
+        }
+    }
+
+    public record AtlasReport(
+        String schema,
+        String corpusSchema,
+        String corpusSha256,
+        String inventoryRevision,
+        String claimBoundary,
+        List&lt;CaseResult&gt; cases,
+        List&lt;DirectionalityResult&gt; directionality,
+        Assessment assessment
+    ) {
+<span class="fc" id="L1022">        public AtlasReport {</span>
+<span class="fc" id="L1023">            Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L1024">            Objects.requireNonNull(corpusSchema, &quot;corpusSchema&quot;);</span>
+<span class="fc" id="L1025">            Objects.requireNonNull(corpusSha256, &quot;corpusSha256&quot;);</span>
+<span class="fc" id="L1026">            Objects.requireNonNull(inventoryRevision, &quot;inventoryRevision&quot;);</span>
+<span class="fc" id="L1027">            Objects.requireNonNull(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="fc" id="L1028">            cases = List.copyOf(cases);</span>
+<span class="fc" id="L1029">            directionality = List.copyOf(directionality);</span>
+<span class="fc" id="L1030">            Objects.requireNonNull(assessment, &quot;assessment&quot;);</span>
+<span class="fc" id="L1031">        }</span>
+
+        public String toJson() {
+<span class="fc" id="L1034">            JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L1035">            writer.property(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L1036">            writer.property(&quot;corpusSchema&quot;, corpusSchema);</span>
+<span class="fc" id="L1037">            writer.property(&quot;corpusSha256&quot;, corpusSha256);</span>
+<span class="fc" id="L1038">            writer.property(&quot;inventoryRevision&quot;, inventoryRevision);</span>
+<span class="fc" id="L1039">            writer.property(&quot;claimBoundary&quot;, claimBoundary);</span>
+<span class="fc" id="L1040">            writer.array(&quot;cases&quot;, array -&gt; cases.forEach(result -&gt;</span>
+<span class="fc" id="L1041">                array.objectValue(object -&gt; writeCase(object, result))));</span>
+<span class="fc" id="L1042">            writer.array(&quot;directionality&quot;, array -&gt; directionality.forEach(result -&gt;</span>
+<span class="fc" id="L1043">                array.objectValue(object -&gt; writeDirectionality(</span>
+                    object,
+                    result))));
+<span class="fc" id="L1046">            writer.object(&quot;assessment&quot;, object -&gt;</span>
+<span class="fc" id="L1047">                writeAssessment(object, assessment));</span>
+<span class="fc" id="L1048">            return writer.endObject().toString();</span>
+        }
+
+        public String toMarkdown() {
+<span class="fc" id="L1052">            StringBuilder markdown = new StringBuilder();</span>
+<span class="fc" id="L1053">            markdown.append(&quot;# Historical rediscovery and reachability atlas\n\n&quot;);</span>
+<span class="fc" id="L1054">            markdown.append(&quot;- **Corpus SHA-256:** `&quot;)</span>
+<span class="fc" id="L1055">                .append(corpusSha256)</span>
+<span class="fc" id="L1056">                .append(&quot;`\n&quot;);</span>
+<span class="fc" id="L1057">            markdown.append(&quot;- **Inventory revision:** `&quot;)</span>
+<span class="fc" id="L1058">                .append(inventoryRevision)</span>
+<span class="fc" id="L1059">                .append(&quot;`\n&quot;);</span>
+<span class="fc" id="L1060">            markdown.append(&quot;- **Assessment:** `&quot;)</span>
+<span class="fc" id="L1061">                .append(assessment.decision())</span>
+<span class="fc" id="L1062">                .append(&quot;`\n\n&quot;);</span>
+<span class="fc" id="L1063">            markdown.append(&quot;&gt; &quot;)</span>
+<span class="fc" id="L1064">                .append(claimBoundary)</span>
+<span class="fc" id="L1065">                .append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L1066">            markdown.append(</span>
+                &quot;| Case | Family | Primary diagnosis | Production oracle | Scalar | Diversity | Guided |\n&quot;);
+<span class="fc" id="L1068">            markdown.append(&quot;|---|---|---|---|---:|---:|---:|\n&quot;);</span>
+<span class="fc bfc" id="L1069" title="All 2 branches covered.">            for (CaseResult result : cases) {</span>
+<span class="fc" id="L1070">                markdown.append(&quot;| &quot;)</span>
+<span class="fc" id="L1071">                    .append(result.benchmarkCase().id()).append(&quot; | &quot;)</span>
+<span class="fc" id="L1072">                    .append(result.benchmarkCase().family()).append(&quot; | &quot;)</span>
+<span class="fc" id="L1073">                    .append(result.status()).append(&quot; | &quot;)</span>
+<span class="fc" id="L1074">                    .append(result.production().oracle().status()).append(&quot; | &quot;)</span>
+<span class="fc" id="L1075">                    .append(mark(result.production().scalar().reached()))</span>
+<span class="fc" id="L1076">                    .append(&quot; | &quot;)</span>
+<span class="fc" id="L1077">                    .append(mark(result.production().diversity().reached()))</span>
+<span class="fc" id="L1078">                    .append(&quot; | &quot;)</span>
+<span class="fc" id="L1079">                    .append(mark(result.production().guided().reached()))</span>
+<span class="fc" id="L1080">                    .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L1081">            }</span>
+<span class="fc" id="L1082">            markdown.append(&quot;\n## Directionality\n\n&quot;);</span>
+<span class="fc bfc" id="L1083" title="All 2 branches covered.">            for (DirectionalityResult result : directionality) {</span>
+<span class="fc" id="L1084">                markdown.append(&quot;- **&quot;)</span>
+<span class="fc" id="L1085">                    .append(result.id())</span>
+<span class="fc" id="L1086">                    .append(&quot;:** `&quot;)</span>
+<span class="fc" id="L1087">                    .append(result.status())</span>
+<span class="fc" id="L1088">                    .append(&quot;`\n&quot;);</span>
+<span class="fc" id="L1089">            }</span>
+<span class="fc" id="L1090">            markdown.append(&quot;\n## Assessment reasons\n\n&quot;);</span>
+<span class="fc bfc" id="L1091" title="All 2 branches covered.">            for (String reason : assessment.reasons()) {</span>
+<span class="fc" id="L1092">                markdown.append(&quot;- &quot;).append(reason).append('\n');</span>
+<span class="fc" id="L1093">            }</span>
+<span class="fc" id="L1094">            return markdown.toString();</span>
+        }
+
+        private static String mark(boolean value) {
+<span class="fc bfc" id="L1098" title="All 2 branches covered.">            return value ? &quot;yes&quot; : &quot;no&quot;;</span>
+        }
+
+        private static void writeDirectionality(
+            JsonWriter writer,
+            DirectionalityResult result
+        ) {
+<span class="fc" id="L1105">            writer.property(&quot;id&quot;, result.id());</span>
+<span class="fc" id="L1106">            writer.property(&quot;forwardCaseId&quot;, result.forwardCaseId());</span>
+<span class="fc" id="L1107">            writer.property(&quot;reverseCaseId&quot;, result.reverseCaseId());</span>
+<span class="fc" id="L1108">            writer.property(&quot;status&quot;, result.status().name());</span>
+<span class="fc" id="L1109">            writer.property(&quot;forwardReachable&quot;, result.forwardReachable());</span>
+<span class="fc" id="L1110">            writer.property(&quot;reverseReachable&quot;, result.reverseReachable());</span>
+<span class="fc" id="L1111">        }</span>
+
+        private static void writeCase(JsonWriter writer, CaseResult result) {
+<span class="fc" id="L1114">            Case benchmarkCase = result.benchmarkCase();</span>
+<span class="fc" id="L1115">            writer.property(&quot;id&quot;, benchmarkCase.id());</span>
+<span class="fc" id="L1116">            writer.property(&quot;family&quot;, benchmarkCase.family());</span>
+<span class="fc" id="L1117">            writer.property(&quot;role&quot;, benchmarkCase.role().name());</span>
+<span class="fc" id="L1118">            writer.property(&quot;relation&quot;, benchmarkCase.relation().name());</span>
+<span class="fc" id="L1119">            writer.property(</span>
+<span class="fc" id="L1120">                &quot;diagnosticPurpose&quot;, benchmarkCase.diagnosticPurpose());</span>
+<span class="fc" id="L1121">            writer.property(&quot;provenance&quot;, benchmarkCase.provenance());</span>
+<span class="fc" id="L1122">            writer.property(&quot;source&quot;, benchmarkCase.source());</span>
+<span class="fc" id="L1123">            writer.property(&quot;target&quot;, benchmarkCase.target());</span>
+<span class="fc" id="L1124">            writer.property(</span>
+<span class="fc" id="L1125">                &quot;targetRelation&quot;, benchmarkCase.targetRelation().name());</span>
+<span class="fc" id="L1126">            writer.property(&quot;primaryStatus&quot;, result.status().name());</span>
+<span class="fc" id="L1127">            writer.object(&quot;representation&quot;, object -&gt; {</span>
+<span class="fc" id="L1128">                object.property(&quot;supported&quot;, result.representation().supported());</span>
+<span class="fc" id="L1129">                object.property(</span>
+                    &quot;formattedSource&quot;,
+<span class="fc" id="L1131">                    result.representation().formattedSource());</span>
+<span class="fc" id="L1132">                object.property(</span>
+                    &quot;formattedTarget&quot;,
+<span class="fc" id="L1134">                    result.representation().formattedTarget());</span>
+<span class="fc" id="L1135">                object.property(&quot;detail&quot;, result.representation().detail());</span>
+<span class="fc" id="L1136">            });</span>
+<span class="fc" id="L1137">            writer.object(&quot;equivalence&quot;, object -&gt; {</span>
+<span class="fc" id="L1138">                object.property(&quot;evaluated&quot;, result.equivalence().evaluated());</span>
+<span class="fc" id="L1139">                object.property(&quot;equivalent&quot;, result.equivalence().equivalent());</span>
+<span class="fc" id="L1140">                object.property(&quot;detail&quot;, result.equivalence().detail());</span>
+<span class="fc" id="L1141">            });</span>
+<span class="fc" id="L1142">            writer.object(&quot;production&quot;, object -&gt;</span>
+<span class="fc" id="L1143">                writeEngine(object, result.production()));</span>
+<span class="fc" id="L1144">            writer.object(&quot;genericBridge&quot;, object -&gt;</span>
+<span class="fc" id="L1145">                writeEngine(object, result.genericBridge()));</span>
+<span class="fc" id="L1146">            writer.object(&quot;curatedControl&quot;, object -&gt;</span>
+<span class="fc" id="L1147">                writeEngine(object, result.curatedControl()));</span>
+<span class="fc" id="L1148">        }</span>
+
+        private static void writeEngine(
+            JsonWriter writer,
+            EngineEvidence evidence
+        ) {
+<span class="fc" id="L1154">            writer.property(&quot;profile&quot;, evidence.profile().name());</span>
+<span class="fc" id="L1155">            writer.property(&quot;execution&quot;, evidence.execution().name());</span>
+<span class="fc" id="L1156">            writer.property(&quot;detail&quot;, evidence.detail());</span>
+<span class="fc" id="L1157">            writer.object(&quot;oracle&quot;, object -&gt;</span>
+<span class="fc" id="L1158">                writeOracle(object, evidence.oracle()));</span>
+<span class="fc" id="L1159">            writer.object(&quot;scalar&quot;, object -&gt;</span>
+<span class="fc" id="L1160">                writeSearch(object, evidence.scalar()));</span>
+<span class="fc" id="L1161">            writer.object(&quot;guided&quot;, object -&gt;</span>
+<span class="fc" id="L1162">                writeSearch(object, evidence.guided()));</span>
+<span class="fc" id="L1163">            writer.object(&quot;diversity&quot;, object -&gt;</span>
+<span class="fc" id="L1164">                writeSearch(object, evidence.diversity()));</span>
+<span class="fc" id="L1165">        }</span>
+
+        private static void writeOracle(
+            JsonWriter writer,
+            OracleEvidence evidence
+        ) {
+<span class="fc" id="L1171">            writer.property(&quot;execution&quot;, evidence.execution().name());</span>
+<span class="fc" id="L1172">            writer.property(&quot;status&quot;, evidence.status());</span>
+<span class="fc" id="L1173">            writer.stringArray(</span>
+<span class="fc" id="L1174">                &quot;witnessExpressions&quot;, evidence.witnessExpressions());</span>
+<span class="fc" id="L1175">            writer.stringArray(&quot;witnessRuleIds&quot;, evidence.witnessRuleIds());</span>
+<span class="fc" id="L1176">            writer.property(&quot;primitiveSteps&quot;, evidence.primitiveSteps());</span>
+<span class="fc" id="L1177">            writer.property(&quot;visitedStates&quot;, evidence.visitedStates());</span>
+<span class="fc" id="L1178">            writer.property(</span>
+<span class="fc" id="L1179">                &quot;generatedTransitions&quot;, evidence.generatedTransitions());</span>
+<span class="fc" id="L1180">            writer.property(</span>
+<span class="fc" id="L1181">                &quot;maximumDepthReached&quot;, evidence.maximumDepthReached());</span>
+<span class="fc" id="L1182">            writer.property(&quot;depthLimitReached&quot;, evidence.depthLimitReached());</span>
+<span class="fc" id="L1183">            writer.property(&quot;stateLimitReached&quot;, evidence.stateLimitReached());</span>
+<span class="fc" id="L1184">            writer.property(&quot;detail&quot;, evidence.detail());</span>
+<span class="fc" id="L1185">        }</span>
+
+        private static void writeSearch(
+            JsonWriter writer,
+            SearchEvidence evidence
+        ) {
+<span class="fc" id="L1191">            writer.property(&quot;execution&quot;, evidence.execution().name());</span>
+<span class="fc" id="L1192">            writer.property(&quot;policy&quot;, evidence.policy());</span>
+<span class="fc" id="L1193">            writer.property(&quot;reached&quot;, evidence.reached());</span>
+<span class="fc" id="L1194">            writer.property(&quot;terminalStatus&quot;, evidence.terminalStatus());</span>
+<span class="fc" id="L1195">            writer.property(&quot;exploredStates&quot;, evidence.exploredStates());</span>
+<span class="fc" id="L1196">            writer.property(&quot;engineCalls&quot;, evidence.engineCalls());</span>
+<span class="fc" id="L1197">            writer.property(</span>
+                &quot;generatedTransformations&quot;,
+<span class="fc" id="L1199">                evidence.generatedTransformations());</span>
+<span class="fc" id="L1200">            writer.property(&quot;depth&quot;, evidence.depth());</span>
+<span class="fc" id="L1201">            writer.stringArray(&quot;path&quot;, evidence.path());</span>
+<span class="fc" id="L1202">            writer.stringArray(&quot;ruleIds&quot;, evidence.ruleIds());</span>
+<span class="fc bfc" id="L1203" title="All 2 branches covered.">            if (evidence.metrics() == null) {</span>
+<span class="fc" id="L1204">                writer.nullProperty(&quot;goalMetrics&quot;);</span>
+            } else {
+<span class="fc" id="L1206">                writer.object(&quot;goalMetrics&quot;, object -&gt;</span>
+<span class="fc" id="L1207">                    writeGoalMetrics(object, evidence.metrics()));</span>
+            }
+<span class="fc" id="L1209">            writer.property(&quot;detail&quot;, evidence.detail());</span>
+<span class="fc" id="L1210">        }</span>
+
+        private static void writeGoalMetrics(
+            JsonWriter writer,
+            GoalMetrics metrics
+        ) {
+<span class="fc" id="L1216">            writer.property(&quot;exploredStates&quot;, metrics.exploredStates());</span>
+<span class="fc" id="L1217">            writer.property(&quot;expandedStates&quot;, metrics.expandedStates());</span>
+<span class="fc" id="L1218">            writer.property(</span>
+                &quot;generatedTransformations&quot;,
+<span class="fc" id="L1220">                metrics.generatedTransformations());</span>
+<span class="fc" id="L1221">            writer.property(&quot;enqueuedStates&quot;, metrics.enqueuedStates());</span>
+<span class="fc" id="L1222">            writer.property(</span>
+                &quot;skippedTransformations&quot;,
+<span class="fc" id="L1224">                metrics.skippedTransformations());</span>
+<span class="fc" id="L1225">            writer.property(&quot;duplicatePrunes&quot;, metrics.duplicatePrunes());</span>
+<span class="fc" id="L1226">            writer.property(</span>
+<span class="fc" id="L1227">                &quot;transpositionPrunes&quot;, metrics.transpositionPrunes());</span>
+<span class="fc" id="L1228">            writer.property(&quot;depthPrunes&quot;, metrics.depthPrunes());</span>
+<span class="fc" id="L1229">            writer.property(</span>
+<span class="fc" id="L1230">                &quot;candidateBudgetPrunes&quot;, metrics.candidateBudgetPrunes());</span>
+<span class="fc" id="L1231">            writer.property(</span>
+                &quot;statesWithoutTransformations&quot;,
+<span class="fc" id="L1233">                metrics.statesWithoutTransformations());</span>
+<span class="fc" id="L1234">            writer.property(&quot;identityCacheHits&quot;, metrics.identityCacheHits());</span>
+<span class="fc" id="L1235">            writer.property(</span>
+<span class="fc" id="L1236">                &quot;identityCacheMisses&quot;, metrics.identityCacheMisses());</span>
+<span class="fc" id="L1237">            writer.property(&quot;cachedExpressions&quot;, metrics.cachedExpressions());</span>
+<span class="fc" id="L1238">            writer.property(&quot;internedValues&quot;, metrics.internedValues());</span>
+<span class="fc" id="L1239">        }</span>
+
+        private static void writeAssessment(
+            JsonWriter writer,
+            Assessment assessment
+        ) {
+<span class="fc" id="L1245">            writer.property(&quot;decision&quot;, assessment.decision().name());</span>
+<span class="fc" id="L1246">            writer.property(</span>
+                &quot;representationLayerWorks&quot;,
+<span class="fc" id="L1248">                assessment.representationLayerWorks());</span>
+<span class="fc" id="L1249">            writer.property(</span>
+                &quot;equivalenceLayerDiscriminates&quot;,
+<span class="fc" id="L1251">                assessment.equivalenceLayerDiscriminates());</span>
+<span class="fc" id="L1252">            writer.property(</span>
+                &quot;productionPositiveControlWorks&quot;,
+<span class="fc" id="L1254">                assessment.productionPositiveControlWorks());</span>
+<span class="fc" id="L1255">            writer.property(</span>
+                &quot;missingInventoryLayerIdentified&quot;,
+<span class="fc" id="L1257">                assessment.missingInventoryLayerIdentified());</span>
+<span class="fc" id="L1258">            writer.property(</span>
+                &quot;searchPolicyDifferenceIdentified&quot;,
+<span class="fc" id="L1260">                assessment.searchPolicyDifferenceIdentified());</span>
+<span class="fc" id="L1261">            writer.property(</span>
+                &quot;genericBridgeDifferenceIdentified&quot;,
+<span class="fc" id="L1263">                assessment.genericBridgeDifferenceIdentified());</span>
+<span class="fc" id="L1264">            writer.property(</span>
+                &quot;negativeControlPassed&quot;,
+<span class="fc" id="L1266">                assessment.negativeControlPassed());</span>
+<span class="fc" id="L1267">            writer.property(</span>
+                &quot;distinctPrimaryStatuses&quot;,
+<span class="fc" id="L1269">                assessment.distinctPrimaryStatuses());</span>
+<span class="fc" id="L1270">            writer.object(&quot;statusCounts&quot;, object -&gt;</span>
+<span class="fc" id="L1271">                assessment.statusCounts().entrySet().stream()</span>
+<span class="fc" id="L1272">                    .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L1273">                    .forEach(entry -&gt; object.property(</span>
+<span class="fc" id="L1274">                        entry.getKey().name(),</span>
+<span class="fc" id="L1275">                        entry.getValue())));</span>
+<span class="fc" id="L1276">            writer.stringArray(&quot;reasons&quot;, assessment.reasons());</span>
+<span class="fc" id="L1277">        }</span>
+    }
+
+<span class="fc" id="L1280">    public record WrittenArtifacts(Path json, Path markdown) {</span>
+    }
+
+    private static final class CountingEngine implements TransformationEngine {
+        private final TransformationEngine delegate;
+        private int calls;
+        private long generated;
+
+<span class="fc" id="L1288">        private CountingEngine(TransformationEngine delegate) {</span>
+<span class="fc" id="L1289">            this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="fc" id="L1290">        }</span>
+
+        @Override
+        public List&lt;Transformation&gt; transform(String expression) {
+<span class="fc" id="L1294">            calls++;</span>
+<span class="fc" id="L1295">            List&lt;Transformation&gt; result = delegate.transform(expression);</span>
+<span class="fc" id="L1296">            generated += result.size();</span>
+<span class="fc" id="L1297">            return result;</span>
+        }
+
+        private int calls() {
+<span class="fc" id="L1301">            return calls;</span>
+        }
+
+        private long generated() {
+<span class="fc" id="L1305">            return generated;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HistoricalRediscoveryCorpus.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">HistoricalRediscoveryCorpus.java</span></div><h1>HistoricalRediscoveryCorpus.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.json.JsonReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Strict loader for the frozen historical rediscovery diagnostic corpus. */
+public final class HistoricalRediscoveryCorpus {
+    public static final String RESOURCE =
+        &quot;/de/regelsuche/benchmark/historical-rediscovery-corpus.json&quot;;
+    public static final String SCHEMA =
+        &quot;regelsuche.historical-rediscovery-corpus/v1&quot;;
+
+<span class="fc" id="L25">    private static final Set&lt;String&gt; ROOT_KEYS = Set.of(</span>
+        &quot;schema&quot;,
+        &quot;evidenceStatus&quot;,
+        &quot;inventoryRevision&quot;,
+        &quot;claimBoundary&quot;,
+        &quot;cases&quot;
+    );
+<span class="fc" id="L32">    private static final Set&lt;String&gt; CASE_KEYS = Set.of(</span>
+        &quot;id&quot;,
+        &quot;family&quot;,
+        &quot;source&quot;,
+        &quot;target&quot;,
+        &quot;relation&quot;,
+        &quot;role&quot;,
+        &quot;diagnosticPurpose&quot;,
+        &quot;provenance&quot;,
+        &quot;targetRelation&quot;,
+        &quot;oracleMaxDepth&quot;,
+        &quot;oracleMaxVisitedStates&quot;,
+        &quot;searchMaxDepth&quot;,
+        &quot;searchMaxVisitedStates&quot;,
+        &quot;maxCandidatesPerState&quot;,
+        &quot;maxExpandingSteps&quot;,
+        &quot;beamWidth&quot;
+    );
+
+    private HistoricalRediscoveryCorpus() {
+    }
+
+    public static Corpus load() {
+<span class="fc" id="L55">        try (InputStream input = HistoricalRediscoveryCorpus.class</span>
+<span class="fc" id="L56">                .getResourceAsStream(RESOURCE)) {</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            if (input == null) {</span>
+<span class="nc" id="L58">                throw new IllegalStateException(&quot;missing corpus resource &quot; + RESOURCE);</span>
+            }
+<span class="fc" id="L60">            byte[] bytes = input.readAllBytes();</span>
+<span class="fc" id="L61">            String json = new String(bytes, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L62">            return parse(json, sha256(bytes));</span>
+<span class="nc" id="L63">        } catch (IOException exception) {</span>
+<span class="nc" id="L64">            throw new IllegalStateException(&quot;cannot read corpus &quot; + RESOURCE, exception);</span>
+        }
+    }
+
+    static Corpus parse(String json, String contentSha256) {
+<span class="fc" id="L69">        Map&lt;String, Object&gt; root = new JsonReader(</span>
+<span class="fc" id="L70">            requireText(json, &quot;json&quot;)).readObject();</span>
+<span class="fc" id="L71">        requireKeys(root, ROOT_KEYS, &quot;corpus root&quot;);</span>
+<span class="fc" id="L72">        String schema = string(root, &quot;schema&quot;);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(&quot;unsupported corpus schema &quot; + schema);</span>
+        }
+<span class="fc" id="L76">        String evidenceStatus = string(root, &quot;evidenceStatus&quot;);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (!&quot;FROZEN_DIAGNOSTIC_CORPUS&quot;.equals(evidenceStatus)) {</span>
+<span class="nc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;unexpected corpus evidenceStatus &quot; + evidenceStatus);
+        }
+<span class="fc" id="L81">        String inventoryRevision = string(root, &quot;inventoryRevision&quot;);</span>
+<span class="fc" id="L82">        String claimBoundary = string(root, &quot;claimBoundary&quot;);</span>
+<span class="fc" id="L83">        Object rawCases = root.get(&quot;cases&quot;);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (!(rawCases instanceof List&lt;?&gt; values)) {</span>
+<span class="nc" id="L85">            throw new IllegalArgumentException(&quot;cases must be a JSON array&quot;);</span>
+        }
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(&quot;corpus must contain at least one case&quot;);</span>
+        }
+
+<span class="fc" id="L91">        List&lt;Case&gt; cases = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L92">        Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (Object rawCase : values) {</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (!(rawCase instanceof Map&lt;?, ?&gt; rawMap)) {</span>
+<span class="nc" id="L95">                throw new IllegalArgumentException(</span>
+                    &quot;each corpus case must be a JSON object&quot;);
+            }
+<span class="fc" id="L98">            Map&lt;String, Object&gt; caseValues = stringKeyed(rawMap);</span>
+<span class="fc" id="L99">            requireKeys(caseValues, CASE_KEYS, &quot;corpus case&quot;);</span>
+<span class="fc" id="L100">            Case benchmarkCase = new Case(</span>
+<span class="fc" id="L101">                string(caseValues, &quot;id&quot;),</span>
+<span class="fc" id="L102">                string(caseValues, &quot;family&quot;),</span>
+<span class="fc" id="L103">                string(caseValues, &quot;source&quot;),</span>
+<span class="fc" id="L104">                string(caseValues, &quot;target&quot;),</span>
+<span class="fc" id="L105">                enumValue(Relation.class, caseValues, &quot;relation&quot;),</span>
+<span class="fc" id="L106">                enumValue(Role.class, caseValues, &quot;role&quot;),</span>
+<span class="fc" id="L107">                string(caseValues, &quot;diagnosticPurpose&quot;),</span>
+<span class="fc" id="L108">                string(caseValues, &quot;provenance&quot;),</span>
+<span class="fc" id="L109">                enumValue(TargetRelation.class, caseValues, &quot;targetRelation&quot;),</span>
+<span class="fc" id="L110">                nonNegativeInt(caseValues, &quot;oracleMaxDepth&quot;),</span>
+<span class="fc" id="L111">                positiveInt(caseValues, &quot;oracleMaxVisitedStates&quot;),</span>
+<span class="fc" id="L112">                nonNegativeInt(caseValues, &quot;searchMaxDepth&quot;),</span>
+<span class="fc" id="L113">                positiveInt(caseValues, &quot;searchMaxVisitedStates&quot;),</span>
+<span class="fc" id="L114">                positiveInt(caseValues, &quot;maxCandidatesPerState&quot;),</span>
+<span class="fc" id="L115">                nonNegativeInt(caseValues, &quot;maxExpandingSteps&quot;),</span>
+<span class="fc" id="L116">                positiveInt(caseValues, &quot;beamWidth&quot;)</span>
+            );
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (!ids.add(benchmarkCase.id())) {</span>
+<span class="nc" id="L119">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L120">                    &quot;duplicate corpus case id &quot; + benchmarkCase.id());</span>
+            }
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (benchmarkCase.role() == Role.NEGATIVE_CONTROL</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                    &amp;&amp; benchmarkCase.relation() != Relation.NOT_EQUIVALENT) {</span>
+<span class="fc" id="L124">                throw new IllegalArgumentException(</span>
+                    &quot;negative control must declare NOT_EQUIVALENT: &quot;
+<span class="fc" id="L126">                        + benchmarkCase.id());</span>
+            }
+<span class="fc" id="L128">            cases.add(benchmarkCase);</span>
+<span class="fc" id="L129">        }</span>
+<span class="fc" id="L130">        return new Corpus(</span>
+            schema,
+            evidenceStatus,
+            inventoryRevision,
+            claimBoundary,
+<span class="fc" id="L135">            requireSha256(contentSha256),</span>
+            cases
+        );
+    }
+
+    private static Map&lt;String, Object&gt; stringKeyed(Map&lt;?, ?&gt; values) {
+<span class="fc" id="L141">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L142">        values.forEach((key, value) -&gt; {</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            if (!(key instanceof String text)) {</span>
+<span class="nc" id="L144">                throw new IllegalArgumentException(&quot;JSON object key must be a string&quot;);</span>
+            }
+<span class="fc" id="L146">            result.put(text, value);</span>
+<span class="fc" id="L147">        });</span>
+<span class="fc" id="L148">        return result;</span>
+    }
+
+    private static void requireKeys(
+        Map&lt;String, Object&gt; values,
+        Set&lt;String&gt; expected,
+        String label
+    ) {
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (!values.keySet().equals(expected)) {</span>
+<span class="fc" id="L157">            throw new IllegalArgumentException(</span>
+                label + &quot; keys differ: expected=&quot; + expected
+<span class="fc" id="L159">                    + &quot;, actual=&quot; + values.keySet());</span>
+        }
+<span class="fc" id="L161">    }</span>
+
+    private static String string(Map&lt;String, Object&gt; values, String key) {
+<span class="fc" id="L164">        Object raw = values.get(key);</span>
+<span class="pc bpc" id="L165" title="2 of 4 branches missed.">        if (!(raw instanceof String text) || text.isBlank()) {</span>
+<span class="nc" id="L166">            throw new IllegalArgumentException(</span>
+                &quot;missing, non-string or blank &quot; + key + &quot; in &quot; + values);
+        }
+<span class="fc" id="L169">        return text.trim();</span>
+    }
+
+    private static int positiveInt(Map&lt;String, Object&gt; values, String key) {
+<span class="fc" id="L173">        int value = integer(values, key);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (value &lt; 1) {</span>
+<span class="nc" id="L175">            throw new IllegalArgumentException(key + &quot; must be positive&quot;);</span>
+        }
+<span class="fc" id="L177">        return value;</span>
+    }
+
+    private static int nonNegativeInt(Map&lt;String, Object&gt; values, String key) {
+<span class="fc" id="L181">        int value = integer(values, key);</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (value &lt; 0) {</span>
+<span class="nc" id="L183">            throw new IllegalArgumentException(key + &quot; must not be negative&quot;);</span>
+        }
+<span class="fc" id="L185">        return value;</span>
+    }
+
+    private static int integer(Map&lt;String, Object&gt; values, String key) {
+<span class="fc" id="L189">        Object raw = values.get(key);</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (!(raw instanceof Number number)) {</span>
+<span class="nc" id="L191">            throw new IllegalArgumentException(key + &quot; must be numeric&quot;);</span>
+        }
+<span class="fc" id="L193">        double decimal = number.doubleValue();</span>
+<span class="fc" id="L194">        int integer = number.intValue();</span>
+<span class="pc bpc" id="L195" title="1 of 4 branches missed.">        if (!Double.isFinite(decimal) || decimal != integer) {</span>
+<span class="fc" id="L196">            throw new IllegalArgumentException(key + &quot; must be an integer&quot;);</span>
+        }
+<span class="fc" id="L198">        return integer;</span>
+    }
+
+    private static &lt;E extends Enum&lt;E&gt;&gt; E enumValue(
+        Class&lt;E&gt; type,
+        Map&lt;String, Object&gt; values,
+        String key
+    ) {
+<span class="fc" id="L206">        String value = string(values, key);</span>
+        try {
+<span class="fc" id="L208">            return Enum.valueOf(type, value);</span>
+<span class="nc" id="L209">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L210">            throw new IllegalArgumentException(</span>
+                &quot;unsupported &quot; + key + &quot; value &quot; + value,
+                exception);
+        }
+    }
+
+    private static String requireText(String value, String label) {
+<span class="pc bpc" id="L217" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L218">            throw new IllegalArgumentException(label + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L220">        return value;</span>
+    }
+
+    private static String requireSha256(String value) {
+<span class="fc" id="L224">        String text = requireText(value, &quot;contentSha256&quot;).trim();</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (!text.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L226">            throw new IllegalArgumentException(</span>
+                &quot;contentSha256 must be lowercase hexadecimal SHA-256&quot;);
+        }
+<span class="fc" id="L229">        return text;</span>
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+<span class="fc" id="L234">            return HexFormat.of().formatHex(</span>
+<span class="fc" id="L235">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+<span class="nc" id="L236">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L237">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L241">    public enum Relation {</span>
+<span class="fc" id="L242">        EQUIVALENT,</span>
+<span class="fc" id="L243">        NOT_EQUIVALENT</span>
+    }
+
+<span class="fc" id="L246">    public enum Role {</span>
+<span class="fc" id="L247">        HISTORICAL_POSITIVE,</span>
+<span class="fc" id="L248">        NEGATIVE_CONTROL,</span>
+<span class="fc" id="L249">        SEARCH_POLICY_CONTROL</span>
+    }
+
+<span class="fc" id="L252">    public enum TargetRelation {</span>
+<span class="fc" id="L253">        SYNTAX_EXACT,</span>
+<span class="fc" id="L254">        VALUE_EQUIVALENT</span>
+    }
+
+    public record Corpus(
+        String schema,
+        String evidenceStatus,
+        String inventoryRevision,
+        String claimBoundary,
+        String contentSha256,
+        List&lt;Case&gt; cases
+    ) {
+<span class="fc" id="L265">        public Corpus {</span>
+<span class="fc" id="L266">            requireText(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L267">            requireText(evidenceStatus, &quot;evidenceStatus&quot;);</span>
+<span class="fc" id="L268">            requireText(inventoryRevision, &quot;inventoryRevision&quot;);</span>
+<span class="fc" id="L269">            requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="fc" id="L270">            contentSha256 = requireSha256(contentSha256);</span>
+<span class="fc" id="L271">            cases = List.copyOf(Objects.requireNonNull(cases, &quot;cases&quot;));</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">            if (cases.isEmpty()) {</span>
+<span class="nc" id="L273">                throw new IllegalArgumentException(&quot;cases must not be empty&quot;);</span>
+            }
+<span class="fc" id="L275">        }</span>
+    }
+
+    public record Case(
+        String id,
+        String family,
+        String source,
+        String target,
+        Relation relation,
+        Role role,
+        String diagnosticPurpose,
+        String provenance,
+        TargetRelation targetRelation,
+        int oracleMaxDepth,
+        int oracleMaxVisitedStates,
+        int searchMaxDepth,
+        int searchMaxVisitedStates,
+        int maxCandidatesPerState,
+        int maxExpandingSteps,
+        int beamWidth
+    ) {
+<span class="fc" id="L296">        public Case {</span>
+<span class="fc" id="L297">            id = requireText(id, &quot;id&quot;).trim();</span>
+<span class="fc" id="L298">            family = requireText(family, &quot;family&quot;).trim();</span>
+<span class="fc" id="L299">            source = requireText(source, &quot;source&quot;).trim();</span>
+<span class="fc" id="L300">            target = requireText(target, &quot;target&quot;).trim();</span>
+<span class="fc" id="L301">            Objects.requireNonNull(relation, &quot;relation&quot;);</span>
+<span class="fc" id="L302">            Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L303">            diagnosticPurpose = requireText(</span>
+                diagnosticPurpose,
+<span class="fc" id="L305">                &quot;diagnosticPurpose&quot;).trim();</span>
+<span class="fc" id="L306">            provenance = requireText(provenance, &quot;provenance&quot;).trim();</span>
+<span class="fc" id="L307">            Objects.requireNonNull(targetRelation, &quot;targetRelation&quot;);</span>
+<span class="pc bpc" id="L308" title="7 of 14 branches missed.">            if (oracleMaxDepth &lt; 0 || searchMaxDepth &lt; 0</span>
+                    || oracleMaxVisitedStates &lt; 1
+                    || searchMaxVisitedStates &lt; 1
+                    || maxCandidatesPerState &lt; 1
+                    || maxExpandingSteps &lt; 0
+                    || beamWidth &lt; 1) {
+<span class="nc" id="L314">                throw new IllegalArgumentException(</span>
+                    &quot;case budgets are outside their declared finite ranges: &quot; + id);
+            }
+<span class="fc" id="L317">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
