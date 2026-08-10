@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import copy
 import hashlib
 import json
 from pathlib import Path
@@ -31,6 +30,119 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _lexical_absolute(path: Path, label: str) -> Path:
+    candidate = path if path.is_absolute() else Path.cwd() / path
+    if ".." in candidate.parts:
+        raise VerificationError(f"{label} must not contain '..': {path}")
+    return candidate
+
+
+def _repository_roots(path: Path) -> tuple[Path, Path]:
+    lexical = _lexical_absolute(path, "repository root")
+    if lexical.is_symlink():
+        raise VerificationError(f"repository root must not be symbolic: {path}")
+    if not lexical.is_dir():
+        raise VerificationError(f"repository root must be a directory: {path}")
+    try:
+        return lexical, lexical.resolve(strict=True)
+    except OSError as exc:
+        raise VerificationError(f"cannot resolve repository root {path}: {exc}") from exc
+
+
+def _checkout_path(
+    repository_lexical: Path,
+    repository_resolved: Path,
+    path: Path,
+    label: str,
+) -> Path:
+    absolute = _lexical_absolute(path, label)
+    base: Path | None = None
+    relative: Path | None = None
+    for candidate_base in (repository_lexical, repository_resolved):
+        try:
+            relative = absolute.relative_to(candidate_base)
+            base = candidate_base
+            break
+        except ValueError:
+            continue
+    if base is None or relative is None or not relative.parts:
+        raise VerificationError(f"{label} must be inside the repository root: {path}")
+
+    current = base
+    for component in relative.parts:
+        current = current / component
+        if current.is_symlink():
+            raise VerificationError(
+                f"{label} contains a symbolic path component: {current}"
+            )
+    return absolute
+
+
+def _require_inside_repository(
+    repository_root: Path,
+    resolved: Path,
+    label: str,
+) -> None:
+    if repository_root not in resolved.parents:
+        raise VerificationError(
+            f"{label} resolves outside the repository root: {resolved}"
+        )
+
+
+def require_regular_checkout_file(
+    repository_lexical: Path,
+    repository_resolved: Path,
+    path: Path,
+    label: str,
+) -> Path:
+    absolute = _checkout_path(
+        repository_lexical, repository_resolved, path, label
+    )
+    if not absolute.is_file():
+        raise VerificationError(f"{label} must be a regular file: {path}")
+    try:
+        resolved = absolute.resolve(strict=True)
+    except OSError as exc:
+        raise VerificationError(f"cannot resolve {label} {path}: {exc}") from exc
+    _require_inside_repository(repository_resolved, resolved, label)
+    return resolved
+
+
+def prepare_checkout_output_directory(
+    repository_lexical: Path,
+    repository_resolved: Path,
+    path: Path,
+) -> Path:
+    label = "output directory"
+    absolute = _checkout_path(
+        repository_lexical, repository_resolved, path, label
+    )
+    if absolute.exists() and not absolute.is_dir():
+        raise VerificationError(f"{label} must be a directory: {path}")
+    try:
+        absolute.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise VerificationError(f"cannot create {label} {path}: {exc}") from exc
+    absolute = _checkout_path(
+        repository_lexical, repository_resolved, absolute, label
+    )
+    if not absolute.is_dir():
+        raise VerificationError(f"{label} must be a directory: {path}")
+    try:
+        resolved = absolute.resolve(strict=True)
+    except OSError as exc:
+        raise VerificationError(f"cannot resolve {label} {path}: {exc}") from exc
+    _require_inside_repository(repository_resolved, resolved, label)
+    return resolved
+
+
+def _require_writable_output_file(path: Path) -> None:
+    if path.is_symlink():
+        raise VerificationError(f"output file must not be symbolic: {path}")
+    if path.exists() and not path.is_file():
+        raise VerificationError(f"output path must be a regular file: {path}")
+
+
 def load_json(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(
@@ -45,9 +157,15 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def canonical_bytes(value: Any) -> bytes:
-    return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode(
-        "utf-8"
-    )
+    return (
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+        + "\n"
+    ).encode("utf-8")
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -55,8 +173,19 @@ def sha256_bytes(data: bytes) -> str:
 
 
 def write_json(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(canonical_bytes(value))
+    _require_writable_output_file(path)
+    try:
+        path.write_bytes(canonical_bytes(value))
+    except OSError as exc:
+        raise VerificationError(f"cannot write output file {path}: {exc}") from exc
+
+
+def write_text(path: Path, value: str) -> None:
+    _require_writable_output_file(path)
+    try:
+        path.write_text(value, encoding="utf-8")
+    except OSError as exc:
+        raise VerificationError(f"cannot write output file {path}: {exc}") from exc
 
 
 def require_string(value: Any, name: str, *, allow_blank: bool = False) -> str:
@@ -144,8 +273,12 @@ def normalize_dependencies(entries: Any) -> list[dict[str, Any]]:
             raise VerificationError(f"duplicate dependency ref: {ref}")
         seen.add(ref)
         depends_on = entry.get("dependsOn", [])
-        if not isinstance(depends_on, list) or not all(isinstance(item, str) for item in depends_on):
-            raise VerificationError(f"dependency[{ref}].dependsOn must be a string array")
+        if not isinstance(depends_on, list) or not all(
+            isinstance(item, str) for item in depends_on
+        ):
+            raise VerificationError(
+                f"dependency[{ref}].dependsOn must be a string array"
+            )
         if len(depends_on) != len(set(depends_on)):
             raise VerificationError(f"dependency[{ref}] contains duplicate edges")
         normalized.append({"ref": ref, "dependsOn": sorted(depends_on)})
@@ -155,7 +288,9 @@ def normalize_dependencies(entries: Any) -> list[dict[str, Any]]:
 
 def validate_policy(policy: dict[str, Any]) -> None:
     if policy.get("schema") != POLICY_SCHEMA:
-        raise VerificationError(f"unsupported supply-chain policy schema: {policy.get('schema')}")
+        raise VerificationError(
+            f"unsupported supply-chain policy schema: {policy.get('schema')}"
+        )
     inventory = policy.get("inventory")
     if not isinstance(inventory, dict):
         raise VerificationError("policy.inventory must be an object")
@@ -164,9 +299,13 @@ def validate_policy(policy: dict[str, Any]) -> None:
     if inventory.get("specVersion") not in SUPPORTED_SPEC_VERSIONS:
         raise VerificationError("policy inventory specVersion is unsupported")
     if inventory.get("includeBomSerialNumber") is not False:
-        raise VerificationError("policy must disable the non-deterministic BOM serial number")
+        raise VerificationError(
+            "policy must disable the non-deterministic BOM serial number"
+        )
     if inventory.get("includeBuildSystem") is not False:
-        raise VerificationError("policy must disable environment-specific build-system references")
+        raise VerificationError(
+            "policy must disable environment-specific build-system references"
+        )
     if inventory.get("rawTimestampTreatment") != "EXCLUDED_FROM_SEMANTIC_IDENTITY":
         raise VerificationError("policy must define timestamp identity treatment")
 
@@ -174,7 +313,9 @@ def validate_policy(policy: dict[str, Any]) -> None:
     if not isinstance(vulnerability, dict):
         raise VerificationError("policy.vulnerabilityPolicy must be an object")
     if vulnerability.get("status") != EXPECTED_VULNERABILITY_STATUS:
-        raise VerificationError("vulnerability scan must remain explicitly deferred in this tranche")
+        raise VerificationError(
+            "vulnerability scan must remain explicitly deferred in this tranche"
+        )
     threshold = vulnerability.get("failOnCvssAtOrAbove")
     if not isinstance(threshold, (int, float)) or not 0.0 <= float(threshold) <= 10.0:
         raise VerificationError("failOnCvssAtOrAbove must be within 0..10")
@@ -183,12 +324,37 @@ def validate_policy(policy: dict[str, Any]) -> None:
     if vulnerability.get("scannerFailure") != "FAIL_CLOSED":
         raise VerificationError("scanner failure must fail closed")
     required = vulnerability.get("requiredDatabaseProperties")
-    if not isinstance(required, list) or not required or not all(isinstance(item, str) for item in required):
-        raise VerificationError("requiredDatabaseProperties must be a non-empty string array")
+    if not isinstance(required, list) or not required or not all(
+        isinstance(item, str) for item in required
+    ):
+        raise VerificationError(
+            "requiredDatabaseProperties must be a non-empty string array"
+        )
 
 
-def verify_and_render(repository_root: Path, bom_path: Path, output_directory: Path) -> None:
-    policy_path = repository_root / "config" / "quality" / "supply-chain-policy.json"
+def verify_and_render(
+    repository_root: Path,
+    bom_path: Path,
+    output_directory: Path,
+) -> None:
+    repository_lexical, repository_resolved = _repository_roots(repository_root)
+    policy_path = require_regular_checkout_file(
+        repository_lexical,
+        repository_resolved,
+        repository_lexical / "config" / "quality" / "supply-chain-policy.json",
+        "supply-chain policy",
+    )
+    bom_path = require_regular_checkout_file(
+        repository_lexical,
+        repository_resolved,
+        bom_path,
+        "CycloneDX BOM",
+    )
+    output_directory = prepare_checkout_output_directory(
+        repository_lexical,
+        repository_resolved,
+        output_directory,
+    )
     policy = load_json(policy_path)
     validate_policy(policy)
     bom = load_json(bom_path)
@@ -198,10 +364,13 @@ def verify_and_render(repository_root: Path, bom_path: Path, output_directory: P
     spec_version = require_string(bom.get("specVersion"), "bom.specVersion")
     if spec_version != policy["inventory"]["specVersion"]:
         raise VerificationError(
-            f"BOM specVersion {spec_version} does not match policy {policy['inventory']['specVersion']}"
+            f"BOM specVersion {spec_version} does not match policy "
+            f"{policy['inventory']['specVersion']}"
         )
     if "serialNumber" in bom:
-        raise VerificationError("BOM serialNumber is forbidden by the deterministic policy")
+        raise VerificationError(
+            "BOM serialNumber is forbidden by the deterministic policy"
+        )
     if not isinstance(bom.get("version"), int) or bom["version"] < 1:
         raise VerificationError("BOM version must be a positive integer")
 
@@ -229,11 +398,16 @@ def verify_and_render(repository_root: Path, bom_path: Path, output_directory: P
 
     for dependency in dependencies:
         if dependency["ref"] not in known_refs:
-            raise VerificationError(f"dependency graph references unknown source: {dependency['ref']}")
-        missing = [ref for ref in dependency["dependsOn"] if ref not in known_refs]
+            raise VerificationError(
+                f"dependency graph references unknown source: {dependency['ref']}"
+            )
+        missing = [
+            ref for ref in dependency["dependsOn"] if ref not in known_refs
+        ]
         if missing:
             raise VerificationError(
-                f"dependency graph source {dependency['ref']} references unknown targets: {missing}"
+                f"dependency graph source {dependency['ref']} references "
+                f"unknown targets: {missing}"
             )
 
     inventory = {
@@ -252,16 +426,21 @@ def verify_and_render(repository_root: Path, bom_path: Path, output_directory: P
         "inventoryHash": sha256_bytes(inventory_bytes),
         "componentCount": len(components),
         "dependencyNodeCount": len(dependencies),
-        "dependencyEdgeCount": sum(len(entry["dependsOn"]) for entry in dependencies),
-        "rawBomTimestampPresent": bool(isinstance(metadata, dict) and metadata.get("timestamp")),
+        "dependencyEdgeCount": sum(
+            len(entry["dependsOn"]) for entry in dependencies
+        ),
+        "rawBomTimestampPresent": bool(
+            isinstance(metadata, dict) and metadata.get("timestamp")
+        ),
         "rawBomTimestampSemantic": False,
         "vulnerabilityDatabaseStatus": "NOT_BOUND",
         "vulnerabilityScanStatus": "NOT_EVALUATED",
         "vulnerabilityPolicyStatus": EXPECTED_VULNERABILITY_STATUS,
-        "claimBoundary": require_string(policy.get("claimBoundary"), "policy.claimBoundary"),
+        "claimBoundary": require_string(
+            policy.get("claimBoundary"), "policy.claimBoundary"
+        ),
     }
 
-    output_directory.mkdir(parents=True, exist_ok=True)
     write_json(output_directory / "dependency-inventory.json", inventory)
     write_json(output_directory / "supply-chain-evidence.json", evidence)
     markdown = "\n".join(
@@ -276,11 +455,13 @@ def verify_and_render(repository_root: Path, bom_path: Path, output_directory: P
             "- Vulnerability database: **NOT BOUND**",
             "- Vulnerability scan: **NOT EVALUATED**",
             "",
-            "> This tranche establishes deterministic resolved-dependency inventory only. It does not claim that dependencies are vulnerability-free.",
+            "> This tranche establishes deterministic resolved-dependency "
+            "inventory only. It does not claim that dependencies are "
+            "vulnerability-free.",
             "",
         ]
     )
-    (output_directory / "supply-chain-evidence.md").write_text(markdown, encoding="utf-8")
+    write_text(output_directory / "supply-chain-evidence.md", markdown)
 
 
 def main() -> int:
@@ -291,9 +472,9 @@ def main() -> int:
     args = parser.parse_args()
     try:
         verify_and_render(
-            args.repository_root.resolve(),
-            args.bom.resolve(),
-            args.output.resolve(),
+            args.repository_root,
+            args.bom,
+            args.output,
         )
     except VerificationError as exc:
         parser.error(str(exc))
