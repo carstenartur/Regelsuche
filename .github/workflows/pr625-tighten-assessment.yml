@@ -1,0 +1,136 @@
+name: Tighten PR 625 aggregate assessment
+
+on:
+  push:
+    branches:
+      - research/historical-rediscovery-atlas-v1
+
+permissions:
+  contents: write
+
+jobs:
+  tighten:
+    name: Align aggregate claims with target-blind evidence
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: research/historical-rediscovery-atlas-v1
+          fetch-depth: 0
+
+      - name: Apply the reviewed assessment invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "regelsuche-experiments/src/main/java/de/regelsuche/benchmark/"
+              "HistoricalRediscoveryAtlas.java"
+          )
+          text = source.read_text(encoding="utf-8")
+
+          old_equivalence = '''            boolean equivalence = results.stream()
+                  .filter(result ->
+                      result.benchmarkCase().role() == Role.NEGATIVE_CONTROL)
+                  .allMatch(result -> result.equivalence().evaluated()
+                      && !result.equivalence().equivalent())
+                  && results.stream()
+                      .filter(result -> result.benchmarkCase().relation()
+                          == Relation.EQUIVALENT)
+                      .anyMatch(result -> result.equivalence().equivalent());
+          '''.replace("\n          ", "\n")
+          new_equivalence = '''            boolean hasNegativeEquivalenceControl = results.stream()
+                  .anyMatch(result ->
+                      result.benchmarkCase().role() == Role.NEGATIVE_CONTROL);
+              boolean equivalence = hasNegativeEquivalenceControl
+                  && results.stream()
+                      .filter(result ->
+                          result.benchmarkCase().role() == Role.NEGATIVE_CONTROL)
+                      .allMatch(result -> result.equivalence().evaluated()
+                          && !result.equivalence().equivalent())
+                  && results.stream()
+                      .filter(result -> result.benchmarkCase().relation()
+                          == Relation.EQUIVALENT)
+                      .anyMatch(result -> result.equivalence().equivalent());
+          '''.replace("\n          ", "\n")
+          if text.count(old_equivalence) != 1:
+              raise SystemExit(
+                  f"expected one equivalence block, found {text.count(old_equivalence)}"
+              )
+          text = text.replace(old_equivalence, new_equivalence)
+
+          old_policy = '''            boolean searchPolicy = counts.getOrDefault(
+                  PrimaryStatus.REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,
+                  0) > 0
+                  || counts.getOrDefault(
+                      PrimaryStatus
+                          .REACHABLE_BUT_SCALAR_MISSED_GUIDANCE_FOUND,
+                      0) > 0;
+          '''.replace("\n          ", "\n")
+          new_policy = '''            boolean searchPolicy = counts.getOrDefault(
+                  PrimaryStatus.REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,
+                  0) > 0;
+          '''.replace("\n          ", "\n")
+          if text.count(old_policy) != 1:
+              raise SystemExit(
+                  f"expected one search-policy block, found {text.count(old_policy)}"
+              )
+          text = text.replace(old_policy, new_policy)
+          text = text.replace(
+              '"matched-work search policies produce different reachability outcomes"',
+              '"target-blind scalar and structural-diversity searches differ under the same declared heuristic budget"',
+          )
+          source.write_text(text, encoding="utf-8")
+
+          test = Path(
+              "regelsuche-experiments/src/test/java/de/regelsuche/benchmark/"
+              "HistoricalRediscoveryAtlasTest.java"
+          )
+          test_text = test.read_text(encoding="utf-8")
+          marker = '''    @Test
+              @Timeout(240)
+              void curatedHitDoesNotBecomeCapabilityGapBeforeProductionClosureCompletes() {
+          '''.replace("\n              ", "\n    ")
+          if test_text.count(marker) != 1:
+              raise SystemExit(
+                  f"expected one test insertion marker, found {test_text.count(marker)}"
+              )
+          method = '''    @Test
+              @Timeout(240)
+              void equivalenceDiscriminationRequiresANegativeControl() {
+                  Corpus full = HistoricalRediscoveryCorpus.load();
+                  HistoricalRediscoveryCorpus.Case positive = full.cases().stream()
+                      .filter(value -> value.id().equals("difference-of-squares-powers"))
+                      .findFirst()
+                      .orElseThrow();
+                  Corpus positiveOnly = new Corpus(
+                      full.schema(),
+                      full.evidenceStatus(),
+                      full.inventoryRevision(),
+                      full.claimBoundary(),
+                      full.contentSha256(),
+                      List.of(positive));
+
+                  HistoricalRediscoveryAtlas.AtlasReport report =
+                      new HistoricalRediscoveryAtlas().run(positiveOnly);
+
+                  assertTrue(report.cases().get(0).equivalence().equivalent());
+                  assertFalse(report.assessment().equivalenceLayerDiscriminates());
+              }
+
+          '''.replace("\n              ", "\n    ")
+          test.write_text(test_text.replace(marker, method + marker), encoding="utf-8")
+          PY
+
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add \
+            regelsuche-experiments/src/main/java/de/regelsuche/benchmark/HistoricalRediscoveryAtlas.java \
+            regelsuche-experiments/src/test/java/de/regelsuche/benchmark/HistoricalRediscoveryAtlasTest.java
+          git rm -- .github/workflows/pr625-tighten-assessment.yml
+          git commit -m "Tighten historical atlas aggregate claims"
+          git push origin HEAD:research/historical-rediscovery-atlas-v1
