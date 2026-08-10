@@ -118,8 +118,9 @@ record RuleRadarRequestBody(
                 throws IOException {
             ContextBuilder builder = new ContextBuilder();
             while (object.nextField()) {
-                builder.hasFields = true;
-                if (!builder.readField(object.fieldName(), object)) {
+                if (builder.readField(object.fieldName(), object)) {
+                    builder.hasFields = true;
+                } else {
                     object.skipValue();
                 }
             }
