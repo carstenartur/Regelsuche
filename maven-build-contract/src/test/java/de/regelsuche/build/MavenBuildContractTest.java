@@ -40,21 +40,29 @@ class MavenBuildContractTest {
         "com.github.eirslett:frontend-maven-plugin"
     );
 
-    private static final List<String> FORBIDDEN_HOST_RUNTIME_MARKERS = List.of(
-        "<executable>python",
-        "<executable>python3",
-        "<executable>bash",
-        "<executable>perl",
-        "<executable>node",
-        "<executable>npm",
-        "<executable>gradle",
-        "<argument>python",
-        "<argument>python3",
-        "<argument>bash",
-        "<argument>perl",
-        "<argument>node",
-        "<argument>npm",
-        "<argument>gradle"
+    private static final Set<String> FORBIDDEN_HOST_RUNTIMES = Set.of(
+        "python",
+        "python3",
+        "bash",
+        "sh",
+        "zsh",
+        "perl",
+        "node",
+        "npm",
+        "npx",
+        "gradle",
+        "gradlew",
+        "cmd",
+        "powershell",
+        "pwsh"
+    );
+
+    private static final List<String> COMMAND_ELEMENT_NAMES = List.of(
+        "executable",
+        "argument",
+        "command",
+        "commandlineArgs",
+        "commandLineArgs"
     );
 
     @Test
@@ -109,21 +117,58 @@ class MavenBuildContractTest {
         }
 
         for (Path pom : poms) {
-            String text = Files.readString(pom).toLowerCase(Locale.ROOT);
-            for (String marker : FORBIDDEN_HOST_RUNTIME_MARKERS) {
-                assertFalse(
-                    text.contains(marker),
-                    () -> pom + " invokes forbidden host runtime marker " + marker
-                );
-            }
+            Document document = parse(pom);
+            assertNoForbiddenCommandElements(document, pom);
 
-            for (String coordinate : buildPluginCoordinates(parse(pom).getDocumentElement())) {
+            for (String coordinate : buildPluginCoordinates(document.getDocumentElement())) {
                 assertFalse(
                     FORBIDDEN_BUILD_PLUGINS.contains(coordinate),
                     () -> pom + " activates forbidden build plugin " + coordinate
                 );
             }
         }
+    }
+
+    private static void assertNoForbiddenCommandElements(Document document, Path pom) {
+        for (String elementName : COMMAND_ELEMENT_NAMES) {
+            NodeList elements = document.getElementsByTagNameNS("*", elementName);
+            for (int index = 0; index < elements.getLength(); index++) {
+                String value = elements.item(index).getTextContent();
+                for (String token : commandTokens(value)) {
+                    assertFalse(
+                        FORBIDDEN_HOST_RUNTIMES.contains(token),
+                        () -> pom + " invokes forbidden host runtime " + token
+                            + " through <" + elementName + ">"
+                    );
+                }
+            }
+        }
+    }
+
+    private static Set<String> commandTokens(String value) {
+        Set<String> tokens = new LinkedHashSet<>();
+        if (value == null || value.isBlank()) {
+            return tokens;
+        }
+        for (String candidate : value.toLowerCase(Locale.ROOT).split("[^a-z0-9_./\\\\${}-]+")) {
+            if (candidate.isBlank()) {
+                continue;
+            }
+            String token = candidate.replace('\\', '/');
+            int slash = token.lastIndexOf('/');
+            if (slash >= 0) {
+                token = token.substring(slash + 1);
+            }
+            token = token.replace("${", "").replace("}", "");
+            if (token.endsWith(".exe")) {
+                token = token.substring(0, token.length() - 4);
+            }
+            if (token.contains(".")) {
+                tokens.add(token.substring(0, token.indexOf('.')));
+            }
+            tokens.add(token);
+        }
+        return tokens;
     }
 
     private static Path repositoryRoot() {
