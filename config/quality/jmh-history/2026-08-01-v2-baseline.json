@@ -1,0 +1,221 @@
+{
+  "benchmarks": [
+    {
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial",
+      "family": "CORE",
+      "score": 2.968339677,
+      "scoreError": 0.122097284,
+      "unit": "us/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium",
+      "family": "CORE",
+      "score": 8.280014442,
+      "scoreError": 0.957093038,
+      "unit": "us/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildLarge",
+      "family": "CORE",
+      "score": 3442.912294261,
+      "scoreError": 151.826398881,
+      "unit": "us/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium",
+      "family": "CORE",
+      "score": 6.294498201,
+      "scoreError": 0.118420735,
+      "unit": "us/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchFullScanLarge",
+      "family": "CORE",
+      "score": 1796.003483267,
+      "scoreError": 100.189490192,
+      "unit": "us/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchIndexedLarge",
+      "family": "CORE",
+      "score": 474.587770137,
+      "scoreError": 30.176176377,
+      "unit": "us/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall",
+      "family": "CORE",
+      "score": 2.082758038,
+      "scoreError": 0.086957993,
+      "unit": "us/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial",
+      "family": "CORE",
+      "score": 92.368514822,
+      "scoreError": 5.464045893,
+      "unit": "us/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
+      "family": "CORE",
+      "score": 207.391126027,
+      "scoreError": 58.914151399,
+      "unit": "us/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
+      "family": "CORE",
+      "score": 985.616185565,
+      "scoreError": 87.793268022,
+      "unit": "us/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedFixedWorkSearch",
+      "family": "END_TO_END_SEARCH",
+      "score": 17.079114672,
+      "scoreError": 63.159409098,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedTargetedSearch",
+      "family": "END_TO_END_SEARCH",
+      "score": 0.364931409,
+      "scoreError": 0.846555046,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceFixedWorkSearch",
+      "family": "END_TO_END_SEARCH",
+      "score": 29.446024096,
+      "scoreError": 82.966720231,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceTargetedSearch",
+      "family": "END_TO_END_SEARCH",
+      "score": 0.751385935,
+      "scoreError": 2.640183118,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.directAstRewriteSource",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.207535664,
+      "scoreError": 0.093452476,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.directSyntheticSource",
+      "family": "REWRITE_PROGRAM",
+      "score": 6.1774e-05,
+      "scoreError": 3.579e-06,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedAstRewriteSource",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.211117888,
+      "scoreError": 0.186586342,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedChoiceTwoAlternatives",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.001147931,
+      "scoreError": 0.000106653,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedFirstApplicableSecondAlternative",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.000563748,
+      "scoreError": 2.8484e-05,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedNestedControlFlow",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.004029276,
+      "scoreError": 0.000158438,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedPrioritizeTwoCandidates",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.001370758,
+      "scoreError": 6.8601e-05,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedPruneTwoCandidatesToOne",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.001220642,
+      "scoreError": 0.00015176,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedRepeatThreeIterations",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.003010427,
+      "scoreError": 0.000558791,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedRequireFilter",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.001342636,
+      "scoreError": 1.9939e-05,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedSequenceTwoSteps",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.001325011,
+      "scoreError": 3.1319e-05,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedSingleSource",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.00041223,
+      "scoreError": 9.4327e-05,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.preparedAstRewriteSource",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.086478533,
+      "scoreError": 0.011595104,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.programmedAstRewriteSource",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.214607218,
+      "scoreError": 0.349560119,
+      "unit": "ms/op"
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.programmedSingleSource",
+      "family": "REWRITE_PROGRAM",
+      "score": 0.00064946,
+      "scoreError": 3.2243e-05,
+      "unit": "ms/op"
+    }
+  ],
+  "execution": {
+    "forks": 1,
+    "jdkMajor": 21,
+    "jmhVersion": "1.36",
+    "measurementIterations": 3,
+    "mode": "avgt",
+    "threads": 1,
+    "warmupIterations": 2
+  },
+  "label": "JMH v2 retained baseline",
+  "recordedAt": "2026-08-01T21:06:39Z",
+  "schema": "regelsuche.quality.jmh-history-snapshot/v1",
+  "sourceArtifactDigest": "sha256:7a8877c8aa5feff1a5b6769f1f8a2948e3980bc5fbf6272110615d0437583e83",
+  "sourceRevision": "5b904d6d1d0d1488353a2d28445c9ec9d3e5fc51"
+}
