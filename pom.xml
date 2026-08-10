@@ -35,6 +35,7 @@
     <maven.compiler.release>21</maven.compiler.release>
     <maven.minimum.version>3.9.9</maven.minimum.version>
     <maven.maximum.exclusive.version>4.0.0</maven.maximum.exclusive.version>
+    <maven.test.fork.timeout.seconds>600</maven.test.fork.timeout.seconds>
     <junit.version>6.1.3</junit.version>
     <jackson.version>2.22.1</jackson.version>
     <maven.clean.plugin.version>3.5.0</maven.clean.plugin.version>
@@ -69,71 +70,19 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-core</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-egraph</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-search</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-validation</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-math-algorithms</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-math-jas</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-persistence</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-solver-ir</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-solver-portfolio</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-learning</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-discovery</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-experiments</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>de.regelsuche</groupId>
-        <artifactId>regelsuche-cli</artifactId>
-        <version>${project.version}</version>
-      </dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-core</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-egraph</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-search</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-validation</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-math-algorithms</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-math-jas</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-persistence</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-solver-ir</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-solver-portfolio</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-learning</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-discovery</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-experiments</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-cli</artifactId><version>${project.version}</version></dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -153,61 +102,17 @@
   <build>
     <pluginManagement>
       <plugins>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-clean-plugin</artifactId>
-          <version>${maven.clean.plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-resources-plugin</artifactId>
-          <version>${maven.resources.plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-compiler-plugin</artifactId>
-          <version>${maven.compiler.plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-surefire-plugin</artifactId>
-          <version>${maven.surefire.plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-failsafe-plugin</artifactId>
-          <version>${maven.failsafe.plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-jar-plugin</artifactId>
-          <version>${maven.jar.plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-install-plugin</artifactId>
-          <version>${maven.install.plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-deploy-plugin</artifactId>
-          <version>${maven.deploy.plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-site-plugin</artifactId>
-          <version>${maven.site.plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-enforcer-plugin</artifactId>
-          <version>${maven.enforcer.plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.jacoco</groupId>
-          <artifactId>jacoco-maven-plugin</artifactId>
-          <version>${jacoco.version}</version>
-        </plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-clean-plugin</artifactId><version>${maven.clean.plugin.version}</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-resources-plugin</artifactId><version>${maven.resources.plugin.version}</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>${maven.compiler.plugin.version}</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>${maven.surefire.plugin.version}</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-failsafe-plugin</artifactId><version>${maven.failsafe.plugin.version}</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>${maven.jar.plugin.version}</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-install-plugin</artifactId><version>${maven.install.plugin.version}</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-deploy-plugin</artifactId><version>${maven.deploy.plugin.version}</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-site-plugin</artifactId><version>${maven.site.plugin.version}</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-enforcer-plugin</artifactId><version>${maven.enforcer.plugin.version}</version></plugin>
+        <plugin><groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId><version>${jacoco.version}</version></plugin>
       </plugins>
     </pluginManagement>
 
@@ -219,25 +124,13 @@
           <execution>
             <id>enforce-minimal-build-toolchain</id>
             <phase>validate</phase>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
+            <goals><goal>enforce</goal></goals>
             <configuration>
               <rules>
-                <requireMavenVersion>
-                  <version>[${maven.minimum.version},${maven.maximum.exclusive.version})</version>
-                  <message>Regelsuche requires Maven 3.9.9 or newer from the 3.x line.</message>
-                </requireMavenVersion>
-                <requireJavaVersion>
-                  <version>[21,22)</version>
-                  <message>Regelsuche requires a Java 21 JDK.</message>
-                </requireJavaVersion>
-                <requireNoRepositories>
-                  <message>The Maven reactor must use the standard Central resolution path and must not declare checkout-specific repositories or plugin repositories.</message>
-                </requireNoRepositories>
-                <requirePluginVersions>
-                  <phases>clean,deploy,site</phases>
-                </requirePluginVersions>
+                <requireMavenVersion><version>[${maven.minimum.version},${maven.maximum.exclusive.version})</version><message>Regelsuche requires Maven 3.9.9 or newer from the 3.x line.</message></requireMavenVersion>
+                <requireJavaVersion><version>[21,22)</version><message>Regelsuche requires a Java 21 JDK.</message></requireJavaVersion>
+                <requireNoRepositories><message>The Maven reactor must use the standard Central resolution path and must not declare checkout-specific repositories or plugin repositories.</message></requireNoRepositories>
+                <requirePluginVersions><phases>clean,deploy,site</phases></requirePluginVersions>
                 <bannedPlugins>
                   <excludes>
                     <exclude>org.codehaus.mojo:exec-maven-plugin</exclude>
@@ -269,6 +162,8 @@
           <useModulePath>false</useModulePath>
           <failIfNoTests>false</failIfNoTests>
           <failIfNoSpecifiedTests>false</failIfNoSpecifiedTests>
+          <forkedProcessTimeoutInSeconds>${maven.test.fork.timeout.seconds}</forkedProcessTimeoutInSeconds>
+          <forkedProcessExitTimeoutInSeconds>60</forkedProcessExitTimeoutInSeconds>
           <systemPropertyVariables>
             <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
             <regelsuche.maven.reactor>true</regelsuche.maven.reactor>
@@ -280,19 +175,8 @@
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
         <executions>
-          <execution>
-            <id>prepare-agent</id>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>report</id>
-            <phase>verify</phase>
-            <goals>
-              <goal>report</goal>
-            </goals>
-          </execution>
+          <execution><id>prepare-agent</id><goals><goal>prepare-agent</goal></goals></execution>
+          <execution><id>report</id><phase>verify</phase><goals><goal>report</goal></goals></execution>
         </executions>
       </plugin>
     </plugins>
