@@ -41,6 +41,35 @@ tasks.named('jacocoTestReport') {
     }
 }
 
+def historicalRediscoveryReportDirectory = layout.buildDirectory.dir(
+    'reports/historical-rediscovery')
+def historicalRediscoveryOutputArgument =
+    historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
+
+def generateHistoricalRediscoveryAtlas = tasks.register(
+    'generateHistoricalRediscoveryAtlas', JavaExec) {
+    group = 'verification'
+    description = 'Executes the frozen historical reachability and search-policy atlas.'
+    dependsOn tasks.named('classes')
+    timeout = java.time.Duration.ofMinutes(10)
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.DiscoveryExperimentRunner'
+    argumentProviders.add({
+        ['historical-rediscovery', historicalRediscoveryOutputArgument.get()]
+    } as CommandLineArgumentProvider)
+    inputs.file(layout.projectDirectory.file(
+        'src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json'))
+    outputs.dir(historicalRediscoveryReportDirectory)
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
+    dependsOn generateHistoricalRediscoveryAtlas
+}
+
+// The repository merge gate invokes the root check rather than every
+// subproject check. Bind the retained experiment explicitly so CI cannot pass
+// without executing the atlas and its fail-closed claim validation.
+rootProject.tasks.named('check') {
+    dependsOn generateHistoricalRediscoveryAtlas
 }

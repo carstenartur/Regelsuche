@@ -72,6 +72,9 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 ### Discovery und Lernen
 
 - [Discovery Engine](discovery-engine.md)
+- [Search Intelligence](search-intelligence.md) — Suchprofile,
+  Diversity-Kontrolle, begrenztes Reachability-Orakel und historischer
+  Rediscovery-Atlas.
 - [Discovery Evidence v1](discovery-evidence-v1.md)
 - [Hypothesis Mining](hypothesis-mining.md)
 - [Rule Discovery](rule-discovery.md)
