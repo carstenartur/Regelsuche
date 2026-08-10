@@ -18,6 +18,13 @@
     <module>regelsuche-search</module>
     <module>regelsuche-validation</module>
     <module>regelsuche-math-algorithms</module>
+    <module>regelsuche-math-jas</module>
+    <module>regelsuche-persistence</module>
+    <module>regelsuche-solver-ir</module>
+    <module>regelsuche-learning</module>
+    <module>regelsuche-discovery</module>
+    <module>regelsuche-experiments</module>
+    <module>regelsuche-cli</module>
     <module>maven-build-contract</module>
   </modules>
 
@@ -84,6 +91,41 @@
       <dependency>
         <groupId>de.regelsuche</groupId>
         <artifactId>regelsuche-math-algorithms</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>de.regelsuche</groupId>
+        <artifactId>regelsuche-math-jas</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>de.regelsuche</groupId>
+        <artifactId>regelsuche-persistence</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>de.regelsuche</groupId>
+        <artifactId>regelsuche-solver-ir</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>de.regelsuche</groupId>
+        <artifactId>regelsuche-learning</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>de.regelsuche</groupId>
+        <artifactId>regelsuche-discovery</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>de.regelsuche</groupId>
+        <artifactId>regelsuche-experiments</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>de.regelsuche</groupId>
+        <artifactId>regelsuche-cli</artifactId>
         <version>${project.version}</version>
       </dependency>
     </dependencies>
