@@ -55,9 +55,9 @@ jobs:
               raise SystemExit(
                   f"expected 4 frozen distribution replacements, got {distribution_replacements}"
               )
-          if checksum_replacements != 5:
+          if checksum_replacements != 6:
               raise SystemExit(
-                  f"expected 5 frozen checksum replacements, got {checksum_replacements}"
+                  f"expected 6 frozen checksum replacements, got {checksum_replacements}"
               )
           PY
 
