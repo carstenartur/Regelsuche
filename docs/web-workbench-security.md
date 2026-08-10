@@ -20,7 +20,13 @@ Standard-Keystore-Typ ist `PKCS12`. Andere Typen können mit `--keystore-type JK
 
 ## Body-Limit
 
-Das Limit für POST-Body-Größen liegt standardmäßig bei 1 MiB. Größere Bodies werden mit HTTP 500 abgelehnt. Anpassen mit `--max-request-bytes 2097152`.
+Das Limit für JSON-POST-Bodies liegt standardmäßig bei 1 MiB und gilt einheitlich für alle dokumentierten Workbench- und Regelradar-Endpunkte. Die Grenze wird unabhängig von `Content-Length` auch für chunked Requests beim Lesen durchgesetzt. Ein Body mit exakt der konfigurierten Größe ist zulässig; ein weiteres Byte führt zu HTTP 413 und dem stabilen JSON-Vertrag:
+
+```json
+{"error":true,"code":"PAYLOAD_TOO_LARGE","message":"request body exceeds configured limit","limitBytes":1048576}
+```
+
+Die Antwort verwendet `Content-Type: application/json; charset=utf-8` und `Cache-Control: no-store`. Das Limit lässt sich beispielsweise mit `--max-request-bytes 2097152` anpassen.
 
 ## Kombination
 

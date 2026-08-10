@@ -211,7 +211,11 @@ public class WebWorkbenchServer {
         this.didacticAnalytics = new de.regelsuche.didactic.analytics.DidacticAnalyticsService(didacticEventStore);
         this.didacticStepValidator = new de.regelsuche.didactic.StudentStepValidator(new SymPyEquivalenceService());
         this.ruleRadarHandler = new de.regelsuche.radar.RuleRadarHttpHandler(
-            inventoryRepository, graphStore, this.pluginRuntimeConfig);
+            inventoryRepository,
+            graphStore,
+            this.pluginRuntimeConfig,
+            this.securityConfig.maxRequestBytes()
+        );
     }
 
     private static de.regelsuche.proof.ProofBridgeService defaultProofBridgeService(
@@ -324,7 +328,11 @@ public class WebWorkbenchServer {
                 sendStatus(exchange, 405, "method not allowed");
                 return;
             }
-            delegate.handle(exchange);
+            try {
+                delegate.handle(exchange);
+            } catch (BoundedRequestBody.PayloadTooLargeException exception) {
+                sendPayloadTooLarge(exchange, exception.limitBytes());
+            }
         };
     }
 
@@ -2876,18 +2884,12 @@ public class WebWorkbenchServer {
     }
 
     private Map<String, Object> readJsonObject(HttpExchange exchange) throws IOException {
-        try (InputStream stream = exchange.getRequestBody()) {
-            int limit = securityConfig.maxRequestBytes();
-            byte[] buffer = stream.readNBytes(limit + 1);
-            if (buffer.length > limit) {
-                throw new IOException("request body exceeds limit of " + limit + " bytes");
-            }
-            String text = new String(buffer, StandardCharsets.UTF_8);
-            if (text.isBlank()) {
-                return Map.of();
-            }
-            return new JsonReader(text).readObject();
+        byte[] buffer = BoundedRequestBody.read(exchange, securityConfig.maxRequestBytes());
+        String text = new String(buffer, StandardCharsets.UTF_8);
+        if (text.isBlank()) {
+            return Map.of();
         }
+        return new JsonReader(text).readObject();
     }
 
     private String stringValue(Map<String, Object> body, String key, String fallback) {
@@ -2930,6 +2932,17 @@ public class WebWorkbenchServer {
             }
         }
         return parsed.getOrDefault(name, fallback);
+    }
+
+    private void sendPayloadTooLarge(HttpExchange exchange, int limitBytes) throws IOException {
+        JsonWriter writer = new JsonWriter().beginObject()
+            .property("error", true)
+            .property("code", "PAYLOAD_TOO_LARGE")
+            .property("message", "request body exceeds configured limit")
+            .property("limitBytes", limitBytes)
+            .endObject();
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        sendJson(exchange, 413, writer.toString());
     }
 
     private void sendJson(HttpExchange exchange, int status, String body) throws IOException {
