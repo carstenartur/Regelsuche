@@ -184,6 +184,9 @@
                   <version>[21,22)</version>
                   <message>Regelsuche requires a Java 21 JDK.</message>
                 </requireJavaVersion>
+                <requireNoRepositories>
+                  <message>The Maven reactor must use the standard Central resolution path and must not declare checkout-specific repositories or plugin repositories.</message>
+                </requireNoRepositories>
                 <requirePluginVersions>
                   <phases>clean,deploy,site</phases>
                 </requirePluginVersions>
