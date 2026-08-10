@@ -48,7 +48,7 @@ def mavenExecutable = System.getProperty('os.name')
 
 def verifyMavenCoreReactor = tasks.register('verifyMavenCoreReactor', Exec) {
     group = 'verification'
-    description = 'Runs the Java-21/JUnit-5 Maven core reactor introduced by issue #632.'
+    description = 'Runs the Java-21/JUnit-Jupiter Maven core reactor introduced by issue #632.'
     workingDir rootProject.rootDir
     commandLine mavenExecutable,
         '--batch-mode',
