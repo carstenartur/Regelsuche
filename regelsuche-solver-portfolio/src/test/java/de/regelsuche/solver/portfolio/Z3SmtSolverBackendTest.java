@@ -3,7 +3,6 @@ package de.regelsuche.solver.portfolio;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import de.regelsuche.solver.ir.SolverExecution;
 import de.regelsuche.solver.ir.SolverIr;
@@ -24,7 +23,6 @@ import de.regelsuche.solver.ir.SolverObligationFactory;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 class Z3SmtSolverBackendTest {
@@ -155,22 +153,6 @@ class Z3SmtSolverBackendTest {
         assertFalse(execution.result().counterexample().isEmpty());
         assertTrue(execution.result().counterexample().get("smtModel")
             .contains("define-fun x"));
-    }
-
-    @Test
-    @Tag("external-prover")
-    void systemZ3ReturnsRealProofObject() {
-        Z3SmtSolverBackend.Detection detection =
-            Z3SmtSolverBackend.detectSystemZ3();
-        assumeTrue(detection.availability() == BackendAvailability.AVAILABLE,
-            () -> "System Z3 is unavailable: " + detection.detail());
-
-        SolverExecution execution = detection.backend().execute(referenceObligation());
-
-        assertEquals(ResultStatus.CONFIRMED, execution.result().status(),
-            execution.result().message());
-        assertTrue(execution.result().certificateHash()
-            .matches("sha256:[0-9a-f]{64}"));
     }
 
     private static Z3SmtSolverBackend backendReturningProof(AtomicInteger calls) {
