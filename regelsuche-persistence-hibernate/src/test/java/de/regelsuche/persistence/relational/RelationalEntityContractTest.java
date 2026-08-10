@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +16,8 @@ class RelationalEntityContractTest {
     @Test
     void searchRunRetainsCanonicalDefaultsAndRejectsInvalidCounters() {
         Instant startedAt = Instant.parse("2026-08-10T00:00:00Z");
+        List<String> bestPathIds = new ArrayList<>(
+            List.of("state-1", "state-2"));
         SearchRunEntity run = new SearchRunEntity(
             "run-1",
             null,
@@ -23,9 +26,10 @@ class RelationalEntityContractTest {
             null,
             3,
             2,
-            List.of("state-1", "state-2"),
+            bestPathIds,
             startedAt,
             null);
+        bestPathIds.add("state-after-construction");
 
         assertEquals("run-1", run.id());
         assertEquals("", run.sourceExpression());
@@ -51,14 +55,17 @@ class RelationalEntityContractTest {
 
     @Test
     void discoveryAndSeedEntitiesPreserveListsAndNullSafeDefaults() {
+        List<String> searchRunIds = new ArrayList<>(
+            List.of("run-1", "run-2"));
         DiscoveryExperimentEntity experiment = new DiscoveryExperimentEntity(
             "experiment-1",
             null,
             null,
             null,
-            List.of("run-1", "run-2"),
+            searchRunIds,
             null,
             null);
+        searchRunIds.add("run-after-construction");
 
         assertEquals("experiment-1", experiment.id());
         assertEquals("experiment-1", experiment.name());
@@ -69,9 +76,11 @@ class RelationalEntityContractTest {
         assertEquals(experiment.createdAt(), experiment.updatedAt());
 
         Instant createdAt = Instant.parse("2026-08-10T01:00:00Z");
+        List<String> tags = new ArrayList<>(
+            List.of("polynomial", "positive"));
         SeedExpressionEntity seed = new SeedExpressionEntity(
-            "seed-1", "x^2 + 1", null, null,
-            List.of("polynomial", "positive"), createdAt);
+            "seed-1", "x^2 + 1", null, null, tags, createdAt);
+        tags.add("tag-after-construction");
 
         assertEquals("seed-1", seed.id());
         assertEquals("x^2 + 1", seed.expression());
@@ -86,19 +95,23 @@ class RelationalEntityContractTest {
     @Test
     void reportEntityRetainsSearchReferencesAndCanonicalFacets() {
         Instant createdAt = Instant.parse("2026-08-10T02:00:00Z");
+        List<SearchFacet> facets = new ArrayList<>(List.of(
+            new SearchFacet(" status ", "confirmed"),
+            new SearchFacet("domain", "algebra")));
+        List<String> references = new ArrayList<>(List.of("run-2", "run-1"));
         ExportReportEntity report = new ExportReportEntity(
             "report-1",
             null,
             null,
             null,
             null,
-            List.of(
-                new SearchFacet(" status ", "confirmed"),
-                new SearchFacet("domain", "algebra")),
+            facets,
             null,
             null,
-            List.of("run-2", "run-1"),
+            references,
             createdAt);
+        facets.add(new SearchFacet("status", "mutated"));
+        references.add("run-after-construction");
 
         assertEquals("report-1", report.id());
         assertEquals("", report.experimentId());
@@ -166,14 +179,16 @@ class RelationalEntityContractTest {
         assertNull(proof.completedAt());
 
         Instant foundAt = Instant.parse("2026-08-10T05:00:00Z");
+        List<String> assumptions = new ArrayList<>(List.of("x != 0"));
         CounterexampleEntity counterexample = new CounterexampleEntity(
             "counterexample-1",
             "hypothesis-before-attach",
             null,
             null,
             null,
-            List.of("x != 0"),
+            assumptions,
             foundAt);
+        assumptions.add("mutated-after-construction");
 
         assertEquals("counterexample-1", counterexample.id());
         assertEquals("hypothesis-before-attach", counterexample.hypothesisId());
