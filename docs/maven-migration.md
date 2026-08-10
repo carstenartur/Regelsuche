@@ -24,8 +24,9 @@ The first Maven reactor covers a coherent Java/JUnit core slice:
 - `regelsuche-math-algorithms`;
 - `maven-build-contract`.
 
-It compiles all main sources in these modules and runs their existing JUnit 5
-tests with Maven Surefire. The build-contract module additionally checks that:
+It compiles all main sources in these modules and runs their existing JUnit
+Jupiter tests with Maven Surefire. The build-contract module additionally checks
+that:
 
 - the declared reactor modules and parent relationships are complete;
 - Java 21 and the Maven 3.9.x range are fail-closed through Maven Enforcer;
@@ -69,7 +70,7 @@ remaining modules are migrated.
 The migration is not complete until:
 
 - every Java module is present in the Maven reactor;
-- integration tests run through JUnit 5 and Maven Failsafe/Testcontainers;
+- integration tests run through JUnit Jupiter and Maven Failsafe/Testcontainers;
 - existing Python and required shell verifier logic has moved to Java/JUnit;
 - CI invokes Maven directly;
 - Gradle files and the Gradle wrapper are removed.
