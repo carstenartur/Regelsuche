@@ -154,6 +154,32 @@ class HistoricalRediscoveryAtlasTest {
 
     @Test
     @Timeout(240)
+    void equivalenceDiscriminationRequiresANegativeControl() {
+        Corpus full = HistoricalRediscoveryCorpus.load();
+        HistoricalRediscoveryCorpus.Case positive =
+            full.cases().stream()
+                .filter(value -> value.id().equals(
+                    "difference-of-squares-powers"))
+                .findFirst()
+                .orElseThrow();
+        Corpus positiveOnly = new Corpus(
+            full.schema(),
+            full.evidenceStatus(),
+            full.inventoryRevision(),
+            full.claimBoundary(),
+            full.contentSha256(),
+            List.of(positive));
+
+        HistoricalRediscoveryAtlas.AtlasReport report =
+            new HistoricalRediscoveryAtlas().run(positiveOnly);
+
+        assertTrue(report.cases().get(0).equivalence().equivalent());
+        assertFalse(
+            report.assessment().equivalenceLayerDiscriminates());
+    }
+
+    @Test
+    @Timeout(240)
     void curatedHitDoesNotBecomeCapabilityGapBeforeProductionClosureCompletes() {
         Corpus full = HistoricalRediscoveryCorpus.load();
         HistoricalRediscoveryCorpus.Case benchmarkCase = full.cases().stream()

@@ -922,15 +922,24 @@ public final class HistoricalRediscoveryAtlas {
                 counts.merge(result.status(), 1, Integer::sum));
             boolean representation = results.stream()
                 .allMatch(result -> result.representation().supported());
-            boolean equivalence = results.stream()
-                .filter(result ->
-                    result.benchmarkCase().role() == Role.NEGATIVE_CONTROL)
-                .allMatch(result -> result.equivalence().evaluated()
-                    && !result.equivalence().equivalent())
+            boolean hasNegativeEquivalenceControl = results.stream()
+                .anyMatch(result ->
+                    result.benchmarkCase().role()
+                        == Role.NEGATIVE_CONTROL);
+            boolean equivalence = hasNegativeEquivalenceControl
                 && results.stream()
-                    .filter(result -> result.benchmarkCase().relation()
-                        == Relation.EQUIVALENT)
-                    .anyMatch(result -> result.equivalence().equivalent());
+                    .filter(result ->
+                        result.benchmarkCase().role()
+                            == Role.NEGATIVE_CONTROL)
+                    .allMatch(result ->
+                        result.equivalence().evaluated()
+                            && !result.equivalence().equivalent())
+                && results.stream()
+                    .filter(result ->
+                        result.benchmarkCase().relation()
+                            == Relation.EQUIVALENT)
+                    .anyMatch(result ->
+                        result.equivalence().equivalent());
             boolean productionPositive = results.stream()
                 .anyMatch(result -> result.production().oracle().reachable());
             boolean missingInventory = counts.getOrDefault(
@@ -938,12 +947,9 @@ public final class HistoricalRediscoveryAtlas {
                     .CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE,
                 0) > 0;
             boolean searchPolicy = counts.getOrDefault(
-                PrimaryStatus.REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,
-                0) > 0
-                || counts.getOrDefault(
-                    PrimaryStatus
-                        .REACHABLE_BUT_SCALAR_MISSED_GUIDANCE_FOUND,
-                    0) > 0;
+                PrimaryStatus
+                    .REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,
+                0) > 0;
             boolean genericBridge = counts.getOrDefault(
                 PrimaryStatus.GENERIC_BRIDGE_REQUIRED_AND_FOUND,
                 0) > 0;
@@ -978,7 +984,7 @@ public final class HistoricalRediscoveryAtlas {
             }
             if (searchPolicy) {
                 reasons.add(
-                    "matched-work search policies produce different reachability outcomes");
+                    "target-blind scalar and structural-diversity searches differ under the same declared heuristic budget");
             }
             if (genericBridge) {
                 reasons.add(
