@@ -89,6 +89,10 @@ primitive work, search metrics, directionality and one evidence-derived primary
 diagnosis per case. The aggregate assessment is one of
 `USEFUL_DIAGNOSTIC_STEP`, `USEFUL_BUT_INCOMPLETE` or `INSUFFICIENT_SIGNAL`.
 
+The dedicated `regelsuche-core` oracle and known-derivation tests remain the
+authoritative unit-level contracts. Atlas tests add only corpus, policy and
+cross-layer integration evidence; they do not replace those focused tests.
+
 Generate the atlas with:
 
 ```bash
