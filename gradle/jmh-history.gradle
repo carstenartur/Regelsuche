@@ -1,0 +1,62 @@
+/*
+ * Deterministic checkout-owned JMH history rendering for issue #514.
+ *
+ * Snapshot identities and comparison semantics are versioned in the checkout.
+ * GitHub Actions only retains the generated build/reports evidence.
+ */
+
+def jmhHistoryRepositoryRoot = layout.projectDirectory
+def jmhHistoryVerificationVenv = layout.buildDirectory.dir('verification-venv')
+def jmhHistoryVerificationPython = providers.provider {
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(jmhHistoryVerificationVenv.get().asFile, executable)
+}
+def jmhHistoryReportDirectory = layout.buildDirectory.dir('reports/quality/jmh-history')
+def jmhHistorySnapshots = fileTree(jmhHistoryRepositoryRoot.dir('config/quality/jmh-history')) {
+    include '*.json'
+}
+
+def testJmhHistoryRenderer = tasks.register('testJmhHistoryRenderer', Exec) {
+    group = 'verification'
+    description = 'Characterizes deterministic JMH history rendering and fail-closed input validation.'
+    dependsOn 'prepareVerificationEnvironment'
+    workingDir jmhHistoryRepositoryRoot
+    inputs.file jmhHistoryRepositoryRoot.file('scripts/render-jmh-history.py')
+    inputs.file jmhHistoryRepositoryRoot.file('scripts/test-render-jmh-history.py')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine jmhHistoryVerificationPython.get().absolutePath,
+            '-B',
+            'scripts/test-render-jmh-history.py',
+            'scripts/render-jmh-history.py'
+    }
+}
+
+def renderJmhHistory = tasks.register('renderJmhHistory', Exec) {
+    group = 'reporting'
+    description = 'Renders checksum-bound historical JMH tables and per-benchmark SVG charts in ms/op.'
+    dependsOn 'prepareVerificationEnvironment', testJmhHistoryRenderer
+    workingDir jmhHistoryRepositoryRoot
+    inputs.file jmhHistoryRepositoryRoot.file('config/quality/jmh-history-policy.json')
+    inputs.file jmhHistoryRepositoryRoot.file('config/quality/jmh-regression-policy-v2.json')
+    inputs.files jmhHistorySnapshots
+    inputs.file jmhHistoryRepositoryRoot.file('scripts/render-jmh-history.py')
+    outputs.dir jmhHistoryReportDirectory
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine jmhHistoryVerificationPython.get().absolutePath,
+            '-B',
+            'scripts/render-jmh-history.py',
+            '--history-policy',
+            jmhHistoryRepositoryRoot.file('config/quality/jmh-history-policy.json').asFile.absolutePath,
+            '--regression-policy',
+            jmhHistoryRepositoryRoot.file('config/quality/jmh-regression-policy-v2.json').asFile.absolutePath,
+            '--output-dir',
+            jmhHistoryReportDirectory.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { candidate -> candidate.name == 'check' }.configureEach {
+    dependsOn renderJmhHistory
+}
