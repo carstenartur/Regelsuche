@@ -42,17 +42,17 @@ public final class Z3SmtSolverBackend implements SolverBackend {
     private final String configurationHash;
 
     public Z3SmtSolverBackend(String backendVersion) {
-<span class="nc" id="L45">        this(backendVersion, List.of(&quot;z3&quot;, &quot;-in&quot;, &quot;-smt2&quot;), Duration.ofSeconds(20),</span>
+<span class="fc" id="L45">        this(backendVersion, List.of(&quot;z3&quot;, &quot;-in&quot;, &quot;-smt2&quot;), Duration.ofSeconds(20),</span>
             new DefaultProcessRunner());
-<span class="nc" id="L47">    }</span>
+<span class="fc" id="L47">    }</span>
 
     public Z3SmtSolverBackend(
         String backendVersion,
         List&lt;String&gt; command,
         Duration timeout
     ) {
-<span class="nc" id="L54">        this(backendVersion, command, timeout, new DefaultProcessRunner());</span>
-<span class="nc" id="L55">    }</span>
+<span class="fc" id="L54">        this(backendVersion, command, timeout, new DefaultProcessRunner());</span>
+<span class="fc" id="L55">    }</span>
 
     Z3SmtSolverBackend(
         String backendVersion,
@@ -60,11 +60,11 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         Duration timeout,
         ProcessRunner processRunner
 <span class="fc" id="L62">    ) {</span>
-<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        if (backendVersion == null || backendVersion.isBlank()) {</span>
-<span class="nc" id="L64">            throw new IllegalArgumentException(&quot;backendVersion must not be blank&quot;);</span>
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">        if (backendVersion == null || backendVersion.isBlank()) {</span>
+<span class="fc" id="L64">            throw new IllegalArgumentException(&quot;backendVersion must not be blank&quot;);</span>
         }
-<span class="pc bpc" id="L66" title="2 of 4 branches missed.">        if (command == null || command.isEmpty()) {</span>
-<span class="nc" id="L67">            throw new IllegalArgumentException(&quot;command must not be empty&quot;);</span>
+<span class="pc bpc" id="L66" title="1 of 4 branches missed.">        if (command == null || command.isEmpty()) {</span>
+<span class="fc" id="L67">            throw new IllegalArgumentException(&quot;command must not be empty&quot;);</span>
         }
 <span class="fc" id="L69">        this.command = List.copyOf(command);</span>
 <span class="fc" id="L70">        this.timeoutMillis = Math.max(100L, Objects.requireNonNull(timeout).toMillis());</span>
@@ -83,11 +83,11 @@ public final class Z3SmtSolverBackend implements SolverBackend {
 
     @Override
     public BackendDescriptor descriptor() {
-<span class="nc" id="L86">        return descriptor;</span>
+<span class="fc" id="L86">        return descriptor;</span>
     }
 
     public String configurationHash() {
-<span class="nc" id="L90">        return configurationHash;</span>
+<span class="fc" id="L90">        return configurationHash;</span>
     }
 
     @Override
@@ -122,26 +122,26 @@ public final class Z3SmtSolverBackend implements SolverBackend {
 <span class="fc" id="L122">                + material.scriptPrefix() + &quot;(check-sat)\n&quot;,</span>
             timeoutMillis);
         SolverResult result;
-<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (!check.available()) {</span>
-<span class="nc" id="L126">            result = result(obligation, ResultStatus.ERROR,</span>
-<span class="nc" id="L127">                &quot;Z3 executable unavailable: &quot; + check.stderr(), Map.of(), &quot;&quot;);</span>
-<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        } else if (check.timedOut()) {</span>
-<span class="nc" id="L129">            result = result(obligation, ResultStatus.TIMEOUT,</span>
-<span class="nc" id="L130">                &quot;Z3 check-sat timed out&quot;, Map.of(), &quot;&quot;);</span>
-<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        } else if (check.exitCode() != 0) {</span>
-<span class="nc" id="L132">            result = result(obligation, ResultStatus.ERROR,</span>
-<span class="nc" id="L133">                &quot;Z3 check-sat failed: &quot; + normalize(check.stdout() + ' ' + check.stderr()),</span>
-<span class="nc" id="L134">                Map.of(), &quot;&quot;);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (!check.available()) {</span>
+<span class="fc" id="L126">            result = result(obligation, ResultStatus.ERROR,</span>
+<span class="fc" id="L127">                &quot;Z3 executable unavailable: &quot; + check.stderr(), Map.of(), &quot;&quot;);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        } else if (check.timedOut()) {</span>
+<span class="fc" id="L129">            result = result(obligation, ResultStatus.TIMEOUT,</span>
+<span class="fc" id="L130">                &quot;Z3 check-sat timed out&quot;, Map.of(), &quot;&quot;);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        } else if (check.exitCode() != 0) {</span>
+<span class="fc" id="L132">            result = result(obligation, ResultStatus.ERROR,</span>
+<span class="fc" id="L133">                &quot;Z3 check-sat failed: &quot; + normalize(check.stdout() + ' ' + check.stderr()),</span>
+<span class="fc" id="L134">                Map.of(), &quot;&quot;);</span>
         } else {
-<span class="pc bpc" id="L136" title="2 of 4 branches missed.">            result = switch (status(check.stdout())) {</span>
+<span class="fc bfc" id="L136" title="All 4 branches covered.">            result = switch (status(check.stdout())) {</span>
 <span class="fc" id="L137">                case &quot;unsat&quot; -&gt; proofResult(obligation, material);</span>
 <span class="fc" id="L138">                case &quot;sat&quot; -&gt; modelResult(obligation, material);</span>
-<span class="nc" id="L139">                case &quot;unknown&quot; -&gt; result(obligation, ResultStatus.UNKNOWN,</span>
-<span class="nc" id="L140">                    &quot;Z3 returned unknown&quot;, Map.of(), &quot;&quot;);</span>
-<span class="pc" id="L141">                default -&gt; result(obligation, ResultStatus.ERROR,</span>
+<span class="fc" id="L139">                case &quot;unknown&quot; -&gt; result(obligation, ResultStatus.UNKNOWN,</span>
+<span class="fc" id="L140">                    &quot;Z3 returned unknown&quot;, Map.of(), &quot;&quot;);</span>
+<span class="fc" id="L141">                default -&gt; result(obligation, ResultStatus.ERROR,</span>
                     &quot;unrecognized Z3 output: &quot;
-<span class="nc" id="L143">                        + normalize(check.stdout() + check.stderr()),</span>
-<span class="nc" id="L144">                    Map.of(), &quot;&quot;);</span>
+<span class="fc" id="L143">                        + normalize(check.stdout() + check.stderr()),</span>
+<span class="fc" id="L144">                    Map.of(), &quot;&quot;);</span>
             };
         }
 <span class="fc" id="L147">        return SolverExecution.create(obligation, translation, result);</span>
@@ -156,13 +156,13 @@ public final class Z3SmtSolverBackend implements SolverBackend {
             &quot;(set-option :produce-proofs true)\n&quot;
 <span class="fc" id="L157">                + material.scriptPrefix() + &quot;(check-sat)\n(get-proof)\n&quot;,</span>
             timeoutMillis);
-<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (!proof.available()) {</span>
-<span class="nc" id="L160">            return result(obligation, ResultStatus.ERROR,</span>
-<span class="nc" id="L161">                &quot;Z3 proof retrieval unavailable&quot;, Map.of(), &quot;&quot;);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (!proof.available()) {</span>
+<span class="fc" id="L160">            return result(obligation, ResultStatus.ERROR,</span>
+<span class="fc" id="L161">                &quot;Z3 proof retrieval unavailable&quot;, Map.of(), &quot;&quot;);</span>
         }
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (proof.timedOut()) {</span>
-<span class="nc" id="L164">            return result(obligation, ResultStatus.TIMEOUT,</span>
-<span class="nc" id="L165">                &quot;Z3 proof retrieval timed out&quot;, Map.of(), &quot;&quot;);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (proof.timedOut()) {</span>
+<span class="fc" id="L164">            return result(obligation, ResultStatus.TIMEOUT,</span>
+<span class="fc" id="L165">                &quot;Z3 proof retrieval timed out&quot;, Map.of(), &quot;&quot;);</span>
         }
 <span class="fc" id="L167">        String payload = payloadAfterStatus(proof.stdout(), &quot;unsat&quot;);</span>
 <span class="fc bfc" id="L168" title="All 2 branches covered.">        if (proof.exitCode() != 0</span>
@@ -186,11 +186,11 @@ public final class Z3SmtSolverBackend implements SolverBackend {
             command,
 <span class="fc" id="L187">            material.scriptPrefix() + &quot;(check-sat)\n(get-model)\n&quot;,</span>
             timeoutMillis);
-<span class="pc bpc" id="L189" title="2 of 4 branches missed.">        String payload = model.available() &amp;&amp; !model.timedOut()</span>
+<span class="pc bpc" id="L189" title="1 of 4 branches missed.">        String payload = model.available() &amp;&amp; !model.timedOut()</span>
 <span class="pc bpc" id="L190" title="1 of 2 branches missed.">                &amp;&amp; model.exitCode() == 0</span>
-<span class="pc" id="L191">            ? payloadAfterStatus(model.stdout(), &quot;sat&quot;) : &quot;&quot;;</span>
-<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        Map&lt;String, String&gt; counterexample = validModelPayload(payload)</span>
-<span class="pc" id="L193">            ? Map.of(&quot;smtModel&quot;, payload) : Map.of();</span>
+<span class="fc" id="L191">            ? payloadAfterStatus(model.stdout(), &quot;sat&quot;) : &quot;&quot;;</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        Map&lt;String, String&gt; counterexample = validModelPayload(payload)</span>
+<span class="fc" id="L193">            ? Map.of(&quot;smtModel&quot;, payload) : Map.of();</span>
 <span class="fc" id="L194">        return result(obligation, ResultStatus.REFUTED,</span>
             &quot;Z3 found a satisfying countermodel for the negated goal&quot;,
             counterexample, &quot;&quot;);
@@ -231,10 +231,10 @@ public final class Z3SmtSolverBackend implements SolverBackend {
     }
 
     public static Detection detectSystemZ3() {
-<span class="fc" id="L234">        ProcessRunner runner = new DefaultProcessRunner();</span>
-<span class="fc" id="L235">        ProcessOutput output = runner.run(</span>
-<span class="fc" id="L236">            List.of(&quot;z3&quot;, &quot;-version&quot;), &quot;&quot;, 2_000L);</span>
-<span class="pc bpc" id="L237" title="3 of 6 branches missed.">        if (!output.available() || output.timedOut() || output.exitCode() != 0) {</span>
+<span class="nc" id="L234">        ProcessRunner runner = new DefaultProcessRunner();</span>
+<span class="nc" id="L235">        ProcessOutput output = runner.run(</span>
+<span class="nc" id="L236">            List.of(&quot;z3&quot;, &quot;-version&quot;), &quot;&quot;, 2_000L);</span>
+<span class="nc bnc" id="L237" title="All 6 branches missed.">        if (!output.available() || output.timedOut() || output.exitCode() != 0) {</span>
 <span class="nc" id="L238">            return new Detection(</span>
                 new Z3SmtSolverBackend(
 <span class="nc" id="L240">                    &quot;unavailable&quot;, List.of(&quot;z3&quot;, &quot;-in&quot;, &quot;-smt2&quot;),</span>
@@ -242,14 +242,14 @@ public final class Z3SmtSolverBackend implements SolverBackend {
                 BackendAvailability.UNAVAILABLE,
 <span class="nc" id="L243">                normalize(output.stdout() + ' ' + output.stderr()));</span>
         }
-<span class="fc" id="L245">        String version = normalize(output.stdout());</span>
-<span class="pc bpc" id="L246" title="1 of 2 branches missed.">        if (version.isBlank()) {</span>
+<span class="nc" id="L245">        String version = normalize(output.stdout());</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (version.isBlank()) {</span>
 <span class="nc" id="L247">            version = &quot;system&quot;;</span>
         }
-<span class="fc" id="L249">        return new Detection(</span>
+<span class="nc" id="L249">        return new Detection(</span>
             new Z3SmtSolverBackend(
-<span class="fc" id="L251">                version, List.of(&quot;z3&quot;, &quot;-in&quot;, &quot;-smt2&quot;),</span>
-<span class="fc" id="L252">                Duration.ofSeconds(20), runner),</span>
+<span class="nc" id="L251">                version, List.of(&quot;z3&quot;, &quot;-in&quot;, &quot;-smt2&quot;),</span>
+<span class="nc" id="L252">                Duration.ofSeconds(20), runner),</span>
             BackendAvailability.AVAILABLE,
             version);
     }
@@ -271,8 +271,8 @@ public final class Z3SmtSolverBackend implements SolverBackend {
 <span class="pc bpc" id="L271" title="1 of 2 branches missed.">        return output == null ? &quot;&quot; : output.lines()</span>
 <span class="fc" id="L272">            .map(String::trim)</span>
 <span class="fc" id="L273">            .map(value -&gt; value.toLowerCase(Locale.ROOT))</span>
-<span class="pc bpc" id="L274" title="1 of 4 branches missed.">            .filter(value -&gt; value.equals(&quot;sat&quot;) || value.equals(&quot;unsat&quot;)</span>
-<span class="pc bnc" id="L275" title="All 2 branches missed.">                || value.equals(&quot;unknown&quot;))</span>
+<span class="fc bfc" id="L274" title="All 4 branches covered.">            .filter(value -&gt; value.equals(&quot;sat&quot;) || value.equals(&quot;unsat&quot;)</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">                || value.equals(&quot;unknown&quot;))</span>
 <span class="fc" id="L276">            .findFirst().orElse(&quot;&quot;);</span>
     }
 
@@ -282,7 +282,7 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         }
 <span class="fc" id="L283">        List&lt;String&gt; lines = output.lines()</span>
 <span class="fc" id="L284">            .map(String::trim)</span>
-<span class="fc bfc" id="L285" title="All 2 branches covered.">            .filter(line -&gt; !line.isBlank())</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">            .filter(line -&gt; !line.isBlank())</span>
 <span class="fc" id="L286">            .toList();</span>
 <span class="fc" id="L287">        int index = lines.indexOf(expectedStatus);</span>
 <span class="pc bpc" id="L288" title="2 of 4 branches missed.">        if (index &lt; 0 || index + 1 &gt;= lines.size()) {</span>
@@ -320,8 +320,8 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         String stderr
     ) {
 <span class="fc" id="L322">        public ProcessOutput {</span>
-<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            stdout = stdout == null ? &quot;&quot; : stdout;</span>
-<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            stderr = stderr == null ? &quot;&quot; : stderr;</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            stdout = stdout == null ? &quot;&quot; : stdout;</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">            stderr = stderr == null ? &quot;&quot; : stderr;</span>
 <span class="fc" id="L325">        }</span>
     }
 
@@ -334,36 +334,36 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         ) {
             Process process;
             try {
-<span class="fc" id="L337">                process = new ProcessBuilder(command).start();</span>
+<span class="nc" id="L337">                process = new ProcessBuilder(command).start();</span>
 <span class="nc" id="L338">            } catch (IOException exception) {</span>
 <span class="nc" id="L339">                return new ProcessOutput(</span>
 <span class="nc" id="L340">                    false, false, -1, &quot;&quot;, exception.getMessage());</span>
-<span class="fc" id="L341">            }</span>
-<span class="fc" id="L342">            ThreadFactory factory = runnable -&gt; {</span>
-<span class="fc" id="L343">                Thread thread = new Thread(runnable, &quot;z3-output-reader&quot;);</span>
-<span class="fc" id="L344">                thread.setDaemon(true);</span>
-<span class="fc" id="L345">                return thread;</span>
+<span class="nc" id="L341">            }</span>
+<span class="nc" id="L342">            ThreadFactory factory = runnable -&gt; {</span>
+<span class="nc" id="L343">                Thread thread = new Thread(runnable, &quot;z3-output-reader&quot;);</span>
+<span class="nc" id="L344">                thread.setDaemon(true);</span>
+<span class="nc" id="L345">                return thread;</span>
             };
-<span class="fc" id="L347">            ExecutorService readers = Executors.newFixedThreadPool(2, factory);</span>
-<span class="fc" id="L348">            Future&lt;String&gt; stdout = readers.submit(</span>
-<span class="fc" id="L349">                () -&gt; new String(process.getInputStream().readAllBytes(),</span>
+<span class="nc" id="L347">            ExecutorService readers = Executors.newFixedThreadPool(2, factory);</span>
+<span class="nc" id="L348">            Future&lt;String&gt; stdout = readers.submit(</span>
+<span class="nc" id="L349">                () -&gt; new String(process.getInputStream().readAllBytes(),</span>
                     StandardCharsets.UTF_8));
-<span class="fc" id="L351">            Future&lt;String&gt; stderr = readers.submit(</span>
-<span class="fc" id="L352">                () -&gt; new String(process.getErrorStream().readAllBytes(),</span>
+<span class="nc" id="L351">            Future&lt;String&gt; stderr = readers.submit(</span>
+<span class="nc" id="L352">                () -&gt; new String(process.getErrorStream().readAllBytes(),</span>
                     StandardCharsets.UTF_8));
             try {
-<span class="fc" id="L355">                process.getOutputStream().write(</span>
-<span class="pc bpc" id="L356" title="1 of 2 branches missed.">                    (stdin == null ? &quot;&quot; : stdin).getBytes(StandardCharsets.UTF_8));</span>
-<span class="fc" id="L357">                process.getOutputStream().close();</span>
-<span class="fc" id="L358">                boolean finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);</span>
-<span class="pc bpc" id="L359" title="1 of 2 branches missed.">                if (!finished) {</span>
+<span class="nc" id="L355">                process.getOutputStream().write(</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">                    (stdin == null ? &quot;&quot; : stdin).getBytes(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L357">                process.getOutputStream().close();</span>
+<span class="nc" id="L358">                boolean finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                if (!finished) {</span>
 <span class="nc" id="L360">                    process.destroyForcibly();</span>
 <span class="nc" id="L361">                    return new ProcessOutput(</span>
 <span class="nc" id="L362">                        true, true, -1, getQuietly(stdout), getQuietly(stderr));</span>
                 }
-<span class="fc" id="L364">                return new ProcessOutput(</span>
-<span class="fc" id="L365">                    true, false, process.exitValue(),</span>
-<span class="fc" id="L366">                    getQuietly(stdout), getQuietly(stderr));</span>
+<span class="nc" id="L364">                return new ProcessOutput(</span>
+<span class="nc" id="L365">                    true, false, process.exitValue(),</span>
+<span class="nc" id="L366">                    getQuietly(stdout), getQuietly(stderr));</span>
 <span class="nc" id="L367">            } catch (IOException exception) {</span>
 <span class="nc" id="L368">                process.destroyForcibly();</span>
 <span class="nc" id="L369">                return new ProcessOutput(</span>
@@ -374,13 +374,13 @@ public final class Z3SmtSolverBackend implements SolverBackend {
 <span class="nc" id="L374">                return new ProcessOutput(</span>
 <span class="nc" id="L375">                    true, true, -1, getQuietly(stdout), &quot;interrupted&quot;);</span>
             } finally {
-<span class="fc" id="L377">                readers.shutdownNow();</span>
+<span class="nc" id="L377">                readers.shutdownNow();</span>
             }
         }
 
         private static String getQuietly(Future&lt;String&gt; output) {
             try {
-<span class="fc" id="L383">                return output.get(2, TimeUnit.SECONDS);</span>
+<span class="nc" id="L383">                return output.get(2, TimeUnit.SECONDS);</span>
 <span class="nc" id="L384">            } catch (InterruptedException exception) {</span>
 <span class="nc" id="L385">                Thread.currentThread().interrupt();</span>
 <span class="nc" id="L386">                return &quot;&quot;;</span>
