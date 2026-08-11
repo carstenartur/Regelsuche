@@ -1,6 +1,7 @@
 package de.regelsuche.quality.jmh;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,6 +34,9 @@ class JmhHistoryRendererTest {
         Fixture fixture = fixture();
         Path firstOutput = temporaryDirectory.resolve("first-output");
         Path secondOutput = temporaryDirectory.resolve("second-output");
+        Path staleChart = firstOutput.resolve("charts/stale.svg");
+        Files.createDirectories(staleChart.getParent());
+        Files.writeString(staleChart, "stale");
 
         JmhHistory history = new JmhHistoryLoader().load(
             fixture.historyPolicy(),
@@ -43,6 +47,7 @@ class JmhHistoryRendererTest {
 
         assertEquals(2, history.snapshots().size());
         assertEquals(2, history.benchmarks().size());
+        assertFalse(Files.exists(staleChart));
         assertEquals(treeDigests(firstOutput), treeDigests(secondOutput));
 
         JsonNode report = mapper.readTree(
@@ -127,6 +132,22 @@ class JmhHistoryRendererTest {
     }
 
     @Test
+    void rejectsCollidingChartFileNamesBeforeWritingCharts() {
+        Path output = temporaryDirectory.resolve("collision-output");
+
+        IOException failure = assertThrows(
+            IOException.class,
+            () -> new JmhHistoryReportWriter().write(
+                collidingHistory(),
+                output
+            )
+        );
+
+        assertTrue(failure.getMessage().contains("filename collision"));
+        assertFalse(Files.exists(output.resolve("charts")));
+    }
+
+    @Test
     void retainedRepositoryHistoryIsCompleteAndRenderable() throws Exception {
         Path root = repositoryRoot();
         JmhHistory history = new JmhHistoryLoader().load(
@@ -192,6 +213,45 @@ class JmhHistoryRendererTest {
         Path policy = quality.resolve("jmh-history-policy.json");
         writePolicy(policy, first, second);
         return new Fixture(policy, regression, first, second);
+    }
+
+    private JmhHistory collidingHistory() {
+        Map<String, JmhHistory.BenchmarkContract> contracts =
+            new LinkedHashMap<>();
+        contracts.put(
+            "example.A B",
+            new JmhHistory.BenchmarkContract("CORE", "ms/op")
+        );
+        contracts.put(
+            "example.A+B",
+            new JmhHistory.BenchmarkContract("CORE", "ms/op")
+        );
+        Map<String, JmhHistory.Measurement> measurements =
+            new LinkedHashMap<>();
+        measurements.put(
+            "example.A B",
+            new JmhHistory.Measurement(1.0d, 0.1d)
+        );
+        measurements.put(
+            "example.A+B",
+            new JmhHistory.Measurement(2.0d, 0.2d)
+        );
+        JmhHistory.Snapshot snapshot = new JmhHistory.Snapshot(
+            "collision",
+            "2026-01-01T00:00:00Z",
+            "a".repeat(40),
+            "sha256:" + "1".repeat(64),
+            "collision.json",
+            "sha256:" + "2".repeat(64),
+            measurements
+        );
+        return new JmhHistory(
+            "synthetic collision fixture",
+            "sha256:" + "3".repeat(64),
+            "sha256:" + "4".repeat(64),
+            List.of(snapshot),
+            contracts
+        );
     }
 
     private Map<String, Object> snapshot(

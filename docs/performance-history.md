@@ -11,6 +11,12 @@ mvn --batch-mode --no-transfer-progress \
   -pl regelsuche-quality -am test
 ```
 
+The Maven test phase writes the durable report to:
+
+- `regelsuche-quality/target/reports/quality/jmh-history/history.json`;
+- `regelsuche-quality/target/reports/quality/jmh-history/history.md`;
+- `regelsuche-quality/target/reports/quality/jmh-history/charts/*.svg`.
+
 During the build migration, the equivalent focused Gradle invocation is:
 
 ```bash
@@ -19,13 +25,11 @@ During the build migration, the equivalent focused Gradle invocation is:
   :regelsuche-quality:renderJmhHistory
 ```
 
-The renderer writes:
-
-- `build/reports/quality/jmh-history/history.json` — normalized machine-readable history;
-- `build/reports/quality/jmh-history/history.md` — indexed comparison tables;
-- `build/reports/quality/jmh-history/charts/*.svg` — one deterministic chart per benchmark.
+The Gradle adapter writes the same Java-rendered evidence below `build/reports/quality/jmh-history/`. Both paths contain normalized machine-readable history, indexed Markdown comparison tables and one deterministic SVG chart per benchmark.
 
 Every table and chart uses **milliseconds per operation (`ms/op`)**. Lower values and lower points are always faster/better. JMH `scoreError` is retained as an error bar.
+
+The writer recreates the dedicated chart directory before every run, so removed benchmarks cannot leave stale SVG evidence behind. It also validates all chart filenames before writing and fails closed if two benchmark identities would normalize to the same filename.
 
 ## Retained evidence contract
 
@@ -47,7 +51,7 @@ The Java loader fails closed when:
 - a family or unit drifts from the active regression policy;
 - a snapshot escapes the repository or is symbolic.
 
-The JUnit suite renders the reports twice and requires byte-identical output. It also executes the retained repository history and requires all 29 declared benchmarks and 29 SVG charts.
+The JUnit suite renders the reports twice and requires byte-identical output. It also executes the retained repository history and requires all 29 declared benchmarks and 29 SVG charts. The Maven-only evidence contract additionally requires the report to remain below `regelsuche-quality/target/` and verifies the complete durable output there.
 
 ## Add a history point
 

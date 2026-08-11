@@ -6,8 +6,10 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -28,8 +30,9 @@ final class JmhHistoryReportWriter {
     void write(JmhHistory history, Path outputDirectory) throws IOException {
         Files.createDirectories(outputDirectory);
         Path charts = outputDirectory.resolve("charts");
-        Files.createDirectories(charts);
-        Map<String, String> chartPaths = writeCharts(history, charts);
+        Map<String, String> chartPaths = chartPaths(history);
+        recreateDirectory(charts);
+        writeCharts(history, charts, chartPaths);
         writeJson(history, chartPaths, outputDirectory.resolve("history.json"));
         writeMarkdown(
             history,
@@ -38,18 +41,67 @@ final class JmhHistoryReportWriter {
         );
     }
 
-    private Map<String, String> writeCharts(
-        JmhHistory history,
-        Path charts
-    ) throws IOException {
+    private Map<String, String> chartPaths(JmhHistory history)
+            throws IOException {
         Map<String, String> result = new LinkedHashMap<>();
+        Map<String, String> ownersByFileName = new LinkedHashMap<>();
         for (String benchmark : history.benchmarks().keySet().stream()
                 .sorted().toList()) {
-            String fileName = safeFileName(benchmark) + ".svg";
-            writeSvg(history, benchmark, charts.resolve(fileName));
+            String stem = safeFileName(benchmark);
+            if (stem.isBlank()) {
+                throw new IOException(
+                    "benchmark cannot form a chart filename: " + benchmark
+                );
+            }
+            String fileName = stem + ".svg";
+            String previous = ownersByFileName.putIfAbsent(
+                fileName,
+                benchmark
+            );
+            if (previous != null) {
+                throw new IOException(
+                    "benchmark chart filename collision: " + previous
+                        + " and " + benchmark + " both map to " + fileName
+                );
+            }
             result.put(benchmark, "charts/" + fileName);
         }
         return Map.copyOf(result);
+    }
+
+    private void writeCharts(
+        JmhHistory history,
+        Path charts,
+        Map<String, String> chartPaths
+    ) throws IOException {
+        for (String benchmark : history.benchmarks().keySet().stream()
+                .sorted().toList()) {
+            Path relative = Path.of(chartPaths.get(benchmark));
+            writeSvg(history, benchmark, charts.resolve(relative.getFileName()));
+        }
+    }
+
+    private static void recreateDirectory(Path directory) throws IOException {
+        if (Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) {
+            if (Files.isSymbolicLink(directory)
+                    || !Files.isDirectory(
+                        directory,
+                        LinkOption.NOFOLLOW_LINKS
+                    )) {
+                throw new IOException(
+                    "report chart path must be a real directory: " + directory
+                );
+            }
+            List<Path> existingPaths;
+            try (var paths = Files.walk(directory)) {
+                existingPaths = paths.sorted(Comparator.reverseOrder())
+                    .toList();
+            }
+            for (Path path : existingPaths) {
+                Files.delete(path);
+            }
+        }
+        Files.createDirectories(directory);
     }
 
     private void writeJson(
