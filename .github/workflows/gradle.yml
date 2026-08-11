@@ -10,90 +10,46 @@ on:
 
 concurrency:
   group: >-
-    ${{ github.event_name == 'create'
-        && github.event.ref_type == 'branch'
-        && github.event.ref == 'showcase/train-freeze-authority-v1'
-        && format('showcase-train-freeze-{0}', github.repository)
-        || format('ci-{0}-{1}', github.repository, github.ref) }}
+    ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && format('showcase-train-freeze-{0}', github.repository) || format('ci-{0}-{1}', github.repository, github.ref) }}
   cancel-in-progress: >-
-    ${{ github.event_name != 'create'
-        || github.event.ref_type != 'branch'
-        || github.event.ref != 'showcase/train-freeze-authority-v1' }}
-
-permissions:
-  actions: read
-  contents: read
-  packages: read
-
+    ${{ github.event_name != 'create' || github.event.ref_type != 'branch' || github.event.ref != 'showcase/train-freeze-authority-v1' }}
+permissions: { actions: read, contents: read, packages: read }
 jobs:
   verification:
-    name: >-
-      ${{ github.event_name == 'create'
-          && 'Showcase train-freeze authority v1'
-          || 'Checkout-local ciCheck' }}
-    if: >-
-      github.event_name != 'create'
-      || (github.event.ref_type == 'branch'
-          && github.event.ref == 'showcase/train-freeze-authority-v1')
+    name: ${{ github.event_name == 'create' && 'Showcase train-freeze authority v1' || 'Checkout-local ciCheck' }}
+    if: github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')
     runs-on: ubuntu-22.04
     timeout-minutes: 300
     env:
       AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
-      REGELSUCHE_CI_TASK: >-
-        ${{ github.event_name == 'create'
-            && github.event.ref_type == 'branch'
-            && github.event.ref == 'showcase/train-freeze-authority-v1'
-            && 'authorizedShowcaseTrainFreeze'
-            || 'ciCheck' }}
+      REGELSUCHE_CI_TASK: ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && 'authorizedShowcaseTrainFreeze' || 'ciCheck' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-        with:
-          cache-cleanup: on-success
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with: { distribution: temurin, java-version: '21' }
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+        with: { cache-cleanup: on-success }
       - name: Install checkout prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            python3-venv \
-            z3=4.8.12-1
-          ./gradlew --no-daemon \
-            :app:installPlaywrightHostDependencies \
-            --console=plain
-
+          sudo apt-get install -y --no-install-recommends python3-venv z3=4.8.12-1
+          ./gradlew --no-daemon :app:installPlaywrightHostDependencies --console=plain
       - name: Run the checkout-owned CI lifecycle
-        shell: bash
         run: |
           set -o pipefail
           mkdir -p build/logs
-          env -u GITHUB_SHA ./gradlew \
-            --no-daemon \
-            --no-configuration-cache \
-            "$REGELSUCHE_CI_TASK" \
-            --console=plain \
-            --stacktrace \
-            2>&1 | tee build/logs/ci-check.log
-
+          env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache "$REGELSUCHE_CI_TASK" --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
+      - name: Verify the complete Maven product reactor
+        if: github.event_name != 'create'
+        run: mvn --batch-mode --no-transfer-progress test
       - name: Retain verification evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: >-
-            ${{ github.event_name == 'create'
-                && github.event.ref_type == 'branch'
-                && github.event.ref == 'showcase/train-freeze-authority-v1'
-                && format('proof-carrying-showcase-train-freeze-{0}-{1}', github.sha, github.run_id)
-                || 'repository-verification' }}
+          name: ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && format('proof-carrying-showcase-train-freeze-{0}-{1}', github.sha, github.run_id) || 'repository-verification' }}
           path: |
             build/logs/**
             build/reports/**
@@ -104,48 +60,30 @@ jobs:
             **/build/reports/**
             **/build/test-results/**
             **/build/discovery-artifacts/**
+            **/target/surefire-reports/**
             docs/generated/**
           include-hidden-files: true
           if-no-files-found: warn
-
   publish-pages:
     name: Publish generated reports
     needs: verification
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
-    concurrency:
-      group: pages-${{ github.repository }}-main
-      cancel-in-progress: false
-    permissions:
-      actions: read
-      contents: write
+    permissions: { actions: read, contents: write }
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: repository-verification
-          path: .
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with: { name: repository-verification, path: . }
       - name: Assemble the static site
         run: |
-          rm -rf build/pages-site
-          mkdir -p build/pages-site
+          rm -rf build/pages-site && mkdir -p build/pages-site
           cp -R docs/. build/pages-site/
           cp -R public/. build/pages-site/
-          # Include benchmark report from build directory (non-deterministic timing values
-          # prevent it from being committed; it is generated by ciCheck and uploaded as an artifact)
-          if [ -f app/build/reports/benchmark/benchmark-report.md ]; then
-            cp app/build/reports/benchmark/benchmark-report.md build/pages-site/
-          fi
-          if [ -f app/build/reports/benchmark/benchmark-summary.json ]; then
-            mkdir -p build/pages-site/assets
-            cp app/build/reports/benchmark/benchmark-summary.json build/pages-site/assets/
-          fi
+          if [ -f app/build/reports/benchmark/benchmark-report.md ]; then cp app/build/reports/benchmark/benchmark-report.md build/pages-site/; fi
+          if [ -f app/build/reports/benchmark/benchmark-summary.json ]; then mkdir -p build/pages-site/assets; cp app/build/reports/benchmark/benchmark-summary.json build/pages-site/assets/; fi
           touch build/pages-site/.nojekyll
-
       - name: Publish generated reports to gh-pages
-        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: build/pages-site

@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec java ${JAVA_OPTS:-} -cp "$SCRIPT_DIR/../regelsuche.jar:$SCRIPT_DIR/../lib/*" de.regelsuche.App "$@"
