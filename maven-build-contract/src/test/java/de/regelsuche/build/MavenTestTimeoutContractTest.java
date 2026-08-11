@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 class MavenTestTimeoutContractTest {
 
@@ -28,13 +27,20 @@ class MavenTestTimeoutContractTest {
             directChildText(properties, "maven.test.fork.timeout.seconds")
         );
 
-        Element surefire = plugin(
+        Element surefire = configuredPlugin(
             project,
             "org.apache.maven.plugins",
             "maven-surefire-plugin"
         );
-        assertNotNull(surefire, "maven-surefire-plugin must be configured");
+        assertNotNull(
+            surefire,
+            "maven-surefire-plugin must be configured under build/plugins"
+        );
         Element configuration = directChild(surefire, "configuration");
+        assertNotNull(
+            configuration,
+            "maven-surefire-plugin must declare an active configuration"
+        );
         assertEquals(
             "${maven.test.fork.timeout.seconds}",
             directChildText(configuration, "forkedProcessTimeoutInSeconds")
@@ -80,14 +86,23 @@ class MavenTestTimeoutContractTest {
         }
     }
 
-    private static Element plugin(
+    private static Element configuredPlugin(
         Element project,
         String expectedGroup,
         String expectedArtifact
     ) {
-        NodeList plugins = project.getElementsByTagNameNS("*", "plugin");
-        for (int index = 0; index < plugins.getLength(); index++) {
-            Element candidate = (Element) plugins.item(index);
+        Element build = directChild(project, "build");
+        Element plugins = directChild(build, "plugins");
+        if (plugins == null) {
+            return null;
+        }
+        for (Node child = plugins.getFirstChild();
+                child != null;
+                child = child.getNextSibling()) {
+            if (!(child instanceof Element candidate)
+                    || !"plugin".equals(candidate.getLocalName())) {
+                continue;
+            }
             String group = directChildText(candidate, "groupId");
             if (group == null || group.isBlank()) {
                 group = "org.apache.maven.plugins";
