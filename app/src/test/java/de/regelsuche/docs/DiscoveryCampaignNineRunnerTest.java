@@ -14,226 +14,311 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@ExtendWith(DiscoveryPromotionPipelineFixtureExtension.class)
 class DiscoveryCampaignNineRunnerTest {
+    private static final List<String> PRIOR_CAMPAIGNS = List.of(
+        "discovery-campaign-1",
+        "discovery-campaign-2",
+        "discovery-campaign-3",
+        "discovery-campaign-5",
+        "discovery-campaign-7",
+        "discovery-campaign-8"
+    );
 
     @Test
-    void campaignNineCasesAreUniqueAndNonEmpty(@TempDir Path tempDir) throws Exception {
-        DiscoveryCampaignNineRunner runner = new DiscoveryCampaignNineRunner();
+    void campaignNineCasesAreUniqueAndNonEmpty(
+        DiscoveryPromotionPipelineFixture fixture
+    ) {
+        DiscoveryCampaignNineRunner.CampaignReport report =
+            fixture.report().campaignNine();
 
-        DiscoveryCampaignNineRunner.CampaignReport report = runner.writeReport(tempDir);
-
-        assertFalse(report.results().isEmpty(), "campaign 9 must have at least one case");
+        assertFalse(
+            report.results().isEmpty(),
+            "campaign 9 must have at least one case"
+        );
 
         Set<String> ids = new HashSet<>();
         for (DiscoveryCampaignNineRunner.CaseResult result : report.results()) {
-            assertTrue(ids.add(result.id()), "duplicate campaign 9 id: " + result.id());
+            assertTrue(
+                ids.add(result.id()),
+                "duplicate campaign 9 id: " + result.id()
+            );
         }
 
-        Set<String> priorCaseIds = priorCampaignCaseIds();
+        Set<String> priorCaseIds = fixture.candidateIdsFromCampaigns(
+            Set.copyOf(PRIOR_CAMPAIGNS)
+        );
         for (DiscoveryCampaignNineRunner.CaseResult result : report.results()) {
-            assertFalse(priorCaseIds.contains(result.id()),
-                "campaign 9 case id duplicates a prior campaign case id: " + result.id());
+            assertFalse(
+                priorCaseIds.contains(result.id()),
+                "campaign 9 case id duplicates a prior campaign case id: "
+                    + result.id()
+            );
         }
     }
 
     @Test
-    void campaignNineNoveltyCheckerDetectsAlphaEquivalentPriorCases(@TempDir Path tempDir) throws Exception {
-        DiscoveryCampaignNineRunner runner = new DiscoveryCampaignNineRunner();
+    void campaignNineNoveltyCheckerDetectsAlphaEquivalentPriorCases(
+        DiscoveryPromotionPipelineFixture fixture
+    ) {
+        DiscoveryCampaignNineRunner.CampaignReport report =
+            fixture.report().campaignNine();
+        List<NoveltyChecker.Candidate> priorCandidates =
+            fixture.noveltyCandidatesFromCampaigns(PRIOR_CAMPAIGNS);
+        List<NoveltyChecker.Candidate> allCandidates =
+            new ArrayList<>(priorCandidates);
+        report.results().stream()
+            .map(this::candidate)
+            .forEach(allCandidates::add);
+        List<NoveltyChecker.NoveltyResult> noveltyResults =
+            new NoveltyChecker().classifyAll(allCandidates);
+        List<NoveltyChecker.NoveltyResult> campaignNineNovelty =
+            noveltyResults.subList(
+                priorCandidates.size(),
+                noveltyResults.size()
+            );
 
-        DiscoveryCampaignNineRunner.CampaignReport report = runner.writeReport(tempDir);
-        List<NoveltyChecker.Candidate> priorCandidates = priorCampaignCandidates();
-        List<NoveltyChecker.Candidate> allCandidates = new ArrayList<>(priorCandidates);
-        report.results().stream().map(this::candidate).forEach(allCandidates::add);
-        List<NoveltyChecker.NoveltyResult> noveltyResults = new NoveltyChecker().classifyAll(allCandidates);
-        List<NoveltyChecker.NoveltyResult> campaignNineNovelty = noveltyResults.subList(
-            priorCandidates.size(), noveltyResults.size());
-
-        assertTrue(campaignNineNovelty.stream().anyMatch(result -> result.status() == NoveltyStatus.ALPHA_EQUIVALENT),
+        assertTrue(campaignNineNovelty.stream().anyMatch(result ->
+                result.status() == NoveltyStatus.ALPHA_EQUIVALENT),
             "campaign 9 validates independent bindings and should be recognized as alpha-equivalent support, not new discovery");
         for (NoveltyChecker.NoveltyResult result : campaignNineNovelty) {
-            assertFalse(result.status() == NoveltyStatus.DUPLICATE,
-                "campaign 9 should not repeat exact normalized input/target pairs: " + result);
-            assertFalse(result.status() == NoveltyStatus.UNKNOWN,
-                "campaign 9 candidates must have enough novelty input data: " + result);
+            assertFalse(
+                result.status() == NoveltyStatus.DUPLICATE,
+                "campaign 9 should not repeat exact normalized input/target pairs: "
+                    + result
+            );
+            assertFalse(
+                result.status() == NoveltyStatus.UNKNOWN,
+                "campaign 9 candidates must have enough novelty input data: "
+                    + result
+            );
         }
     }
 
     @Test
-    void campaignNineWritesCandidateReports(@TempDir Path tempDir) throws Exception {
-        DiscoveryCampaignNineRunner runner = new DiscoveryCampaignNineRunner();
+    void campaignNineWritesCandidateReports(
+        DiscoveryPromotionPipelineFixture fixture
+    ) {
+        Path campaignDirectory = fixture.campaignDirectory(
+            "discovery-campaign-9"
+        );
 
-        runner.writeReport(tempDir);
-
-        assertTrue(Files.exists(tempDir.resolve("discovery-campaign-9.json")));
-        assertTrue(Files.exists(tempDir.resolve("campaign-progress.md")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-candidates.md")));
-        assertTrue(Files.exists(tempDir.resolve("operator-suggestions.md")));
-        assertTrue(Files.exists(tempDir.resolve("macro-candidates.md")));
+        assertTrue(Files.exists(
+            campaignDirectory.resolve("discovery-campaign-9.json")
+        ));
+        assertTrue(Files.exists(
+            campaignDirectory.resolve("campaign-progress.md")
+        ));
+        assertTrue(Files.exists(
+            campaignDirectory.resolve("discovery-candidates.md")
+        ));
+        assertTrue(Files.exists(
+            campaignDirectory.resolve("operator-suggestions.md")
+        ));
+        assertTrue(Files.exists(
+            campaignDirectory.resolve("macro-candidates.md")
+        ));
     }
 
     @Test
-    void campaignNineProgressReportComparesThreeCampaigns(@TempDir Path tempDir) throws Exception {
-        DiscoveryCampaignNineRunner runner = new DiscoveryCampaignNineRunner();
+    void campaignNineProgressReportComparesThreeCampaigns(
+        DiscoveryPromotionPipelineFixture fixture
+    ) throws Exception {
+        DiscoveryCampaignNineRunner.CampaignReport report =
+            fixture.report().campaignNine();
+        Path campaignDirectory = fixture.campaignDirectory(
+            "discovery-campaign-9"
+        );
 
-        DiscoveryCampaignNineRunner.CampaignReport report = runner.writeReport(tempDir);
-
-        assertFalse(report.progress().isEmpty(), "progress summaries must not be empty");
+        assertFalse(
+            report.progress().isEmpty(),
+            "progress summaries must not be empty"
+        );
         Set<String> progressIds = new HashSet<>();
-        for (DiscoveryCampaignNineRunner.ProgressSummary summary : report.progress()) {
-            assertTrue(progressIds.add(summary.campaignId()), "duplicate progress entry: " + summary.campaignId());
+        for (DiscoveryCampaignNineRunner.ProgressSummary summary
+                : report.progress()) {
+            assertTrue(
+                progressIds.add(summary.campaignId()),
+                "duplicate progress entry: " + summary.campaignId()
+            );
         }
-        assertTrue(progressIds.contains("discovery-campaign-7"), "progress must include campaign 7");
-        assertTrue(progressIds.contains("discovery-campaign-8"), "progress must include campaign 8");
-        assertTrue(progressIds.contains("discovery-campaign-9"), "progress must include campaign 9");
+        assertTrue(
+            progressIds.contains("discovery-campaign-7"),
+            "progress must include campaign 7"
+        );
+        assertTrue(
+            progressIds.contains("discovery-campaign-8"),
+            "progress must include campaign 8"
+        );
+        assertTrue(
+            progressIds.contains("discovery-campaign-9"),
+            "progress must include campaign 9"
+        );
 
-        String progressMarkdown = Files.readString(tempDir.resolve("campaign-progress.md"), StandardCharsets.UTF_8);
+        String progressMarkdown = Files.readString(
+            campaignDirectory.resolve("campaign-progress.md"),
+            StandardCharsets.UTF_8
+        );
         assertTrue(progressMarkdown.contains("discovery-campaign-7"));
         assertTrue(progressMarkdown.contains("discovery-campaign-8"));
         assertTrue(progressMarkdown.contains("discovery-campaign-9"));
-        assertTrue(progressMarkdown.contains("Promotion-ready"), "progress table must use 'Promotion-ready' column header");
-        assertTrue(progressMarkdown.contains("Promotion-ready** means"), "progress table must include definition note");
+        assertTrue(
+            progressMarkdown.contains("Promotion-ready"),
+            "progress table must use 'Promotion-ready' column header"
+        );
+        assertTrue(
+            progressMarkdown.contains("Promotion-ready** means"),
+            "progress table must include definition note"
+        );
     }
 
     @Test
-    void campaignNineIsIntegratedIntoPromotionPipeline(@TempDir Path tempDir) throws Exception {
+    void campaignNineIsIntegratedIntoPromotionPipeline(
+        DiscoveryPromotionPipelineFixture fixture
+    ) throws Exception {
         DiscoveryPromotionPipelineRunner.PipelineReport pipelineReport =
-            new DiscoveryPromotionPipelineRunner().writeReport(tempDir.resolve("pipeline"));
+            fixture.report();
 
         assertTrue(pipelineReport.promotionRecords().stream()
-            .anyMatch(record -> "discovery-campaign-9".equals(record.sourceCampaign())),
-            "pipeline must include campaign 9 promotion records");
+            .anyMatch(record -> "discovery-campaign-9".equals(
+                record.sourceCampaign()
+            )), "pipeline must include campaign 9 promotion records");
+        assertTrue(
+            pipelineReport.campaignNine() != null,
+            "pipeline report must include campaign 9 report"
+        );
 
-        assertTrue(pipelineReport.campaignNine() != null,
-            "pipeline report must include campaign 9 report");
-
-        Path metricsPath = tempDir.resolve("pipeline").resolve("campaign-metrics.json");
-        List<Map<String, Object>> metrics = new ObjectMapper()
-            .readValue(metricsPath.toFile(), new TypeReference<>() {});
-        assertTrue(metrics.stream().anyMatch(m -> "discovery-campaign-9".equals(m.get("campaign"))),
+        Path metricsPath = fixture.outputDirectory().resolve(
+            "campaign-metrics.json"
+        );
+        List<Map<String, Object>> metrics = new ObjectMapper().readValue(
+            metricsPath.toFile(),
+            new TypeReference<>() { }
+        );
+        assertTrue(metrics.stream().anyMatch(metric ->
+            "discovery-campaign-9".equals(metric.get("campaign"))),
             "campaign-metrics.json must include campaign 9");
 
+        Path campaignDirectory = fixture.campaignDirectory(
+            "discovery-campaign-9"
+        );
         assertTrue(Files.exists(
-            tempDir.resolve("pipeline").resolve("discovery-campaign-9").resolve("discovery-campaign-9.json")));
+            campaignDirectory.resolve("discovery-campaign-9.json")
+        ));
         assertTrue(Files.exists(
-            tempDir.resolve("pipeline").resolve("discovery-campaign-9").resolve("discovery-candidates.md")));
+            campaignDirectory.resolve("discovery-candidates.md")
+        ));
         assertTrue(Files.exists(
-            tempDir.resolve("pipeline").resolve("discovery-campaign-9").resolve("operator-suggestions.md")));
+            campaignDirectory.resolve("operator-suggestions.md")
+        ));
         assertTrue(Files.exists(
-            tempDir.resolve("pipeline").resolve("discovery-campaign-9").resolve("macro-candidates.md")));
+            campaignDirectory.resolve("macro-candidates.md")
+        ));
     }
 
     @Test
-    void campaignNineCandidatesReportContainsProvenanceFields(@TempDir Path tempDir) throws Exception {
-        DiscoveryCampaignNineRunner runner = new DiscoveryCampaignNineRunner();
-        runner.writeReport(tempDir);
-
+    void campaignNineCandidatesReportContainsProvenanceFields(
+        DiscoveryPromotionPipelineFixture fixture
+    ) throws Exception {
         String candidatesMarkdown = Files.readString(
-            tempDir.resolve("discovery-candidates.md"), StandardCharsets.UTF_8);
-        assertTrue(candidatesMarkdown.contains("| Candidate |"), "must have Candidate column");
-        assertTrue(candidatesMarkdown.contains("| Family |"), "must have Family column");
-        assertTrue(candidatesMarkdown.contains("| Stage |"), "must have Stage column");
-        assertTrue(candidatesMarkdown.contains("| Novelty |"), "must have Novelty column");
-        assertTrue(candidatesMarkdown.contains("| Oracle |"), "must have Oracle column");
-        assertTrue(candidatesMarkdown.contains("| Ablation |"), "must have Ablation column");
-        assertTrue(candidatesMarkdown.contains("| Source |"), "must have Source column");
-        assertTrue(candidatesMarkdown.contains("| Pack |"), "must have Pack column");
-        assertTrue(candidatesMarkdown.contains("| Operator |"), "must have Operator column");
+            fixture.campaignDirectory("discovery-campaign-9")
+                .resolve("discovery-candidates.md"),
+            StandardCharsets.UTF_8
+        );
+        assertTrue(
+            candidatesMarkdown.contains("| Candidate |"),
+            "must have Candidate column"
+        );
+        assertTrue(
+            candidatesMarkdown.contains("| Family |"),
+            "must have Family column"
+        );
+        assertTrue(
+            candidatesMarkdown.contains("| Stage |"),
+            "must have Stage column"
+        );
+        assertTrue(
+            candidatesMarkdown.contains("| Novelty |"),
+            "must have Novelty column"
+        );
+        assertTrue(
+            candidatesMarkdown.contains("| Oracle |"),
+            "must have Oracle column"
+        );
+        assertTrue(
+            candidatesMarkdown.contains("| Ablation |"),
+            "must have Ablation column"
+        );
+        assertTrue(
+            candidatesMarkdown.contains("| Source |"),
+            "must have Source column"
+        );
+        assertTrue(
+            candidatesMarkdown.contains("| Pack |"),
+            "must have Pack column"
+        );
+        assertTrue(
+            candidatesMarkdown.contains("| Operator |"),
+            "must have Operator column"
+        );
     }
 
     @Test
-    void campaignNineCoversDistinctFamilies(@TempDir Path tempDir) throws Exception {
-        DiscoveryCampaignNineRunner runner = new DiscoveryCampaignNineRunner();
-        DiscoveryCampaignNineRunner.CampaignReport report = runner.writeReport(tempDir);
-
+    void campaignNineCoversDistinctFamilies(
+        DiscoveryPromotionPipelineFixture fixture
+    ) {
         Set<String> families = new HashSet<>();
-        for (DiscoveryCampaignNineRunner.CaseResult result : report.results()) {
+        for (DiscoveryCampaignNineRunner.CaseResult result
+                : fixture.report().campaignNine().results()) {
             families.add(result.family());
         }
-        assertTrue(families.size() >= 2, "campaign 9 must cover at least 2 distinct families, found: " + families);
+        assertTrue(
+            families.size() >= 2,
+            "campaign 9 must cover at least 2 distinct families, found: "
+                + families
+        );
     }
 
     @Test
-    void campaignNineCasesHaveOperatorProvenance(@TempDir Path tempDir) throws Exception {
-        DiscoveryCampaignNineRunner runner = new DiscoveryCampaignNineRunner();
-        DiscoveryCampaignNineRunner.CampaignReport report = runner.writeReport(tempDir);
-
+    void campaignNineCasesHaveOperatorProvenance(
+        DiscoveryPromotionPipelineFixture fixture
+    ) {
         Set<String> expectedOperatorIds = Set.of(
             "trig_power_reduction",
             "exp_log_inverse",
             "log_product_assumption",
             "power_root_assumptions"
         );
-        for (DiscoveryCampaignNineRunner.CaseResult result : report.results()) {
+        for (DiscoveryCampaignNineRunner.CaseResult result
+                : fixture.report().campaignNine().results()) {
             if (result.success()) {
-                assertFalse(result.shortcutOperatorId().isBlank(),
-                    "successful result must have operator provenance: " + result.id());
-                assertTrue(expectedOperatorIds.contains(result.shortcutOperatorId()),
+                assertFalse(
+                    result.shortcutOperatorId().isBlank(),
+                    "successful result must have operator provenance: "
+                        + result.id()
+                );
+                assertTrue(
+                    expectedOperatorIds.contains(result.shortcutOperatorId()),
                     "shortcutOperatorId '" + result.shortcutOperatorId()
-                        + "' not in expected assumption-carrying operator set for: " + result.id());
+                        + "' not in expected assumption-carrying operator set for: "
+                        + result.id()
+                );
             }
         }
     }
 
-    private Set<String> priorCampaignCaseIds() {
-        Set<String> ids = new HashSet<>();
-        new DiscoveryCampaignOneRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
-        new DiscoveryCampaignTwoRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
-        new DiscoveryCampaignThreeRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
-        new DiscoveryCampaignFiveRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
-        new DiscoveryCampaignSevenRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
-        new DiscoveryCampaignEightRunner().run().results().stream().map(r -> r.id()).forEach(ids::add);
-        return ids;
-    }
-
-    private List<NoveltyChecker.Candidate> priorCampaignCandidates() {
-        List<NoveltyChecker.Candidate> candidates = new ArrayList<>();
-        new DiscoveryCampaignOneRunner().run().results().stream().map(this::candidate).forEach(candidates::add);
-        new DiscoveryCampaignTwoRunner().run().results().stream().map(this::candidate).forEach(candidates::add);
-        new DiscoveryCampaignThreeRunner().run().results().stream().map(this::candidate).forEach(candidates::add);
-        new DiscoveryCampaignFiveRunner().run().results().stream().map(this::candidate).forEach(candidates::add);
-        new DiscoveryCampaignSevenRunner().run().results().stream().map(this::candidate).forEach(candidates::add);
-        new DiscoveryCampaignEightRunner().run().results().stream().map(this::candidate).forEach(candidates::add);
-        return candidates;
-    }
-
-    private NoveltyChecker.Candidate candidate(DiscoveryCampaignOneRunner.CaseResult result) {
-        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
-    }
-
-    private NoveltyChecker.Candidate candidate(DiscoveryCampaignTwoRunner.CaseResult result) {
-        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
-    }
-
-    private NoveltyChecker.Candidate candidate(DiscoveryCampaignThreeRunner.CaseResult result) {
-        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
-    }
-
-    private NoveltyChecker.Candidate candidate(DiscoveryCampaignFiveRunner.CaseResult result) {
-        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
-    }
-
-    private NoveltyChecker.Candidate candidate(DiscoveryCampaignSevenRunner.CaseResult result) {
-        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
-    }
-
-    private NoveltyChecker.Candidate candidate(DiscoveryCampaignEightRunner.CaseResult result) {
-        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
-    }
-
-    private NoveltyChecker.Candidate candidate(DiscoveryCampaignNineRunner.CaseResult result) {
-        return candidate(result.id(), result.family(), result.inputExpression(), result.targetExpression(), result.shortcutOperatorId(), result.rulePath());
-    }
-
     private NoveltyChecker.Candidate candidate(
-        String id,
-        String family,
-        String input,
-        String target,
-        String operator,
-        List<String> rulePath
+        DiscoveryCampaignNineRunner.CaseResult result
     ) {
-        return new NoveltyChecker.Candidate(id, family, input, target, operator, rulePath);
+        return new NoveltyChecker.Candidate(
+            result.id(),
+            result.family(),
+            result.inputExpression(),
+            result.targetExpression(),
+            result.shortcutOperatorId(),
+            result.rulePath()
+        );
     }
 }
