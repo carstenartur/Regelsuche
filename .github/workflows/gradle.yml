@@ -43,7 +43,7 @@ jobs:
           mkdir -p build/logs
           env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache "$REGELSUCHE_CI_TASK" --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
       - name: Verify the complete Maven product reactor
-        if: github.event_name != 'create'
+        if: always() && github.event_name != 'create'
         run: mvn --batch-mode --no-transfer-progress test
       - name: Retain verification evidence
         if: always()
