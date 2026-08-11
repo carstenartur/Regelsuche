@@ -2,6 +2,7 @@ package de.regelsuche.solver.portfolio;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.solver.ir.SolverExecution;
@@ -26,6 +27,101 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class Z3SmtSolverBackendTest {
+
+    @Test
+    void constructorsAndValueObjectsEnforceDeterministicConfiguration() {
+        Z3SmtSolverBackend defaultBackend = new Z3SmtSolverBackend("test");
+        Z3SmtSolverBackend customBackend = new Z3SmtSolverBackend(
+            "test", List.of("z3"), Duration.ofMillis(1));
+
+        assertTrue(defaultBackend.configurationHash().startsWith("sha256:"));
+        assertTrue(customBackend.configurationHash().startsWith("sha256:"));
+        assertTrue(customBackend.descriptor().supportedTheories().contains(
+            Theory.REAL_ARITHMETIC));
+        assertThrows(IllegalArgumentException.class, () ->
+            new Z3SmtSolverBackend(
+                " ", List.of("z3"), Duration.ofSeconds(1), noOpRunner()));
+        assertThrows(IllegalArgumentException.class, () ->
+            new Z3SmtSolverBackend(
+                "test", List.of(), Duration.ofSeconds(1), noOpRunner()));
+
+        Z3SmtSolverBackend.Detection detection =
+            new Z3SmtSolverBackend.Detection(
+                customBackend, BackendAvailability.UNAVAILABLE, null);
+        assertEquals("", detection.detail());
+
+        Z3SmtSolverBackend.ProcessOutput normalized =
+            new Z3SmtSolverBackend.ProcessOutput(
+                true, false, 0, null, null);
+        assertEquals("", normalized.stdout());
+        assertEquals("", normalized.stderr());
+    }
+
+    @Test
+    void checkSatTransportFailuresRemainTyped() {
+        assertCheckResult(
+            new Z3SmtSolverBackend.ProcessOutput(
+                false, false, -1, "", "not installed"),
+            ResultStatus.ERROR,
+            "unavailable");
+        assertCheckResult(
+            new Z3SmtSolverBackend.ProcessOutput(
+                true, true, -1, "", ""),
+            ResultStatus.TIMEOUT,
+            "timed out");
+        assertCheckResult(
+            new Z3SmtSolverBackend.ProcessOutput(
+                true, false, 7, "bad output", "bad error"),
+            ResultStatus.ERROR,
+            "failed");
+    }
+
+    @Test
+    void unknownAndUnrecognizedCheckSatOutputsRemainDistinct() {
+        assertCheckResult(
+            new Z3SmtSolverBackend.ProcessOutput(
+                true, false, 0, "unknown\n", ""),
+            ResultStatus.UNKNOWN,
+            "returned unknown");
+        assertCheckResult(
+            new Z3SmtSolverBackend.ProcessOutput(
+                true, false, 0, "success\n", ""),
+            ResultStatus.ERROR,
+            "unrecognized Z3 output");
+    }
+
+    @Test
+    void proofRetrievalAvailabilityAndTimeoutRemainTyped() {
+        SolverExecution unavailable = executeWithProofOutput(
+            new Z3SmtSolverBackend.ProcessOutput(
+                false, false, -1, "", "not installed"));
+        assertEquals(ResultStatus.ERROR, unavailable.result().status());
+        assertTrue(unavailable.result().message().contains(
+            "proof retrieval unavailable"));
+
+        SolverExecution timedOut = executeWithProofOutput(
+            new Z3SmtSolverBackend.ProcessOutput(
+                true, true, -1, "", ""));
+        assertEquals(ResultStatus.TIMEOUT, timedOut.result().status());
+        assertTrue(timedOut.result().message().contains(
+            "proof retrieval timed out"));
+    }
+
+    @Test
+    void missingModelDoesNotInventCounterexampleEvidence() {
+        Z3SmtSolverBackend backend = new Z3SmtSolverBackend(
+            "test", List.of("z3"), Duration.ofSeconds(1),
+            (command, stdin, timeout) -> stdin.contains("(get-model)")
+                ? new Z3SmtSolverBackend.ProcessOutput(
+                    false, false, -1, "", "not installed")
+                : new Z3SmtSolverBackend.ProcessOutput(
+                    true, false, 0, "sat\n", ""));
+
+        SolverExecution execution = backend.execute(referenceObligation());
+
+        assertEquals(ResultStatus.REFUTED, execution.result().status());
+        assertTrue(execution.result().counterexample().isEmpty());
+    }
 
     @Test
     void unsatIsConfirmedOnlyAfterProofObjectRetrieval() {
@@ -153,6 +249,52 @@ class Z3SmtSolverBackendTest {
         assertFalse(execution.result().counterexample().isEmpty());
         assertTrue(execution.result().counterexample().get("smtModel")
             .contains("define-fun x"));
+    }
+
+    private static void assertCheckResult(
+        Z3SmtSolverBackend.ProcessOutput checkOutput,
+        ResultStatus expectedStatus,
+        String expectedMessage
+    ) {
+        AtomicInteger calls = new AtomicInteger();
+        Z3SmtSolverBackend backend = new Z3SmtSolverBackend(
+            "test", List.of("z3"), Duration.ofSeconds(1),
+            (command, stdin, timeout) -> {
+                calls.incrementAndGet();
+                return checkOutput;
+            });
+
+        SolverExecution execution = backend.execute(referenceObligation());
+
+        assertEquals(1, calls.get());
+        assertEquals(expectedStatus, execution.result().status());
+        assertTrue(execution.result().message().contains(expectedMessage));
+    }
+
+    private static SolverExecution executeWithProofOutput(
+        Z3SmtSolverBackend.ProcessOutput proofOutput
+    ) {
+        AtomicInteger calls = new AtomicInteger();
+        Z3SmtSolverBackend backend = new Z3SmtSolverBackend(
+            "test", List.of("z3"), Duration.ofSeconds(1),
+            (command, stdin, timeout) -> {
+                calls.incrementAndGet();
+                if (stdin.contains("(get-proof)")) {
+                    return proofOutput;
+                }
+                return new Z3SmtSolverBackend.ProcessOutput(
+                    true, false, 0, "unsat\n", "");
+            });
+
+        SolverExecution execution = backend.execute(referenceObligation());
+        assertEquals(2, calls.get());
+        return execution;
+    }
+
+    private static Z3SmtSolverBackend.ProcessRunner noOpRunner() {
+        return (command, stdin, timeout) ->
+            new Z3SmtSolverBackend.ProcessOutput(
+                true, false, 0, "unknown\n", "");
     }
 
     private static Z3SmtSolverBackend backendReturningProof(AtomicInteger calls) {
