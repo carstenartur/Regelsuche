@@ -1,0 +1,58 @@
+plugins {
+    id 'java-library'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.1'
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    systemProperty 'regelsuche.repositoryRoot', rootProject.projectDir.absolutePath
+}
+
+// The existing coverage policy fails closed on every emitted JaCoCo XML and
+// requires an evidence-backed floor for each declared module. This new module
+// intentionally does not emit a coverage report in its bootstrap tranche: a
+// guessed floor would violate the ratchet policy. A separate follow-up must
+// measure a retained green run, declare the module floor and then enable JaCoCo.
+def historyOutput = rootProject.layout.buildDirectory.dir(
+    'reports/quality/jmh-history')
+
+tasks.register('renderJmhHistory', JavaExec) {
+    group = 'reporting'
+    description = 'Validates and renders checksum-bound JMH history in Java.'
+    dependsOn tasks.named('classes'), tasks.named('test')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.quality.jmh.JmhHistoryMain'
+    args rootProject.file('config/quality/jmh-history-policy.json'),
+        rootProject.file('config/quality/jmh-regression-policy-v2.json'),
+        historyOutput.get().asFile
+    inputs.file rootProject.file('config/quality/jmh-history-policy.json')
+    inputs.file rootProject.file('config/quality/jmh-regression-policy-v2.json')
+    inputs.files rootProject.fileTree('config/quality/jmh-history') {
+        include '*.json'
+    }
+    outputs.dir historyOutput
+    outputs.upToDateWhen { false }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('renderJmhHistory')
+}
+
+rootProject.tasks.named('check') {
+    dependsOn tasks.named('renderJmhHistory')
+}

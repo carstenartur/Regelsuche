@@ -85,6 +85,8 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 ### Vergleich und Reproduktion
 
 - [Comparative Discovery Benchmarks](discovery-benchmarks.md)
+- [JMH-Performance-Historie](performance-history.md) — checksumgebundene
+  Snapshots, einheitliche `ms/op`-Charts und Maven-/Gradle-Reproduktion.
 - [Scientific Reproducibility](scientific-reproducibility.md)
 - [Autonomous Discovery Result Card](autonomous-discovery-walkthrough.md)
 - [Independent Reproduction Artifact](independent-reproduction.md)

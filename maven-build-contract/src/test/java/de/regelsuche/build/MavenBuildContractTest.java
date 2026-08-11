@@ -44,6 +44,7 @@ class MavenBuildContractTest {
         "regelsuche-discovery",
         "regelsuche-experiments",
         "regelsuche-cli",
+        "regelsuche-quality",
         "maven-build-contract"
     );
 
