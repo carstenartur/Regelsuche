@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 
 @ExtendWith(DiscoveryPromotionPipelineFixtureExtension.class)
 class DiscoveryCampaignSevenRunnerTest {
@@ -63,28 +64,16 @@ class DiscoveryCampaignSevenRunnerTest {
     }
 
     @Test
-    void campaignSevenWritesCandidateReports(
-        DiscoveryPromotionPipelineFixture fixture
-    ) {
-        Path campaignDirectory = fixture.campaignDirectory(
-            "discovery-campaign-7"
-        );
+    void campaignSevenWritesCandidateReports(@TempDir Path tempDir) {
+        new DiscoveryCampaignSevenRunner().writeReport(tempDir);
 
         assertTrue(Files.exists(
-            campaignDirectory.resolve("discovery-campaign-7.json")
+            tempDir.resolve("discovery-campaign-7.json")
         ));
-        assertTrue(Files.exists(
-            campaignDirectory.resolve("campaign-progress.md")
-        ));
-        assertTrue(Files.exists(
-            campaignDirectory.resolve("discovery-candidates.md")
-        ));
-        assertTrue(Files.exists(
-            campaignDirectory.resolve("operator-suggestions.md")
-        ));
-        assertTrue(Files.exists(
-            campaignDirectory.resolve("macro-candidates.md")
-        ));
+        assertTrue(Files.exists(tempDir.resolve("campaign-progress.md")));
+        assertTrue(Files.exists(tempDir.resolve("discovery-candidates.md")));
+        assertTrue(Files.exists(tempDir.resolve("operator-suggestions.md")));
+        assertTrue(Files.exists(tempDir.resolve("macro-candidates.md")));
     }
 
     @Test

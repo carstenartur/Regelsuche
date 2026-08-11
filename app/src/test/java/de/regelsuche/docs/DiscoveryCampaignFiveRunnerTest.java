@@ -14,6 +14,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 
 @ExtendWith(DiscoveryPromotionPipelineFixtureExtension.class)
 class DiscoveryCampaignFiveRunnerTest {
@@ -142,25 +143,20 @@ class DiscoveryCampaignFiveRunnerTest {
 
     @Test
     void campaignFiveWritesMoveTreeReportWithRewriteMoves(
-        DiscoveryPromotionPipelineFixture fixture
+        @TempDir Path tempDir
     ) throws Exception {
-        Path campaignDirectory = fixture.campaignDirectory(
-            "discovery-campaign-5"
-        );
-        assertTrue(Files.exists(
-            campaignDirectory.resolve("move-tree-report.json")
-        ));
-        assertTrue(Files.exists(
-            campaignDirectory.resolve("move-tree-report.md")
-        ));
+        DiscoveryCampaignFiveRunner runner = new DiscoveryCampaignFiveRunner();
+        runner.writeReport(tempDir);
+
+        assertTrue(Files.exists(tempDir.resolve("move-tree-report.json")));
+        assertTrue(Files.exists(tempDir.resolve("move-tree-report.md")));
 
         String moveTreeJson = Files.readString(
-            campaignDirectory.resolve("move-tree-report.json"),
+            tempDir.resolve("move-tree-report.json"),
             StandardCharsets.UTF_8
         );
         assertTrue(moveTreeJson.contains("rewriteMove"), moveTreeJson);
 
-        DiscoveryCampaignFiveRunner runner = new DiscoveryCampaignFiveRunner();
         de.regelsuche.moves.report.MoveTreeReport moveTree =
             runner.buildMoveTreeReport();
         assertFalse(
