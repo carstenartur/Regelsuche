@@ -1,11 +1,6 @@
 /* Re-run evidence-producing tests and compare their retained JSON bytes. */
 
 pluginManager.withPlugin('java') {
-    def verificationPython = rootProject.layout.buildDirectory.file(
-        System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
-            ? 'verification-venv/Scripts/python.exe'
-            : 'verification-venv/bin/python')
-
     def registerDeterminismContract = { String label, String reportDirectory,
             List<String> testPatterns ->
         def title = label.substring(0, 1).toUpperCase(Locale.ROOT) + label.substring(1)
@@ -39,23 +34,25 @@ pluginManager.withPlugin('java') {
             }
         }
 
-        tasks.register("verify${title}EvidenceDeterminism", Exec) {
+        tasks.register("verify${title}EvidenceDeterminism", Test) {
             group = 'verification'
             description = "Requires repeated ${reportDirectory} JSON evidence to be byte-identical."
-            dependsOn ':prepareVerificationEnvironment', rerun
-            workingDir rootProject.layout.projectDirectory
-            inputs.file rootProject.layout.projectDirectory.file(
-                'scripts/verify-byte-identical-directories.py')
+            dependsOn rerun, tasks.named('testClasses')
+            testClassesDirs = sourceSets.test.output.classesDirs
+            classpath = sourceSets.test.runtimeClasspath
+            useJUnitPlatform()
+            filter {
+                includeTestsMatching(
+                    'de.regelsuche.verification.ByteIdenticalDirectoriesContractTest')
+            }
+            systemProperty 'regelsuche.byteIdentity.left',
+                baselineEvidence.get().asFile.absolutePath
+            systemProperty 'regelsuche.byteIdentity.right',
+                currentEvidence.get().asFile.absolutePath
+            systemProperty 'regelsuche.byteIdentity.include', '*.json'
             inputs.dir baselineEvidence
             inputs.dir currentEvidence
             outputs.upToDateWhen { false }
-            doFirst {
-                commandLine verificationPython.get().asFile.absolutePath,
-                    'scripts/verify-byte-identical-directories.py',
-                    '--left', baselineEvidence.get().asFile.absolutePath,
-                    '--right', currentEvidence.get().asFile.absolutePath,
-                    '--include', '*.json'
-            }
         }
     }
 
