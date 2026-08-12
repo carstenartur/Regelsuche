@@ -83,6 +83,39 @@ aufgrund ihres offenen Zustands. Entscheidend sind die dokumentierte
 Claim-Grenze, ein grüner Checkout und ein vollständig erfolgreicher
 Release-Lauf.
 
+## Release-Notes- und Issue-Audit
+
+Jeder Release verwendet das eindeutige semantische Intervall
+`previousTag..releaseTag`. `previousTag` ist der unmittelbar vorhergehende
+veröffentlichte SemVer-Tag. Ist er nicht eindeutig bestimmbar, wird die
+automatische Veröffentlichung abgebrochen.
+
+Vor der Veröffentlichung werden alle Issues geprüft, die im Intervall durch
+Closing-Referenzen oder Erwähnungen in PRs, Commits und Reviews berührt wurden.
+Übergeordnete Sammel-Issues der ausgelieferten Arbeit gehören ebenfalls dazu.
+
+Ein Issue erscheint nur dann unter **Abgeschlossene Issues**, wenn alle
+verbindlichen Akzeptanzkriterien erfüllt sind, Implementierung und Nachweise
+vorliegen, ein Abschlusskommentar die maßgeblichen PRs nennt und der
+GitHub-Schließungsgrund `completed` lautet. Teilweise erfüllte Sammel-Issues
+bleiben offen; ein Audit-Kommentar nennt ausgelieferte Teilpakete und echte
+Restarbeiten. `not planned`, Duplikat- und Ersetzt-Klassifikationen sind keine
+ausgelieferten Merkmale.
+
+Die Release Notes trennen abgeschlossene Issues, optionale Teilfortschritte
+offener Issues, technische PR-Änderungen aus demselben Tag-Intervall, bekannte
+Einschränkungen sowie Reproduktion und Artefakte. Automatisch erzeugte
+GitHub-Hinweise sind nur die technische PR-Übersicht und müssen mindestens mit
+`--notes-start-tag "$PREVIOUS_TAG"` dieselbe Grenze verwenden; sie ersetzen den
+Issue-Audit nicht.
+
+Vor dem echten Release werden beide Tags und Commit-SHAs, die im Intervall als
+`completed` geschlossenen Issues, ausgeschlossene Verwaltungsentscheidungen,
+berührte offene Issues samt aktualisiertem Status, die PR-Liste und die
+geprüfte Release-Notes-Fassung festgehalten. Nach GitHub- und
+Zenodo-Publikation wird kontrolliert, dass keine offenen Sammel-Issues als
+vollständig erledigt und keine PRs außerhalb des Intervalls dargestellt werden.
+
 ## Verpflichtender Trockenlauf
 
 Der normale Release beginnt immer mit einem Trockenlauf:
