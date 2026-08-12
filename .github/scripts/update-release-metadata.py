@@ -15,7 +15,7 @@ CODEMETA_RELEASE_DATE_KEY = 'date' + 'Published'
 ORCID_ID = '0009-0005-1047-6381'
 ORCID_URL = 'https://orcid.org/' + ORCID_ID
 POM_VERSION_PATTERN = re.compile(
-    r'(<artifactId>regelsuche-parent</artifactId>\s*<version>)[^<]+(</version>)'
+    r'(<artifactId>regelsuche-parent</artifactId>\s*<version>)([^<]+)(</version>)'
 )
 
 
@@ -53,14 +53,14 @@ def pom_paths() -> tuple[Path, ...]:
 
 def declared_pom_version(path: Path) -> str | None:
     match = POM_VERSION_PATTERN.search(path.read_text(encoding='utf-8'))
-    return match.group(1 + 1).strip() if match else None
+    return match.group(2).strip() if match else None
 
 
 def update_maven_versions(version: str) -> None:
     for path in pom_paths():
         text = path.read_text(encoding='utf-8')
         updated, replacements = POM_VERSION_PATTERN.subn(
-            rf'\g<1>{version}\g<2>',
+            rf'\g<1>{version}\g<3>',
             text,
             count=1,
         )
