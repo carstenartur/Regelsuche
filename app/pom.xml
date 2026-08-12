@@ -1,14 +1,152 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion><parent><groupId>de.regelsuche</groupId><artifactId>regelsuche-parent</artifactId><version>0.2.0-SNAPSHOT</version><relativePath>../pom.xml</relativePath></parent><artifactId>regelsuche-app</artifactId><name>Regelsuche Application</name>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>de.regelsuche</groupId>
+    <artifactId>regelsuche-parent</artifactId>
+    <version>0.2.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>regelsuche-app</artifactId>
+  <name>Regelsuche Application</name>
+
   <dependencies>
-    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-core</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-egraph</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-search</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-validation</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-math-algorithms</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-persistence</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-persistence-hibernate</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-learning</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-experiments</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-cli</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-discovery</artifactId></dependency>
-    <dependency><groupId>org.neo4j.driver</groupId><artifactId>neo4j-java-driver</artifactId></dependency><dependency><groupId>jakarta.persistence</groupId><artifactId>jakarta.persistence-api</artifactId></dependency><dependency><groupId>org.graalvm.polyglot</groupId><artifactId>polyglot</artifactId></dependency><dependency><groupId>com.fasterxml.jackson.dataformat</groupId><artifactId>jackson-dataformat-yaml</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-solver-portfolio</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-core</artifactId></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-egraph</artifactId></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-search</artifactId></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-validation</artifactId></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-math-algorithms</artifactId></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-persistence</artifactId></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-persistence-hibernate</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-learning</artifactId></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-experiments</artifactId></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-cli</artifactId></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-discovery</artifactId></dependency>
+
+    <dependency><groupId>org.neo4j.driver</groupId><artifactId>neo4j-java-driver</artifactId></dependency>
+    <dependency><groupId>jakarta.persistence</groupId><artifactId>jakarta.persistence-api</artifactId><version>${jakarta.persistence.version}</version></dependency>
+    <dependency><groupId>org.graalvm.polyglot</groupId><artifactId>polyglot</artifactId></dependency>
+    <dependency><groupId>com.fasterxml.jackson.dataformat</groupId><artifactId>jackson-dataformat-yaml</artifactId></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-solver-portfolio</artifactId><scope>test</scope></dependency>
   </dependencies>
-  <build><finalName>regelsuche-${releaseVersion}</finalName><plugins>
-    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><configuration><systemPropertyVariables combine.children="append"><regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot><regelsuche.maven.reactor>true</regelsuche.maven.reactor><regelsuche.recordDocs>false</regelsuche.recordDocs></systemPropertyVariables></configuration></plugin>
-    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><configuration><archive><manifest><mainClass>de.regelsuche.App</mainClass><addDefaultImplementationEntries>true</addDefaultImplementationEntries></manifest><manifestEntries><Implementation-Version>${releaseVersion}</Implementation-Version></manifestEntries></archive></configuration></plugin>
-    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-dependency-plugin</artifactId><version>3.8.1</version><executions><execution><id>copy-runtime-dependencies</id><phase>prepare-package</phase><goals><goal>copy-dependencies</goal></goals><configuration><includeScope>runtime</includeScope><outputDirectory>${project.build.directory}/distribution/lib</outputDirectory><excludeTransitive>false</excludeTransitive><overWriteReleases>false</overWriteReleases><overWriteSnapshots>true</overWriteSnapshots></configuration></execution></executions></plugin>
-    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-assembly-plugin</artifactId><version>3.7.1</version><executions><execution><id>build-release-distributions</id><phase>package</phase><goals><goal>single</goal></goals><configuration><appendAssemblyId>false</appendAssemblyId><finalName>regelsuche-${releaseVersion}</finalName><descriptors><descriptor>src/assembly/distribution.xml</descriptor></descriptors></configuration></execution></executions></plugin>
-  </plugins></build>
+
+  <build>
+    <finalName>regelsuche-${releaseVersion}</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <systemPropertyVariables combine.children="append">
+            <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
+            <regelsuche.maven.reactor>true</regelsuche.maven.reactor>
+            <regelsuche.recordDocs>false</regelsuche.recordDocs>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>de.regelsuche.App</mainClass>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+            </manifest>
+            <manifestEntries>
+              <Implementation-Version>${releaseVersion}</Implementation-Version>
+            </manifestEntries>
+          </archive>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack-swagger-ui-assets</id>
+            <phase>generate-resources</phase>
+            <goals><goal>unpack</goal></goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.webjars</groupId>
+                  <artifactId>swagger-ui</artifactId>
+                  <version>${swagger.ui.version}</version>
+                  <type>jar</type>
+                  <outputDirectory>${project.build.directory}/generated-resources/swagger-ui-webjar</outputDirectory>
+                  <includes>META-INF/resources/webjars/swagger-ui/${swagger.ui.version}/swagger-ui.css,META-INF/resources/webjars/swagger-ui/${swagger.ui.version}/swagger-ui-bundle.js,META-INF/resources/webjars/swagger-ui/${swagger.ui.version}/swagger-ui-standalone-preset.js</includes>
+                </artifactItem>
+              </artifactItems>
+              <overWriteReleases>false</overWriteReleases>
+              <overWriteSnapshots>true</overWriteSnapshots>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy-runtime-dependencies</id>
+            <phase>prepare-package</phase>
+            <goals><goal>copy-dependencies</goal></goals>
+            <configuration>
+              <includeScope>runtime</includeScope>
+              <outputDirectory>${project.build.directory}/distribution/lib</outputDirectory>
+              <excludeTransitive>false</excludeTransitive>
+              <overWriteReleases>false</overWriteReleases>
+              <overWriteSnapshots>true</overWriteSnapshots>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-swagger-ui-assets</id>
+            <phase>process-resources</phase>
+            <goals><goal>copy-resources</goal></goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}/web/openapi/vendor</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.build.directory}/generated-resources/swagger-ui-webjar/META-INF/resources/webjars/swagger-ui/${swagger.ui.version}</directory>
+                  <filtering>false</filtering>
+                  <includes>
+                    <include>swagger-ui.css</include>
+                    <include>swagger-ui-bundle.js</include>
+                    <include>swagger-ui-standalone-preset.js</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>build-release-distributions</id>
+            <phase>package</phase>
+            <goals><goal>single</goal></goals>
+            <configuration>
+              <appendAssemblyId>false</appendAssemblyId>
+              <finalName>regelsuche-${releaseVersion}</finalName>
+              <descriptors>
+                <descriptor>src/assembly/distribution.xml</descriptor>
+              </descriptors>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
