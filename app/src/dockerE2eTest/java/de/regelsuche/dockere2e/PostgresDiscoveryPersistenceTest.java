@@ -8,27 +8,15 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers(disabledWithoutDocker = true)
 class PostgresDiscoveryPersistenceTest {
     @Container
-    static final GenericContainer<?> POSTGRES = new GenericContainer<>("postgres:16-alpine")
-        .withEnv("POSTGRES_DB", "regelsuche")
-        .withEnv("POSTGRES_USER", "regelsuche")
-        .withEnv("POSTGRES_PASSWORD", "regelsuche-demo")
-        .withExposedPorts(5432)
-        // The PostgreSQL image opens port 5432 while its temporary bootstrap
-        // server is still shutting down. Wait for both readiness messages so
-        // the second one denotes the final server, not merely an open socket.
-        .waitingFor(Wait.forLogMessage(
-            ".*database system is ready to accept connections.*\\s", 2))
-        .withStartupTimeout(Duration.ofMinutes(2));
+    static final GenericContainer<?> POSTGRES = PinnedPostgresContainer.create();
 
     @Test
     void migrationsCreateSearchableDiscoverySchema() throws Exception {
