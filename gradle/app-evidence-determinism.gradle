@@ -43,7 +43,8 @@ pluginManager.withPlugin('java') {
             useJUnitPlatform()
             filter {
                 includeTestsMatching(
-                    'de.regelsuche.verification.ByteIdenticalDirectoriesContractTest')
+                    'de.regelsuche.plugin.PluginArtifactIndexEvidenceTest.'
+                        + 'configuredEvidenceDirectoriesAreByteIdentical')
             }
             systemProperty 'regelsuche.byteIdentity.left',
                 baselineEvidence.get().asFile.absolutePath
