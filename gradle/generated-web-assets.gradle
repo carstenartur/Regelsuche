@@ -75,7 +75,6 @@ afterEvaluate {
     }
 
     rootProject.tasks.named('verifyStaticReferencePage').configure {
-        actions.clear()
         dependsOn verifyStaticReferencePageContract
     }
 
