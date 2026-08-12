@@ -90,30 +90,56 @@ final class ByteIdenticalDirectoriesVerifier {
 
     private static Map<String, byte[]> collect(Path root, String pattern)
             throws IOException {
-        if (!Files.isDirectory(root)) {
-            throw new IllegalArgumentException("missing directory: " + root);
-        }
-        if (pattern == null || pattern.isBlank()) {
-            throw new IllegalArgumentException("include pattern must not be blank");
-        }
+        requireDirectory(root);
+        requirePattern(pattern);
 
         PathMatcher matcher = root.getFileSystem().getPathMatcher("glob:" + pattern);
-        Map<String, byte[]> files = new TreeMap<>();
-        try (var paths = Files.walk(root)) {
-            for (Path path : paths.filter(Files::isRegularFile).toList()) {
-                Path relative = root.relativize(path);
-                if (matcher.matches(relative)
-                        || matcher.matches(relative.getFileName())) {
-                    files.put(relative.toString().replace('\\', '/'),
-                        Files.readAllBytes(path));
-                }
-            }
-        }
-        if (files.isEmpty()) {
+        List<Path> matchingPaths = matchingPaths(root, matcher);
+        if (matchingPaths.isEmpty()) {
             throw new IllegalArgumentException(
                 "no files matching '" + pattern + "' under " + root);
         }
+
+        Map<String, byte[]> files = new TreeMap<>();
+        for (Path path : matchingPaths) {
+            Path relative = root.relativize(path);
+            files.put(relative.toString().replace('\\', '/'),
+                Files.readAllBytes(path));
+        }
         return files;
+    }
+
+    private static List<Path> matchingPaths(Path root, PathMatcher matcher)
+            throws IOException {
+        try (var paths = Files.walk(root)) {
+            return paths
+                .filter(Files::isRegularFile)
+                .filter(path -> matches(root, matcher, path))
+                .sorted()
+                .toList();
+        }
+    }
+
+    private static boolean matches(
+            Path root, PathMatcher matcher, Path path) {
+        Path relative = root.relativize(path);
+        return matcher.matches(relative)
+            || matcher.matches(relative.getFileName());
+    }
+
+    private static void requireDirectory(Path root) {
+        if (!Files.isDirectory(root)) {
+            throw new IllegalArgumentException("missing directory: " + root);
+        }
+    }
+
+    private static void requirePattern(String pattern) {
+        if (pattern == null) {
+            throw new IllegalArgumentException("include pattern must not be null");
+        }
+        if (pattern.isBlank()) {
+            throw new IllegalArgumentException("include pattern must not be blank");
+        }
     }
 
     private static String sha256(byte[] bytes) {
