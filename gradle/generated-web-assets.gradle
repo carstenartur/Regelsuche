@@ -52,6 +52,33 @@ afterEvaluate {
         }
     }
 
+    def verifyStaticReferencePageContract = tasks.register(
+            'verifyStaticReferencePageContract', Test) {
+        group = 'verification'
+        description = 'Verifies the generated static reference page through JUnit.'
+        dependsOn tasks.named('generateStaticReferencePage'), tasks.named('testClasses')
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        useJUnitPlatform()
+        filter {
+            includeTestsMatching(
+                'de.regelsuche.verification.StaticReferencePageContractTest')
+        }
+        systemProperty 'regelsuche.staticReferencePage.root',
+            layout.buildDirectory.dir('reports/static-reference-page')
+                .get()
+                .asFile
+                .absolutePath
+        inputs.dir layout.buildDirectory.dir('reports/static-reference-page')
+        outputs.upToDateWhen { false }
+        shouldRunAfter tasks.named('test')
+    }
+
+    rootProject.tasks.named('verifyStaticReferencePage').configure {
+        actions.clear()
+        dependsOn verifyStaticReferencePageContract
+    }
+
     tasks.named('check').configure {
         dependsOn verifyWebAssetGenerationIsolation
     }
