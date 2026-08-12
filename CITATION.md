@@ -4,7 +4,7 @@ If you use **Regelsuche** in research, teaching, software-engineering studies, m
 
 ## Preferred citation
 
-Carsten Hammer. **Regelsuche**. Version 0.2.0-SNAPSHOT. 2026. Software. GitHub repository: https://github.com/carstenartur/Regelsuche
+Carsten Hammer. **Regelsuche**. Version 0.2.0. 2026. Software. GitHub repository: https://github.com/carstenartur/Regelsuche
 
 When a Zenodo DOI is minted for a release, prefer the Zenodo citation shown on the release page and keep the GitHub repository URL as the code source.
 
@@ -15,7 +15,8 @@ When a Zenodo DOI is minted for a release, prefer the Zenodo citation shown on t
   author       = {Hammer, Carsten},
   orcid        = {https://orcid.org/0009-0005-1047-6381},
   title        = {Regelsuche},
-  version      = {0.2.0-SNAPSHOT},
+  version      = {0.2.0},
+  date         = {2026-08-12},
   publisher    = {GitHub and Zenodo},
   url          = {https://github.com/carstenartur/Regelsuche},
   license      = {MIT}
