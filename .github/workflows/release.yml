@@ -448,6 +448,29 @@ jobs:
           SOURCE_COMMIT: ${{ steps.release-state.outputs.source_commit }}
         run: |
           set -euo pipefail
+
+          validate_archive_root() {
+            local format="$1"
+            local archive="$2"
+            local expected_prefix="$3"
+            local entries entry
+            if [[ "$format" == 'zip' ]]; then
+              entries=$(unzip -Z1 "$archive")
+            else
+              entries=$(tar -tf "$archive")
+            fi
+            if [[ -z "$entries" ]]; then
+              echo "::error::Archive is empty: $archive"
+              return 1
+            fi
+            while IFS= read -r entry; do
+              if [[ "$entry" != "${expected_prefix}"* ]]; then
+                echo "::error::Archive entry outside ${expected_prefix}: ${entry}"
+                return 1
+              fi
+            done <<< "$entries"
+          }
+
           rm -rf release-artifacts
           mkdir -p release-artifacts
 
@@ -466,8 +489,8 @@ jobs:
             echo "::error::Application JAR does not expose Implementation-Version ${VERSION}"
             exit 1
           fi
-          unzip -Z1 "$ZIP" | grep -q "^regelsuche-${VERSION}/"
-          tar -tf "$TAR" | grep -q "^regelsuche-${VERSION}/"
+          validate_archive_root zip "$ZIP" "regelsuche-${VERSION}/"
+          validate_archive_root tar "$TAR" "regelsuche-${VERSION}/"
 
           cp "$JAR" "$TAR" "$ZIP" release-artifacts/
           {
@@ -531,7 +554,8 @@ jobs:
           else
             SERIES="${VERSION%.*}"
             git fetch --force --tags origin
-            if ! git tag --contains "$OLD_SHA" --list "v${SERIES}.*" | grep -q .; then
+            PRESERVING_TAGS=$(git tag --contains "$OLD_SHA" --list "v${SERIES}.*")
+            if [[ -z "$PRESERVING_TAGS" ]]; then
               echo "::error::Refusing to replace ${BRANCH}: ${OLD_SHA} is not preserved by a v${SERIES}.* tag"
               exit 1
             fi
@@ -574,12 +598,16 @@ jobs:
 
           ACTUAL=''
           for attempt in {1..10}; do
-            ACTUAL=$(gh release view "$TAG" \
+            if CANDIDATE=$(gh release view "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --json assets \
-              --jq '.assets[].name' | sort)
-            if [[ "$ACTUAL" == "$EXPECTED" ]]; then
-              break
+              --jq '.assets[].name' 2>/dev/null); then
+              ACTUAL=$(printf '%s\n' "$CANDIDATE" | sort)
+              if [[ "$ACTUAL" == "$EXPECTED" ]]; then
+                break
+              fi
+            else
+              ACTUAL=''
             fi
             sleep 2
           done
