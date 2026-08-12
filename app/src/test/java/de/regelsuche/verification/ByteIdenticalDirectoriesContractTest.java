@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.file.Path;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class ByteIdenticalDirectoriesContractTest {
@@ -22,9 +21,8 @@ class ByteIdenticalDirectoriesContractTest {
         String right = System.getProperty(RIGHT_PROPERTY);
         String include = System.getProperty(INCLUDE_PROPERTY);
 
-        boolean completelyConfigured = Stream.of(left, right, include)
-            .allMatch(value -> value != null && !value.isBlank());
-        assumeTrue(completelyConfigured,
+        assumeTrue(isConfigured(left) && isConfigured(right)
+                && isConfigured(include),
             "The standalone evidence contract is configured by its Gradle task");
 
         Path leftRoot = Path.of(left).toAbsolutePath().normalize();
@@ -35,5 +33,9 @@ class ByteIdenticalDirectoriesContractTest {
 
         assertTrue(comparison.identical(),
             () -> comparison.describe(leftRoot, rightRoot, include));
+    }
+
+    private static boolean isConfigured(String value) {
+        return value != null && !value.isBlank();
     }
 }
