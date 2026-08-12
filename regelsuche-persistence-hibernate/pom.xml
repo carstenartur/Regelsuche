@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion><parent><groupId>de.regelsuche</groupId><artifactId>regelsuche-parent</artifactId><version>0.2.0-SNAPSHOT</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>regelsuche-persistence-hibernate</artifactId><name>Regelsuche Hibernate Persistence</name>
+  <dependencies>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-persistence</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-learning</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-validation</artifactId></dependency><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-core</artifactId></dependency>
+    <dependency><groupId>org.hibernate.orm</groupId><artifactId>hibernate-core</artifactId></dependency><dependency><groupId>org.hibernate.search</groupId><artifactId>hibernate-search-mapper-orm</artifactId></dependency><dependency><groupId>org.hibernate.search</groupId><artifactId>hibernate-search-backend-lucene</artifactId></dependency><dependency><groupId>org.hibernate.validator</groupId><artifactId>hibernate-validator</artifactId></dependency><dependency><groupId>org.glassfish</groupId><artifactId>jakarta.el</artifactId></dependency><dependency><groupId>org.eclipse</groupId><artifactId>yasson</artifactId></dependency><dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId></dependency>
+  </dependencies>
+</project>
