@@ -3,42 +3,85 @@
 Diese Seite beschreibt den operativen Ablauf für einen GitHub-Release. Sie ist
 nicht mit der fachlichen [Release Readiness](release-readiness.md) zu
 verwechseln: `release-readiness.md` begrenzt wissenschaftliche Claims und
-Evidence Profiles; diese Seite beschreibt Versionierung, Trockenlauf,
+Evidence Profiles; diese Seite beschreibt Versionierung, Prüfung, Paketierung,
 Publikation und Nachkontrolle.
 
 ## Maßgebliche Quellen
 
-Der Release-Ablauf besitzt genau zwei maßgebliche Quellen:
+Der Release-Ablauf besitzt drei zusammengehörige, maschinell geprüfte Quellen:
 
-- `release.properties` legt die aktuelle Entwicklungsversion fest;
+- `release.properties` legt die aktuelle Entwicklungs- oder Release-Version
+  fest;
+- der Maven-Reaktor in `pom.xml` und allen Modul-POMs trägt exakt dieselbe
+  Projektversion;
 - `.github/workflows/release.yml` implementiert Auflösung, Prüfung,
-  Paketierung und GitHub-spezifische Mutationen.
+  Maven-Paketierung und GitHub-spezifische Mutationen.
 
 Die Versionsangaben in `CITATION.cff`, `CITATION.md`, `.zenodo.json` und
-`codemeta.json` müssen zur Entwicklungsversion passen. Der Workflow prüft diese
-Invariante vor jeder neuen Veröffentlichung.
+`codemeta.json` müssen ebenfalls übereinstimmen. Der Befehl
+
+```bash
+python3 .github/scripts/update-release-metadata.py 0.2.0-SNAPSHOT --check
+```
+
+prüft diese Invariante einschließlich sämtlicher POMs, ohne Dateien zu ändern.
+Die gleiche Hilfsroutine stellt beim Release und beim Wechsel auf die nächste
+Entwicklungsversion alle Quellen gemeinsam um.
 
 Bei `version=0.2.0-SNAPSHOT` ist die zu veröffentlichende Version `0.2.0` und
-der Tag `v0.2.0`. Die Eingabe für die nächste Version verändert nicht die zu
+der Tag `v0.2.0`. Die Angabe der nächsten Version verändert nicht die zu
 veröffentlichende Version; sie bestimmt ausschließlich die anschließende
 Entwicklungslinie.
+
+## Build-Vertrag
+
+Die Produktartefakte werden autoritativ durch Maven gebaut:
+
+```bash
+mvn --batch-mode --no-transfer-progress test
+mvn --batch-mode --no-transfer-progress -DreleaseVersion=0.2.0 -DskipTests package
+```
+
+Das zweite Kommando erzeugt unter `app/target/` genau diese drei
+Release-Kandidaten:
+
+- `regelsuche-0.2.0.jar`;
+- `regelsuche-0.2.0.zip`;
+- `regelsuche-0.2.0.tar`.
+
+Der Release-Workflow kontrolliert zusätzlich die `Implementation-Version` im
+JAR, das gemeinsame Wurzelverzeichnis der Archive und die vollständige,
+vorhersehbare Asset-Liste.
+
+Der bestehende Gradle-Aufruf
+
+```bash
+./gradlew --no-daemon --no-configuration-cache ciCheck
+```
+
+bleibt während der Maven-Migration eine umfassende Kompatibilitäts- und
+Evidence-Prüfung. Er ist nicht mehr die Quelle der veröffentlichten
+Produktpakete. Damit sind fachliche Vollprüfung und reproduzierbare
+Produktverpackung klar getrennt, ohne eine der beiden Prüfungen zu schwächen.
 
 ## Voraussetzungen
 
 Vor einem Release müssen folgende Bedingungen erfüllt sein:
 
-1. `main` ist grün und der maßgebliche Checkout-Aufruf
-   `./gradlew --no-daemon --no-configuration-cache ciCheck` ist erfolgreich.
-2. Es gibt keinen bekannten release-blockierenden Pull Request oder
+1. `main` ist grün.
+2. `ciCheck` und `mvn test` sind erfolgreich.
+3. Beide Befehle hinterlassen den Checkout unverändert.
+4. `release.properties`, sämtliche POMs und die Zitiermetadaten enthalten
+   dieselbe gültige `X.Y.Z-SNAPSHOT`-Version.
+5. Es gibt keinen bekannten release-blockierenden Pull Request oder
    ungeklärten Fehler auf `main`.
-3. `release.properties` enthält genau eine gültige `X.Y.Z-SNAPSHOT`-Version.
-4. Die Zitier- und Metadatendateien enthalten dieselbe SNAPSHOT-Version.
-5. Der Ziel-Tag und ein gleichnamiger GitHub Release stehen nicht in
+6. Ziel-Tag und gleichnamiger GitHub Release stehen nicht in
    widersprüchlichem Zustand.
 
 Offene Forschungs- und Roadmap-Issues blockieren einen Release nicht allein
 aufgrund ihres offenen Zustands. Entscheidend sind die dokumentierte
-Claim-Grenze, ein grüner Checkout und ein erfolgreich geprüfter Release-Lauf.
+Claim-Grenze, ein grüner Checkout und ein vollständig erfolgreicher
+Release-Lauf.
 
 ## Verpflichtender Trockenlauf
 
@@ -53,26 +96,64 @@ Der normale Release beginnt immer mit einem Trockenlauf:
    konventionelle Auswahl den beabsichtigten Wert nicht ausdrückt.
 
 Der Trockenlauf führt dieselbe Versionsauflösung, Metadatenprüfung,
-Checkout-Verifikation, Release-Metadatenumstellung, Paketierung,
+Checkout-Verifikation, lokale Release-Metadatenumstellung, Maven-Paketierung,
 Manifest-Erzeugung und SHA-256-Bildung wie ein echter Release aus. Er erzeugt
 jedoch keinen Tag, keinen GitHub Release, keinen Maintenance-Branch und keinen
 Folge-PR.
 
 `skip_tests=true` ist kein normaler Release-Pfad. Diese Option reduziert die
-Prüfung auf Assembly und darf nur für eine begründete Wiederherstellung eines
-bereits anderweitig vollständig geprüften Zustands verwendet werden.
+Vorprüfung auf eine Maven-Paketierung und darf nur für eine begründete
+Wiederherstellung eines bereits anderweitig vollständig geprüften Zustands
+verwendet werden.
+
+## Auditierbarer Automationsauslöser
+
+Für Werkzeuge mit GitHub-Schreibzugriff, aber ohne Zugriff auf
+`workflow_dispatch`, existiert ein bewusst enger, auditierbarer Auslöser. Eine
+Anforderungs-Branch muss unmittelbar auf dem aktuellen `main` basieren und
+exakt einen zusätzlichen Nicht-Merge-Commit besitzen. Dieser Commit darf nur
+`.github/release-request` ändern.
+
+Trockenlauf:
+
+```text
+release/dry-run-v0.2.0-next-v0.3.0-SNAPSHOT
+```
+
+Echter Lauf:
+
+```text
+release/run-v0.2.0-next-v0.3.0-SNAPSHOT
+```
+
+Die Datei muss genau drei Zeilen enthalten:
+
+```text
+mode=dry-run
+release=0.2.0
+next=0.3.0-SNAPSHOT
+```
+
+beziehungsweise für die Veröffentlichung `mode=run`. Der Workflow vergleicht
+Branchname, Payload, Trigger-SHA, einzigen Eltern-Commit, aktuellen `main` und
+die in `release.properties` deklarierte Version. Jede zusätzliche Änderung,
+ein veralteter Eltern-Commit oder eine abweichende Versionsangabe beendet den
+Lauf vor allen Mutationen. Dieser Pfad ist damit kein Umgehen der
+Release-Prüfung, sondern lediglich eine andere, vollständig protokollierte
+Auslösung desselben Jobs.
 
 ## Trockenlauf auswerten
 
 Ein Trockenlauf gilt nur dann als erfolgreich, wenn:
 
 - der Job **Verify, package and publish** vollständig grün ist;
-- `ciCheck` den Checkout unverändert hinterlässt;
-- das Artefakt `regelsuche-<version>-artifacts` vorhanden ist;
+- `ciCheck` und der vollständige Maven-Produktreaktor erfolgreich sind;
+- der Checkout nach den Prüfungen unverändert ist;
+- das Workflow-Artefakt `regelsuche-<version>-artifacts` vorhanden ist;
 - ZIP, TAR und JAR sowie `RELEASE-MANIFEST.txt` und `SHA256SUMS.txt` enthalten
   sind;
-- Manifest-Version, Tag und Source Commit dem beabsichtigten Release
-  entsprechen;
+- Manifest-Version, Tag, Quell-Commit und Release-Commit dem beabsichtigten
+  Kandidaten entsprechen;
 - keine Warnung eine übersprungene oder abgeschwächte Prüfung anzeigt.
 
 Die im Trockenlauf erzeugten Binärartefakte dienen als Nachweis des
@@ -90,44 +171,69 @@ mit denselben Versionsangaben gestartet, diesmal mit:
 Der Workflow:
 
 1. prüft den Checkout erneut vollständig;
-2. erzeugt einen lokalen Commit mit Release-Metadaten;
-3. baut ZIP, TAR und JAR und erzeugt Manifest sowie SHA-256-Summen;
-4. erstellt und pusht den annotierten Tag `vX.Y.Z`;
-5. aktualisiert `maintenance/X.Y.x` auf den getaggten Release-Commit;
-6. erstellt den GitHub Release und lädt die Artefakte hoch;
-7. stellt den autoritativen Stand von `main` wieder her;
-8. öffnet bei Bedarf einen Pull Request für die nächste
-   `X.Y.Z-SNAPSHOT`-Entwicklungsversion.
+2. erzeugt einen lokalen Commit, in dem Release-Metadaten und sämtliche POMs
+   gemeinsam auf `X.Y.Z` stehen;
+3. baut JAR, ZIP und TAR mit Maven;
+4. erzeugt ein Herkunftsmanifest und SHA-256-Summen;
+5. erstellt und pusht den annotierten Tag `vX.Y.Z`;
+6. aktualisiert `maintenance/X.Y.x` auf den getaggten Release-Commit;
+7. erstellt den GitHub Release und lädt genau die fünf vereinbarten Assets
+   hoch;
+8. prüft, dass der Release weder Entwurf noch Pre-Release ist und dass die
+   Asset-Liste exakt stimmt;
+9. stellt den autoritativen Stand von `main` wieder her;
+10. öffnet bei Bedarf einen Pull Request für die nächste
+    `X.Y.Z-SNAPSHOT`-Entwicklungsversion einschließlich aller POMs.
 
 Die nächste Entwicklungsversion muss numerisch größer als die veröffentlichte
 Version sein. Freie Eingaben werden getrimmt und strikt gegen das Format
 `X.Y.Z-SNAPSHOT` geprüft.
+
+## Zenodo
+
+Zenodo ist ein nachgelagerter Publikationsschritt der GitHub-Integration. Erst
+ein erfolgreich angelegter, nicht als Entwurf markierter GitHub Release kann
+eine neue Zenodo-Version auslösen. Deshalb wird Zenodo niemals als Beleg für
+einen nur lokal gebauten oder lediglich getaggten Kandidaten verwendet.
+
+Nach dem GitHub Release ist zu prüfen:
+
+- Zenodo hat eine neue Version für `vX.Y.Z` angelegt;
+- Version, Titel, Autoren, Veröffentlichungsdatum und Dateien stimmen mit den
+  Release-Metadaten überein;
+- die Konzept-DOI verweist auf die neue jüngste Version;
+- die vorherige Zenodo-Version bleibt unverändert und zitierfähig.
 
 ## Nachkontrolle
 
 Nach dem echten Lauf sind folgende Punkte zu prüfen:
 
 - Tag `vX.Y.Z` existiert und zeigt auf den Release-Metadaten-Commit;
-- der GitHub Release enthält alle erwarteten Artefakte und Prüfsummen;
+- der GitHub Release enthält JAR, ZIP, TAR, Manifest und Prüfsummen;
 - `maintenance/X.Y.x` zeigt auf denselben getaggten Commit;
 - der Folge-PR enthält ausschließlich die nächste Entwicklungsversion in
-  `release.properties`, `CITATION.cff`, `CITATION.md`, `.zenodo.json` und
-  `codemeta.json`;
+  `release.properties`, `CITATION.cff`, `CITATION.md`, `.zenodo.json`,
+  `codemeta.json`, dem Root-POM und allen Modul-POMs;
 - nach Merge des Folge-PRs ist `main` erneut grün;
-- die veröffentlichte Version ist in Zitiermetadaten und Release-Artefakten
-  konsistent.
+- GitHub und Zenodo zeigen die tatsächlich veröffentlichte Version.
 
 Ein Release-Issue oder eine Checkliste darf erst geschlossen werden, wenn diese
 Nachkontrolle abgeschlossen ist.
 
 ## Fehler- und Wiederholungssemantik
 
-Der Workflow erkennt vorhandene Tags und GitHub Releases getrennt. Ein
-vorhandener Tag wird nur akzeptiert, wenn dessen `release.properties` exakt die
-erwartete Release-Version enthält. Maintenance-Branches werden nur ersetzt,
-wenn der vorherige Stand bereits durch einen passenden Release-Tag erhalten
-ist. Diese Prüfungen verhindern, dass ein Wiederholungslauf widersprüchliche
-Historie überschreibt.
+Der Workflow erkennt vorhandene Tags und GitHub Releases getrennt. Ein GitHub
+Release ohne den zugehörigen Tag wird als inkonsistenter Zustand abgelehnt. Ein
+vorhandener Tag wird nur akzeptiert, wenn dessen `release.properties` und alle
+weiteren Metadaten exakt die erwartete Release-Version enthalten.
+Maintenance-Branches werden nur ersetzt, wenn der vorherige Stand bereits
+durch einen passenden Release-Tag erhalten ist.
+
+Ein Tag-Push startet außerdem denselben Workflow als Wiederherstellungspfad.
+Die globale Release-Serialisierung verhindert konkurrierende Publikationen.
+Existiert der GitHub Release bereits vollständig, überspringt der
+Wiederholungslauf Build und Upload und kontrolliert nur den veröffentlichten
+Zustand.
 
 Bei einem fehlgeschlagenen Trockenlauf wird nichts veröffentlicht. Bei einem
 fehlgeschlagenen echten Lauf ist vor einer Wiederholung zuerst festzustellen,
@@ -138,17 +244,17 @@ Workflows erneut zu erfüllen.
 
 ## Lokale Vorprüfung
 
-Die GitHub-spezifischen Mutationen sind nur im Workflow verfügbar. Die
-maßgebliche lokale Vorprüfung bleibt:
+Für `0.2.0-SNAPSHOT` lautet die vollständige lokale Vorprüfung:
 
 ```bash
+python3 .github/scripts/update-release-metadata.py 0.2.0-SNAPSHOT --check
 ./gradlew --no-daemon --no-configuration-cache ciCheck
-```
-
-Sie muss ohne unversionierte oder veränderte Dateien enden:
-
-```bash
+mvn --batch-mode --no-transfer-progress test
+mvn --batch-mode --no-transfer-progress \
+  -DreleaseVersion=0.2.0 \
+  -DskipTests \
+  package
 git status --short
 ```
 
-Eine leere Ausgabe ist Teil der Release-Invariante.
+Eine leere Ausgabe des letzten Befehls ist Teil der Release-Invariante.
