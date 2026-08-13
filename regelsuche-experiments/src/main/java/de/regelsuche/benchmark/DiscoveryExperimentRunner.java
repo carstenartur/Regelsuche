@@ -45,8 +45,15 @@ public interface DiscoveryExperimentRunner {
         HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();
         HistoricalRediscoveryAtlas.AtlasReport report = atlas.run(corpus);
         verifyRetainedClaims(report);
+        HistoricalRediscoveryRunArtifact.begin(output);
         HistoricalRediscoveryAtlas.WrittenArtifacts artifacts =
             atlas.write(output, report);
+        HistoricalRediscoveryRunArtifact.VerifiedRun verifiedRun =
+            HistoricalRediscoveryRunArtifact.commit(
+                output,
+                corpus,
+                report,
+                artifacts);
         System.out.println("historicalRediscoveryAssessment="
             + report.assessment().decision());
         System.out.println("historicalRediscoveryCases=" + report.cases().size());
@@ -54,6 +61,10 @@ public interface DiscoveryExperimentRunner {
             + artifacts.json().toAbsolutePath().normalize());
         System.out.println("historicalRediscoveryMarkdown="
             + artifacts.markdown().toAbsolutePath().normalize());
+        System.out.println("historicalRediscoveryRun="
+            + verifiedRun.manifestPath());
+        System.out.println("historicalRediscoveryRunHash="
+            + verifiedRun.manifest().contentHash());
     }
 
     /**
