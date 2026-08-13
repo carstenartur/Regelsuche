@@ -9,7 +9,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,34 +63,39 @@ class MavenDependencyManagementContractTest {
           "de.regelsuche:regelsuche-app",
           "de.regelsuche:regelsuche-integration-tests");
 
-  private static final List<String> CONSUMER_POMS =
-      List.of(
-          "regelsuche-core/pom.xml",
-          "regelsuche-persistence-hibernate/pom.xml",
-          "app/pom.xml",
-          "regelsuche-integration-tests/pom.xml");
+  private static final Set<String> MANAGED_PLUGINS =
+      Set.of(
+          "org.apache.maven.plugins:maven-clean-plugin",
+          "org.apache.maven.plugins:maven-resources-plugin",
+          "org.apache.maven.plugins:maven-compiler-plugin",
+          "org.apache.maven.plugins:maven-surefire-plugin",
+          "org.apache.maven.plugins:maven-failsafe-plugin",
+          "org.apache.maven.plugins:maven-jar-plugin",
+          "org.apache.maven.plugins:maven-dependency-plugin",
+          "org.apache.maven.plugins:maven-assembly-plugin",
+          "org.apache.maven.plugins:maven-install-plugin",
+          "org.apache.maven.plugins:maven-deploy-plugin",
+          "org.apache.maven.plugins:maven-site-plugin",
+          "org.apache.maven.plugins:maven-enforcer-plugin",
+          "org.jacoco:jacoco-maven-plugin");
 
   @Test
-  void parentOwnsExternalAndReactorDependencyVersions() throws Exception {
+  void parentOwnsExternalReactorAndPluginVersions() throws Exception {
     Document parent = parse(repositoryRoot().resolve("pom.xml"));
-    Map<String, Element> managed = managedDependencies(parent);
+    Map<String, Element> managedDependencies = managedDependencies(parent);
 
     for (String coordinate : MANAGED_EXTERNAL_DEPENDENCIES) {
-      Element dependency = managed.get(coordinate);
+      Element dependency = managedDependencies.get(coordinate);
       assertNotNull(
           dependency,
           () -> "parent dependencyManagement is missing " + coordinate);
-      String version = directChildText(dependency, "version");
-      assertNotNull(
-          version,
-          () -> "managed dependency has no version: " + coordinate);
-      assertTrue(
-          version.matches("\\$\\{[^}]+}"),
-          () -> coordinate + " must resolve through one parent property");
+      assertPropertyVersion(
+          directChildText(dependency, "version"),
+          "managed dependency " + coordinate);
     }
 
     for (String coordinate : MANAGED_REACTOR_DEPENDENCIES) {
-      Element dependency = managed.get(coordinate);
+      Element dependency = managedDependencies.get(coordinate);
       assertNotNull(
           dependency,
           () -> "parent dependencyManagement is missing " + coordinate);
@@ -98,41 +105,98 @@ class MavenDependencyManagementContractTest {
           () -> coordinate + " must follow the reactor version");
     }
 
-    assertImportedBom(managed, "org.junit:junit-bom", "${junit.version}");
     assertImportedBom(
-        managed,
+        managedDependencies,
+        "org.junit:junit-bom",
+        "${junit.version}");
+    assertImportedBom(
+        managedDependencies,
         "org.testcontainers:testcontainers-bom",
         "${testcontainers.version}");
+
+    Map<String, Element> managedPlugins = managedPlugins(parent);
+    for (String coordinate : MANAGED_PLUGINS) {
+      Element plugin = managedPlugins.get(coordinate);
+      assertNotNull(
+          plugin,
+          () -> "parent pluginManagement is missing " + coordinate);
+      assertPropertyVersion(
+          directChildText(plugin, "version"),
+          "managed plugin " + coordinate);
+    }
   }
 
   @Test
-  void consumingModulesDoNotRepeatParentOwnedDependencyVersions()
+  void allDeclaredModulesInheritDependencyAndPluginVersions()
       throws Exception {
     Path root = repositoryRoot();
-    Set<String> centrallyManaged =
-        new java.util.HashSet<>(MANAGED_EXTERNAL_DEPENDENCIES);
-    centrallyManaged.addAll(MANAGED_REACTOR_DEPENDENCIES);
-    centrallyManaged.add(
-        "org.testcontainers:testcontainers-junit-jupiter");
+    Document parent = parse(root.resolve("pom.xml"));
+    Map<String, Element> managedDependencies = managedDependencies(parent);
+    Map<String, Element> managedPlugins = managedPlugins(parent);
 
-    for (String relative : CONSUMER_POMS) {
-      Document document = parse(root.resolve(relative));
-      Element dependencies =
-          directChild(document.getDocumentElement(), "dependencies");
-      assertNotNull(dependencies, () -> "missing dependencies in " + relative);
-      for (Element dependency : directChildren(
-          dependencies,
-          "dependency")) {
-        String coordinate = coordinate(dependency);
-        if (centrallyManaged.contains(coordinate)) {
+    for (Path pom : modulePoms(parent, root)) {
+      assertTrue(
+          Files.isRegularFile(pom),
+          () -> "declared Maven module has no pom.xml: " + pom);
+      String relative = root.relativize(pom).toString().replace('\\', '/');
+      Document module = parse(pom);
+      Element project = module.getDocumentElement();
+
+      Element dependencies = directChild(project, "dependencies");
+      if (dependencies != null) {
+        for (Element dependency : directChildren(
+            dependencies,
+            "dependency")) {
+          String coordinate = dependencyCoordinate(dependency);
           assertNull(
               directChild(dependency, "version"),
               () -> relative
-                  + " must inherit the centrally managed version for "
+                  + " must inherit the dependency version for "
+                  + coordinate);
+          if (!isBomManaged(coordinate)) {
+            assertNotNull(
+                managedDependencies.get(coordinate),
+                () -> relative
+                    + " uses an unmanaged dependency: "
+                    + coordinate);
+          }
+        }
+      }
+
+      Element build = directChild(project, "build");
+      Element plugins = directChild(build, "plugins");
+      if (plugins != null) {
+        for (Element plugin : directChildren(plugins, "plugin")) {
+          String coordinate = pluginCoordinate(plugin);
+          assertNull(
+              directChild(plugin, "version"),
+              () -> relative
+                  + " must inherit the plugin version for "
+                  + coordinate);
+          assertNotNull(
+              managedPlugins.get(coordinate),
+              () -> relative
+                  + " uses an unmanaged build plugin: "
                   + coordinate);
         }
       }
     }
+  }
+
+  private static boolean isBomManaged(String coordinate) {
+    return coordinate.startsWith("org.junit:")
+        || coordinate.startsWith("org.junit.jupiter:")
+        || coordinate.startsWith("org.testcontainers:");
+  }
+
+  private static void assertPropertyVersion(
+      String version,
+      String label
+  ) {
+    assertNotNull(version, () -> label + " has no version");
+    assertTrue(
+        version.matches("\\$\\{[^}]+\\}"),
+        () -> label + " must resolve through one parent property");
   }
 
   private static void assertImportedBom(
@@ -155,22 +219,94 @@ class MavenDependencyManagementContractTest {
     assertNotNull(management, "missing parent dependencyManagement");
     Element dependencies = directChild(management, "dependencies");
     assertNotNull(dependencies, "missing managed dependencies");
+    return uniqueByCoordinate(
+        directChildren(dependencies, "dependency"),
+        MavenDependencyManagementContractTest::dependencyCoordinate,
+        "managed dependency");
+  }
+
+  private static Map<String, Element> managedPlugins(Document parent) {
+    Element build = directChild(parent.getDocumentElement(), "build");
+    Element management = directChild(build, "pluginManagement");
+    assertNotNull(management, "missing parent pluginManagement");
+    Element plugins = directChild(management, "plugins");
+    assertNotNull(plugins, "missing managed plugins");
+    return uniqueByCoordinate(
+        directChildren(plugins, "plugin"),
+        MavenDependencyManagementContractTest::pluginCoordinate,
+        "managed plugin");
+  }
+
+  private static Map<String, Element> uniqueByCoordinate(
+      List<Element> elements,
+      java.util.function.Function<Element, String> coordinate,
+      String label
+  ) {
     Map<String, Element> result = new LinkedHashMap<>();
-    for (Element dependency : directChildren(
-        dependencies,
-        "dependency")) {
-      String coordinate = coordinate(dependency);
+    for (Element element : elements) {
+      String value = coordinate.apply(element);
       assertNull(
-          result.put(coordinate, dependency),
-          () -> "duplicate managed dependency: " + coordinate);
+          result.put(value, element),
+          () -> "duplicate " + label + ": " + value);
     }
     return result;
   }
 
-  private static String coordinate(Element dependency) {
-    return directChildText(dependency, "groupId")
+  private static List<Path> modulePoms(
+      Document parent,
+      Path root
+  ) {
+    LinkedHashSet<String> modules = new LinkedHashSet<>();
+    Element project = parent.getDocumentElement();
+    addModules(directChild(project, "modules"), modules);
+    Element profiles = directChild(project, "profiles");
+    if (profiles != null) {
+      for (Element profile : directChildren(profiles, "profile")) {
+        addModules(directChild(profile, "modules"), modules);
+      }
+    }
+    assertTrue(!modules.isEmpty(), "parent must declare Maven modules");
+    return modules.stream()
+        .map(module -> root.resolve(module).resolve("pom.xml"))
+        .toList();
+  }
+
+  private static void addModules(
+      Element modules,
+      Set<String> result
+  ) {
+    if (modules == null) {
+      return;
+    }
+    for (Element module : directChildren(modules, "module")) {
+      String path = module.getTextContent().trim();
+      assertTrue(!path.isBlank(), "module path must not be blank");
+      result.add(path);
+    }
+  }
+
+  private static String dependencyCoordinate(Element dependency) {
+    return requiredChildText(dependency, "groupId")
         + ":"
-        + directChildText(dependency, "artifactId");
+        + requiredChildText(dependency, "artifactId");
+  }
+
+  private static String pluginCoordinate(Element plugin) {
+    String groupId = directChildText(plugin, "groupId");
+    if (groupId == null) {
+      groupId = "org.apache.maven.plugins";
+    }
+    return groupId + ":" + requiredChildText(plugin, "artifactId");
+  }
+
+  private static String requiredChildText(
+      Element parent,
+      String localName
+  ) {
+    String value = directChildText(parent, localName);
+    assertNotNull(value, () -> "missing " + localName);
+    assertTrue(!value.isBlank(), () -> localName + " must not be blank");
+    return value;
   }
 
   private static Path repositoryRoot() {
@@ -226,7 +362,7 @@ class MavenDependencyManagementContractTest {
       Element parent,
       String localName
   ) {
-    List<Element> elements = new java.util.ArrayList<>();
+    List<Element> elements = new ArrayList<>();
     for (Node child = parent.getFirstChild();
         child != null;
         child = child.getNextSibling()) {
