@@ -42,9 +42,9 @@ jobs:
           set -o pipefail
           mkdir -p build/logs
           env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache "$REGELSUCHE_CI_TASK" --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
-      - name: Verify the complete Maven product reactor
+      - name: Verify the complete Maven product and Docker contract
         if: always() && github.event_name != 'create'
-        run: mvn --batch-mode --no-transfer-progress test
+        run: mvn --batch-mode --no-transfer-progress -Pfull verify
       - name: Retain verification evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -61,6 +61,8 @@ jobs:
             **/build/test-results/**
             **/build/discovery-artifacts/**
             **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+            **/target/discovery-artifacts/**
             docs/generated/**
           include-hidden-files: true
           if-no-files-found: warn
