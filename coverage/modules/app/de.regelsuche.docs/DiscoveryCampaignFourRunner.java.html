@@ -49,45 +49,48 @@ import java.util.Set;
     }
 
     CampaignReport writeReport(Path outputDirectory, List&lt;PromotionRecord&gt; promotedRecords) {
+<span class="nc" id="L52">        return writeReport(outputDirectory, run(promotedRecords));</span>
+    }
+
+    CampaignReport writeReport(Path outputDirectory, CampaignReport report) {
         try {
-<span class="fc" id="L53">            Files.createDirectories(outputDirectory);</span>
-<span class="fc" id="L54">            CampaignReport report = run(promotedRecords);</span>
-<span class="fc" id="L55">            AtomicJsonFile.writeUtf8(</span>
-<span class="fc" id="L56">                outputDirectory.resolve(&quot;discovery-campaign-4.json&quot;),</span>
-<span class="fc" id="L57">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
+<span class="fc" id="L57">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L58">            AtomicJsonFile.writeUtf8(</span>
+<span class="fc" id="L59">                outputDirectory.resolve(&quot;discovery-campaign-4.json&quot;),</span>
+<span class="fc" id="L60">                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)</span>
             );
-<span class="fc" id="L59">            Files.writeString(</span>
-<span class="fc" id="L60">                outputDirectory.resolve(&quot;macro-reuse-report.md&quot;),</span>
-<span class="fc" id="L61">                renderMarkdown(report),</span>
+<span class="fc" id="L62">            Files.writeString(</span>
+<span class="fc" id="L63">                outputDirectory.resolve(&quot;macro-reuse-report.md&quot;),</span>
+<span class="fc" id="L64">                renderMarkdown(report),</span>
                 StandardCharsets.UTF_8
             );
-<span class="fc" id="L64">            return report;</span>
-<span class="nc" id="L65">        } catch (IOException exception) {</span>
-<span class="nc" id="L66">            throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L67">            return report;</span>
+<span class="nc" id="L68">        } catch (IOException exception) {</span>
+<span class="nc" id="L69">            throw new UncheckedIOException(exception);</span>
         }
     }
 
     private CaseResult evaluate(ReuseCase reuseCase) {
-<span class="fc" id="L71">        DiscoveryBenchmarkScenario scenario = loader.load(reuseCase.scenarioResource());</span>
-<span class="fc" id="L72">        DiscoveryBenchmarkEvidence evidence = executor.execute(scenario);</span>
-<span class="fc" id="L73">        RunMetrics macroDisabled = metrics(evidence.withoutMacroRun().success(), evidence.withoutMacroRun().path(),</span>
-<span class="fc" id="L74">            evidence.withoutMacroRun().analytics().statesExplored(), bridgeCount(evidence.withoutMacroRun().appliedRuleIds()));</span>
-<span class="fc" id="L75">        int enabledBridgeCount = bridgeCount(evidence.withMacroRun().appliedRuleIds());</span>
-<span class="fc" id="L76">        RunMetrics macroEnabled = metrics(evidence.withMacroRun().success(), evidence.withMacroRun().path(),</span>
-<span class="fc" id="L77">            evidence.withMacroRun().analytics().statesExplored(), enabledBridgeCount);</span>
-<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        boolean measuredImprovement = macroEnabled.success()</span>
-<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            &amp;&amp; (!macroDisabled.success()</span>
-<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                || macroEnabled.statesExplored() &lt; macroDisabled.statesExplored()</span>
-<span class="nc bnc" id="L81" title="All 2 branches missed.">                || macroEnabled.pathLength() &lt; macroDisabled.pathLength()</span>
-<span class="pc bnc" id="L82" title="All 2 branches missed.">                || macroEnabled.bridgeCount() &lt; macroDisabled.bridgeCount());</span>
-<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        String generatedMacroId = evidence.learnedMacros().isEmpty() ? &quot;&quot; : evidence.learnedMacros().getFirst();</span>
-<span class="fc" id="L84">        return new CaseResult(</span>
+<span class="fc" id="L74">        DiscoveryBenchmarkScenario scenario = loader.load(reuseCase.scenarioResource());</span>
+<span class="fc" id="L75">        DiscoveryBenchmarkEvidence evidence = executor.execute(scenario);</span>
+<span class="fc" id="L76">        RunMetrics macroDisabled = metrics(evidence.withoutMacroRun().success(), evidence.withoutMacroRun().path(),</span>
+<span class="fc" id="L77">            evidence.withoutMacroRun().analytics().statesExplored(), bridgeCount(evidence.withoutMacroRun().appliedRuleIds()));</span>
+<span class="fc" id="L78">        int enabledBridgeCount = bridgeCount(evidence.withMacroRun().appliedRuleIds());</span>
+<span class="fc" id="L79">        RunMetrics macroEnabled = metrics(evidence.withMacroRun().success(), evidence.withMacroRun().path(),</span>
+<span class="fc" id="L80">            evidence.withMacroRun().analytics().statesExplored(), enabledBridgeCount);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        boolean measuredImprovement = macroEnabled.success()</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            &amp;&amp; (!macroDisabled.success()</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                || macroEnabled.statesExplored() &lt; macroDisabled.statesExplored()</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                || macroEnabled.pathLength() &lt; macroDisabled.pathLength()</span>
+<span class="pc bnc" id="L85" title="All 2 branches missed.">                || macroEnabled.bridgeCount() &lt; macroDisabled.bridgeCount());</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        String generatedMacroId = evidence.learnedMacros().isEmpty() ? &quot;&quot; : evidence.learnedMacros().getFirst();</span>
+<span class="fc" id="L87">        return new CaseResult(</span>
             &quot;discovery-campaign-4&quot;,
-<span class="fc" id="L86">            reuseCase.candidateId(),</span>
-<span class="fc" id="L87">            reuseCase.sourceCampaign(),</span>
-<span class="fc" id="L88">            reuseCase.scenarioId(),</span>
+<span class="fc" id="L89">            reuseCase.candidateId(),</span>
+<span class="fc" id="L90">            reuseCase.sourceCampaign(),</span>
+<span class="fc" id="L91">            reuseCase.scenarioId(),</span>
             generatedMacroId,
-<span class="fc" id="L90">            evidence.reusedMacros(),</span>
+<span class="fc" id="L93">            evidence.reusedMacros(),</span>
             macroDisabled,
             macroEnabled,
             measuredImprovement
@@ -95,43 +98,43 @@ import java.util.Set;
     }
 
     private RunMetrics metrics(boolean success, List&lt;String&gt; path, long statesExplored, int bridgeCount) {
-<span class="fc" id="L98">        return new RunMetrics(success, Math.max(0, path.size() - 1), statesExplored, bridgeCount);</span>
+<span class="fc" id="L101">        return new RunMetrics(success, Math.max(0, path.size() - 1), statesExplored, bridgeCount);</span>
     }
 
     private int bridgeCount(List&lt;String&gt; appliedRuleIds) {
-<span class="fc" id="L102">        return (int) appliedRuleIds.stream()</span>
-<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            .filter(ruleId -&gt; ruleId != null)</span>
-<span class="fc" id="L104">            .filter(ruleId -&gt; {</span>
-<span class="fc" id="L105">                String lower = ruleId.toLowerCase(Locale.ROOT);</span>
-<span class="fc bfc" id="L106" title="All 4 branches covered.">                return lower.contains(&quot;bridge&quot;) || lower.startsWith(&quot;hypothesis_&quot;);</span>
+<span class="fc" id="L105">        return (int) appliedRuleIds.stream()</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            .filter(ruleId -&gt; ruleId != null)</span>
+<span class="fc" id="L107">            .filter(ruleId -&gt; {</span>
+<span class="fc" id="L108">                String lower = ruleId.toLowerCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L109" title="All 4 branches covered.">                return lower.contains(&quot;bridge&quot;) || lower.startsWith(&quot;hypothesis_&quot;);</span>
             })
-<span class="fc" id="L108">            .count();</span>
+<span class="fc" id="L111">            .count();</span>
     }
 
     private String renderMarkdown(CampaignReport report) {
-<span class="fc" id="L112">        StringBuilder out = new StringBuilder(&quot;# Discovery Campaign 4\n\n&quot;);</span>
-<span class="fc" id="L113">        out.append(&quot;| Candidate | Scenario | Macro | Reused | Disabled success | Enabled success | Disabled path | Enabled path | Disabled states | Enabled states | Improved |\n&quot;);</span>
-<span class="fc" id="L114">        out.append(&quot;| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |\n&quot;);</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (CaseResult result : report.results()) {</span>
-<span class="fc" id="L116">            out.append(&quot;| &quot;).append(escape(result.candidateId()))</span>
-<span class="fc" id="L117">                .append(&quot; | &quot;).append(escape(result.scenarioId()))</span>
-<span class="fc" id="L118">                .append(&quot; | &quot;).append(escape(orDash(result.generatedMacroId())))</span>
-<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(escape(result.reusedMacroIds().isEmpty() ? &quot;—&quot; : String.join(&quot;, &quot;, result.reusedMacroIds())))</span>
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(result.macroDisabled().success() ? &quot;yes&quot; : &quot;no&quot;)</span>
-<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(result.macroEnabled().success() ? &quot;yes&quot; : &quot;no&quot;)</span>
-<span class="fc" id="L122">                .append(&quot; | &quot;).append(result.macroDisabled().pathLength())</span>
-<span class="fc" id="L123">                .append(&quot; | &quot;).append(result.macroEnabled().pathLength())</span>
-<span class="fc" id="L124">                .append(&quot; | &quot;).append(result.macroDisabled().statesExplored())</span>
-<span class="fc" id="L125">                .append(&quot; | &quot;).append(result.macroEnabled().statesExplored())</span>
-<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(result.measuredImprovement() ? &quot;yes&quot; : &quot;no&quot;)</span>
-<span class="fc" id="L127">                .append(&quot; |\n&quot;);</span>
-<span class="fc" id="L128">        }</span>
-<span class="fc" id="L129">        out.append(&quot;\n- improvedCandidates: &quot;).append(report.improvedCandidates()).append('\n');</span>
-<span class="fc" id="L130">        return out.toString();</span>
+<span class="fc" id="L115">        StringBuilder out = new StringBuilder(&quot;# Discovery Campaign 4\n\n&quot;);</span>
+<span class="fc" id="L116">        out.append(&quot;| Candidate | Scenario | Macro | Reused | Disabled success | Enabled success | Disabled path | Enabled path | Disabled states | Enabled states | Improved |\n&quot;);</span>
+<span class="fc" id="L117">        out.append(&quot;| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |\n&quot;);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (CaseResult result : report.results()) {</span>
+<span class="fc" id="L119">            out.append(&quot;| &quot;).append(escape(result.candidateId()))</span>
+<span class="fc" id="L120">                .append(&quot; | &quot;).append(escape(result.scenarioId()))</span>
+<span class="fc" id="L121">                .append(&quot; | &quot;).append(escape(orDash(result.generatedMacroId())))</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(escape(result.reusedMacroIds().isEmpty() ? &quot;—&quot; : String.join(&quot;, &quot;, result.reusedMacroIds())))</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(result.macroDisabled().success() ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(result.macroEnabled().success() ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="fc" id="L125">                .append(&quot; | &quot;).append(result.macroDisabled().pathLength())</span>
+<span class="fc" id="L126">                .append(&quot; | &quot;).append(result.macroEnabled().pathLength())</span>
+<span class="fc" id="L127">                .append(&quot; | &quot;).append(result.macroDisabled().statesExplored())</span>
+<span class="fc" id="L128">                .append(&quot; | &quot;).append(result.macroEnabled().statesExplored())</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                .append(&quot; | &quot;).append(result.measuredImprovement() ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="fc" id="L130">                .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L131">        }</span>
+<span class="fc" id="L132">        out.append(&quot;\n- improvedCandidates: &quot;).append(report.improvedCandidates()).append('\n');</span>
+<span class="fc" id="L133">        return out.toString();</span>
     }
 
     private List&lt;ReuseCase&gt; supportedCases() {
-<span class="fc" id="L134">        return List.of(</span>
+<span class="fc" id="L137">        return List.of(</span>
             new ReuseCase(
                 &quot;complete-square-family&quot;,
                 &quot;discovery-campaign-1&quot;,
@@ -160,17 +163,17 @@ import java.util.Set;
     }
 
     private String orDash(String value) {
-<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
+<span class="pc bpc" id="L166" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;—&quot; : value;</span>
     }
 
     private String escape(String value) {
-<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
     }
 
     public record CampaignReport(String campaignId, List&lt;CaseResult&gt; results, long improvedCandidates) {
-<span class="fc" id="L171">        public CampaignReport {</span>
-<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            results = results == null ? List.of() : List.copyOf(results);</span>
-<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        public CampaignReport {</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            results = results == null ? List.of() : List.copyOf(results);</span>
+<span class="fc" id="L176">        }</span>
     }
 
     public record CaseResult(
@@ -184,16 +187,16 @@ import java.util.Set;
         RunMetrics macroEnabled,
         boolean measuredImprovement
     ) {
-<span class="fc" id="L187">        public CaseResult {</span>
-<span class="pc bpc" id="L188" title="1 of 2 branches missed.">            generatedMacroId = generatedMacroId == null ? &quot;&quot; : generatedMacroId;</span>
-<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            reusedMacroIds = reusedMacroIds == null ? List.of() : List.copyOf(reusedMacroIds);</span>
-<span class="fc" id="L190">        }</span>
+<span class="fc" id="L190">        public CaseResult {</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            generatedMacroId = generatedMacroId == null ? &quot;&quot; : generatedMacroId;</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            reusedMacroIds = reusedMacroIds == null ? List.of() : List.copyOf(reusedMacroIds);</span>
+<span class="fc" id="L193">        }</span>
     }
 
-<span class="fc" id="L193">    public record RunMetrics(boolean success, int pathLength, long statesExplored, int bridgeCount) {</span>
+<span class="fc" id="L196">    public record RunMetrics(boolean success, int pathLength, long statesExplored, int bridgeCount) {</span>
     }
 
-<span class="fc" id="L196">    private record ReuseCase(String candidateId, String sourceCampaign, String scenarioId, String scenarioResource) {</span>
+<span class="fc" id="L199">    private record ReuseCase(String candidateId, String sourceCampaign, String scenarioId, String scenarioResource) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
