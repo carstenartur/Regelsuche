@@ -72,4 +72,30 @@ pluginManager.withPlugin('java') {
             'de.regelsuche.plugin.PluginTrustStoreRevisionTest',
             'de.regelsuche.plugin.PluginTrustStoreRevisionStrictJsonTest',
         ])
+
+    def generatedStaticReferencePage =
+        layout.buildDirectory.dir('reports/static-reference-page')
+    def verifyStaticReferencePageContract = tasks.register(
+            'verifyStaticReferencePageContract', Test) {
+        group = 'verification'
+        description = 'Requires the generated static reference page to satisfy its Java/JUnit contract.'
+        dependsOn tasks.named('generateStaticReferencePage'),
+            tasks.named('testClasses')
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        useJUnitPlatform()
+        filter {
+            includeTestsMatching(
+                'de.regelsuche.docs.StaticReferencePageContractTest')
+        }
+        systemProperty 'regelsuche.staticReferencePageDir',
+            generatedStaticReferencePage.get().asFile.absolutePath
+        inputs.dir generatedStaticReferencePage
+        outputs.upToDateWhen { false }
+    }
+
+    rootProject.tasks.named('verifyStaticReferencePage').configure {
+        dependsOn verifyStaticReferencePageContract
+        description = 'Compatibility alias; Java/JUnit owns the static reference-page contract.'
+    }
 }
