@@ -14,4 +14,12 @@
   <artifactId>maven-build-contract</artifactId>
   <name>Regelsuche Maven Build Contract</name>
   <description>JUnit contract for the host-tool-minimal Maven reactor.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
 </project>
