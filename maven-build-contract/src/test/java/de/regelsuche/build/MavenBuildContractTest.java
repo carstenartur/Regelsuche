@@ -29,7 +29,6 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 class MavenBuildContractTest {
-
     private static final List<String> EXPECTED_MODULES = List.of(
         "regelsuche-core",
         "regelsuche-egraph",
@@ -47,95 +46,111 @@ class MavenBuildContractTest {
         "regelsuche-quality",
         "maven-build-contract"
     );
-
     private static final Set<String> FORBIDDEN_BUILD_PLUGINS = Set.of(
         "org.codehaus.mojo:exec-maven-plugin",
         "com.github.eirslett:frontend-maven-plugin"
     );
-
-    private static final Map<String, String> REQUIRED_PLUGIN_VERSIONS = Map.ofEntries(
-        Map.entry("org.apache.maven.plugins:maven-clean-plugin", "${maven.clean.plugin.version}"),
-        Map.entry("org.apache.maven.plugins:maven-resources-plugin", "${maven.resources.plugin.version}"),
-        Map.entry("org.apache.maven.plugins:maven-compiler-plugin", "${maven.compiler.plugin.version}"),
-        Map.entry("org.apache.maven.plugins:maven-surefire-plugin", "${maven.surefire.plugin.version}"),
-        Map.entry("org.apache.maven.plugins:maven-failsafe-plugin", "${maven.failsafe.plugin.version}"),
-        Map.entry("org.apache.maven.plugins:maven-jar-plugin", "${maven.jar.plugin.version}"),
-        Map.entry("org.apache.maven.plugins:maven-install-plugin", "${maven.install.plugin.version}"),
-        Map.entry("org.apache.maven.plugins:maven-deploy-plugin", "${maven.deploy.plugin.version}"),
-        Map.entry("org.apache.maven.plugins:maven-site-plugin", "${maven.site.plugin.version}"),
-        Map.entry("org.apache.maven.plugins:maven-enforcer-plugin", "${maven.enforcer.plugin.version}"),
-        Map.entry("org.jacoco:jacoco-maven-plugin", "${jacoco.version}")
-    );
-
     private static final Set<String> FORBIDDEN_HOST_RUNTIMES = Set.of(
-        "python",
-        "python3",
-        "bash",
-        "sh",
-        "zsh",
-        "perl",
-        "node",
-        "npm",
-        "npx",
-        "gradle",
-        "gradlew",
-        "cmd",
-        "powershell",
-        "pwsh"
+        "python", "python3", "bash", "sh", "zsh", "perl", "node",
+        "npm", "npx", "gradle", "gradlew", "cmd", "powershell", "pwsh"
     );
-
     private static final List<String> COMMAND_ELEMENT_NAMES = List.of(
-        "executable",
-        "argument",
-        "command",
-        "commandlineArgs",
+        "executable", "argument", "command", "commandlineArgs",
         "commandLineArgs"
     );
+    private static final Map<String, String> REQUIRED_PROPERTIES = Map.ofEntries(
+        Map.entry("maven.compiler.release", "21"),
+        Map.entry("maven.minimum.version", "3.9.9"),
+        Map.entry("maven.maximum.exclusive.version", "4.0.0"),
+        Map.entry("junit.version", "6.1.3"),
+        Map.entry("maven.clean.plugin.version", "3.5.0"),
+        Map.entry("maven.resources.plugin.version", "3.5.0"),
+        Map.entry("maven.compiler.plugin.version", "3.15.0"),
+        Map.entry("maven.surefire.plugin.version", "3.5.4"),
+        Map.entry("maven.failsafe.plugin.version", "3.5.4"),
+        Map.entry("maven.jar.plugin.version", "3.5.1"),
+        Map.entry("maven.install.plugin.version", "3.1.4"),
+        Map.entry("maven.deploy.plugin.version", "3.1.4"),
+        Map.entry("maven.site.plugin.version", "3.22.0")
+    );
+    private static final Map<String, String> REQUIRED_PLUGIN_VERSIONS =
+        Map.ofEntries(
+            Map.entry(
+                "org.apache.maven.plugins:maven-clean-plugin",
+                "${maven.clean.plugin.version}"),
+            Map.entry(
+                "org.apache.maven.plugins:maven-resources-plugin",
+                "${maven.resources.plugin.version}"),
+            Map.entry(
+                "org.apache.maven.plugins:maven-compiler-plugin",
+                "${maven.compiler.plugin.version}"),
+            Map.entry(
+                "org.apache.maven.plugins:maven-surefire-plugin",
+                "${maven.surefire.plugin.version}"),
+            Map.entry(
+                "org.apache.maven.plugins:maven-failsafe-plugin",
+                "${maven.failsafe.plugin.version}"),
+            Map.entry(
+                "org.apache.maven.plugins:maven-jar-plugin",
+                "${maven.jar.plugin.version}"),
+            Map.entry(
+                "org.apache.maven.plugins:maven-install-plugin",
+                "${maven.install.plugin.version}"),
+            Map.entry(
+                "org.apache.maven.plugins:maven-deploy-plugin",
+                "${maven.deploy.plugin.version}"),
+            Map.entry(
+                "org.apache.maven.plugins:maven-site-plugin",
+                "${maven.site.plugin.version}"),
+            Map.entry(
+                "org.apache.maven.plugins:maven-enforcer-plugin",
+                "${maven.enforcer.plugin.version}"),
+            Map.entry(
+                "org.jacoco:jacoco-maven-plugin",
+                "${jacoco.version}")
+        );
 
     @Test
     void reactorContainsTheDeclaredJavaModuleSlice() throws Exception {
         Path root = repositoryRoot();
         Document parent = parse(root.resolve("pom.xml"));
-
         List<String> modules = directChildTexts(
             directChild(parent.getDocumentElement(), "modules"),
-            "module"
-        );
+            "module");
         assertEquals(EXPECTED_MODULES, modules);
-
         for (String module : modules) {
-            Path modulePom = root.resolve(module).resolve("pom.xml");
-            assertTrue(Files.isRegularFile(modulePom), () -> "missing module POM: " + modulePom);
-            Document child = parse(modulePom);
-            Element parentElement = directChild(child.getDocumentElement(), "parent");
-            assertNotNull(parentElement, () -> "module has no parent: " + module);
-            assertEquals("de.regelsuche", directChildText(parentElement, "groupId"));
-            assertEquals("regelsuche-parent", directChildText(parentElement, "artifactId"));
-            assertEquals("0.2.0-SNAPSHOT", directChildText(parentElement, "version"));
+            Path pom = root.resolve(module).resolve("pom.xml");
+            assertTrue(Files.isRegularFile(pom), () -> "missing module POM: " + pom);
+            Element declaredParent = directChild(
+                parse(pom).getDocumentElement(),
+                "parent");
+            assertNotNull(declaredParent, () -> "module has no parent: " + module);
+            assertEquals("de.regelsuche", directChildText(declaredParent, "groupId"));
+            assertEquals(
+                "regelsuche-parent",
+                directChildText(declaredParent, "artifactId"));
+            assertEquals(
+                "0.2.0-SNAPSHOT",
+                directChildText(declaredParent, "version"));
         }
     }
 
     @Test
-    void reactorPinsJavaMavenJUnitAndEveryDefaultLifecyclePlugin() throws Exception {
-        Document parent = parse(repositoryRoot().resolve("pom.xml"));
-        Element project = parent.getDocumentElement();
+    void reactorPinsJavaMavenJUnitAndEveryDefaultLifecyclePlugin()
+            throws Exception {
+        Element project = parse(repositoryRoot().resolve("pom.xml"))
+            .getDocumentElement();
         Element properties = directChild(project, "properties");
+        REQUIRED_PROPERTIES.forEach((name, expected) -> assertEquals(
+            expected,
+            directChildText(properties, name),
+            () -> "unexpected parent property " + name));
 
-        assertEquals("21", directChildText(properties, "maven.compiler.release"));
-        assertEquals("3.9.9", directChildText(properties, "maven.minimum.version"));
-        assertEquals("4.0.0", directChildText(properties, "maven.maximum.exclusive.version"));
-        assertEquals("6.1.3", directChildText(properties, "junit.version"));
-        assertEquals("3.5.0", directChildText(properties, "maven.clean.plugin.version"));
-        assertEquals("3.5.0", directChildText(properties, "maven.resources.plugin.version"));
-        assertEquals("3.15.0", directChildText(properties, "maven.compiler.plugin.version"));
-        assertEquals("3.5.4", directChildText(properties, "maven.surefire.plugin.version"));
-        assertEquals("3.5.4", directChildText(properties, "maven.failsafe.plugin.version"));
-        assertEquals("3.5.1", directChildText(properties, "maven.jar.plugin.version"));
-        assertEquals("3.1.4", directChildText(properties, "maven.install.plugin.version"));
-        assertEquals("3.1.4", directChildText(properties, "maven.deploy.plugin.version"));
-        assertEquals("3.22.0", directChildText(properties, "maven.site.plugin.version"));
-
-        assertEquals(REQUIRED_PLUGIN_VERSIONS, buildPluginVersions(project));
+        Map<String, String> actual = buildPluginVersions(project);
+        assertTrue(
+            actual.entrySet().containsAll(REQUIRED_PLUGIN_VERSIONS.entrySet()),
+            () -> "required lifecycle plugin versions are missing: expected="
+                + REQUIRED_PLUGIN_VERSIONS + ", actual=" + actual);
     }
 
     @Test
@@ -143,10 +158,8 @@ class MavenBuildContractTest {
         Path root = repositoryRoot();
         List<Path> poms = new ArrayList<>();
         poms.add(root.resolve("pom.xml"));
-        for (String module : EXPECTED_MODULES) {
-            poms.add(root.resolve(module).resolve("pom.xml"));
-        }
-
+        EXPECTED_MODULES.forEach(module ->
+            poms.add(root.resolve(module).resolve("pom.xml")));
         for (Path pom : poms) {
             Document document = parse(pom);
             assertNoForbiddenCommandElements(document, pom);
@@ -155,84 +168,66 @@ class MavenBuildContractTest {
     }
 
     @Test
-    void commandScannerRejectsWhitespaceAndPathWrappedRuntime(@TempDir Path temporary)
-            throws Exception {
-        Path syntheticPom = temporary.resolve("pom.xml");
-        Files.writeString(syntheticPom, """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <project xmlns="http://maven.apache.org/POM/4.0.0">
-              <modelVersion>4.0.0</modelVersion>
-              <build>
-                <plugins>
-                  <plugin>
-                    <groupId>example</groupId>
-                    <artifactId>example-plugin</artifactId>
-                    <configuration>
-                      <executable>
-                        /usr/bin/python3
-                      </executable>
-                    </configuration>
-                  </plugin>
-                </plugins>
-              </build>
-            </project>
-            """);
-
+    void commandScannerRejectsWhitespaceAndPathWrappedRuntime(
+            @TempDir Path temporary) throws Exception {
+        Path pom = temporary.resolve("pom.xml");
+        Files.writeString(pom, syntheticPom(
+            "<configuration><executable> /usr/bin/python3 </executable>"
+                + "</configuration>"));
         AssertionError failure = assertThrows(
             AssertionError.class,
-            () -> assertNoForbiddenCommandElements(parse(syntheticPom), syntheticPom)
-        );
+            () -> assertNoForbiddenCommandElements(parse(pom), pom));
         assertTrue(failure.getMessage().contains("python3"));
     }
 
     @Test
-    void pluginScannerRejectsUnversionedExecPlugin(@TempDir Path temporary)
-            throws Exception {
-        Path syntheticPom = temporary.resolve("pom.xml");
-        Files.writeString(syntheticPom, """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <project xmlns="http://maven.apache.org/POM/4.0.0">
-              <modelVersion>4.0.0</modelVersion>
-              <build>
-                <plugins>
-                  <plugin>
-                    <groupId>org.codehaus.mojo</groupId>
-                    <artifactId>exec-maven-plugin</artifactId>
-                  </plugin>
-                </plugins>
-              </build>
-            </project>
-            """);
-
+    void pluginScannerRejectsUnversionedExecPlugin(
+            @TempDir Path temporary) throws Exception {
+        Path pom = temporary.resolve("pom.xml");
+        Files.writeString(pom, syntheticPom(""));
         AssertionError failure = assertThrows(
             AssertionError.class,
-            () -> assertNoForbiddenPlugins(parse(syntheticPom), syntheticPom)
-        );
+            () -> assertNoForbiddenPlugins(parse(pom), pom));
         assertTrue(failure.getMessage().contains("exec-maven-plugin"));
     }
 
-    private static void assertNoForbiddenCommandElements(Document document, Path pom) {
+    private static String syntheticPom(String configuration) {
+        return """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0">
+              <modelVersion>4.0.0</modelVersion>
+              <build><plugins><plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                %s
+              </plugin></plugins></build>
+            </project>
+            """.formatted(configuration);
+    }
+
+    private static void assertNoForbiddenCommandElements(
+            Document document,
+            Path pom) {
         for (String elementName : COMMAND_ELEMENT_NAMES) {
             NodeList elements = document.getElementsByTagNameNS("*", elementName);
             for (int index = 0; index < elements.getLength(); index++) {
-                String value = elements.item(index).getTextContent();
-                for (String token : commandTokens(value)) {
+                for (String token : commandTokens(
+                        elements.item(index).getTextContent())) {
                     assertFalse(
                         FORBIDDEN_HOST_RUNTIMES.contains(token),
                         () -> pom + " invokes forbidden host runtime " + token
-                            + " through <" + elementName + ">"
-                    );
+                            + " through <" + elementName + ">");
                 }
             }
         }
     }
 
     private static void assertNoForbiddenPlugins(Document document, Path pom) {
-        for (String coordinate : buildPluginCoordinates(document.getDocumentElement())) {
+        for (String coordinate : buildPluginCoordinates(
+                document.getDocumentElement())) {
             assertFalse(
                 FORBIDDEN_BUILD_PLUGINS.contains(coordinate),
-                () -> pom + " activates forbidden build plugin " + coordinate
-            );
+                () -> pom + " activates forbidden build plugin " + coordinate);
         }
     }
 
@@ -241,21 +236,21 @@ class MavenBuildContractTest {
         if (value == null || value.isBlank()) {
             return tokens;
         }
-        for (String candidate : value.toLowerCase(Locale.ROOT).split("[^a-z0-9_./\\\\${}-]+")) {
+        for (String candidate : value.toLowerCase(Locale.ROOT)
+                .split("[^a-z0-9_./\\\\${}-]+")) {
             if (candidate.isBlank()) {
                 continue;
             }
             String token = candidate.replace('\\', '/');
-            int slash = token.lastIndexOf('/');
-            if (slash >= 0) {
-                token = token.substring(slash + 1);
-            }
-            token = token.replace("${", "").replace("}", "");
+            token = token.substring(token.lastIndexOf('/') + 1)
+                .replace("${", "")
+                .replace("}", "");
             if (token.endsWith(".exe")) {
                 token = token.substring(0, token.length() - 4);
             }
-            if (token.contains(".")) {
-                tokens.add(token.substring(0, token.indexOf('.')));
+            int extension = token.indexOf('.');
+            if (extension > 0) {
+                tokens.add(token.substring(0, extension));
             }
             tokens.add(token);
         }
@@ -264,9 +259,13 @@ class MavenBuildContractTest {
 
     private static Path repositoryRoot() {
         String configured = System.getProperty("regelsuche.repositoryRoot");
-        assertNotNull(configured, "Maven must expose maven.multiModuleProjectDirectory to tests");
+        assertNotNull(
+            configured,
+            "Maven must expose maven.multiModuleProjectDirectory to tests");
         Path root = Path.of(configured).toAbsolutePath().normalize();
-        assertTrue(Files.isRegularFile(root.resolve("pom.xml")), () -> "no root pom.xml below " + root);
+        assertTrue(
+            Files.isRegularFile(root.resolve("pom.xml")),
+            () -> "no root pom.xml below " + root);
         return root;
     }
 
@@ -276,9 +275,15 @@ class MavenBuildContractTest {
         factory.setNamespaceAware(true);
         factory.setXIncludeAware(false);
         factory.setExpandEntityReferences(false);
-        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setFeature(
+            "http://apache.org/xml/features/disallow-doctype-decl",
+            true);
+        factory.setFeature(
+            "http://xml.org/sax/features/external-general-entities",
+            false);
+        factory.setFeature(
+            "http://xml.org/sax/features/external-parameter-entities",
+            false);
         factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
         factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
         try (InputStream input = Files.newInputStream(path)) {
@@ -287,28 +292,25 @@ class MavenBuildContractTest {
     }
 
     private static Set<String> buildPluginCoordinates(Element project) {
-        Set<String> coordinates = new LinkedHashSet<>();
-        NodeList plugins = project.getElementsByTagNameNS("*", "plugin");
-        for (int index = 0; index < plugins.getLength(); index++) {
-            Element plugin = (Element) plugins.item(index);
-            String artifactId = directChildText(plugin, "artifactId");
-            if (artifactId == null || artifactId.isBlank()) {
-                continue;
-            }
-            String groupId = directChildText(plugin, "groupId");
-            if (groupId == null || groupId.isBlank()) {
-                groupId = "org.apache.maven.plugins";
-            }
-            coordinates.add(groupId + ":" + artifactId);
-        }
-        return Set.copyOf(coordinates);
+        return Set.copyOf(buildPlugins(project).keySet());
     }
 
     private static Map<String, String> buildPluginVersions(Element project) {
-        Map<String, String> pluginsByCoordinate = new LinkedHashMap<>();
-        NodeList plugins = project.getElementsByTagNameNS("*", "plugin");
-        for (int index = 0; index < plugins.getLength(); index++) {
-            Element plugin = (Element) plugins.item(index);
+        Map<String, String> versions = new LinkedHashMap<>();
+        buildPlugins(project).forEach((coordinate, plugin) -> {
+            String version = directChildText(plugin, "version");
+            if (version != null) {
+                versions.put(coordinate, version);
+            }
+        });
+        return Map.copyOf(versions);
+    }
+
+    private static Map<String, Element> buildPlugins(Element project) {
+        Map<String, Element> plugins = new LinkedHashMap<>();
+        NodeList nodes = project.getElementsByTagNameNS("*", "plugin");
+        for (int index = 0; index < nodes.getLength(); index++) {
+            Element plugin = (Element) nodes.item(index);
             String artifactId = directChildText(plugin, "artifactId");
             if (artifactId == null || artifactId.isBlank()) {
                 continue;
@@ -317,18 +319,20 @@ class MavenBuildContractTest {
             if (groupId == null || groupId.isBlank()) {
                 groupId = "org.apache.maven.plugins";
             }
-            String coordinate = groupId + ":" + artifactId;
-            String version = directChildText(plugin, "version");
-            if (version != null) {
-                pluginsByCoordinate.put(coordinate, version);
-            }
+            plugins.put(groupId + ":" + artifactId, plugin);
         }
-        return Map.copyOf(pluginsByCoordinate);
+        return plugins;
     }
 
     private static Element directChild(Element parent, String localName) {
-        for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
-            if (child instanceof Element element && localName.equals(element.getLocalName())) {
+        if (parent == null) {
+            return null;
+        }
+        for (Node child = parent.getFirstChild();
+                child != null;
+                child = child.getNextSibling()) {
+            if (child instanceof Element element
+                    && localName.equals(element.getLocalName())) {
                 return element;
             }
         }
@@ -336,18 +340,20 @@ class MavenBuildContractTest {
     }
 
     private static String directChildText(Element parent, String localName) {
-        if (parent == null) {
-            return null;
-        }
         Element child = directChild(parent, localName);
         return child == null ? null : child.getTextContent().trim();
     }
 
-    private static List<String> directChildTexts(Element parent, String localName) {
-        List<String> values = new ArrayList<>();
+    private static List<String> directChildTexts(
+            Element parent,
+            String localName) {
         assertNotNull(parent);
-        for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
-            if (child instanceof Element element && localName.equals(element.getLocalName())) {
+        List<String> values = new ArrayList<>();
+        for (Node child = parent.getFirstChild();
+                child != null;
+                child = child.getNextSibling()) {
+            if (child instanceof Element element
+                    && localName.equals(element.getLocalName())) {
                 values.add(element.getTextContent().trim());
             }
         }
