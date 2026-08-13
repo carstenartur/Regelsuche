@@ -86,8 +86,10 @@ pluginManager.withPlugin('java') {
         useJUnitPlatform()
         filter {
             includeTestsMatching(
-                'de.regelsuche.docs.StaticReferencePageGeneratorTest')
+                'de.regelsuche.docs.StaticReferencePageContractTest')
         }
+        systemProperty 'regelsuche.staticReferencePageDir',
+            generatedStaticReferencePage.get().asFile.absolutePath
         inputs.dir generatedStaticReferencePage
         outputs.upToDateWhen { false }
     }
