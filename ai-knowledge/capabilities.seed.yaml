@@ -280,3 +280,20 @@
     - docs/proof-carrying-self-improvement-showcase.md
     - docs/evolution-rewrite-program-populations.md
   tags: [showcase, learning, reproducibility, authority]
+
+- id: static-reference-publication
+  label: "Static reference-page publication"
+  description: "Generates the self-contained reference page for the canonical campaign, timeline and observatory outputs and verifies the retained publication bytes through a checkout-owned Java/JUnit contract."
+  modules: [app]
+  ownerModules: [app]
+  typePatterns:
+    - 'StaticReferencePage*'
+  testPatterns:
+    - 'StaticReferencePage*Test'
+  docPatterns:
+    - docs/scientific-reproducibility.md
+    - docs/web-workbench.md
+  evidenceTypes:
+    - discovery-evidence
+    - ui-evidence
+  tags: [publication, reference-page, reproducibility, junit]
