@@ -48,7 +48,7 @@ def mavenExecutable = System.getProperty('os.name')
 
 def verifyMavenCoreReactor = tasks.register('verifyMavenCoreReactor', Exec) {
     group = 'verification'
-    description = 'Runs the focused Maven/JUnit build-contract slice; the complete product and Docker reactor is verified once by mvn -Pfull verify.'
+    description = 'Runs the focused Maven/JUnit build-contract slice used by Gradle; CI separately runs the complete Maven/Testcontainers reactor.'
     workingDir rootProject.rootDir
     commandLine mavenExecutable,
         '--batch-mode',
@@ -58,15 +58,9 @@ def verifyMavenCoreReactor = tasks.register('verifyMavenCoreReactor', Exec) {
         '--projects',
         'maven-build-contract',
         'test'
-    inputs.file rootProject.file('pom.xml')
-    inputs.files rootProject.files(
-        'regelsuche-core/pom.xml',
-        'regelsuche-egraph/pom.xml',
-        'regelsuche-search/pom.xml',
-        'regelsuche-validation/pom.xml',
-        'regelsuche-math-algorithms/pom.xml',
-        'maven-build-contract/pom.xml'
-    )
+    inputs.files rootProject.fileTree(rootProject.rootDir) {
+        include 'pom.xml', '*/pom.xml'
+    }
     outputs.upToDateWhen { false }
 }
 
