@@ -48,13 +48,15 @@ def mavenExecutable = System.getProperty('os.name')
 
 def verifyMavenCoreReactor = tasks.register('verifyMavenCoreReactor', Exec) {
     group = 'verification'
-    description = 'Runs the Java-21/JUnit-Jupiter Maven core reactor introduced by issue #632.'
+    description = 'Runs the focused Maven/JUnit build-contract slice; the complete product and Docker reactor is verified once by mvn -Pfull verify.'
     workingDir rootProject.rootDir
     commandLine mavenExecutable,
         '--batch-mode',
         '--no-transfer-progress',
         '--file',
         rootProject.file('pom.xml').absolutePath,
+        '--projects',
+        'maven-build-contract',
         'test'
     inputs.file rootProject.file('pom.xml')
     inputs.files rootProject.files(
