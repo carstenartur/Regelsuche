@@ -79,15 +79,24 @@ curated completing-the-square recognition rule. These controls distinguish a
 missing production edge from representation or matcher failure; they never
 count as autonomous rediscovery.
 
-The source corpus and strict schema are:
+The source corpus and strict schemas are:
 
 - `regelsuche-experiments/src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json`;
-- `docs/schemas/regelsuche-historical-rediscovery-corpus-v1.schema.json`.
+- `docs/schemas/regelsuche-historical-rediscovery-corpus-v1.schema.json`;
+- `docs/schemas/regelsuche-historical-rediscovery-run-v1.schema.json`.
 
 Generated JSON and Markdown retain the corpus hash, witnesses, rule IDs,
 primitive work, search metrics, directionality and one evidence-derived primary
 diagnosis per case. The aggregate assessment is one of
 `USEFUL_DIAGNOSTIC_STEP`, `USEFUL_BUT_INCOMPLETE` or `INSUFFICIENT_SIGNAL`.
+
+The output directory is committed as a manifest-last run. Before payload
+replacement, any previous `historical-rediscovery-run.json` is removed. The
+manifest is written only after the canonical atlas JSON and Markdown exist, and
+binds their exact byte lengths and SHA-256 hashes together with the corpus,
+inventory, claim boundary, case count and assessment decision. Consumers must
+verify the manifest and both payloads; a missing manifest denotes an incomplete
+run rather than reusable evidence.
 
 The dedicated `regelsuche-core` oracle and known-derivation tests remain the
 authoritative unit-level contracts. Atlas tests add only corpus, policy and
@@ -100,8 +109,13 @@ Generate the atlas with:
 ```
 
 The output is written under
-`regelsuche-experiments/build/reports/historical-rediscovery/`. The ordinary
-checkout-owned merge gate remains:
+`regelsuche-experiments/build/reports/historical-rediscovery/` and contains:
+
+- `historical-rediscovery-atlas.json`;
+- `historical-rediscovery-atlas.md`;
+- `historical-rediscovery-run.json`.
+
+The ordinary checkout-owned merge gate remains:
 
 ```bash
 ./gradlew --no-configuration-cache ciCheck

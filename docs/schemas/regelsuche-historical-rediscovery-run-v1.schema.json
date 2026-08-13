@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.historical-rediscovery-run/v1",
+  "title": "Regelsuche historical rediscovery run v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "evidenceStatus",
+    "corpusSchema",
+    "corpusSha256",
+    "atlasSchema",
+    "inventoryRevision",
+    "claimBoundary",
+    "assessmentDecision",
+    "caseCount",
+    "artifacts",
+    "commitProtocol",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.historical-rediscovery-run/v1"
+    },
+    "evidenceStatus": {
+      "const": "EXECUTED_DIAGNOSTIC"
+    },
+    "corpusSchema": {
+      "const": "regelsuche.historical-rediscovery-corpus/v1"
+    },
+    "corpusSha256": {
+      "$ref": "#/$defs/rawSha256"
+    },
+    "atlasSchema": {
+      "const": "regelsuche.historical-rediscovery-atlas/v1"
+    },
+    "inventoryRevision": {
+      "$ref": "#/$defs/text"
+    },
+    "claimBoundary": {
+      "$ref": "#/$defs/text"
+    },
+    "assessmentDecision": {
+      "enum": [
+        "USEFUL_DIAGNOSTIC_STEP",
+        "USEFUL_BUT_INCOMPLETE",
+        "INSUFFICIENT_SIGNAL"
+      ]
+    },
+    "caseCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "ATLAS_JSON"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "ATLAS_MARKDOWN"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        }
+      ]
+    },
+    "commitProtocol": {
+      "const": "MANIFEST_LAST_ATOMIC_RENAME"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/prefixedSha256"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "rawSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prefixedSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "required": [
+        "fileName",
+        "role",
+        "mediaType",
+        "byteHash",
+        "byteLength"
+      ],
+      "properties": {
+        "fileName": {
+          "enum": [
+            "historical-rediscovery-atlas.json",
+            "historical-rediscovery-atlas.md"
+          ]
+        },
+        "role": {
+          "enum": [
+            "ATLAS_JSON",
+            "ATLAS_MARKDOWN"
+          ]
+        },
+        "mediaType": {
+          "enum": [
+            "application/json",
+            "text/markdown"
+          ]
+        },
+        "byteHash": {
+          "$ref": "#/$defs/prefixedSha256"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 33554432
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "ATLAS_JSON"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "historical-rediscovery-atlas.json"
+              },
+              "mediaType": {
+                "const": "application/json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "ATLAS_MARKDOWN"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "historical-rediscovery-atlas.md"
+              },
+              "mediaType": {
+                "const": "text/markdown"
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

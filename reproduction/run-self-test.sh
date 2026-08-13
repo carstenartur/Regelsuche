@@ -53,7 +53,7 @@ fi
 
 log "Validate frozen wrapper, container and executable inputs"
 grep -qx \
-  'distributionSha256Sum=bafc141b619ad6350fd975fc903156dd5c151998cc8b058e8c1044ab5f7b031f' \
+  'distributionSha256Sum=84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae' \
   gradle/wrapper/gradle-wrapper.properties
 grep -qx \
   'FROM eclipse-temurin:21.0.11_10-jdk-noble@sha256:35685c7e23352983a48882d97cd9875f5284c228db71d1e2476e5e6c1bab1080 AS build' \
@@ -120,7 +120,7 @@ assert manifest["declaredEnvironment"]["javaImageIndexDigest"] == (
     "sha256:35685c7e23352983a48882d97cd9875f5284c228db71d1e2476e5e6c1bab1080"
 )
 assert manifest["declaredEnvironment"]["gradleDistributionSha256"] == (
-    "bafc141b619ad6350fd975fc903156dd5c151998cc8b058e8c1044ab5f7b031f"
+    "84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae"
 )
 with tarfile.open(archive, "r:gz") as bundle:
     names = [member.name for member in bundle.getmembers()]
