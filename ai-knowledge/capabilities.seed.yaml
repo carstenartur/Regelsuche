@@ -280,3 +280,27 @@
     - docs/proof-carrying-self-improvement-showcase.md
     - docs/evolution-rewrite-program-populations.md
   tags: [showcase, learning, reproducibility, authority]
+
+- id: maven-build-contract
+  label: "Maven and Testcontainers build contract"
+  description: "Defines the checkout-owned Java 21 and Maven reactor, central dependency and plugin ownership, fast Surefire tests and the explicit Failsafe/Testcontainers profile for pinned PostgreSQL integration boundaries."
+  modules: [app, regelsuche-persistence-hibernate]
+  ownerModules: [app]
+  typePatterns:
+    - 'Maven*Contract*'
+    - 'DockerAvailabilityIT'
+    - 'PinnedPostgresContainer'
+    - '*Postgres*E2E*'
+    - 'HibernateFullModePersistenceTest'
+  testPatterns:
+    - 'Maven*ContractTest'
+    - 'DockerAvailabilityIT'
+    - '*Postgres*E2ETest'
+    - 'HibernateFullModePersistenceTest'
+  docPatterns:
+    - docs/README.md
+    - docs/architecture.md
+  evidenceTypes:
+    - build-evidence
+    - persistence-evidence
+  tags: [maven, junit, failsafe, testcontainers, reproducibility]

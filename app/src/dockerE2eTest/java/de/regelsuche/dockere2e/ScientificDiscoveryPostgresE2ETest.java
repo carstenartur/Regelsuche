@@ -13,28 +13,17 @@ import de.regelsuche.persistence.PersistenceConfig;
 import de.regelsuche.persistence.relational.RelationalPersistenceAdapters;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers(disabledWithoutDocker = true)
 class ScientificDiscoveryPostgresE2ETest {
     @Container
-    static final GenericContainer<?> POSTGRES = new GenericContainer<>("postgres:16-alpine")
-        .withEnv("POSTGRES_DB", "regelsuche")
-        .withEnv("POSTGRES_USER", "regelsuche")
-        .withEnv("POSTGRES_PASSWORD", "regelsuche-demo")
-        .withExposedPorts(5432)
-        .waitingFor(Wait.forLogMessage(
-            ".*database system is ready to accept connections.*\\s",
-            2
-        ))
-        .withStartupTimeout(Duration.ofMinutes(2));
+    static final GenericContainer<?> POSTGRES = PinnedPostgresContainer.create();
 
     @TempDir
     Path tempDir;
