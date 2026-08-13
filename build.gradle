@@ -124,14 +124,10 @@ def prepareVerificationEnvironment = tasks.register('prepareVerificationEnvironm
     }
 }
 
-def checkDocumentationMath = tasks.register('checkDocumentationMath', Exec) {
+def checkDocumentationMath = tasks.register('checkDocumentationMath') {
     group = 'verification'
-    description = 'Checks documentation math delimiters from a plain checkout.'
-    workingDir rootDir
-    commandLine pythonExecutable, 'scripts/check-docs-math.py'
-    inputs.files(fileTree('docs') { include '**/*.md' })
-    inputs.file('README.md')
-    inputs.file('scripts/check-docs-math.py')
+    description = 'Compatibility alias; Maven/JUnit owns the documentation Markdown contract.'
+    dependsOn ':regelsuche-core:verifyMavenCoreReactor'
 }
 
 def verifyGeneratedDiscoveryGallery = tasks.register('verifyGeneratedDiscoveryGallery', Exec) {
