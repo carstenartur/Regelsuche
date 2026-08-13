@@ -62,6 +62,44 @@ class HistoricalRediscoveryRunArtifactTest {
     }
 
     @Test
+    void manifestRejectsUnsupportedNestedSchemaIdentities(
+            @TempDir Path directory) {
+        HistoricalRediscoveryRunArtifact.Manifest manifest =
+            writeRun(directory).manifest();
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new HistoricalRediscoveryRunArtifact.Manifest(
+                manifest.schema(),
+                manifest.evidenceStatus(),
+                "unsupported-corpus/v2",
+                manifest.corpusSha256(),
+                manifest.atlasSchema(),
+                manifest.inventoryRevision(),
+                manifest.claimBoundary(),
+                manifest.assessmentDecision(),
+                manifest.caseCount(),
+                manifest.artifacts(),
+                manifest.commitProtocol(),
+                manifest.contentHash()));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new HistoricalRediscoveryRunArtifact.Manifest(
+                manifest.schema(),
+                manifest.evidenceStatus(),
+                manifest.corpusSchema(),
+                manifest.corpusSha256(),
+                "unsupported-atlas/v2",
+                manifest.inventoryRevision(),
+                manifest.claimBoundary(),
+                manifest.assessmentDecision(),
+                manifest.caseCount(),
+                manifest.artifacts(),
+                manifest.commitProtocol(),
+                manifest.contentHash()));
+    }
+
+    @Test
     void beginInvalidatesAFormerManifestBeforePayloadReplacement(
             @TempDir Path directory) {
         writeRun(directory);
