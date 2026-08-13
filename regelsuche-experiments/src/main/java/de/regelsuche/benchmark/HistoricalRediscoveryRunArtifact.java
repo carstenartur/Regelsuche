@@ -8,6 +8,9 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -39,6 +42,12 @@ public final class HistoricalRediscoveryRunArtifact {
 
     private static final long MAX_MANIFEST_BYTES = 64L * 1024L;
     private static final long MAX_PAYLOAD_BYTES = 32L * 1024L * 1024L;
+    private static final int MAX_TEXT_LENGTH = 4096;
+    private static final Set<String> ASSESSMENT_DECISIONS = Set.of(
+        "USEFUL_DIAGNOSTIC_STEP",
+        "USEFUL_BUT_INCOMPLETE",
+        "INSUFFICIENT_SIGNAL"
+    );
     private static final Set<String> ROOT_KEYS = Set.of(
         "schema",
         "evidenceStatus",
@@ -75,9 +84,23 @@ public final class HistoricalRediscoveryRunArtifact {
     public static void begin(Path outputDirectory) {
         Path directory = normalizedDirectory(outputDirectory);
         try {
+            rejectSymbolicAncestry(directory);
             Files.createDirectories(directory);
             rejectSymbolicAncestry(directory);
-            Files.deleteIfExists(directory.resolve(MANIFEST_FILE_NAME));
+            if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IllegalArgumentException(
+                    "historical rediscovery output must be a directory");
+            }
+            Path manifest = directory.resolve(MANIFEST_FILE_NAME);
+            if (Files.exists(manifest, LinkOption.NOFOLLOW_LINKS)
+                    && (Files.isSymbolicLink(manifest)
+                        || !Files.isRegularFile(
+                            manifest,
+                            LinkOption.NOFOLLOW_LINKS))) {
+                throw new IllegalArgumentException(
+                    "former historical rediscovery manifest must be a regular file");
+            }
+            Files.deleteIfExists(manifest);
         } catch (IOException exception) {
             throw new UncheckedIOException(
                 "Could not begin historical rediscovery run", exception);
@@ -97,6 +120,7 @@ public final class HistoricalRediscoveryRunArtifact {
         Objects.requireNonNull(corpus, "corpus");
         Objects.requireNonNull(report, "report");
         Objects.requireNonNull(writtenArtifacts, "writtenArtifacts");
+        rejectSymbolicAncestry(directory);
         requireManifestAbsent(directory);
         verifyBindings(directory, corpus, report, writtenArtifacts);
 
@@ -118,17 +142,23 @@ public final class HistoricalRediscoveryRunArtifact {
 
     /**
      * Loads a bounded immutable run and fails closed on any membership,
-     * identity, length, hash or semantic-root mismatch.
+     * encoding, canonicalization, identity, length, hash or semantic-root
+     * mismatch.
      */
     public static VerifiedRun verify(Path outputDirectory) {
         Path directory = normalizedDirectory(outputDirectory);
         rejectSymbolicAncestry(directory);
         verifyDirectoryMembership(directory);
         Path manifestPath = directory.resolve(MANIFEST_FILE_NAME);
-        Manifest manifest = Manifest.parse(readUtf8(
+        String manifestJson = readUtf8(
             manifestPath,
             MAX_MANIFEST_BYTES,
-            "historical rediscovery manifest"));
+            "historical rediscovery manifest");
+        Manifest manifest = Manifest.parse(manifestJson);
+        if (!manifest.toCanonicalJson().equals(manifestJson)) {
+            throw new IllegalArgumentException(
+                "historical rediscovery manifest is not canonical");
+        }
         for (Artifact artifact : manifest.artifacts()) {
             Artifact actual = describe(
                 artifact.role(),
@@ -213,7 +243,10 @@ public final class HistoricalRediscoveryRunArtifact {
             atlasPath,
             MAX_PAYLOAD_BYTES,
             "historical rediscovery atlas")).readObject();
-        requireEqual(manifest.atlasSchema(), string(atlas, "schema"), "atlas schema");
+        requireEqual(
+            manifest.atlasSchema(),
+            string(atlas, "schema"),
+            "atlas schema");
         requireEqual(
             manifest.corpusSchema(),
             string(atlas, "corpusSchema"),
@@ -232,7 +265,8 @@ public final class HistoricalRediscoveryRunArtifact {
             "claim boundary");
         List<?> cases = list(atlas, "cases");
         if (cases.size() != manifest.caseCount()) {
-            throw new IllegalArgumentException("atlas case count differs from manifest");
+            throw new IllegalArgumentException(
+                "atlas case count differs from manifest");
         }
         Map<String, Object> assessment = object(atlas, "assessment");
         requireEqual(
@@ -242,15 +276,19 @@ public final class HistoricalRediscoveryRunArtifact {
     }
 
     private static void verifyDirectoryMembership(Path directory) {
-        if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
+        if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)
+                || Files.isSymbolicLink(directory)) {
             throw new IllegalArgumentException(
                 "missing historical rediscovery run directory: " + directory);
         }
         try (var paths = Files.list(directory)) {
             List<String> names = paths.map(path -> {
-                if (Files.isSymbolicLink(path)) {
+                if (Files.isSymbolicLink(path)
+                        || !Files.isRegularFile(
+                            path,
+                            LinkOption.NOFOLLOW_LINKS)) {
                     throw new IllegalArgumentException(
-                        "symbolic links are not accepted in run artifacts: " + path);
+                        "run artifacts must be regular files: " + path);
                 }
                 return path.getFileName().toString();
             }).sorted().toList();
@@ -277,24 +315,43 @@ public final class HistoricalRediscoveryRunArtifact {
     private static byte[] readBytes(Path path, long maximum, String label) {
         Path normalized = Objects.requireNonNull(path, "path")
             .toAbsolutePath().normalize();
+        rejectSymbolicAncestry(normalized);
         if (Files.isSymbolicLink(normalized)
-                || !Files.isRegularFile(normalized, LinkOption.NOFOLLOW_LINKS)) {
+                || !Files.isRegularFile(
+                    normalized,
+                    LinkOption.NOFOLLOW_LINKS)) {
             throw new IllegalArgumentException(label + " must be a regular file");
         }
         try {
-            long length = Files.size(normalized);
-            if (length < 1L || length > maximum) {
+            long declaredLength = Files.size(normalized);
+            if (declaredLength < 1L || declaredLength > maximum) {
                 throw new IllegalArgumentException(
-                    label + " size is outside the bounded range: " + length);
+                    label + " size is outside the bounded range: "
+                        + declaredLength);
             }
-            return Files.readAllBytes(normalized);
+            byte[] bytes = Files.readAllBytes(normalized);
+            if (bytes.length != declaredLength) {
+                throw new IllegalArgumentException(
+                    label + " changed while being read");
+            }
+            return bytes;
         } catch (IOException exception) {
             throw new UncheckedIOException("Could not read " + label, exception);
         }
     }
 
     private static String readUtf8(Path path, long maximum, String label) {
-        return new String(readBytes(path, maximum, label), StandardCharsets.UTF_8);
+        byte[] bytes = readBytes(path, maximum, label);
+        try {
+            return StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString();
+        } catch (CharacterCodingException exception) {
+            throw new IllegalArgumentException(
+                label + " is not valid UTF-8", exception);
+        }
     }
 
     private static Path normalizedDirectory(Path directory) {
@@ -326,9 +383,13 @@ public final class HistoricalRediscoveryRunArtifact {
         Map<String, Object> result = new LinkedHashMap<>();
         raw.forEach((key, value) -> {
             if (!(key instanceof String text)) {
-                throw new IllegalArgumentException("JSON object key must be a string");
+                throw new IllegalArgumentException(
+                    "JSON object key must be a string");
             }
-            result.put(text, value);
+            if (result.put(text, value) != null) {
+                throw new IllegalArgumentException(
+                    "duplicate JSON object key: " + text);
+            }
         });
         return result;
     }
@@ -355,7 +416,8 @@ public final class HistoricalRediscoveryRunArtifact {
     private static String string(Map<String, Object> values, String key) {
         Object value = values.get(key);
         if (!(value instanceof String text) || text.isBlank()) {
-            throw new IllegalArgumentException(key + " must be a non-blank string");
+            throw new IllegalArgumentException(
+                key + " must be a non-blank string");
         }
         return text;
     }
@@ -368,7 +430,22 @@ public final class HistoricalRediscoveryRunArtifact {
         double decimal = number.doubleValue();
         int integer = number.intValue();
         if (!Double.isFinite(decimal) || decimal != integer || integer < 1) {
-            throw new IllegalArgumentException(key + " must be a positive integer");
+            throw new IllegalArgumentException(
+                key + " must be a positive integer");
+        }
+        return integer;
+    }
+
+    private static long positiveLong(Map<String, Object> values, String key) {
+        Object value = values.get(key);
+        if (!(value instanceof Number number)) {
+            throw new IllegalArgumentException(key + " must be numeric");
+        }
+        double decimal = number.doubleValue();
+        long integer = number.longValue();
+        if (!Double.isFinite(decimal) || decimal != integer || integer < 1L) {
+            throw new IllegalArgumentException(
+                key + " must be a positive integer");
         }
         return integer;
     }
@@ -389,6 +466,9 @@ public final class HistoricalRediscoveryRunArtifact {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(label + " must not be blank");
         }
+        if (value.length() > MAX_TEXT_LENGTH) {
+            throw new IllegalArgumentException(label + " is too long");
+        }
         return value;
     }
 
@@ -404,9 +484,19 @@ public final class HistoricalRediscoveryRunArtifact {
     private static String requirePrefixedSha256(String value, String label) {
         String text = requireText(value, label);
         if (!text.matches("sha256:[0-9a-f]{64}")) {
-            throw new IllegalArgumentException(label + " must be prefixed SHA-256");
+            throw new IllegalArgumentException(
+                label + " must be prefixed SHA-256");
         }
         return text;
+    }
+
+    private static String requireAssessmentDecision(String value) {
+        String decision = requireText(value, "assessmentDecision");
+        if (!ASSESSMENT_DECISIONS.contains(decision)) {
+            throw new IllegalArgumentException(
+                "unsupported historical rediscovery assessment decision");
+        }
+        return decision;
     }
 
     private static String sha256(byte[] bytes) {
@@ -428,20 +518,53 @@ public final class HistoricalRediscoveryRunArtifact {
         int caseCount,
         List<Artifact> artifacts
     ) {
-        String material = SCHEMA
-            + "\nevidenceStatus=" + EVIDENCE_STATUS
-            + "\ncorpusSchema=" + corpusSchema
-            + "\ncorpusSha256=" + corpusSha256
-            + "\natlasSchema=" + atlasSchema
-            + "\ninventoryRevision=" + inventoryRevision
-            + "\nclaimBoundary=" + claimBoundary
-            + "\nassessmentDecision=" + assessmentDecision
-            + "\ncaseCount=" + caseCount
-            + "\nartifacts=" + String.join(
-                "\nartifact=",
-                artifacts.stream().map(Artifact::canonicalMaterial).toList())
-            + "\ncommitProtocol=" + COMMIT_PROTOCOL;
-        return sha256(material.getBytes(StandardCharsets.UTF_8));
+        String canonicalWithoutHash = renderManifest(
+            corpusSchema,
+            corpusSha256,
+            atlasSchema,
+            inventoryRevision,
+            claimBoundary,
+            assessmentDecision,
+            caseCount,
+            artifacts,
+            null);
+        return sha256(canonicalWithoutHash.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String renderManifest(
+        String corpusSchema,
+        String corpusSha256,
+        String atlasSchema,
+        String inventoryRevision,
+        String claimBoundary,
+        String assessmentDecision,
+        int caseCount,
+        List<Artifact> artifacts,
+        String contentHash
+    ) {
+        JsonWriter writer = new JsonWriter().beginObject();
+        writer.property("schema", SCHEMA);
+        writer.property("evidenceStatus", EVIDENCE_STATUS);
+        writer.property("corpusSchema", corpusSchema);
+        writer.property("corpusSha256", corpusSha256);
+        writer.property("atlasSchema", atlasSchema);
+        writer.property("inventoryRevision", inventoryRevision);
+        writer.property("claimBoundary", claimBoundary);
+        writer.property("assessmentDecision", assessmentDecision);
+        writer.property("caseCount", caseCount);
+        writer.array("artifacts", array -> artifacts.forEach(artifact ->
+            array.objectValue(object -> {
+                object.property("fileName", artifact.fileName());
+                object.property("role", artifact.role().name());
+                object.property("mediaType", artifact.mediaType());
+                object.property("byteHash", artifact.byteHash());
+                object.property("byteLength", artifact.byteLength());
+            })));
+        writer.property("commitProtocol", COMMIT_PROTOCOL);
+        if (contentHash != null) {
+            writer.property("contentHash", contentHash);
+        }
+        return writer.endObject().toString();
     }
 
     private static List<Artifact> normalizeArtifacts(List<Artifact> values) {
@@ -510,11 +633,6 @@ public final class HistoricalRediscoveryRunArtifact {
             }
         }
 
-        private String canonicalMaterial() {
-            return fileName + '|' + role.name() + '|' + mediaType
-                + '|' + byteHash + '|' + byteLength;
-        }
-
         private static Artifact parse(Object raw) {
             if (!(raw instanceof Map<?, ?> map)) {
                 throw new IllegalArgumentException(
@@ -535,7 +653,7 @@ public final class HistoricalRediscoveryRunArtifact {
                 role,
                 string(values, "mediaType"),
                 string(values, "byteHash"),
-                positiveInt(values, "byteLength")
+                positiveLong(values, "byteLength")
             );
         }
     }
@@ -567,7 +685,9 @@ public final class HistoricalRediscoveryRunArtifact {
                 throw new IllegalArgumentException(
                     "unsupported historical rediscovery corpus schema");
             }
-            corpusSha256 = requireRawSha256(corpusSha256, "corpusSha256");
+            corpusSha256 = requireRawSha256(
+                corpusSha256,
+                "corpusSha256");
             if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)) {
                 throw new IllegalArgumentException(
                     "unsupported historical rediscovery atlas schema");
@@ -576,18 +696,20 @@ public final class HistoricalRediscoveryRunArtifact {
                 inventoryRevision,
                 "inventoryRevision");
             claimBoundary = requireText(claimBoundary, "claimBoundary");
-            assessmentDecision = requireText(
-                assessmentDecision,
-                "assessmentDecision");
+            assessmentDecision = requireAssessmentDecision(
+                assessmentDecision);
             if (caseCount < 1) {
-                throw new IllegalArgumentException("caseCount must be positive");
+                throw new IllegalArgumentException(
+                    "caseCount must be positive");
             }
             artifacts = normalizeArtifacts(artifacts);
             if (!COMMIT_PROTOCOL.equals(commitProtocol)) {
                 throw new IllegalArgumentException(
                     "historical rediscovery run must use manifest-last commit");
             }
-            contentHash = requirePrefixedSha256(contentHash, "contentHash");
+            contentHash = requirePrefixedSha256(
+                contentHash,
+                "contentHash");
             String expected = manifestHash(
                 corpusSchema,
                 corpusSha256,
@@ -637,7 +759,10 @@ public final class HistoricalRediscoveryRunArtifact {
 
         public static Manifest parse(String json) {
             Map<String, Object> values = new JsonReader(json).readObject();
-            requireKeys(values, ROOT_KEYS, "historical rediscovery run");
+            requireKeys(
+                values,
+                ROOT_KEYS,
+                "historical rediscovery run");
             List<Artifact> parsedArtifacts = list(values, "artifacts").stream()
                 .map(Artifact::parse)
                 .toList();
@@ -658,27 +783,16 @@ public final class HistoricalRediscoveryRunArtifact {
         }
 
         public String toCanonicalJson() {
-            JsonWriter writer = new JsonWriter().beginObject();
-            writer.property("schema", schema);
-            writer.property("evidenceStatus", evidenceStatus);
-            writer.property("corpusSchema", corpusSchema);
-            writer.property("corpusSha256", corpusSha256);
-            writer.property("atlasSchema", atlasSchema);
-            writer.property("inventoryRevision", inventoryRevision);
-            writer.property("claimBoundary", claimBoundary);
-            writer.property("assessmentDecision", assessmentDecision);
-            writer.property("caseCount", caseCount);
-            writer.array("artifacts", array -> artifacts.forEach(artifact ->
-                array.objectValue(object -> {
-                    object.property("fileName", artifact.fileName());
-                    object.property("role", artifact.role().name());
-                    object.property("mediaType", artifact.mediaType());
-                    object.property("byteHash", artifact.byteHash());
-                    object.property("byteLength", artifact.byteLength());
-                })));
-            writer.property("commitProtocol", commitProtocol);
-            writer.property("contentHash", contentHash);
-            return writer.endObject().toString();
+            return renderManifest(
+                corpusSchema,
+                corpusSha256,
+                atlasSchema,
+                inventoryRevision,
+                claimBoundary,
+                assessmentDecision,
+                caseCount,
+                artifacts,
+                contentHash);
         }
     }
 
@@ -693,6 +807,10 @@ public final class HistoricalRediscoveryRunArtifact {
             manifestPath = Objects.requireNonNull(manifestPath, "manifestPath")
                 .toAbsolutePath().normalize();
             Objects.requireNonNull(manifest, "manifest");
+            if (!directory.resolve(MANIFEST_FILE_NAME).equals(manifestPath)) {
+                throw new IllegalArgumentException(
+                    "manifestPath must use the canonical run location");
+            }
         }
     }
 }
