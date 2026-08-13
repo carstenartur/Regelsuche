@@ -164,7 +164,7 @@ public final class DiscoveryPromotionPipelineRunner {
                 StandardCharsets.UTF_8
             );
             campaignFiveRunner.writeReport(outputDirectory.resolve("discovery-campaign-5"), report.campaignFive());
-            campaignFourRunner.writeReport(outputDirectory.resolve("discovery-campaign-4"), report.promotionRecords());
+            campaignFourRunner.writeReport(outputDirectory.resolve("discovery-campaign-4"), report.campaignFour());
             campaignSevenRunner.writeReport(outputDirectory.resolve("discovery-campaign-7"), report.campaignSeven());
             campaignEightRunner.writeReport(outputDirectory.resolve("discovery-campaign-8"), report.campaignEight());
             campaignNineRunner.writeReport(outputDirectory.resolve("discovery-campaign-9"), report.campaignNine());

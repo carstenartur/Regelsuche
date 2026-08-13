@@ -49,9 +49,12 @@ public final class DiscoveryCampaignFourRunner {
     }
 
     CampaignReport writeReport(Path outputDirectory, List<PromotionRecord> promotedRecords) {
+        return writeReport(outputDirectory, run(promotedRecords));
+    }
+
+    CampaignReport writeReport(Path outputDirectory, CampaignReport report) {
         try {
             Files.createDirectories(outputDirectory);
-            CampaignReport report = run(promotedRecords);
             AtomicJsonFile.writeUtf8(
                 outputDirectory.resolve("discovery-campaign-4.json"),
                 JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)
