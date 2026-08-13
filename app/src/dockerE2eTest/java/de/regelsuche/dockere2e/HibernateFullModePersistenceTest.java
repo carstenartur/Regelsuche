@@ -26,21 +26,13 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers(disabledWithoutDocker = true)
 class HibernateFullModePersistenceTest {
     @Container
-    static final GenericContainer<?> POSTGRES = new GenericContainer<>("postgres:16-alpine")
-        .withEnv("POSTGRES_DB", "regelsuche")
-        .withEnv("POSTGRES_USER", "regelsuche")
-        .withEnv("POSTGRES_PASSWORD", "regelsuche-demo")
-        .withExposedPorts(5432)
-        .waitingFor(Wait.forLogMessage(
-            ".*database system is ready to accept connections.*\\n",
-            2));
+    static final GenericContainer<?> POSTGRES = PinnedPostgresContainer.create();
 
     @TempDir
     Path tempDir;

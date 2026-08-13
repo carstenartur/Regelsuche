@@ -21,14 +21,14 @@
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-validation</artifactId></dependency>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-math-algorithms</artifactId></dependency>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-persistence</artifactId></dependency>
-    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-persistence-hibernate</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-persistence-hibernate</artifactId></dependency>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-learning</artifactId></dependency>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-experiments</artifactId></dependency>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-cli</artifactId></dependency>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-discovery</artifactId></dependency>
 
     <dependency><groupId>org.neo4j.driver</groupId><artifactId>neo4j-java-driver</artifactId></dependency>
-    <dependency><groupId>jakarta.persistence</groupId><artifactId>jakarta.persistence-api</artifactId><version>${jakarta.persistence.version}</version></dependency>
+    <dependency><groupId>jakarta.persistence</groupId><artifactId>jakarta.persistence-api</artifactId></dependency>
     <dependency><groupId>org.graalvm.polyglot</groupId><artifactId>polyglot</artifactId></dependency>
     <dependency><groupId>com.fasterxml.jackson.dataformat</groupId><artifactId>jackson-dataformat-yaml</artifactId></dependency>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-solver-portfolio</artifactId><scope>test</scope></dependency>
@@ -68,7 +68,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
-        <version>3.8.1</version>
         <executions>
           <execution>
             <id>unpack-swagger-ui-assets</id>
@@ -133,7 +132,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-assembly-plugin</artifactId>
-        <version>3.7.1</version>
         <executions>
           <execution>
             <id>build-release-distributions</id>

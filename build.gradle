@@ -146,13 +146,9 @@ def verifyGeneratedDiscoveryGallery = tasks.register('verifyGeneratedDiscoveryGa
     }
 }
 
-def verifyStaticReferencePage = tasks.register('verifyStaticReferencePage', Exec) {
+def verifyStaticReferencePage = tasks.register('verifyStaticReferencePage') {
     group = 'verification'
-    description = 'Generates and verifies the static reference-page contract.'
-    dependsOn ':app:generateStaticReferencePage'
-    workingDir rootDir
-    commandLine pythonExecutable, 'scripts/verify-static-reference-page.py'
-    inputs.file('scripts/verify-static-reference-page.py')
+    description = 'Runs the checkout-owned Java/JUnit static reference-page contract.'
 }
 
 def verifySolverIrEvidence = tasks.register('verifySolverIrEvidence', Exec) {

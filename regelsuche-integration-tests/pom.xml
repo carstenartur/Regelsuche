@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>de.regelsuche</groupId>
+    <artifactId>regelsuche-parent</artifactId>
+    <version>0.2.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>regelsuche-integration-tests</artifactId>
+  <name>Regelsuche Docker Integration Tests</name>
+  <description>Explicit Maven Failsafe and Testcontainers contract for external runtimes.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>de.regelsuche</groupId>
+      <artifactId>regelsuche-app</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <testSourceDirectory>${maven.multiModuleProjectDirectory}/app/src/dockerE2eTest/java</testSourceDirectory>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <testIncludes>
+            <testInclude>de/regelsuche/dockere2e/DockerAvailabilityIT.java</testInclude>
+            <testInclude>de/regelsuche/dockere2e/PinnedPostgresContainer.java</testInclude>
+            <testInclude>de/regelsuche/dockere2e/PostgresDiscoveryPersistenceTest.java</testInclude>
+            <testInclude>de/regelsuche/dockere2e/HibernateFullModePersistenceTest.java</testInclude>
+            <testInclude>de/regelsuche/dockere2e/ScientificDiscoveryPostgresE2ETest.java</testInclude>
+          </testIncludes>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <skipTests>true</skipTests>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>docker-backed-integration-tests</id>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <useModulePath>false</useModulePath>
+          <failIfNoTests>true</failIfNoTests>
+          <forkedProcessTimeoutInSeconds>900</forkedProcessTimeoutInSeconds>
+          <includes>
+            <include>**/DockerAvailabilityIT.java</include>
+            <include>**/PostgresDiscoveryPersistenceTest.java</include>
+            <include>**/HibernateFullModePersistenceTest.java</include>
+            <include>**/ScientificDiscoveryPostgresE2ETest.java</include>
+          </includes>
+          <systemPropertyVariables>
+            <regelsuche.projectRoot>${maven.multiModuleProjectDirectory}</regelsuche.projectRoot>
+            <regelsuche.discoveryArtifactsDir>${project.build.directory}/discovery-artifacts</regelsuche.discoveryArtifactsDir>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
