@@ -437,8 +437,9 @@ public final class HistoricalRediscoveryRunArtifact {
             + "\nclaimBoundary=" + claimBoundary
             + "\nassessmentDecision=" + assessmentDecision
             + "\ncaseCount=" + caseCount
-            + "\nartifacts=" + artifacts.stream()
-                .map(Artifact::canonicalMaterial).toList()
+            + "\nartifacts=" + String.join(
+                "\nartifact=",
+                artifacts.stream().map(Artifact::canonicalMaterial).toList())
             + "\ncommitProtocol=" + COMMIT_PROTOCOL;
         return sha256(material.getBytes(StandardCharsets.UTF_8));
     }
@@ -562,9 +563,15 @@ public final class HistoricalRediscoveryRunArtifact {
                 throw new IllegalArgumentException(
                     "unexpected historical rediscovery evidence status");
             }
-            corpusSchema = requireText(corpusSchema, "corpusSchema");
+            if (!HistoricalRediscoveryCorpus.SCHEMA.equals(corpusSchema)) {
+                throw new IllegalArgumentException(
+                    "unsupported historical rediscovery corpus schema");
+            }
             corpusSha256 = requireRawSha256(corpusSha256, "corpusSha256");
-            atlasSchema = requireText(atlasSchema, "atlasSchema");
+            if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)) {
+                throw new IllegalArgumentException(
+                    "unsupported historical rediscovery atlas schema");
+            }
             inventoryRevision = requireText(
                 inventoryRevision,
                 "inventoryRevision");
