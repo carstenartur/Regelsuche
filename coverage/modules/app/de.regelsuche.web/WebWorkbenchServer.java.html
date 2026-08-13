@@ -2531,8 +2531,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L2532">        int priority = body.priority();</span>
 <span class="fc bfc" id="L2533" title="All 2 branches covered.">        if (priority &lt; 0) {</span>
-<span class="fc" id="L2534">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
-<span class="fc" id="L2535">            return;</span>
+<span class="nc" id="L2534">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
+<span class="nc" id="L2535">            return;</span>
         }
 <span class="fc" id="L2537">        String worker = body.worker().trim();</span>
 <span class="fc bfc" id="L2538" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
