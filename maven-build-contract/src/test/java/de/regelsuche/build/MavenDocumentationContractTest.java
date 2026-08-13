@@ -2,8 +2,8 @@ package de.regelsuche.build;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -105,6 +105,12 @@ class MavenDocumentationContractTest {
             finding.message().startsWith("missing local target:")));
         assertTrue(findings.stream().anyMatch(finding ->
             finding.message().startsWith("link escapes repository:")));
+    }
+
+    @Test
+    void repositoryRootRequiresNonBlankMavenProperty() {
+        assertThrows(AssertionError.class, () -> repositoryRoot(null));
+        assertThrows(AssertionError.class, () -> repositoryRoot(" \t "));
     }
 
     private static List<Finding> verifyRepository(Path repositoryRoot)
@@ -270,9 +276,14 @@ class MavenDocumentationContractTest {
     }
 
     private static Path repositoryRoot() {
-        String configured = System.getProperty("regelsuche.repositoryRoot");
-        assertNotNull(configured,
-            "Maven must expose maven.multiModuleProjectDirectory to tests");
+        return repositoryRoot(System.getProperty("regelsuche.repositoryRoot"));
+    }
+
+    private static Path repositoryRoot(String configured) {
+        assertTrue(
+            configured != null && !configured.isBlank(),
+            "Maven must expose maven.multiModuleProjectDirectory to tests"
+        );
         return Path.of(configured).toAbsolutePath().normalize();
     }
 
