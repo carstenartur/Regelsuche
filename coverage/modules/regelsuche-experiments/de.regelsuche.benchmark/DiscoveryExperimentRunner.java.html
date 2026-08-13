@@ -45,16 +45,27 @@ public interface DiscoveryExperimentRunner {
 <span class="nc" id="L45">        HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();</span>
 <span class="nc" id="L46">        HistoricalRediscoveryAtlas.AtlasReport report = atlas.run(corpus);</span>
 <span class="nc" id="L47">        verifyRetainedClaims(report);</span>
-<span class="nc" id="L48">        HistoricalRediscoveryAtlas.WrittenArtifacts artifacts =</span>
-<span class="nc" id="L49">            atlas.write(output, report);</span>
-<span class="nc" id="L50">        System.out.println(&quot;historicalRediscoveryAssessment=&quot;</span>
-<span class="nc" id="L51">            + report.assessment().decision());</span>
-<span class="nc" id="L52">        System.out.println(&quot;historicalRediscoveryCases=&quot; + report.cases().size());</span>
-<span class="nc" id="L53">        System.out.println(&quot;historicalRediscoveryJson=&quot;</span>
-<span class="nc" id="L54">            + artifacts.json().toAbsolutePath().normalize());</span>
-<span class="nc" id="L55">        System.out.println(&quot;historicalRediscoveryMarkdown=&quot;</span>
-<span class="nc" id="L56">            + artifacts.markdown().toAbsolutePath().normalize());</span>
-<span class="nc" id="L57">    }</span>
+<span class="nc" id="L48">        HistoricalRediscoveryRunArtifact.begin(output);</span>
+<span class="nc" id="L49">        HistoricalRediscoveryAtlas.WrittenArtifacts artifacts =</span>
+<span class="nc" id="L50">            atlas.write(output, report);</span>
+<span class="nc" id="L51">        HistoricalRediscoveryRunArtifact.VerifiedRun verifiedRun =</span>
+<span class="nc" id="L52">            HistoricalRediscoveryRunArtifact.commit(</span>
+                output,
+                corpus,
+                report,
+                artifacts);
+<span class="nc" id="L57">        System.out.println(&quot;historicalRediscoveryAssessment=&quot;</span>
+<span class="nc" id="L58">            + report.assessment().decision());</span>
+<span class="nc" id="L59">        System.out.println(&quot;historicalRediscoveryCases=&quot; + report.cases().size());</span>
+<span class="nc" id="L60">        System.out.println(&quot;historicalRediscoveryJson=&quot;</span>
+<span class="nc" id="L61">            + artifacts.json().toAbsolutePath().normalize());</span>
+<span class="nc" id="L62">        System.out.println(&quot;historicalRediscoveryMarkdown=&quot;</span>
+<span class="nc" id="L63">            + artifacts.markdown().toAbsolutePath().normalize());</span>
+<span class="nc" id="L64">        System.out.println(&quot;historicalRediscoveryRun=&quot;</span>
+<span class="nc" id="L65">            + verifiedRun.manifestPath());</span>
+<span class="nc" id="L66">        System.out.println(&quot;historicalRediscoveryRunHash=&quot;</span>
+<span class="nc" id="L67">            + verifiedRun.manifest().contentHash());</span>
+<span class="nc" id="L68">    }</span>
 
     /**
      * Prevents aggregate or per-case claims that are stronger than the
@@ -63,33 +74,33 @@ public interface DiscoveryExperimentRunner {
     private static void verifyRetainedClaims(
         HistoricalRediscoveryAtlas.AtlasReport report
     ) {
-<span class="nc" id="L66">        boolean targetBlindDiversitySignal = false;</span>
-<span class="nc bnc" id="L67" title="All 2 branches missed.">        for (HistoricalRediscoveryAtlas.CaseResult result : report.cases()) {</span>
-<span class="nc bnc" id="L68" title="All 3 branches missed.">            switch (result.status()) {</span>
+<span class="nc" id="L77">        boolean targetBlindDiversitySignal = false;</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        for (HistoricalRediscoveryAtlas.CaseResult result : report.cases()) {</span>
+<span class="nc bnc" id="L79" title="All 3 branches missed.">            switch (result.status()) {</span>
                 case GENERIC_BRIDGE_REQUIRED_AND_FOUND,
                      CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE -&gt; {
-<span class="nc bnc" id="L71" title="All 2 branches missed.">                    if (!result.production().oracle().completeClosureExhausted()) {</span>
-<span class="nc" id="L72">                        throw new IllegalStateException(</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                    if (!result.production().oracle().completeClosureExhausted()) {</span>
+<span class="nc" id="L83">                        throw new IllegalStateException(</span>
                             &quot;claim requires complete production closure: &quot;
-<span class="nc" id="L74">                                + result.benchmarkCase().id()</span>
+<span class="nc" id="L85">                                + result.benchmarkCase().id()</span>
                                 + &quot; has production oracle status &quot;
-<span class="nc" id="L76">                                + result.production().oracle().status());</span>
+<span class="nc" id="L87">                                + result.production().oracle().status());</span>
                     }
                 }
                 case REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND -&gt;
-<span class="nc" id="L80">                    targetBlindDiversitySignal = true;</span>
+<span class="nc" id="L91">                    targetBlindDiversitySignal = true;</span>
                 default -&gt; {
                     // No additional cross-case claim invariant.
                 }
             }
-<span class="nc" id="L85">        }</span>
-<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (report.assessment().searchPolicyDifferenceIdentified()</span>
+<span class="nc" id="L96">        }</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (report.assessment().searchPolicyDifferenceIdentified()</span>
                 != targetBlindDiversitySignal) {
-<span class="nc" id="L88">            throw new IllegalStateException(</span>
+<span class="nc" id="L99">            throw new IllegalStateException(</span>
                 &quot;search-policy claim must be backed by a target-blind &quot;
                     + &quot;structural-diversity result&quot;);
         }
-<span class="nc" id="L92">    }</span>
+<span class="nc" id="L103">    }</span>
 
     /**
      * Outcome of a single seed run.
@@ -98,7 +109,7 @@ public interface DiscoveryExperimentRunner {
      * @param success whether the run reached a useful terminal state
      * @param summary short, human-readable result description
      */
-<span class="fc" id="L101">    record ExperimentResult(String seedExpression, boolean success, String summary) {</span>
+<span class="fc" id="L112">    record ExperimentResult(String seedExpression, boolean success, String summary) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
