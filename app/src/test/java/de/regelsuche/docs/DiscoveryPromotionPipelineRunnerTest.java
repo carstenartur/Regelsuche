@@ -7,43 +7,46 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
+@ExtendWith(DiscoveryPromotionPipelineFixtureExtension.class)
 class DiscoveryPromotionPipelineRunnerTest {
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
 
     @Test
-    void pipelineWritesClosedLoopPromotionArtifacts(@TempDir Path tempDir) throws Exception {
-        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+    void pipelineWritesClosedLoopPromotionArtifacts(
+        DiscoveryPromotionPipelineFixture fixture
+    ) throws Exception {
+        Path outputDirectory = fixture.outputDirectory();
+        DiscoveryPromotionPipelineRunner.PipelineReport report = fixture.report();
 
-        DiscoveryPromotionPipelineRunner.PipelineReport report = runner.writeReport(tempDir);
-
-        assertTrue(Files.exists(tempDir.resolve("promotion-records.json")));
-        assertTrue(Files.exists(tempDir.resolve("promotion-registry.json")));
-        assertTrue(Files.exists(tempDir.resolve("promotion-history.md")));
-        assertTrue(Files.exists(tempDir.resolve("campaign-metrics.json")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("blocked-candidates.md")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("operator-opportunities.md")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("macro-opportunities.md")));
-        assertTrue(Files.exists(tempDir.resolve("promotion-dashboard.json")));
-        assertTrue(Files.exists(tempDir.resolve("promotion-dashboard.md")));
-        assertTrue(Files.exists(tempDir.resolve("gallery-2.0.md")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-details").resolve("README.md")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-campaign-5").resolve("discovery-campaign-5.json")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-campaign-5").resolve("hidden-structure-report.md")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-campaign-4").resolve("discovery-campaign-4.json")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-campaign-4").resolve("macro-reuse-report.md")));
+        assertTrue(Files.exists(outputDirectory.resolve("promotion-records.json")));
+        assertTrue(Files.exists(outputDirectory.resolve("promotion-registry.json")));
+        assertTrue(Files.exists(outputDirectory.resolve("promotion-history.md")));
+        assertTrue(Files.exists(outputDirectory.resolve("campaign-metrics.json")));
+        assertTrue(Files.exists(outputDirectory.resolve("discovery-backlog").resolve("blocked-candidates.md")));
+        assertTrue(Files.exists(outputDirectory.resolve("discovery-backlog").resolve("operator-opportunities.md")));
+        assertTrue(Files.exists(outputDirectory.resolve("discovery-backlog").resolve("macro-opportunities.md")));
+        assertTrue(Files.exists(outputDirectory.resolve("promotion-dashboard.json")));
+        assertTrue(Files.exists(outputDirectory.resolve("promotion-dashboard.md")));
+        assertTrue(Files.exists(outputDirectory.resolve("gallery-2.0.md")));
+        assertTrue(Files.exists(outputDirectory.resolve("discovery-details").resolve("README.md")));
+        assertTrue(Files.exists(outputDirectory.resolve("discovery-campaign-5").resolve("discovery-campaign-5.json")));
+        assertTrue(Files.exists(outputDirectory.resolve("discovery-campaign-5").resolve("hidden-structure-report.md")));
+        assertTrue(Files.exists(outputDirectory.resolve("discovery-campaign-4").resolve("discovery-campaign-4.json")));
+        assertTrue(Files.exists(outputDirectory.resolve("discovery-campaign-4").resolve("macro-reuse-report.md")));
 
         assertTrue(report.promotionRecords().stream()
             .anyMatch(record -> record.stage() == PromotionStage.REUSED));
@@ -56,14 +59,23 @@ class DiscoveryPromotionPipelineRunnerTest {
             .collect(Collectors.toSet());
         assertEquals(candidateIds.size(), report.registry().records().size());
 
-        String dashboard = Files.readString(tempDir.resolve("promotion-dashboard.md"), StandardCharsets.UTF_8);
+        String dashboard = Files.readString(
+            outputDirectory.resolve("promotion-dashboard.md"),
+            StandardCharsets.UTF_8
+        );
         assertTrue(dashboard.contains("Top promoted candidates"));
         assertTrue(dashboard.contains("Unresolved blockers"));
 
-        String detailsIndex = Files.readString(tempDir.resolve("discovery-details").resolve("README.md"), StandardCharsets.UTF_8);
+        String detailsIndex = Files.readString(
+            outputDirectory.resolve("discovery-details").resolve("README.md"),
+            StandardCharsets.UTF_8
+        );
         assertTrue(detailsIndex.contains(".md)"));
 
-        String gallery = Files.readString(tempDir.resolve("gallery-2.0.md"), StandardCharsets.UTF_8);
+        String gallery = Files.readString(
+            outputDirectory.resolve("gallery-2.0.md"),
+            StandardCharsets.UTF_8
+        );
         List<String> galleryCandidates = gallery.lines()
             .filter(line -> line.startsWith("| ") && !line.contains("Candidate | Stage"))
             .filter(line -> !line.contains("---"))
@@ -77,7 +89,10 @@ class DiscoveryPromotionPipelineRunnerTest {
         }
 
         Map<String, Object> dashboardJson = JSON.readValue(
-            Files.readString(tempDir.resolve("promotion-dashboard.json"), StandardCharsets.UTF_8),
+            Files.readString(
+                outputDirectory.resolve("promotion-dashboard.json"),
+                StandardCharsets.UTF_8
+            ),
             new TypeReference<LinkedHashMap<String, Object>>() { }
         );
         long observed = report.promotionRecords().size();
@@ -101,20 +116,30 @@ class DiscoveryPromotionPipelineRunnerTest {
     }
 
     @Test
-    void promotionRegistryIsDeterministicAndRerunsDoNotCreateDuplicates(@TempDir Path tempDir) throws Exception {
+    void promotionRegistryIsDeterministicAndRerunsDoNotCreateDuplicates(
+        @TempDir Path tempDir,
+        DiscoveryPromotionPipelineFixture fixture
+    ) throws Exception {
         DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
         Path first = tempDir.resolve("first");
-        Path second = tempDir.resolve("second");
 
         runner.writeReport(first);
-        runner.writeReport(second);
         runner.writeReport(first);
 
-        String firstRegistry = Files.readString(first.resolve("promotion-registry.json"), StandardCharsets.UTF_8);
-        String secondRegistry = Files.readString(second.resolve("promotion-registry.json"), StandardCharsets.UTF_8);
-        String firstHistory = Files.readString(first.resolve("promotion-history.md"), StandardCharsets.UTF_8);
+        String firstRegistry = Files.readString(
+            first.resolve("promotion-registry.json"),
+            StandardCharsets.UTF_8
+        );
+        String fixtureRegistry = Files.readString(
+            fixture.outputDirectory().resolve("promotion-registry.json"),
+            StandardCharsets.UTF_8
+        );
+        String firstHistory = Files.readString(
+            first.resolve("promotion-history.md"),
+            StandardCharsets.UTF_8
+        );
 
-        assertEquals(firstRegistry, secondRegistry);
+        assertEquals(fixtureRegistry, firstRegistry);
         assertTrue(firstHistory.contains("complete-square-family"));
         assertTrue(firstRegistry.indexOf("\"candidateId\" : \"complete-square-family\"")
             == firstRegistry.lastIndexOf("\"candidateId\" : \"complete-square-family\""));
@@ -751,22 +776,31 @@ class DiscoveryPromotionPipelineRunnerTest {
     }
 
     @Test
-    void dashboardIncludesOracleContradictionsAndCampaignProgress(@TempDir Path tempDir) throws Exception {
-        DiscoveryPromotionPipelineRunner runner = new DiscoveryPromotionPipelineRunner();
+    void dashboardIncludesOracleContradictionsAndCampaignProgress(
+        DiscoveryPromotionPipelineFixture fixture
+    ) throws Exception {
+        Path outputDirectory = fixture.outputDirectory();
 
-        runner.writeReport(tempDir);
-
-        String dashboard = Files.readString(tempDir.resolve("promotion-dashboard.md"), StandardCharsets.UTF_8);
+        String dashboard = Files.readString(
+            outputDirectory.resolve("promotion-dashboard.md"),
+            StandardCharsets.UTF_8
+        );
         assertTrue(dashboard.contains("## Oracle contradictions"));
         assertTrue(dashboard.contains("oracle-disagree count:"));
         assertTrue(dashboard.contains("## Campaign progress"));
-        String dashboardJson = Files.readString(tempDir.resolve("promotion-dashboard.json"), StandardCharsets.UTF_8);
+        String dashboardJson = Files.readString(
+            outputDirectory.resolve("promotion-dashboard.json"),
+            StandardCharsets.UTF_8
+        );
         assertTrue(dashboardJson.contains("\"oracleContradictions\""));
         assertTrue(dashboardJson.contains("\"campaignProgress\""));
-        assertTrue(Files.exists(tempDir.resolve("discovery-backlog").resolve("operator-impact.md")));
+        assertTrue(Files.exists(
+            outputDirectory.resolve("discovery-backlog").resolve("operator-impact.md")
+        ));
         String operatorImpact = Files.readString(
-            tempDir.resolve("discovery-backlog").resolve("operator-impact.md"), StandardCharsets.UTF_8);
+            outputDirectory.resolve("discovery-backlog").resolve("operator-impact.md"),
+            StandardCharsets.UTF_8
+        );
         assertTrue(operatorImpact.contains("# Operator impact"));
     }
-
 }
