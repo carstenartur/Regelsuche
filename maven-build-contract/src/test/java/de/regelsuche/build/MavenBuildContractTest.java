@@ -319,7 +319,7 @@ class MavenBuildContractTest {
             if (groupId == null || groupId.isBlank()) {
                 groupId = "org.apache.maven.plugins";
             }
-            plugins.put(groupId + ":" + artifactId, plugin);
+            plugins.putIfAbsent(groupId + ":" + artifactId, plugin);
         }
         return plugins;
     }
