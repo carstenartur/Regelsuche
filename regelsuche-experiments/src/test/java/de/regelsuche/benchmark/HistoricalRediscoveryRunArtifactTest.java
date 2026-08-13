@@ -14,6 +14,7 @@ import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.TargetRelation;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -100,6 +101,29 @@ class HistoricalRediscoveryRunArtifactTest {
     }
 
     @Test
+    void manifestRejectsUnsupportedAssessmentDecision(
+            @TempDir Path directory) {
+        HistoricalRediscoveryRunArtifact.Manifest manifest =
+            writeRun(directory).manifest();
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new HistoricalRediscoveryRunArtifact.Manifest(
+                manifest.schema(),
+                manifest.evidenceStatus(),
+                manifest.corpusSchema(),
+                manifest.corpusSha256(),
+                manifest.atlasSchema(),
+                manifest.inventoryRevision(),
+                manifest.claimBoundary(),
+                "UNREVIEWED_SUCCESS",
+                manifest.caseCount(),
+                manifest.artifacts(),
+                manifest.commitProtocol(),
+                manifest.contentHash()));
+    }
+
+    @Test
     void beginInvalidatesAFormerManifestBeforePayloadReplacement(
             @TempDir Path directory) {
         writeRun(directory);
@@ -174,9 +198,32 @@ class HistoricalRediscoveryRunArtifactTest {
     }
 
     @Test
+    void nonCanonicalAndInvalidUtf8ManifestBytesFailClosed(
+            @TempDir Path temporary) throws Exception {
+        Path nonCanonical = temporary.resolve("non-canonical");
+        writeRun(nonCanonical);
+        replaceManifest(nonCanonical, json -> " " + json);
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> HistoricalRediscoveryRunArtifact.verify(nonCanonical));
+
+        Path invalidUtf8 = temporary.resolve("invalid-utf8");
+        HistoricalRediscoveryRunArtifact.VerifiedRun run =
+            writeRun(invalidUtf8);
+        byte[] canonical = Files.readAllBytes(run.manifestPath());
+        byte[] malformed = Arrays.copyOf(canonical, canonical.length + 1);
+        malformed[malformed.length - 1] = (byte) 0xc3;
+        Files.write(run.manifestPath(), malformed);
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> HistoricalRediscoveryRunArtifact.verify(invalidUtf8));
+    }
+
+    @Test
     void commitRequiresExplicitPreviousManifestInvalidation(
             @TempDir Path directory) {
-        HistoricalRediscoveryRunArtifact.VerifiedRun run = writeRun(directory);
+        HistoricalRediscoveryRunArtifact.VerifiedRun run =
+            writeRun(directory);
         Fixture fixture = fixture();
 
         assertThrows(
@@ -186,8 +233,10 @@ class HistoricalRediscoveryRunArtifactTest {
                 fixture.corpus(),
                 fixture.report(),
                 new HistoricalRediscoveryAtlas.WrittenArtifacts(
-                    directory.resolve("historical-rediscovery-atlas.json"),
-                    directory.resolve("historical-rediscovery-atlas.md"))));
+                    directory.resolve(
+                        "historical-rediscovery-atlas.json"),
+                    directory.resolve(
+                        "historical-rediscovery-atlas.md"))));
         assertTrue(Files.exists(run.manifestPath()));
     }
 
