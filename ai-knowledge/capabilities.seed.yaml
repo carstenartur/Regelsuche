@@ -284,8 +284,8 @@
 - id: maven-build-contract
   label: "Maven and Testcontainers build contract"
   description: "Defines the checkout-owned Java 21 and Maven reactor, central dependency and plugin ownership, fast Surefire tests and the explicit Failsafe/Testcontainers profile for pinned PostgreSQL integration boundaries."
-  modules: [maven-build-contract, app, regelsuche-persistence-hibernate]
-  ownerModules: [maven-build-contract]
+  modules: [app, regelsuche-persistence-hibernate]
+  ownerModules: [app]
   typePatterns:
     - 'Maven*Contract*'
     - 'DockerAvailabilityIT'
