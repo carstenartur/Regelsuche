@@ -181,7 +181,7 @@ def verifyDomainLifecycleHandoffEvidence = tasks.register('verifyDomainLifecycle
 }
 
 def verifyDomainGenericQualificationEvidence = tasks.register('verifyDomainGenericQualificationEvidence', Exec) {
-    group = 'verifification'
+    group = 'verification'
     description = 'Generates and verifies the domain-generic qualification profile.'
     dependsOn prepareVerificationEnvironment, ':regelsuche-release:runDomainGenericQualification'
     workingDir rootDir
@@ -209,7 +209,7 @@ def generateCapabilityStatusForVerification = tasks.register('generateCapability
     group = 'verification'
     description = 'Regenerates the public capability matrix from retained release and domain evidence.'
     dependsOn prepareVerificationEnvironment,
-        ':regelsuche-release:runQualiedReleaseReadinessWithHiddenRuleEvidence',
+        ':regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence',
         ':regelsuche-release:runDomainGenericQualification'
     workingDir rootDir
     doFirst {
@@ -265,7 +265,7 @@ def repositoryCheck = tasks.register('check') {
 }
 
 def verifySolverPortfolioEvidence = tasks.register('verifySolverPortfolioEvidence', Exec) {
-    group = 'verifification'
+    group = 'verification'
     description = 'Requires real Z3 and verifies the canonical solver-portfolio evidence chain.'
     dependsOn prepareVerificationEnvironment, repositoryTest,
         ':regelsuche-solver-portfolio:writeSolverPortfolioExample'
@@ -280,7 +280,7 @@ def verifySolverPortfolioEvidence = tasks.register('verifySolverPortfolioEvidenc
 def verifyReleaseReadinessDockerReproduction = tasks.register('verifyReleaseReadinessDockerReproduction', Exec) {
     group = 'verification'
     description = 'Requires Docker and compares release-readiness Gradle and runtime-image evidence byte for byte.'
-    dependsOn prepareVerifificationEnvironment, verifyReleaseReadinessEvidence
+    dependsOn prepareVerificationEnvironment, verifyReleaseReadinessEvidence
     mustRunAfter repositoryCheck
     workingDir rootDir
     inputs.file('scripts/verify-release-readiness-docker-reproduction.sh')
@@ -297,7 +297,7 @@ tasks.register('fullCheck') {
 }
 
 gradle.projectsEvaluated {
-    project(':regelsuche-release').tasks.named('zunQualifiedReleaseReadinessWithHiddenRuleEvidence').configure {
+    project(':regelsuche-release').tasks.named('runQualifiedReleaseReadinessWithHiddenRuleEvidence').configure {
         mustRunAfter repositoryTest
     }
     project(':regelsuche-release').tasks.named('runDomainGenericQualification').configure {
