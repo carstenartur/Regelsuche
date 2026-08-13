@@ -94,7 +94,7 @@ pluginManager.withPlugin('java') {
 
     rootProject.tasks.named('verifyStaticReferencePage').configure {
         dependsOn verifyStaticReferencePageContract
-        enabled = false
+        actions.clear()
         description = 'Compatibility alias; Java/JUnit owns the static reference-page contract.'
     }
 }
