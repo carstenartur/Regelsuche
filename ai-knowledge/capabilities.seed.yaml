@@ -321,3 +321,23 @@
     - discovery-evidence
     - ui-evidence
   tags: [publication, reference-page, reproducibility, junit]
+
+- id: historical-rediscovery-diagnostics
+  label: "Historical rediscovery diagnostics"
+  description: "Executes a frozen historical identity corpus through bounded reachability and production-search controls, then commits the complete atlas as a manifest-last content-addressed diagnostic run with independently verified semantic roots."
+  modules: [regelsuche-experiments, regelsuche-core, regelsuche-search, regelsuche-validation]
+  ownerModules: [regelsuche-experiments]
+  typePatterns:
+    - 'HistoricalRediscovery*'
+    - 'BoundedRewriteReachabilityOracle'
+    - 'StructuralDiversitySearchStrategy'
+  testPatterns:
+    - 'HistoricalRediscovery*Test'
+    - 'BoundedRewriteReachabilityOracleTest'
+  docPatterns:
+    - docs/search-intelligence.md
+    - docs/schemas/regelsuche-historical-rediscovery-corpus-v1.schema.json
+    - docs/schemas/regelsuche-historical-rediscovery-run-v1.schema.json
+  evidenceTypes:
+    - diagnostic-evidence
+  tags: [historical-rediscovery, reachability, diagnostics, reproducibility]
