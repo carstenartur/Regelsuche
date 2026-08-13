@@ -114,8 +114,11 @@ class MavenBuildContractTest {
     void reactorContainsTheDeclaredJavaModuleSlice() throws Exception {
         Path root = repositoryRoot();
         Document parent = parse(root.resolve("pom.xml"));
+        Element parentProject = parent.getDocumentElement();
+        String parentVersion = directChildText(parentProject, "version");
+        assertNotNull(parentVersion, "root POM has no version");
         List<String> modules = directChildTexts(
-            directChild(parent.getDocumentElement(), "modules"),
+            directChild(parentProject, "modules"),
             "module");
         assertEquals(EXPECTED_MODULES, modules);
         for (String module : modules) {
@@ -130,8 +133,9 @@ class MavenBuildContractTest {
                 "regelsuche-parent",
                 directChildText(declaredParent, "artifactId"));
             assertEquals(
-                "0.2.0-SNAPSHOT",
-                directChildText(declaredParent, "version"));
+                parentVersion,
+                directChildText(declaredParent, "version"),
+                () -> "module parent version differs from root POM: " + module);
         }
     }
 
