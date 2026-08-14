@@ -104,7 +104,7 @@ public final class RepresentationCandidateAssessor {
             knownStructureMatcher.match(candidateRoot);
         List<KnownStructureMatch> newMatches =
             newlyExposed(sourceMatches, candidateMatches);
-        List<String> newlyUnlockedConsequences =
+        List<KnownStructureConsequenceUnlock> newlyUnlockedConsequences =
             newlyUnlockedConsequences(
                 sourceMatches,
                 newMatches,
@@ -212,29 +212,48 @@ public final class RepresentationCandidateAssessor {
             .toList();
     }
 
-    private static List<String> newlyUnlockedConsequences(
+    private static List<KnownStructureConsequenceUnlock> newlyUnlockedConsequences(
         List<KnownStructureMatch> sourceMatches,
         List<KnownStructureMatch> newlyExposedMatches,
         List<String> activeAssumptions
     ) {
         Set<String> availableBefore = new HashSet<>();
         for (KnownStructureMatch sourceMatch : sourceMatches) {
-            if (assumptionsSatisfied(sourceMatch, activeAssumptions)) {
-                availableBefore.addAll(sourceMatch.consequenceIds());
+            if (!assumptionsSatisfied(sourceMatch, activeAssumptions)) {
+                continue;
+            }
+            for (String consequence : sourceMatch.consequenceIds()) {
+                availableBefore.add(opportunityIdentity(sourceMatch, consequence));
             }
         }
-        TreeSet<String> unlocked = new TreeSet<>();
+
+        TreeSet<KnownStructureConsequenceUnlock> unlocked = new TreeSet<>();
         for (KnownStructureMatch match : newlyExposedMatches) {
             if (!assumptionsSatisfied(match, activeAssumptions)) {
                 continue;
             }
             for (String consequence : match.consequenceIds()) {
-                if (!availableBefore.contains(consequence)) {
-                    unlocked.add(consequence);
+                KnownStructureConsequenceUnlock opportunity =
+                    new KnownStructureConsequenceUnlock(
+                        consequence,
+                        match.structureId(),
+                        match.occurrencePath(),
+                        match.identity()
+                    );
+                if (!availableBefore.contains(
+                        opportunity.opportunityIdentity())) {
+                    unlocked.add(opportunity);
                 }
             }
         }
         return List.copyOf(unlocked);
+    }
+
+    private static String opportunityIdentity(
+        KnownStructureMatch match,
+        String consequence
+    ) {
+        return consequence + "|" + match.identity();
     }
 
     private static boolean assumptionsSatisfied(
@@ -251,7 +270,7 @@ public final class RepresentationCandidateAssessor {
         List<String> introducedVariables,
         List<String> introducedFunctions,
         List<KnownStructureMatch> newlyExposedMatches,
-        List<String> newlyUnlockedConsequences,
+        List<KnownStructureConsequenceUnlock> newlyUnlockedConsequences,
         List<String> activeAssumptions
     ) {
         EnumSet<RepresentationAssessmentWarning> warnings =
