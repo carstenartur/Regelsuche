@@ -20,7 +20,7 @@ Der erste produktive Slice liegt unter
 - Vorkommenspfade mit Prüfung, dass der umgebende Ausdruck unverändert bleibt;
 - einen content-addressed Katalog bekannter Strukturen;
 - Mustererkennung im ganzen Ausdruck und in Teilausdrücken;
-- konkrete Konsequenz- beziehungsweise Capability-IDs für bekannte Strukturen;
+- occurrence-spezifische Konsequenz- beziehungsweise Capability-Unlocks;
 - getrennte Kandidatenklassen für Kompression, bekannte Formen und
   nachgelagerte Fähigkeiten;
 - konservative Schutzregeln gegen Kompression durch neu erfundene Variablen-
@@ -66,9 +66,14 @@ Eine `KnownStructure` bindet:
 Der Kataloghash ist unabhängig von der Eingabereihenfolge. Ein Match hält den
 exakten Vorkommenspfad und die gerenderten Platzhalterbindungen fest. Ein
 bekannter Name allein ist nur ein Signal. `DOWNSTREAM_CAPABILITY_BRIDGE` wird
-erst vergeben, wenn eine neu exponierte Struktur eine konkrete, zuvor nicht
-verfügbare Konsequenz freischaltet und alle deklarierten Annahmen vorhanden
-sind.
+erst vergeben, wenn eine neu exponierte Struktur eine konkrete Konsequenz an
+einem zuvor nicht verfügbaren Strukturmatch freischaltet und alle deklarierten
+Annahmen vorhanden sind.
+
+Ein Capability-Unlock bindet deshalb nicht nur eine globale Regel-ID, sondern
+zusätzlich Struktur-ID, AST-Vorkommenspfad und Match-Identität. Wird dieselbe
+Regelfamilie an einer zweiten Stelle des Ausdrucks neu anwendbar, bleibt dies als
+eigenständige neue Möglichkeit sichtbar.
 
 ## Claim-Grenze
 
