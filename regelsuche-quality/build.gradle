@@ -54,34 +54,23 @@ def slowTestJson = rootProject.layout.buildDirectory.file(
 def slowTestMarkdown = rootProject.layout.buildDirectory.file(
     'reports/quality/slow-tests.md')
 
-// Gradle remains only the transitional checkout-wide producer of JUnit XML.
-// Model the precise Test-task outputs instead of the repository root so Gradle
-// can verify producer ownership without treating unrelated build artifacts as
-// implicit inputs. The Java implementation itself is compiled and tested by
-// the Maven reactor on the path toward issue #632's Maven-only target.
-def gradleJUnitXmlReports = rootProject.files()
-rootProject.subprojects.each { candidateProject ->
-    candidateProject.tasks
-        .withType(org.gradle.api.tasks.testing.Test)
-        .configureEach { testTask ->
-            gradleJUnitXmlReports.from(
-                testTask.reports.junitXml.outputLocation
-            )
-        }
-}
-
 tasks.register('reportSlowTests', JavaExec) {
     group = 'reporting'
-    description = 'Renders deterministic slow-test evidence from checkout JUnit XML in Java.'
+    description = 'Transitional adapter that renders slow-test evidence with the Maven-tested Java implementation.'
+
+    // Gradle remains only the temporary producer of the legacy checkout-wide
+    // JUnit XML corpus. The aggregate root test task already owns every Test
+    // task in the checkout. Keep this adapter deliberately free of additional
+    // Gradle input modelling: it always executes, and the Java implementation
+    // performs deterministic, fail-closed discovery after all tests complete.
+    // This avoids creating a second Gradle reporting contract while issue #632
+    // moves the authoritative lifecycle to Maven/JUnit.
     dependsOn rootProject.tasks.named('test'), tasks.named('classes')
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'de.regelsuche.quality.tests.SlowTestReportMain'
     args '--root', rootProject.projectDir.absolutePath,
         '--json-output', slowTestJson.get().asFile.absolutePath,
         '--markdown-output', slowTestMarkdown.get().asFile.absolutePath
-    inputs.files(gradleJUnitXmlReports)
-        .withPropertyName('gradleJUnitXmlReports')
-        .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
     outputs.file slowTestJson
     outputs.file slowTestMarkdown
     outputs.upToDateWhen { false }
