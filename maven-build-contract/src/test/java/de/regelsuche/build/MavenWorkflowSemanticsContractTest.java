@@ -1,6 +1,7 @@
 package de.regelsuche.build;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -35,73 +36,52 @@ class MavenWorkflowSemanticsContractTest {
             .build()
     );
 
-    private static final String EXPECTED_POLICY_SCHEMA =
+    private static final String POLICY_SCHEMA =
         "regelsuche.workflow-semantics-policy/v2";
-    private static final String EXPECTED_GOVERNANCE_SCHEMA =
+    private static final String GOVERNANCE_SCHEMA =
         "regelsuche.github-merge-governance-policy/v1";
-
     private static final Set<String> POLICY_FIELDS = Set.of(
-        "schema",
-        "maximumWorkflowCount",
-        "verificationWorkflows",
+        "schema", "maximumWorkflowCount", "verificationWorkflows",
         "platformWorkflows"
     );
     private static final Set<String> GOVERNANCE_FIELDS = Set.of(
-        "schema",
-        "defaultBranch",
-        "requiredStatusCheck",
-        "createEventCheckContext",
-        "routineBypassActors",
-        "currentUserCanBypass",
-        "requiredApprovingReviewCount",
+        "schema", "defaultBranch", "requiredStatusCheck",
+        "createEventCheckContext", "routineBypassActors",
+        "currentUserCanBypass", "requiredApprovingReviewCount",
         "requiredReviewThreadResolution"
     );
     private static final Set<String> REQUIRED_STATUS_FIELDS = Set.of(
-        "context",
-        "integrationId",
-        "strictUpToDate"
+        "context", "integrationId", "strictUpToDate"
     );
 
     private static final List<NamedPattern> TEXT_PATTERNS = List.of(
-        new NamedPattern(
+        named(
             "inline-interpreter-heredoc",
-            Pattern.compile("\\b(?:python3?|node|ruby|perl)\\s+-\\s*<<")
+            "\\b(?:python3?|node|ruby|perl)\\s+-\\s*<<"
         ),
-        new NamedPattern(
+        named(
             "manual-docker-lifecycle",
-            Pattern.compile("\\bdocker\\s+(?:build|run|compose)\\b")
+            "\\bdocker\\s+(?:build|run|compose)\\b"
         ),
-        new NamedPattern(
+        named(
             "fixed-host-port",
-            Pattern.compile(
-                "(?:^|\\s)-p\\s+\\d{2,5}:\\d{2,5}(?:\\s|$)"
-            )
+            "(?:^|\\s)-p\\s+\\d{2,5}:\\d{2,5}(?:\\s|$)"
         ),
-        new NamedPattern(
-            "github-service-fixture",
-            Pattern.compile("^\\s+services:\\s*$")
-        ),
-        new NamedPattern(
+        named("github-service-fixture", "^\\s+services:\\s*$"),
+        named(
             "direct-repository-script",
-            Pattern.compile(
-                "\\b(?:python3?|bash)\\s+(?:scripts/|reproduction/)"
-            )
+            "\\b(?:python3?|bash)\\s+(?:scripts/|reproduction/)"
         )
     );
     private static final List<String> ASSERTION_PREFIXES = List.of(
-        "grep ",
-        "test ",
-        "cmp ",
-        "diff ",
-        "git diff ",
-        "jq -e ",
-        "[ ",
-        "[[ "
+        "grep ", "test ", "cmp ", "diff ", "git diff ", "jq -e ",
+        "[ ", "[[ "
     );
     private static final Pattern GRADLE_INVOCATION =
         Pattern.compile("\\./gradlew\\b");
-    private static final Pattern CI_ENTRYPOINT =
-        Pattern.compile("\\bciCheck\\b");
+    private static final Pattern CI_TASK_ON_INVOCATION = Pattern.compile(
+        "(?:\\bciCheck\\b|\\$\\{?REGELSUCHE_CI_TASK\\}?)"
+    );
 
     @Test
     void repositoryWorkflowsSatisfyTheCheckoutOwnedContract()
@@ -112,16 +92,11 @@ class MavenWorkflowSemanticsContractTest {
         assertEquals(1, result.verificationWorkflowCount());
         assertEquals(1, result.platformWorkflowCount());
         assertEquals("Checkout-local ciCheck", result.requiredCheck());
-
         System.out.println(
             "workflowSemantics=VERIFIED workflows="
-                + result.workflowCount()
-                + "/"
-                + result.maximumWorkflowCount()
-                + " verification="
-                + result.verificationWorkflowCount()
-                + " platform="
-                + result.platformWorkflowCount()
+                + result.workflowCount() + "/" + result.maximumWorkflowCount()
+                + " verification=" + result.verificationWorkflowCount()
+                + " platform=" + result.platformWorkflowCount()
         );
     }
 
@@ -197,7 +172,6 @@ class MavenWorkflowSemanticsContractTest {
     @Test
     void workflowClassificationFailsClosed() {
         Policy policy = validPolicy();
-
         expectInvalid(
             () -> verifyClassification(
                 policy,
@@ -245,18 +219,10 @@ class MavenWorkflowSemanticsContractTest {
 
         MergeGovernance governance = validGovernance();
         for (Map.Entry<String, String> sample : samples.entrySet()) {
-            List<Violation> violations = scanVerificationWorkflow(
-                "gradle.yml",
+            assertViolation(
                 validWorkflow() + "\n" + sample.getValue() + "\n",
-                governance
-            );
-            assertTrue(
-                violations.stream().anyMatch(violation ->
-                    violation.category().equals(sample.getKey())),
-                () -> "missing "
-                    + sample.getKey()
-                    + " in "
-                    + violations
+                governance,
+                sample.getKey()
             );
         }
 
@@ -272,24 +238,27 @@ class MavenWorkflowSemanticsContractTest {
             governance,
             "too-many-gradle-entrypoints"
         );
+
+        String misleadingCiText = workflow(
+            "Checkout-local ciCheck",
+            "Showcase train-freeze authority v1",
+            "./gradlew test"
+        ) + "\n    env:\n      DISPLAY_LABEL: ciCheck\n";
         assertViolation(
-            workflow(
-                "Required verification",
-                "Create verification",
-                "./gradlew test"
-            ),
-            new MergeGovernance(
-                "main",
-                "Required verification",
-                15368,
-                true,
-                "Create verification",
-                "never",
-                0,
-                true
-            ),
+            misleadingCiText,
+            governance,
             "missing-ci-entrypoint"
         );
+        assertNoViolation(
+            workflow(
+                "Checkout-local ciCheck",
+                "Showcase train-freeze authority v1",
+                "./gradlew \"$REGELSUCHE_CI_TASK\""
+            ),
+            governance,
+            "missing-ci-entrypoint"
+        );
+
         assertViolation(
             validWorkflow().replace(
                 "Showcase train-freeze authority v1' || 'Checkout-local ciCheck",
@@ -300,18 +269,15 @@ class MavenWorkflowSemanticsContractTest {
         );
     }
 
-    private static VerificationResult verify(Path repositoryRoot)
-            throws IOException {
-        Path workflowDirectory = repositoryRoot.resolve(".github/workflows");
-        Policy policy = parsePolicy(parseStrict(repositoryRoot.resolve(
+    private static VerificationResult verify(Path root) throws IOException {
+        Path workflows = root.resolve(".github/workflows");
+        Policy policy = parsePolicy(parseStrict(root.resolve(
             "config/workflow-semantics-policy.json"
         )));
-        MergeGovernance governance = parseGovernance(parseStrict(
-            repositoryRoot.resolve(
-                "config/github-merge-governance-policy.json"
-            )
-        ));
-        List<String> actual = workflowNames(workflowDirectory);
+        MergeGovernance governance = parseGovernance(parseStrict(root.resolve(
+            "config/github-merge-governance-policy.json"
+        )));
+        List<String> actual = workflowNames(workflows);
         verifyClassification(policy, actual);
 
         List<Violation> violations = new ArrayList<>();
@@ -319,7 +285,7 @@ class MavenWorkflowSemanticsContractTest {
             violations.addAll(scanVerificationWorkflow(
                 workflow,
                 Files.readString(
-                    workflowDirectory.resolve(workflow),
+                    workflows.resolve(workflow),
                     StandardCharsets.UTF_8
                 ),
                 governance
@@ -330,13 +296,10 @@ class MavenWorkflowSemanticsContractTest {
                 "verification workflows contain checkout-owned semantics:\n"
                     + violations.stream()
                         .map(Violation::toString)
-                        .reduce(
-                            (left, right) -> left + "\n" + right
-                        )
+                        .reduce((left, right) -> left + "\n" + right)
                         .orElse("none")
             );
         }
-
         return new VerificationResult(
             actual.size(),
             policy.maximumWorkflowCount(),
@@ -350,7 +313,7 @@ class MavenWorkflowSemanticsContractTest {
         ObjectNode document = requireObject(value, "workflow policy");
         requireExactFields(document, POLICY_FIELDS, "workflow policy");
         requireEquals(
-            EXPECTED_POLICY_SCHEMA,
+            POLICY_SCHEMA,
             requiredText(document, "schema", "workflow policy"),
             "unsupported workflow policy schema"
         );
@@ -405,7 +368,7 @@ class MavenWorkflowSemanticsContractTest {
             "merge-governance policy"
         );
         requireEquals(
-            EXPECTED_GOVERNANCE_SCHEMA,
+            GOVERNANCE_SCHEMA,
             requiredText(document, "schema", "merge-governance policy"),
             "unsupported merge-governance policy schema"
         );
@@ -494,7 +457,6 @@ class MavenWorkflowSemanticsContractTest {
                 "requiredReviewThreadResolution must remain true"
             );
         }
-
         return new MergeGovernance(
             defaultBranch,
             requiredContext,
@@ -513,13 +475,11 @@ class MavenWorkflowSemanticsContractTest {
     ) {
         if (actual.size() > policy.maximumWorkflowCount()) {
             throw invalid(
-                "too many workflows: "
-                    + actual.size()
+                "too many workflows: " + actual.size()
                     + " present, maximum is "
                     + policy.maximumWorkflowCount()
             );
         }
-
         List<String> classified = Stream.concat(
             policy.verificationWorkflows().stream(),
             policy.platformWorkflows().stream()
@@ -531,9 +491,7 @@ class MavenWorkflowSemanticsContractTest {
             stale.removeAll(actual);
             throw invalid(
                 "workflow classifications differ: unclassified="
-                    + unclassified
-                    + " stale="
-                    + stale
+                    + unclassified + " stale=" + stale
             );
         }
     }
@@ -546,11 +504,10 @@ class MavenWorkflowSemanticsContractTest {
             );
         }
         try (Stream<Path> paths = Files.list(directory)) {
-            return paths
-                .filter(Files::isRegularFile)
+            return paths.filter(Files::isRegularFile)
                 .map(path -> path.getFileName().toString())
-                .filter(name -> name.endsWith(".yml")
-                    || name.endsWith(".yaml"))
+                .filter(name ->
+                    name.endsWith(".yml") || name.endsWith(".yaml"))
                 .sorted()
                 .toList();
         }
@@ -563,6 +520,7 @@ class MavenWorkflowSemanticsContractTest {
     ) {
         List<String> lines = text.lines().toList();
         List<Violation> violations = new ArrayList<>();
+        List<String> gradleLines = new ArrayList<>();
 
         for (int index = 0; index < lines.size(); index++) {
             String line = lines.get(index);
@@ -586,12 +544,12 @@ class MavenWorkflowSemanticsContractTest {
                     stripped
                 ));
             }
+            if (GRADLE_INVOCATION.matcher(line).find()) {
+                gradleLines.add(line);
+            }
         }
 
-        long invocationCount = GRADLE_INVOCATION.matcher(text)
-            .results()
-            .count();
-        if (invocationCount == 0) {
+        if (gradleLines.isEmpty()) {
             violations.add(new Violation(
                 workflow,
                 1,
@@ -599,22 +557,24 @@ class MavenWorkflowSemanticsContractTest {
                 "no checkout-local Gradle invocation found"
             ));
         }
-        if (invocationCount > 2) {
+        if (gradleLines.size() > 2) {
             violations.add(new Violation(
                 workflow,
                 1,
                 "too-many-gradle-entrypoints",
-                "found "
-                    + invocationCount
+                "found " + gradleLines.size()
                     + " Gradle invocations; expected at most two"
             ));
         }
-        if (!CI_ENTRYPOINT.matcher(text).find()) {
+        boolean invokesCiTask = gradleLines.stream().anyMatch(line ->
+            CI_TASK_ON_INVOCATION.matcher(line).find()
+        );
+        if (!invokesCiTask) {
             violations.add(new Violation(
                 workflow,
                 1,
                 "missing-ci-entrypoint",
-                "verification workflow does not invoke ciCheck"
+                "no Gradle invocation runs ciCheck or REGELSUCHE_CI_TASK"
             ));
         }
 
@@ -657,9 +617,7 @@ class MavenWorkflowSemanticsContractTest {
             return document;
         } catch (JsonProcessingException exception) {
             throw invalid(
-                "invalid JSON "
-                    + path
-                    + ": "
+                "invalid JSON " + path + ": "
                     + exception.getOriginalMessage(),
                 exception
             );
@@ -722,7 +680,9 @@ class MavenWorkflowSemanticsContractTest {
         if (value == null
                 || !value.isIntegralNumber()
                 || !value.canConvertToInt()) {
-            throw invalid(context + " field " + field + " must be an integer");
+            throw invalid(
+                context + " field " + field + " must be an integer"
+            );
         }
         return value.intValue();
     }
@@ -734,7 +694,9 @@ class MavenWorkflowSemanticsContractTest {
     ) {
         JsonNode value = object.get(field);
         if (value == null || !value.isBoolean()) {
-            throw invalid(context + " field " + field + " must be boolean");
+            throw invalid(
+                context + " field " + field + " must be boolean"
+            );
         }
         return value.booleanValue();
     }
@@ -752,9 +714,7 @@ class MavenWorkflowSemanticsContractTest {
         for (JsonNode value : values) {
             if (!value.isTextual() || value.asText().isBlank()) {
                 throw invalid(
-                    context
-                        + " field "
-                        + field
+                    context + " field " + field
                         + " must contain non-blank text"
                 );
             }
@@ -785,7 +745,7 @@ class MavenWorkflowSemanticsContractTest {
 
     private static ObjectNode validPolicyDocument() {
         ObjectNode policy = JSON.createObjectNode();
-        policy.put("schema", EXPECTED_POLICY_SCHEMA);
+        policy.put("schema", POLICY_SCHEMA);
         policy.put("maximumWorkflowCount", 2);
         policy.putArray("verificationWorkflows").add("gradle.yml");
         policy.putArray("platformWorkflows").add("release.yml");
@@ -798,7 +758,7 @@ class MavenWorkflowSemanticsContractTest {
 
     private static ObjectNode validGovernanceDocument() {
         ObjectNode governance = JSON.createObjectNode();
-        governance.put("schema", EXPECTED_GOVERNANCE_SCHEMA);
+        governance.put("schema", GOVERNANCE_SCHEMA);
         governance.put("defaultBranch", "main");
         ObjectNode required = governance.putObject("requiredStatusCheck");
         required.put("context", "Checkout-local ciCheck");
@@ -853,9 +813,33 @@ class MavenWorkflowSemanticsContractTest {
             governance
         );
         assertTrue(
-            violations.stream().anyMatch(violation ->
-                violation.category().equals(category)),
+            hasCategory(violations, category),
             () -> "missing " + category + " in " + violations
+        );
+    }
+
+    private static void assertNoViolation(
+        String text,
+        MergeGovernance governance,
+        String category
+    ) {
+        List<Violation> violations = scanVerificationWorkflow(
+            "gradle.yml",
+            text,
+            governance
+        );
+        assertFalse(
+            hasCategory(violations, category),
+            () -> "unexpected " + category + " in " + violations
+        );
+    }
+
+    private static boolean hasCategory(
+        List<Violation> violations,
+        String category
+    ) {
+        return violations.stream().anyMatch(violation ->
+            violation.category().equals(category)
         );
     }
 
@@ -871,12 +855,13 @@ class MavenWorkflowSemanticsContractTest {
             failure.getMessage().toLowerCase().contains(
                 fragment.toLowerCase()
             ),
-            () -> "expected <"
-                + fragment
-                + "> in <"
-                + failure.getMessage()
-                + ">"
+            () -> "expected <" + fragment + "> in <"
+                + failure.getMessage() + ">"
         );
+    }
+
+    private static NamedPattern named(String category, String pattern) {
+        return new NamedPattern(category, Pattern.compile(pattern));
     }
 
     private static Path repositoryRoot() {
@@ -931,13 +916,7 @@ class MavenWorkflowSemanticsContractTest {
     ) {
         @Override
         public String toString() {
-            return workflow
-                + ":"
-                + line
-                + ": "
-                + category
-                + ": "
-                + excerpt;
+            return workflow + ":" + line + ": " + category + ": " + excerpt;
         }
     }
 
