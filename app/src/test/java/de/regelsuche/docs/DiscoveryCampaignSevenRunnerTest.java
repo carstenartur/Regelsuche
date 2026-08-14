@@ -64,16 +64,26 @@ class DiscoveryCampaignSevenRunnerTest {
     }
 
     @Test
-    void campaignSevenWritesCandidateReports(@TempDir Path tempDir) {
-        new DiscoveryCampaignSevenRunner().writeReport(tempDir);
+    void campaignSevenWritesCandidateReports(
+        DiscoveryPromotionPipelineFixture fixture,
+        @TempDir Path tempDir
+    ) throws Exception {
+        new DiscoveryCampaignSevenRunner().writeReport(
+            tempDir,
+            fixture.report().campaignSeven()
+        );
 
-        assertTrue(Files.exists(
-            tempDir.resolve("discovery-campaign-7.json")
-        ));
-        assertTrue(Files.exists(tempDir.resolve("campaign-progress.md")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-candidates.md")));
-        assertTrue(Files.exists(tempDir.resolve("operator-suggestions.md")));
-        assertTrue(Files.exists(tempDir.resolve("macro-candidates.md")));
+        assertReproducedFiles(
+            fixture.campaignDirectory("discovery-campaign-7"),
+            tempDir,
+            List.of(
+                "discovery-campaign-7.json",
+                "campaign-progress.md",
+                "discovery-candidates.md",
+                "operator-suggestions.md",
+                "macro-candidates.md"
+            )
+        );
     }
 
     @Test
@@ -370,5 +380,21 @@ class DiscoveryCampaignSevenRunnerTest {
             "rsf-x2-plus-x with NEW novelty must be accepted by the public evidence gate: "
                 + decision.rejectionReasons()
         );
+    }
+
+    private void assertReproducedFiles(
+        Path retainedDirectory,
+        Path reproducedDirectory,
+        List<String> fileNames
+    ) throws Exception {
+        for (String fileName : fileNames) {
+            Path expected = retainedDirectory.resolve(fileName);
+            Path actual = reproducedDirectory.resolve(fileName);
+            assertTrue(Files.isRegularFile(actual), fileName);
+            assertTrue(
+                Files.mismatch(expected, actual) == -1L,
+                fileName + " must reproduce retained fixture bytes"
+            );
+        }
     }
 }
