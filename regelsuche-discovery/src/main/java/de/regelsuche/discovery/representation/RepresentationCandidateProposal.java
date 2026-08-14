@@ -13,12 +13,13 @@ public record RepresentationCandidateProposal(
     CandidateProofStatus validationStatus
 ) {
     public RepresentationCandidateProposal {
-        sourceExpression = RepresentationContracts.text(
+        sourceExpression = RepresentationCandidateAssessment.requireText(
             sourceExpression, "sourceExpression");
-        candidateExpression = RepresentationContracts.text(
+        candidateExpression = RepresentationCandidateAssessment.requireText(
             candidateExpression, "candidateExpression");
         occurrencePath = Objects.requireNonNull(occurrencePath, "occurrencePath");
-        assumptions = RepresentationContracts.sortedUnique(assumptions, "assumptions");
+        assumptions = RepresentationCandidateAssessment.sortedUnique(
+            assumptions, "assumptions");
         validationStatus = validationStatus == null
             ? CandidateProofStatus.OBSERVED
             : validationStatus;
