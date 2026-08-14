@@ -1,12 +1,28 @@
 package de.regelsuche.discovery.representation;
 
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.COMPRESSION_BLOCKED_BY_INTRODUCED_SYMBOLS;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.COMPRESSION_MATERIAL_MULTI_DIMENSIONAL;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.COMPRESSION_NON_MATERIAL;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_DOWNSTREAM_CAPABILITY_BRIDGE;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_KNOWN_SUBFORM_BRIDGE;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_KNOWN_WHOLE_FORM_BRIDGE;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_NO_MATERIAL_REPRESENTATION_GAIN;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_SUBEXPRESSION_COMPRESSION;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_WHOLE_EXPRESSION_COMPRESSION;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_INTRODUCED_FUNCTION_SYMBOLS;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_INTRODUCED_VARIABLE_SYMBOLS;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_STRUCTURAL_COMPRESSION_REGRESSION;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION;
+
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -58,10 +74,10 @@ public final class RepresentationCandidateAssessor {
             wholeCandidate.variableSymbols(), wholeSource.variableSymbols());
         List<String> introducedFunctions = difference(
             wholeCandidate.functionSymbols(), wholeSource.functionSymbols());
-        SemanticCompressionStatus compressionStatus = compressionStatus(
+        String compressionStatus = compressionStatus(
             scopedDelta, wholeDelta, introducedVariables, introducedFunctions);
-        boolean materialCompression = compressionStatus
-            == SemanticCompressionStatus.MATERIAL_MULTI_DIMENSIONAL;
+        boolean materialCompression =
+            COMPRESSION_MATERIAL_MULTI_DIMENSIONAL.equals(compressionStatus);
 
         List<KnownStructureMatch> sourceMatches = matcher.match(sourceRoot);
         List<KnownStructureMatch> candidateMatches = matcher.match(candidateRoot);
@@ -69,7 +85,7 @@ public final class RepresentationCandidateAssessor {
             sourceMatches, candidateMatches);
         List<KnownStructureConsequenceUnlock> unlocks = unlocks(
             sourceMatches, newMatches, proposal.assumptions());
-        List<RepresentationCandidateType> types = candidateTypes(
+        List<String> types = candidateTypes(
             wholeExpression, materialCompression, newMatches, unlocks);
         boolean materialGain = materialCompression || !unlocks.isEmpty();
         boolean claimEligible = materialGain && proposal.validationStatus().atLeast(
@@ -105,47 +121,46 @@ public final class RepresentationCandidateAssessor {
         );
     }
 
-    private static SemanticCompressionStatus compressionStatus(
+    private static String compressionStatus(
         SemanticCompressionDelta scoped,
         SemanticCompressionDelta whole,
         List<String> introducedVariables,
         List<String> introducedFunctions
     ) {
         if (scoped.improvedDimensions().size() < MINIMUM_IMPROVED_DIMENSIONS) {
-            return SemanticCompressionStatus.NON_MATERIAL;
+            return COMPRESSION_NON_MATERIAL;
         }
         if (!introducedVariables.isEmpty() || !introducedFunctions.isEmpty()) {
-            return SemanticCompressionStatus.BLOCKED_BY_INTRODUCED_SYMBOLS;
+            return COMPRESSION_BLOCKED_BY_INTRODUCED_SYMBOLS;
         }
         return scoped.hasStructuralRegression() || whole.hasStructuralRegression()
-            ? SemanticCompressionStatus.BLOCKED_BY_STRUCTURAL_REGRESSION
-            : SemanticCompressionStatus.MATERIAL_MULTI_DIMENSIONAL;
+            ? COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION
+            : COMPRESSION_MATERIAL_MULTI_DIMENSIONAL;
     }
 
-    private static List<RepresentationCandidateType> candidateTypes(
+    private static List<String> candidateTypes(
         boolean wholeExpression,
         boolean materialCompression,
         List<KnownStructureMatch> newMatches,
         List<KnownStructureConsequenceUnlock> unlocks
     ) {
-        EnumSet<RepresentationCandidateType> types =
-            EnumSet.noneOf(RepresentationCandidateType.class);
+        TreeSet<String> types = new TreeSet<>();
         if (materialCompression) {
             types.add(wholeExpression
-                ? RepresentationCandidateType.WHOLE_EXPRESSION_COMPRESSION
-                : RepresentationCandidateType.SUBEXPRESSION_COMPRESSION);
+                ? TYPE_WHOLE_EXPRESSION_COMPRESSION
+                : TYPE_SUBEXPRESSION_COMPRESSION);
         }
         if (newMatches.stream().anyMatch(KnownStructureMatch::wholeExpression)) {
-            types.add(RepresentationCandidateType.KNOWN_WHOLE_FORM_BRIDGE);
+            types.add(TYPE_KNOWN_WHOLE_FORM_BRIDGE);
         }
         if (newMatches.stream().anyMatch(match -> !match.wholeExpression())) {
-            types.add(RepresentationCandidateType.KNOWN_SUBFORM_BRIDGE);
+            types.add(TYPE_KNOWN_SUBFORM_BRIDGE);
         }
         if (!unlocks.isEmpty()) {
-            types.add(RepresentationCandidateType.DOWNSTREAM_CAPABILITY_BRIDGE);
+            types.add(TYPE_DOWNSTREAM_CAPABILITY_BRIDGE);
         }
         if (types.isEmpty()) {
-            types.add(RepresentationCandidateType.NO_MATERIAL_REPRESENTATION_GAIN);
+            types.add(TYPE_NO_MATERIAL_REPRESENTATION_GAIN);
         }
         return List.copyOf(types);
     }
@@ -209,42 +224,36 @@ public final class RepresentationCandidateAssessor {
         return activeAssumptions.containsAll(match.requiredAssumptions());
     }
 
-    private static List<RepresentationAssessmentWarning> warnings(
+    private static List<String> warnings(
         RepresentationCandidateProposal proposal,
-        SemanticCompressionStatus compressionStatus,
+        String compressionStatus,
         List<String> introducedVariables,
         List<String> introducedFunctions,
         List<KnownStructureMatch> newMatches,
         List<KnownStructureConsequenceUnlock> unlocks
     ) {
-        EnumSet<RepresentationAssessmentWarning> warnings =
-            EnumSet.noneOf(RepresentationAssessmentWarning.class);
+        TreeSet<String> warnings = new TreeSet<>();
         if (!introducedVariables.isEmpty()) {
-            warnings.add(RepresentationAssessmentWarning.INTRODUCED_VARIABLE_SYMBOLS);
+            warnings.add(WARNING_INTRODUCED_VARIABLE_SYMBOLS);
         }
         if (!introducedFunctions.isEmpty()) {
-            warnings.add(RepresentationAssessmentWarning.INTRODUCED_FUNCTION_SYMBOLS);
+            warnings.add(WARNING_INTRODUCED_FUNCTION_SYMBOLS);
         }
-        if (compressionStatus
-                == SemanticCompressionStatus.BLOCKED_BY_STRUCTURAL_REGRESSION) {
-            warnings.add(
-                RepresentationAssessmentWarning.STRUCTURAL_COMPRESSION_REGRESSION);
+        if (COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION.equals(
+                compressionStatus)) {
+            warnings.add(WARNING_STRUCTURAL_COMPRESSION_REGRESSION);
         }
         Set<String> assumptions = Set.copyOf(proposal.assumptions());
         if (newMatches.stream().anyMatch(
                 match -> !assumptionsSatisfied(match, assumptions))) {
-            warnings.add(
-                RepresentationAssessmentWarning
-                    .UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS);
+            warnings.add(WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS);
         }
         if (!newMatches.isEmpty() && unlocks.isEmpty()) {
-            warnings.add(
-                RepresentationAssessmentWarning.KNOWN_FORM_WITHOUT_NEW_CAPABILITY);
+            warnings.add(WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY);
         }
         if (!proposal.validationStatus().atLeast(
                 CandidateProofStatus.SYMBOLICALLY_VERIFIED)) {
-            warnings.add(
-                RepresentationAssessmentWarning.VALIDATION_BELOW_SYMBOLIC_CONFIRMATION);
+            warnings.add(WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION);
         }
         return List.copyOf(warnings);
     }
