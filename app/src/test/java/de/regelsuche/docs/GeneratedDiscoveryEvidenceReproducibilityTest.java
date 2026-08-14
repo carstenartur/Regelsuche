@@ -2,16 +2,19 @@ package de.regelsuche.docs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class GeneratedDiscoveryEvidenceReproducibilityTest {
     private static final String[] VOLATILE_COMMIT_FIELDS = {
@@ -20,61 +23,228 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
         "\"headSha\"",
         "\"commitSha\""
     };
+    private static final Path GALLERY_PATH = Path.of(
+        "docs/demo-gallery.md"
+    );
+    private static final Path GENERATED_PATH = Path.of(
+        "docs/generated/discovery"
+    );
 
     @Test
-    void regeneratingDiscoveryGalleryIsDeterministic() throws IOException {
-        Path repoRoot = locateRepoRoot();
-        new DocsDiscoveryGalleryGenerator().generate(repoRoot);
-        Map<String, String> first = snapshot(repoRoot);
+    void regeneratingDiscoveryGalleryIsDeterministicAndMatchesCheckout(
+        @TempDir Path temporary
+    ) throws IOException {
+        Path repository = repositoryRoot();
+        Path first = temporary.resolve("first");
+        Path second = temporary.resolve("second");
 
-        new DocsDiscoveryGalleryGenerator().generate(repoRoot);
-        Map<String, String> second = snapshot(repoRoot);
-        assertEquals(first, second, "Consecutive gallery generations must be deterministic.");
-        assertNoVolatileCommitFields(second);
+        DocsDiscoveryGalleryGenerator generator =
+            new DocsDiscoveryGalleryGenerator();
+        generator.generate(first);
+        generator.generate(second);
+
+        assertArtifactTreesEqual(repository, first);
+        assertArtifactTreesEqual(first, second);
+        assertNoVolatileCommitFields(artifactFiles(first));
     }
 
     @Test
-    void committedDiscoveryEvidenceDoesNotContainVolatileCommitFields() throws IOException {
-        Path repoRoot = locateRepoRoot();
-        assertNoVolatileCommitFields(snapshot(repoRoot));
+    void committedDiscoveryEvidenceDoesNotContainVolatileCommitFields()
+            throws IOException {
+        assertNoVolatileCommitFields(artifactFiles(repositoryRoot()));
     }
 
-    private Map<String, String> snapshot(Path repoRoot) throws IOException {
-        LinkedHashMap<String, String> files = new LinkedHashMap<>();
-        files.put("README.md", Files.readString(repoRoot.resolve("README.md"), StandardCharsets.UTF_8));
-        files.put("docs/demo-gallery.md", Files.readString(repoRoot.resolve("docs/demo-gallery.md"), StandardCharsets.UTF_8));
-        Path generated = repoRoot.resolve("docs/generated/discovery");
+    @Test
+    void artifactComparisonRejectsByteAndMembershipDrift(
+        @TempDir Path temporary
+    ) throws IOException {
+        Path expected = temporary.resolve("expected");
+        Path actual = temporary.resolve("actual");
+        seedSyntheticRoot(expected, "expected\n");
+        seedSyntheticRoot(actual, "changed\n");
+
+        assertThrows(
+            AssertionError.class,
+            () -> assertArtifactTreesEqual(expected, actual)
+        );
+
+        Path actualGenerated = actual.resolve(GENERATED_PATH);
+        Files.writeString(
+            actualGenerated.resolve("evidence.json"),
+            "expected\n",
+            StandardCharsets.UTF_8
+        );
+        Path unexpected = actualGenerated.resolve("unexpected.json");
+        Files.writeString(
+            unexpected,
+            "{}\n",
+            StandardCharsets.UTF_8
+        );
+        assertThrows(
+            AssertionError.class,
+            () -> assertArtifactTreesEqual(expected, actual)
+        );
+
+        Files.delete(unexpected);
+        Files.delete(actualGenerated.resolve("evidence.json"));
+        assertThrows(
+            AssertionError.class,
+            () -> assertArtifactTreesEqual(expected, actual)
+        );
+    }
+
+    private static void seedSyntheticRoot(Path root, String evidence)
+            throws IOException {
+        Files.createDirectories(root.resolve(GENERATED_PATH));
+        Files.createDirectories(root.resolve(GALLERY_PATH).getParent());
+        Files.writeString(
+            root.resolve(GALLERY_PATH),
+            "gallery\n",
+            StandardCharsets.UTF_8
+        );
+        Files.writeString(
+            root.resolve(GENERATED_PATH).resolve("evidence.json"),
+            evidence,
+            StandardCharsets.UTF_8
+        );
+    }
+
+    private static void assertArtifactTreesEqual(
+        Path expectedRoot,
+        Path actualRoot
+    ) throws IOException {
+        Map<String, Path> expected = artifactFiles(expectedRoot);
+        Map<String, Path> actual = artifactFiles(actualRoot);
+        assertEquals(
+            expected.keySet(),
+            actual.keySet(),
+            "generated gallery file set differs"
+        );
+        for (String relative : expected.keySet()) {
+            long mismatch = Files.mismatch(
+                expected.get(relative),
+                actual.get(relative)
+            );
+            assertEquals(
+                -1L,
+                mismatch,
+                "generated bytes differ at offset "
+                    + mismatch
+                    + ": "
+                    + relative
+            );
+        }
+    }
+
+    private static Map<String, Path> artifactFiles(Path root)
+            throws IOException {
+        Map<String, Path> files = new TreeMap<>();
+        addRegularFile(files, root, GALLERY_PATH);
+
+        requireNoSymbolicComponents(root, GENERATED_PATH);
+        Path generated = root.resolve(GENERATED_PATH);
+        assertTrue(
+            Files.isDirectory(generated, LinkOption.NOFOLLOW_LINKS),
+            "generated discovery directory is missing: " + generated
+        );
         try (Stream<Path> paths = Files.walk(generated)) {
-            for (Path file : paths.filter(Files::isRegularFile).sorted().toList()) {
-                String relative = generated.relativize(file).toString().replace('\\', '/');
-                files.put("docs/generated/discovery/" + relative, Files.readString(file, StandardCharsets.UTF_8));
+            for (Path path : paths.sorted().toList()) {
+                if (path.equals(generated)) {
+                    continue;
+                }
+                assertFalse(
+                    Files.isSymbolicLink(path),
+                    "generated tree must not contain symbolic paths: "
+                        + path
+                );
+                if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+                    continue;
+                }
+                assertTrue(
+                    Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS),
+                    "generated tree contains unsupported path type: " + path
+                );
+                String relative = GENERATED_PATH.resolve(
+                    generated.relativize(path)
+                ).toString().replace('\\', '/');
+                files.put(relative, path);
             }
         }
+        assertTrue(
+            files.size() > 1,
+            "generated gallery must contain files below " + GENERATED_PATH
+        );
         return Map.copyOf(files);
     }
 
-    private static Path locateRepoRoot() {
-        Path candidate = Paths.get(".").toAbsolutePath().normalize();
-        for (int i = 0; i < 6; i++) {
-            if (Files.exists(candidate.resolve("README.md")) && Files.exists(candidate.resolve("settings.gradle"))) {
+    private static void addRegularFile(
+        Map<String, Path> files,
+        Path root,
+        Path relative
+    ) {
+        requireNoSymbolicComponents(root, relative);
+        Path path = root.resolve(relative);
+        assertTrue(
+            Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS),
+            "generated file is missing or non-regular: " + relative
+        );
+        files.put(relative.toString().replace('\\', '/'), path);
+    }
+
+    private static void requireNoSymbolicComponents(
+        Path root,
+        Path relative
+    ) {
+        Path current = root;
+        for (Path component : relative) {
+            current = current.resolve(component);
+            assertFalse(
+                Files.isSymbolicLink(current),
+                "generated path contains a symbolic component: " + relative
+            );
+        }
+    }
+
+    private static Path repositoryRoot() {
+        String configured = System.getProperty("regelsuche.repositoryRoot");
+        if (configured != null && !configured.isBlank()) {
+            return Path.of(configured).toAbsolutePath().normalize();
+        }
+        Path candidate = Path.of(".").toAbsolutePath().normalize();
+        for (int index = 0; index < 8 && candidate != null; index++) {
+            if (Files.isRegularFile(
+                    candidate.resolve("README.md"),
+                    LinkOption.NOFOLLOW_LINKS
+                ) && Files.isRegularFile(
+                    candidate.resolve("pom.xml"),
+                    LinkOption.NOFOLLOW_LINKS
+                )) {
                 return candidate;
             }
             candidate = candidate.getParent();
-            if (candidate == null) {
-                break;
-            }
         }
-        throw new IllegalStateException("Could not locate repository root");
+        throw new AssertionError("Could not locate repository root");
     }
 
-    private static void assertNoVolatileCommitFields(Map<String, String> files) {
-        for (Map.Entry<String, String> entry : files.entrySet()) {
-            if (!entry.getKey().startsWith("docs/generated/discovery/")) {
+    private static void assertNoVolatileCommitFields(
+        Map<String, Path> files
+    ) throws IOException {
+        for (Map.Entry<String, Path> entry : files.entrySet()) {
+            if (!entry.getKey().startsWith(
+                    GENERATED_PATH.toString().replace('\\', '/') + "/")) {
                 continue;
             }
+            String content = Files.readString(
+                entry.getValue(),
+                StandardCharsets.UTF_8
+            );
             for (String field : VOLATILE_COMMIT_FIELDS) {
-                assertFalse(entry.getValue().contains(field),
-                        () -> entry.getKey() + " must not contain volatile field " + field);
+                assertFalse(
+                    content.contains(field),
+                    () -> entry.getKey()
+                        + " must not contain volatile field "
+                        + field
+                );
             }
         }
     }
