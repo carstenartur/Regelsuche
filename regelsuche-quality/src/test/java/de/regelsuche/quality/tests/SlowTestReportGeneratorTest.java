@@ -48,6 +48,18 @@ class SlowTestReportGeneratorTest {
         );
         writeSuite(
             root.resolve(
+                "module-f/build/test-results/test/TEST-ranking.xml"
+            ),
+            """
+            <testsuite>
+              <testcase classname="z.Accumulated" name="part-one" time="0.1"/>
+              <testcase classname="z.Accumulated" name="part-two" time="0.2"/>
+              <testcase classname="a.Direct" name="direct" time="0.3"/>
+            </testsuite>
+            """
+        );
+        writeSuite(
+            root.resolve(
                 "module-c/build/test-results/test/TEST-broken.xml"
             ),
             "<testsuite><testcase"
@@ -105,9 +117,9 @@ class SlowTestReportGeneratorTest {
         );
 
         assertEquals(report, repeated);
-        assertEquals(2, report.suiteCount());
-        assertEquals(4, report.testCount());
-        assertEquals(13.373457d, report.totalTestSeconds());
+        assertEquals(3, report.suiteCount());
+        assertEquals(7, report.testCount());
+        assertEquals(13.973457d, report.totalTestSeconds());
         assertEquals(2, report.slowTestCount());
         assertEquals(3, report.slowestTests().size());
         assertEquals(
@@ -128,6 +140,14 @@ class SlowTestReportGeneratorTest {
         assertEquals("module-a", report.slowestClasses().get(1).module());
         assertEquals(6.25d, report.slowestClasses().get(1).seconds());
         assertEquals(2, report.slowestClasses().get(1).testCount());
+        assertEquals("module-f", report.slowestClasses().get(2).module());
+        assertEquals(
+            "z.Accumulated",
+            report.slowestClasses().get(2).className(),
+            "0.1 + 0.2 must rank by its unrounded sum before a direct 0.3"
+        );
+        assertEquals(0.3d, report.slowestClasses().get(2).seconds());
+        assertEquals(2, report.slowestClasses().get(2).testCount());
 
         assertEquals(
             -1L,
@@ -145,8 +165,8 @@ class SlowTestReportGeneratorTest {
             SlowTestReportGenerator.SCHEMA,
             json.path("schema").asText()
         );
-        assertEquals(2, json.path("suiteCount").asInt());
-        assertEquals(4, json.path("testCount").asInt());
+        assertEquals(3, json.path("suiteCount").asInt());
+        assertEquals(7, json.path("testCount").asInt());
         assertEquals(2, json.path("slowTestCount").asInt());
         assertTrue(
             json.path("slowestTests").get(0).path("failed").asBoolean()
@@ -161,7 +181,7 @@ class SlowTestReportGeneratorTest {
             StandardCharsets.UTF_8
         );
         assertTrue(markdown.contains(
-            "Parsed **4** tests from **2** JUnit suites."
+            "Parsed **7** tests from **3** JUnit suites."
         ));
         assertTrue(markdown.contains(
             "Tests at or above **5.0s**: **2**."
@@ -171,6 +191,9 @@ class SlowTestReportGeneratorTest {
         ));
         assertTrue(markdown.contains(
             "| 6.250 | 2 | `module-a` | `a.Class` |"
+        ));
+        assertTrue(markdown.contains(
+            "| 0.300 | 2 | `module-f` | `z.Accumulated` |"
         ));
     }
 
