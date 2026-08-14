@@ -18,17 +18,16 @@ public record KnownStructureMatch(
     String provenance
 ) {
     public KnownStructureMatch {
-        structureId = requireText(structureId, "structureId");
-        domainId = requireText(domainId, "domainId");
+        structureId = RepresentationContracts.text(structureId, "structureId");
+        domainId = RepresentationContracts.text(domainId, "domainId");
         occurrencePath = Objects.requireNonNull(occurrencePath, "occurrencePath");
-        Objects.requireNonNull(bindings, "bindings");
-        bindings = Collections.unmodifiableMap(
-            new LinkedHashMap<>(new TreeMap<>(bindings)));
-        requiredAssumptions = List.copyOf(
-            Objects.requireNonNull(requiredAssumptions, "requiredAssumptions"));
-        consequenceIds = List.copyOf(
-            Objects.requireNonNull(consequenceIds, "consequenceIds"));
-        provenance = requireText(provenance, "provenance");
+        bindings = Collections.unmodifiableMap(new LinkedHashMap<>(
+            new TreeMap<>(Objects.requireNonNull(bindings, "bindings"))));
+        requiredAssumptions = RepresentationContracts.sortedUnique(
+            requiredAssumptions, "requiredAssumptions");
+        consequenceIds = RepresentationContracts.sortedUnique(
+            consequenceIds, "consequenceIds");
+        provenance = RepresentationContracts.text(provenance, "provenance");
     }
 
     public boolean wholeExpression() {
@@ -36,23 +35,7 @@ public record KnownStructureMatch(
     }
 
     public String identity() {
-        StringBuilder identity = new StringBuilder(structureId)
-            .append('|')
-            .append(occurrencePath.canonical());
-        bindings.forEach((name, value) -> identity
-            .append('|')
-            .append(name)
-            .append('=')
-            .append(value));
-        return identity.toString();
-    }
-
-    private static String requireText(String value, String field) {
-        Objects.requireNonNull(value, field);
-        String normalized = value.trim();
-        if (normalized.isEmpty()) {
-            throw new IllegalArgumentException(field + " must not be blank");
-        }
-        return normalized;
+        return structureId + "\u0000" + occurrencePath.canonical()
+            + "\u0000" + bindings;
     }
 }
