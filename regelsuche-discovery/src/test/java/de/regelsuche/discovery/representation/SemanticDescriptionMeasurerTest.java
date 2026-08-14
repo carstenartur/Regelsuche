@@ -1,8 +1,13 @@
 package de.regelsuche.discovery.representation;
 
+import static de.regelsuche.ast.BinaryOperator.ADD;
+import static de.regelsuche.ast.BinaryOperator.MUL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import org.junit.jupiter.api.Test;
 
 class SemanticDescriptionMeasurerTest {
@@ -20,6 +25,17 @@ class SemanticDescriptionMeasurerTest {
             metrics.semanticValueOccurrences() - metrics.distinctSemanticValues(),
             metrics.repeatedSemanticValueSavings());
         assertTrue(metrics.variableSymbols().contains("x"));
+    }
+
+    @Test
+    void countsSharedAstObjectAtEverySyntaxPosition() {
+        var shared = new BinaryExpr(new VariableExpr("x"), ADD, new NumberExpr(1));
+        var root = new BinaryExpr(shared, MUL, shared);
+
+        SemanticDescriptionMetrics metrics = measurer.measure(root);
+
+        assertEquals(metrics.astNodeCount(), metrics.semanticValueOccurrences());
+        assertTrue(metrics.repeatedSemanticValueSavings() > 0);
     }
 
     @Test
