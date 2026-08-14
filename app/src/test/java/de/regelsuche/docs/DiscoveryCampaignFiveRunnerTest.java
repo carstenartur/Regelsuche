@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
@@ -143,13 +144,22 @@ class DiscoveryCampaignFiveRunnerTest {
 
     @Test
     void campaignFiveWritesMoveTreeReportWithRewriteMoves(
+        DiscoveryPromotionPipelineFixture fixture,
         @TempDir Path tempDir
     ) throws Exception {
         DiscoveryCampaignFiveRunner runner = new DiscoveryCampaignFiveRunner();
-        runner.writeReport(tempDir);
+        runner.writeReport(tempDir, fixture.report().campaignFive());
 
-        assertTrue(Files.exists(tempDir.resolve("move-tree-report.json")));
-        assertTrue(Files.exists(tempDir.resolve("move-tree-report.md")));
+        assertReproducedFiles(
+            fixture.campaignDirectory("discovery-campaign-5"),
+            tempDir,
+            List.of(
+                "discovery-campaign-5.json",
+                "hidden-structure-report.md",
+                "move-tree-report.json",
+                "move-tree-report.md"
+            )
+        );
 
         String moveTreeJson = Files.readString(
             tempDir.resolve("move-tree-report.json"),
@@ -173,5 +183,31 @@ class DiscoveryCampaignFiveRunnerTest {
         assertTrue(moveTree.successfulPathMoves().stream().anyMatch(move ->
                 !move.operatorId().isBlank() || !move.assumptions().isEmpty()),
             "expected successful-path moves to retain edge metadata");
+    }
+
+    private void assertReproducedFiles(
+        Path retainedDirectory,
+        Path reproducedDirectory,
+        List<String> fileNames
+    ) throws Exception {
+        for (String fileName : fileNames) {
+            Path expected = retainedDirectory.resolve(fileName);
+            Path actual = reproducedDirectory.resolve(fileName);
+            assertTrue(
+                Files.isRegularFile(expected, LinkOption.NOFOLLOW_LINKS),
+                "missing or non-regular retained fixture file: " + fileName
+            );
+            assertTrue(
+                Files.isRegularFile(actual, LinkOption.NOFOLLOW_LINKS),
+                "missing or non-regular reproduced file: " + fileName
+            );
+            long mismatch = Files.mismatch(expected, actual);
+            assertTrue(
+                mismatch == -1L,
+                () -> fileName
+                    + " differs from retained fixture at byte offset "
+                    + mismatch
+            );
+        }
     }
 }

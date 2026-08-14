@@ -7,6 +7,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -99,16 +100,26 @@ class DiscoveryCampaignNineRunnerTest {
     }
 
     @Test
-    void campaignNineWritesCandidateReports(@TempDir Path tempDir) {
-        new DiscoveryCampaignNineRunner().writeReport(tempDir);
+    void campaignNineWritesCandidateReports(
+        DiscoveryPromotionPipelineFixture fixture,
+        @TempDir Path tempDir
+    ) throws Exception {
+        new DiscoveryCampaignNineRunner().writeReport(
+            tempDir,
+            fixture.report().campaignNine()
+        );
 
-        assertTrue(Files.exists(
-            tempDir.resolve("discovery-campaign-9.json")
-        ));
-        assertTrue(Files.exists(tempDir.resolve("campaign-progress.md")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-candidates.md")));
-        assertTrue(Files.exists(tempDir.resolve("operator-suggestions.md")));
-        assertTrue(Files.exists(tempDir.resolve("macro-candidates.md")));
+        assertReproducedFiles(
+            fixture.campaignDirectory("discovery-campaign-9"),
+            tempDir,
+            List.of(
+                "discovery-campaign-9.json",
+                "campaign-progress.md",
+                "discovery-candidates.md",
+                "operator-suggestions.md",
+                "macro-candidates.md"
+            )
+        );
     }
 
     @Test
@@ -295,6 +306,32 @@ class DiscoveryCampaignNineRunnerTest {
                         + result.id()
                 );
             }
+        }
+    }
+
+    private void assertReproducedFiles(
+        Path retainedDirectory,
+        Path reproducedDirectory,
+        List<String> fileNames
+    ) throws Exception {
+        for (String fileName : fileNames) {
+            Path expected = retainedDirectory.resolve(fileName);
+            Path actual = reproducedDirectory.resolve(fileName);
+            assertTrue(
+                Files.isRegularFile(expected, LinkOption.NOFOLLOW_LINKS),
+                "missing or non-regular retained fixture file: " + fileName
+            );
+            assertTrue(
+                Files.isRegularFile(actual, LinkOption.NOFOLLOW_LINKS),
+                "missing or non-regular reproduced file: " + fileName
+            );
+            long mismatch = Files.mismatch(expected, actual);
+            assertTrue(
+                mismatch == -1L,
+                () -> fileName
+                    + " differs from retained fixture at byte offset "
+                    + mismatch
+            );
         }
     }
 
