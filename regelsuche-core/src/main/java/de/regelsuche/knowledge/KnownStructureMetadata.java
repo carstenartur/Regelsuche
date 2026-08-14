@@ -2,93 +2,69 @@ package de.regelsuche.knowledge;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.TreeSet;
 
-/** Structured provenance and capability policy for one known mathematical structure. */
+/** Source and policy metadata retained with one imported mathematical form. */
 public record KnownStructureMetadata(
-    String sourceProject,
-    String license,
-    String sourceUrl,
-    String sourceVersion,
-    String sourceReference,
-    String translationNotes,
-    List<String> enabledRulePackIds,
-    List<String> compatibleBackendIds,
+    String sourceProject, String license, String sourceUrl,
+    String sourceVersion, String sourceReference, String translationNotes,
+    List<String> enabledRulePackIds, List<String> compatibleBackendIds,
     KnownStructureEvidence minimumEvidence
 ) {
     public KnownStructureMetadata {
-        sourceProject = requireText(sourceProject, "sourceProject");
-        license = requireText(license, "license");
-        sourceUrl = requireText(sourceUrl, "sourceUrl");
-        sourceVersion = requireText(sourceVersion, "sourceVersion");
-        sourceReference = requireText(sourceReference, "sourceReference");
-        translationNotes = requireText(translationNotes, "translationNotes");
-        enabledRulePackIds = sortedUnique(
-            enabledRulePackIds, "enabledRulePackIds");
-        compatibleBackendIds = sortedUnique(
-            compatibleBackendIds, "compatibleBackendIds");
-        minimumEvidence = Objects.requireNonNull(
-            minimumEvidence, "minimumEvidence");
+        sourceProject = text(sourceProject, "sourceProject");
+        license = text(license, "license");
+        sourceUrl = text(sourceUrl, "sourceUrl");
+        sourceVersion = text(sourceVersion, "sourceVersion");
+        sourceReference = text(sourceReference, "sourceReference");
+        translationNotes = text(translationNotes, "translationNotes");
+        enabledRulePackIds = normalized(enabledRulePackIds);
+        compatibleBackendIds = normalized(compatibleBackendIds);
+        minimumEvidence = Objects.requireNonNull(minimumEvidence);
     }
 
     public static KnownStructureMetadata legacy(String provenance) {
-        String normalized = requireText(provenance, "provenance");
         return new KnownStructureMetadata(
-            normalized,
-            "UNSPECIFIED",
-            "urn:regelsuche:legacy-known-structure",
-            "legacy",
-            normalized,
-            "Legacy in-process structure without structured external-source metadata.",
-            List.of(),
-            List.of(),
-            KnownStructureEvidence.OBSERVED
-        );
+            provenance, "UNSPECIFIED", "urn:regelsuche:legacy-known-structure",
+            "legacy", provenance, "Legacy in-process structure.",
+            List.of(), List.of(), KnownStructureEvidence.OBSERVED);
     }
 
     public String provenanceSummary() {
-        return sourceProject + " " + sourceVersion + " — "
-            + sourceReference + " [" + license + "]";
+        return sourceProject + " " + sourceVersion + " — " + sourceReference
+            + " [" + license + "]";
     }
 
     public String canonicalDescriptor() {
-        StringBuilder descriptor = new StringBuilder();
-        appendField(descriptor, sourceProject);
-        appendField(descriptor, license);
-        appendField(descriptor, sourceUrl);
-        appendField(descriptor, sourceVersion);
-        appendField(descriptor, sourceReference);
-        appendField(descriptor, translationNotes);
-        appendList(descriptor, enabledRulePackIds);
-        appendList(descriptor, compatibleBackendIds);
-        appendField(descriptor, minimumEvidence.name());
-        return descriptor.toString();
+        StringBuilder value = new StringBuilder();
+        append(value, sourceProject, license, sourceUrl, sourceVersion,
+            sourceReference, translationNotes);
+        appendList(value, enabledRulePackIds);
+        appendList(value, compatibleBackendIds);
+        append(value, minimumEvidence.name());
+        return value.toString();
     }
 
-    static List<String> sortedUnique(List<String> values, String field) {
-        Objects.requireNonNull(values, field);
-        TreeSet<String> normalized = new TreeSet<>();
-        for (String value : values) {
-            normalized.add(requireText(value, field + " entry"));
-        }
-        return List.copyOf(normalized);
+    private static List<String> normalized(List<String> values) {
+        return Objects.requireNonNull(values).stream()
+            .map(value -> text(value, "list entry")).distinct().sorted().toList();
     }
 
-    static String requireText(String value, String field) {
-        Objects.requireNonNull(value, field);
-        String normalized = value.trim();
-        if (normalized.isEmpty()) {
+    private static String text(String value, String field) {
+        String result = Objects.requireNonNull(value, field).trim();
+        if (result.isEmpty()) {
             throw new IllegalArgumentException(field + " must not be blank");
         }
-        return normalized;
+        return result;
     }
 
-    private static void appendList(StringBuilder descriptor, List<String> values) {
-        appendField(descriptor, Integer.toString(values.size()));
-        values.forEach(value -> appendField(descriptor, value));
+    private static void appendList(StringBuilder target, List<String> values) {
+        append(target, Integer.toString(values.size()));
+        values.forEach(value -> append(target, value));
     }
 
-    private static void appendField(StringBuilder descriptor, String value) {
-        descriptor.append(value.length()).append(':').append(value);
+    private static void append(StringBuilder target, String... values) {
+        for (String value : values) {
+            target.append(value.length()).append(':').append(value);
+        }
     }
 }
