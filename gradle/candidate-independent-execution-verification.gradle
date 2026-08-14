@@ -89,6 +89,13 @@ def verifyCandidateIndependentExecutionFoundation = tasks.register(
     }
 }
 
+tasks.matching { task -> task.name == 'verifyCandidateIndependentBenchmark' }
+    .configureEach {
+        description = 'Compatibility alias; Maven/JUnit owns the candidate-independent preregistration contract.'
+        dependsOn ':regelsuche-core:verifyMavenCoreReactor'
+        setActions([])
+    }
+
 tasks.matching { task -> task.name == 'check' }.configureEach {
     dependsOn verifyCandidateIndependentExecutionFoundation
 }
