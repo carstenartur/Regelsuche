@@ -85,6 +85,12 @@ public final class SlowTestReportGenerator {
         ).stream()
             .sorted(CLASS_ORDER)
             .limit(limit)
+            .map(entry -> new SlowTestReport.TestClassEntry(
+                entry.module(),
+                entry.className(),
+                roundSix(entry.seconds()),
+                entry.testCount()
+            ))
             .toList();
 
         double totalSeconds = 0.0d;
@@ -333,7 +339,7 @@ public final class SlowTestReportGenerator {
             result.add(new SlowTestReport.TestClassEntry(
                 entry.getKey().module(),
                 entry.getKey().className(),
-                roundSix(entry.getValue().seconds),
+                entry.getValue().seconds,
                 entry.getValue().count
             ));
         }
