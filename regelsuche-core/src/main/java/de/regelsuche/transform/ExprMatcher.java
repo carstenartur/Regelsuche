@@ -10,16 +10,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
-/**
- * Declarative, nestable matcher algebra for symbolic expressions.
- *
- * <p>A matcher is intentionally not an {@link ExprTemplate}. Nodes such as
- * {@link Not}, {@link Contains} and {@link AnyOf} can recognize expressions but
- * do not describe one unique expression that could be instantiated. Existing
- * {@link PatternExpr} values remain usable through {@link #pattern(PatternExpr)}.
- * The algebra is sealed so knowledge packs can be inspected, hashed and
- * executed without loading arbitrary predicate code.</p>
- */
+/** Declarative, nestable matcher algebra independent of {@link ExprTemplate}. */
 public sealed interface ExprMatcher
     permits ExprMatcher.Any, ExprMatcher.LiteralNumber,
         ExprMatcher.LiteralVariable, ExprMatcher.NumberProperty,
@@ -40,7 +31,6 @@ public sealed interface ExprMatcher
         );
     }
 
-    /** Stable structural description used by content-addressed catalogs. */
     String canonicalDescriptor();
 
     static ExprMatcher any() {
@@ -64,24 +54,19 @@ public sealed interface ExprMatcher
     }
 
     static ExprMatcher nonZeroNumberLiteral() {
-        return new NumberProperty(
-            NumberPropertyKind.NON_ZERO_NUMBER_LITERAL);
+        return new NumberProperty(NumberPropertyKind.NON_ZERO_NUMBER_LITERAL);
     }
 
     static ExprMatcher pattern(PatternExpr pattern) {
         return pattern(pattern, RecognitionProfile.exact());
     }
 
-    static ExprMatcher pattern(
-        PatternExpr pattern,
-        RecognitionProfile profile
-    ) {
+    static ExprMatcher pattern(PatternExpr pattern, RecognitionProfile profile) {
         Pattern structural = new Pattern(pattern, profile);
-        if (profile.recognitionRuleIds().isEmpty()
-                || profile.maxEquivalenceDepth() == 0) {
-            return structural;
-        }
-        return new Equivalent(profile, structural);
+        return profile.recognitionRuleIds().isEmpty()
+                || profile.maxEquivalenceDepth() == 0
+            ? structural
+            : new Equivalent(profile, structural);
     }
 
     static ExprMatcher bind(String name, ExprMatcher matcher) {
@@ -120,15 +105,10 @@ public sealed interface ExprMatcher
         return new Function(name, List.of(arguments));
     }
 
-    /** Matches when the nested matcher succeeds at this node or a descendant. */
     static ExprMatcher contains(ExprMatcher matcher) {
         return new Contains(matcher);
     }
 
-    /**
-     * Applies the nested matcher to a bounded set of equivalent
-     * representatives supplied by {@link MatchOptions#representativeProvider()}.
-     */
     static ExprMatcher equivalent(
         RecognitionProfile profile,
         ExprMatcher matcher
@@ -136,10 +116,7 @@ public sealed interface ExprMatcher
         return new Equivalent(profile, matcher);
     }
 
-    static ExprMatcher where(
-        ExprMatcher matcher,
-        Constraint constraint
-    ) {
+    static ExprMatcher where(ExprMatcher matcher, Constraint constraint) {
         return new Where(matcher, constraint);
     }
 
@@ -150,15 +127,8 @@ public sealed interface ExprMatcher
         return new BindingMatches(bindingName, matcher);
     }
 
-    static Constraint sameAs(
-        String leftBinding,
-        String rightBinding
-    ) {
-        return sameAs(
-            leftBinding,
-            rightBinding,
-            RecognitionProfile.exact()
-        );
+    static Constraint sameAs(String leftBinding, String rightBinding) {
+        return sameAs(leftBinding, rightBinding, RecognitionProfile.exact());
     }
 
     static Constraint sameAs(
@@ -167,18 +137,6 @@ public sealed interface ExprMatcher
         RecognitionProfile profile
     ) {
         return new SameAs(leftBinding, rightBinding, profile);
-    }
-
-    static Constraint allConstraints(Constraint... constraints) {
-        return new AllConstraints(List.of(constraints));
-    }
-
-    static Constraint anyConstraint(Constraint... constraints) {
-        return new AnyConstraint(List.of(constraints));
-    }
-
-    static Constraint notConstraint(Constraint constraint) {
-        return new NotConstraint(constraint);
     }
 
     record MatchOptions(
@@ -191,8 +149,7 @@ public sealed interface ExprMatcher
             representativeProvider = representativeProvider == null
                 ? EquivalentExpressionProvider.identity()
                 : representativeProvider;
-            if (maxResults < 1 || maxSteps < 1
-                    || maxPatternBranches < 1) {
+            if (maxResults < 1 || maxSteps < 1 || maxPatternBranches < 1) {
                 throw new IllegalArgumentException(
                     "matcher limits must be positive");
             }
@@ -251,20 +208,17 @@ public sealed interface ExprMatcher
                 new TreeMap<>(bindings)));
             representative = Objects.requireNonNull(
                 representative, "representative");
+            recognitionStrength = Objects.requireNonNull(
+                recognitionStrength, "recognitionStrength");
+            trace = List.copyOf(Objects.requireNonNull(trace, "trace"));
             if (representativeIndex < 0) {
                 throw new IllegalArgumentException(
                     "representativeIndex must not be negative");
             }
-            recognitionStrength = Objects.requireNonNull(
-                recognitionStrength, "recognitionStrength");
-            trace = List.copyOf(Objects.requireNonNull(trace, "trace"));
         }
     }
 
-    record MatchDiagnostic(
-        String code,
-        String matcherDescriptor
-    ) {
+    record MatchDiagnostic(String code, String matcherDescriptor) {
         public MatchDiagnostic {
             code = requireText(code, "code");
             matcherDescriptor = requireText(
@@ -344,9 +298,7 @@ public sealed interface ExprMatcher
         NON_ZERO_NUMBER_LITERAL
     }
 
-    record NumberProperty(
-        NumberPropertyKind kind
-    ) implements ExprMatcher {
+    record NumberProperty(NumberPropertyKind kind) implements ExprMatcher {
         public NumberProperty {
             kind = Objects.requireNonNull(kind, "kind");
         }
@@ -409,10 +361,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "all-of",
-                matcherDescriptors(matchers)
-            );
+            return descriptor("all-of", matcherDescriptors(matchers));
         }
     }
 
@@ -423,10 +372,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "any-of",
-                matcherDescriptors(matchers)
-            );
+            return descriptor("any-of", matcherDescriptors(matchers));
         }
     }
 
@@ -489,10 +435,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "contains",
-                matcher.canonicalDescriptor()
-            );
+            return descriptor("contains", matcher.canonicalDescriptor());
         }
     }
 
@@ -536,9 +479,7 @@ public sealed interface ExprMatcher
         }
     }
 
-    sealed interface Constraint
-        permits BindingMatches, SameAs, AllConstraints,
-            AnyConstraint, NotConstraint {
+    sealed interface Constraint permits BindingMatches, SameAs {
         String canonicalDescriptor();
     }
 
@@ -585,76 +526,13 @@ public sealed interface ExprMatcher
         }
     }
 
-    record AllConstraints(
-        List<Constraint> constraints
-    ) implements Constraint {
-        public AllConstraints {
-            constraints = constraintList(constraints, "constraints");
-        }
-
-        @Override
-        public String canonicalDescriptor() {
-            return descriptor(
-                "all-constraints",
-                constraintDescriptors(constraints)
-            );
-        }
-    }
-
-    record AnyConstraint(
-        List<Constraint> constraints
-    ) implements Constraint {
-        public AnyConstraint {
-            constraints = constraintList(constraints, "constraints");
-        }
-
-        @Override
-        public String canonicalDescriptor() {
-            return descriptor(
-                "any-constraint",
-                constraintDescriptors(constraints)
-            );
-        }
-    }
-
-    record NotConstraint(
-        Constraint constraint
-    ) implements Constraint {
-        public NotConstraint {
-            constraint = Objects.requireNonNull(constraint, "constraint");
-        }
-
-        @Override
-        public String canonicalDescriptor() {
-            return descriptor(
-                "not-constraint",
-                constraint.canonicalDescriptor()
-            );
-        }
-    }
-
     private static List<ExprMatcher> matcherList(
         List<ExprMatcher> values,
         String field
     ) {
         Objects.requireNonNull(values, field);
         if (values.isEmpty()) {
-            throw new IllegalArgumentException(
-                field + " must not be empty");
-        }
-        return values.stream()
-            .map(value -> Objects.requireNonNull(value, field + " entry"))
-            .toList();
-    }
-
-    private static List<Constraint> constraintList(
-        List<Constraint> values,
-        String field
-    ) {
-        Objects.requireNonNull(values, field);
-        if (values.isEmpty()) {
-            throw new IllegalArgumentException(
-                field + " must not be empty");
+            throw new IllegalArgumentException(field + " must not be empty");
         }
         return values.stream()
             .map(value -> Objects.requireNonNull(value, field + " entry"))
@@ -670,40 +548,24 @@ public sealed interface ExprMatcher
         );
     }
 
-    private static String constraintDescriptors(
-        List<Constraint> constraints
-    ) {
-        return descriptor(
-            "constraint-list",
-            constraints.stream()
-                .map(Constraint::canonicalDescriptor)
-                .toArray(String[]::new)
-        );
-    }
-
     private static String profileDescriptor(RecognitionProfile profile) {
         return descriptor(
             "recognition-profile",
             descriptor(
                 "associative",
                 profile.associativeOperators().stream()
-                    .map(Enum::name)
-                    .sorted()
-                    .toArray(String[]::new)
+                    .map(Enum::name).sorted().toArray(String[]::new)
             ),
             descriptor(
                 "commutative",
                 profile.commutativeOperators().stream()
-                    .map(Enum::name)
-                    .sorted()
-                    .toArray(String[]::new)
+                    .map(Enum::name).sorted().toArray(String[]::new)
             ),
             Boolean.toString(profile.inferAlgebraicBindings()),
             descriptor(
                 "recognition-rules",
                 profile.recognitionRuleIds().stream()
-                    .sorted()
-                    .toArray(String[]::new)
+                    .sorted().toArray(String[]::new)
             ),
             Integer.toString(profile.maxEquivalenceDepth())
         );
