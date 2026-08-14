@@ -164,7 +164,7 @@ class ExprMatcherTest {
             .findFirst()
             .orElseThrow();
         assertEquals(
-            "(a + b)^2",
+            "(a + b) ^ 2",
             ExpressionFormatter.format(match.bindings().get("square"))
         );
         assertEquals(
