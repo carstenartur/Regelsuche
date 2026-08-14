@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnownStructureConsequenceUnlock.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">KnownStructureConsequenceUnlock.java</span></div><h1>KnownStructureConsequenceUnlock.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import java.util.Comparator;
+import java.util.Objects;
+
+/** One newly available consequence at one exact known-structure occurrence. */
+public record KnownStructureConsequenceUnlock(
+    String consequenceId,
+    String structureId,
+    ExpressionOccurrencePath occurrencePath,
+    String matchIdentity
+) implements Comparable&lt;KnownStructureConsequenceUnlock&gt; {
+<span class="fc" id="L13">    private static final Comparator&lt;KnownStructureConsequenceUnlock&gt; ORDER =</span>
+<span class="fc" id="L14">        Comparator.comparing(KnownStructureConsequenceUnlock::consequenceId)</span>
+<span class="fc" id="L15">            .thenComparing(KnownStructureConsequenceUnlock::structureId)</span>
+<span class="fc" id="L16">            .thenComparing(KnownStructureConsequenceUnlock::occurrencePath)</span>
+<span class="fc" id="L17">            .thenComparing(KnownStructureConsequenceUnlock::matchIdentity);</span>
+
+<span class="fc" id="L19">    public KnownStructureConsequenceUnlock {</span>
+<span class="fc" id="L20">        consequenceId = RepresentationCandidateAssessment.requireText(</span>
+            consequenceId, &quot;consequenceId&quot;);
+<span class="fc" id="L22">        structureId = RepresentationCandidateAssessment.requireText(</span>
+            structureId, &quot;structureId&quot;);
+<span class="fc" id="L24">        occurrencePath = Objects.requireNonNull(occurrencePath, &quot;occurrencePath&quot;);</span>
+<span class="fc" id="L25">        matchIdentity = RepresentationCandidateAssessment.requireText(</span>
+            matchIdentity, &quot;matchIdentity&quot;);
+<span class="fc" id="L27">    }</span>
+
+    public String opportunityIdentity() {
+<span class="fc" id="L30">        return consequenceId + &quot;|&quot; + matchIdentity;</span>
+    }
+
+    @Override
+    public int compareTo(KnownStructureConsequenceUnlock other) {
+<span class="fc" id="L35">        return ORDER.compare(this, Objects.requireNonNull(other, &quot;other&quot;));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

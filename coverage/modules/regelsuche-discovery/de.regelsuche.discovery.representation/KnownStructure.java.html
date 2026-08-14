@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnownStructure.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">KnownStructure.java</span></div><h1>KnownStructure.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import de.regelsuche.transform.ExprMatcher;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RecognitionProfile;
+import java.util.List;
+import java.util.Objects;
+
+/** One provenance-bearing known mathematical structure and its matcher. */
+public record KnownStructure(
+    String id,
+    String domainId,
+    ExprMatcher matcher,
+    List&lt;String&gt; requiredAssumptions,
+    List&lt;String&gt; consequenceIds,
+    String provenance
+) {
+    /** Compatibility constructor for an exact instantiable pattern. */
+    public KnownStructure(
+        String id,
+        String domainId,
+        PatternExpr pattern,
+        List&lt;String&gt; requiredAssumptions,
+        List&lt;String&gt; consequenceIds,
+        String provenance
+    ) {
+<span class="fc" id="L27">        this(</span>
+            id,
+            domainId,
+<span class="fc" id="L30">            ExprMatcher.pattern(pattern),</span>
+            requiredAssumptions,
+            consequenceIds,
+            provenance
+        );
+<span class="fc" id="L35">    }</span>
+
+    /** Compatibility constructor for a pattern plus recognition policy. */
+    public KnownStructure(
+        String id,
+        String domainId,
+        PatternExpr pattern,
+        RecognitionProfile recognitionProfile,
+        List&lt;String&gt; requiredAssumptions,
+        List&lt;String&gt; consequenceIds,
+        String provenance
+    ) {
+<span class="fc" id="L47">        this(</span>
+            id,
+            domainId,
+<span class="fc" id="L50">            ExprMatcher.pattern(pattern, recognitionProfile),</span>
+            requiredAssumptions,
+            consequenceIds,
+            provenance
+        );
+<span class="fc" id="L55">    }</span>
+
+<span class="fc" id="L57">    public KnownStructure {</span>
+<span class="fc" id="L58">        id = RepresentationCandidateAssessment.requireText(id, &quot;id&quot;);</span>
+<span class="fc" id="L59">        domainId = RepresentationCandidateAssessment.requireText(</span>
+            domainId, &quot;domainId&quot;);
+<span class="fc" id="L61">        matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
+<span class="fc" id="L62">        requiredAssumptions = RepresentationCandidateAssessment.sortedUnique(</span>
+            requiredAssumptions, &quot;requiredAssumptions&quot;);
+<span class="fc" id="L64">        consequenceIds = RepresentationCandidateAssessment.sortedUnique(</span>
+            consequenceIds, &quot;consequenceIds&quot;);
+<span class="fc" id="L66">        provenance = RepresentationCandidateAssessment.requireText(</span>
+            provenance, &quot;provenance&quot;);
+<span class="fc" id="L68">    }</span>
+
+    String canonicalDescriptor() {
+<span class="fc" id="L71">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L72">        KnownStructureCatalog.appendCanonicalField(descriptor, id);</span>
+<span class="fc" id="L73">        KnownStructureCatalog.appendCanonicalField(descriptor, domainId);</span>
+<span class="fc" id="L74">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor,
+<span class="fc" id="L76">            matcher.canonicalDescriptor()</span>
+        );
+<span class="fc" id="L78">        KnownStructureCatalog.appendCanonicalList(</span>
+            descriptor,
+            requiredAssumptions
+        );
+<span class="fc" id="L82">        KnownStructureCatalog.appendCanonicalList(descriptor, consequenceIds);</span>
+<span class="fc" id="L83">        KnownStructureCatalog.appendCanonicalField(descriptor, provenance);</span>
+<span class="fc" id="L84">        return descriptor.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnownStructureMatcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">KnownStructureMatcher.java</span></div><h1>KnownStructureMatcher.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.EquivalentExpressionProvider;
+import de.regelsuche.transform.ExprMatcher;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Deterministic known-structure matching at every AST occurrence. */
+public final class KnownStructureMatcher {
+    private final KnownStructureCatalog catalog;
+    private final ExpressionParser parser;
+    private final ExprMatcher.MatchOptions matchOptions;
+
+    public KnownStructureMatcher(KnownStructureCatalog catalog) {
+<span class="fc" id="L24">        this(</span>
+            catalog,
+            new ExpressionParser(),
+<span class="fc" id="L27">            EquivalentExpressionProvider.identity()</span>
+        );
+<span class="fc" id="L29">    }</span>
+
+    public KnownStructureMatcher(
+        KnownStructureCatalog catalog,
+        EquivalentExpressionProvider representativeProvider
+    ) {
+<span class="fc" id="L35">        this(catalog, new ExpressionParser(), representativeProvider);</span>
+<span class="fc" id="L36">    }</span>
+
+    public KnownStructureMatcher(
+        KnownStructureCatalog catalog,
+        ExpressionParser parser
+    ) {
+<span class="nc" id="L42">        this(catalog, parser, EquivalentExpressionProvider.identity());</span>
+<span class="nc" id="L43">    }</span>
+
+    public KnownStructureMatcher(
+        KnownStructureCatalog catalog,
+        ExpressionParser parser,
+        EquivalentExpressionProvider representativeProvider
+<span class="fc" id="L49">    ) {</span>
+<span class="fc" id="L50">        this.catalog = Objects.requireNonNull(catalog, &quot;catalog&quot;);</span>
+<span class="fc" id="L51">        this.parser = Objects.requireNonNull(parser, &quot;parser&quot;);</span>
+<span class="fc" id="L52">        this.matchOptions = ExprMatcher.MatchOptions.defaults()</span>
+<span class="fc" id="L53">            .withRepresentativeProvider(Objects.requireNonNull(</span>
+                representativeProvider,
+                &quot;representativeProvider&quot;
+            ));
+<span class="fc" id="L57">    }</span>
+
+    public String catalogHash() {
+<span class="fc" id="L60">        return catalog.contentHash();</span>
+    }
+
+    /**
+     * Strict convenience API. A bounded recognition limit fails closed instead
+     * of being reported as a mathematical non-match.
+     */
+    public List&lt;KnownStructureMatch&gt; match(String expression) {
+<span class="fc" id="L68">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L69">        return match(parser.parseTerm(expression));</span>
+    }
+
+    /**
+     * Strict convenience API. Use {@link #scan(Expr)} when diagnostics should
+     * be retained instead of raised.
+     */
+    public List&lt;KnownStructureMatch&gt; match(Expr expression) {
+<span class="fc" id="L77">        ScanResult result = scan(expression);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (!result.complete()) {</span>
+<span class="fc" id="L79">            throw new IncompleteRecognitionException(result.diagnostics());</span>
+        }
+<span class="fc" id="L81">        return result.matches();</span>
+    }
+
+    public ScanResult scan(String expression) {
+<span class="fc" id="L85">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L86">        return scan(parser.parseTerm(expression));</span>
+    }
+
+    public ScanResult scan(Expr expression) {
+<span class="fc" id="L90">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L91">        Map&lt;String, KnownStructureMatch&gt; matches = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L92">        List&lt;RecognitionDiagnostic&gt; diagnostics = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L93">        collect(</span>
+            expression,
+<span class="fc" id="L95">            ExpressionOccurrencePath.root(),</span>
+            matches,
+            diagnostics
+        );
+<span class="fc" id="L99">        List&lt;KnownStructureMatch&gt; orderedMatches = matches.values().stream()</span>
+<span class="fc" id="L100">            .sorted(Comparator</span>
+<span class="fc" id="L101">                .comparing(KnownStructureMatch::structureId)</span>
+<span class="fc" id="L102">                .thenComparing(KnownStructureMatch::occurrencePath)</span>
+<span class="fc" id="L103">                .thenComparing(KnownStructureMatch::identity))</span>
+<span class="fc" id="L104">            .toList();</span>
+<span class="fc" id="L105">        List&lt;RecognitionDiagnostic&gt; orderedDiagnostics = diagnostics.stream()</span>
+<span class="fc" id="L106">            .sorted(Comparator</span>
+<span class="fc" id="L107">                .comparing(RecognitionDiagnostic::structureId)</span>
+<span class="fc" id="L108">                .thenComparing(RecognitionDiagnostic::occurrencePath)</span>
+<span class="fc" id="L109">                .thenComparing(RecognitionDiagnostic::code)</span>
+<span class="fc" id="L110">                .thenComparing(RecognitionDiagnostic::matcherDescriptor))</span>
+<span class="fc" id="L111">            .toList();</span>
+<span class="fc" id="L112">        return new ScanResult(orderedMatches, orderedDiagnostics);</span>
+    }
+
+    private void collect(
+        Expr expression,
+        ExpressionOccurrencePath path,
+        Map&lt;String, KnownStructureMatch&gt; matches,
+        List&lt;RecognitionDiagnostic&gt; diagnostics
+    ) {
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (KnownStructure structure : catalog.structures()) {</span>
+<span class="fc" id="L122">            ExprMatcher.MatchOutcome outcome = structure.matcher().match(</span>
+                expression,
+                matchOptions
+            );
+            for (ExprMatcher.MatchDiagnostic diagnostic
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                    : outcome.diagnostics()) {</span>
+<span class="fc" id="L128">                diagnostics.add(new RecognitionDiagnostic(</span>
+<span class="fc" id="L129">                    structure.id(),</span>
+                    path,
+<span class="fc" id="L131">                    diagnostic.code(),</span>
+<span class="fc" id="L132">                    diagnostic.matcherDescriptor()</span>
+                ));
+<span class="fc" id="L134">            }</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            for (ExprMatcher.MatchResult result : outcome.matches()) {</span>
+<span class="fc" id="L136">                Map&lt;String, String&gt; renderedBindings =</span>
+                    new LinkedHashMap&lt;&gt;();
+<span class="fc" id="L138">                result.bindings().entrySet().stream()</span>
+<span class="fc" id="L139">                    .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L140">                    .forEach(entry -&gt; renderedBindings.put(</span>
+<span class="fc" id="L141">                        entry.getKey(),</span>
+<span class="fc" id="L142">                        ExpressionFormatter.format(entry.getValue())</span>
+                    ));
+<span class="fc" id="L144">                KnownStructureMatch match = new KnownStructureMatch(</span>
+<span class="fc" id="L145">                    structure.id(),</span>
+<span class="fc" id="L146">                    structure.domainId(),</span>
+                    path,
+                    renderedBindings,
+<span class="fc" id="L149">                    structure.requiredAssumptions(),</span>
+<span class="fc" id="L150">                    structure.consequenceIds(),</span>
+<span class="fc" id="L151">                    structure.provenance(),</span>
+<span class="fc" id="L152">                    recognitionMode(result.recognitionStrength()),</span>
+<span class="fc" id="L153">                    ExpressionFormatter.format(result.representative()),</span>
+<span class="fc" id="L154">                    result.representativeIndex()</span>
+                );
+<span class="fc" id="L156">                matches.putIfAbsent(match.identity(), match);</span>
+<span class="fc" id="L157">            }</span>
+<span class="fc" id="L158">        }</span>
+
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L161">            collect(binary.left(), path.append(0), matches, diagnostics);</span>
+<span class="fc" id="L162">            collect(binary.right(), path.append(1), matches, diagnostics);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L164">            for (int index = 0;</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                    index &lt; function.arguments().size();</span>
+<span class="fc" id="L166">                    index++) {</span>
+<span class="fc" id="L167">                collect(</span>
+<span class="fc" id="L168">                    function.arguments().get(index),</span>
+<span class="fc" id="L169">                    path.append(index),</span>
+                    matches,
+                    diagnostics
+                );
+            }
+        }
+<span class="fc" id="L175">    }</span>
+
+    private static String recognitionMode(
+        ExprMatcher.RecognitionStrength strength
+    ) {
+<span class="fc bfc" id="L180" title="All 3 branches covered.">        return switch (strength) {</span>
+<span class="fc" id="L181">            case EXACT -&gt; KnownStructureMatch.RECOGNITION_EXACT;</span>
+            case EQUIVALENCE_AWARE -&gt;
+<span class="fc" id="L183">                KnownStructureMatch.RECOGNITION_EQUIVALENCE_AWARE;</span>
+            case BOUNDED_REPRESENTATIVE -&gt;
+<span class="fc" id="L185">                KnownStructureMatch.RECOGNITION_BOUNDED_REPRESENTATIVE;</span>
+        };
+    }
+
+    public record ScanResult(
+        List&lt;KnownStructureMatch&gt; matches,
+        List&lt;RecognitionDiagnostic&gt; diagnostics
+    ) {
+<span class="fc" id="L193">        public ScanResult {</span>
+<span class="fc" id="L194">            matches = List.copyOf(Objects.requireNonNull(matches, &quot;matches&quot;));</span>
+<span class="fc" id="L195">            diagnostics = List.copyOf(</span>
+<span class="fc" id="L196">                Objects.requireNonNull(diagnostics, &quot;diagnostics&quot;));</span>
+<span class="fc" id="L197">        }</span>
+
+        public boolean complete() {
+<span class="fc" id="L200">            return diagnostics.isEmpty();</span>
+        }
+    }
+
+    public record RecognitionDiagnostic(
+        String structureId,
+        ExpressionOccurrencePath occurrencePath,
+        String code,
+        String matcherDescriptor
+    ) {
+<span class="fc" id="L210">        public RecognitionDiagnostic {</span>
+<span class="fc" id="L211">            structureId = RepresentationCandidateAssessment.requireText(</span>
+                structureId, &quot;structureId&quot;);
+<span class="fc" id="L213">            occurrencePath = Objects.requireNonNull(</span>
+                occurrencePath, &quot;occurrencePath&quot;);
+<span class="fc" id="L215">            code = RepresentationCandidateAssessment.requireText(</span>
+                code, &quot;code&quot;);
+<span class="fc" id="L217">            matcherDescriptor =</span>
+<span class="fc" id="L218">                RepresentationCandidateAssessment.requireText(</span>
+                    matcherDescriptor,
+                    &quot;matcherDescriptor&quot;
+                );
+<span class="fc" id="L222">        }</span>
+    }
+
+    public static final class IncompleteRecognitionException
+        extends IllegalStateException {
+        private final List&lt;RecognitionDiagnostic&gt; diagnostics;
+
+        private IncompleteRecognitionException(
+            List&lt;RecognitionDiagnostic&gt; diagnostics
+        ) {
+<span class="fc" id="L232">            super(&quot;known-structure recognition was inconclusive: &quot;</span>
+                + diagnostics);
+<span class="fc" id="L234">            this.diagnostics = List.copyOf(diagnostics);</span>
+<span class="fc" id="L235">        }</span>
+
+        public List&lt;RecognitionDiagnostic&gt; diagnostics() {
+<span class="nc" id="L238">            return diagnostics;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

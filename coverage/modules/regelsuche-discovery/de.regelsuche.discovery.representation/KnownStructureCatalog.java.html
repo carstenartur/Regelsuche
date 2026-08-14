@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnownStructureCatalog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">KnownStructureCatalog.java</span></div><h1>KnownStructureCatalog.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/** Content-addressed catalog used for post-hoc or visible known-form matching. */
+public final class KnownStructureCatalog {
+    private final String revision;
+    private final List&lt;KnownStructure&gt; structures;
+    private final String contentHash;
+
+<span class="fc" id="L19">    public KnownStructureCatalog(String revision, List&lt;KnownStructure&gt; structures) {</span>
+<span class="fc" id="L20">        this.revision = RepresentationCandidateAssessment.requireText(</span>
+            revision, &quot;revision&quot;);
+<span class="fc" id="L22">        Objects.requireNonNull(structures, &quot;structures&quot;);</span>
+<span class="fc" id="L23">        this.structures = structures.stream()</span>
+<span class="fc" id="L24">            .map(structure -&gt; Objects.requireNonNull(structure, &quot;structure&quot;))</span>
+<span class="fc" id="L25">            .sorted(Comparator.comparing(KnownStructure::id))</span>
+<span class="fc" id="L26">            .toList();</span>
+<span class="fc" id="L27">        rejectDuplicateIds(this.structures);</span>
+<span class="fc" id="L28">        this.contentHash = sha256(canonicalDescriptor());</span>
+<span class="fc" id="L29">    }</span>
+
+    public static KnownStructureCatalog empty() {
+<span class="fc" id="L32">        return new KnownStructureCatalog(&quot;none&quot;, List.of());</span>
+    }
+
+    public String revision() {
+<span class="nc" id="L36">        return revision;</span>
+    }
+
+    public List&lt;KnownStructure&gt; structures() {
+<span class="fc" id="L40">        return structures;</span>
+    }
+
+    public String contentHash() {
+<span class="fc" id="L44">        return contentHash;</span>
+    }
+
+    private String canonicalDescriptor() {
+<span class="fc" id="L48">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L49">        appendCanonicalField(descriptor, revision);</span>
+<span class="fc" id="L50">        appendCanonicalField(descriptor, Integer.toString(structures.size()));</span>
+<span class="fc" id="L51">        structures.forEach(structure -&gt;</span>
+<span class="fc" id="L52">            appendCanonicalField(descriptor, structure.canonicalDescriptor()));</span>
+<span class="fc" id="L53">        return descriptor.toString();</span>
+    }
+
+    private static void rejectDuplicateIds(List&lt;KnownStructure&gt; structures) {
+<span class="fc" id="L57">        Set&lt;String&gt; ids = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (KnownStructure structure : structures) {</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (!ids.add(structure.id())) {</span>
+<span class="fc" id="L60">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L61">                    &quot;duplicate known-structure id: &quot; + structure.id());</span>
+            }
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">    }</span>
+
+    static void appendCanonicalList(
+        StringBuilder descriptor,
+        List&lt;String&gt; values
+    ) {
+<span class="fc" id="L70">        appendCanonicalField(descriptor, Integer.toString(values.size()));</span>
+<span class="fc" id="L71">        values.forEach(value -&gt; appendCanonicalField(descriptor, value));</span>
+<span class="fc" id="L72">    }</span>
+
+    static void appendCanonicalField(StringBuilder descriptor, String value) {
+<span class="fc" id="L75">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
+<span class="fc" id="L76">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L77">        descriptor.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L78">    }</span>
+
+    static String sha256(String value) {
+        try {
+<span class="fc" id="L82">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L83">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L84">                    .digest(value.getBytes(StandardCharsets.UTF_8))</span>
+            );
+<span class="nc" id="L86">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L87">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

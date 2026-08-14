@@ -1,0 +1,720 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExprMatcherEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">ExprMatcherEngine.java</span></div><h1>ExprMatcherEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Executes the sealed {@link ExprMatcher} algebra deterministically. */
+final class ExprMatcherEngine {
+    private ExprMatcherEngine() {
+    }
+
+    static ExprMatcher.MatchOutcome match(
+        ExprMatcher matcher,
+        Expr expression,
+        ExprMatcher.MatchOptions options
+    ) {
+<span class="fc" id="L26">        Session session = new Session(options);</span>
+<span class="fc" id="L27">        State initial = new State(</span>
+<span class="fc" id="L28">            Map.of(),</span>
+            expression,
+            0,
+            ExprMatcher.RecognitionStrength.EXACT,
+<span class="fc" id="L32">            List.of()</span>
+        );
+<span class="fc" id="L34">        List&lt;State&gt; states = session.limit(</span>
+<span class="fc" id="L35">            evaluate(matcher, expression, initial, session, true),</span>
+<span class="fc" id="L36">            matcher.canonicalDescriptor()</span>
+        );
+<span class="fc" id="L38">        return new ExprMatcher.MatchOutcome(</span>
+<span class="fc" id="L39">            states.stream().map(State::toResult).toList(),</span>
+<span class="fc" id="L40">            List.copyOf(session.diagnostics),</span>
+            session.steps,
+            session.patternBranches
+        );
+    }
+
+    private static List&lt;State&gt; evaluate(
+        ExprMatcher matcher,
+        Expr expression,
+        State state,
+        Session session,
+        boolean atRoot
+    ) {
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (!session.consumeStep(matcher.canonicalDescriptor())) {</span>
+<span class="nc" id="L54">            return List.of();</span>
+        }
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.Any) {</span>
+<span class="fc" id="L57">            return List.of(state.traced(&quot;any&quot;));</span>
+        }
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (matcher instanceof ExprMatcher.LiteralNumber literal) {</span>
+<span class="nc" id="L60">            return expression instanceof NumberExpr number</span>
+<span class="nc bnc" id="L61" title="All 4 branches missed.">                    &amp;&amp; Double.compare(number.value(), literal.value()) == 0</span>
+<span class="nc" id="L62">                ? List.of(state.traced(&quot;literal-number&quot;))</span>
+<span class="nc" id="L63">                : List.of();</span>
+        }
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.LiteralVariable literal) {</span>
+<span class="fc" id="L66">            return expression instanceof VariableExpr variable</span>
+<span class="fc bfc" id="L67" title="All 4 branches covered.">                    &amp;&amp; variable.name().equals(literal.name())</span>
+<span class="fc" id="L68">                ? List.of(state.traced(&quot;literal-variable&quot;))</span>
+<span class="fc" id="L69">                : List.of();</span>
+        }
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.NumberProperty property) {</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            return matchesNumberProperty(expression, property.kind())</span>
+<span class="fc" id="L73">                ? List.of(state.traced(</span>
+<span class="fc" id="L74">                    &quot;number-property:&quot; + property.kind().name()))</span>
+<span class="fc" id="L75">                : List.of();</span>
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.Pattern pattern) {</span>
+<span class="fc" id="L78">            return matchPattern(pattern, expression, state, session, atRoot);</span>
+        }
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.Bind bind) {</span>
+<span class="fc" id="L81">            return matchBind(bind, expression, state, session, atRoot);</span>
+        }
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.AllOf all) {</span>
+<span class="fc" id="L84">            return matchAll(all, expression, state, session, atRoot);</span>
+        }
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.AnyOf any) {</span>
+<span class="fc" id="L87">            return matchAny(any, expression, state, session, atRoot);</span>
+        }
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.Not not) {</span>
+<span class="fc" id="L90">            return matchNot(not, expression, state, session, atRoot);</span>
+        }
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.Operation operation) {</span>
+<span class="fc" id="L93">            return matchOperation(operation, expression, state, session);</span>
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (matcher instanceof ExprMatcher.Function function) {</span>
+<span class="nc" id="L96">            return matchFunction(function, expression, state, session);</span>
+        }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.Contains contains) {</span>
+<span class="fc" id="L99">            List&lt;State&gt; matches = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L100">            collectContained(</span>
+<span class="fc" id="L101">                contains.matcher(),</span>
+                expression,
+                state,
+                session,
+<span class="fc" id="L105">                List.of(),</span>
+                matches
+            );
+<span class="fc" id="L108">            return session.limit(matches, matcher.canonicalDescriptor());</span>
+        }
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (matcher instanceof ExprMatcher.Equivalent equivalent) {</span>
+<span class="nc" id="L111">            return matchEquivalent(</span>
+                equivalent,
+                expression,
+                state,
+                session,
+                atRoot
+            );
+        }
+<span class="fc" id="L119">        ExprMatcher.Where where = (ExprMatcher.Where) matcher;</span>
+<span class="fc" id="L120">        List&lt;State&gt; accepted = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (State candidate : evaluate(</span>
+<span class="fc" id="L122">                where.matcher(), expression, state, session, atRoot)) {</span>
+<span class="fc" id="L123">            accepted.addAll(evaluateConstraint(</span>
+<span class="fc" id="L124">                where.constraint(), candidate, session));</span>
+<span class="fc" id="L125">        }</span>
+<span class="fc" id="L126">        return session.limit(accepted, matcher.canonicalDescriptor());</span>
+    }
+
+    private static List&lt;State&gt; matchPattern(
+        ExprMatcher.Pattern matcher,
+        Expr expression,
+        State state,
+        Session session,
+        boolean atRoot
+    ) {
+<span class="fc" id="L136">        EquivalenceAwarePatternMatcher.MatchAttempt exact =</span>
+<span class="fc" id="L137">            EquivalenceAwarePatternMatcher.matchDetailed(</span>
+<span class="fc" id="L138">                matcher.pattern(),</span>
+                expression,
+                state.bindings,
+<span class="fc" id="L141">                RecognitionProfile.exact(),</span>
+<span class="fc" id="L142">                session.options.maxPatternBranches()</span>
+            );
+<span class="fc" id="L144">        session.patternBranches += exact.visitedBranches();</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (exact.matched()) {</span>
+<span class="fc" id="L146">            return List.of(state</span>
+<span class="fc" id="L147">                .withBindings(exact.bindings())</span>
+<span class="fc" id="L148">                .recognized(</span>
+                    ExprMatcher.RecognitionStrength.EXACT,
+                    expression,
+                    0,
+                    atRoot
+                )
+<span class="fc" id="L154">                .traced(&quot;pattern:exact&quot;));</span>
+        }
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (exact.inconclusive()) {</span>
+<span class="nc" id="L157">            session.diagnostic(exact.limitCode(), matcher.canonicalDescriptor());</span>
+<span class="nc" id="L158">            return List.of();</span>
+        }
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (matcher.recognitionProfile().equals(RecognitionProfile.exact())) {</span>
+<span class="fc" id="L161">            return List.of();</span>
+        }
+<span class="fc" id="L163">        EquivalenceAwarePatternMatcher.MatchAttempt equivalent =</span>
+<span class="fc" id="L164">            EquivalenceAwarePatternMatcher.matchDetailed(</span>
+<span class="fc" id="L165">                matcher.pattern(),</span>
+                expression,
+                state.bindings,
+<span class="fc" id="L168">                matcher.recognitionProfile(),</span>
+<span class="fc" id="L169">                session.options.maxPatternBranches()</span>
+            );
+<span class="fc" id="L171">        session.patternBranches += equivalent.visitedBranches();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (equivalent.inconclusive()) {</span>
+<span class="fc" id="L173">            session.diagnostic(</span>
+<span class="fc" id="L174">                equivalent.limitCode(), matcher.canonicalDescriptor());</span>
+<span class="fc" id="L175">            return List.of();</span>
+        }
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (!equivalent.matched()) {</span>
+<span class="nc" id="L178">            return List.of();</span>
+        }
+<span class="fc" id="L180">        return List.of(state</span>
+<span class="fc" id="L181">            .withBindings(equivalent.bindings())</span>
+<span class="fc" id="L182">            .recognized(</span>
+                ExprMatcher.RecognitionStrength.EQUIVALENCE_AWARE,
+                expression,
+                0,
+                atRoot
+            )
+<span class="fc" id="L188">            .traced(&quot;pattern:equivalence-aware&quot;));</span>
+    }
+
+    private static List&lt;State&gt; matchBind(
+        ExprMatcher.Bind bind,
+        Expr expression,
+        State state,
+        Session session,
+        boolean atRoot
+    ) {
+<span class="fc" id="L198">        List&lt;State&gt; bound = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (State candidate : evaluate(</span>
+<span class="fc" id="L200">                bind.matcher(), expression, state, session, atRoot)) {</span>
+<span class="fc" id="L201">            Expr previous = candidate.bindings.get(bind.name());</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            if (previous == null) {</span>
+<span class="fc" id="L203">                bound.add(candidate</span>
+<span class="fc" id="L204">                    .withBinding(bind.name(), expression)</span>
+<span class="fc" id="L205">                    .traced(&quot;bind:&quot; + bind.name()));</span>
+<span class="fc" id="L206">                continue;</span>
+            }
+<span class="nc" id="L208">            Comparison comparison = compare(</span>
+                previous,
+                expression,
+<span class="nc" id="L211">                bind.equalityProfile(),</span>
+                session,
+<span class="nc" id="L213">                bind.canonicalDescriptor()</span>
+            );
+<span class="nc bnc" id="L215" title="All 2 branches missed.">            if (comparison.matched) {</span>
+<span class="nc" id="L216">                bound.add(candidate</span>
+<span class="nc" id="L217">                    .withStrength(comparison.strength)</span>
+<span class="nc" id="L218">                    .traced(&quot;rebind:&quot; + bind.name()));</span>
+            }
+<span class="nc" id="L220">        }</span>
+<span class="fc" id="L221">        return session.limit(bound, bind.canonicalDescriptor());</span>
+    }
+
+    private static List&lt;State&gt; matchAll(
+        ExprMatcher.AllOf all,
+        Expr expression,
+        State state,
+        Session session,
+        boolean atRoot
+    ) {
+<span class="fc" id="L231">        List&lt;State&gt; current = List.of(state);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (ExprMatcher matcher : all.matchers()) {</span>
+<span class="fc" id="L233">            List&lt;State&gt; next = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            for (State candidate : current) {</span>
+<span class="fc" id="L235">                next.addAll(evaluate(</span>
+                    matcher, expression, candidate, session, atRoot));
+<span class="fc" id="L237">            }</span>
+<span class="fc" id="L238">            current = session.limit(next, all.canonicalDescriptor());</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            if (current.isEmpty()) {</span>
+<span class="fc" id="L240">                break;</span>
+            }
+<span class="fc" id="L242">        }</span>
+<span class="fc" id="L243">        return current;</span>
+    }
+
+    private static List&lt;State&gt; matchAny(
+        ExprMatcher.AnyOf any,
+        Expr expression,
+        State state,
+        Session session,
+        boolean atRoot
+    ) {
+<span class="fc" id="L253">        List&lt;State&gt; matches = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        for (ExprMatcher matcher : any.matchers()) {</span>
+<span class="fc" id="L255">            matches.addAll(evaluate(</span>
+                matcher, expression, state, session, atRoot));
+<span class="fc" id="L257">        }</span>
+<span class="fc" id="L258">        return session.limit(matches, any.canonicalDescriptor());</span>
+    }
+
+    private static List&lt;State&gt; matchNot(
+        ExprMatcher.Not not,
+        Expr expression,
+        State state,
+        Session session,
+        boolean atRoot
+    ) {
+<span class="fc" id="L268">        int diagnosticCount = session.diagnostics.size();</span>
+<span class="fc" id="L269">        List&lt;State&gt; excluded = evaluate(</span>
+<span class="fc" id="L270">            not.matcher(), expression, state, session, atRoot);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        if (!excluded.isEmpty()</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                || session.diagnostics.size() &gt; diagnosticCount) {</span>
+<span class="fc" id="L273">            return List.of();</span>
+        }
+<span class="fc" id="L275">        return List.of(state.traced(&quot;not&quot;));</span>
+    }
+
+    private static List&lt;State&gt; matchOperation(
+        ExprMatcher.Operation operation,
+        Expr expression,
+        State state,
+        Session session
+    ) {
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr binary)</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                || binary.operator() != operation.operator()) {</span>
+<span class="nc" id="L286">            return List.of();</span>
+        }
+<span class="fc" id="L288">        List&lt;State&gt; matches = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        for (State left : evaluate(</span>
+<span class="fc" id="L290">                operation.left(), binary.left(), state, session, false)) {</span>
+<span class="fc" id="L291">            matches.addAll(evaluate(</span>
+<span class="fc" id="L292">                operation.right(), binary.right(), left, session, false));</span>
+<span class="fc" id="L293">        }</span>
+<span class="fc" id="L294">        return session.limit(matches, operation.canonicalDescriptor()).stream()</span>
+<span class="fc" id="L295">            .map(candidate -&gt; candidate.traced(</span>
+<span class="fc" id="L296">                &quot;operation:&quot; + operation.operator().name()))</span>
+<span class="fc" id="L297">            .toList();</span>
+    }
+
+    private static List&lt;State&gt; matchFunction(
+        ExprMatcher.Function function,
+        Expr expression,
+        State state,
+        Session session
+    ) {
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        if (!(expression instanceof FunctionExpr candidate)</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                || !candidate.name().equals(function.name())</span>
+<span class="nc" id="L308">                || candidate.arguments().size()</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">                    != function.arguments().size()) {</span>
+<span class="nc" id="L310">            return List.of();</span>
+        }
+<span class="nc" id="L312">        List&lt;State&gt; current = List.of(state);</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">        for (int index = 0; index &lt; function.arguments().size(); index++) {</span>
+<span class="nc" id="L314">            List&lt;State&gt; next = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">            for (State match : current) {</span>
+<span class="nc" id="L316">                next.addAll(evaluate(</span>
+<span class="nc" id="L317">                    function.arguments().get(index),</span>
+<span class="nc" id="L318">                    candidate.arguments().get(index),</span>
+                    match,
+                    session,
+                    false
+                ));
+<span class="nc" id="L323">            }</span>
+<span class="nc" id="L324">            current = session.limit(next, function.canonicalDescriptor());</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">            if (current.isEmpty()) {</span>
+<span class="nc" id="L326">                return List.of();</span>
+            }
+        }
+<span class="nc" id="L329">        return current.stream()</span>
+<span class="nc" id="L330">            .map(match -&gt; match.traced(&quot;function:&quot; + function.name()))</span>
+<span class="nc" id="L331">            .toList();</span>
+    }
+
+    private static void collectContained(
+        ExprMatcher matcher,
+        Expr expression,
+        State state,
+        Session session,
+        List&lt;Integer&gt; path,
+        List&lt;State&gt; matches
+    ) {
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">        if (matches.size() &gt;= session.options.maxResults()) {</span>
+<span class="nc" id="L343">            session.diagnostic(</span>
+<span class="nc" id="L344">                &quot;MATCH_RESULT_LIMIT&quot;, matcher.canonicalDescriptor());</span>
+<span class="nc" id="L345">            return;</span>
+        }
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        String renderedPath = path.isEmpty()</span>
+<span class="fc" id="L348">            ? &quot;root&quot;</span>
+<span class="fc" id="L349">            : path.stream()</span>
+<span class="fc" id="L350">                .map(String::valueOf)</span>
+<span class="fc" id="L351">                .reduce((left, right) -&gt; left + &quot;.&quot; + right)</span>
+<span class="fc" id="L352">                .orElse(&quot;root&quot;);</span>
+<span class="fc" id="L353">        evaluate(matcher, expression, state, session, false).stream()</span>
+<span class="fc" id="L354">            .map(match -&gt; match.traced(&quot;contains@&quot; + renderedPath))</span>
+<span class="fc" id="L355">            .forEach(matches::add);</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L357">            collectContained(</span>
+                matcher,
+<span class="fc" id="L359">                binary.left(),</span>
+                state,
+                session,
+<span class="fc" id="L362">                append(path, 0),</span>
+                matches
+            );
+<span class="fc" id="L365">            collectContained(</span>
+                matcher,
+<span class="fc" id="L367">                binary.right(),</span>
+                state,
+                session,
+<span class="fc" id="L370">                append(path, 1),</span>
+                matches
+            );
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L374">            for (int index = 0;</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">                    index &lt; function.arguments().size();</span>
+<span class="nc" id="L376">                    index++) {</span>
+<span class="nc" id="L377">                collectContained(</span>
+                    matcher,
+<span class="nc" id="L379">                    function.arguments().get(index),</span>
+                    state,
+                    session,
+<span class="nc" id="L382">                    append(path, index),</span>
+                    matches
+                );
+            }
+        }
+<span class="fc" id="L387">    }</span>
+
+    private static List&lt;State&gt; matchEquivalent(
+        ExprMatcher.Equivalent equivalent,
+        Expr expression,
+        State state,
+        Session session,
+        boolean atRoot
+    ) {
+<span class="nc" id="L396">        List&lt;Expr&gt; representatives = session.options</span>
+<span class="nc" id="L397">            .representativeProvider()</span>
+<span class="nc" id="L398">            .representatives(expression, equivalent.recognitionProfile());</span>
+<span class="nc bnc" id="L399" title="All 4 branches missed.">        if (representatives == null || representatives.isEmpty()) {</span>
+<span class="nc" id="L400">            session.diagnostic(</span>
+                &quot;REPRESENTATIVE_PROVIDER_EMPTY&quot;,
+<span class="nc" id="L402">                equivalent.canonicalDescriptor()</span>
+            );
+<span class="nc" id="L404">            return List.of();</span>
+        }
+<span class="nc" id="L406">        List&lt;State&gt; matches = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">        for (int index = 0; index &lt; representatives.size(); index++) {</span>
+<span class="nc" id="L408">            Expr representative = representatives.get(index);</span>
+<span class="nc bnc" id="L409" title="All 2 branches missed.">            if (representative == null) {</span>
+<span class="nc" id="L410">                session.diagnostic(</span>
+                    &quot;REPRESENTATIVE_PROVIDER_NULL&quot;,
+<span class="nc" id="L412">                    equivalent.canonicalDescriptor()</span>
+                );
+<span class="nc" id="L414">                continue;</span>
+            }
+<span class="nc bnc" id="L416" title="All 4 branches missed.">            boolean changed = index &gt; 0 || !representative.equals(expression);</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">            for (State candidate : evaluate(</span>
+<span class="nc" id="L418">                    equivalent.matcher(),</span>
+                    representative,
+                    state,
+                    session,
+                    atRoot)) {
+<span class="nc bnc" id="L423" title="All 2 branches missed.">                matches.add(changed</span>
+                    ? candidate
+<span class="nc" id="L425">                        .recognized(</span>
+                            ExprMatcher.RecognitionStrength
+                                .BOUNDED_REPRESENTATIVE,
+                            representative,
+                            index,
+                            atRoot
+                        )
+<span class="nc" id="L432">                        .traced(&quot;representative:&quot; + index)</span>
+<span class="nc" id="L433">                    : candidate);</span>
+<span class="nc" id="L434">            }</span>
+        }
+<span class="nc" id="L436">        return session.limit(matches, equivalent.canonicalDescriptor());</span>
+    }
+
+    private static List&lt;State&gt; evaluateConstraint(
+        ExprMatcher.Constraint constraint,
+        State state,
+        Session session
+    ) {
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">        if (!session.consumeStep(constraint.canonicalDescriptor())) {</span>
+<span class="nc" id="L445">            return List.of();</span>
+        }
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        if (constraint instanceof ExprMatcher.BindingMatches bindingMatches) {</span>
+<span class="nc" id="L448">            Expr expression = state.bindings.get(bindingMatches.bindingName());</span>
+<span class="nc bnc" id="L449" title="All 2 branches missed.">            return expression == null</span>
+<span class="nc" id="L450">                ? List.of()</span>
+<span class="nc" id="L451">                : evaluate(</span>
+<span class="nc" id="L452">                    bindingMatches.matcher(),</span>
+                    expression,
+                    state,
+                    session,
+                    false
+                );
+        }
+<span class="fc" id="L459">        ExprMatcher.SameAs sameAs = (ExprMatcher.SameAs) constraint;</span>
+<span class="fc" id="L460">        Expr left = state.bindings.get(sameAs.leftBinding());</span>
+<span class="fc" id="L461">        Expr right = state.bindings.get(sameAs.rightBinding());</span>
+<span class="pc bpc" id="L462" title="2 of 4 branches missed.">        if (left == null || right == null) {</span>
+<span class="nc" id="L463">            return List.of();</span>
+        }
+<span class="fc" id="L465">        Comparison comparison = compare(</span>
+            left,
+            right,
+<span class="fc" id="L468">            sameAs.recognitionProfile(),</span>
+            session,
+<span class="fc" id="L470">            sameAs.canonicalDescriptor()</span>
+        );
+<span class="fc bfc" id="L472" title="All 2 branches covered.">        return comparison.matched</span>
+<span class="fc" id="L473">            ? List.of(state</span>
+<span class="fc" id="L474">                .withStrength(comparison.strength)</span>
+<span class="fc" id="L475">                .traced(&quot;same-as&quot;))</span>
+<span class="fc" id="L476">            : List.of();</span>
+    }
+
+    private static Comparison compare(
+        Expr expected,
+        Expr candidate,
+        RecognitionProfile profile,
+        Session session,
+        String descriptor
+    ) {
+<span class="pc bpc" id="L486" title="1 of 2 branches missed.">        if (expected.equals(candidate)) {</span>
+<span class="nc" id="L487">            return Comparison.exact();</span>
+        }
+<span class="pc bpc" id="L489" title="1 of 2 branches missed.">        List&lt;Expr&gt; representatives = profile.recognitionRuleIds().isEmpty()</span>
+<span class="pc bnc" id="L490" title="All 2 branches missed.">                || profile.maxEquivalenceDepth() == 0</span>
+<span class="fc" id="L491">            ? List.of(candidate)</span>
+<span class="nc" id="L492">            : session.options.representativeProvider()</span>
+<span class="pc" id="L493">                .representatives(candidate, profile);</span>
+<span class="pc bpc" id="L494" title="2 of 4 branches missed.">        if (representatives == null || representatives.isEmpty()) {</span>
+<span class="nc" id="L495">            session.diagnostic(&quot;REPRESENTATIVE_PROVIDER_EMPTY&quot;, descriptor);</span>
+<span class="nc" id="L496">            return Comparison.noMatch();</span>
+        }
+<span class="fc" id="L498">        PatternExpr pattern = literalPattern(expected);</span>
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        for (int index = 0; index &lt; representatives.size(); index++) {</span>
+<span class="fc" id="L500">            Expr representative = representatives.get(index);</span>
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">            if (representative == null) {</span>
+<span class="nc" id="L502">                session.diagnostic(&quot;REPRESENTATIVE_PROVIDER_NULL&quot;, descriptor);</span>
+<span class="nc" id="L503">                continue;</span>
+            }
+<span class="fc" id="L505">            EquivalenceAwarePatternMatcher.MatchAttempt attempt =</span>
+<span class="fc" id="L506">                EquivalenceAwarePatternMatcher.matchDetailed(</span>
+                    pattern,
+                    representative,
+<span class="fc" id="L509">                    Map.of(),</span>
+                    profile,
+<span class="fc" id="L511">                    session.options.maxPatternBranches()</span>
+                );
+<span class="fc" id="L513">            session.patternBranches += attempt.visitedBranches();</span>
+<span class="fc bfc" id="L514" title="All 2 branches covered.">            if (attempt.matched()) {</span>
+<span class="fc" id="L515">                return new Comparison(</span>
+                    true,
+<span class="pc bpc" id="L517" title="2 of 4 branches missed.">                    index &gt; 0 || !representative.equals(candidate)</span>
+                        ? ExprMatcher.RecognitionStrength
+<span class="nc" id="L519">                            .BOUNDED_REPRESENTATIVE</span>
+                        : ExprMatcher.RecognitionStrength
+<span class="fc" id="L521">                            .EQUIVALENCE_AWARE</span>
+                );
+            }
+<span class="pc bpc" id="L524" title="1 of 2 branches missed.">            if (attempt.inconclusive()) {</span>
+<span class="nc" id="L525">                session.diagnostic(attempt.limitCode(), descriptor);</span>
+            }
+        }
+<span class="fc" id="L528">        return Comparison.noMatch();</span>
+    }
+
+    private static PatternExpr literalPattern(Expr expression) {
+<span class="pc bpc" id="L532" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr number) {</span>
+<span class="nc" id="L533">            return PatternExpr.num(number.value());</span>
+        }
+<span class="fc bfc" id="L535" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L536">            return PatternExpr.variable(variable.name());</span>
+        }
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L539">            return PatternExpr.op(</span>
+<span class="fc" id="L540">                binary.operator(),</span>
+<span class="fc" id="L541">                literalPattern(binary.left()),</span>
+<span class="fc" id="L542">                literalPattern(binary.right())</span>
+            );
+        }
+<span class="nc bnc" id="L545" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L546">            return PatternExpr.fn(</span>
+<span class="nc" id="L547">                function.name(),</span>
+<span class="nc" id="L548">                function.arguments().stream()</span>
+<span class="nc" id="L549">                    .map(ExprMatcherEngine::literalPattern)</span>
+<span class="nc" id="L550">                    .toArray(PatternExpr[]::new)</span>
+            );
+        }
+<span class="nc" id="L553">        throw new IllegalArgumentException(</span>
+<span class="nc" id="L554">            &quot;Unsupported expression type: &quot; + expression.getClass().getName());</span>
+    }
+
+    private static boolean matchesNumberProperty(
+        Expr expression,
+        ExprMatcher.NumberPropertyKind kind
+    ) {
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">        if (!(expression instanceof NumberExpr number)</span>
+<span class="pc bpc" id="L562" title="1 of 2 branches missed.">                || !Double.isFinite(number.value())) {</span>
+<span class="nc" id="L563">            return false;</span>
+        }
+<span class="pc bpc" id="L565" title="1 of 3 branches missed.">        return switch (kind) {</span>
+<span class="fc" id="L566">            case NUMBER_LITERAL -&gt; true;</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">            case INTEGER_LITERAL -&gt; number.value() == Math.rint(number.value());</span>
+<span class="fc bfc" id="L568" title="All 2 branches covered.">            case NON_ZERO_NUMBER_LITERAL -&gt; number.value() != 0.0;</span>
+        };
+    }
+
+    private static List&lt;Integer&gt; append(List&lt;Integer&gt; path, int index) {
+<span class="fc" id="L573">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(path.size() + 1);</span>
+<span class="fc" id="L574">        result.addAll(path);</span>
+<span class="fc" id="L575">        result.add(index);</span>
+<span class="fc" id="L576">        return List.copyOf(result);</span>
+    }
+
+    private static final class Session {
+        private final ExprMatcher.MatchOptions options;
+<span class="fc" id="L581">        private final Set&lt;ExprMatcher.MatchDiagnostic&gt; diagnostics =</span>
+            new LinkedHashSet&lt;&gt;();
+        private int steps;
+        private int patternBranches;
+        private boolean stepLimitReported;
+
+<span class="fc" id="L587">        private Session(ExprMatcher.MatchOptions options) {</span>
+<span class="fc" id="L588">            this.options = options;</span>
+<span class="fc" id="L589">        }</span>
+
+        private boolean consumeStep(String descriptor) {
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">            if (steps &lt; options.maxSteps()) {</span>
+<span class="fc" id="L593">                steps++;</span>
+<span class="fc" id="L594">                return true;</span>
+            }
+<span class="nc bnc" id="L596" title="All 2 branches missed.">            if (!stepLimitReported) {</span>
+<span class="nc" id="L597">                diagnostic(&quot;MATCH_STEP_LIMIT&quot;, descriptor);</span>
+<span class="nc" id="L598">                stepLimitReported = true;</span>
+            }
+<span class="nc" id="L600">            return false;</span>
+        }
+
+        private void diagnostic(String code, String descriptor) {
+<span class="fc" id="L604">            diagnostics.add(new ExprMatcher.MatchDiagnostic(code, descriptor));</span>
+<span class="fc" id="L605">        }</span>
+
+        private List&lt;State&gt; limit(List&lt;State&gt; states, String descriptor) {
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">            if (states.size() &lt;= options.maxResults()) {</span>
+<span class="fc" id="L609">                return List.copyOf(states);</span>
+            }
+<span class="nc" id="L611">            diagnostic(&quot;MATCH_RESULT_LIMIT&quot;, descriptor);</span>
+<span class="nc" id="L612">            return List.copyOf(states.subList(0, options.maxResults()));</span>
+        }
+    }
+
+    private record State(
+        Map&lt;String, Expr&gt; bindings,
+        Expr representative,
+        int representativeIndex,
+        ExprMatcher.RecognitionStrength recognitionStrength,
+        List&lt;String&gt; trace
+    ) {
+<span class="fc" id="L623">        private State {</span>
+<span class="fc" id="L624">            bindings = Map.copyOf(bindings);</span>
+<span class="fc" id="L625">            representative = Objects.requireNonNull(</span>
+                representative, &quot;representative&quot;);
+<span class="fc" id="L627">            recognitionStrength = Objects.requireNonNull(</span>
+                recognitionStrength, &quot;recognitionStrength&quot;);
+<span class="fc" id="L629">            trace = List.copyOf(trace);</span>
+<span class="fc" id="L630">        }</span>
+
+        private State withBindings(Map&lt;String, Expr&gt; replacements) {
+<span class="fc" id="L633">            return new State(</span>
+                replacements,
+                representative,
+                representativeIndex,
+                recognitionStrength,
+                trace
+            );
+        }
+
+        private State withBinding(String name, Expr expression) {
+<span class="fc" id="L643">            Map&lt;String, Expr&gt; updated = new HashMap&lt;&gt;(bindings);</span>
+<span class="fc" id="L644">            updated.put(name, expression);</span>
+<span class="fc" id="L645">            return withBindings(updated);</span>
+        }
+
+        private State withStrength(
+            ExprMatcher.RecognitionStrength strength
+        ) {
+<span class="fc" id="L651">            return new State(</span>
+                bindings,
+                representative,
+                representativeIndex,
+<span class="fc" id="L655">                ExprMatcher.RecognitionStrength.strongest(</span>
+                    recognitionStrength, strength),
+                trace
+            );
+        }
+
+        private State recognized(
+            ExprMatcher.RecognitionStrength strength,
+            Expr matchedRepresentative,
+            int matchedRepresentativeIndex,
+            boolean replaceRootRepresentative
+        ) {
+<span class="fc" id="L667">            return new State(</span>
+                bindings,
+<span class="pc bpc" id="L669" title="1 of 2 branches missed.">                replaceRootRepresentative</span>
+<span class="nc" id="L670">                    ? matchedRepresentative</span>
+<span class="fc" id="L671">                    : representative,</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                replaceRootRepresentative</span>
+<span class="nc" id="L673">                    ? matchedRepresentativeIndex</span>
+<span class="fc" id="L674">                    : representativeIndex,</span>
+<span class="fc" id="L675">                ExprMatcher.RecognitionStrength.strongest(</span>
+                    recognitionStrength, strength),
+                trace
+            );
+        }
+
+        private State traced(String entry) {
+<span class="fc" id="L682">            List&lt;String&gt; updated = new ArrayList&lt;&gt;(trace.size() + 1);</span>
+<span class="fc" id="L683">            updated.addAll(trace);</span>
+<span class="fc" id="L684">            updated.add(entry);</span>
+<span class="fc" id="L685">            return new State(</span>
+                bindings,
+                representative,
+                representativeIndex,
+                recognitionStrength,
+                updated
+            );
+        }
+
+        private ExprMatcher.MatchResult toResult() {
+<span class="fc" id="L695">            return new ExprMatcher.MatchResult(</span>
+                bindings,
+                representative,
+                representativeIndex,
+                recognitionStrength,
+                trace
+            );
+        }
+    }
+
+<span class="fc" id="L705">    private record Comparison(</span>
+        boolean matched,
+        ExprMatcher.RecognitionStrength strength
+    ) {
+        private static Comparison exact() {
+<span class="nc" id="L710">            return new Comparison(</span>
+                true, ExprMatcher.RecognitionStrength.EXACT);
+        }
+
+        private static Comparison noMatch() {
+<span class="fc" id="L715">            return new Comparison(</span>
+                false, ExprMatcher.RecognitionStrength.EXACT);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

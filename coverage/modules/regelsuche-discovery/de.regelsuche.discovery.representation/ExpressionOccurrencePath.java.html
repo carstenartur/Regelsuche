@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExpressionOccurrencePath.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">ExpressionOccurrencePath.java</span></div><h1>ExpressionOccurrencePath.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Domain-neutral child-index path from an expression root.
+ *
+ * &lt;p&gt;For binary nodes, child {@code 0} is the left operand and child {@code 1}
+ * is the right operand. Function arguments use their zero-based argument index.&lt;/p&gt;
+ */
+public record ExpressionOccurrencePath(List&lt;Integer&gt; childIndexes)
+        implements Comparable&lt;ExpressionOccurrencePath&gt; {
+<span class="fc" id="L15">    public ExpressionOccurrencePath {</span>
+<span class="fc" id="L16">        Objects.requireNonNull(childIndexes, &quot;childIndexes&quot;);</span>
+<span class="pc bpc" id="L17" title="3 of 6 branches missed.">        if (childIndexes.stream().anyMatch(index -&gt; index == null || index &lt; 0)) {</span>
+<span class="nc" id="L18">            throw new IllegalArgumentException(&quot;child indexes must be non-negative&quot;);</span>
+        }
+<span class="fc" id="L20">        childIndexes = List.copyOf(childIndexes);</span>
+<span class="fc" id="L21">    }</span>
+
+    public static ExpressionOccurrencePath root() {
+<span class="fc" id="L24">        return new ExpressionOccurrencePath(List.of());</span>
+    }
+
+    public boolean isRoot() {
+<span class="fc" id="L28">        return childIndexes.isEmpty();</span>
+    }
+
+    public ExpressionOccurrencePath append(int childIndex) {
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (childIndex &lt; 0) {</span>
+<span class="nc" id="L33">            throw new IllegalArgumentException(&quot;child index must be non-negative&quot;);</span>
+        }
+<span class="fc" id="L35">        List&lt;Integer&gt; next = new ArrayList&lt;&gt;(childIndexes);</span>
+<span class="fc" id="L36">        next.add(childIndex);</span>
+<span class="fc" id="L37">        return new ExpressionOccurrencePath(next);</span>
+    }
+
+    public String canonical() {
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (isRoot()) {</span>
+<span class="fc" id="L42">            return &quot;/&quot;;</span>
+        }
+<span class="fc" id="L44">        StringBuilder value = new StringBuilder();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (Integer childIndex : childIndexes) {</span>
+<span class="fc" id="L46">            value.append('/').append(childIndex);</span>
+<span class="fc" id="L47">        }</span>
+<span class="fc" id="L48">        return value.toString();</span>
+    }
+
+    @Override
+    public int compareTo(ExpressionOccurrencePath other) {
+<span class="fc" id="L53">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc" id="L54">        int shared = Math.min(childIndexes.size(), other.childIndexes.size());</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (int i = 0; i &lt; shared; i++) {</span>
+<span class="fc" id="L56">            int compared = Integer.compare(childIndexes.get(i), other.childIndexes.get(i));</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (compared != 0) {</span>
+<span class="fc" id="L58">                return compared;</span>
+            }
+        }
+<span class="fc" id="L61">        return Integer.compare(childIndexes.size(), other.childIndexes.size());</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L66">        return canonical();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

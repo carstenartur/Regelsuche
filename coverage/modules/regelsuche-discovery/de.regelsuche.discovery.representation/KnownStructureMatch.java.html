@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnownStructureMatch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">KnownStructureMatch.java</span></div><h1>KnownStructureMatch.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** One occurrence-local match against a known-structure catalog entry. */
+public record KnownStructureMatch(
+    String structureId,
+    String domainId,
+    ExpressionOccurrencePath occurrencePath,
+    Map&lt;String, String&gt; bindings,
+    List&lt;String&gt; requiredAssumptions,
+    List&lt;String&gt; consequenceIds,
+    String provenance,
+    String recognitionMode,
+    String matchedRepresentative,
+    int representativeIndex
+) {
+    public static final String RECOGNITION_EXACT = &quot;EXACT&quot;;
+    public static final String RECOGNITION_EQUIVALENCE_AWARE =
+        &quot;EQUIVALENCE_AWARE&quot;;
+    public static final String RECOGNITION_BOUNDED_REPRESENTATIVE =
+        &quot;BOUNDED_REPRESENTATIVE&quot;;
+
+<span class="fc" id="L30">    private static final Set&lt;String&gt; RECOGNITION_MODES = Set.of(</span>
+        RECOGNITION_EXACT,
+        RECOGNITION_EQUIVALENCE_AWARE,
+        RECOGNITION_BOUNDED_REPRESENTATIVE
+    );
+
+<span class="fc" id="L36">    public KnownStructureMatch {</span>
+<span class="fc" id="L37">        structureId = RepresentationCandidateAssessment.requireText(</span>
+            structureId, &quot;structureId&quot;);
+<span class="fc" id="L39">        domainId = RepresentationCandidateAssessment.requireText(</span>
+            domainId, &quot;domainId&quot;);
+<span class="fc" id="L41">        occurrencePath = Objects.requireNonNull(occurrencePath, &quot;occurrencePath&quot;);</span>
+<span class="fc" id="L42">        bindings = normalizedBindings(bindings);</span>
+<span class="fc" id="L43">        requiredAssumptions = RepresentationCandidateAssessment.sortedUnique(</span>
+            requiredAssumptions, &quot;requiredAssumptions&quot;);
+<span class="fc" id="L45">        consequenceIds = RepresentationCandidateAssessment.sortedUnique(</span>
+            consequenceIds, &quot;consequenceIds&quot;);
+<span class="fc" id="L47">        provenance = RepresentationCandidateAssessment.requireText(</span>
+            provenance, &quot;provenance&quot;);
+<span class="fc" id="L49">        recognitionMode = RepresentationCandidateAssessment.requireText(</span>
+            recognitionMode, &quot;recognitionMode&quot;);
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (!RECOGNITION_MODES.contains(recognitionMode)) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(</span>
+                &quot;unsupported recognitionMode: &quot; + recognitionMode);
+        }
+<span class="fc" id="L55">        matchedRepresentative = RepresentationCandidateAssessment.requireText(</span>
+            matchedRepresentative, &quot;matchedRepresentative&quot;);
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (representativeIndex &lt; 0) {</span>
+<span class="nc" id="L58">            throw new IllegalArgumentException(</span>
+                &quot;representativeIndex must not be negative&quot;);
+        }
+<span class="fc" id="L61">    }</span>
+
+    public boolean wholeExpression() {
+<span class="fc" id="L64">        return occurrencePath.isRoot();</span>
+    }
+
+    public String identity() {
+<span class="fc" id="L68">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L69">        KnownStructureCatalog.appendCanonicalField(descriptor, structureId);</span>
+<span class="fc" id="L70">        KnownStructureCatalog.appendCanonicalField(descriptor, domainId);</span>
+<span class="fc" id="L71">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L72">            descriptor, occurrencePath.canonical());</span>
+<span class="fc" id="L73">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L74">            descriptor, Integer.toString(bindings.size()));</span>
+<span class="fc" id="L75">        bindings.forEach((name, expression) -&gt; {</span>
+<span class="fc" id="L76">            KnownStructureCatalog.appendCanonicalField(descriptor, name);</span>
+<span class="fc" id="L77">            KnownStructureCatalog.appendCanonicalField(descriptor, expression);</span>
+<span class="fc" id="L78">        });</span>
+<span class="fc" id="L79">        return KnownStructureCatalog.sha256(descriptor.toString());</span>
+    }
+
+    private static Map&lt;String, String&gt; normalizedBindings(
+        Map&lt;String, String&gt; values
+    ) {
+<span class="fc" id="L85">        TreeMap&lt;String, String&gt; sorted = new TreeMap&lt;&gt;();</span>
+        for (Map.Entry&lt;String, String&gt; entry
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                : Objects.requireNonNull(values, &quot;bindings&quot;).entrySet()) {</span>
+<span class="fc" id="L88">            String name = RepresentationCandidateAssessment.requireText(</span>
+<span class="fc" id="L89">                entry.getKey(), &quot;binding name&quot;);</span>
+<span class="fc" id="L90">            String expression = RepresentationCandidateAssessment.requireText(</span>
+<span class="fc" id="L91">                entry.getValue(), &quot;binding expression&quot;);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (sorted.put(name, expression) != null) {</span>
+<span class="nc" id="L93">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate normalized binding name: &quot; + name);
+            }
+<span class="fc" id="L96">        }</span>
+<span class="fc" id="L97">        return Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(sorted));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

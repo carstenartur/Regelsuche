@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SemanticDescriptionMeasurer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">SemanticDescriptionMeasurer.java</span></div><h1>SemanticDescriptionMeasurer.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.value.ExprValueFactory;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.LinkedHashSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/** Computes deterministic raw description measures without choosing one scalar score. */
+public final class SemanticDescriptionMeasurer {
+    private final ExpressionParser parser;
+
+    public SemanticDescriptionMeasurer() {
+<span class="fc" id="L23">        this(new ExpressionParser());</span>
+<span class="fc" id="L24">    }</span>
+
+<span class="fc" id="L26">    public SemanticDescriptionMeasurer(ExpressionParser parser) {</span>
+<span class="fc" id="L27">        this.parser = Objects.requireNonNull(parser, &quot;parser&quot;);</span>
+<span class="fc" id="L28">    }</span>
+
+    public SemanticDescriptionMetrics measure(String expression) {
+<span class="fc" id="L31">        return measure(parser.parseTerm(Objects.requireNonNull(expression, &quot;expression&quot;)));</span>
+    }
+
+    public SemanticDescriptionMetrics measure(Expr expression) {
+<span class="fc" id="L35">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L36">        SyntaxStatistics syntax = new SyntaxStatistics();</span>
+<span class="fc" id="L37">        inspect(expression, syntax);</span>
+
+        int distinctValues;
+<span class="fc" id="L40">        try (ExprValueFactory factory = new ExprValueFactory()) {</span>
+<span class="fc" id="L41">            distinctValues = new LinkedHashSet&lt;&gt;(</span>
+<span class="fc" id="L42">                factory.project(expression).valuesBySyntaxIdentity().values()).size();</span>
+        }
+
+<span class="fc" id="L45">        String normalized = ExpressionFormatter.format(expression);</span>
+<span class="fc" id="L46">        return new SemanticDescriptionMetrics(</span>
+            normalized,
+<span class="fc" id="L48">            tokenCount(normalized),</span>
+            syntax.astNodeCount,
+            syntax.operatorCount,
+            syntax.numericBitLength,
+            syntax.astNodeCount,
+            distinctValues,
+            syntax.astNodeCount - distinctValues,
+<span class="fc" id="L55">            syntax.variables.stream().toList(),</span>
+<span class="fc" id="L56">            syntax.functions.stream().toList()</span>
+        );
+    }
+
+    private static void inspect(Expr expression, SyntaxStatistics statistics) {
+<span class="fc" id="L61">        statistics.astNodeCount++;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L63">            statistics.operatorCount++;</span>
+<span class="fc" id="L64">            inspect(binary.left(), statistics);</span>
+<span class="fc" id="L65">            inspect(binary.right(), statistics);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L67">            statistics.operatorCount++;</span>
+<span class="fc" id="L68">            statistics.functions.add(function.name());</span>
+<span class="fc" id="L69">            function.arguments().forEach(argument -&gt; inspect(argument, statistics));</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        } else if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L71">            statistics.variables.add(variable.name());</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        } else if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L73">            statistics.numericBitLength = Math.addExact(</span>
+<span class="fc" id="L74">                statistics.numericBitLength, numericBitLength(number.value()));</span>
+        } else {
+<span class="nc" id="L76">            throw new IllegalArgumentException(</span>
+                &quot;Unsupported expression implementation: &quot;
+<span class="nc" id="L78">                    + expression.getClass().getName());</span>
+        }
+<span class="fc" id="L80">    }</span>
+
+    private static int numericBitLength(double value) {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (!Double.isFinite(value)) {</span>
+<span class="nc" id="L84">            throw new IllegalArgumentException(&quot;non-finite numbers are not measurable&quot;);</span>
+        }
+<span class="fc" id="L86">        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();</span>
+<span class="fc" id="L87">        int bits = Math.max(1, decimal.unscaledValue().abs().bitLength());</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        return decimal.scale() == 0</span>
+<span class="fc" id="L89">            ? bits</span>
+<span class="fc" id="L90">            : Math.addExact(</span>
+                bits,
+<span class="fc" id="L92">                BigInteger.TEN.pow(Math.abs(decimal.scale())).bitLength());</span>
+    }
+
+    private static int tokenCount(String expression) {
+<span class="fc" id="L96">        int tokens = 0;</span>
+<span class="fc" id="L97">        int index = 0;</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        while (index &lt; expression.length()) {</span>
+<span class="fc" id="L99">            char current = expression.charAt(index);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (Character.isWhitespace(current)) {</span>
+<span class="fc" id="L101">                index++;</span>
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">            } else if (Character.isLetter(current) || current == '_') {</span>
+<span class="fc" id="L103">                index = scanIdentifier(expression, index);</span>
+<span class="fc" id="L104">                tokens++;</span>
+<span class="pc bpc" id="L105" title="1 of 4 branches missed.">            } else if (Character.isDigit(current) || current == '.') {</span>
+<span class="fc" id="L106">                index = scanNumber(expression, index);</span>
+<span class="fc" id="L107">                tokens++;</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            } else if (&quot;+-*/^(),&quot;.indexOf(current) &gt;= 0) {</span>
+<span class="fc" id="L109">                index++;</span>
+<span class="fc" id="L110">                tokens++;</span>
+            } else {
+<span class="nc" id="L112">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported formatted token at position &quot; + index);
+            }
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">        return Math.max(1, tokens);</span>
+    }
+
+    private static int scanIdentifier(String expression, int index) {
+<span class="fc" id="L120">        int cursor = index + 1;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        while (cursor &lt; expression.length()) {</span>
+<span class="fc" id="L122">            char current = expression.charAt(cursor);</span>
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">            if (!Character.isLetterOrDigit(current) &amp;&amp; current != '_') {</span>
+<span class="fc" id="L124">                break;</span>
+            }
+<span class="fc" id="L126">            cursor++;</span>
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">        return cursor;</span>
+    }
+
+    private static int scanNumber(String expression, int index) {
+<span class="fc" id="L132">        int cursor = index;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        while (cursor &lt; expression.length()</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                &amp;&amp; Character.isDigit(expression.charAt(cursor))) {</span>
+<span class="fc" id="L135">            cursor++;</span>
+        }
+<span class="fc bfc" id="L137" title="All 4 branches covered.">        if (cursor &lt; expression.length() &amp;&amp; expression.charAt(cursor) == '.') {</span>
+<span class="fc" id="L138">            cursor++;</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            while (cursor &lt; expression.length()</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                    &amp;&amp; Character.isDigit(expression.charAt(cursor))) {</span>
+<span class="fc" id="L141">                cursor++;</span>
+            }
+        }
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (cursor &lt; expression.length()</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                &amp;&amp; (expression.charAt(cursor) == 'e'</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                    || expression.charAt(cursor) == 'E')) {</span>
+<span class="fc" id="L147">            cursor++;</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (cursor &lt; expression.length()</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                    &amp;&amp; (expression.charAt(cursor) == '+'</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                        || expression.charAt(cursor) == '-')) {</span>
+<span class="fc" id="L151">                cursor++;</span>
+            }
+<span class="fc" id="L153">            int exponentStart = cursor;</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            while (cursor &lt; expression.length()</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                    &amp;&amp; Character.isDigit(expression.charAt(cursor))) {</span>
+<span class="fc" id="L156">                cursor++;</span>
+            }
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            if (cursor == exponentStart) {</span>
+<span class="nc" id="L159">                throw new IllegalArgumentException(</span>
+                    &quot;invalid formatted exponent at position &quot; + index);
+            }
+        }
+<span class="pc bpc" id="L163" title="1 of 4 branches missed.">        if (cursor == index</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                || cursor == index + 1 &amp;&amp; expression.charAt(index) == '.') {</span>
+<span class="nc" id="L165">            throw new IllegalArgumentException(</span>
+                &quot;invalid formatted number at position &quot; + index);
+        }
+<span class="fc" id="L168">        return cursor;</span>
+    }
+
+<span class="fc" id="L171">    private static final class SyntaxStatistics {</span>
+        private int astNodeCount;
+        private int operatorCount;
+        private int numericBitLength;
+<span class="fc" id="L175">        private final Set&lt;String&gt; variables = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L176">        private final Set&lt;String&gt; functions = new TreeSet&lt;&gt;();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
