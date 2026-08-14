@@ -176,10 +176,6 @@ public record RepresentationCandidateAssessment(
         if (normalized.isEmpty()) {
             throw new IllegalArgumentException(field + " must not be blank");
         }
-        if (normalized.codePoints().anyMatch(Character::isISOControl)) {
-            throw new IllegalArgumentException(
-                field + " must not contain control characters");
-        }
         return normalized;
     }
 }

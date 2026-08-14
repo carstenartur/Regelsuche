@@ -87,12 +87,17 @@ public final class KnownStructureMatcher {
         List<KnownStructureMatch> matches
     ) {
         for (KnownStructure structure : catalog.structures()) {
-            var result = patternMatcher.match(
-                structure.pattern(),
-                expression,
-                structure.recognitionProfile(),
-                representativeProvider
-            );
+            Map<String, Expr> exactBindings = new LinkedHashMap<>();
+            boolean exact = structure.pattern().match(expression, exactBindings);
+            var result = exact
+                ? new EquivalenceClassPatternMatcher.MatchResult(
+                    true, expression, Map.copyOf(exactBindings), 0)
+                : patternMatcher.match(
+                    structure.pattern(),
+                    expression,
+                    structure.recognitionProfile(),
+                    representativeProvider
+                );
             if (!result.matched()) {
                 continue;
             }
@@ -111,10 +116,7 @@ public final class KnownStructureMatcher {
                 structure.requiredAssumptions(),
                 structure.consequenceIds(),
                 structure.provenance(),
-                recognitionMode(
-                    structure.recognitionProfile(),
-                    result.representativeIndex()
-                ),
+                recognitionMode(exact, result.representativeIndex()),
                 ExpressionFormatter.format(result.representative()),
                 result.representativeIndex()
             ));
@@ -131,14 +133,14 @@ public final class KnownStructureMatcher {
     }
 
     private static String recognitionMode(
-        RecognitionProfile profile,
+        boolean exact,
         int representativeIndex
     ) {
-        if (representativeIndex > 0) {
-            return KnownStructureMatch.RECOGNITION_BOUNDED_REPRESENTATIVE;
+        if (exact) {
+            return KnownStructureMatch.RECOGNITION_EXACT;
         }
-        return profile.equals(RecognitionProfile.exact())
-            ? KnownStructureMatch.RECOGNITION_EXACT
+        return representativeIndex > 0
+            ? KnownStructureMatch.RECOGNITION_BOUNDED_REPRESENTATIVE
             : KnownStructureMatch.RECOGNITION_EQUIVALENCE_AWARE;
     }
 }

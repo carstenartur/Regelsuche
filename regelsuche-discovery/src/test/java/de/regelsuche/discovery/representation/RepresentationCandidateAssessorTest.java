@@ -256,6 +256,16 @@ class RepresentationCandidateAssessorTest {
             catalog(completeSquare(RecognitionProfile.algebraicAc())));
         assertFalse(algebraicMatcher.match(
             "x^2 + 3*a*x + (9/4)*a^2").isEmpty());
+
+        var broadSquareMatcher = new KnownStructureMatcher(
+            catalog(perfectSquare(RecognitionProfile.algebraicAc())));
+        assertEquals(
+            KnownStructureMatch.RECOGNITION_EXACT,
+            matchById(
+                broadSquareMatcher.match("(x + a)^2"),
+                "perfect-square"
+            ).recognitionMode()
+        );
     }
 
     @Test
@@ -317,18 +327,31 @@ class RepresentationCandidateAssessorTest {
     }
 
     @Test
-    void catalogTextAndDuplicateIdsFailClosed() {
+    void catalogIdentityIsDelimiterSafeAndDuplicateIdsFailClosed() {
         KnownStructure structure = perfectSquare();
         assertThrows(IllegalArgumentException.class,
             () -> new KnownStructureCatalog("v1", List.of(structure, structure)));
-        assertThrows(IllegalArgumentException.class, () -> new KnownStructure(
-            "bad\nid",
-            "algebra",
+
+        KnownStructure delimiterInId = new KnownStructure(
+            "a\u0000b",
+            "c",
             PatternExpr.var("value"),
             List.of(),
             List.of(),
             "first-party"
-        ));
+        );
+        KnownStructure delimiterInDomain = new KnownStructure(
+            "a",
+            "b\u0000c",
+            PatternExpr.var("value"),
+            List.of(),
+            List.of(),
+            "first-party"
+        );
+        assertNotEquals(
+            catalog(delimiterInId).contentHash(),
+            catalog(delimiterInDomain).contentHash()
+        );
     }
 
     private static RepresentationCandidateAssessment assess(
@@ -384,10 +407,15 @@ class RepresentationCandidateAssessorTest {
     }
 
     private static KnownStructure perfectSquare() {
+        return perfectSquare(RecognitionProfile.exact());
+    }
+
+    private static KnownStructure perfectSquare(RecognitionProfile profile) {
         return new KnownStructure(
             "perfect-square",
             "algebra",
             PatternExpr.op(POW, PatternExpr.var("base"), PatternExpr.num(2)),
+            profile,
             List.of(),
             List.of("rule:square-reasoning"),
             "first-party"
