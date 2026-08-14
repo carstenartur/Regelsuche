@@ -92,15 +92,10 @@ tasks.register('verifyCandidateIndependentBenchmark', Exec) {
     inputs.file('scripts/verify-candidate-independent-preregistration.py')
 }
 
-tasks.register('verifyWorkflowSemantics', Exec) {
+tasks.register('verifyWorkflowSemantics') {
     group = 'verification'
-    description = 'Rejects unclassified workflows and workflow-owned verification semantics.'
-    workingDir rootDir
-    commandLine pythonExecutable, 'scripts/verify-workflow-semantics.py'
-    inputs.dir('.github/workflows')
-    inputs.file('config/workflow-semantics-policy.json')
-    inputs.file('config/github-merge-governance-policy.json')
-    inputs.file('scripts/verify-workflow-semantics.py')
+    description = 'Compatibility alias; Maven/JUnit owns the workflow-semantics contract.'
+    dependsOn ':regelsuche-core:verifyMavenCoreReactor'
 }
 
 def verificationVenvDirectory = layout.buildDirectory.dir('verification-venv')
