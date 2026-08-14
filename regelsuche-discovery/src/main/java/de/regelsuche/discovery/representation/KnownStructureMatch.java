@@ -18,16 +18,19 @@ public record KnownStructureMatch(
     String provenance
 ) {
     public KnownStructureMatch {
-        structureId = RepresentationContracts.text(structureId, "structureId");
-        domainId = RepresentationContracts.text(domainId, "domainId");
+        structureId = RepresentationCandidateAssessment.requireText(
+            structureId, "structureId");
+        domainId = RepresentationCandidateAssessment.requireText(
+            domainId, "domainId");
         occurrencePath = Objects.requireNonNull(occurrencePath, "occurrencePath");
         bindings = Collections.unmodifiableMap(new LinkedHashMap<>(
             new TreeMap<>(Objects.requireNonNull(bindings, "bindings"))));
-        requiredAssumptions = RepresentationContracts.sortedUnique(
+        requiredAssumptions = RepresentationCandidateAssessment.sortedUnique(
             requiredAssumptions, "requiredAssumptions");
-        consequenceIds = RepresentationContracts.sortedUnique(
+        consequenceIds = RepresentationCandidateAssessment.sortedUnique(
             consequenceIds, "consequenceIds");
-        provenance = RepresentationContracts.text(provenance, "provenance");
+        provenance = RepresentationCandidateAssessment.requireText(
+            provenance, "provenance");
     }
 
     public boolean wholeExpression() {
