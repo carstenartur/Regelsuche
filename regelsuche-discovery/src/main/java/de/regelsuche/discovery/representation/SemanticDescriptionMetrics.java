@@ -17,7 +17,7 @@ public record SemanticDescriptionMetrics(
     List<String> functionSymbols
 ) {
     public SemanticDescriptionMetrics {
-        normalizedExpression = RepresentationContracts.text(
+        normalizedExpression = RepresentationCandidateAssessment.requireText(
             normalizedExpression, "normalizedExpression");
         if (tokenCount < 1 || astNodeCount < 1 || operatorCount < 0
                 || numericBitLength < 0 || semanticValueOccurrences < 1
