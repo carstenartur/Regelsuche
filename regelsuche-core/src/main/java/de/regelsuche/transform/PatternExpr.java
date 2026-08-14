@@ -12,12 +12,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Builds one expression from previously established matcher bindings. */
-@FunctionalInterface
-interface ExprTemplate {
-    Expr instantiate(Map<String, Expr> bindings);
-}
-
 /**
  * Instantiable expression pattern retained for rewrite compatibility.
  *
@@ -201,4 +195,10 @@ public sealed interface PatternExpr extends ExprTemplate
             return new FunctionExpr(name, args);
         }
     }
+}
+
+/** Builds one expression from previously established matcher bindings. */
+@FunctionalInterface
+interface ExprTemplate {
+    Expr instantiate(Map<String, Expr> bindings);
 }
