@@ -2,9 +2,11 @@ package de.regelsuche.docs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -14,23 +16,72 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class GeneratedDiscoveryGalleryContractTest {
+    private static final Path README_PATH = Path.of("README.md");
     private static final List<Path> GENERATED_PATHS = List.of(
         Path.of("docs/generated/discovery"),
-        Path.of("docs/demo-gallery.md")
+        Path.of("docs/demo-gallery.md"),
+        README_PATH
     );
 
     @Test
     void generatorReproducesCommittedGalleryByteForByte(
         @TempDir Path temporary
     ) throws IOException {
+        Path repository = repositoryRoot();
+        Path committedReadme = repository.resolve(README_PATH);
+        assertTrue(
+            Files.isRegularFile(committedReadme, LinkOption.NOFOLLOW_LINKS),
+            "committed README must be a regular file"
+        );
+        Files.copy(committedReadme, temporary.resolve(README_PATH));
+
         new DocsDiscoveryGalleryGenerator().generate(temporary);
 
-        Path repository = repositoryRoot();
         for (Path relative : GENERATED_PATHS) {
             Path expected = repository.resolve(relative);
             Path actual = temporary.resolve(relative);
             assertSameTree(expected, actual, relative);
         }
+    }
+
+    @Test
+    void treeComparisonRejectsMembershipAndByteDrift(
+        @TempDir Path temporary
+    ) throws IOException {
+        Path expected = temporary.resolve("expected");
+        Path actual = temporary.resolve("actual");
+        Files.createDirectories(expected);
+        Files.createDirectories(actual);
+        Files.writeString(
+            expected.resolve("evidence.json"),
+            "expected\n",
+            StandardCharsets.UTF_8
+        );
+        Files.writeString(
+            actual.resolve("evidence.json"),
+            "changed\n",
+            StandardCharsets.UTF_8
+        );
+
+        assertThrows(
+            AssertionError.class,
+            () -> assertSameTree(expected, actual, Path.of("generated"))
+        );
+
+        Files.writeString(
+            actual.resolve("evidence.json"),
+            "expected\n",
+            StandardCharsets.UTF_8
+        );
+        Files.writeString(
+            actual.resolve("unexpected.txt"),
+            "unexpected\n",
+            StandardCharsets.UTF_8
+        );
+        assertThrows(
+            AssertionError.class,
+            () -> assertSameTree(expected, actual, Path.of("generated"))
+        );
     }
 
     private static void assertSameTree(
