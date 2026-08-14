@@ -1,6 +1,6 @@
 package de.regelsuche.discovery.representation;
 
-import de.regelsuche.knowledge.KnownStructureMetadata;
+import de.regelsuche.knowledge.KnowledgePack.KnownStructureMetadata;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;

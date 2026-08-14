@@ -21,7 +21,7 @@ import static de.regelsuche.discovery.representation.RepresentationCandidateAsse
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
-import de.regelsuche.knowledge.KnownStructureEvidence;
+import de.regelsuche.knowledge.KnowledgePack.KnownStructureEvidence;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.util.Comparator;

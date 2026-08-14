@@ -1,6 +1,6 @@
 package de.regelsuche.discovery.representation;
 
-import de.regelsuche.knowledge.KnownStructureMetadata;
+import de.regelsuche.knowledge.KnowledgePack.KnownStructureMetadata;
 import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.RecognitionProfile;

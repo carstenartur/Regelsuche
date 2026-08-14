@@ -1,5 +1,6 @@
 package de.regelsuche.knowledge;
 
+import de.regelsuche.knowledge.KnowledgePack.KnownStructureDefinition;
 import de.regelsuche.transform.PatternRewriteRule;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
