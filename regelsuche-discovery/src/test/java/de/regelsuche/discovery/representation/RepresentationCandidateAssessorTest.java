@@ -1,12 +1,26 @@
 package de.regelsuche.discovery.representation;
 
+import static de.regelsuche.ast.BinaryOperator.ADD;
+import static de.regelsuche.ast.BinaryOperator.MUL;
 import static de.regelsuche.ast.BinaryOperator.POW;
 import static de.regelsuche.ast.BinaryOperator.SUB;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.COMPRESSION_BLOCKED_BY_INTRODUCED_SYMBOLS;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.COMPRESSION_MATERIAL_MULTI_DIMENSIONAL;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_DOWNSTREAM_CAPABILITY_BRIDGE;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_KNOWN_WHOLE_FORM_BRIDGE;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_NO_MATERIAL_REPRESENTATION_GAIN;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_SUBEXPRESSION_COMPRESSION;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_WHOLE_EXPRESSION_COMPRESSION;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.util.List;
@@ -15,6 +29,8 @@ import org.junit.jupiter.api.Test;
 class RepresentationCandidateAssessorTest {
     private static final CandidateProofStatus VERIFIED =
         CandidateProofStatus.SYMBOLICALLY_VERIFIED;
+    private final SemanticDescriptionMeasurer measurer =
+        new SemanticDescriptionMeasurer();
 
     @Test
     void recognizesTargetFreeMultiDimensionalCompression() {
@@ -25,10 +41,9 @@ class RepresentationCandidateAssessorTest {
             VERIFIED
         );
 
-        assertEquals(
-            SemanticCompressionStatus.MATERIAL_MULTI_DIMENSIONAL,
+        assertEquals(COMPRESSION_MATERIAL_MULTI_DIMENSIONAL,
             result.compressionStatus());
-        assertType(result, RepresentationCandidateType.WHOLE_EXPRESSION_COMPRESSION);
+        assertType(result, TYPE_WHOLE_EXPRESSION_COMPRESSION);
         assertTrue(result.materialRepresentationGain());
         assertTrue(result.claimEligible());
         assertTrue(result.scopedCompressionDelta().improvedDimensions().size() >= 2);
@@ -39,8 +54,7 @@ class RepresentationCandidateAssessorTest {
         var result = assess(
             KnownStructureCatalog.empty(), "a + b", "b + a", VERIFIED);
 
-        assertEquals(
-            List.of(RepresentationCandidateType.NO_MATERIAL_REPRESENTATION_GAIN),
+        assertEquals(List.of(TYPE_NO_MATERIAL_REPRESENTATION_GAIN),
             result.candidateTypes());
         assertFalse(result.materialRepresentationGain());
         assertFalse(result.claimEligible());
@@ -55,8 +69,7 @@ class RepresentationCandidateAssessorTest {
             VERIFIED
         );
 
-        assertEquals(
-            SemanticCompressionStatus.BLOCKED_BY_INTRODUCED_SYMBOLS,
+        assertEquals(COMPRESSION_BLOCKED_BY_INTRODUCED_SYMBOLS,
             result.compressionStatus());
         assertEquals(List.of("shortcut"), result.introducedFunctionSymbols());
         assertFalse(result.materialRepresentationGain());
@@ -71,15 +84,15 @@ class RepresentationCandidateAssessorTest {
             VERIFIED
         );
 
-        assertType(result, RepresentationCandidateType.KNOWN_WHOLE_FORM_BRIDGE);
-        assertType(result, RepresentationCandidateType.DOWNSTREAM_CAPABILITY_BRIDGE);
+        assertType(result, TYPE_KNOWN_WHOLE_FORM_BRIDGE);
+        assertType(result, TYPE_DOWNSTREAM_CAPABILITY_BRIDGE);
         assertTrue(result.newlyUnlockedConsequences().stream().anyMatch(unlock ->
             unlock.consequenceId().equals("rule:factor-difference-of-squares")
                 && unlock.occurrencePath().isRoot()));
         assertTrue(result.materialRepresentationGain());
         assertTrue(result.claimEligible());
         assertFalse(result.candidateTypes().contains(
-            RepresentationCandidateType.WHOLE_EXPRESSION_COMPRESSION));
+            TYPE_WHOLE_EXPRESSION_COMPRESSION));
     }
 
     @Test
@@ -108,7 +121,7 @@ class RepresentationCandidateAssessorTest {
         var result = new RepresentationCandidateAssessor(
             KnownStructureCatalog.empty()).assess(proposal);
 
-        assertType(result, RepresentationCandidateType.SUBEXPRESSION_COMPRESSION);
+        assertType(result, TYPE_SUBEXPRESSION_COMPRESSION);
         assertTrue(result.materialRepresentationGain());
     }
 
@@ -142,7 +155,7 @@ class RepresentationCandidateAssessorTest {
 
         assertTrue(result.newlyUnlockedConsequences().isEmpty());
         assertTrue(result.warnings().contains(
-            RepresentationAssessmentWarning.UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS));
+            WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS));
     }
 
     @Test
@@ -157,7 +170,81 @@ class RepresentationCandidateAssessorTest {
         assertTrue(result.materialRepresentationGain());
         assertFalse(result.claimEligible());
         assertTrue(result.warnings().contains(
-            RepresentationAssessmentWarning.VALIDATION_BELOW_SYMBOLIC_CONFIRMATION));
+            WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION));
+    }
+
+    @Test
+    void exposesSharingAwareRawDimensions() {
+        var metrics = measurer.measure("(x + 1) * (x + 1)");
+
+        assertTrue(metrics.semanticValueOccurrences()
+            > metrics.distinctSemanticValues());
+        assertEquals(
+            metrics.semanticValueOccurrences() - metrics.distinctSemanticValues(),
+            metrics.repeatedSemanticValueSavings());
+        assertTrue(metrics.variableSymbols().contains("x"));
+    }
+
+    @Test
+    void countsSharedAstObjectAtEverySyntaxPosition() {
+        var shared = new BinaryExpr(new VariableExpr("x"), ADD, new NumberExpr(1));
+        var root = new BinaryExpr(shared, MUL, shared);
+        var metrics = measurer.measure(root);
+
+        assertEquals(metrics.astNodeCount(), metrics.semanticValueOccurrences());
+        assertTrue(metrics.repeatedSemanticValueSavings() > 0);
+    }
+
+    @Test
+    void compactSquareImprovesRawDimensions() {
+        var expanded = measurer.measure("a^2 + 2*a*b + b^2");
+        var compact = measurer.measure("(a + b)^2");
+
+        assertTrue(expanded.tokenCount() > compact.tokenCount());
+        assertTrue(expanded.astNodeCount() > compact.astNodeCount());
+        assertTrue(expanded.operatorCount() > compact.operatorCount());
+        assertTrue(expanded.distinctSemanticValues()
+            > compact.distinctSemanticValues());
+    }
+
+    @Test
+    void whitespaceDoesNotChangeMeasuredExpression() {
+        assertEquals(measurer.measure("a+b"), measurer.measure("  a   +   b  "));
+    }
+
+    @Test
+    void findsKnownStructureAtExactOccurrence() {
+        var matcher = new KnownStructureMatcher(catalog(perfectSquare()));
+        var matches = matcher.match("z + (a + b)^2");
+
+        assertTrue(matches.stream().anyMatch(match ->
+            match.structureId().equals("perfect-square")
+                && match.occurrencePath().equals(path(1))));
+        assertFalse(matches.stream().anyMatch(KnownStructureMatch::wholeExpression));
+    }
+
+    @Test
+    void catalogIdentityIsIndependentOfInputOrder() {
+        KnownStructure first = perfectSquare();
+        KnownStructure second = new KnownStructure(
+            "sum",
+            "algebra",
+            PatternExpr.op(ADD, PatternExpr.var("left"), PatternExpr.var("right")),
+            List.of(),
+            List.of(),
+            "first-party"
+        );
+
+        assertEquals(
+            new KnownStructureCatalog("v1", List.of(first, second)).contentHash(),
+            new KnownStructureCatalog("v1", List.of(second, first)).contentHash());
+    }
+
+    @Test
+    void duplicateStructureIdsFailClosed() {
+        KnownStructure structure = perfectSquare();
+        assertThrows(IllegalArgumentException.class,
+            () -> new KnownStructureCatalog("v1", List.of(structure, structure)));
     }
 
     private static RepresentationCandidateAssessment assess(
@@ -182,7 +269,7 @@ class RepresentationCandidateAssessorTest {
 
     private static void assertType(
         RepresentationCandidateAssessment result,
-        RepresentationCandidateType type
+        String type
     ) {
         assertTrue(result.candidateTypes().contains(type));
     }
