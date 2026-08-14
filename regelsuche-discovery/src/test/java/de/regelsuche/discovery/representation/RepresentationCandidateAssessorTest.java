@@ -96,12 +96,35 @@ class RepresentationCandidateAssessorTest {
             RepresentationCandidateType.KNOWN_WHOLE_FORM_BRIDGE));
         assertTrue(assessment.candidateTypes().contains(
             RepresentationCandidateType.DOWNSTREAM_CAPABILITY_BRIDGE));
-        assertTrue(assessment.newlyUnlockedConsequences().contains(
-            "rule:factor-difference-of-squares"));
+        assertTrue(assessment.newlyUnlockedConsequences().stream().anyMatch(
+            unlock -> unlock.consequenceId().equals(
+                "rule:factor-difference-of-squares")
+                && unlock.occurrencePath().isRoot()));
         assertTrue(assessment.materialRepresentationGain());
         assertTrue(assessment.claimEligible());
         assertFalse(assessment.candidateTypes().contains(
             RepresentationCandidateType.WHOLE_EXPRESSION_COMPRESSION));
+    }
+
+    @Test
+    void sameCapabilityAtANewOccurrenceIsANewOpportunity() {
+        KnownStructureCatalog catalog = new KnownStructureCatalog(
+            "algebra-v1",
+            List.of(perfectSquare())
+        );
+        RepresentationCandidateAssessment assessment = assessor(catalog).assess(
+            RepresentationCandidateProposal.whole(
+                "(a + b)^2 + (c^2 + 2*c*d + d^2)",
+                "(a + b)^2 + (c + d)^2",
+                List.of(),
+                CandidateProofStatus.SYMBOLICALLY_VERIFIED
+            )
+        );
+
+        assertTrue(assessment.newlyUnlockedConsequences().stream().anyMatch(
+            unlock -> unlock.consequenceId().equals("rule:square-reasoning")
+                && unlock.occurrencePath().equals(
+                    new ExpressionOccurrencePath(List.of(1)))));
     }
 
     @Test
@@ -242,6 +265,21 @@ class RepresentationCandidateAssessorTest {
             ),
             List.of(),
             List.of("rule:factor-difference-of-squares"),
+            "first-party"
+        );
+    }
+
+    private static KnownStructure perfectSquare() {
+        return new KnownStructure(
+            "perfect-square",
+            "algebra",
+            PatternExpr.op(
+                POW,
+                PatternExpr.var("base"),
+                PatternExpr.num(2)
+            ),
+            List.of(),
+            List.of("rule:square-reasoning"),
             "first-party"
         );
     }
