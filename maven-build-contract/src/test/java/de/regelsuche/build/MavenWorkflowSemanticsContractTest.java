@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -90,6 +91,9 @@ class MavenWorkflowSemanticsContractTest {
         "jq -e ",
         "[ ",
         "[[ "
+    );
+    private static final Pattern RUN_DIRECTIVE = Pattern.compile(
+        "^(\\s*)(?:-\\s*)?run:\\s*(.*)$"
     );
     private static final Pattern GRADLE_INVOCATION =
         Pattern.compile("\\./gradlew\\b");
@@ -270,9 +274,24 @@ class MavenWorkflowSemanticsContractTest {
             "Checkout-local ciCheck",
             "Showcase train-freeze authority v1",
             "./gradlew test"
-        ) + "\n    env:\n      DISPLAY_LABEL: ciCheck\n";
+        ) + "\n    env:\n      COMMAND: ./gradlew ciCheck\n";
         assertViolation(
             misleadingCiText,
+            governance,
+            "missing-ci-entrypoint"
+        );
+        String commentedCiText = workflow(
+            "Checkout-local ciCheck",
+            "Showcase train-freeze authority v1",
+            "./gradlew test"
+        ) + """
+
+                  - run: |
+                      # ./gradlew ciCheck
+                      echo no-op
+            """;
+        assertViolation(
+            commentedCiText,
             governance,
             "missing-ci-entrypoint"
         );
@@ -550,7 +569,6 @@ class MavenWorkflowSemanticsContractTest {
     ) {
         List<String> lines = text.lines().toList();
         List<Violation> violations = new ArrayList<>();
-        List<String> gradleLines = new ArrayList<>();
 
         for (int index = 0; index < lines.size(); index++) {
             String line = lines.get(index);
@@ -574,14 +592,14 @@ class MavenWorkflowSemanticsContractTest {
                     stripped
                 ));
             }
-            if (GRADLE_INVOCATION.matcher(line).find()) {
-                gradleLines.add(line);
-            }
         }
 
-        long invocationCount = GRADLE_INVOCATION.matcher(text)
-            .results()
-            .count();
+        List<String> commandLines = workflowRunCommands(lines);
+        long invocationCount = commandLines.stream()
+            .mapToLong(command -> GRADLE_INVOCATION.matcher(command)
+                .results()
+                .count())
+            .sum();
         if (invocationCount == 0) {
             violations.add(new Violation(
                 workflow,
@@ -600,9 +618,10 @@ class MavenWorkflowSemanticsContractTest {
                     + " Gradle invocations; expected at most two"
             ));
         }
-        boolean invokesCiTask = gradleLines.stream().anyMatch(line ->
-            CI_TASK_ON_INVOCATION.matcher(line).find()
-        );
+        boolean invokesCiTask = commandLines.stream()
+            .filter(command -> GRADLE_INVOCATION.matcher(command).find())
+            .anyMatch(command ->
+                CI_TASK_ON_INVOCATION.matcher(command).find());
         if (!invokesCiTask) {
             violations.add(new Violation(
                 workflow,
@@ -636,6 +655,49 @@ class MavenWorkflowSemanticsContractTest {
             ));
         }
         return List.copyOf(violations);
+    }
+
+    private static List<String> workflowRunCommands(List<String> lines) {
+        List<String> commands = new ArrayList<>();
+        Integer blockIndent = null;
+
+        for (String line : lines) {
+            if (blockIndent != null) {
+                String stripped = line.strip();
+                if (stripped.isEmpty()) {
+                    continue;
+                }
+                int indentation = leadingWhitespace(line);
+                if (indentation > blockIndent) {
+                    if (!stripped.startsWith("#")) {
+                        commands.add(stripped);
+                    }
+                    continue;
+                }
+                blockIndent = null;
+            }
+
+            Matcher directive = RUN_DIRECTIVE.matcher(line);
+            if (!directive.matches()) {
+                continue;
+            }
+            String command = directive.group(2).strip();
+            if (command.matches("[|>][+-]?")) {
+                blockIndent = directive.group(1).length();
+            } else if (!command.isEmpty() && !command.startsWith("#")) {
+                commands.add(command);
+            }
+        }
+        return List.copyOf(commands);
+    }
+
+    private static int leadingWhitespace(String line) {
+        int count = 0;
+        while (count < line.length()
+                && Character.isWhitespace(line.charAt(count))) {
+            count++;
+        }
+        return count;
     }
 
     private static JsonNode parseStrict(Path path) throws IOException {
