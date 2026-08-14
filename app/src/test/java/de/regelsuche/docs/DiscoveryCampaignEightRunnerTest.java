@@ -83,16 +83,26 @@ class DiscoveryCampaignEightRunnerTest {
     }
 
     @Test
-    void campaignEightWritesCandidateReports(@TempDir Path tempDir) {
-        new DiscoveryCampaignEightRunner().writeReport(tempDir);
+    void campaignEightWritesCandidateReports(
+        DiscoveryPromotionPipelineFixture fixture,
+        @TempDir Path tempDir
+    ) throws Exception {
+        new DiscoveryCampaignEightRunner().writeReport(
+            tempDir,
+            fixture.report().campaignEight()
+        );
 
-        assertTrue(Files.exists(
-            tempDir.resolve("discovery-campaign-8.json")
-        ));
-        assertTrue(Files.exists(tempDir.resolve("campaign-progress.md")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-candidates.md")));
-        assertTrue(Files.exists(tempDir.resolve("operator-suggestions.md")));
-        assertTrue(Files.exists(tempDir.resolve("macro-candidates.md")));
+        assertReproducedFiles(
+            fixture.campaignDirectory("discovery-campaign-8"),
+            tempDir,
+            List.of(
+                "discovery-campaign-8.json",
+                "campaign-progress.md",
+                "discovery-candidates.md",
+                "operator-suggestions.md",
+                "macro-candidates.md"
+            )
+        );
     }
 
     @Test
@@ -252,6 +262,22 @@ class DiscoveryCampaignEightRunnerTest {
             "campaign 8 must cover at least 2 distinct families, found: "
                 + families
         );
+    }
+
+    private void assertReproducedFiles(
+        Path retainedDirectory,
+        Path reproducedDirectory,
+        List<String> fileNames
+    ) throws Exception {
+        for (String fileName : fileNames) {
+            Path expected = retainedDirectory.resolve(fileName);
+            Path actual = reproducedDirectory.resolve(fileName);
+            assertTrue(Files.isRegularFile(actual), fileName);
+            assertTrue(
+                Files.mismatch(expected, actual) == -1L,
+                fileName + " must reproduce retained fixture bytes"
+            );
+        }
     }
 
     private NoveltyChecker.Candidate candidate(
