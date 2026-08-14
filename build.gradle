@@ -125,16 +125,10 @@ def checkDocumentationMath = tasks.register('checkDocumentationMath') {
     dependsOn ':regelsuche-core:verifyMavenCoreReactor'
 }
 
-def verifyGeneratedDiscoveryGallery = tasks.register('verifyGeneratedDiscoveryGallery', Exec) {
+def verifyGeneratedDiscoveryGallery = tasks.register('verifyGeneratedDiscoveryGallery') {
     group = 'verification'
-    description = 'Regenerates and verifies the deterministic discovery gallery.'
-    dependsOn ':app:generateDiscoveryGallery'
-    workingDir rootDir
-    commandLine pythonExecutable, 'scripts/verify-generated-discovery-gallery.py'
-    inputs.file('scripts/verify-generated-discovery-gallery.py')
-    doFirst {
-        environment.remove('GITHUB_SHA')
-    }
+    description = 'Compatibility alias; Java/JUnit owns deterministic discovery-gallery regeneration.'
+    dependsOn ':app:test'
 }
 
 def verifyStaticReferencePage = tasks.register('verifyStaticReferencePage') {
