@@ -156,6 +156,30 @@
           <bannedPlugins><excludes><exclude>org.codehaus.mojo:exec-maven-plugin</exclude><exclude>com.github.eirslett:frontend-maven-plugin</exclude></excludes><message>Host scripting and frontend runtimes are not part of the Maven build contract.</message></bannedPlugins>
         </rules></configuration></execution></executions>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-clean-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>delete-stale-test-reports</id>
+            <phase>initialize</phase>
+            <goals><goal>clean</goal></goals>
+            <configuration>
+              <excludeDefaultDirectories>true</excludeDefaultDirectories>
+              <filesets>
+                <fileset>
+                  <directory>${project.build.directory}/surefire-reports</directory>
+                  <followSymlinks>false</followSymlinks>
+                </fileset>
+                <fileset>
+                  <directory>${project.build.directory}/failsafe-reports</directory>
+                  <followSymlinks>false</followSymlinks>
+                </fileset>
+              </filesets>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><configuration><release>${maven.compiler.release}</release><encoding>${project.build.sourceEncoding}</encoding><parameters>true</parameters><showWarnings>true</showWarnings></configuration></plugin>
       <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><configuration><useModulePath>false</useModulePath><failIfNoTests>false</failIfNoTests><failIfNoSpecifiedTests>false</failIfNoSpecifiedTests><forkedProcessTimeoutInSeconds>${maven.test.fork.timeout.seconds}</forkedProcessTimeoutInSeconds><forkedProcessExitTimeoutInSeconds>60</forkedProcessExitTimeoutInSeconds><systemPropertyVariables><regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot><regelsuche.maven.reactor>true</regelsuche.maven.reactor></systemPropertyVariables></configuration></plugin>
       <plugin><groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId><executions><execution><id>prepare-agent</id><goals><goal>prepare-agent</goal></goals></execution><execution><id>report</id><phase>verify</phase><goals><goal>report</goal></goals></execution></executions></plugin>
