@@ -68,16 +68,25 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
             () -> assertArtifactTreesEqual(expected, actual)
         );
 
+        Path actualGenerated = actual.resolve(GENERATED_PATH);
         Files.writeString(
-            actual.resolve(GENERATED_PATH).resolve("evidence.json"),
+            actualGenerated.resolve("evidence.json"),
             "expected\n",
             StandardCharsets.UTF_8
         );
+        Path unexpected = actualGenerated.resolve("unexpected.json");
         Files.writeString(
-            actual.resolve(GENERATED_PATH).resolve("unexpected.json"),
+            unexpected,
             "{}\n",
             StandardCharsets.UTF_8
         );
+        assertThrows(
+            AssertionError.class,
+            () -> assertArtifactTreesEqual(expected, actual)
+        );
+
+        Files.delete(unexpected);
+        Files.delete(actualGenerated.resolve("evidence.json"));
         assertThrows(
             AssertionError.class,
             () -> assertArtifactTreesEqual(expected, actual)
@@ -132,12 +141,8 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
         Map<String, Path> files = new TreeMap<>();
         addRegularFile(files, root, GALLERY_PATH);
 
+        requireNoSymbolicComponents(root, GENERATED_PATH);
         Path generated = root.resolve(GENERATED_PATH);
-        assertFalse(
-            Files.isSymbolicLink(generated),
-            "generated discovery directory must not be symbolic: "
-                + generated
-        );
         assertTrue(
             Files.isDirectory(generated, LinkOption.NOFOLLOW_LINKS),
             "generated discovery directory is missing: " + generated
@@ -177,20 +182,27 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
         Path root,
         Path relative
     ) {
+        requireNoSymbolicComponents(root, relative);
         Path path = root.resolve(relative);
-        requireRegularFile(path, relative.toString());
+        assertTrue(
+            Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS),
+            "generated file is missing or non-regular: " + relative
+        );
         files.put(relative.toString().replace('\\', '/'), path);
     }
 
-    private static void requireRegularFile(Path path, String displayPath) {
-        assertFalse(
-            Files.isSymbolicLink(path),
-            "generated file must not be symbolic: " + displayPath
-        );
-        assertTrue(
-            Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS),
-            "generated file is missing or non-regular: " + displayPath
-        );
+    private static void requireNoSymbolicComponents(
+        Path root,
+        Path relative
+    ) {
+        Path current = root;
+        for (Path component : relative) {
+            current = current.resolve(component);
+            assertFalse(
+                Files.isSymbolicLink(current),
+                "generated path contains a symbolic component: " + relative
+            );
+        }
     }
 
     private static Path repositoryRoot() {
