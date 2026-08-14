@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
+import javax.xml.XMLConstants;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
@@ -343,9 +344,10 @@ public final class SlowTestReportGenerator {
         XMLInputFactory factory = XMLInputFactory.newFactory();
         factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
         factory.setProperty(
-            "javax.xml.stream.isSupportingExternalEntities",
+            XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES,
             false
         );
+        factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
         return factory;
     }
 
