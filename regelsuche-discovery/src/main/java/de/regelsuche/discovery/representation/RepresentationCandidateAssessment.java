@@ -18,7 +18,7 @@ public record RepresentationCandidateAssessment(
     List<KnownStructureMatch> sourceStructureMatches,
     List<KnownStructureMatch> candidateStructureMatches,
     List<KnownStructureMatch> newlyExposedStructureMatches,
-    List<String> newlyUnlockedConsequences,
+    List<KnownStructureConsequenceUnlock> newlyUnlockedConsequences,
     List<RepresentationCandidateType> candidateTypes,
     List<String> introducedVariableSymbols,
     List<String> introducedFunctionSymbols,
