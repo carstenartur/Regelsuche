@@ -65,12 +65,7 @@ class MavenContainerImagePolicyContractTest {
         "schema", "policy", "files"
     );
     private static final Set<String> IGNORED_DIRECTORY_NAMES = Set.of(
-        ".git",
-        ".gradle",
-        "build",
-        "node_modules",
-        "out",
-        "target"
+        ".git", ".gradle", "build", "node_modules", "out", "target"
     );
     private static final Pattern FROM_PATTERN = Pattern.compile(
         "^\\s*FROM\\s+(?:--platform=\\S+\\s+)?(\\S+)"
@@ -107,7 +102,6 @@ class MavenContainerImagePolicyContractTest {
         );
         assertEquals("PASSED", evaluation.status());
         assertEquals(policy.files().size(), evaluation.files().size());
-
         System.out.println(
             "containerImagePolicyStatus=" + evaluation.status()
         );
@@ -141,6 +135,43 @@ class MavenContainerImagePolicyContractTest {
     }
 
     @Test
+    void policyParsingFailsClosedButPreservesRepeatedStageImages() {
+        ObjectNode unknown = validPolicyDocument("example/image:1.2.3");
+        unknown.put("unexpected", true);
+        expectInvalid(
+            () -> parsePolicy(unknown),
+            "container image policy unknown="
+        );
+
+        ObjectNode wrongSchema = validPolicyDocument("example/image:1.2.3");
+        wrongSchema.put("schema", "unsupported");
+        expectInvalid(() -> parsePolicy(wrongSchema), "unsupported policy schema");
+
+        ObjectNode traversal = validPolicyDocument("example/image:1.2.3");
+        ObjectNode traversalFiles = (ObjectNode) traversal.get("files");
+        JsonNode declaration = traversalFiles.remove(VISUAL_DOCKERFILE);
+        traversalFiles.set("../Dockerfile", declaration);
+        expectInvalid(
+            () -> parsePolicy(traversal),
+            "must be normalized and relative"
+        );
+
+        ObjectNode empty = validPolicyDocument("example/image:1.2.3");
+        ((ObjectNode) empty.get("files")).removeAll();
+        expectInvalid(() -> parsePolicy(empty), "policy has no Dockerfiles");
+
+        String repeatedImage = "example/image:1.2.3";
+        ObjectNode repeated = validPolicyDocument(repeatedImage);
+        ((ArrayNode) ((ObjectNode) repeated.get("files"))
+            .get(VISUAL_DOCKERFILE)).add(repeatedImage);
+        Policy parsed = parsePolicy(repeated);
+        assertEquals(
+            List.of(repeatedImage, repeatedImage),
+            parsed.files().get(VISUAL_DOCKERFILE)
+        );
+    }
+
+    @Test
     void dockerfileParserRetainsExternalStagesAndSkipsAliases(
         @TempDir Path temporary
     ) throws IOException {
@@ -154,7 +185,6 @@ class MavenContainerImagePolicyContractTest {
             """,
             StandardCharsets.UTF_8
         );
-
         assertEquals(
             List.of(
                 "eclipse-temurin:21.0.11_10-jdk-noble",
@@ -187,8 +217,7 @@ class MavenContainerImagePolicyContractTest {
     @Test
     void imageIdentityRejectsFloatingAndPartialTags() {
         assertTrue(isDigestOrExactVersion(
-            "example/image@sha256:"
-                + "a".repeat(64)
+            "example/image@sha256:" + "a".repeat(64)
         ));
         assertTrue(isDigestOrExactVersion(
             "eclipse-temurin:21.0.11_10-jdk-noble"
@@ -229,7 +258,6 @@ class MavenContainerImagePolicyContractTest {
                 StandardCharsets.UTF_8
             );
         }
-
         assertEquals(
             List.of(
                 "Dockerfile",
@@ -240,44 +268,36 @@ class MavenContainerImagePolicyContractTest {
     }
 
     @Test
-    void declarationsAndVisualBindingFailClosed(
+    void declarationsVisualBindingAndReportFailClosed(
         @TempDir Path temporary
     ) throws IOException {
         String image =
             "mcr.microsoft.com/playwright/java:v1.60.0-noble@sha256:"
                 + "a".repeat(64);
-        Files.writeString(
-            temporary.resolve("Dockerfile.visual-regression"),
-            "FROM " + image + "\n",
-            StandardCharsets.UTF_8
-        );
-        Files.createDirectories(temporary.resolve(VISUAL_POLICY_PATH)
-            .getParent());
-        ObjectNode visual = JSON.createObjectNode();
-        visual.put("schema", VISUAL_POLICY_SCHEMA);
-        ObjectNode environment = visual.putObject("environment");
-        environment.put("containerImage", image);
-        environment.put("playwrightVersion", "1.60.0");
-        writeJson(temporary.resolve(VISUAL_POLICY_PATH), visual);
-        Files.createDirectories(temporary.resolve(APP_BUILD_PATH).getParent());
-        Files.writeString(
-            temporary.resolve(APP_BUILD_PATH),
-            "e2eTestImplementation 'com.microsoft.playwright:playwright:1.60.0'\n",
-            StandardCharsets.UTF_8
-        );
-
+        createVisualFixture(temporary, image, "1.60.0", "1.60.0");
         Policy policy = new Policy(
             "fixture",
             Map.of(VISUAL_DOCKERFILE, List.of(image))
         );
-        Evaluation passing = evaluate(temporary, policy);
-        assertTrue(passing.violations().isEmpty(), passing.violations().toString());
 
-        Files.writeString(
-            temporary.resolve(APP_BUILD_PATH),
-            "e2eTestImplementation 'com.microsoft.playwright:playwright:1.59.0'\n",
-            StandardCharsets.UTF_8
+        Evaluation passing = evaluate(temporary, policy);
+        assertTrue(
+            passing.violations().isEmpty(),
+            passing.violations().toString()
         );
+        Path firstReport = temporary.resolve("first/report.json");
+        Path secondReport = temporary.resolve("second/report.json");
+        writeReport(firstReport, passing);
+        writeReport(secondReport, passing);
+        assertEquals(
+            Files.readString(firstReport, StandardCharsets.UTF_8),
+            Files.readString(secondReport, StandardCharsets.UTF_8)
+        );
+        JsonNode report = parseStrict(firstReport);
+        assertEquals(REPORT_SCHEMA, report.path("schema").asText());
+        assertEquals("PASSED", report.path("status").asText());
+
+        createVisualFixture(temporary, image, "1.60.0", "1.59.0");
         Evaluation mismatch = evaluate(temporary, policy);
         assertTrue(
             mismatch.violations().stream().anyMatch(message ->
@@ -285,10 +305,10 @@ class MavenContainerImagePolicyContractTest {
             mismatch.violations().toString()
         );
 
-        Policy undeclared = new Policy("fixture", Map.of(
-            "Dockerfile.other",
-            List.of("example/image:1.2.3")
-        ));
+        Policy undeclared = new Policy(
+            "fixture",
+            Map.of("Dockerfile.other", List.of("example/image:1.2.3"))
+        );
         Evaluation classification = evaluate(temporary, undeclared);
         assertTrue(
             classification.violations().stream().anyMatch(message ->
@@ -372,7 +392,6 @@ class MavenContainerImagePolicyContractTest {
         for (String violation : visual.violations()) {
             violations.add("visual regression: " + violation);
         }
-
         return new Evaluation(
             violations.isEmpty() ? "PASSED" : "FAILED",
             tracked,
@@ -392,8 +411,7 @@ class MavenContainerImagePolicyContractTest {
             parseStrict(root.resolve(VISUAL_POLICY_PATH)),
             "visual regression policy"
         );
-        if (!VISUAL_POLICY_SCHEMA.equals(
-                optionalText(visual, "schema"))) {
+        if (!VISUAL_POLICY_SCHEMA.equals(optionalText(visual, "schema"))) {
             violations.add("unsupported visual regression policy schema");
         }
 
@@ -415,9 +433,7 @@ class MavenContainerImagePolicyContractTest {
         }
         if (version == null
                 || !PLAYWRIGHT_VERSION_PATTERN.matcher(version).matches()) {
-            violations.add(
-                "visual regression playwrightVersion is invalid"
-            );
+            violations.add("visual regression playwrightVersion is invalid");
         }
 
         if (image != null && !image.isBlank()) {
@@ -617,11 +633,6 @@ class MavenContainerImagePolicyContractTest {
                 }
                 images.add(image.asText());
             }
-            if (new HashSet<>(images).size() != images.size()) {
-                throw invalid(
-                    "duplicate image declaration for " + path
-                );
-            }
             declarations.put(path, List.copyOf(images));
         });
         return new Policy(policyText, Map.copyOf(declarations));
@@ -738,6 +749,44 @@ class MavenContainerImagePolicyContractTest {
             path,
             JSON.writerWithDefaultPrettyPrinter().writeValueAsString(value)
                 + "\n",
+            StandardCharsets.UTF_8
+        );
+    }
+
+    private static ObjectNode validPolicyDocument(String image) {
+        ObjectNode policy = JSON.createObjectNode();
+        policy.put("schema", POLICY_SCHEMA);
+        policy.put("policy", "fixture");
+        policy.putObject("files")
+            .putArray(VISUAL_DOCKERFILE)
+            .add(image);
+        return policy;
+    }
+
+    private static void createVisualFixture(
+        Path root,
+        String image,
+        String policyVersion,
+        String dependencyVersion
+    ) throws IOException {
+        Files.writeString(
+            root.resolve(VISUAL_DOCKERFILE),
+            "FROM " + image + "\n",
+            StandardCharsets.UTF_8
+        );
+        Files.createDirectories(root.resolve(VISUAL_POLICY_PATH).getParent());
+        ObjectNode visual = JSON.createObjectNode();
+        visual.put("schema", VISUAL_POLICY_SCHEMA);
+        ObjectNode environment = visual.putObject("environment");
+        environment.put("containerImage", image);
+        environment.put("playwrightVersion", policyVersion);
+        writeJson(root.resolve(VISUAL_POLICY_PATH), visual);
+        Files.createDirectories(root.resolve(APP_BUILD_PATH).getParent());
+        Files.writeString(
+            root.resolve(APP_BUILD_PATH),
+            "e2eTestImplementation 'com.microsoft.playwright:playwright:"
+                + dependencyVersion
+                + "'\n",
             StandardCharsets.UTF_8
         );
     }
