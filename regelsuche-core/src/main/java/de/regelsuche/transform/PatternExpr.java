@@ -12,8 +12,19 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-public sealed interface PatternExpr
-    permits PatternExpr.Placeholder, PatternExpr.LiteralNumber, PatternExpr.LiteralVariable, PatternExpr.Operation, PatternExpr.Function {
+/**
+ * Instantiable expression pattern retained for rewrite compatibility.
+ *
+ * <p>New recognition code should adapt a pattern through
+ * {@link ExprMatcher#pattern(PatternExpr)} rather than extending this type with
+ * non-instantiable matcher concepts. The legacy {@link #match(Expr, Map)}
+ * method remains for source compatibility while matching and template
+ * construction are migrated to separate contracts.</p>
+ */
+public sealed interface PatternExpr extends ExprTemplate
+    permits PatternExpr.Placeholder, PatternExpr.LiteralNumber,
+        PatternExpr.LiteralVariable, PatternExpr.Operation,
+        PatternExpr.Function {
     static PatternExpr var(String name) {
         return new Placeholder(name);
     }
@@ -26,7 +37,11 @@ public sealed interface PatternExpr
         return new LiteralVariable(name);
     }
 
-    static PatternExpr op(BinaryOperator operator, PatternExpr left, PatternExpr right) {
+    static PatternExpr op(
+        BinaryOperator operator,
+        PatternExpr left,
+        PatternExpr right
+    ) {
         return new Operation(operator, left, right);
     }
 
@@ -34,14 +49,23 @@ public sealed interface PatternExpr
         return new Function(name, List.of(arguments));
     }
 
+    /**
+     * Legacy exact structural matcher.
+     *
+     * @deprecated use {@link ExprMatcher#pattern(PatternExpr)} so matching can
+     *     be composed independently from expression instantiation
+     */
+    @Deprecated(forRemoval = false)
     boolean match(Expr expression, Map<String, Expr> bindings);
 
+    @Override
     Expr instantiate(Map<String, Expr> bindings);
 
     record Placeholder(String name) implements PatternExpr {
         public Placeholder {
             if (name == null || name.isBlank()) {
-                throw new IllegalArgumentException("placeholder name must not be blank");
+                throw new IllegalArgumentException(
+                    "placeholder name must not be blank");
             }
         }
 
@@ -58,14 +82,16 @@ public sealed interface PatternExpr
         @Override
         public Expr instantiate(Map<String, Expr> bindings) {
             return Optional.ofNullable(bindings.get(name))
-                .orElseThrow(() -> new IllegalArgumentException("Missing binding for " + name));
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Missing binding for " + name));
         }
     }
 
     record LiteralNumber(double value) implements PatternExpr {
         @Override
         public boolean match(Expr expression, Map<String, Expr> bindings) {
-            return expression instanceof NumberExpr numberExpr && numberExpr.value() == value;
+            return expression instanceof NumberExpr numberExpr
+                && numberExpr.value() == value;
         }
 
         @Override
@@ -75,9 +101,18 @@ public sealed interface PatternExpr
     }
 
     record LiteralVariable(String name) implements PatternExpr {
+        public LiteralVariable {
+            Objects.requireNonNull(name, "name");
+            if (name.isBlank()) {
+                throw new IllegalArgumentException(
+                    "variable name must not be blank");
+            }
+        }
+
         @Override
         public boolean match(Expr expression, Map<String, Expr> bindings) {
-            return expression instanceof VariableExpr variableExpr && variableExpr.name().equals(name);
+            return expression instanceof VariableExpr variableExpr
+                && variableExpr.name().equals(name);
         }
 
         @Override
@@ -86,37 +121,48 @@ public sealed interface PatternExpr
         }
     }
 
-    record Operation(BinaryOperator operator, PatternExpr left, PatternExpr right) implements PatternExpr {
+    record Operation(
+        BinaryOperator operator,
+        PatternExpr left,
+        PatternExpr right
+    ) implements PatternExpr {
         public Operation {
             if (operator == null || left == null || right == null) {
-                throw new IllegalArgumentException("operator, left and right must not be null");
+                throw new IllegalArgumentException(
+                    "operator, left and right must not be null");
             }
         }
 
         @Override
         public boolean match(Expr expression, Map<String, Expr> bindings) {
-            if (!(expression instanceof BinaryExpr binaryExpr) || binaryExpr.operator() != operator) {
+            if (!(expression instanceof BinaryExpr binaryExpr)
+                    || binaryExpr.operator() != operator) {
                 return false;
             }
-            return left.match(binaryExpr.left(), bindings) && right.match(binaryExpr.right(), bindings);
+            return left.match(binaryExpr.left(), bindings)
+                && right.match(binaryExpr.right(), bindings);
         }
 
         @Override
         public Expr instantiate(Map<String, Expr> bindings) {
-            return new BinaryExpr(left.instantiate(bindings), operator, right.instantiate(bindings));
+            return new BinaryExpr(
+                left.instantiate(bindings),
+                operator,
+                right.instantiate(bindings)
+            );
         }
     }
 
-    /**
-     * Pattern for function applications like {@code sin(A)} or {@code log(A*B)}.
-     * Matches a {@link FunctionExpr} by exact name (case-sensitive) and arity,
-     * recursively matching each argument.
-     */
-    record Function(String name, List<PatternExpr> arguments) implements PatternExpr {
+    /** Pattern for function applications such as {@code sin(A)}. */
+    record Function(
+        String name,
+        List<PatternExpr> arguments
+    ) implements PatternExpr {
         public Function {
             Objects.requireNonNull(name, "name");
             if (name.isBlank()) {
-                throw new IllegalArgumentException("function name must not be blank");
+                throw new IllegalArgumentException(
+                    "function name must not be blank");
             }
             Objects.requireNonNull(arguments, "arguments");
             arguments = List.copyOf(arguments);
@@ -127,11 +173,13 @@ public sealed interface PatternExpr
             if (!(expression instanceof FunctionExpr functionExpr)) {
                 return false;
             }
-            if (!functionExpr.name().equals(name) || functionExpr.arguments().size() != arguments.size()) {
+            if (!functionExpr.name().equals(name)
+                    || functionExpr.arguments().size() != arguments.size()) {
                 return false;
             }
-            for (int i = 0; i < arguments.size(); i++) {
-                if (!arguments.get(i).match(functionExpr.arguments().get(i), bindings)) {
+            for (int index = 0; index < arguments.size(); index++) {
+                if (!arguments.get(index).match(
+                        functionExpr.arguments().get(index), bindings)) {
                     return false;
                 }
             }
