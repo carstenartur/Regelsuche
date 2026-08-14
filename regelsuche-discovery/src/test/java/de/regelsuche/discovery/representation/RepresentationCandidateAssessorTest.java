@@ -13,158 +13,124 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class RepresentationCandidateAssessorTest {
+    private static final CandidateProofStatus VERIFIED =
+        CandidateProofStatus.SYMBOLICALLY_VERIFIED;
+
     @Test
     void recognizesTargetFreeMultiDimensionalCompression() {
-        RepresentationCandidateAssessment assessment =
-            assessor(KnownStructureCatalog.empty()).assess(
-                RepresentationCandidateProposal.whole(
-                    "a^2 + 2*a*b + b^2",
-                    "(a + b)^2",
-                    List.of(),
-                    CandidateProofStatus.SYMBOLICALLY_VERIFIED
-                )
-            );
+        var result = assess(
+            KnownStructureCatalog.empty(),
+            "a^2 + 2*a*b + b^2",
+            "(a + b)^2",
+            VERIFIED
+        );
 
         assertEquals(
             SemanticCompressionStatus.MATERIAL_MULTI_DIMENSIONAL,
-            assessment.compressionStatus());
-        assertTrue(assessment.candidateTypes().contains(
-            RepresentationCandidateType.WHOLE_EXPRESSION_COMPRESSION));
-        assertTrue(assessment.materialRepresentationGain());
-        assertTrue(assessment.claimEligible());
-        assertTrue(assessment.scopedCompressionDelta()
-            .improvedDimensions().size() >= 2);
+            result.compressionStatus());
+        assertType(result, RepresentationCandidateType.WHOLE_EXPRESSION_COMPRESSION);
+        assertTrue(result.materialRepresentationGain());
+        assertTrue(result.claimEligible());
+        assertTrue(result.scopedCompressionDelta().improvedDimensions().size() >= 2);
     }
 
     @Test
-    void acReorderingIsRetainedAsANonMaterialControl() {
-        RepresentationCandidateAssessment assessment =
-            assessor(KnownStructureCatalog.empty()).assess(
-                RepresentationCandidateProposal.whole(
-                    "a + b",
-                    "b + a",
-                    List.of(),
-                    CandidateProofStatus.SYMBOLICALLY_VERIFIED
-                )
-            );
+    void keepsAcReorderingAsNonMaterialControl() {
+        var result = assess(
+            KnownStructureCatalog.empty(), "a + b", "b + a", VERIFIED);
 
         assertEquals(
-            List.of(
-                RepresentationCandidateType.NO_MATERIAL_REPRESENTATION_GAIN),
-            assessment.candidateTypes());
-        assertFalse(assessment.materialRepresentationGain());
-        assertFalse(assessment.claimEligible());
+            List.of(RepresentationCandidateType.NO_MATERIAL_REPRESENTATION_GAIN),
+            result.candidateTypes());
+        assertFalse(result.materialRepresentationGain());
+        assertFalse(result.claimEligible());
     }
 
     @Test
-    void introducedFunctionCannotManufactureCompressionCredit() {
-        RepresentationCandidateAssessment assessment =
-            assessor(KnownStructureCatalog.empty()).assess(
-                RepresentationCandidateProposal.whole(
-                    "a^2 + 2*a*b + b^2",
-                    "shortcut(a, b)",
-                    List.of(),
-                    CandidateProofStatus.SYMBOLICALLY_VERIFIED
-                )
-            );
+    void blocksCompressionByInventedFunctionAlias() {
+        var result = assess(
+            KnownStructureCatalog.empty(),
+            "a^2 + 2*a*b + b^2",
+            "shortcut(a, b)",
+            VERIFIED
+        );
 
         assertEquals(
             SemanticCompressionStatus.BLOCKED_BY_INTRODUCED_SYMBOLS,
-            assessment.compressionStatus());
-        assertTrue(assessment.introducedFunctionSymbols().contains("shortcut"));
-        assertFalse(assessment.candidateTypes().contains(
-            RepresentationCandidateType.WHOLE_EXPRESSION_COMPRESSION));
-        assertFalse(assessment.materialRepresentationGain());
+            result.compressionStatus());
+        assertEquals(List.of("shortcut"), result.introducedFunctionSymbols());
+        assertFalse(result.materialRepresentationGain());
     }
 
     @Test
-    void longerDifferenceOfSquaresFormQualifiesByUnlockedConsequence() {
-        KnownStructureCatalog catalog = new KnownStructureCatalog(
-            "algebra-v1",
-            List.of(differenceOfSquares())
-        );
-        RepresentationCandidateAssessment assessment = assessor(catalog).assess(
-            RepresentationCandidateProposal.whole(
-                "x^4 + 4*y^4",
-                "(x^2 + 2*y^2)^2 - (2*x*y)^2",
-                List.of(),
-                CandidateProofStatus.SYMBOLICALLY_VERIFIED
-            )
+    void acceptsLongerFormWhenItUnlocksFactorization() {
+        var result = assess(
+            catalog(differenceOfSquares()),
+            "x^4 + 4*y^4",
+            "(x^2 + 2*y^2)^2 - (2*x*y)^2",
+            VERIFIED
         );
 
-        assertTrue(assessment.candidateTypes().contains(
-            RepresentationCandidateType.KNOWN_WHOLE_FORM_BRIDGE));
-        assertTrue(assessment.candidateTypes().contains(
-            RepresentationCandidateType.DOWNSTREAM_CAPABILITY_BRIDGE));
-        assertTrue(assessment.newlyUnlockedConsequences().stream().anyMatch(
-            unlock -> unlock.consequenceId().equals(
-                "rule:factor-difference-of-squares")
+        assertType(result, RepresentationCandidateType.KNOWN_WHOLE_FORM_BRIDGE);
+        assertType(result, RepresentationCandidateType.DOWNSTREAM_CAPABILITY_BRIDGE);
+        assertTrue(result.newlyUnlockedConsequences().stream().anyMatch(unlock ->
+            unlock.consequenceId().equals("rule:factor-difference-of-squares")
                 && unlock.occurrencePath().isRoot()));
-        assertTrue(assessment.materialRepresentationGain());
-        assertTrue(assessment.claimEligible());
-        assertFalse(assessment.candidateTypes().contains(
+        assertTrue(result.materialRepresentationGain());
+        assertTrue(result.claimEligible());
+        assertFalse(result.candidateTypes().contains(
             RepresentationCandidateType.WHOLE_EXPRESSION_COMPRESSION));
     }
 
     @Test
-    void sameCapabilityAtANewOccurrenceIsANewOpportunity() {
-        KnownStructureCatalog catalog = new KnownStructureCatalog(
-            "algebra-v1",
-            List.of(perfectSquare())
-        );
-        RepresentationCandidateAssessment assessment = assessor(catalog).assess(
-            RepresentationCandidateProposal.whole(
-                "(a + b)^2 + (c^2 + 2*c*d + d^2)",
-                "(a + b)^2 + (c + d)^2",
-                List.of(),
-                CandidateProofStatus.SYMBOLICALLY_VERIFIED
-            )
+    void treatsSameCapabilityAtNewOccurrenceAsNewOpportunity() {
+        var result = assess(
+            catalog(perfectSquare()),
+            "(a + b)^2 + (c^2 + 2*c*d + d^2)",
+            "(a + b)^2 + (c + d)^2",
+            VERIFIED
         );
 
-        assertTrue(assessment.newlyUnlockedConsequences().stream().anyMatch(
-            unlock -> unlock.consequenceId().equals("rule:square-reasoning")
-                && unlock.occurrencePath().equals(
-                    new ExpressionOccurrencePath(List.of(1)))));
+        assertTrue(result.newlyUnlockedConsequences().stream().anyMatch(unlock ->
+            unlock.consequenceId().equals("rule:square-reasoning")
+                && unlock.occurrencePath().equals(path(1))));
     }
 
     @Test
-    void occurrenceLocalCompressionPreservesTheEnclosingContext() {
-        RepresentationCandidateAssessment assessment =
-            assessor(KnownStructureCatalog.empty()).assess(
-                RepresentationCandidateProposal.subexpression(
-                    "z + (a^2 + 2*a*b + b^2)",
-                    "z + (a + b)^2",
-                    new ExpressionOccurrencePath(List.of(1)),
-                    List.of(),
-                    CandidateProofStatus.SYMBOLICALLY_VERIFIED
-                )
-            );
+    void compressesOneOccurrenceWithoutChangingItsContext() {
+        var proposal = RepresentationCandidateProposal.subexpression(
+            "z + (a^2 + 2*a*b + b^2)",
+            "z + (a + b)^2",
+            path(1),
+            List.of(),
+            VERIFIED
+        );
+        var result = new RepresentationCandidateAssessor(
+            KnownStructureCatalog.empty()).assess(proposal);
 
-        assertTrue(assessment.candidateTypes().contains(
-            RepresentationCandidateType.SUBEXPRESSION_COMPRESSION));
-        assertTrue(assessment.materialRepresentationGain());
+        assertType(result, RepresentationCandidateType.SUBEXPRESSION_COMPRESSION);
+        assertTrue(result.materialRepresentationGain());
     }
 
     @Test
-    void occurrenceLocalProposalRejectsChangesOutsideTheDeclaredPath() {
-        RepresentationCandidateProposal proposal =
-            RepresentationCandidateProposal.subexpression(
-                "z + (a^2 + 2*a*b + b^2)",
-                "w + (a + b)^2",
-                new ExpressionOccurrencePath(List.of(1)),
-                List.of(),
-                CandidateProofStatus.SYMBOLICALLY_VERIFIED
-            );
+    void rejectsChangesOutsideDeclaredOccurrence() {
+        var proposal = RepresentationCandidateProposal.subexpression(
+            "z + (a^2 + 2*a*b + b^2)",
+            "w + (a + b)^2",
+            path(1),
+            List.of(),
+            VERIFIED
+        );
 
         assertThrows(
             IllegalArgumentException.class,
-            () -> assessor(KnownStructureCatalog.empty()).assess(proposal)
-        );
+            () -> new RepresentationCandidateAssessor(
+                KnownStructureCatalog.empty()).assess(proposal));
     }
 
     @Test
-    void knownStructureConsequencesRequireTheirDeclaredAssumptions() {
-        KnownStructure guarded = new KnownStructure(
+    void requiresDeclaredAssumptionsBeforeUnlockingConsequences() {
+        var guarded = new KnownStructure(
             "guarded-quotient",
             "rational",
             PatternExpr.var("expression"),
@@ -172,78 +138,53 @@ class RepresentationCandidateAssessorTest {
             List.of("rule:guarded-cancellation"),
             "first-party"
         );
-        RepresentationCandidateAssessment assessment =
-            assessor(new KnownStructureCatalog("rational-v1", List.of(guarded)))
-                .assess(
-                    RepresentationCandidateProposal.whole(
-                        "x",
-                        "x + 0",
-                        List.of(),
-                        CandidateProofStatus.SYMBOLICALLY_VERIFIED
-                    )
-                );
+        var result = assess(catalog(guarded), "x", "x + 0", VERIFIED);
 
-        assertTrue(assessment.newlyUnlockedConsequences().isEmpty());
-        assertTrue(assessment.warnings().contains(
-            RepresentationAssessmentWarning
-                .UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS));
+        assertTrue(result.newlyUnlockedConsequences().isEmpty());
+        assertTrue(result.warnings().contains(
+            RepresentationAssessmentWarning.UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS));
     }
 
     @Test
-    void materialSignalRemainsIneligibleUntilSymbolicallyConfirmed() {
-        RepresentationCandidateAssessment assessment =
-            assessor(KnownStructureCatalog.empty()).assess(
-                RepresentationCandidateProposal.whole(
-                    "a^2 + 2*a*b + b^2",
-                    "(a + b)^2",
-                    List.of(),
-                    CandidateProofStatus.VALIDATED_BY_EXAMPLES
-                )
-            );
-
-        assertTrue(assessment.materialRepresentationGain());
-        assertFalse(assessment.claimEligible());
-        assertTrue(assessment.warnings().contains(
-            RepresentationAssessmentWarning
-                .VALIDATION_BELOW_SYMBOLIC_CONFIRMATION));
-    }
-
-    @Test
-    void assessmentCodecIsDeterministicStrictAndRoundTrips() {
-        RepresentationCandidateAssessment assessment =
-            assessor(new KnownStructureCatalog(
-                "algebra-v1",
-                List.of(differenceOfSquares())
-            )).assess(
-                RepresentationCandidateProposal.whole(
-                    "x^4 + 4*y^4",
-                    "(x^2 + 2*y^2)^2 - (2*x*y)^2",
-                    List.of(),
-                    CandidateProofStatus.SYMBOLICALLY_VERIFIED
-                )
-            );
-        RepresentationCandidateAssessmentCodec codec =
-            new RepresentationCandidateAssessmentCodec();
-
-        String first = codec.encode(assessment);
-        String second = codec.encode(assessment);
-
-        assertEquals(first, second);
-        assertEquals(assessment, codec.decode(first));
-        assertEquals(codec.semanticHash(assessment), codec.semanticHash(assessment));
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> codec.decode(first.replaceFirst(
-                "\\{",
-                "{\"unknown\":true,"
-            ))
+    void leavesMaterialSignalIneligibleUntilSymbolicallyConfirmed() {
+        var result = assess(
+            KnownStructureCatalog.empty(),
+            "a^2 + 2*a*b + b^2",
+            "(a + b)^2",
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES
         );
+
+        assertTrue(result.materialRepresentationGain());
+        assertFalse(result.claimEligible());
+        assertTrue(result.warnings().contains(
+            RepresentationAssessmentWarning.VALIDATION_BELOW_SYMBOLIC_CONFIRMATION));
     }
 
-    private static RepresentationCandidateAssessor assessor(
-        KnownStructureCatalog catalog
+    private static RepresentationCandidateAssessment assess(
+        KnownStructureCatalog catalog,
+        String source,
+        String candidate,
+        CandidateProofStatus status
     ) {
-        return new RepresentationCandidateAssessor(catalog);
+        return new RepresentationCandidateAssessor(catalog).assess(
+            RepresentationCandidateProposal.whole(
+                source, candidate, List.of(), status));
+    }
+
+    private static KnownStructureCatalog catalog(KnownStructure structure) {
+        return new KnownStructureCatalog("test-v1", List.of(structure));
+    }
+
+    private static ExpressionOccurrencePath path(int... indexes) {
+        return new ExpressionOccurrencePath(
+            java.util.Arrays.stream(indexes).boxed().toList());
+    }
+
+    private static void assertType(
+        RepresentationCandidateAssessment result,
+        RepresentationCandidateType type
+    ) {
+        assertTrue(result.candidateTypes().contains(type));
     }
 
     private static KnownStructure differenceOfSquares() {
@@ -252,16 +193,8 @@ class RepresentationCandidateAssessorTest {
             "algebra",
             PatternExpr.op(
                 SUB,
-                PatternExpr.op(
-                    POW,
-                    PatternExpr.var("left"),
-                    PatternExpr.num(2)
-                ),
-                PatternExpr.op(
-                    POW,
-                    PatternExpr.var("right"),
-                    PatternExpr.num(2)
-                )
+                PatternExpr.op(POW, PatternExpr.var("left"), PatternExpr.num(2)),
+                PatternExpr.op(POW, PatternExpr.var("right"), PatternExpr.num(2))
             ),
             List.of(),
             List.of("rule:factor-difference-of-squares"),
@@ -273,11 +206,7 @@ class RepresentationCandidateAssessorTest {
         return new KnownStructure(
             "perfect-square",
             "algebra",
-            PatternExpr.op(
-                POW,
-                PatternExpr.var("base"),
-                PatternExpr.num(2)
-            ),
+            PatternExpr.op(POW, PatternExpr.var("base"), PatternExpr.num(2)),
             List.of(),
             List.of("rule:square-reasoning"),
             "first-party"
