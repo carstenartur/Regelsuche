@@ -1,5 +1,6 @@
 package de.regelsuche.discovery.representation;
 
+import de.regelsuche.knowledge.KnownStructureMetadata;
 import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.RecognitionProfile;
@@ -13,8 +14,29 @@ public record KnownStructure(
     ExprMatcher matcher,
     List<String> requiredAssumptions,
     List<String> consequenceIds,
-    String provenance
+    String provenance,
+    KnownStructureMetadata metadata
 ) {
+    /** Compatibility constructor for an existing matcher. */
+    public KnownStructure(
+        String id,
+        String domainId,
+        ExprMatcher matcher,
+        List<String> requiredAssumptions,
+        List<String> consequenceIds,
+        String provenance
+    ) {
+        this(
+            id,
+            domainId,
+            matcher,
+            requiredAssumptions,
+            consequenceIds,
+            provenance,
+            KnownStructureMetadata.legacy(provenance)
+        );
+    }
+
     /** Compatibility constructor for an exact instantiable pattern. */
     public KnownStructure(
         String id,
@@ -65,6 +87,7 @@ public record KnownStructure(
             consequenceIds, "consequenceIds");
         provenance = RepresentationCandidateAssessment.requireText(
             provenance, "provenance");
+        metadata = Objects.requireNonNull(metadata, "metadata");
     }
 
     String canonicalDescriptor() {
@@ -81,6 +104,8 @@ public record KnownStructure(
         );
         KnownStructureCatalog.appendCanonicalList(descriptor, consequenceIds);
         KnownStructureCatalog.appendCanonicalField(descriptor, provenance);
+        KnownStructureCatalog.appendCanonicalField(
+            descriptor, metadata.canonicalDescriptor());
         return descriptor.toString();
     }
 }

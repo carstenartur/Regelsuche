@@ -149,6 +149,7 @@ public final class KnownStructureMatcher {
                     structure.requiredAssumptions(),
                     structure.consequenceIds(),
                     structure.provenance(),
+                    structure.metadata(),
                     recognitionMode(result.recognitionStrength()),
                     ExpressionFormatter.format(result.representative()),
                     result.representativeIndex()

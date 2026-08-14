@@ -63,6 +63,8 @@ public record RepresentationCandidateAssessment(
         "KNOWN_FORM_WITHOUT_NEW_CAPABILITY";
     public static final String WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS =
         "UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS";
+    public static final String WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM =
+        "KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM";
     public static final String WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION =
         "VALIDATION_BELOW_SYMBOLIC_CONFIRMATION";
 
@@ -88,6 +90,7 @@ public record RepresentationCandidateAssessment(
         WARNING_STRUCTURAL_COMPRESSION_REGRESSION,
         WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY,
         WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS,
+        WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM,
         WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION
     );
 
@@ -141,7 +144,8 @@ public record RepresentationCandidateAssessment(
     ) {
         String normalized = requireText(value, field);
         if (!allowed.contains(normalized)) {
-            throw new IllegalArgumentException("unsupported " + field + ": " + value);
+            throw new IllegalArgumentException(
+                "unsupported " + field + ": " + value);
         }
         return normalized;
     }
@@ -156,7 +160,8 @@ public record RepresentationCandidateAssessment(
         if ((!emptyAllowed && copy.isEmpty())
                 || !allowed.containsAll(copy)
                 || new HashSet<>(copy).size() != copy.size()) {
-            throw new IllegalArgumentException("invalid " + field + ": " + copy);
+            throw new IllegalArgumentException(
+                "invalid " + field + ": " + copy);
         }
         return copy;
     }
@@ -174,7 +179,8 @@ public record RepresentationCandidateAssessment(
         Objects.requireNonNull(value, field);
         String normalized = value.trim();
         if (normalized.isEmpty()) {
-            throw new IllegalArgumentException(field + " must not be blank");
+            throw new IllegalArgumentException(
+                field + " must not be blank");
         }
         return normalized;
     }
