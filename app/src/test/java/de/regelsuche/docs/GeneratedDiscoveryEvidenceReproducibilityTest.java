@@ -130,7 +130,10 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
                 files.put(relative, path);
             }
         }
-        assertFalse(files.isEmpty(), "generated gallery must contain files");
+        assertTrue(
+            files.size() > 2,
+            "generated gallery must contain files below " + GENERATED_PATH
+        );
         return Map.copyOf(files);
     }
 
