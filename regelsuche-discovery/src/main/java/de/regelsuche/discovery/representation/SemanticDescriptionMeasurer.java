@@ -37,11 +37,9 @@ public final class SemanticDescriptionMeasurer {
         SyntaxStatistics syntax = new SyntaxStatistics();
         inspect(expression, syntax);
 
-        int semanticOccurrences;
         int distinctValues;
         try (ExprValueFactory factory = new ExprValueFactory()) {
             ExprValueFactory.Projection projection = factory.project(expression);
-            semanticOccurrences = projection.valuesBySyntaxIdentity().size();
             distinctValues = new LinkedHashSet<>(
                 projection.valuesBySyntaxIdentity().values()).size();
         }
@@ -53,9 +51,9 @@ public final class SemanticDescriptionMeasurer {
             syntax.astNodeCount,
             syntax.operatorCount,
             syntax.numericBitLength,
-            semanticOccurrences,
+            syntax.astNodeCount,
             distinctValues,
-            semanticOccurrences - distinctValues,
+            syntax.astNodeCount - distinctValues,
             syntax.variables.stream().toList(),
             syntax.functions.stream().toList()
         );
