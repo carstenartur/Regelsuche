@@ -54,6 +54,19 @@ class SlowTestReportGeneratorTest {
         );
         writeSuite(
             root.resolve(
+                "module-c/build/test-results/test/TEST-external.xml"
+            ),
+            """
+            <!DOCTYPE testsuite [
+              <!ENTITY external SYSTEM "file:///definitely-not-a-report">
+            ]>
+            <testsuite>
+              <testcase classname="ignored.Class" name="&external;" time="99"/>
+            </testsuite>
+            """
+        );
+        writeSuite(
+            root.resolve(
                 "module-d/build/test-results/binary/results.xml"
             ),
             """
@@ -128,11 +141,16 @@ class SlowTestReportGeneratorTest {
         );
 
         JsonNode json = JSON.readTree(firstJson.toFile());
-        assertEquals(SlowTestReportGenerator.SCHEMA, json.path("schema").asText());
+        assertEquals(
+            SlowTestReportGenerator.SCHEMA,
+            json.path("schema").asText()
+        );
         assertEquals(2, json.path("suiteCount").asInt());
         assertEquals(4, json.path("testCount").asInt());
         assertEquals(2, json.path("slowTestCount").asInt());
-        assertTrue(json.path("slowestTests").get(0).path("failed").asBoolean());
+        assertTrue(
+            json.path("slowestTests").get(0).path("failed").asBoolean()
+        );
         assertEquals(
             "slow-case",
             json.path("slowestTests").get(0).path("testName").asText()
@@ -173,6 +191,14 @@ class SlowTestReportGeneratorTest {
             "invalid reporting limits"
         );
         expectInvalid(
+            () -> generator.generate(
+                root,
+                100,
+                Double.POSITIVE_INFINITY
+            ),
+            "invalid reporting limits"
+        );
+        expectInvalid(
             () -> generator.generate(root, 100, 5.0d),
             "no JUnit test cases found"
         );
@@ -202,7 +228,10 @@ class SlowTestReportGeneratorTest {
 
         assertTrue(Files.isRegularFile(json));
         assertTrue(Files.isRegularFile(markdown));
-        assertEquals(1, JSON.readTree(json.toFile()).path("slowTestCount").asInt());
+        assertEquals(
+            1,
+            JSON.readTree(json.toFile()).path("slowTestCount").asInt()
+        );
         expectInvalid(
             () -> SlowTestReportMain.main(new String[] {
                 "--unknown", "value"
