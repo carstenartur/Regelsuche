@@ -265,10 +265,11 @@ public final class SlowTestReportGenerator {
         Path root,
         Path path
     ) {
-        try (InputStream input = Files.newInputStream(path)) {
-            XMLStreamReader reader = xmlFactory().createXMLStreamReader(
-                input
-            );
+        try (InputStream input = Files.newInputStream(path);
+                ReaderHandle handle = new ReaderHandle(
+                    xmlFactory().createXMLStreamReader(input)
+                )) {
+            XMLStreamReader reader = handle.reader();
             List<SlowTestReport.TestCaseEntry> cases = new ArrayList<>();
             String module = module(root, path);
             while (reader.hasNext()) {
@@ -278,7 +279,6 @@ public final class SlowTestReportGenerator {
                     cases.add(readTestCase(reader, module));
                 }
             }
-            reader.close();
             return List.copyOf(cases);
         } catch (IOException | XMLStreamException exception) {
             return null;
@@ -440,6 +440,14 @@ public final class SlowTestReportGenerator {
     }
 
     private record ClassKey(String module, String className) { }
+
+    private record ReaderHandle(XMLStreamReader reader)
+            implements AutoCloseable {
+        @Override
+        public void close() throws XMLStreamException {
+            reader.close();
+        }
+    }
 
     private static final class ClassAccumulator {
         private double seconds;
