@@ -139,13 +139,13 @@ class NestedKnownStructureMatcherTest {
 
     @Test
     void recognitionLimitsRemainVisibleAndStrictApiFailsClosed() {
-        PatternExpr pattern = PatternExpr.var("A0");
+        PatternExpr pattern = PatternExpr.variable("a0");
         StringBuilder expression = new StringBuilder("a8");
         for (int index = 1; index < 9; index++) {
             pattern = PatternExpr.op(
                 ADD,
                 pattern,
-                PatternExpr.var("A" + index)
+                PatternExpr.variable("a" + index)
             );
             expression.append(" + a").append(8 - index);
         }
