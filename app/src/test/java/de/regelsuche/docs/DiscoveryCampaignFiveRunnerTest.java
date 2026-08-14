@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
@@ -192,10 +193,20 @@ class DiscoveryCampaignFiveRunnerTest {
         for (String fileName : fileNames) {
             Path expected = retainedDirectory.resolve(fileName);
             Path actual = reproducedDirectory.resolve(fileName);
-            assertTrue(Files.isRegularFile(actual), fileName);
             assertTrue(
-                Files.mismatch(expected, actual) == -1L,
-                fileName + " must reproduce retained fixture bytes"
+                Files.isRegularFile(expected, LinkOption.NOFOLLOW_LINKS),
+                "missing or non-regular retained fixture file: " + fileName
+            );
+            assertTrue(
+                Files.isRegularFile(actual, LinkOption.NOFOLLOW_LINKS),
+                "missing or non-regular reproduced file: " + fileName
+            );
+            long mismatch = Files.mismatch(expected, actual);
+            assertTrue(
+                mismatch == -1L,
+                () -> fileName
+                    + " differs from retained fixture at byte offset "
+                    + mismatch
             );
         }
     }
