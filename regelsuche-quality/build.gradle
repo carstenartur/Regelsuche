@@ -54,6 +54,22 @@ def slowTestJson = rootProject.layout.buildDirectory.file(
 def slowTestMarkdown = rootProject.layout.buildDirectory.file(
     'reports/quality/slow-tests.md')
 
+// Gradle remains only the transitional checkout-wide producer of JUnit XML.
+// Model the precise Test-task outputs instead of the repository root so Gradle
+// can verify producer ownership without treating unrelated build artifacts as
+// implicit inputs. The Java implementation itself is compiled and tested by
+// the Maven reactor on the path toward issue #632's Maven-only target.
+def gradleJUnitXmlReports = rootProject.files()
+rootProject.subprojects.each { candidateProject ->
+    candidateProject.tasks
+        .withType(org.gradle.api.tasks.testing.Test)
+        .configureEach { testTask ->
+            gradleJUnitXmlReports.from(
+                testTask.reports.junitXml.outputLocation
+            )
+        }
+}
+
 tasks.register('reportSlowTests', JavaExec) {
     group = 'reporting'
     description = 'Renders deterministic slow-test evidence from checkout JUnit XML in Java.'
@@ -63,10 +79,9 @@ tasks.register('reportSlowTests', JavaExec) {
     args '--root', rootProject.projectDir.absolutePath,
         '--json-output', slowTestJson.get().asFile.absolutePath,
         '--markdown-output', slowTestMarkdown.get().asFile.absolutePath
-    inputs.files rootProject.fileTree(rootProject.rootDir) {
-        include '**/build/test-results/**/*.xml'
-        exclude '**/binary/**'
-    }
+    inputs.files(gradleJUnitXmlReports)
+        .withPropertyName('gradleJUnitXmlReports')
+        .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
     outputs.file slowTestJson
     outputs.file slowTestMarkdown
     outputs.upToDateWhen { false }
