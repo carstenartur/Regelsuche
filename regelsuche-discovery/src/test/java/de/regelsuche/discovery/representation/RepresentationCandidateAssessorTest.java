@@ -1,6 +1,7 @@
 package de.regelsuche.discovery.representation;
 
 import static de.regelsuche.ast.BinaryOperator.ADD;
+import static de.regelsuche.ast.BinaryOperator.DIV;
 import static de.regelsuche.ast.BinaryOperator.MUL;
 import static de.regelsuche.ast.BinaryOperator.POW;
 import static de.regelsuche.ast.BinaryOperator.SUB;
@@ -22,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RecognitionProfile;
@@ -51,7 +53,8 @@ class RepresentationCandidateAssessorTest {
         assertType(result, TYPE_WHOLE_EXPRESSION_COMPRESSION);
         assertTrue(result.materialRepresentationGain());
         assertTrue(result.claimEligible());
-        assertTrue(result.scopedCompressionDelta().improvedDimensions().size() >= 2);
+        assertTrue(result.scopedCompressionDelta().improvedDimensions().size()
+            >= 2);
     }
 
     @Test
@@ -92,7 +95,8 @@ class RepresentationCandidateAssessorTest {
         assertType(result, TYPE_KNOWN_WHOLE_FORM_BRIDGE);
         assertType(result, TYPE_DOWNSTREAM_CAPABILITY_BRIDGE);
         assertTrue(result.newlyUnlockedConsequences().stream().anyMatch(unlock ->
-            unlock.consequenceId().equals("rule:factor-difference-of-squares")
+            unlock.consequenceId().equals(
+                "rule:factor-difference-of-squares")
                 && unlock.occurrencePath().isRoot()));
         assertTrue(result.materialRepresentationGain());
         assertTrue(result.claimEligible());
@@ -185,18 +189,24 @@ class RepresentationCandidateAssessorTest {
         assertTrue(metrics.semanticValueOccurrences()
             > metrics.distinctSemanticValues());
         assertEquals(
-            metrics.semanticValueOccurrences() - metrics.distinctSemanticValues(),
+            metrics.semanticValueOccurrences()
+                - metrics.distinctSemanticValues(),
             metrics.repeatedSemanticValueSavings());
         assertTrue(metrics.variableSymbols().contains("x"));
     }
 
     @Test
     void countsSharedAstObjectAtEverySyntaxPosition() {
-        var shared = new BinaryExpr(new VariableExpr("x"), ADD, new NumberExpr(1));
+        var shared = new BinaryExpr(
+            new VariableExpr("x"),
+            ADD,
+            new NumberExpr(1)
+        );
         var root = new BinaryExpr(shared, MUL, shared);
         var metrics = measurer.measure(root);
 
-        assertEquals(metrics.astNodeCount(), metrics.semanticValueOccurrences());
+        assertEquals(metrics.astNodeCount(),
+            metrics.semanticValueOccurrences());
         assertTrue(metrics.repeatedSemanticValueSavings() > 0);
     }
 
@@ -214,7 +224,8 @@ class RepresentationCandidateAssessorTest {
 
     @Test
     void lexicalTokenCountIsIdentifierLengthIndependentAndExponentAware() {
-        assertEquals(3, measurer.measure("veryLongIdentifier + x").tokenCount());
+        assertEquals(3,
+            measurer.measure("veryLongIdentifier + x").tokenCount());
         var scientific = new BinaryExpr(
             new NumberExpr(0.0001),
             ADD,
@@ -229,7 +240,10 @@ class RepresentationCandidateAssessorTest {
     @Test
     void findsKnownStructureAtExactOccurrence() {
         var matcher = new KnownStructureMatcher(catalog(perfectSquare()));
-        var match = matchById(matcher.match("z + (a + b)^2"), "perfect-square");
+        var match = matchById(
+            matcher.match("z + (a + b)^2"),
+            "perfect-square"
+        );
 
         assertEquals(path(1), match.occurrencePath());
         assertEquals(KnownStructureMatch.RECOGNITION_EXACT,
@@ -247,7 +261,10 @@ class RepresentationCandidateAssessorTest {
 
         var acMatcher = new KnownStructureMatcher(
             catalog(completeSquare(RecognitionProfile.arithmeticAc())));
-        var acMatch = matchById(acMatcher.match(reordered), "complete-square");
+        var acMatch = matchById(
+            acMatcher.match(reordered),
+            "complete-square"
+        );
         assertEquals(KnownStructureMatch.RECOGNITION_EQUIVALENCE_AWARE,
             acMatch.recognitionMode());
         assertEquals(0, acMatch.representativeIndex());
@@ -307,30 +324,147 @@ class RepresentationCandidateAssessorTest {
     }
 
     @Test
+    void catalogRunsNestedBindingsAndRelationalConstraints() {
+        var rational = new KnownStructure(
+            "numeric-denominator",
+            "rational",
+            ExprMatcher.bind(
+                "fraction",
+                ExprMatcher.op(
+                    DIV,
+                    ExprMatcher.bind("numerator", ExprMatcher.any()),
+                    ExprMatcher.bind(
+                        "denominator",
+                        ExprMatcher.allOf(
+                            ExprMatcher.numberLiteral(),
+                            ExprMatcher.nonZeroNumberLiteral()
+                        )
+                    )
+                )
+            ),
+            List.of(),
+            List.of("backend:rational-normalizer"),
+            "first-party"
+        );
+        var repeated = new KnownStructure(
+            "repeated-sum",
+            "algebra",
+            ExprMatcher.where(
+                ExprMatcher.op(
+                    ADD,
+                    ExprMatcher.bind("left", ExprMatcher.any()),
+                    ExprMatcher.bind("right", ExprMatcher.any())
+                ),
+                ExprMatcher.sameAs(
+                    "left",
+                    "right",
+                    RecognitionProfile.arithmeticAc()
+                )
+            ),
+            List.of(),
+            List.of("rule:double-term"),
+            "first-party"
+        );
+        var matcher = new KnownStructureMatcher(
+            new KnownStructureCatalog(
+                "nested-v1",
+                List.of(rational, repeated)
+            )
+        );
+
+        var fraction = matchById(
+            matcher.match("z + (x + 1) / 2"),
+            "numeric-denominator"
+        );
+        assertEquals("(x + 1) / 2", fraction.bindings().get("fraction"));
+        assertEquals("x + 1", fraction.bindings().get("numerator"));
+        assertEquals("2", fraction.bindings().get("denominator"));
+        assertEquals(path(1), fraction.occurrencePath());
+
+        assertFalse(matcher.match("(a + b) + (b + a)").stream()
+            .filter(match -> match.structureId().equals("repeated-sum"))
+            .toList()
+            .isEmpty());
+        assertTrue(matcher.match("(a + b) + (b + c)").stream()
+            .noneMatch(match -> match.structureId().equals("repeated-sum")));
+    }
+
+    @Test
+    void recognitionLimitsRemainVisibleAndStrictApiFailsClosed() {
+        PatternExpr pattern = PatternExpr.variable("a0");
+        StringBuilder expression = new StringBuilder("a8");
+        for (int index = 1; index < 9; index++) {
+            pattern = PatternExpr.op(
+                ADD,
+                pattern,
+                PatternExpr.variable("a" + index)
+            );
+            expression.append(" + a").append(8 - index);
+        }
+        var wide = new KnownStructure(
+            "wide-ac",
+            "algebra",
+            pattern,
+            RecognitionProfile.arithmeticAc(),
+            List.of(),
+            List.of(),
+            "first-party"
+        );
+        var matcher = new KnownStructureMatcher(catalog(wide));
+
+        var scan = matcher.scan(expression.toString());
+
+        assertFalse(scan.complete());
+        assertTrue(scan.diagnostics().stream().anyMatch(diagnostic ->
+            diagnostic.code().equals("COMMUTATIVE_OPERAND_LIMIT")));
+        assertThrows(
+            KnownStructureMatcher.IncompleteRecognitionException.class,
+            () -> matcher.match(expression.toString())
+        );
+    }
+
+    @Test
     void catalogIdentityBindsRecognitionPolicyAndInputOrder() {
         KnownStructure first = perfectSquare();
         KnownStructure second = new KnownStructure(
             "sum",
             "algebra",
-            PatternExpr.op(ADD, PatternExpr.var("left"), PatternExpr.var("right")),
+            PatternExpr.op(
+                ADD,
+                PatternExpr.var("left"),
+                PatternExpr.var("right")
+            ),
             List.of(),
             List.of(),
             "first-party"
         );
 
         assertEquals(
-            new KnownStructureCatalog("v1", List.of(first, second)).contentHash(),
-            new KnownStructureCatalog("v1", List.of(second, first)).contentHash());
+            new KnownStructureCatalog(
+                "v1",
+                List.of(first, second)
+            ).contentHash(),
+            new KnownStructureCatalog(
+                "v1",
+                List.of(second, first)
+            ).contentHash());
         assertNotEquals(
-            catalog(completeSquare(RecognitionProfile.exact())).contentHash(),
-            catalog(completeSquare(RecognitionProfile.arithmeticAc())).contentHash());
+            catalog(completeSquare(
+                RecognitionProfile.exact())).contentHash(),
+            catalog(completeSquare(
+                RecognitionProfile.arithmeticAc())).contentHash());
     }
 
     @Test
     void catalogIdentityIsDelimiterSafeAndDuplicateIdsFailClosed() {
         KnownStructure structure = perfectSquare();
-        assertThrows(IllegalArgumentException.class,
-            () -> new KnownStructureCatalog("v1", List.of(structure, structure)));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new KnownStructureCatalog(
+                "v1",
+                List.of(structure, structure)
+            )
+        );
 
         KnownStructure delimiterInId = new KnownStructure(
             "a\u0000b",
@@ -362,7 +496,12 @@ class RepresentationCandidateAssessorTest {
     ) {
         return new RepresentationCandidateAssessor(catalog).assess(
             RepresentationCandidateProposal.whole(
-                source, candidate, List.of(), status));
+                source,
+                candidate,
+                List.of(),
+                status
+            )
+        );
     }
 
     private static KnownStructureCatalog catalog(KnownStructure structure) {
@@ -397,8 +536,16 @@ class RepresentationCandidateAssessorTest {
             "algebra",
             PatternExpr.op(
                 SUB,
-                PatternExpr.op(POW, PatternExpr.var("left"), PatternExpr.num(2)),
-                PatternExpr.op(POW, PatternExpr.var("right"), PatternExpr.num(2))
+                PatternExpr.op(
+                    POW,
+                    PatternExpr.var("left"),
+                    PatternExpr.num(2)
+                ),
+                PatternExpr.op(
+                    POW,
+                    PatternExpr.var("right"),
+                    PatternExpr.num(2)
+                )
             ),
             List.of(),
             List.of("rule:factor-difference-of-squares"),
@@ -414,7 +561,11 @@ class RepresentationCandidateAssessorTest {
         return new KnownStructure(
             "perfect-square",
             "algebra",
-            PatternExpr.op(POW, PatternExpr.var("base"), PatternExpr.num(2)),
+            PatternExpr.op(
+                POW,
+                PatternExpr.var("base"),
+                PatternExpr.num(2)
+            ),
             profile,
             List.of(),
             List.of("rule:square-reasoning"),
@@ -425,13 +576,21 @@ class RepresentationCandidateAssessorTest {
     private static KnownStructure completeSquare(RecognitionProfile profile) {
         PatternExpr x = PatternExpr.var("x");
         PatternExpr a = PatternExpr.var("a");
-        PatternExpr squareX = PatternExpr.op(POW, x, PatternExpr.num(2));
+        PatternExpr squareX = PatternExpr.op(
+            POW,
+            x,
+            PatternExpr.num(2)
+        );
         PatternExpr product = PatternExpr.op(
             MUL,
             PatternExpr.op(MUL, PatternExpr.num(2), x),
             a
         );
-        PatternExpr squareA = PatternExpr.op(POW, a, PatternExpr.num(2));
+        PatternExpr squareA = PatternExpr.op(
+            POW,
+            a,
+            PatternExpr.num(2)
+        );
         return new KnownStructure(
             "complete-square",
             "algebra",
