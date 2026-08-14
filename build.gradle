@@ -127,7 +127,7 @@ def checkDocumentationMath = tasks.register('checkDocumentationMath') {
 
 def verifyGeneratedDiscoveryGallery = tasks.register('verifyGeneratedDiscoveryGallery') {
     group = 'verification'
-    description = 'Compatibility alias; Java/JUnit owns deterministic discovery-gallery regeneration.'
+    description = 'Compatibility alias; app JUnit contracts own generated gallery bytes and README claim/link consistency.'
     dependsOn ':app:test'
 }
 
