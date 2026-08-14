@@ -15,6 +15,7 @@ import static de.regelsuche.discovery.representation.RepresentationCandidateAsse
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -22,8 +23,12 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RecognitionTheory;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class RepresentationCandidateAssessorTest {
@@ -208,23 +213,91 @@ class RepresentationCandidateAssessorTest {
     }
 
     @Test
-    void whitespaceDoesNotChangeMeasuredExpression() {
-        assertEquals(measurer.measure("a+b"), measurer.measure("  a   +   b  "));
+    void lexicalTokenCountIsIdentifierLengthIndependentAndExponentAware() {
+        assertEquals(3, measurer.measure("veryLongIdentifier + x").tokenCount());
+        var scientific = new BinaryExpr(
+            new NumberExpr(0.0001),
+            ADD,
+            new VariableExpr("x")
+        );
+        assertEquals(3, measurer.measure(scientific).tokenCount());
+        assertEquals(
+            measurer.measure("a+b"),
+            measurer.measure("  a   +   b  "));
     }
 
     @Test
     void findsKnownStructureAtExactOccurrence() {
         var matcher = new KnownStructureMatcher(catalog(perfectSquare()));
-        var matches = matcher.match("z + (a + b)^2");
+        var match = matchById(matcher.match("z + (a + b)^2"), "perfect-square");
 
-        assertTrue(matches.stream().anyMatch(match ->
-            match.structureId().equals("perfect-square")
-                && match.occurrencePath().equals(path(1))));
-        assertFalse(matches.stream().anyMatch(KnownStructureMatch::wholeExpression));
+        assertEquals(path(1), match.occurrencePath());
+        assertEquals(KnownStructureMatch.RECOGNITION_EXACT,
+            match.recognitionMode());
+        assertEquals(0, match.representativeIndex());
+        assertFalse(match.wholeExpression());
     }
 
     @Test
-    void catalogIdentityIsIndependentOfInputOrder() {
+    void recognizesKnownFormsModuloAcAndAlgebraicBindings() {
+        String reordered = "x^2 + a^2 + 2*a*x";
+        var exactMatcher = new KnownStructureMatcher(
+            catalog(completeSquare(RecognitionProfile.exact())));
+        assertTrue(exactMatcher.match(reordered).isEmpty());
+
+        var acMatcher = new KnownStructureMatcher(
+            catalog(completeSquare(RecognitionProfile.arithmeticAc())));
+        var acMatch = matchById(acMatcher.match(reordered), "complete-square");
+        assertEquals(KnownStructureMatch.RECOGNITION_EQUIVALENCE_AWARE,
+            acMatch.recognitionMode());
+        assertEquals(0, acMatch.representativeIndex());
+
+        var algebraicMatcher = new KnownStructureMatcher(
+            catalog(completeSquare(RecognitionProfile.algebraicAc())));
+        assertFalse(algebraicMatcher.match(
+            "x^2 + 3*a*x + (9/4)*a^2").isEmpty());
+    }
+
+    @Test
+    void recognizesKnownFormThroughBoundedAllowListedTheory() {
+        PatternExpr value = PatternExpr.var("value");
+        var productToSquare = new PatternRewriteRule(
+            "recognize-product-square",
+            PatternExpr.op(MUL, value, value),
+            PatternExpr.op(POW, value, PatternExpr.num(2))
+        );
+        var square = new KnownStructure(
+            "square",
+            "algebra",
+            PatternExpr.op(
+                POW,
+                PatternExpr.var("base"),
+                PatternExpr.num(2)
+            ),
+            RecognitionProfile.exact().withRecognitionRules(
+                Set.of(productToSquare.id()),
+                1
+            ),
+            List.of(),
+            List.of("rule:square-reasoning"),
+            "first-party"
+        );
+        var matcher = new KnownStructureMatcher(
+            catalog(square),
+            new RecognitionTheory(List.of(productToSquare))
+        );
+
+        var match = matchById(matcher.match("x*x"), "square");
+
+        assertEquals(
+            KnownStructureMatch.RECOGNITION_BOUNDED_REPRESENTATIVE,
+            match.recognitionMode());
+        assertEquals(1, match.representativeIndex());
+        assertEquals("x ^ 2", match.matchedRepresentative());
+    }
+
+    @Test
+    void catalogIdentityBindsRecognitionPolicyAndInputOrder() {
         KnownStructure first = perfectSquare();
         KnownStructure second = new KnownStructure(
             "sum",
@@ -238,13 +311,24 @@ class RepresentationCandidateAssessorTest {
         assertEquals(
             new KnownStructureCatalog("v1", List.of(first, second)).contentHash(),
             new KnownStructureCatalog("v1", List.of(second, first)).contentHash());
+        assertNotEquals(
+            catalog(completeSquare(RecognitionProfile.exact())).contentHash(),
+            catalog(completeSquare(RecognitionProfile.arithmeticAc())).contentHash());
     }
 
     @Test
-    void duplicateStructureIdsFailClosed() {
+    void catalogTextAndDuplicateIdsFailClosed() {
         KnownStructure structure = perfectSquare();
         assertThrows(IllegalArgumentException.class,
             () -> new KnownStructureCatalog("v1", List.of(structure, structure)));
+        assertThrows(IllegalArgumentException.class, () -> new KnownStructure(
+            "bad\nid",
+            "algebra",
+            PatternExpr.var("value"),
+            List.of(),
+            List.of(),
+            "first-party"
+        ));
     }
 
     private static RepresentationCandidateAssessment assess(
@@ -260,6 +344,16 @@ class RepresentationCandidateAssessorTest {
 
     private static KnownStructureCatalog catalog(KnownStructure structure) {
         return new KnownStructureCatalog("test-v1", List.of(structure));
+    }
+
+    private static KnownStructureMatch matchById(
+        List<KnownStructureMatch> matches,
+        String structureId
+    ) {
+        return matches.stream()
+            .filter(match -> match.structureId().equals(structureId))
+            .findFirst()
+            .orElseThrow();
     }
 
     private static ExpressionOccurrencePath path(int... indexes) {
@@ -296,6 +390,31 @@ class RepresentationCandidateAssessorTest {
             PatternExpr.op(POW, PatternExpr.var("base"), PatternExpr.num(2)),
             List.of(),
             List.of("rule:square-reasoning"),
+            "first-party"
+        );
+    }
+
+    private static KnownStructure completeSquare(RecognitionProfile profile) {
+        PatternExpr x = PatternExpr.var("x");
+        PatternExpr a = PatternExpr.var("a");
+        PatternExpr squareX = PatternExpr.op(POW, x, PatternExpr.num(2));
+        PatternExpr product = PatternExpr.op(
+            MUL,
+            PatternExpr.op(MUL, PatternExpr.num(2), x),
+            a
+        );
+        PatternExpr squareA = PatternExpr.op(POW, a, PatternExpr.num(2));
+        return new KnownStructure(
+            "complete-square",
+            "algebra",
+            PatternExpr.op(
+                ADD,
+                PatternExpr.op(ADD, squareX, product),
+                squareA
+            ),
+            profile,
+            List.of(),
+            List.of("capability:rewrite-as-square"),
             "first-party"
         );
     }

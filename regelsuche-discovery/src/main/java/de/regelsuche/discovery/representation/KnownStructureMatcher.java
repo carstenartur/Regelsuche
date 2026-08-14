@@ -5,6 +5,9 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.EquivalenceClassPatternMatcher;
+import de.regelsuche.transform.EquivalentExpressionProvider;
+import de.regelsuche.transform.RecognitionProfile;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -12,21 +15,50 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Deterministic exact-pattern matching for whole expressions and subexpressions. */
+/**
+ * Deterministic known-structure matching at every AST occurrence.
+ *
+ * <p>Each catalog entry owns its recognition profile. A bounded representative
+ * provider may additionally expose explicitly allow-listed equivalent forms.</p>
+ */
 public final class KnownStructureMatcher {
     private final KnownStructureCatalog catalog;
     private final ExpressionParser parser;
+    private final EquivalentExpressionProvider representativeProvider;
+    private final EquivalenceClassPatternMatcher patternMatcher =
+        new EquivalenceClassPatternMatcher();
 
     public KnownStructureMatcher(KnownStructureCatalog catalog) {
-        this(catalog, new ExpressionParser());
+        this(
+            catalog,
+            new ExpressionParser(),
+            EquivalentExpressionProvider.identity()
+        );
+    }
+
+    public KnownStructureMatcher(
+        KnownStructureCatalog catalog,
+        EquivalentExpressionProvider representativeProvider
+    ) {
+        this(catalog, new ExpressionParser(), representativeProvider);
     }
 
     public KnownStructureMatcher(
         KnownStructureCatalog catalog,
         ExpressionParser parser
     ) {
+        this(catalog, parser, EquivalentExpressionProvider.identity());
+    }
+
+    public KnownStructureMatcher(
+        KnownStructureCatalog catalog,
+        ExpressionParser parser,
+        EquivalentExpressionProvider representativeProvider
+    ) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.parser = Objects.requireNonNull(parser, "parser");
+        this.representativeProvider = Objects.requireNonNull(
+            representativeProvider, "representativeProvider");
     }
 
     public String catalogHash() {
@@ -55,25 +87,37 @@ public final class KnownStructureMatcher {
         List<KnownStructureMatch> matches
     ) {
         for (KnownStructure structure : catalog.structures()) {
-            Map<String, Expr> bindings = new LinkedHashMap<>();
-            if (structure.pattern().match(expression, bindings)) {
-                Map<String, String> renderedBindings = new LinkedHashMap<>();
-                bindings.entrySet().stream()
-                    .sorted(Map.Entry.comparingByKey())
-                    .forEach(entry -> renderedBindings.put(
-                        entry.getKey(),
-                        ExpressionFormatter.format(entry.getValue())
-                    ));
-                matches.add(new KnownStructureMatch(
-                    structure.id(),
-                    structure.domainId(),
-                    path,
-                    renderedBindings,
-                    structure.requiredAssumptions(),
-                    structure.consequenceIds(),
-                    structure.provenance()
-                ));
+            var result = patternMatcher.match(
+                structure.pattern(),
+                expression,
+                structure.recognitionProfile(),
+                representativeProvider
+            );
+            if (!result.matched()) {
+                continue;
             }
+            Map<String, String> renderedBindings = new LinkedHashMap<>();
+            result.bindings().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> renderedBindings.put(
+                    entry.getKey(),
+                    ExpressionFormatter.format(entry.getValue())
+                ));
+            matches.add(new KnownStructureMatch(
+                structure.id(),
+                structure.domainId(),
+                path,
+                renderedBindings,
+                structure.requiredAssumptions(),
+                structure.consequenceIds(),
+                structure.provenance(),
+                recognitionMode(
+                    structure.recognitionProfile(),
+                    result.representativeIndex()
+                ),
+                ExpressionFormatter.format(result.representative()),
+                result.representativeIndex()
+            ));
         }
 
         if (expression instanceof BinaryExpr binary) {
@@ -84,5 +128,17 @@ public final class KnownStructureMatcher {
                 collect(function.arguments().get(index), path.append(index), matches);
             }
         }
+    }
+
+    private static String recognitionMode(
+        RecognitionProfile profile,
+        int representativeIndex
+    ) {
+        if (representativeIndex > 0) {
+            return KnownStructureMatch.RECOGNITION_BOUNDED_REPRESENTATIVE;
+        }
+        return profile.equals(RecognitionProfile.exact())
+            ? KnownStructureMatch.RECOGNITION_EXACT
+            : KnownStructureMatch.RECOGNITION_EQUIVALENCE_AWARE;
     }
 }

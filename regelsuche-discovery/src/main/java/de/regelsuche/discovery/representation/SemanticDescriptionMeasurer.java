@@ -93,10 +93,79 @@ public final class SemanticDescriptionMeasurer {
     }
 
     private static int tokenCount(String expression) {
-        return Math.max(1, expression
-            .replaceAll("[A-Za-z_][A-Za-z0-9_]*|\\d+(?:\\.\\d+)?", "x")
-            .replaceAll("\\s+", "")
-            .length());
+        int tokens = 0;
+        int index = 0;
+        while (index < expression.length()) {
+            char current = expression.charAt(index);
+            if (Character.isWhitespace(current)) {
+                index++;
+            } else if (Character.isLetter(current) || current == '_') {
+                index = scanIdentifier(expression, index);
+                tokens++;
+            } else if (Character.isDigit(current) || current == '.') {
+                index = scanNumber(expression, index);
+                tokens++;
+            } else if ("+-*/^(),".indexOf(current) >= 0) {
+                index++;
+                tokens++;
+            } else {
+                throw new IllegalArgumentException(
+                    "unsupported formatted token at position " + index);
+            }
+        }
+        return Math.max(1, tokens);
+    }
+
+    private static int scanIdentifier(String expression, int index) {
+        int cursor = index + 1;
+        while (cursor < expression.length()) {
+            char current = expression.charAt(cursor);
+            if (!Character.isLetterOrDigit(current) && current != '_') {
+                break;
+            }
+            cursor++;
+        }
+        return cursor;
+    }
+
+    private static int scanNumber(String expression, int index) {
+        int cursor = index;
+        while (cursor < expression.length()
+                && Character.isDigit(expression.charAt(cursor))) {
+            cursor++;
+        }
+        if (cursor < expression.length() && expression.charAt(cursor) == '.') {
+            cursor++;
+            while (cursor < expression.length()
+                    && Character.isDigit(expression.charAt(cursor))) {
+                cursor++;
+            }
+        }
+        if (cursor < expression.length()
+                && (expression.charAt(cursor) == 'e'
+                    || expression.charAt(cursor) == 'E')) {
+            cursor++;
+            if (cursor < expression.length()
+                    && (expression.charAt(cursor) == '+'
+                        || expression.charAt(cursor) == '-')) {
+                cursor++;
+            }
+            int exponentStart = cursor;
+            while (cursor < expression.length()
+                    && Character.isDigit(expression.charAt(cursor))) {
+                cursor++;
+            }
+            if (cursor == exponentStart) {
+                throw new IllegalArgumentException(
+                    "invalid formatted exponent at position " + index);
+            }
+        }
+        if (cursor == index
+                || cursor == index + 1 && expression.charAt(index) == '.') {
+            throw new IllegalArgumentException(
+                "invalid formatted number at position " + index);
+        }
+        return cursor;
     }
 
     private static final class SyntaxStatistics {

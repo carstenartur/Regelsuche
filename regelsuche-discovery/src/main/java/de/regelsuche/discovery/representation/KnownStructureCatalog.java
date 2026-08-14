@@ -45,10 +45,11 @@ public final class KnownStructureCatalog {
     }
 
     private String canonicalDescriptor() {
-        StringBuilder descriptor = new StringBuilder(revision);
-        structures.forEach(structure -> descriptor
-            .append('\n')
-            .append(structure.canonicalDescriptor()));
+        StringBuilder descriptor = new StringBuilder();
+        appendCanonicalField(descriptor, revision);
+        appendCanonicalField(descriptor, Integer.toString(structures.size()));
+        structures.forEach(structure ->
+            appendCanonicalField(descriptor, structure.canonicalDescriptor()));
         return descriptor.toString();
     }
 
@@ -62,7 +63,21 @@ public final class KnownStructureCatalog {
         }
     }
 
-    private static String sha256(String value) {
+    static void appendCanonicalList(
+        StringBuilder descriptor,
+        List<String> values
+    ) {
+        appendCanonicalField(descriptor, Integer.toString(values.size()));
+        values.forEach(value -> appendCanonicalField(descriptor, value));
+    }
+
+    static void appendCanonicalField(StringBuilder descriptor, String value) {
+        Objects.requireNonNull(descriptor, "descriptor");
+        Objects.requireNonNull(value, "value");
+        descriptor.append(value.length()).append(':').append(value);
+    }
+
+    static String sha256(String value) {
         try {
             return "sha256:" + HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256")
