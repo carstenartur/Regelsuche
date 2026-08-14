@@ -23,7 +23,6 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
         "\"headSha\"",
         "\"commitSha\""
     };
-    private static final Path README_PATH = Path.of("README.md");
     private static final Path GALLERY_PATH = Path.of(
         "docs/demo-gallery.md"
     );
@@ -38,8 +37,6 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
         Path repository = repositoryRoot();
         Path first = temporary.resolve("first");
         Path second = temporary.resolve("second");
-        seedReadme(repository, first);
-        seedReadme(repository, second);
 
         DocsDiscoveryGalleryGenerator generator =
             new DocsDiscoveryGalleryGenerator();
@@ -87,22 +84,9 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
         );
     }
 
-    private static void seedReadme(Path repository, Path targetRoot)
-            throws IOException {
-        Path committedReadme = repository.resolve(README_PATH);
-        requireRegularFile(committedReadme, README_PATH.toString());
-        Files.createDirectories(targetRoot);
-        Files.copy(committedReadme, targetRoot.resolve(README_PATH));
-    }
-
     private static void seedSyntheticRoot(Path root, String evidence)
             throws IOException {
         Files.createDirectories(root.resolve(GENERATED_PATH));
-        Files.writeString(
-            root.resolve(README_PATH),
-            "README\n",
-            StandardCharsets.UTF_8
-        );
         Files.createDirectories(root.resolve(GALLERY_PATH).getParent());
         Files.writeString(
             root.resolve(GALLERY_PATH),
@@ -146,7 +130,6 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
     private static Map<String, Path> artifactFiles(Path root)
             throws IOException {
         Map<String, Path> files = new TreeMap<>();
-        addRegularFile(files, root, README_PATH);
         addRegularFile(files, root, GALLERY_PATH);
 
         Path generated = root.resolve(GENERATED_PATH);
@@ -183,7 +166,7 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
             }
         }
         assertTrue(
-            files.size() > 2,
+            files.size() > 1,
             "generated gallery must contain files below " + GENERATED_PATH
         );
         return Map.copyOf(files);
