@@ -60,7 +60,11 @@
       "type": "array",
       "items": { "$ref": "#/$defs/knownStructureMatch" }
     },
-    "newlyUnlockedConsequences": { "$ref": "#/$defs/stringArray" },
+    "newlyUnlockedConsequences": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/consequenceUnlock" }
+    },
     "candidateTypes": {
       "type": "array",
       "minItems": 1,
@@ -213,6 +217,22 @@
         "requiredAssumptions": { "$ref": "#/$defs/stringArray" },
         "consequenceIds": { "$ref": "#/$defs/stringArray" },
         "provenance": { "$ref": "#/$defs/nonBlank" }
+      },
+      "additionalProperties": false
+    },
+    "consequenceUnlock": {
+      "type": "object",
+      "required": [
+        "consequenceId",
+        "structureId",
+        "occurrencePath",
+        "matchIdentity"
+      ],
+      "properties": {
+        "consequenceId": { "$ref": "#/$defs/nonBlank" },
+        "structureId": { "$ref": "#/$defs/nonBlank" },
+        "occurrencePath": { "$ref": "#/$defs/path" },
+        "matchIdentity": { "$ref": "#/$defs/nonBlank" }
       },
       "additionalProperties": false
     },
