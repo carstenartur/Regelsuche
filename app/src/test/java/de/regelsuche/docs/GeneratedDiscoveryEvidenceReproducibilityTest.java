@@ -2,6 +2,7 @@ package de.regelsuche.docs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -56,12 +57,63 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
         assertNoVolatileCommitFields(artifactFiles(repositoryRoot()));
     }
 
+    @Test
+    void artifactComparisonRejectsByteAndMembershipDrift(
+        @TempDir Path temporary
+    ) throws IOException {
+        Path expected = temporary.resolve("expected");
+        Path actual = temporary.resolve("actual");
+        seedSyntheticRoot(expected, "expected\n");
+        seedSyntheticRoot(actual, "changed\n");
+
+        assertThrows(
+            AssertionError.class,
+            () -> assertArtifactTreesEqual(expected, actual)
+        );
+
+        Files.writeString(
+            actual.resolve(GENERATED_PATH).resolve("evidence.json"),
+            "expected\n",
+            StandardCharsets.UTF_8
+        );
+        Files.writeString(
+            actual.resolve(GENERATED_PATH).resolve("unexpected.json"),
+            "{}\n",
+            StandardCharsets.UTF_8
+        );
+        assertThrows(
+            AssertionError.class,
+            () -> assertArtifactTreesEqual(expected, actual)
+        );
+    }
+
     private static void seedReadme(Path repository, Path targetRoot)
             throws IOException {
         Path committedReadme = repository.resolve(README_PATH);
         requireRegularFile(committedReadme, README_PATH.toString());
         Files.createDirectories(targetRoot);
         Files.copy(committedReadme, targetRoot.resolve(README_PATH));
+    }
+
+    private static void seedSyntheticRoot(Path root, String evidence)
+            throws IOException {
+        Files.createDirectories(root.resolve(GENERATED_PATH));
+        Files.writeString(
+            root.resolve(README_PATH),
+            "README\n",
+            StandardCharsets.UTF_8
+        );
+        Files.createDirectories(root.resolve(GALLERY_PATH).getParent());
+        Files.writeString(
+            root.resolve(GALLERY_PATH),
+            "gallery\n",
+            StandardCharsets.UTF_8
+        );
+        Files.writeString(
+            root.resolve(GENERATED_PATH).resolve("evidence.json"),
+            evidence,
+            StandardCharsets.UTF_8
+        );
     }
 
     private static void assertArtifactTreesEqual(
