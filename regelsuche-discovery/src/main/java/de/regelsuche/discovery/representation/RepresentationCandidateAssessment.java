@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 
 /** First-stage evidence for one representation candidate. */
 public record RepresentationCandidateAssessment(
@@ -160,7 +161,16 @@ public record RepresentationCandidateAssessment(
         return copy;
     }
 
-    private static String requireText(String value, String field) {
+    static List<String> sortedUnique(List<String> values, String field) {
+        Objects.requireNonNull(values, field);
+        TreeSet<String> normalized = new TreeSet<>();
+        for (String value : values) {
+            normalized.add(requireText(value, field + " entry"));
+        }
+        return List.copyOf(normalized);
+    }
+
+    static String requireText(String value, String field) {
         Objects.requireNonNull(value, field);
         String normalized = value.trim();
         if (normalized.isEmpty()) {
