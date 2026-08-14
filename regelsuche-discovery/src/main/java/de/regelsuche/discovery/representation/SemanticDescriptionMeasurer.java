@@ -28,8 +28,7 @@ public final class SemanticDescriptionMeasurer {
     }
 
     public SemanticDescriptionMetrics measure(String expression) {
-        Objects.requireNonNull(expression, "expression");
-        return measure(parser.parseTerm(expression));
+        return measure(parser.parseTerm(Objects.requireNonNull(expression, "expression")));
     }
 
     public SemanticDescriptionMetrics measure(Expr expression) {
@@ -39,9 +38,8 @@ public final class SemanticDescriptionMeasurer {
 
         int distinctValues;
         try (ExprValueFactory factory = new ExprValueFactory()) {
-            ExprValueFactory.Projection projection = factory.project(expression);
             distinctValues = new LinkedHashSet<>(
-                projection.valuesBySyntaxIdentity().values()).size();
+                factory.project(expression).valuesBySyntaxIdentity().values()).size();
         }
 
         String normalized = ExpressionFormatter.format(expression);
@@ -65,29 +63,20 @@ public final class SemanticDescriptionMeasurer {
             statistics.operatorCount++;
             inspect(binary.left(), statistics);
             inspect(binary.right(), statistics);
-            return;
-        }
-        if (expression instanceof FunctionExpr function) {
+        } else if (expression instanceof FunctionExpr function) {
             statistics.operatorCount++;
             statistics.functions.add(function.name());
-            for (Expr argument : function.arguments()) {
-                inspect(argument, statistics);
-            }
-            return;
-        }
-        if (expression instanceof VariableExpr variable) {
+            function.arguments().forEach(argument -> inspect(argument, statistics));
+        } else if (expression instanceof VariableExpr variable) {
             statistics.variables.add(variable.name());
-            return;
-        }
-        if (expression instanceof NumberExpr number) {
+        } else if (expression instanceof NumberExpr number) {
             statistics.numericBitLength = Math.addExact(
-                statistics.numericBitLength,
-                numericBitLength(number.value())
-            );
-            return;
+                statistics.numericBitLength, numericBitLength(number.value()));
+        } else {
+            throw new IllegalArgumentException(
+                "Unsupported expression implementation: "
+                    + expression.getClass().getName());
         }
-        throw new IllegalArgumentException(
-            "Unsupported expression implementation: " + expression.getClass().getName());
     }
 
     private static int numericBitLength(double value) {
@@ -95,55 +84,19 @@ public final class SemanticDescriptionMeasurer {
             throw new IllegalArgumentException("non-finite numbers are not measurable");
         }
         BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();
-        BigInteger unscaled = decimal.unscaledValue().abs();
-        int bits = Math.max(1, unscaled.bitLength());
-        int scale = decimal.scale();
-        if (scale != 0) {
-            bits = Math.addExact(
+        int bits = Math.max(1, decimal.unscaledValue().abs().bitLength());
+        return decimal.scale() == 0
+            ? bits
+            : Math.addExact(
                 bits,
-                BigInteger.TEN.pow(Math.abs(scale)).bitLength()
-            );
-        }
-        return bits;
+                BigInteger.TEN.pow(Math.abs(decimal.scale())).bitLength());
     }
 
     private static int tokenCount(String expression) {
-        int tokens = 0;
-        int index = 0;
-        while (index < expression.length()) {
-            char current = expression.charAt(index);
-            if (Character.isWhitespace(current)) {
-                index++;
-                continue;
-            }
-            if (Character.isLetter(current) || current == '_') {
-                index++;
-                while (index < expression.length()) {
-                    char next = expression.charAt(index);
-                    if (!Character.isLetterOrDigit(next) && next != '_') {
-                        break;
-                    }
-                    index++;
-                }
-                tokens++;
-                continue;
-            }
-            if (Character.isDigit(current) || current == '.') {
-                index++;
-                while (index < expression.length()) {
-                    char next = expression.charAt(index);
-                    if (!Character.isDigit(next) && next != '.') {
-                        break;
-                    }
-                    index++;
-                }
-                tokens++;
-                continue;
-            }
-            tokens++;
-            index++;
-        }
-        return Math.max(1, tokens);
+        return Math.max(1, expression
+            .replaceAll("[A-Za-z_][A-Za-z0-9_]*|\\d+(?:\\.\\d+)?", "x")
+            .replaceAll("\\s+", "")
+            .length());
     }
 
     private static final class SyntaxStatistics {
