@@ -216,7 +216,7 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
                     candidate.resolve("README.md"),
                     LinkOption.NOFOLLOW_LINKS
                 ) && Files.isRegularFile(
-                    candidate.resolve("settings.gradle"),
+                    candidate.resolve("pom.xml"),
                     LinkOption.NOFOLLOW_LINKS
                 )) {
                 return candidate;
