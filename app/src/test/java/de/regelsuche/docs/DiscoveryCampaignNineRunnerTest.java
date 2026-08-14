@@ -99,16 +99,26 @@ class DiscoveryCampaignNineRunnerTest {
     }
 
     @Test
-    void campaignNineWritesCandidateReports(@TempDir Path tempDir) {
-        new DiscoveryCampaignNineRunner().writeReport(tempDir);
+    void campaignNineWritesCandidateReports(
+        DiscoveryPromotionPipelineFixture fixture,
+        @TempDir Path tempDir
+    ) throws Exception {
+        new DiscoveryCampaignNineRunner().writeReport(
+            tempDir,
+            fixture.report().campaignNine()
+        );
 
-        assertTrue(Files.exists(
-            tempDir.resolve("discovery-campaign-9.json")
-        ));
-        assertTrue(Files.exists(tempDir.resolve("campaign-progress.md")));
-        assertTrue(Files.exists(tempDir.resolve("discovery-candidates.md")));
-        assertTrue(Files.exists(tempDir.resolve("operator-suggestions.md")));
-        assertTrue(Files.exists(tempDir.resolve("macro-candidates.md")));
+        assertReproducedFiles(
+            fixture.campaignDirectory("discovery-campaign-9"),
+            tempDir,
+            List.of(
+                "discovery-campaign-9.json",
+                "campaign-progress.md",
+                "discovery-candidates.md",
+                "operator-suggestions.md",
+                "macro-candidates.md"
+            )
+        );
     }
 
     @Test
@@ -295,6 +305,22 @@ class DiscoveryCampaignNineRunnerTest {
                         + result.id()
                 );
             }
+        }
+    }
+
+    private void assertReproducedFiles(
+        Path retainedDirectory,
+        Path reproducedDirectory,
+        List<String> fileNames
+    ) throws Exception {
+        for (String fileName : fileNames) {
+            Path expected = retainedDirectory.resolve(fileName);
+            Path actual = reproducedDirectory.resolve(fileName);
+            assertTrue(Files.isRegularFile(actual), fileName);
+            assertTrue(
+                Files.mismatch(expected, actual) == -1L,
+                fileName + " must reproduce retained fixture bytes"
+            );
         }
     }
 
