@@ -25,6 +25,7 @@ import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 
 class MavenWorkflowSemanticsContractTest {
@@ -134,14 +135,7 @@ class MavenWorkflowSemanticsContractTest {
             "{\"schema\":\"first\",\"schema\":\"second\"}",
             StandardCharsets.UTF_8
         );
-        IllegalArgumentException duplicateFailure = assertThrows(
-            IllegalArgumentException.class,
-            () -> parseStrict(duplicate)
-        );
-        assertTrue(
-            duplicateFailure.getMessage().toLowerCase().contains("duplicate"),
-            duplicateFailure.getMessage()
-        );
+        expectInvalid(() -> parseStrict(duplicate), "duplicate");
 
         Path trailing = temporary.resolve("trailing.json");
         Files.writeString(
@@ -149,227 +143,185 @@ class MavenWorkflowSemanticsContractTest {
             "{\"schema\":\"first\"} {}",
             StandardCharsets.UTF_8
         );
-        IllegalArgumentException trailingFailure = assertThrows(
-            IllegalArgumentException.class,
-            () -> parseStrict(trailing)
-        );
-        assertTrue(
-            trailingFailure.getMessage().contains("trailing JSON content"),
-            trailingFailure.getMessage()
-        );
+        expectInvalid(() -> parseStrict(trailing), "trailing JSON content");
     }
 
     @Test
-    void policyAndGovernanceDriftFailClosed(@TempDir Path temporary)
-            throws IOException {
-        Path unknownPolicy = createValidRepository(
-            temporary.resolve("unknown-policy")
+    void policyAndGovernanceDriftFailClosed() {
+        ObjectNode unknownPolicy = validPolicyDocument();
+        unknownPolicy.put("unexpected", true);
+        expectInvalid(
+            () -> parsePolicy(unknownPolicy),
+            "workflow policy unknown="
         );
-        ObjectNode policy = validPolicy();
-        policy.put("unexpected", true);
-        writeJson(policyPath(unknownPolicy), policy);
-        expectFailure(unknownPolicy, "workflow policy unknown=");
 
-        Path unsortedPolicy = createValidRepository(
-            temporary.resolve("unsorted-policy")
-        );
-        ObjectNode unsorted = validPolicy();
-        ArrayNode verification = (ArrayNode) unsorted.get(
-            "verificationWorkflows"
-        );
-        verification.add("another.yml");
-        writeJson(policyPath(unsortedPolicy), unsorted);
-        expectFailure(
-            unsortedPolicy,
+        ObjectNode unsortedPolicy = validPolicyDocument();
+        ((ArrayNode) unsortedPolicy.get("verificationWorkflows"))
+            .add("another.yml");
+        expectInvalid(
+            () -> parsePolicy(unsortedPolicy),
             "verificationWorkflows must be sorted and unique"
         );
 
-        Path weakStrictness = createValidRepository(
-            temporary.resolve("weak-strictness")
+        ObjectNode excessivePolicy = validPolicyDocument();
+        excessivePolicy.put("maximumWorkflowCount", 1);
+        expectInvalid(
+            () -> parsePolicy(excessivePolicy),
+            "classified workflows exceed maximumWorkflowCount"
         );
-        ObjectNode governance = validGovernance();
-        ((ObjectNode) governance.get("requiredStatusCheck"))
+
+        ObjectNode weakStrictness = validGovernanceDocument();
+        ((ObjectNode) weakStrictness.get("requiredStatusCheck"))
             .put("strictUpToDate", false);
-        writeJson(governancePath(weakStrictness), governance);
-        expectFailure(weakStrictness, "strictUpToDate must remain true");
+        expectInvalid(
+            () -> parseGovernance(weakStrictness),
+            "strictUpToDate must remain true"
+        );
 
-        Path bypass = createValidRepository(temporary.resolve("bypass"));
-        ObjectNode bypassGovernance = validGovernance();
-        ((ArrayNode) bypassGovernance.get("routineBypassActors"))
+        ObjectNode bypass = validGovernanceDocument();
+        ((ArrayNode) bypass.get("routineBypassActors"))
             .add("repository-role:admin");
-        writeJson(governancePath(bypass), bypassGovernance);
-        expectFailure(bypass, "routineBypassActors must be an empty array");
+        expectInvalid(
+            () -> parseGovernance(bypass),
+            "routineBypassActors must be an empty array"
+        );
 
-        Path collision = createValidRepository(
-            temporary.resolve("check-collision")
-        );
-        ObjectNode collisionGovernance = validGovernance();
-        collisionGovernance.put(
-            "createEventCheckContext",
-            "Checkout-local ciCheck"
-        );
-        writeJson(governancePath(collision), collisionGovernance);
-        expectFailure(
-            collision,
+        ObjectNode collision = validGovernanceDocument();
+        collision.put("createEventCheckContext", "Checkout-local ciCheck");
+        expectInvalid(
+            () -> parseGovernance(collision),
             "create-event check context must differ"
         );
     }
 
     @Test
-    void workflowClassificationFailsClosed(@TempDir Path temporary)
-            throws IOException {
-        Path unclassified = createValidRepository(
-            temporary.resolve("unclassified")
-        );
-        ObjectNode widerPolicy = validPolicy();
-        widerPolicy.put("maximumWorkflowCount", 3);
-        writeJson(policyPath(unclassified), widerPolicy);
-        Files.writeString(
-            workflowDirectory(unclassified).resolve("extra.yml"),
-            "name: Extra\n",
-            StandardCharsets.UTF_8
-        );
-        expectFailure(unclassified, "unclassified=[extra.yml]");
+    void workflowClassificationFailsClosed() {
+        Policy policy = validPolicy();
 
-        Path stale = createValidRepository(temporary.resolve("stale"));
-        Files.delete(workflowDirectory(stale).resolve("release.yml"));
-        expectFailure(stale, "stale=[release.yml]");
-
-        Path excessive = createValidRepository(
-            temporary.resolve("excessive")
+        expectInvalid(
+            () -> verifyClassification(
+                policy,
+                List.of("extra.yml", "gradle.yml", "release.yml")
+            ),
+            "too many workflows"
         );
-        ObjectNode excessivePolicy = validPolicy();
-        excessivePolicy.put("maximumWorkflowCount", 1);
-        writeJson(policyPath(excessive), excessivePolicy);
-        expectFailure(
-            excessive,
-            "classified workflows exceed maximumWorkflowCount"
+        expectInvalid(
+            () -> verifyClassification(
+                policy,
+                List.of("extra.yml", "gradle.yml")
+            ),
+            "unclassified=[extra.yml] stale=[release.yml]"
+        );
+        expectInvalid(
+            () -> verifyClassification(policy, List.of("gradle.yml")),
+            "unclassified=[] stale=[release.yml]"
         );
     }
 
     @Test
-    void workflowTextGuardRejectsEveryForbiddenSemantic(
-        @TempDir Path temporary
-    ) throws IOException {
+    void workflowTextGuardRejectsEveryForbiddenSemantic() {
         Map<String, String> samples = new LinkedHashMap<>();
-        samples.put("inline-interpreter-heredoc", "python3 - <<'PY'");
-        samples.put("manual-docker-lifecycle", "docker build .");
-        samples.put("fixed-host-port", "docker run -p 18080:8080 image");
+        samples.put(
+            "inline-interpreter-heredoc",
+            "      - run: python3 - <<'PY'"
+        );
+        samples.put(
+            "manual-docker-lifecycle",
+            "      - run: docker build ."
+        );
+        samples.put(
+            "fixed-host-port",
+            "      - run: docker run -p 18080:8080 image"
+        );
         samples.put("github-service-fixture", "    services:");
-        samples.put("direct-repository-script", "bash scripts/check.sh");
-        samples.put("workflow-owned-assertion", "grep expected output.txt");
+        samples.put(
+            "direct-repository-script",
+            "      - run: bash scripts/check.sh"
+        );
+        samples.put(
+            "workflow-owned-assertion",
+            "          grep expected output.txt"
+        );
 
-        int index = 0;
+        MergeGovernance governance = validGovernance();
         for (Map.Entry<String, String> sample : samples.entrySet()) {
-            Path repository = createValidRepository(
-                temporary.resolve("sample-" + index++)
+            List<Violation> violations = scanVerificationWorkflow(
+                "gradle.yml",
+                validWorkflow() + "\n" + sample.getValue() + "\n",
+                governance
             );
-            Files.writeString(
-                verificationWorkflow(repository),
-                validWorkflow()
-                    + "\n      - run: "
-                    + sample.getValue()
-                    + "\n",
-                StandardCharsets.UTF_8
+            assertTrue(
+                violations.stream().anyMatch(violation ->
+                    violation.category().equals(sample.getKey())),
+                () -> "missing "
+                    + sample.getKey()
+                    + " in "
+                    + violations
             );
-            expectFailure(repository, sample.getKey());
         }
 
-        Path noGradle = createValidRepository(
-            temporary.resolve("no-gradle")
-        );
-        Files.writeString(
-            verificationWorkflow(noGradle),
+        assertViolation(
             validWorkflow().replace("./gradlew", "echo"),
-            StandardCharsets.UTF_8
+            governance,
+            "missing-gradle-entrypoint"
         );
-        expectFailure(noGradle, "missing-gradle-entrypoint");
-
-        Path tooManyGradle = createValidRepository(
-            temporary.resolve("too-many-gradle")
-        );
-        Files.writeString(
-            verificationWorkflow(tooManyGradle),
+        assertViolation(
             validWorkflow()
                 + "\n      - run: ./gradlew test\n"
                 + "      - run: ./gradlew check\n",
-            StandardCharsets.UTF_8
+            governance,
+            "too-many-gradle-entrypoints"
         );
-        expectFailure(tooManyGradle, "too-many-gradle-entrypoints");
-
-        Path missingCi = createValidRepository(
-            temporary.resolve("missing-ci")
-        );
-        ObjectNode governance = validGovernance();
-        ((ObjectNode) governance.get("requiredStatusCheck"))
-            .put("context", "Required verification");
-        governance.put("createEventCheckContext", "Create verification");
-        writeJson(governancePath(missingCi), governance);
-        Files.writeString(
-            verificationWorkflow(missingCi),
+        assertViolation(
             workflow(
                 "Required verification",
                 "Create verification",
                 "./gradlew test"
             ),
-            StandardCharsets.UTF_8
+            new MergeGovernance(
+                "main",
+                "Required verification",
+                15368,
+                true,
+                "Create verification",
+                "never",
+                0,
+                true
+            ),
+            "missing-ci-entrypoint"
         );
-        expectFailure(missingCi, "missing-ci-entrypoint");
-
-        Path wrongName = createValidRepository(
-            temporary.resolve("wrong-name")
-        );
-        Files.writeString(
-            verificationWorkflow(wrongName),
+        assertViolation(
             validWorkflow().replace(
                 "Showcase train-freeze authority v1' || 'Checkout-local ciCheck",
                 "Wrong create check' || 'Wrong required check"
             ),
-            StandardCharsets.UTF_8
+            governance,
+            "required-check-create-collision"
         );
-        expectFailure(wrongName, "required-check-create-collision");
     }
 
     private static VerificationResult verify(Path repositoryRoot)
             throws IOException {
-        Path workflowDirectory = workflowDirectory(repositoryRoot);
-        Policy policy = loadPolicy(policyPath(repositoryRoot));
-        MergeGovernance governance = loadGovernance(
-            governancePath(repositoryRoot)
-        );
+        Path workflowDirectory = repositoryRoot.resolve(".github/workflows");
+        Policy policy = parsePolicy(parseStrict(repositoryRoot.resolve(
+            "config/workflow-semantics-policy.json"
+        )));
+        MergeGovernance governance = parseGovernance(parseStrict(
+            repositoryRoot.resolve(
+                "config/github-merge-governance-policy.json"
+            )
+        ));
         List<String> actual = workflowNames(workflowDirectory);
-
-        if (actual.size() > policy.maximumWorkflowCount()) {
-            throw invalid(
-                "too many workflows: "
-                    + actual.size()
-                    + " present, maximum is "
-                    + policy.maximumWorkflowCount()
-            );
-        }
-
-        List<String> classified = Stream.concat(
-            policy.verificationWorkflows().stream(),
-            policy.platformWorkflows().stream()
-        ).sorted().toList();
-        if (!classified.equals(actual)) {
-            Set<String> unclassified = new TreeSet<>(actual);
-            unclassified.removeAll(classified);
-            Set<String> stale = new TreeSet<>(classified);
-            stale.removeAll(actual);
-            throw invalid(
-                "workflow classifications differ: unclassified="
-                    + unclassified
-                    + " stale="
-                    + stale
-            );
-        }
+        verifyClassification(policy, actual);
 
         List<Violation> violations = new ArrayList<>();
         for (String workflow : policy.verificationWorkflows()) {
             violations.addAll(scanVerificationWorkflow(
-                workflowDirectory,
                 workflow,
+                Files.readString(
+                    workflowDirectory.resolve(workflow),
+                    StandardCharsets.UTF_8
+                ),
                 governance
             ));
         }
@@ -394,11 +346,8 @@ class MavenWorkflowSemanticsContractTest {
         );
     }
 
-    private static Policy loadPolicy(Path path) throws IOException {
-        ObjectNode document = requireObject(
-            parseStrict(path),
-            "workflow policy"
-        );
+    private static Policy parsePolicy(JsonNode value) {
+        ObjectNode document = requireObject(value, "workflow policy");
         requireExactFields(document, POLICY_FIELDS, "workflow policy");
         requireEquals(
             EXPECTED_POLICY_SCHEMA,
@@ -445,10 +394,9 @@ class MavenWorkflowSemanticsContractTest {
         return new Policy(maximum, verification, platform);
     }
 
-    private static MergeGovernance loadGovernance(Path path)
-            throws IOException {
+    private static MergeGovernance parseGovernance(JsonNode value) {
         ObjectNode document = requireObject(
-            parseStrict(path),
+            value,
             "merge-governance policy"
         );
         requireExactFields(
@@ -559,6 +507,37 @@ class MavenWorkflowSemanticsContractTest {
         );
     }
 
+    private static void verifyClassification(
+        Policy policy,
+        List<String> actual
+    ) {
+        if (actual.size() > policy.maximumWorkflowCount()) {
+            throw invalid(
+                "too many workflows: "
+                    + actual.size()
+                    + " present, maximum is "
+                    + policy.maximumWorkflowCount()
+            );
+        }
+
+        List<String> classified = Stream.concat(
+            policy.verificationWorkflows().stream(),
+            policy.platformWorkflows().stream()
+        ).sorted().toList();
+        if (!classified.equals(actual)) {
+            Set<String> unclassified = new TreeSet<>(actual);
+            unclassified.removeAll(classified);
+            Set<String> stale = new TreeSet<>(classified);
+            stale.removeAll(actual);
+            throw invalid(
+                "workflow classifications differ: unclassified="
+                    + unclassified
+                    + " stale="
+                    + stale
+            );
+        }
+    }
+
     private static List<String> workflowNames(Path directory)
             throws IOException {
         if (!Files.isDirectory(directory)) {
@@ -578,14 +557,10 @@ class MavenWorkflowSemanticsContractTest {
     }
 
     private static List<Violation> scanVerificationWorkflow(
-        Path directory,
         String workflow,
+        String text,
         MergeGovernance governance
-    ) throws IOException {
-        String text = Files.readString(
-            directory.resolve(workflow),
-            StandardCharsets.UTF_8
-        );
+    ) {
         List<String> lines = text.lines().toList();
         List<Violation> violations = new ArrayList<>();
 
@@ -808,26 +783,7 @@ class MavenWorkflowSemanticsContractTest {
         }
     }
 
-    private static Path createValidRepository(Path repository)
-            throws IOException {
-        Files.createDirectories(workflowDirectory(repository));
-        Files.createDirectories(repository.resolve("config"));
-        writeJson(policyPath(repository), validPolicy());
-        writeJson(governancePath(repository), validGovernance());
-        Files.writeString(
-            verificationWorkflow(repository),
-            validWorkflow(),
-            StandardCharsets.UTF_8
-        );
-        Files.writeString(
-            workflowDirectory(repository).resolve("release.yml"),
-            "name: Release\n",
-            StandardCharsets.UTF_8
-        );
-        return repository;
-    }
-
-    private static ObjectNode validPolicy() {
+    private static ObjectNode validPolicyDocument() {
         ObjectNode policy = JSON.createObjectNode();
         policy.put("schema", EXPECTED_POLICY_SCHEMA);
         policy.put("maximumWorkflowCount", 2);
@@ -836,7 +792,11 @@ class MavenWorkflowSemanticsContractTest {
         return policy;
     }
 
-    private static ObjectNode validGovernance() {
+    private static Policy validPolicy() {
+        return parsePolicy(validPolicyDocument());
+    }
+
+    private static ObjectNode validGovernanceDocument() {
         ObjectNode governance = JSON.createObjectNode();
         governance.put("schema", EXPECTED_GOVERNANCE_SCHEMA);
         governance.put("defaultBranch", "main");
@@ -853,6 +813,10 @@ class MavenWorkflowSemanticsContractTest {
         governance.put("requiredApprovingReviewCount", 0);
         governance.put("requiredReviewThreadResolution", true);
         return governance;
+    }
+
+    private static MergeGovernance validGovernance() {
+        return parseGovernance(validGovernanceDocument());
     }
 
     private static String validWorkflow() {
@@ -878,47 +842,40 @@ class MavenWorkflowSemanticsContractTest {
             """.formatted(createContext, requiredContext, command);
     }
 
-    private static void writeJson(Path path, JsonNode value)
-            throws IOException {
-        Files.createDirectories(path.getParent());
-        Files.writeString(
-            path,
-            JSON.writerWithDefaultPrettyPrinter().writeValueAsString(value)
-                + "\n",
-            StandardCharsets.UTF_8
+    private static void assertViolation(
+        String text,
+        MergeGovernance governance,
+        String category
+    ) {
+        List<Violation> violations = scanVerificationWorkflow(
+            "gradle.yml",
+            text,
+            governance
+        );
+        assertTrue(
+            violations.stream().anyMatch(violation ->
+                violation.category().equals(category)),
+            () -> "missing " + category + " in " + violations
         );
     }
 
-    private static void expectFailure(Path repository, String fragment) {
+    private static void expectInvalid(
+        Executable operation,
+        String fragment
+    ) {
         IllegalArgumentException failure = assertThrows(
             IllegalArgumentException.class,
-            () -> verify(repository)
+            operation
         );
         assertTrue(
-            failure.getMessage().contains(fragment),
+            failure.getMessage().toLowerCase().contains(
+                fragment.toLowerCase()
+            ),
             () -> "expected <"
                 + fragment
                 + "> in <"
                 + failure.getMessage()
                 + ">"
-        );
-    }
-
-    private static Path workflowDirectory(Path repository) {
-        return repository.resolve(".github/workflows");
-    }
-
-    private static Path verificationWorkflow(Path repository) {
-        return workflowDirectory(repository).resolve("gradle.yml");
-    }
-
-    private static Path policyPath(Path repository) {
-        return repository.resolve("config/workflow-semantics-policy.json");
-    }
-
-    private static Path governancePath(Path repository) {
-        return repository.resolve(
-            "config/github-merge-governance-policy.json"
         );
     }
 
