@@ -14,14 +14,16 @@ public record KnownStructure(
     String provenance
 ) {
     public KnownStructure {
-        id = RepresentationContracts.text(id, "id");
-        domainId = RepresentationContracts.text(domainId, "domainId");
+        id = RepresentationCandidateAssessment.requireText(id, "id");
+        domainId = RepresentationCandidateAssessment.requireText(
+            domainId, "domainId");
         pattern = Objects.requireNonNull(pattern, "pattern");
-        requiredAssumptions = RepresentationContracts.sortedUnique(
+        requiredAssumptions = RepresentationCandidateAssessment.sortedUnique(
             requiredAssumptions, "requiredAssumptions");
-        consequenceIds = RepresentationContracts.sortedUnique(
+        consequenceIds = RepresentationCandidateAssessment.sortedUnique(
             consequenceIds, "consequenceIds");
-        provenance = RepresentationContracts.text(provenance, "provenance");
+        provenance = RepresentationCandidateAssessment.requireText(
+            provenance, "provenance");
     }
 
     String canonicalDescriptor() {
