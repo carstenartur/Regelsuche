@@ -113,6 +113,7 @@
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-experiments</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-cli</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-quality</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-quality-aggregate</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-autopilot</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-release</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-benchmarks</artifactId><version>${project.version}</version></dependency>
@@ -171,6 +172,7 @@
         <module>regelsuche-release</module>
         <module>regelsuche-benchmarks</module>
         <module>app</module>
+        <module>regelsuche-quality-aggregate</module>
       </modules>
     </profile>
     <profile>
@@ -182,6 +184,7 @@
         <module>regelsuche-benchmarks</module>
         <module>app</module>
         <module>regelsuche-integration-tests</module>
+        <module>regelsuche-quality-aggregate</module>
       </modules>
     </profile>
   </profiles>

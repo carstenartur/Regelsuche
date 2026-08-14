@@ -17,6 +17,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 import javax.xml.XMLConstants;
 import javax.xml.stream.XMLInputFactory;
@@ -24,7 +26,7 @@ import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 
-/** Parses Gradle JUnit XML and emits deterministic JSON/Markdown timing evidence. */
+/** Parses checkout-owned JUnit XML and emits deterministic timing evidence. */
 public final class SlowTestReportGenerator {
     public static final String SCHEMA = "regelsuche.quality.slow-tests/v1";
     public static final int DEFAULT_LIMIT = 100;
@@ -51,6 +53,15 @@ public final class SlowTestReportGenerator {
             .thenComparing(SlowTestReport.TestClassEntry::module)
             .thenComparing(SlowTestReport.TestClassEntry::className);
 
+    /**
+     * Generates the transitional report from Gradle JUnit XML.
+     *
+     * @param repositoryRoot checkout root
+     * @param limit maximum number of test and class rows
+     * @param slowSeconds inclusive slow-test threshold
+     * @return deterministic report
+     * @throws IOException when the checkout cannot be inspected
+     */
     public SlowTestReport generate(
         Path repositoryRoot,
         int limit,
@@ -58,10 +69,100 @@ public final class SlowTestReportGenerator {
     ) throws IOException {
         Path root = requireRoot(repositoryRoot);
         validateLimits(limit, slowSeconds);
+        return generateReport(
+            root,
+            limit,
+            slowSeconds,
+            gradleJUnitXmlReports(root)
+        );
+    }
 
+    /**
+     * Generates the authoritative Maven-reactor report from the declared
+     * module set only.
+     *
+     * @param repositoryRoot checkout root
+     * @param limit maximum number of test and class rows
+     * @param slowSeconds inclusive slow-test threshold
+     * @param modules exact top-level Maven modules in the active reactor
+     * @return deterministic report
+     * @throws IOException when the checkout cannot be inspected
+     */
+    public SlowTestReport generateMaven(
+        Path repositoryRoot,
+        int limit,
+        double slowSeconds,
+        Set<String> modules
+    ) throws IOException {
+        Path root = requireRoot(repositoryRoot);
+        validateLimits(limit, slowSeconds);
+        return generateReport(
+            root,
+            limit,
+            slowSeconds,
+            mavenJUnitXmlReports(root, requireMavenModules(modules))
+        );
+    }
+
+    public SlowTestReport write(
+        Path repositoryRoot,
+        int limit,
+        double slowSeconds,
+        Path jsonOutput,
+        Path markdownOutput
+    ) throws IOException {
+        Path root = requireRoot(repositoryRoot);
+        return writeOutputs(
+            root,
+            generate(root, limit, slowSeconds),
+            jsonOutput,
+            markdownOutput
+        );
+    }
+
+    public SlowTestReport writeMaven(
+        Path repositoryRoot,
+        int limit,
+        double slowSeconds,
+        Set<String> modules,
+        Path jsonOutput,
+        Path markdownOutput
+    ) throws IOException {
+        Path root = requireRoot(repositoryRoot);
+        return writeOutputs(
+            root,
+            generateMaven(root, limit, slowSeconds, modules),
+            jsonOutput,
+            markdownOutput
+        );
+    }
+
+    private SlowTestReport writeOutputs(
+        Path root,
+        SlowTestReport report,
+        Path jsonOutput,
+        Path markdownOutput
+    ) throws IOException {
+        Path json = resolveOutput(root, jsonOutput, "JSON output");
+        Path markdown = resolveOutput(
+            root,
+            markdownOutput,
+            "Markdown output"
+        );
+        writeUtf8(json, renderJson(report));
+        writeUtf8(markdown, renderMarkdown(report));
+        return report;
+    }
+
+    private SlowTestReport generateReport(
+        Path root,
+        int limit,
+        double slowSeconds,
+        List<Path> reports
+    ) {
         List<SlowTestReport.TestCaseEntry> cases = new ArrayList<>();
         int suiteCount = 0;
-        for (Path report : junitXmlReports(root)) {
+        for (Path report : reports) {
             List<SlowTestReport.TestCaseEntry> parsed = parseSuite(
                 root,
                 report
@@ -110,26 +211,6 @@ public final class SlowTestReportGenerator {
             orderedTests,
             orderedClasses
         );
-    }
-
-    public SlowTestReport write(
-        Path repositoryRoot,
-        int limit,
-        double slowSeconds,
-        Path jsonOutput,
-        Path markdownOutput
-    ) throws IOException {
-        Path root = requireRoot(repositoryRoot);
-        SlowTestReport report = generate(root, limit, slowSeconds);
-        Path json = resolveOutput(root, jsonOutput, "JSON output");
-        Path markdown = resolveOutput(
-            root,
-            markdownOutput,
-            "Markdown output"
-        );
-        writeUtf8(json, renderJson(report));
-        writeUtf8(markdown, renderMarkdown(report));
-        return report;
     }
 
     String renderJson(SlowTestReport report) throws IOException {
@@ -223,7 +304,8 @@ public final class SlowTestReportGenerator {
         return output.toString();
     }
 
-    private List<Path> junitXmlReports(Path root) throws IOException {
+    private List<Path> gradleJUnitXmlReports(Path root)
+            throws IOException {
         try (Stream<Path> paths = Files.walk(root)) {
             return paths
                 .filter(path -> Files.isRegularFile(
@@ -236,6 +318,76 @@ public final class SlowTestReportGenerator {
                     path
                 )))
                 .toList();
+        }
+    }
+
+    private List<Path> mavenJUnitXmlReports(
+        Path root,
+        List<String> modules
+    ) throws IOException {
+        List<Path> reports = new ArrayList<>();
+        for (String module : modules) {
+            Path moduleRoot = root.resolve(module);
+            if (!Files.isDirectory(
+                    moduleRoot,
+                    LinkOption.NOFOLLOW_LINKS)) {
+                throw invalid(
+                    "configured Maven module is not a directory: "
+                        + module
+                );
+            }
+            if (!Files.isRegularFile(
+                    moduleRoot.resolve("pom.xml"),
+                    LinkOption.NOFOLLOW_LINKS)) {
+                throw invalid(
+                    "configured Maven module has no pom.xml: " + module
+                );
+            }
+            collectMavenReports(
+                root,
+                moduleRoot.resolve("target/surefire-reports"),
+                reports
+            );
+            collectMavenReports(
+                root,
+                moduleRoot.resolve("target/failsafe-reports"),
+                reports
+            );
+        }
+        return reports.stream()
+            .sorted(Comparator.comparing(path -> normalizedRelative(
+                root,
+                path
+            )))
+            .toList();
+    }
+
+    private void collectMavenReports(
+        Path root,
+        Path reportDirectory,
+        List<Path> reports
+    ) throws IOException {
+        if (!Files.exists(
+                reportDirectory,
+                LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
+        if (!Files.isDirectory(
+                reportDirectory,
+                LinkOption.NOFOLLOW_LINKS)) {
+            throw invalid(
+                "Maven report path is not a directory: "
+                    + normalizedRelative(root, reportDirectory)
+            );
+        }
+        try (Stream<Path> children = Files.list(reportDirectory)) {
+            children
+                .filter(path -> Files.isRegularFile(
+                    path,
+                    LinkOption.NOFOLLOW_LINKS
+                ))
+                .filter(SlowTestReportGenerator::isMavenJUnitXml)
+                .forEach(reports::add);
         }
     }
 
@@ -259,6 +411,12 @@ public final class SlowTestReportGenerator {
             }
         }
         return underTestResults;
+    }
+
+    private static boolean isMavenJUnitXml(Path path) {
+        String fileName = path.getFileName().toString();
+        return fileName.startsWith("TEST-")
+            && fileName.endsWith(".xml");
     }
 
     private List<SlowTestReport.TestCaseEntry> parseSuite(
@@ -389,6 +547,21 @@ public final class SlowTestReportGenerator {
 
     private static String normalizedRelative(Path root, Path path) {
         return root.relativize(path).toString().replace('\\', '/');
+    }
+
+    private static List<String> requireMavenModules(Set<String> values) {
+        if (values == null || values.isEmpty()) {
+            throw invalid("Maven module set is required");
+        }
+        TreeSet<String> modules = new TreeSet<>();
+        for (String value : values) {
+            if (value == null
+                    || !value.matches("[A-Za-z0-9][A-Za-z0-9._-]*")) {
+                throw invalid("invalid Maven module path: " + value);
+            }
+            modules.add(value);
+        }
+        return List.copyOf(modules);
     }
 
     private static Path requireRoot(Path value) {

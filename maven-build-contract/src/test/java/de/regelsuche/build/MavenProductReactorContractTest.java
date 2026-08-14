@@ -46,7 +46,18 @@ class MavenProductReactorContractTest {
           "regelsuche-autopilot",
           "regelsuche-release",
           "regelsuche-benchmarks",
-          "app");
+          "app",
+          "regelsuche-quality-aggregate");
+
+  private static final List<String> FULL_PROFILE_MODULES =
+      List.of(
+          "regelsuche-persistence-hibernate",
+          "regelsuche-autopilot",
+          "regelsuche-release",
+          "regelsuche-benchmarks",
+          "app",
+          "regelsuche-integration-tests",
+          "regelsuche-quality-aggregate");
 
   @Test
   void activeProductProfileCompletesTheJavaApplicationReactor() throws Exception {
@@ -66,6 +77,14 @@ class MavenProductReactorContractTest {
     assertEquals(
         PRODUCT_PROFILE_MODULES,
         directChildTexts(directChild(productProfile, "modules"), "module"));
+
+    Element fullProfile = profile(parent, "full");
+    assertNotNull(fullProfile, "missing full Maven profile");
+    assertEquals(
+        FULL_PROFILE_MODULES,
+        directChildTexts(directChild(fullProfile, "modules"), "module"));
+    assertEquals("regelsuche-quality-aggregate", PRODUCT_PROFILE_MODULES.getLast());
+    assertEquals("regelsuche-quality-aggregate", FULL_PROFILE_MODULES.getLast());
 
     Set<String> complete = new LinkedHashSet<>(BASE_MODULES);
     complete.addAll(PRODUCT_PROFILE_MODULES);

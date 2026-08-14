@@ -2,7 +2,7 @@ package de.regelsuche.quality.tests;
 
 import java.util.List;
 
-/** Deterministic checkout-owned summary of Gradle JUnit XML durations. */
+/** Deterministic checkout-owned summary of JUnit XML durations. */
 public record SlowTestReport(
     int suiteCount,
     int testCount,
