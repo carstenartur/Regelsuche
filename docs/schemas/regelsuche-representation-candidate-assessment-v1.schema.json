@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.representation-candidate-assessment/v1",
+  "title": "Regelsuche representation candidate assessment v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "proposal",
+    "knownStructureCatalogHash",
+    "wholeSourceMetrics",
+    "wholeCandidateMetrics",
+    "scopedSourceMetrics",
+    "scopedCandidateMetrics",
+    "wholeCompressionDelta",
+    "scopedCompressionDelta",
+    "compressionStatus",
+    "sourceStructureMatches",
+    "candidateStructureMatches",
+    "newlyExposedStructureMatches",
+    "newlyUnlockedConsequences",
+    "candidateTypes",
+    "introducedVariableSymbols",
+    "introducedFunctionSymbols",
+    "warnings",
+    "materialRepresentationGain",
+    "claimEligible"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.representation-candidate-assessment/v1"
+    },
+    "proposal": { "$ref": "#/$defs/proposal" },
+    "knownStructureCatalogHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "wholeSourceMetrics": { "$ref": "#/$defs/metrics" },
+    "wholeCandidateMetrics": { "$ref": "#/$defs/metrics" },
+    "scopedSourceMetrics": { "$ref": "#/$defs/metrics" },
+    "scopedCandidateMetrics": { "$ref": "#/$defs/metrics" },
+    "wholeCompressionDelta": { "$ref": "#/$defs/delta" },
+    "scopedCompressionDelta": { "$ref": "#/$defs/delta" },
+    "compressionStatus": {
+      "enum": [
+        "MATERIAL_MULTI_DIMENSIONAL",
+        "NON_MATERIAL",
+        "BLOCKED_BY_INTRODUCED_SYMBOLS",
+        "BLOCKED_BY_STRUCTURAL_REGRESSION"
+      ]
+    },
+    "sourceStructureMatches": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/knownStructureMatch" }
+    },
+    "candidateStructureMatches": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/knownStructureMatch" }
+    },
+    "newlyExposedStructureMatches": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/knownStructureMatch" }
+    },
+    "newlyUnlockedConsequences": { "$ref": "#/$defs/stringArray" },
+    "candidateTypes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "WHOLE_EXPRESSION_COMPRESSION",
+          "SUBEXPRESSION_COMPRESSION",
+          "KNOWN_WHOLE_FORM_BRIDGE",
+          "KNOWN_SUBFORM_BRIDGE",
+          "DOWNSTREAM_CAPABILITY_BRIDGE",
+          "REPEATED_STRUCTURE_EXTRACTION",
+          "REUSABLE_PARAMETRIC_BRIDGE",
+          "NO_MATERIAL_REPRESENTATION_GAIN"
+        ]
+      }
+    },
+    "introducedVariableSymbols": { "$ref": "#/$defs/stringArray" },
+    "introducedFunctionSymbols": { "$ref": "#/$defs/stringArray" },
+    "warnings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "INTRODUCED_VARIABLE_SYMBOLS",
+          "INTRODUCED_FUNCTION_SYMBOLS",
+          "STRUCTURAL_COMPRESSION_REGRESSION",
+          "KNOWN_FORM_WITHOUT_NEW_CAPABILITY",
+          "UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS",
+          "VALIDATION_BELOW_SYMBOLIC_CONFIRMATION"
+        ]
+      }
+    },
+    "materialRepresentationGain": { "type": "boolean" },
+    "claimEligible": { "type": "boolean" }
+  },
+  "$defs": {
+    "proposal": {
+      "type": "object",
+      "required": [
+        "sourceExpression",
+        "candidateExpression",
+        "scope",
+        "occurrencePath",
+        "assumptions",
+        "validationStatus"
+      ],
+      "properties": {
+        "sourceExpression": { "$ref": "#/$defs/nonBlank" },
+        "candidateExpression": { "$ref": "#/$defs/nonBlank" },
+        "scope": {
+          "enum": ["WHOLE_EXPRESSION", "SUBEXPRESSION"]
+        },
+        "occurrencePath": { "$ref": "#/$defs/path" },
+        "assumptions": { "$ref": "#/$defs/stringArray" },
+        "validationStatus": {
+          "enum": [
+            "REJECTED",
+            "OBSERVED",
+            "VALIDATED_BY_EXAMPLES",
+            "SYMBOLICALLY_VERIFIED",
+            "FORMALLY_PROVABLE",
+            "FORMALLY_PROVED"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "path": {
+      "type": "object",
+      "required": ["childIndexes"],
+      "properties": {
+        "childIndexes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "metrics": {
+      "type": "object",
+      "required": [
+        "normalizedExpression",
+        "tokenCount",
+        "astNodeCount",
+        "operatorCount",
+        "numericBitLength",
+        "semanticValueOccurrences",
+        "distinctSemanticValues",
+        "repeatedSemanticValueSavings",
+        "variableSymbols",
+        "functionSymbols"
+      ],
+      "properties": {
+        "normalizedExpression": { "$ref": "#/$defs/nonBlank" },
+        "tokenCount": { "$ref": "#/$defs/positive" },
+        "astNodeCount": { "$ref": "#/$defs/positive" },
+        "operatorCount": { "$ref": "#/$defs/nonNegative" },
+        "numericBitLength": { "$ref": "#/$defs/nonNegative" },
+        "semanticValueOccurrences": { "$ref": "#/$defs/positive" },
+        "distinctSemanticValues": { "$ref": "#/$defs/positive" },
+        "repeatedSemanticValueSavings": { "$ref": "#/$defs/nonNegative" },
+        "variableSymbols": { "$ref": "#/$defs/stringArray" },
+        "functionSymbols": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "delta": {
+      "type": "object",
+      "required": [
+        "tokenCountReduction",
+        "astNodeCountReduction",
+        "operatorCountReduction",
+        "numericBitLengthReduction",
+        "distinctSemanticValueReduction",
+        "repeatedSemanticValueSavingsIncrease"
+      ],
+      "properties": {
+        "tokenCountReduction": { "type": "integer" },
+        "astNodeCountReduction": { "type": "integer" },
+        "operatorCountReduction": { "type": "integer" },
+        "numericBitLengthReduction": { "type": "integer" },
+        "distinctSemanticValueReduction": { "type": "integer" },
+        "repeatedSemanticValueSavingsIncrease": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "knownStructureMatch": {
+      "type": "object",
+      "required": [
+        "structureId",
+        "domainId",
+        "occurrencePath",
+        "bindings",
+        "requiredAssumptions",
+        "consequenceIds",
+        "provenance"
+      ],
+      "properties": {
+        "structureId": { "$ref": "#/$defs/nonBlank" },
+        "domainId": { "$ref": "#/$defs/nonBlank" },
+        "occurrencePath": { "$ref": "#/$defs/path" },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "requiredAssumptions": { "$ref": "#/$defs/stringArray" },
+        "consequenceIds": { "$ref": "#/$defs/stringArray" },
+        "provenance": { "$ref": "#/$defs/nonBlank" }
+      },
+      "additionalProperties": false
+    },
+    "nonBlank": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonNegative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "positive": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "stringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "additionalProperties": false
+}
