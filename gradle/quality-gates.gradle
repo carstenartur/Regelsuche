@@ -76,21 +76,10 @@ def verifyJmhRegression = tasks.register('verifyJmhRegression', Exec) {
     }
 }
 
-def reportSlowTests = tasks.register('reportSlowTests', Exec) {
+def reportSlowTests = tasks.register('reportSlowTests') {
     group = 'reporting'
-    description = 'Renders deterministic slow-test evidence from all checkout JUnit XML reports.'
-    dependsOn 'prepareVerificationEnvironment', 'test'
-    mustRunAfter 'test'
-    workingDir qualityRepositoryRoot
-    inputs.file qualityRepositoryRoot.file('scripts/report-slowest-tests.py')
-    outputs.file layout.buildDirectory.file('reports/quality/slow-tests.json')
-    outputs.file layout.buildDirectory.file('reports/quality/slow-tests.md')
-    outputs.upToDateWhen { false }
-    doFirst {
-        commandLine qualityVerificationPython.get().absolutePath,
-            'scripts/report-slowest-tests.py',
-            '--root', qualityRepositoryRoot.asFile.absolutePath
-    }
+    description = 'Compatibility alias; regelsuche-quality Java/JUnit owns slow-test evidence.'
+    dependsOn ':regelsuche-quality:reportSlowTests'
 }
 
 def supplyChainReportDirectory = qualityRepositoryRoot.dir('build/reports/quality/supply-chain')
