@@ -12,6 +12,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+/** Builds one expression from previously established matcher bindings. */
+@FunctionalInterface
+interface ExprTemplate {
+    Expr instantiate(Map<String, Expr> bindings);
+}
+
 /**
  * Instantiable expression pattern retained for rewrite compatibility.
  *
@@ -19,7 +25,7 @@ import java.util.Optional;
  * {@link ExprMatcher#pattern(PatternExpr)} rather than extending this type with
  * non-instantiable matcher concepts. The legacy {@link #match(Expr, Map)}
  * method remains for source compatibility while matching and template
- * construction are migrated to separate contracts.</p>
+ * construction use separate contracts.</p>
  */
 public sealed interface PatternExpr extends ExprTemplate
     permits PatternExpr.Placeholder, PatternExpr.LiteralNumber,
