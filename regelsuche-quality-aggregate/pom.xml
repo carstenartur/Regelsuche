@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>de.regelsuche</groupId>
+    <artifactId>regelsuche-parent</artifactId>
+    <version>0.3.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>regelsuche-quality-aggregate</artifactId>
+  <name>Regelsuche Maven Quality Aggregate</name>
+  <description>
+    Final reactor module for reports that require complete Surefire and
+    Failsafe outputs.
+  </description>
+
+  <properties>
+    <regelsuche.slow-test-report.full>false</regelsuche.slow-test-report.full>
+    <regelsuche.slow-test-report.modules>
+      regelsuche-core,
+      regelsuche-egraph,
+      regelsuche-search,
+      regelsuche-validation,
+      regelsuche-math-algorithms,
+      regelsuche-math-jas,
+      regelsuche-persistence,
+      regelsuche-solver-ir,
+      regelsuche-solver-portfolio,
+      regelsuche-learning,
+      regelsuche-discovery,
+      regelsuche-experiments,
+      regelsuche-cli,
+      regelsuche-quality,
+      maven-build-contract,
+      regelsuche-persistence-hibernate,
+      regelsuche-autopilot,
+      regelsuche-release,
+      regelsuche-benchmarks,
+      app
+    </regelsuche.slow-test-report.modules>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>de.regelsuche</groupId>
+      <artifactId>regelsuche-quality</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>de.regelsuche</groupId>
+      <artifactId>regelsuche-app</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <systemPropertyVariables>
+            <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
+            <regelsuche.maven.reactor>true</regelsuche.maven.reactor>
+            <regelsuche.slowTestReport.full>${regelsuche.slow-test-report.full}</regelsuche.slowTestReport.full>
+            <regelsuche.slowTestReport.modules>${regelsuche.slow-test-report.modules}</regelsuche.slowTestReport.modules>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <profile>
+      <id>full</id>
+      <properties>
+        <regelsuche.slow-test-report.full>true</regelsuche.slow-test-report.full>
+        <regelsuche.slow-test-report.modules>
+          regelsuche-core,
+          regelsuche-egraph,
+          regelsuche-search,
+          regelsuche-validation,
+          regelsuche-math-algorithms,
+          regelsuche-math-jas,
+          regelsuche-persistence,
+          regelsuche-solver-ir,
+          regelsuche-solver-portfolio,
+          regelsuche-learning,
+          regelsuche-discovery,
+          regelsuche-experiments,
+          regelsuche-cli,
+          regelsuche-quality,
+          maven-build-contract,
+          regelsuche-persistence-hibernate,
+          regelsuche-autopilot,
+          regelsuche-release,
+          regelsuche-benchmarks,
+          app,
+          regelsuche-integration-tests
+        </regelsuche.slow-test-report.modules>
+      </properties>
+      <dependencies>
+        <dependency>
+          <groupId>de.regelsuche</groupId>
+          <artifactId>regelsuche-integration-tests</artifactId>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
+</project>

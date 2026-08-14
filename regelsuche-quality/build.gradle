@@ -49,6 +49,33 @@ tasks.register('renderJmhHistory', JavaExec) {
     outputs.upToDateWhen { false }
 }
 
+def slowTestJson = rootProject.layout.buildDirectory.file(
+    'reports/quality/slow-tests.json')
+def slowTestMarkdown = rootProject.layout.buildDirectory.file(
+    'reports/quality/slow-tests.md')
+
+tasks.register('reportSlowTests', JavaExec) {
+    group = 'reporting'
+    description = 'Transitional adapter that renders slow-test evidence with the Maven-tested Java implementation.'
+
+    // Gradle remains only the temporary producer of the legacy checkout-wide
+    // JUnit XML corpus. The aggregate root test task already owns every Test
+    // task in the checkout. Keep this adapter deliberately free of additional
+    // Gradle input modelling: it always executes, and the Java implementation
+    // performs deterministic, fail-closed discovery after all tests complete.
+    // This avoids creating a second Gradle reporting contract while issue #632
+    // moves the authoritative lifecycle to Maven/JUnit.
+    dependsOn rootProject.tasks.named('test'), tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.quality.tests.SlowTestReportMain'
+    args '--root', rootProject.projectDir.absolutePath,
+        '--json-output', slowTestJson.get().asFile.absolutePath,
+        '--markdown-output', slowTestMarkdown.get().asFile.absolutePath
+    outputs.file slowTestJson
+    outputs.file slowTestMarkdown
+    outputs.upToDateWhen { false }
+}
+
 tasks.named('check') {
     dependsOn tasks.named('renderJmhHistory')
 }
