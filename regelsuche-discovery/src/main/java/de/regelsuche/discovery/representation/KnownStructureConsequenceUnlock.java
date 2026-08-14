@@ -17,11 +17,13 @@ public record KnownStructureConsequenceUnlock(
             .thenComparing(KnownStructureConsequenceUnlock::matchIdentity);
 
     public KnownStructureConsequenceUnlock {
-        consequenceId = RepresentationContracts.text(
+        consequenceId = RepresentationCandidateAssessment.requireText(
             consequenceId, "consequenceId");
-        structureId = RepresentationContracts.text(structureId, "structureId");
+        structureId = RepresentationCandidateAssessment.requireText(
+            structureId, "structureId");
         occurrencePath = Objects.requireNonNull(occurrencePath, "occurrencePath");
-        matchIdentity = RepresentationContracts.text(matchIdentity, "matchIdentity");
+        matchIdentity = RepresentationCandidateAssessment.requireText(
+            matchIdentity, "matchIdentity");
     }
 
     public String opportunityIdentity() {
