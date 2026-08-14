@@ -33,20 +33,10 @@ def verifyCoverageRegression = tasks.register('verifyCoverageRegression', Exec) 
     }
 }
 
-def verifyContainerImagePolicy = tasks.register('verifyContainerImagePolicy', Exec) {
+def verifyContainerImagePolicy = tasks.register('verifyContainerImagePolicy') {
     group = 'verification'
-    description = 'Rejects undeclared Dockerfiles and floating or unapproved base images.'
-    dependsOn 'prepareVerificationEnvironment'
-    workingDir qualityRepositoryRoot
-    inputs.file qualityRepositoryRoot.file('config/quality/container-image-policy.json')
-    inputs.file qualityRepositoryRoot.file('scripts/verify-container-image-policy.py')
-    outputs.file layout.buildDirectory.file('reports/quality/container-image-report.json')
-    outputs.upToDateWhen { false }
-    doFirst {
-        commandLine qualityVerificationPython.get().absolutePath,
-            'scripts/verify-container-image-policy.py',
-            '--root', qualityRepositoryRoot.asFile.absolutePath
-    }
+    description = 'Compatibility alias; Maven/JUnit owns the container-image policy contract.'
+    dependsOn ':regelsuche-core:verifyMavenCoreReactor'
 }
 
 def testJmhRegressionVerifier = tasks.register('testJmhRegressionVerifier', Exec) {
