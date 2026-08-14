@@ -63,6 +63,6 @@ Diese Folgearbeiten bleiben #663-Tranchen unter den Informationsgrenzen aus
 ```bash
 mvn --batch-mode --no-transfer-progress \
   -pl regelsuche-discovery -am \
-  -Dtest='SemanticDescriptionMeasurerTest,KnownStructureMatcherTest,RepresentationCandidateAssessorTest' \
+  -Dtest=RepresentationCandidateAssessorTest \
   test
 ```
