@@ -31,19 +31,12 @@ final class ExprMatcherEngine {
             ExprMatcher.RecognitionStrength.EXACT,
             List.of()
         );
-        List<State> states = evaluate(
-            matcher,
-            expression,
-            initial,
-            session,
-            true
+        List<State> states = session.limit(
+            evaluate(matcher, expression, initial, session, true),
+            matcher.canonicalDescriptor()
         );
-        states = session.limit(states, matcher.canonicalDescriptor());
-        List<ExprMatcher.MatchResult> results = states.stream()
-            .map(State::toResult)
-            .toList();
         return new ExprMatcher.MatchOutcome(
-            results,
+            states.stream().map(State::toResult).toList(),
             List.copyOf(session.diagnostics),
             session.steps,
             session.patternBranches
@@ -87,32 +80,20 @@ final class ExprMatcherEngine {
         if (matcher instanceof ExprMatcher.Bind bind) {
             return matchBind(bind, expression, state, session, atRoot);
         }
-        if (matcher instanceof ExprMatcher.AllOf allOf) {
-            return matchAllOf(allOf, expression, state, session, atRoot);
+        if (matcher instanceof ExprMatcher.AllOf all) {
+            return matchAll(all, expression, state, session, atRoot);
         }
-        if (matcher instanceof ExprMatcher.AnyOf anyOf) {
-            return matchAnyOf(anyOf, expression, state, session, atRoot);
+        if (matcher instanceof ExprMatcher.AnyOf any) {
+            return matchAny(any, expression, state, session, atRoot);
         }
         if (matcher instanceof ExprMatcher.Not not) {
             return matchNot(not, expression, state, session, atRoot);
         }
         if (matcher instanceof ExprMatcher.Operation operation) {
-            return matchOperation(
-                operation,
-                expression,
-                state,
-                session,
-                atRoot
-            );
+            return matchOperation(operation, expression, state, session);
         }
         if (matcher instanceof ExprMatcher.Function function) {
-            return matchFunction(
-                function,
-                expression,
-                state,
-                session,
-                atRoot
-            );
+            return matchFunction(function, expression, state, session);
         }
         if (matcher instanceof ExprMatcher.Contains contains) {
             List<State> matches = new ArrayList<>();
@@ -136,20 +117,11 @@ final class ExprMatcherEngine {
             );
         }
         ExprMatcher.Where where = (ExprMatcher.Where) matcher;
-        List<State> candidates = evaluate(
-            where.matcher(),
-            expression,
-            state,
-            session,
-            atRoot
-        );
         List<State> accepted = new ArrayList<>();
-        for (State candidate : candidates) {
+        for (State candidate : evaluate(
+                where.matcher(), expression, state, session, atRoot)) {
             accepted.addAll(evaluateConstraint(
-                where.constraint(),
-                candidate,
-                session
-            ));
+                where.constraint(), candidate, session));
         }
         return session.limit(accepted, matcher.canonicalDescriptor());
     }
@@ -161,10 +133,18 @@ final class ExprMatcherEngine {
         Session session,
         boolean atRoot
     ) {
-        Map<String, Expr> exactBindings = new HashMap<>(state.bindings);
-        if (matcher.pattern().match(expression, exactBindings)) {
+        EquivalenceAwarePatternMatcher.MatchAttempt exact =
+            EquivalenceAwarePatternMatcher.matchDetailed(
+                matcher.pattern(),
+                expression,
+                state.bindings,
+                RecognitionProfile.exact(),
+                session.options.maxPatternBranches()
+            );
+        session.patternBranches += exact.visitedBranches();
+        if (exact.matched()) {
             return List.of(state
-                .withBindings(exactBindings)
+                .withBindings(exact.bindings())
                 .recognized(
                     ExprMatcher.RecognitionStrength.EXACT,
                     expression,
@@ -173,8 +153,14 @@ final class ExprMatcherEngine {
                 )
                 .traced("pattern:exact"));
         }
-
-        EquivalenceAwarePatternMatcher.MatchAttempt attempt =
+        if (exact.inconclusive()) {
+            session.diagnostic(exact.limitCode(), matcher.canonicalDescriptor());
+            return List.of();
+        }
+        if (matcher.recognitionProfile().equals(RecognitionProfile.exact())) {
+            return List.of();
+        }
+        EquivalenceAwarePatternMatcher.MatchAttempt equivalent =
             EquivalenceAwarePatternMatcher.matchDetailed(
                 matcher.pattern(),
                 expression,
@@ -182,19 +168,17 @@ final class ExprMatcherEngine {
                 matcher.recognitionProfile(),
                 session.options.maxPatternBranches()
             );
-        session.patternBranches += attempt.visitedBranches();
-        if (attempt.inconclusive()) {
+        session.patternBranches += equivalent.visitedBranches();
+        if (equivalent.inconclusive()) {
             session.diagnostic(
-                attempt.limitCode(),
-                matcher.canonicalDescriptor()
-            );
+                equivalent.limitCode(), matcher.canonicalDescriptor());
             return List.of();
         }
-        if (!attempt.matched()) {
+        if (!equivalent.matched()) {
             return List.of();
         }
         return List.of(state
-            .withBindings(attempt.bindings())
+            .withBindings(equivalent.bindings())
             .recognized(
                 ExprMatcher.RecognitionStrength.EQUIVALENCE_AWARE,
                 expression,
@@ -211,15 +195,9 @@ final class ExprMatcherEngine {
         Session session,
         boolean atRoot
     ) {
-        List<State> inner = evaluate(
-            bind.matcher(),
-            expression,
-            state,
-            session,
-            atRoot
-        );
         List<State> bound = new ArrayList<>();
-        for (State candidate : inner) {
+        for (State candidate : evaluate(
+                bind.matcher(), expression, state, session, atRoot)) {
             Expr previous = candidate.bindings.get(bind.name());
             if (previous == null) {
                 bound.add(candidate
@@ -236,41 +214,28 @@ final class ExprMatcherEngine {
             );
             if (comparison.matched) {
                 bound.add(candidate
-                    .recognized(
-                        comparison.strength,
-                        candidate.representative,
-                        candidate.representativeIndex,
-                        false
-                    )
+                    .withStrength(comparison.strength)
                     .traced("rebind:" + bind.name()));
             }
         }
         return session.limit(bound, bind.canonicalDescriptor());
     }
 
-    private static List<State> matchAllOf(
-        ExprMatcher.AllOf allOf,
+    private static List<State> matchAll(
+        ExprMatcher.AllOf all,
         Expr expression,
         State state,
         Session session,
         boolean atRoot
     ) {
         List<State> current = List.of(state);
-        for (ExprMatcher matcher : allOf.matchers()) {
+        for (ExprMatcher matcher : all.matchers()) {
             List<State> next = new ArrayList<>();
             for (State candidate : current) {
                 next.addAll(evaluate(
-                    matcher,
-                    expression,
-                    candidate,
-                    session,
-                    atRoot
-                ));
+                    matcher, expression, candidate, session, atRoot));
             }
-            current = session.limit(
-                next,
-                allOf.canonicalDescriptor()
-            );
+            current = session.limit(next, all.canonicalDescriptor());
             if (current.isEmpty()) {
                 break;
             }
@@ -278,24 +243,19 @@ final class ExprMatcherEngine {
         return current;
     }
 
-    private static List<State> matchAnyOf(
-        ExprMatcher.AnyOf anyOf,
+    private static List<State> matchAny(
+        ExprMatcher.AnyOf any,
         Expr expression,
         State state,
         Session session,
         boolean atRoot
     ) {
         List<State> matches = new ArrayList<>();
-        for (ExprMatcher matcher : anyOf.matchers()) {
+        for (ExprMatcher matcher : any.matchers()) {
             matches.addAll(evaluate(
-                matcher,
-                expression,
-                state,
-                session,
-                atRoot
-            ));
+                matcher, expression, state, session, atRoot));
         }
-        return session.limit(matches, anyOf.canonicalDescriptor());
+        return session.limit(matches, any.canonicalDescriptor());
     }
 
     private static List<State> matchNot(
@@ -307,16 +267,9 @@ final class ExprMatcherEngine {
     ) {
         int diagnosticCount = session.diagnostics.size();
         List<State> excluded = evaluate(
-            not.matcher(),
-            expression,
-            state,
-            session,
-            atRoot
-        );
-        if (!excluded.isEmpty()) {
-            return List.of();
-        }
-        if (session.diagnostics.size() > diagnosticCount) {
+            not.matcher(), expression, state, session, atRoot);
+        if (!excluded.isEmpty()
+                || session.diagnostics.size() > diagnosticCount) {
             return List.of();
         }
         return List.of(state.traced("not"));
@@ -326,29 +279,17 @@ final class ExprMatcherEngine {
         ExprMatcher.Operation operation,
         Expr expression,
         State state,
-        Session session,
-        boolean atRoot
+        Session session
     ) {
         if (!(expression instanceof BinaryExpr binary)
                 || binary.operator() != operation.operator()) {
             return List.of();
         }
-        List<State> leftMatches = evaluate(
-            operation.left(),
-            binary.left(),
-            state,
-            session,
-            false
-        );
         List<State> matches = new ArrayList<>();
-        for (State left : leftMatches) {
+        for (State left : evaluate(
+                operation.left(), binary.left(), state, session, false)) {
             matches.addAll(evaluate(
-                operation.right(),
-                binary.right(),
-                left,
-                session,
-                false
-            ));
+                operation.right(), binary.right(), left, session, false));
         }
         return session.limit(matches, operation.canonicalDescriptor()).stream()
             .map(candidate -> candidate.traced(
@@ -360,8 +301,7 @@ final class ExprMatcherEngine {
         ExprMatcher.Function function,
         Expr expression,
         State state,
-        Session session,
-        boolean atRoot
+        Session session
     ) {
         if (!(expression instanceof FunctionExpr candidate)
                 || !candidate.name().equals(function.name())
@@ -381,10 +321,7 @@ final class ExprMatcherEngine {
                     false
                 ));
             }
-            current = session.limit(
-                next,
-                function.canonicalDescriptor()
-            );
+            current = session.limit(next, function.canonicalDescriptor());
             if (current.isEmpty()) {
                 return List.of();
             }
@@ -402,29 +339,20 @@ final class ExprMatcherEngine {
         List<Integer> path,
         List<State> matches
     ) {
-        List<State> local = evaluate(
-            matcher,
-            expression,
-            state,
-            session,
-            false
-        );
+        if (matches.size() >= session.options.maxResults()) {
+            session.diagnostic(
+                "MATCH_RESULT_LIMIT", matcher.canonicalDescriptor());
+            return;
+        }
         String renderedPath = path.isEmpty()
             ? "root"
             : path.stream()
                 .map(String::valueOf)
                 .reduce((left, right) -> left + "." + right)
                 .orElse("root");
-        local.stream()
+        evaluate(matcher, expression, state, session, false).stream()
             .map(match -> match.traced("contains@" + renderedPath))
             .forEach(matches::add);
-        if (matches.size() >= session.options.maxResults()) {
-            session.diagnostic(
-                "MATCH_RESULT_LIMIT",
-                matcher.canonicalDescriptor()
-            );
-            return;
-        }
         if (expression instanceof BinaryExpr binary) {
             collectContained(
                 matcher,
@@ -467,10 +395,7 @@ final class ExprMatcherEngine {
     ) {
         List<Expr> representatives = session.options
             .representativeProvider()
-            .representatives(
-                expression,
-                equivalent.recognitionProfile()
-            );
+            .representatives(expression, equivalent.recognitionProfile());
         if (representatives == null || representatives.isEmpty()) {
             session.diagnostic(
                 "REPRESENTATIVE_PROVIDER_EMPTY",
@@ -488,15 +413,13 @@ final class ExprMatcherEngine {
                 );
                 continue;
             }
-            List<State> local = evaluate(
-                equivalent.matcher(),
-                representative,
-                state,
-                session,
-                atRoot
-            );
             boolean changed = index > 0 || !representative.equals(expression);
-            for (State candidate : local) {
+            for (State candidate : evaluate(
+                    equivalent.matcher(),
+                    representative,
+                    state,
+                    session,
+                    atRoot)) {
                 matches.add(changed
                     ? candidate
                         .recognized(
@@ -523,86 +446,34 @@ final class ExprMatcherEngine {
         }
         if (constraint instanceof ExprMatcher.BindingMatches bindingMatches) {
             Expr expression = state.bindings.get(bindingMatches.bindingName());
-            if (expression == null) {
-                return List.of();
-            }
-            return evaluate(
-                bindingMatches.matcher(),
-                expression,
-                state,
-                session,
-                false
-            );
-        }
-        if (constraint instanceof ExprMatcher.SameAs sameAs) {
-            Expr left = state.bindings.get(sameAs.leftBinding());
-            Expr right = state.bindings.get(sameAs.rightBinding());
-            if (left == null || right == null) {
-                return List.of();
-            }
-            Comparison comparison = compare(
-                left,
-                right,
-                sameAs.recognitionProfile(),
-                session,
-                sameAs.canonicalDescriptor()
-            );
-            return comparison.matched
-                ? List.of(state
-                    .recognized(
-                        comparison.strength,
-                        state.representative,
-                        state.representativeIndex,
-                        false
-                    )
-                    .traced("same-as"))
-                : List.of();
-        }
-        if (constraint instanceof ExprMatcher.AllConstraints all) {
-            List<State> current = List.of(state);
-            for (ExprMatcher.Constraint nested : all.constraints()) {
-                List<State> next = new ArrayList<>();
-                for (State candidate : current) {
-                    next.addAll(evaluateConstraint(
-                        nested,
-                        candidate,
-                        session
-                    ));
-                }
-                current = session.limit(
-                    next,
-                    all.canonicalDescriptor()
-                );
-                if (current.isEmpty()) {
-                    break;
-                }
-            }
-            return current;
-        }
-        if (constraint instanceof ExprMatcher.AnyConstraint any) {
-            List<State> matches = new ArrayList<>();
-            for (ExprMatcher.Constraint nested : any.constraints()) {
-                matches.addAll(evaluateConstraint(
-                    nested,
+            return expression == null
+                ? List.of()
+                : evaluate(
+                    bindingMatches.matcher(),
+                    expression,
                     state,
-                    session
-                ));
-            }
-            return session.limit(matches, any.canonicalDescriptor());
+                    session,
+                    false
+                );
         }
-        ExprMatcher.NotConstraint not =
-            (ExprMatcher.NotConstraint) constraint;
-        int diagnosticCount = session.diagnostics.size();
-        List<State> excluded = evaluateConstraint(
-            not.constraint(),
-            state,
-            session
-        );
-        if (!excluded.isEmpty()
-                || session.diagnostics.size() > diagnosticCount) {
+        ExprMatcher.SameAs sameAs = (ExprMatcher.SameAs) constraint;
+        Expr left = state.bindings.get(sameAs.leftBinding());
+        Expr right = state.bindings.get(sameAs.rightBinding());
+        if (left == null || right == null) {
             return List.of();
         }
-        return List.of(state.traced("not-constraint"));
+        Comparison comparison = compare(
+            left,
+            right,
+            sameAs.recognitionProfile(),
+            session,
+            sameAs.canonicalDescriptor()
+        );
+        return comparison.matched
+            ? List.of(state
+                .withStrength(comparison.strength)
+                .traced("same-as"))
+            : List.of();
     }
 
     private static Comparison compare(
@@ -615,33 +486,25 @@ final class ExprMatcherEngine {
         if (expected.equals(candidate)) {
             return Comparison.exact();
         }
-        PatternExpr literalPattern = literalPattern(expected);
         List<Expr> representatives = profile.recognitionRuleIds().isEmpty()
                 || profile.maxEquivalenceDepth() == 0
             ? List.of(candidate)
             : session.options.representativeProvider()
                 .representatives(candidate, profile);
         if (representatives == null || representatives.isEmpty()) {
-            session.diagnostic(
-                "REPRESENTATIVE_PROVIDER_EMPTY",
-                descriptor
-            );
+            session.diagnostic("REPRESENTATIVE_PROVIDER_EMPTY", descriptor);
             return Comparison.noMatch();
         }
-        boolean inconclusive = false;
+        PatternExpr pattern = literalPattern(expected);
         for (int index = 0; index < representatives.size(); index++) {
             Expr representative = representatives.get(index);
             if (representative == null) {
-                session.diagnostic(
-                    "REPRESENTATIVE_PROVIDER_NULL",
-                    descriptor
-                );
-                inconclusive = true;
+                session.diagnostic("REPRESENTATIVE_PROVIDER_NULL", descriptor);
                 continue;
             }
             EquivalenceAwarePatternMatcher.MatchAttempt attempt =
                 EquivalenceAwarePatternMatcher.matchDetailed(
-                    literalPattern,
+                    pattern,
                     representative,
                     Map.of(),
                     profile,
@@ -660,12 +523,9 @@ final class ExprMatcherEngine {
             }
             if (attempt.inconclusive()) {
                 session.diagnostic(attempt.limitCode(), descriptor);
-                inconclusive = true;
             }
         }
-        return inconclusive
-            ? Comparison.inconclusive()
-            : Comparison.noMatch();
+        return Comparison.noMatch();
     }
 
     private static PatternExpr literalPattern(Expr expression) {
@@ -682,11 +542,16 @@ final class ExprMatcherEngine {
                 literalPattern(binary.right())
             );
         }
-        FunctionExpr function = (FunctionExpr) expression;
-        PatternExpr[] arguments = function.arguments().stream()
-            .map(ExprMatcherEngine::literalPattern)
-            .toArray(PatternExpr[]::new);
-        return PatternExpr.fn(function.name(), arguments);
+        if (expression instanceof FunctionExpr function) {
+            return PatternExpr.fn(
+                function.name(),
+                function.arguments().stream()
+                    .map(ExprMatcherEngine::literalPattern)
+                    .toArray(PatternExpr[]::new)
+            );
+        }
+        throw new IllegalArgumentException(
+            "Unsupported expression type: " + expression.getClass().getName());
     }
 
     private static boolean matchesNumberProperty(
@@ -724,28 +589,22 @@ final class ExprMatcherEngine {
         }
 
         private boolean consumeStep(String descriptor) {
-            if (steps >= options.maxSteps()) {
-                if (!stepLimitReported) {
-                    diagnostic("MATCH_STEP_LIMIT", descriptor);
-                    stepLimitReported = true;
-                }
-                return false;
+            if (steps < options.maxSteps()) {
+                steps++;
+                return true;
             }
-            steps++;
-            return true;
+            if (!stepLimitReported) {
+                diagnostic("MATCH_STEP_LIMIT", descriptor);
+                stepLimitReported = true;
+            }
+            return false;
         }
 
         private void diagnostic(String code, String descriptor) {
-            diagnostics.add(new ExprMatcher.MatchDiagnostic(
-                code,
-                descriptor
-            ));
+            diagnostics.add(new ExprMatcher.MatchDiagnostic(code, descriptor));
         }
 
-        private List<State> limit(
-            List<State> states,
-            String descriptor
-        ) {
+        private List<State> limit(List<State> states, String descriptor) {
             if (states.size() <= options.maxResults()) {
                 return List.copyOf(states);
             }
@@ -786,6 +645,19 @@ final class ExprMatcherEngine {
             return withBindings(updated);
         }
 
+        private State withStrength(
+            ExprMatcher.RecognitionStrength strength
+        ) {
+            return new State(
+                bindings,
+                representative,
+                representativeIndex,
+                ExprMatcher.RecognitionStrength.strongest(
+                    recognitionStrength, strength),
+                trace
+            );
+        }
+
         private State recognized(
             ExprMatcher.RecognitionStrength strength,
             Expr matchedRepresentative,
@@ -801,9 +673,7 @@ final class ExprMatcherEngine {
                     ? matchedRepresentativeIndex
                     : representativeIndex,
                 ExprMatcher.RecognitionStrength.strongest(
-                    recognitionStrength,
-                    strength
-                ),
+                    recognitionStrength, strength),
                 trace
             );
         }
@@ -838,20 +708,12 @@ final class ExprMatcherEngine {
     ) {
         private static Comparison exact() {
             return new Comparison(
-                true,
-                ExprMatcher.RecognitionStrength.EXACT
-            );
+                true, ExprMatcher.RecognitionStrength.EXACT);
         }
 
         private static Comparison noMatch() {
             return new Comparison(
-                false,
-                ExprMatcher.RecognitionStrength.EXACT
-            );
-        }
-
-        private static Comparison inconclusive() {
-            return noMatch();
+                false, ExprMatcher.RecognitionStrength.EXACT);
         }
     }
 }
