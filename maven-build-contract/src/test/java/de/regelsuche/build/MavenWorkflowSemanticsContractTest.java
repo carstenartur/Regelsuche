@@ -41,17 +41,25 @@ class MavenWorkflowSemanticsContractTest {
     private static final String GOVERNANCE_SCHEMA =
         "regelsuche.github-merge-governance-policy/v1";
     private static final Set<String> POLICY_FIELDS = Set.of(
-        "schema", "maximumWorkflowCount", "verificationWorkflows",
+        "schema",
+        "maximumWorkflowCount",
+        "verificationWorkflows",
         "platformWorkflows"
     );
     private static final Set<String> GOVERNANCE_FIELDS = Set.of(
-        "schema", "defaultBranch", "requiredStatusCheck",
-        "createEventCheckContext", "routineBypassActors",
-        "currentUserCanBypass", "requiredApprovingReviewCount",
+        "schema",
+        "defaultBranch",
+        "requiredStatusCheck",
+        "createEventCheckContext",
+        "routineBypassActors",
+        "currentUserCanBypass",
+        "requiredApprovingReviewCount",
         "requiredReviewThreadResolution"
     );
     private static final Set<String> REQUIRED_STATUS_FIELDS = Set.of(
-        "context", "integrationId", "strictUpToDate"
+        "context",
+        "integrationId",
+        "strictUpToDate"
     );
 
     private static final List<NamedPattern> TEXT_PATTERNS = List.of(
@@ -74,8 +82,14 @@ class MavenWorkflowSemanticsContractTest {
         )
     );
     private static final List<String> ASSERTION_PREFIXES = List.of(
-        "grep ", "test ", "cmp ", "diff ", "git diff ", "jq -e ",
-        "[ ", "[[ "
+        "grep ",
+        "test ",
+        "cmp ",
+        "diff ",
+        "git diff ",
+        "jq -e ",
+        "[ ",
+        "[[ "
     );
     private static final Pattern GRADLE_INVOCATION =
         Pattern.compile("\\./gradlew\\b");
@@ -94,9 +108,13 @@ class MavenWorkflowSemanticsContractTest {
         assertEquals("Checkout-local ciCheck", result.requiredCheck());
         System.out.println(
             "workflowSemantics=VERIFIED workflows="
-                + result.workflowCount() + "/" + result.maximumWorkflowCount()
-                + " verification=" + result.verificationWorkflowCount()
-                + " platform=" + result.platformWorkflowCount()
+                + result.workflowCount()
+                + "/"
+                + result.maximumWorkflowCount()
+                + " verification="
+                + result.verificationWorkflowCount()
+                + " platform="
+                + result.platformWorkflowCount()
         );
     }
 
@@ -235,6 +253,15 @@ class MavenWorkflowSemanticsContractTest {
             validWorkflow()
                 + "\n      - run: ./gradlew test\n"
                 + "      - run: ./gradlew check\n",
+            governance,
+            "too-many-gradle-entrypoints"
+        );
+        assertViolation(
+            workflow(
+                "Checkout-local ciCheck",
+                "Showcase train-freeze authority v1",
+                "./gradlew ciCheck && ./gradlew test && ./gradlew check"
+            ),
             governance,
             "too-many-gradle-entrypoints"
         );
@@ -475,7 +502,8 @@ class MavenWorkflowSemanticsContractTest {
     ) {
         if (actual.size() > policy.maximumWorkflowCount()) {
             throw invalid(
-                "too many workflows: " + actual.size()
+                "too many workflows: "
+                    + actual.size()
                     + " present, maximum is "
                     + policy.maximumWorkflowCount()
             );
@@ -491,7 +519,9 @@ class MavenWorkflowSemanticsContractTest {
             stale.removeAll(actual);
             throw invalid(
                 "workflow classifications differ: unclassified="
-                    + unclassified + " stale=" + stale
+                    + unclassified
+                    + " stale="
+                    + stale
             );
         }
     }
@@ -549,7 +579,10 @@ class MavenWorkflowSemanticsContractTest {
             }
         }
 
-        if (gradleLines.isEmpty()) {
+        long invocationCount = GRADLE_INVOCATION.matcher(text)
+            .results()
+            .count();
+        if (invocationCount == 0) {
             violations.add(new Violation(
                 workflow,
                 1,
@@ -557,12 +590,13 @@ class MavenWorkflowSemanticsContractTest {
                 "no checkout-local Gradle invocation found"
             ));
         }
-        if (gradleLines.size() > 2) {
+        if (invocationCount > 2) {
             violations.add(new Violation(
                 workflow,
                 1,
                 "too-many-gradle-entrypoints",
-                "found " + gradleLines.size()
+                "found "
+                    + invocationCount
                     + " Gradle invocations; expected at most two"
             ));
         }
@@ -617,7 +651,9 @@ class MavenWorkflowSemanticsContractTest {
             return document;
         } catch (JsonProcessingException exception) {
             throw invalid(
-                "invalid JSON " + path + ": "
+                "invalid JSON "
+                    + path
+                    + ": "
                     + exception.getOriginalMessage(),
                 exception
             );
@@ -714,7 +750,9 @@ class MavenWorkflowSemanticsContractTest {
         for (JsonNode value : values) {
             if (!value.isTextual() || value.asText().isBlank()) {
                 throw invalid(
-                    context + " field " + field
+                    context
+                        + " field "
+                        + field
                         + " must contain non-blank text"
                 );
             }
@@ -855,8 +893,11 @@ class MavenWorkflowSemanticsContractTest {
             failure.getMessage().toLowerCase().contains(
                 fragment.toLowerCase()
             ),
-            () -> "expected <" + fragment + "> in <"
-                + failure.getMessage() + ">"
+            () -> "expected <"
+                + fragment
+                + "> in <"
+                + failure.getMessage()
+                + ">"
         );
     }
 
@@ -916,7 +957,13 @@ class MavenWorkflowSemanticsContractTest {
     ) {
         @Override
         public String toString() {
-            return workflow + ":" + line + ": " + category + ": " + excerpt;
+            return workflow
+                + ":"
+                + line
+                + ": "
+                + category
+                + ": "
+                + excerpt;
         }
     }
 
