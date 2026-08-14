@@ -1,5 +1,6 @@
 package de.regelsuche.discovery.representation;
 
+import java.util.Comparator;
 import java.util.Objects;
 
 /** One newly available consequence at one exact known-structure occurrence. */
@@ -9,11 +10,18 @@ public record KnownStructureConsequenceUnlock(
     ExpressionOccurrencePath occurrencePath,
     String matchIdentity
 ) implements Comparable<KnownStructureConsequenceUnlock> {
+    private static final Comparator<KnownStructureConsequenceUnlock> ORDER =
+        Comparator.comparing(KnownStructureConsequenceUnlock::consequenceId)
+            .thenComparing(KnownStructureConsequenceUnlock::structureId)
+            .thenComparing(KnownStructureConsequenceUnlock::occurrencePath)
+            .thenComparing(KnownStructureConsequenceUnlock::matchIdentity);
+
     public KnownStructureConsequenceUnlock {
-        consequenceId = requireText(consequenceId, "consequenceId");
-        structureId = requireText(structureId, "structureId");
+        consequenceId = RepresentationContracts.text(
+            consequenceId, "consequenceId");
+        structureId = RepresentationContracts.text(structureId, "structureId");
         occurrencePath = Objects.requireNonNull(occurrencePath, "occurrencePath");
-        matchIdentity = requireText(matchIdentity, "matchIdentity");
+        matchIdentity = RepresentationContracts.text(matchIdentity, "matchIdentity");
     }
 
     public String opportunityIdentity() {
@@ -22,28 +30,6 @@ public record KnownStructureConsequenceUnlock(
 
     @Override
     public int compareTo(KnownStructureConsequenceUnlock other) {
-        Objects.requireNonNull(other, "other");
-        int consequence = consequenceId.compareTo(other.consequenceId);
-        if (consequence != 0) {
-            return consequence;
-        }
-        int structure = structureId.compareTo(other.structureId);
-        if (structure != 0) {
-            return structure;
-        }
-        int occurrence = occurrencePath.compareTo(other.occurrencePath);
-        if (occurrence != 0) {
-            return occurrence;
-        }
-        return matchIdentity.compareTo(other.matchIdentity);
-    }
-
-    private static String requireText(String value, String field) {
-        Objects.requireNonNull(value, field);
-        String normalized = value.trim();
-        if (normalized.isEmpty()) {
-            throw new IllegalArgumentException(field + " must not be blank");
-        }
-        return normalized;
+        return ORDER.compare(this, Objects.requireNonNull(other, "other"));
     }
 }
