@@ -84,7 +84,7 @@ A custom output directory can be selected with:
 
 ## Docker reproduction
 
-Build the dedicated Java 21 runtime image:
+Build the dedicated Java 25 runtime image:
 
 ```bash
 docker build -f Dockerfile.autopilot -t regelsuche-autopilot-campaign .

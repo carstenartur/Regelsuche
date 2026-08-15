@@ -1,5 +1,5 @@
 # ---------- Stage 1: Build with Gradle ----------
-FROM eclipse-temurin:21.0.11_10-jdk-noble AS build
+FROM eclipse-temurin:25.0.3_9-jdk-noble AS build
 WORKDIR /workspace
 
 # Copy Gradle wrapper and build scripts first to leverage Docker layer caching
@@ -74,7 +74,7 @@ ENTRYPOINT ["./gradlew", "--no-daemon", ":regelsuche-release:runAutonomousDiscov
 
 
 # ---------- Default Web Workbench runtime ----------
-FROM eclipse-temurin:21.0.11_10-jre-noble AS runtime
+FROM eclipse-temurin:25.0.3_9-jre-noble AS runtime
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     JAVA_OPTS=""

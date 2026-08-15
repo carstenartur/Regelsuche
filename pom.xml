@@ -10,7 +10,7 @@
   <packaging>pom</packaging>
 
   <name>Regelsuche Maven Reactor</name>
-  <description>Authoritative Java 21, Maven and JUnit reactor introduced by issue 632.</description>
+  <description>Authoritative Java 25 LTS, Maven and JUnit reactor introduced by issue 632.</description>
 
   <modules>
     <module>regelsuche-core</module>
@@ -33,7 +33,7 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <maven.compiler.release>21</maven.compiler.release>
+    <maven.compiler.release>25</maven.compiler.release>
     <maven.minimum.version>3.9.9</maven.minimum.version>
     <maven.maximum.exclusive.version>4.0.0</maven.maximum.exclusive.version>
     <maven.test.fork.timeout.seconds>600</maven.test.fork.timeout.seconds>
@@ -150,7 +150,7 @@
         <groupId>org.apache.maven.plugins</groupId><artifactId>maven-enforcer-plugin</artifactId>
         <executions><execution><id>enforce-minimal-build-toolchain</id><phase>validate</phase><goals><goal>enforce</goal></goals><configuration><rules>
           <requireMavenVersion><version>[${maven.minimum.version},${maven.maximum.exclusive.version})</version><message>Regelsuche requires Maven 3.9.9 or newer from the 3.x line.</message></requireMavenVersion>
-          <requireJavaVersion><version>[21,22)</version><message>Regelsuche requires a Java 21 JDK.</message></requireJavaVersion>
+          <requireJavaVersion><version>[25,26)</version><message>Regelsuche requires a Java 25 JDK.</message></requireJavaVersion>
           <requireNoRepositories><message>The Maven reactor must use the standard Central resolution path and must not declare checkout-specific repositories or plugin repositories.</message></requireNoRepositories>
           <requirePluginVersions><phases>clean,deploy,site</phases></requirePluginVersions>
           <bannedPlugins><excludes><exclude>org.codehaus.mojo:exec-maven-plugin</exclude><exclude>com.github.eirslett:frontend-maven-plugin</exclude></excludes><message>Host scripting and frontend runtimes are not part of the Maven build contract.</message></bannedPlugins>

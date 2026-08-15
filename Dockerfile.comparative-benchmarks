@@ -1,11 +1,11 @@
-FROM eclipse-temurin:21.0.11_10-jdk-noble AS build
+FROM eclipse-temurin:25.0.3_9-jdk-noble AS build
 WORKDIR /workspace
 
 COPY . .
 RUN chmod +x ./gradlew \
     && ./gradlew --no-daemon :regelsuche-benchmarks:installDist -x test
 
-FROM eclipse-temurin:21.0.11_10-jre-noble AS runtime
+FROM eclipse-temurin:25.0.3_9-jre-noble AS runtime
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

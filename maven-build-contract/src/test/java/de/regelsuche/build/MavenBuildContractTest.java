@@ -59,7 +59,7 @@ class MavenBuildContractTest {
         "commandLineArgs"
     );
     private static final Map<String, String> REQUIRED_PROPERTIES = Map.ofEntries(
-        Map.entry("maven.compiler.release", "21"),
+        Map.entry("maven.compiler.release", "25"),
         Map.entry("maven.minimum.version", "3.9.9"),
         Map.entry("maven.maximum.exclusive.version", "4.0.0"),
         Map.entry("junit.version", "6.1.3"),
