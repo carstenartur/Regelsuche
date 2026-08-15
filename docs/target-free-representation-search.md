@@ -37,8 +37,9 @@ Der erste Slice verwendet eine deterministische, budgetierte Breitensuche:
    algebraisch auf eine bevorzugte Form reduziert.
 2. Alle vom sichtbaren `AstRewriteTransformationEngine` erzeugten
    Transformationen werden deterministisch sortiert.
-3. Jede unterschiedliche normalisierte Darstellung wird einmal als Zustand
-   behalten.
+3. Jede unterschiedliche Kombination aus normalisierter Darstellung und
+   kumulativem Annahmekontext wird einmal als Zustand behalten. Derselbe Text
+   ohne Annahmen und unter einer Nebenbedingung bleibt bewusst getrennt.
 4. Die erste erhaltene Lineage ist aufgrund der Breitensuche eine kürzeste
    Rewrite-Tiefe unter der eingefrorenen Transformationsreihenfolge.
 5. Duplikate und Zustandsbudget-Verwerfungen bleiben als Übergänge sichtbar.
@@ -48,10 +49,11 @@ Der erste Slice verwendet eine deterministische, budgetierte Breitensuche:
    Beschreibungsdimensionen ausgewiesen.
 
 Die Pareto-Front ist kein universeller Einfachheitsscore. Verwendet werden
-getrennt Token-, AST-, Operator-, Zahlenbit- und semantische Wertkosten sowie
-wiederverwendbare Teilstruktur. Längere Zustände bleiben im vollständigen
-begrenzten Kandidatenbestand erhalten, damit eine erst nach dem Freeze
-erkennbare Wissensbrücke nicht durch eine reine Kürzungsheuristik verloren geht.
+getrennt Token-, AST-, Operator-, Zahlenbit- und semantische Wertkosten,
+wiederverwendbare Teilstruktur sowie die Anzahl benötigter Annahmen. Längere
+Zustände bleiben im vollständigen begrenzten Kandidatenbestand erhalten, damit
+eine erst nach dem Freeze erkennbare Wissensbrücke nicht durch eine reine
+Kürzungsheuristik verloren geht.
 
 ## Reproduzierbare Evidence
 
@@ -66,9 +68,16 @@ erkennbare Wissensbrücke nicht durch eine reine Kürzungsheuristik verloren geh
 - explizite Trunkierung;
 - targetfreie Pareto-Zustände.
 
-Die Zustandsidentität ist repräsentationsbezogen. Algebraisch äquivalente, aber
-unterschiedlich geschriebene Formen bleiben getrennt, weil genau diese
-Darstellungsunterschiede Gegenstand der Discovery sind.
+Die Zustandsidentität besteht aus Darstellung und normalisiertem
+Annahmekontext. Algebraisch äquivalente, aber unterschiedlich geschriebene
+Formen bleiben getrennt, weil genau diese Darstellungsunterschiede Gegenstand
+der Discovery sind. Ebenso werden identische Darstellungen nicht
+zusammengelegt, wenn eine Lineage zusätzliche Nebenbedingungen benötigt.
+
+Das Artefakt validiert beim Aufbau außerdem Ressourcenbilanz, Sequenzen,
+Zustands- und Übergangshashes, Elternlineagen, Budgetverwerfungen und die
+vollständige Pareto-Front. Inkonsistente oder nachträglich manipulierte Evidence
+wird dadurch fail-closed abgelehnt.
 
 ## End-to-End-Szenario
 
