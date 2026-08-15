@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -95,6 +96,11 @@ class SymPyKnowledgeBridgeScenarioTest {
             KnownStructureCatalog.sha256(canonicalContent(content)),
             artifact.contentHash()
         );
+        assertThrows(IllegalArgumentException.class,
+            () -> new SymPyKnowledgeBridgeScenario.ScenarioArtifact(
+                content,
+                "sha256:" + "0".repeat(64)
+            ));
     }
 
     @Test
