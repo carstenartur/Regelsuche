@@ -4,6 +4,7 @@ import static de.regelsuche.discovery.representation.RepresentationCandidateAsse
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.discovery.representation.KnownStructureCatalog;
@@ -12,6 +13,11 @@ import de.regelsuche.discovery.representation.KnownStructureMatcher;
 import de.regelsuche.discovery.representation.RepresentationCandidateAssessment;
 import de.regelsuche.discovery.representation.RepresentationCandidateAssessor;
 import de.regelsuche.discovery.representation.RepresentationCandidateProposal;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary.CandidateFreezeReceipt;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary.PostFreezeDisclosure;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary.Track;
+import de.regelsuche.knowledge.KnowledgePackRegistry;
 import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.knowledge.RuleProfile;
 import de.regelsuche.validation.CandidateProofStatus;
@@ -21,6 +27,8 @@ import org.junit.jupiter.api.Test;
 
 class DiscoveryKnowledgePackOptionsTest {
     private static final String SYMPY_TRIGONOMETRY = "sympy-trigonometry";
+    private static final String PYTHAGOREAN_PAIR =
+        "sympy.trig.pythagorean-pair";
 
     @Test
     void supportsCustomEnabledAndDisabledPacks() {
@@ -52,7 +60,7 @@ class DiscoveryKnowledgePackOptionsTest {
             .match("cos(x)^2 + sin(x)^2")
             .stream()
             .filter(value -> value.structureId().equals(
-                "sympy.trig.pythagorean-pair"))
+                PYTHAGOREAN_PAIR))
             .findFirst()
             .orElseThrow();
 
@@ -83,6 +91,107 @@ class DiscoveryKnowledgePackOptionsTest {
         assertTrue(provisional.warnings().contains(
             WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM));
         assertFalse(verified.newlyUnlockedConsequences().isEmpty());
+    }
+
+    @Test
+    void informationTracksSeparateFormationFromPostFreezeKnowledge() {
+        DiscoveryOptions options = sympyOptions();
+        RepresentationCandidateProposal candidate =
+            proposal(CandidateProofStatus.SYMBOLICALLY_VERIFIED);
+
+        RepresentationDiscoveryInformationBoundary compression =
+            options.representationDiscoveryBoundary(
+                Track.R1_TARGET_FREE_COMPRESSION);
+        assertTrue(compression.candidateFormationCatalog()
+            .structures().isEmpty());
+        assertTrue(compression.disclosePostFreeze(
+            compression.freezeCandidates(List.of(candidate)))
+            .classificationCatalog().structures().isEmpty());
+
+        RepresentationDiscoveryInformationBoundary blind =
+            options.representationDiscoveryBoundary(
+                Track.R2_CATALOG_BLIND_POST_HOC_BRIDGE);
+        assertTrue(blind.candidateFormationCatalog().structures().isEmpty());
+        CandidateFreezeReceipt blindFreeze =
+            blind.freezeCandidates(List.of(candidate));
+        PostFreezeDisclosure blindDisclosure =
+            blind.disclosePostFreeze(blindFreeze);
+        assertEquals(7,
+            blindDisclosure.classificationCatalog().structures().size());
+
+        RepresentationDiscoveryInformationBoundary visible =
+            options.representationDiscoveryBoundary(
+                Track.R3_CATALOG_VISIBLE_KNOWLEDGE_NAVIGATION);
+        assertEquals(7,
+            visible.candidateFormationCatalog().structures().size());
+        PostFreezeDisclosure visibleDisclosure =
+            visible.disclosePostFreeze(
+                visible.freezeCandidates(List.of(candidate)));
+        assertEquals(visible.candidateFormationCatalog().contentHash(),
+            visibleDisclosure.classificationCatalog().contentHash());
+
+        assertNotEquals(blind.contentHash(), visible.contentHash());
+        assertThrows(IllegalArgumentException.class,
+            () -> visible.disclosePostFreeze(blindFreeze));
+    }
+
+    @Test
+    void hiddenStructureTrackWithholdsItsDirectRulePack() {
+        DiscoveryOptions options = sympyOptions();
+        RepresentationDiscoveryInformationBoundary hidden =
+            options.representationDiscoveryBoundary(
+                Track.R4_HIDDEN_STRUCTURE_REDISCOVERY,
+                Set.of(PYTHAGOREAN_PAIR)
+            );
+
+        assertTrue(hidden.formationSelection().disabledPacks()
+            .contains(SYMPY_TRIGONOMETRY));
+        assertTrue(hidden.candidateFormationCatalog().structures().stream()
+            .noneMatch(structure -> structure.id().equals(
+                PYTHAGOREAN_PAIR)));
+        assertTrue(new KnowledgePackRegistry()
+            .enabledRules(hidden.formationSelection())
+            .stream()
+            .noneMatch(rule -> rule.descriptor().packId().equals(
+                SYMPY_TRIGONOMETRY)));
+
+        PostFreezeDisclosure disclosure = hidden.disclosePostFreeze(
+            hidden.freezeCandidates(List.of(
+                proposal(CandidateProofStatus.SYMBOLICALLY_VERIFIED))));
+        assertEquals(Set.of(PYTHAGOREAN_PAIR),
+            disclosure.requestedHoldoutStructureIds());
+        assertTrue(disclosure.formationExcludedStructureIds()
+            .contains(PYTHAGOREAN_PAIR));
+        assertEquals(Set.of(SYMPY_TRIGONOMETRY),
+            disclosure.withheldRulePackIds());
+        assertTrue(disclosure.classificationCatalog().structures().stream()
+            .anyMatch(structure -> structure.id().equals(
+                PYTHAGOREAN_PAIR)));
+        assertEquals(hidden.holdoutCommitmentHash(),
+            disclosure.holdoutCommitmentHash());
+    }
+
+    @Test
+    void invalidHoldoutConfigurationsFailClosed() {
+        DiscoveryOptions options = sympyOptions();
+
+        assertThrows(IllegalArgumentException.class,
+            () -> options.representationDiscoveryBoundary(
+                Track.R4_HIDDEN_STRUCTURE_REDISCOVERY));
+        assertThrows(IllegalArgumentException.class,
+            () -> options.representationDiscoveryBoundary(
+                Track.R2_CATALOG_BLIND_POST_HOC_BRIDGE,
+                Set.of(PYTHAGOREAN_PAIR)));
+        assertThrows(IllegalArgumentException.class,
+            () -> options.representationDiscoveryBoundary(
+                Track.R4_HIDDEN_STRUCTURE_REDISCOVERY,
+                Set.of("unknown.structure")));
+    }
+
+    private static DiscoveryOptions sympyOptions() {
+        return DiscoveryOptions
+            .forProfile(DiscoveryProfile.PURE_REWRITE)
+            .enablePack(SYMPY_TRIGONOMETRY);
     }
 
     private static RepresentationCandidateProposal proposal(

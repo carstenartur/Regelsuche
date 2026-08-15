@@ -39,11 +39,33 @@ experimentell und standardmäßig deaktiviert. Regelsuche übernimmt weder die
 Python-Laufzeit noch SymPys globales `simplify()` oder dessen interne
 Ausdrucksrepräsentation.
 
-Für Experimente bleiben drei Informationsregime getrennt:
+## Erzwingbare Informationsregime
 
-- katalogblinde Discovery aktiviert den Pack erst nach Candidate Formation;
-- katalogsichtbare Navigation aktiviert ihn ausdrücklich vor der Suche;
-- Rediscovery-Holdouts verbergen Struktur und direkte Regel gemeinsam.
+`RepresentationDiscoveryInformationBoundary` bindet Regel-Auswahl,
+Formation-Katalog, Post-Freeze-Katalog und Holdout-Verpflichtung an eine
+content-addressed Identität. Die vier Tracks aus #663 werden damit nicht nur
+dokumentiert, sondern durch verschiedene zugängliche Informationsflächen
+ausgeführt:
+
+- **R1 – targetfreie Kompression:** Formation und Auswertung sehen keinen
+  bekannten-Strukturen-Katalog.
+- **R2 – katalogblinde Post-hoc-Brücke:** Formation sieht keinen Katalog. Erst
+  nachdem der vollständige Kandidatensatz eingefroren wurde, kann der gebundene
+  Katalog zur Klassifikation offengelegt werden.
+- **R3 – katalogsichtbare Wissensnavigation:** Formation und spätere
+  Klassifikation verwenden denselben ausdrücklich ausgewählten Katalog.
+- **R4 – Hidden-Structure-Rediscovery:** Die festgelegte Struktur und alle von
+  ihr deklarierten direkten Regel-Packs werden während der Formation
+  zurückgehalten. Der vollständige Katalog und die Holdout-Details werden erst
+  nach dem Kandidaten-Freeze offengelegt.
+
+R2 und R4 benötigen ein `CandidateFreezeReceipt`, das sowohl den eingefrorenen
+Kandidatensatz als auch exakt dieselbe Informationsgrenze bindet. Ein Receipt aus
+einem anderen Track oder einer anderen Pack-Auswahl wird abgewiesen. Bei R4 wird
+der komplette deklarierte Regel-Pack deaktiviert; nur das Struktur-Label zu
+verbergen, während ein direktes Makro ausführbar bleibt, ist unzulässig. Falls
+eine versteckte Struktur eine direkte Regel nennt, aber keinen zugehörigen
+Rule-Pack deklariert, schlägt die Konfiguration fehlersicher fehl.
 
 Knowledge Packs sind nicht identisch mit:
 
