@@ -140,7 +140,8 @@ public class KnowledgePackLoader {
                     require(ruleYaml.rule.from, "rule.from", path)),
                 KnowledgePatternParser.parse(
                     require(ruleYaml.rule.to, "rule.to", path)),
-                descriptor
+                descriptor,
+                recognitionProfile(ruleYaml.recognition)
             ));
         }
         return List.copyOf(rules);
@@ -340,6 +341,14 @@ public class KnowledgePackLoader {
         return values == null ? List.of() : List.copyOf(values);
     }
 
+    private static RecognitionProfile recognitionProfile(
+        RecognitionYaml recognition
+    ) {
+        return recognition == null
+            ? RecognitionProfile.exact()
+            : recognition.profile();
+    }
+
     private static List<SearchEffect> searchEffects(RuleYaml rule) {
         return rule.searchEffects == null || rule.searchEffects.isEmpty()
                 ? List.of()
@@ -376,6 +385,7 @@ public class KnowledgePackLoader {
         public List<SearchEffect> searchEffects;
         public List<String> categories;
         public RuleBodyYaml rule;
+        public RecognitionYaml recognition;
         public ValidationYaml validation;
     }
 

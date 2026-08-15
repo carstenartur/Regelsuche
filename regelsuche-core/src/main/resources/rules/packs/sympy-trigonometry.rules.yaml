@@ -17,6 +17,7 @@ rules:
     searchEffects:
       - SIMPLIFYING
     riskLevel: low
+    recognition: ARITHMETIC_AC
     rule:
       from: "add(pow(sin(?X), 2), pow(cos(?X), 2))"
       to: "1"
