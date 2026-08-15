@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactSharingRepresentation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">ExactSharingRepresentation.java</span></div><h1>ExactSharingRepresentation.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Exact definition/reference overlay for one material repeated-structure
+ * candidate.
+ *
+ * &lt;p&gt;The overlay introduces no new expression syntax. It is accepted only when
+ * the candidate can be regenerated from the normalized source, all selected
+ * occurrences have the same exact AST presentation, their paths do not overlap,
+ * and substituting the retained definition at every path therefore expands to
+ * the unchanged source tree.&lt;/p&gt;
+ */
+public record ExactSharingRepresentation(
+    String schema,
+    String identity,
+    String candidateIdentity,
+    String sourceExpression,
+    String semanticValueKey,
+    String definitionExpression,
+    List&lt;ExpressionOccurrencePath&gt; referencePaths,
+    RepeatedStructureExtractionCandidate.Policy policy,
+    RepeatedStructureExtractionCandidate.SharingCost sharingCost,
+    String sourceTreeHash,
+    String expandedTreeHash,
+    String claimBoundary
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.exact-sharing-representation/v1&quot;;
+    public static final String CLAIM_BOUNDARY =
+        &quot;Exact normalized-AST definition/reference reconstruction and &quot;
+            + &quot;sharing-cost evidence; not new expression syntax, an &quot;
+            + &quot;executable rewrite, proof of usefulness, held-out superiority &quot;
+            + &quot;or external mathematical novelty.&quot;;
+
+<span class="fc" id="L48">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L49">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L50">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L51">        .build();</span>
+
+<span class="fc" id="L53">    public ExactSharingRepresentation {</span>
+<span class="fc" id="L54">        schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="fc" id="L56">            throw new IllegalArgumentException(</span>
+                &quot;unsupported exact-sharing schema: &quot; + schema);
+        }
+<span class="fc" id="L59">        identity = requireHash(identity, &quot;identity&quot;);</span>
+<span class="fc" id="L60">        candidateIdentity = requireHash(</span>
+            candidateIdentity, &quot;candidateIdentity&quot;);
+<span class="fc" id="L62">        sourceExpression = normalize(sourceExpression);</span>
+<span class="fc" id="L63">        semanticValueKey = requireText(</span>
+            semanticValueKey, &quot;semanticValueKey&quot;);
+<span class="fc" id="L65">        definitionExpression = normalize(definitionExpression);</span>
+<span class="fc" id="L66">        referencePaths = Objects.requireNonNull(</span>
+<span class="fc" id="L67">            referencePaths, &quot;referencePaths&quot;).stream()</span>
+<span class="fc" id="L68">            .map(path -&gt; Objects.requireNonNull(path, &quot;referencePath&quot;))</span>
+<span class="fc" id="L69">            .sorted()</span>
+<span class="fc" id="L70">            .toList();</span>
+<span class="fc" id="L71">        policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L72">        sharingCost = Objects.requireNonNull(sharingCost, &quot;sharingCost&quot;);</span>
+<span class="fc" id="L73">        sourceTreeHash = requireHash(sourceTreeHash, &quot;sourceTreeHash&quot;);</span>
+<span class="fc" id="L74">        expandedTreeHash = requireHash(expandedTreeHash, &quot;expandedTreeHash&quot;);</span>
+<span class="fc" id="L75">        claimBoundary = requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (!CLAIM_BOUNDARY.equals(claimBoundary)) {</span>
+<span class="fc" id="L77">            throw new IllegalArgumentException(</span>
+                &quot;unsupported exact-sharing claim boundary&quot;);
+        }
+
+<span class="fc" id="L81">        RepeatedStructureExtractionCandidate candidate = regenerate(</span>
+            sourceExpression,
+            policy,
+            candidateIdentity
+        );
+<span class="fc" id="L86">        verifyCandidate(</span>
+            candidate,
+            semanticValueKey,
+            definitionExpression,
+            referencePaths,
+            sharingCost
+        );
+<span class="fc" id="L93">        verifyExactOccurrences(</span>
+            sourceExpression,
+            definitionExpression,
+            referencePaths
+        );
+
+<span class="fc" id="L99">        String expectedTreeHash = treeHash(sourceExpression);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (!expectedTreeHash.equals(sourceTreeHash)</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                || !sourceTreeHash.equals(expandedTreeHash)) {</span>
+<span class="fc" id="L102">            throw new IllegalArgumentException(</span>
+                &quot;exact-sharing tree hashes do not reconstruct the source&quot;);
+        }
+<span class="fc" id="L105">        String expectedIdentity = identityFor(</span>
+            candidateIdentity,
+            sourceExpression,
+            semanticValueKey,
+            definitionExpression,
+            referencePaths,
+            policy,
+            sharingCost,
+            sourceTreeHash,
+            expandedTreeHash
+        );
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (!expectedIdentity.equals(identity)) {</span>
+<span class="fc" id="L117">            throw new IllegalArgumentException(</span>
+                &quot;identity does not match exact-sharing evidence&quot;);
+        }
+<span class="fc" id="L120">    }</span>
+
+    public static ExactSharingRepresentation create(
+        RepeatedStructureExtractionCandidate candidate
+    ) {
+<span class="fc" id="L125">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L126">        List&lt;ExpressionOccurrencePath&gt; paths = candidate.occurrences().stream()</span>
+<span class="fc" id="L127">            .map(RepeatedStructureExtractionCandidate.Occurrence::path)</span>
+<span class="fc" id="L128">            .sorted()</span>
+<span class="fc" id="L129">            .toList();</span>
+<span class="fc" id="L130">        String source = normalize(candidate.sourceExpression());</span>
+<span class="fc" id="L131">        String sourceHash = treeHash(source);</span>
+<span class="fc" id="L132">        String identity = identityFor(</span>
+<span class="fc" id="L133">            candidate.identity(),</span>
+            source,
+<span class="fc" id="L135">            candidate.semanticValueKey(),</span>
+<span class="fc" id="L136">            candidate.representativeExpression(),</span>
+            paths,
+<span class="fc" id="L138">            candidate.policy(),</span>
+<span class="fc" id="L139">            candidate.sharingCost(),</span>
+            sourceHash,
+            sourceHash
+        );
+<span class="fc" id="L143">        return new ExactSharingRepresentation(</span>
+            SCHEMA,
+            identity,
+<span class="fc" id="L146">            candidate.identity(),</span>
+            source,
+<span class="fc" id="L148">            candidate.semanticValueKey(),</span>
+<span class="fc" id="L149">            candidate.representativeExpression(),</span>
+            paths,
+<span class="fc" id="L151">            candidate.policy(),</span>
+<span class="fc" id="L152">            candidate.sharingCost(),</span>
+            sourceHash,
+            sourceHash,
+            CLAIM_BOUNDARY
+        );
+    }
+
+    /** Exact normalized tree recovered after expanding the sharing overlay. */
+    public String reconstructSourceExpression() {
+<span class="fc" id="L161">        verifyExactOccurrences(</span>
+            sourceExpression,
+            definitionExpression,
+            referencePaths
+        );
+<span class="fc" id="L166">        return sourceExpression;</span>
+    }
+
+    public String toCanonicalJson() {
+        try {
+<span class="fc" id="L171">            return JSON.writeValueAsString(this);</span>
+<span class="nc" id="L172">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L173">            throw new IllegalStateException(</span>
+                &quot;Unable to render exact-sharing evidence&quot;, exception);
+        }
+    }
+
+    private static RepeatedStructureExtractionCandidate regenerate(
+        String sourceExpression,
+        RepeatedStructureExtractionCandidate.Policy policy,
+        String candidateIdentity
+    ) {
+<span class="fc" id="L183">        return new RepeatedStructureExtractor(policy)</span>
+<span class="fc" id="L184">            .extract(sourceExpression).stream()</span>
+<span class="fc" id="L185">            .filter(candidate -&gt; candidate.identity().equals(candidateIdentity))</span>
+<span class="fc" id="L186">            .findFirst()</span>
+<span class="fc" id="L187">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                &quot;candidate cannot be regenerated from the source&quot;));
+    }
+
+    private static void verifyCandidate(
+        RepeatedStructureExtractionCandidate candidate,
+        String semanticValueKey,
+        String definitionExpression,
+        List&lt;ExpressionOccurrencePath&gt; referencePaths,
+        RepeatedStructureExtractionCandidate.SharingCost sharingCost
+    ) {
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (!candidate.material()) {</span>
+<span class="fc" id="L199">            throw new IllegalArgumentException(</span>
+                &quot;exact sharing requires a material extraction candidate&quot;);
+        }
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (!candidate.semanticValueKey().equals(semanticValueKey)</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                || !candidate.representativeExpression().equals(</span>
+                    definitionExpression)
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                || !candidate.sharingCost().equals(sharingCost)) {</span>
+<span class="fc" id="L206">            throw new IllegalArgumentException(</span>
+                &quot;exact-sharing evidence differs from its candidate&quot;);
+        }
+<span class="fc" id="L209">        List&lt;ExpressionOccurrencePath&gt; candidatePaths =</span>
+<span class="fc" id="L210">            candidate.occurrences().stream()</span>
+<span class="fc" id="L211">                .map(RepeatedStructureExtractionCandidate.Occurrence::path)</span>
+<span class="fc" id="L212">                .sorted()</span>
+<span class="fc" id="L213">                .toList();</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (!candidatePaths.equals(referencePaths)) {</span>
+<span class="fc" id="L215">            throw new IllegalArgumentException(</span>
+                &quot;reference paths differ from the extraction candidate&quot;);
+        }
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (candidate.occurrences().stream().anyMatch(occurrence -&gt;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                !occurrence.expression().equals(definitionExpression))) {</span>
+<span class="fc" id="L220">            throw new IllegalArgumentException(</span>
+                &quot;exact sharing requires presentation-identical occurrences&quot;);
+        }
+<span class="fc" id="L223">    }</span>
+
+    private static void verifyExactOccurrences(
+        String sourceExpression,
+        String definitionExpression,
+        List&lt;ExpressionOccurrencePath&gt; referencePaths
+    ) {
+<span class="fc" id="L230">        rejectDuplicateOrOverlappingPaths(referencePaths);</span>
+<span class="fc" id="L231">        Expr root = parse(sourceExpression);</span>
+<span class="fc" id="L232">        Expr definition = parse(definitionExpression);</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (ExpressionOccurrencePath path : referencePaths) {</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            if (!atPath(root, path).equals(definition)) {</span>
+<span class="nc" id="L235">                throw new IllegalArgumentException(</span>
+                    &quot;definition does not match source occurrence &quot; + path);
+            }
+<span class="fc" id="L238">        }</span>
+<span class="fc" id="L239">    }</span>
+
+    private static void rejectDuplicateOrOverlappingPaths(
+        List&lt;ExpressionOccurrencePath&gt; paths
+    ) {
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(paths).size() != paths.size()) {</span>
+<span class="nc" id="L245">            throw new IllegalArgumentException(</span>
+                &quot;exact-sharing reference paths must be unique&quot;);
+        }
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        for (int left = 0; left &lt; paths.size(); left++) {</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            for (int right = left + 1; right &lt; paths.size(); right++) {</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                if (isStrictPrefix(paths.get(left), paths.get(right))</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                        || isStrictPrefix(</span>
+<span class="fc" id="L252">                            paths.get(right), paths.get(left))) {</span>
+<span class="nc" id="L253">                    throw new IllegalArgumentException(</span>
+                        &quot;exact-sharing reference paths overlap&quot;);
+                }
+            }
+        }
+<span class="fc" id="L258">    }</span>
+
+    private static boolean isStrictPrefix(
+        ExpressionOccurrencePath prefix,
+        ExpressionOccurrencePath path
+    ) {
+<span class="fc" id="L264">        List&lt;Integer&gt; prefixIndexes = prefix.childIndexes();</span>
+<span class="fc" id="L265">        List&lt;Integer&gt; pathIndexes = path.childIndexes();</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        return prefixIndexes.size() &lt; pathIndexes.size()</span>
+<span class="nc" id="L267">            &amp;&amp; pathIndexes.subList(0, prefixIndexes.size())</span>
+<span class="pc bnc" id="L268" title="All 2 branches missed.">                .equals(prefixIndexes);</span>
+    }
+
+    private static Expr atPath(
+        Expr root,
+        ExpressionOccurrencePath path
+    ) {
+<span class="fc" id="L275">        Expr current = root;</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        for (Integer childIndex : path.childIndexes()) {</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">            if (current instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L278" title="1 of 3 branches missed.">                current = switch (childIndex) {</span>
+<span class="fc" id="L279">                    case 0 -&gt; binary.left();</span>
+<span class="fc" id="L280">                    case 1 -&gt; binary.right();</span>
+<span class="pc" id="L281">                    default -&gt; throw invalidPath(path);</span>
+                };
+<span class="nc bnc" id="L283" title="All 2 branches missed.">            } else if (current instanceof FunctionExpr function</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                    &amp;&amp; childIndex &lt; function.arguments().size()) {</span>
+<span class="nc" id="L285">                current = function.arguments().get(childIndex);</span>
+            } else {
+<span class="nc" id="L287">                throw invalidPath(path);</span>
+            }
+<span class="fc" id="L289">        }</span>
+<span class="fc" id="L290">        return current;</span>
+    }
+
+    private static IllegalArgumentException invalidPath(
+        ExpressionOccurrencePath path
+    ) {
+<span class="nc" id="L296">        return new IllegalArgumentException(</span>
+            &quot;invalid exact-sharing source path: &quot; + path);
+    }
+
+    private static String identityFor(
+        String candidateIdentity,
+        String sourceExpression,
+        String semanticValueKey,
+        String definitionExpression,
+        List&lt;ExpressionOccurrencePath&gt; referencePaths,
+        RepeatedStructureExtractionCandidate.Policy policy,
+        RepeatedStructureExtractionCandidate.SharingCost sharingCost,
+        String sourceTreeHash,
+        String expandedTreeHash
+    ) {
+<span class="fc" id="L311">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L312">        append(descriptor, SCHEMA);</span>
+<span class="fc" id="L313">        append(descriptor, candidateIdentity);</span>
+<span class="fc" id="L314">        append(descriptor, sourceExpression);</span>
+<span class="fc" id="L315">        append(descriptor, semanticValueKey);</span>
+<span class="fc" id="L316">        append(descriptor, definitionExpression);</span>
+<span class="fc" id="L317">        append(descriptor, Integer.toString(referencePaths.size()));</span>
+<span class="fc" id="L318">        referencePaths.forEach(path -&gt;</span>
+<span class="fc" id="L319">            append(descriptor, path.canonical()));</span>
+<span class="fc" id="L320">        append(descriptor, policy.contentHash());</span>
+<span class="fc" id="L321">        appendCost(descriptor, sharingCost);</span>
+<span class="fc" id="L322">        append(descriptor, sourceTreeHash);</span>
+<span class="fc" id="L323">        append(descriptor, expandedTreeHash);</span>
+<span class="fc" id="L324">        append(descriptor, CLAIM_BOUNDARY);</span>
+<span class="fc" id="L325">        return KnownStructureCatalog.sha256(descriptor.toString());</span>
+    }
+
+    private static void appendCost(
+        StringBuilder descriptor,
+        RepeatedStructureExtractionCandidate.SharingCost cost
+    ) {
+<span class="fc" id="L332">        append(descriptor, Integer.toString(cost.repeatedTreeCost()));</span>
+<span class="fc" id="L333">        append(descriptor, Integer.toString(cost.definitionTreeCost()));</span>
+<span class="fc" id="L334">        append(descriptor, Integer.toString(cost.referenceTreeCost()));</span>
+<span class="fc" id="L335">        append(descriptor, Integer.toString(cost.explicitSharingTreeCost()));</span>
+<span class="fc" id="L336">        append(descriptor, Integer.toString(cost.netAstNodeSavings()));</span>
+<span class="fc" id="L337">        append(descriptor, Integer.toString(cost.minimumNetSavings()));</span>
+<span class="fc" id="L338">        append(descriptor, Boolean.toString(cost.material()));</span>
+<span class="fc" id="L339">    }</span>
+
+    private static String treeHash(String normalizedExpression) {
+<span class="fc" id="L342">        return KnownStructureCatalog.sha256(</span>
+            SCHEMA + &quot;/tree\n&quot; + normalizedExpression);
+    }
+
+    private static String normalize(String expression) {
+<span class="fc" id="L347">        return ExpressionFormatter.format(parse(requireText(</span>
+            expression, &quot;expression&quot;)));
+    }
+
+    private static Expr parse(String expression) {
+<span class="fc" id="L352">        return new ExpressionParser().parseTerm(expression);</span>
+    }
+
+    private static void append(StringBuilder descriptor, String value) {
+<span class="fc" id="L356">        KnownStructureCatalog.appendCanonicalField(descriptor, value);</span>
+<span class="fc" id="L357">    }</span>
+
+    private static String requireText(String value, String field) {
+<span class="fc" id="L360">        return RepresentationCandidateAssessment.requireText(value, field);</span>
+    }
+
+    private static String requireHash(String value, String field) {
+<span class="fc" id="L364">        String normalized = requireText(value, field);</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        if (!normalized.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="fc" id="L366">            throw new IllegalArgumentException(</span>
+                field + &quot; must be a lowercase SHA-256 identity&quot;);
+        }
+<span class="fc" id="L369">        return normalized;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
