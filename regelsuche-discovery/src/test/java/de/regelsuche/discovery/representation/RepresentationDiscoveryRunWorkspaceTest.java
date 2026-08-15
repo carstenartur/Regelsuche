@@ -6,15 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace.ArtifactReference;
-import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace.ArtifactRole;
-import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace.ArtifactStatus;
-import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace.RevisionEvidence;
-import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace.RunInput;
-import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace.RunOutcome;
-import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace.RunPlan;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactStatus;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryRunOutcome.TerminalState;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace.RunRelation;
-import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace.TerminalState;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,16 +21,18 @@ class RepresentationDiscoveryRunWorkspaceTest {
 
     @Test
     void rootWorkspaceIsOrderIndependentAndCorrelatesArtifactsAndSelection() {
-        RunInput input = RunInput.expression(
-            " sin(x)^2 + (cos(x)^2 + 0) ",
-            List.of("x is real", "x != 0")
-        );
-        RunPlan plan = plan(
+        RepresentationDiscoveryRunInput input =
+            RepresentationDiscoveryRunInput.expression(
+                " sin(x)^2 + (cos(x)^2 + 0) ",
+                List.of("x is real", "x != 0")
+            );
+        RepresentationDiscoveryRunPlan plan = plan(
             sha("budget"),
             42,
             List.of("sympy:1.14.0", "internal:java21")
         );
-        List<ArtifactReference> artifacts = completeArtifacts();
+        List<RepresentationDiscoveryArtifactReference> artifacts =
+            completeArtifacts();
         RepresentationDiscoveryRunWorkspace first =
             RepresentationDiscoveryRunWorkspace.create(
                 input,
@@ -45,12 +42,12 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 revisions()
             );
 
-        List<ArtifactReference> reversedArtifacts =
+        List<RepresentationDiscoveryArtifactReference> reversedArtifacts =
             new ArrayList<>(artifacts);
         Collections.reverse(reversedArtifacts);
         RepresentationDiscoveryRunWorkspace second =
             RepresentationDiscoveryRunWorkspace.create(
-                RunInput.expression(
+                RepresentationDiscoveryRunInput.expression(
                     "sin(x) ^ 2 + (cos(x) ^ 2 + 0)",
                     List.of("x != 0", "x is real")
                 ),
@@ -78,7 +75,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
             ).targetContentHash()
         );
 
-        var selection = first.selection(
+        RepresentationDiscoveryRunSelection selection = first.selection(
             sha("candidate"),
             sha("state"),
             sha("edge"),
@@ -101,7 +98,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
     @Test
     void duplicateRequiresExactlyOneVisiblePlanChangeAndStartsClean() {
         RepresentationDiscoveryRunWorkspace parent = root();
-        RunPlan changedBudget = plan(
+        RepresentationDiscoveryRunPlan changedBudget = plan(
             sha("budget-v2"),
             parent.plan().deterministicSeed(),
             parent.plan().backendIdentities()
@@ -135,7 +132,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
                     parent.plan(),
                     revisions()
                 ));
-        RunPlan twoChanges = plan(
+        RepresentationDiscoveryRunPlan twoChanges = plan(
             sha("budget-v2"),
             99,
             parent.plan().backendIdentities()
@@ -155,18 +152,19 @@ class RepresentationDiscoveryRunWorkspaceTest {
             RepresentationDiscoveryRunWorkspace.create(
                 expressionInput(),
                 basePlan(),
-                RunOutcome.created(),
+                RepresentationDiscoveryRunOutcome.created(),
                 RepresentationDiscoveryRunWorkspace.notProducedArtifacts(),
                 revisions()
             );
-        RunOutcome exhausted = RunOutcome.create(
-            TerminalState.BUDGET_EXHAUSTED,
-            "MAX_GENERATED_TRANSITIONS",
-            100,
-            100,
-            sha("continued-work"),
-            sha("continued-runtime")
-        );
+        RepresentationDiscoveryRunOutcome exhausted =
+            RepresentationDiscoveryRunOutcome.create(
+                TerminalState.BUDGET_EXHAUSTED,
+                "MAX_GENERATED_TRANSITIONS",
+                100,
+                100,
+                sha("continued-work"),
+                sha("continued-runtime")
+            );
 
         RepresentationDiscoveryRunWorkspace continuation =
             RepresentationDiscoveryRunWorkspace.continueFrom(
@@ -185,7 +183,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
         assertThrows(IllegalArgumentException.class, () ->
             RepresentationDiscoveryRunWorkspace.continueFrom(
                 parent,
-                RunOutcome.created(),
+                RepresentationDiscoveryRunOutcome.created(),
                 completeArtifacts(),
                 revisions()
             ));
@@ -193,27 +191,30 @@ class RepresentationDiscoveryRunWorkspaceTest {
 
     @Test
     void everyArtifactRoleMustBeExplicitAndUnique() {
-        List<ArtifactReference> missing = new ArrayList<>(
-            RepresentationDiscoveryRunWorkspace.notProducedArtifacts());
+        List<RepresentationDiscoveryArtifactReference> missing =
+            new ArrayList<>(
+                RepresentationDiscoveryRunWorkspace.notProducedArtifacts());
         missing.removeFirst();
         assertThrows(IllegalArgumentException.class, () ->
             RepresentationDiscoveryRunWorkspace.create(
                 expressionInput(),
                 basePlan(),
-                RunOutcome.created(),
+                RepresentationDiscoveryRunOutcome.created(),
                 missing,
                 revisions()
             ));
 
-        List<ArtifactReference> duplicate = new ArrayList<>(
-            RepresentationDiscoveryRunWorkspace.notProducedArtifacts());
-        duplicate.add(ArtifactReference.notProduced(
-            ArtifactRole.SEARCH_GRAPH));
+        List<RepresentationDiscoveryArtifactReference> duplicate =
+            new ArrayList<>(
+                RepresentationDiscoveryRunWorkspace.notProducedArtifacts());
+        duplicate.add(
+            RepresentationDiscoveryArtifactReference.notProduced(
+                ArtifactRole.SEARCH_GRAPH));
         assertThrows(IllegalArgumentException.class, () ->
             RepresentationDiscoveryRunWorkspace.create(
                 expressionInput(),
                 basePlan(),
-                RunOutcome.created(),
+                RepresentationDiscoveryRunOutcome.created(),
                 duplicate,
                 revisions()
             ));
@@ -243,13 +244,14 @@ class RepresentationDiscoveryRunWorkspaceTest {
 
     @Test
     void artifactReferencesRejectForgedAvailabilityAndHashes() {
-        ArtifactReference available = ArtifactReference.available(
-            ArtifactRole.SEARCH_GRAPH,
-            "regelsuche.search-graph/v1",
-            sha("graph")
-        );
+        RepresentationDiscoveryArtifactReference available =
+            RepresentationDiscoveryArtifactReference.available(
+                ArtifactRole.SEARCH_GRAPH,
+                "regelsuche.search-graph/v1",
+                sha("graph")
+            );
         assertThrows(IllegalArgumentException.class, () ->
-            new ArtifactReference(
+            new RepresentationDiscoveryArtifactReference(
                 available.role(),
                 available.status(),
                 available.artifactSchema(),
@@ -258,7 +260,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 available.contentHash()
             ));
         assertThrows(IllegalArgumentException.class, () ->
-            new ArtifactReference(
+            new RepresentationDiscoveryArtifactReference(
                 available.role(),
                 available.status(),
                 available.artifactSchema(),
@@ -267,13 +269,14 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 sha("forged-reference")
             ));
 
-        ArtifactReference unavailable = ArtifactReference.unavailable(
-            ArtifactRole.RULE_RADAR,
-            ArtifactStatus.UNSUPPORTED,
-            "DOMAIN_UNSUPPORTED"
-        );
+        RepresentationDiscoveryArtifactReference unavailable =
+            RepresentationDiscoveryArtifactReference.unavailable(
+                ArtifactRole.RULE_RADAR,
+                ArtifactStatus.UNSUPPORTED,
+                "DOMAIN_UNSUPPORTED"
+            );
         assertThrows(IllegalArgumentException.class, () ->
-            new ArtifactReference(
+            new RepresentationDiscoveryArtifactReference(
                 unavailable.role(),
                 unavailable.status(),
                 unavailable.artifactSchema(),
@@ -282,7 +285,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 unavailable.contentHash()
             ));
         assertThrows(IllegalArgumentException.class, () ->
-            ArtifactReference.unavailable(
+            RepresentationDiscoveryArtifactReference.unavailable(
                 ArtifactRole.RULE_RADAR,
                 ArtifactStatus.AVAILABLE,
                 "wrong factory"
@@ -291,7 +294,8 @@ class RepresentationDiscoveryRunWorkspaceTest {
 
     @Test
     void workOutcomesBalanceAndKeepRuntimeNonAuthoritative() {
-        RunOutcome created = RunOutcome.created();
+        RepresentationDiscoveryRunOutcome created =
+            RepresentationDiscoveryRunOutcome.created();
         assertEquals(0, created.configuredWork());
         assertEquals(0, created.consumedWork());
         assertNotEquals(
@@ -300,7 +304,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
         );
 
         assertThrows(IllegalArgumentException.class, () ->
-            RunOutcome.create(
+            RepresentationDiscoveryRunOutcome.create(
                 TerminalState.COMPLETED,
                 "SUCCESS",
                 10,
@@ -309,7 +313,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 sha("runtime")
             ));
         assertThrows(IllegalArgumentException.class, () ->
-            RunOutcome.create(
+            RepresentationDiscoveryRunOutcome.create(
                 TerminalState.BUDGET_EXHAUSTED,
                 "LIMIT",
                 10,
@@ -318,7 +322,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 sha("runtime")
             ));
         assertThrows(IllegalArgumentException.class, () ->
-            RunOutcome.create(
+            RepresentationDiscoveryRunOutcome.create(
                 TerminalState.CREATED,
                 "WRONG",
                 0,
@@ -327,9 +331,9 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 sha("runtime")
             ));
 
-        RunOutcome valid = completedOutcome();
+        RepresentationDiscoveryRunOutcome valid = completedOutcome();
         assertThrows(IllegalArgumentException.class, () ->
-            new RunOutcome(
+            new RepresentationDiscoveryRunOutcome(
                 valid.state(),
                 valid.terminalReason(),
                 valid.configuredWork(),
@@ -342,15 +346,16 @@ class RepresentationDiscoveryRunWorkspaceTest {
 
     @Test
     void expressionInputIsNormalizedAndHashBound() {
-        RunInput input = RunInput.expression(
-            " (x+0) * 1 ",
-            List.of("x is real")
-        );
+        RepresentationDiscoveryRunInput input =
+            RepresentationDiscoveryRunInput.expression(
+                " (x+0) * 1 ",
+                List.of("x is real")
+            );
 
         assertEquals("(x + 0) * 1", input.displayText());
         assertEquals(List.of("x is real"), input.assumptions());
         assertThrows(IllegalArgumentException.class, () ->
-            new RunInput(
+            new RepresentationDiscoveryRunInput(
                 input.domainId(),
                 input.inputSchema(),
                 sha("forged-input"),
@@ -359,7 +364,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 input.contentHash()
             ));
         assertThrows(IllegalArgumentException.class, () ->
-            new RunInput(
+            new RepresentationDiscoveryRunInput(
                 input.domainId(),
                 input.inputSchema(),
                 input.canonicalInputHash(),
@@ -368,21 +373,22 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 input.contentHash()
             ));
 
-        RunInput generic = RunInput.create(
-            "integer-sequence",
-            "regelsuche.sequence-input/v1",
-            sha("sequence-input"),
-            "1, 4, 9, 16",
-            List.of()
-        );
+        RepresentationDiscoveryRunInput generic =
+            RepresentationDiscoveryRunInput.create(
+                "integer-sequence",
+                "regelsuche.sequence-input/v1",
+                sha("sequence-input"),
+                "1, 4, 9, 16",
+                List.of()
+            );
         assertEquals("integer-sequence", generic.domainId());
     }
 
     @Test
     void planRevisionSelectionAndWorkspaceTamperingAreRejected() {
-        RunPlan plan = basePlan();
+        RepresentationDiscoveryRunPlan plan = basePlan();
         assertThrows(IllegalArgumentException.class, () ->
-            new RunPlan(
+            new RepresentationDiscoveryRunPlan(
                 plan.informationTrack(),
                 plan.informationBoundaryHash(),
                 plan.ruleInventoryHash(),
@@ -397,7 +403,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 sha("forged-plan")
             ));
         assertThrows(IllegalArgumentException.class, () ->
-            RunPlan.create(
+            RepresentationDiscoveryRunPlan.create(
                 plan.informationTrack(),
                 plan.informationBoundaryHash(),
                 plan.ruleInventoryHash(),
@@ -411,15 +417,15 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 List.of()
             ));
 
-        RevisionEvidence revision = revisions();
+        RepresentationDiscoveryRevisionEvidence revision = revisions();
         assertThrows(IllegalArgumentException.class, () ->
-            new RevisionEvidence(
+            new RepresentationDiscoveryRevisionEvidence(
                 "not-a-commit",
                 revision.applicationRevision(),
                 revision.contentHash()
             ));
         assertThrows(IllegalArgumentException.class, () ->
-            new RevisionEvidence(
+            new RepresentationDiscoveryRevisionEvidence(
                 revision.repositoryCommit(),
                 revision.applicationRevision(),
                 sha("forged-revision")
@@ -428,10 +434,10 @@ class RepresentationDiscoveryRunWorkspaceTest {
         RepresentationDiscoveryRunWorkspace workspace = root();
         assertThrows(IllegalArgumentException.class, () ->
             workspace.selection("", "", "", "", ""));
-        var selection = workspace.selection(
+        RepresentationDiscoveryRunSelection selection = workspace.selection(
             sha("candidate"), "", "", "", "");
         assertThrows(IllegalArgumentException.class, () ->
-            new RepresentationDiscoveryRunWorkspace.RunSelection(
+            new RepresentationDiscoveryRunSelection(
                 selection.runId(),
                 selection.candidateId(),
                 selection.stateId(),
@@ -486,14 +492,14 @@ class RepresentationDiscoveryRunWorkspaceTest {
         );
     }
 
-    private static RunInput expressionInput() {
-        return RunInput.expression(
+    private static RepresentationDiscoveryRunInput expressionInput() {
+        return RepresentationDiscoveryRunInput.expression(
             "sin(x)^2 + (cos(x)^2 + 0)",
             List.of()
         );
     }
 
-    private static RunPlan basePlan() {
+    private static RepresentationDiscoveryRunPlan basePlan() {
         return plan(
             sha("budget"),
             42,
@@ -501,12 +507,12 @@ class RepresentationDiscoveryRunWorkspaceTest {
         );
     }
 
-    private static RunPlan plan(
+    private static RepresentationDiscoveryRunPlan plan(
         String budgetHash,
         long seed,
         List<String> backends
     ) {
-        return RunPlan.create(
+        return RepresentationDiscoveryRunPlan.create(
             RepresentationDiscoveryInformationBoundary.Track
                 .R2_CATALOG_BLIND_POST_HOC_BRIDGE,
             sha("boundary"),
@@ -522,8 +528,8 @@ class RepresentationDiscoveryRunWorkspaceTest {
         );
     }
 
-    private static RunOutcome completedOutcome() {
-        return RunOutcome.create(
+    private static RepresentationDiscoveryRunOutcome completedOutcome() {
+        return RepresentationDiscoveryRunOutcome.create(
             TerminalState.COMPLETED,
             "CANDIDATES_RETAINED",
             100,
@@ -533,43 +539,49 @@ class RepresentationDiscoveryRunWorkspaceTest {
         );
     }
 
-    private static List<ArtifactReference> completeArtifacts() {
-        List<ArtifactReference> references = new ArrayList<>(
-            RepresentationDiscoveryRunWorkspace.notProducedArtifacts());
-        replace(references, ArtifactReference.available(
-            ArtifactRole.SEARCH_GRAPH,
-            "regelsuche.search-graph/v1",
-            sha("search-graph")
-        ));
-        replace(references, ArtifactReference.available(
-            ArtifactRole.REPRESENTATION_CANDIDATES,
-            "regelsuche.representation-candidates/v1",
-            sha("candidates")
-        ));
-        replace(references, ArtifactReference.available(
-            ArtifactRole.CANDIDATE_DOSSIERS,
-            "regelsuche.candidate-dossiers/v1",
-            sha("candidate-dossiers")
-        ));
-        replace(references, ArtifactReference.unavailable(
-            ArtifactRole.RULE_RADAR,
-            ArtifactStatus.UNSUPPORTED,
-            "NOT_AVAILABLE_FOR_RETAINED_RUN"
-        ));
+    private static List<RepresentationDiscoveryArtifactReference>
+            completeArtifacts() {
+        List<RepresentationDiscoveryArtifactReference> references =
+            new ArrayList<>(
+                RepresentationDiscoveryRunWorkspace.notProducedArtifacts());
+        replace(references,
+            RepresentationDiscoveryArtifactReference.available(
+                ArtifactRole.SEARCH_GRAPH,
+                "regelsuche.search-graph/v1",
+                sha("search-graph")
+            ));
+        replace(references,
+            RepresentationDiscoveryArtifactReference.available(
+                ArtifactRole.REPRESENTATION_CANDIDATES,
+                "regelsuche.representation-candidates/v1",
+                sha("candidates")
+            ));
+        replace(references,
+            RepresentationDiscoveryArtifactReference.available(
+                ArtifactRole.CANDIDATE_DOSSIERS,
+                "regelsuche.candidate-dossiers/v1",
+                sha("candidate-dossiers")
+            ));
+        replace(references,
+            RepresentationDiscoveryArtifactReference.unavailable(
+                ArtifactRole.RULE_RADAR,
+                ArtifactStatus.UNSUPPORTED,
+                "NOT_AVAILABLE_FOR_RETAINED_RUN"
+            ));
         return references;
     }
 
     private static void replace(
-        List<ArtifactReference> references,
-        ArtifactReference replacement
+        List<RepresentationDiscoveryArtifactReference> references,
+        RepresentationDiscoveryArtifactReference replacement
     ) {
         references.removeIf(reference ->
             reference.role() == replacement.role());
         references.add(replacement);
     }
 
-    private static RevisionEvidence revisions() {
-        return RevisionEvidence.create(
+    private static RepresentationDiscoveryRevisionEvidence revisions() {
+        return RepresentationDiscoveryRevisionEvidence.create(
             REPOSITORY_COMMIT,
             "Regelsuche-workbench/0.3-SNAPSHOT"
         );
