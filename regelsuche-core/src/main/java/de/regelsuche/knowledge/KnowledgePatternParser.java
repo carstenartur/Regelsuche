@@ -2,6 +2,7 @@ package de.regelsuche.knowledge;
 
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.transform.PatternExpr;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,8 +18,7 @@ final class KnowledgePatternParser {
         KnowledgePatternParser parser = new KnowledgePatternParser(input);
         PatternExpr expr = parser.parseExpression();
         if (!parser.isAtEnd()) {
-            throw new IllegalArgumentException(
-                "Unexpected token at position " + parser.pos + " in " + input);
+            throw new IllegalArgumentException("Unexpected token at position " + parser.pos + " in " + input);
         }
         return expr;
     }
@@ -28,11 +28,7 @@ final class KnowledgePatternParser {
         while (match('+') || match('-')) {
             char op = input.charAt(pos - 1);
             PatternExpr right = parseTerm();
-            expr = PatternExpr.op(
-                op == '+' ? BinaryOperator.ADD : BinaryOperator.SUB,
-                expr,
-                right
-            );
+            expr = PatternExpr.op(op == '+' ? BinaryOperator.ADD : BinaryOperator.SUB, expr, right);
         }
         return expr;
     }
@@ -42,22 +38,14 @@ final class KnowledgePatternParser {
         while (match('*') || match('/')) {
             char op = input.charAt(pos - 1);
             PatternExpr right = parseUnary();
-            expr = PatternExpr.op(
-                op == '*' ? BinaryOperator.MUL : BinaryOperator.DIV,
-                expr,
-                right
-            );
+            expr = PatternExpr.op(op == '*' ? BinaryOperator.MUL : BinaryOperator.DIV, expr, right);
         }
         return expr;
     }
 
     private PatternExpr parseUnary() {
         if (match('-')) {
-            return PatternExpr.op(
-                BinaryOperator.SUB,
-                PatternExpr.num(0),
-                parseUnary()
-            );
+            return PatternExpr.op(BinaryOperator.SUB, PatternExpr.num(0), parseUnary());
         }
         return parsePower();
     }
@@ -79,8 +67,7 @@ final class KnowledgePatternParser {
         if (match('?')) {
             String name = readPlainIdentifier();
             if (name.isBlank()) {
-                throw new IllegalArgumentException(
-                    "Expected pattern variable at position " + pos);
+                throw new IllegalArgumentException("Expected pattern variable at position " + pos);
             }
             return PatternExpr.var(name);
         }
@@ -94,7 +81,7 @@ final class KnowledgePatternParser {
                     } while (match(','));
                     expect(')');
                 }
-                return call(identifier, arguments);
+                return PatternExpr.fn(identifier, arguments.toArray(PatternExpr[]::new));
             }
             return PatternExpr.variable(identifier);
         }
@@ -102,42 +89,14 @@ final class KnowledgePatternParser {
         if (!number.isBlank()) {
             return PatternExpr.num(Double.parseDouble(number));
         }
-        throw new IllegalArgumentException(
-            "Expected expression at position " + pos + " in " + input);
-    }
-
-    private PatternExpr call(
-        String identifier,
-        List<PatternExpr> arguments
-    ) {
-        BinaryOperator operator = switch (identifier) {
-            case "add" -> BinaryOperator.ADD;
-            case "sub" -> BinaryOperator.SUB;
-            case "mul" -> BinaryOperator.MUL;
-            case "div" -> BinaryOperator.DIV;
-            case "pow" -> BinaryOperator.POW;
-            default -> null;
-        };
-        if (operator == null) {
-            return PatternExpr.fn(
-                identifier,
-                arguments.toArray(PatternExpr[]::new)
-            );
-        }
-        if (arguments.size() != 2) {
-            throw new IllegalArgumentException(
-                "Operator alias " + identifier
-                    + " requires exactly two arguments in " + input);
-        }
-        return PatternExpr.op(operator, arguments.get(0), arguments.get(1));
+        throw new IllegalArgumentException("Expected expression at position " + pos + " in " + input);
     }
 
     private String readPlainIdentifier() {
         int start = pos;
         if (!isAtEnd() && Character.isLetter(input.charAt(pos))) {
             pos++;
-            while (!isAtEnd()
-                    && Character.isLetterOrDigit(input.charAt(pos))) {
+            while (!isAtEnd() && Character.isLetterOrDigit(input.charAt(pos))) {
                 pos++;
             }
         }
@@ -146,9 +105,7 @@ final class KnowledgePatternParser {
 
     private String readNumber() {
         int start = pos;
-        while (!isAtEnd()
-                && (Character.isDigit(input.charAt(pos))
-                    || input.charAt(pos) == '.')) {
+        while (!isAtEnd() && (Character.isDigit(input.charAt(pos)) || input.charAt(pos) == '.')) {
             pos++;
         }
         return input.substring(start, pos);
@@ -164,9 +121,7 @@ final class KnowledgePatternParser {
 
     private void expect(char expected) {
         if (!match(expected)) {
-            throw new IllegalArgumentException(
-                "Expected '" + expected + "' at position " + pos
-                    + " in " + input);
+            throw new IllegalArgumentException("Expected '" + expected + "' at position " + pos + " in " + input);
         }
     }
 
