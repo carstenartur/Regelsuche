@@ -213,7 +213,7 @@ public final class SymPyKnowledgeBridgeScenario {
         }
         Files.writeString(
             absolute,
-            result.toCanonicalJson() + System.lineSeparator(),
+            result.toCanonicalJson() + "\n",
             StandardCharsets.UTF_8
         );
         return result;
@@ -286,16 +286,22 @@ public final class SymPyKnowledgeBridgeScenario {
         String disabledInventoryHash,
         String enabledInventoryHash
     ) {
+        List<Transformation> formationResults =
+            formation.transform(CANDIDATE_EXPRESSION);
+        List<Transformation> disabledResults =
+            disabled.transform(CANDIDATE_EXPRESSION);
+        List<Transformation> enabledResults =
+            enabled.transform(CANDIDATE_EXPRESSION);
         return new FollowOnEvidence(
             hasTargetRule(formation),
             hasTargetRule(disabled),
             hasTargetRule(enabled),
-            targetSuccessors(formation),
-            targetSuccessors(disabled),
-            targetSuccessors(enabled),
-            formation.transform(CANDIDATE_EXPRESSION).size(),
-            disabled.transform(CANDIDATE_EXPRESSION).size(),
-            enabled.transform(CANDIDATE_EXPRESSION).size(),
+            targetSuccessors(formationResults),
+            targetSuccessors(disabledResults),
+            targetSuccessors(enabledResults),
+            formationResults.size(),
+            disabledResults.size(),
+            enabledResults.size(),
             disabledInventoryHash,
             enabledInventoryHash
         );
@@ -309,9 +315,9 @@ public final class SymPyKnowledgeBridgeScenario {
     }
 
     private static List<String> targetSuccessors(
-        AstRewriteTransformationEngine engine
+        List<Transformation> transformations
     ) {
-        return engine.transform(CANDIDATE_EXPRESSION).stream()
+        return transformations.stream()
             .filter(result -> result.rule().equals(targetRuleId()))
             .map(Transformation::transformedExpression)
             .distinct()
