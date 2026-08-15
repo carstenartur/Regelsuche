@@ -121,7 +121,10 @@ class SymPyKnowledgeBridgeScenarioTest {
             Files.readAllBytes(copy)
         );
 
-        JsonNode root = JSON.readTree(Files.readString(retained));
+        String retainedText = Files.readString(retained);
+        assertTrue(retainedText.endsWith("\n"));
+        assertFalse(retainedText.contains("\r"));
+        JsonNode root = JSON.readTree(retainedText);
         assertEquals(SCHEMA,
             root.path("content").path("schema").asText());
         assertEquals(
