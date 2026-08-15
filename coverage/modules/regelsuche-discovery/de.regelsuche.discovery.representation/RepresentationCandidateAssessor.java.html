@@ -291,38 +291,41 @@ public final class RepresentationCandidateAssessor {
 <span class="fc bfc" id="L291" title="All 2 branches covered.">                !evidenceSatisfied(match, proposal.validationStatus()))) {</span>
 <span class="fc" id="L292">            warnings.add(WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM);</span>
         }
-<span class="fc bfc" id="L294" title="All 4 branches covered.">        if (!newMatches.isEmpty() &amp;&amp; unlocks.isEmpty()) {</span>
-<span class="fc" id="L295">            warnings.add(WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY);</span>
+<span class="fc" id="L294">        boolean hasUnlockEligibleMatch = newMatches.stream().anyMatch(match -&gt;</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            assumptionsSatisfied(match, assumptions)</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">                &amp;&amp; evidenceSatisfied(match, proposal.validationStatus()));</span>
+<span class="fc bfc" id="L297" title="All 4 branches covered.">        if (hasUnlockEligibleMatch &amp;&amp; unlocks.isEmpty()) {</span>
+<span class="fc" id="L298">            warnings.add(WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY);</span>
         }
-<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (!proposal.validationStatus().atLeast(</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (!proposal.validationStatus().atLeast(</span>
                 CandidateProofStatus.SYMBOLICALLY_VERIFIED)) {
-<span class="fc" id="L299">            warnings.add(WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION);</span>
+<span class="fc" id="L302">            warnings.add(WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION);</span>
         }
-<span class="fc" id="L301">        return List.copyOf(warnings);</span>
+<span class="fc" id="L304">        return List.copyOf(warnings);</span>
     }
 
     private static List&lt;String&gt; difference(
         List&lt;String&gt; left,
         List&lt;String&gt; right
     ) {
-<span class="fc" id="L308">        TreeSet&lt;String&gt; result = new TreeSet&lt;&gt;(left);</span>
-<span class="fc" id="L309">        result.removeAll(right);</span>
-<span class="fc" id="L310">        return List.copyOf(result);</span>
+<span class="fc" id="L311">        TreeSet&lt;String&gt; result = new TreeSet&lt;&gt;(left);</span>
+<span class="fc" id="L312">        result.removeAll(right);</span>
+<span class="fc" id="L313">        return List.copyOf(result);</span>
     }
 
     private static Expr resolve(
         Expr root,
         ExpressionOccurrencePath path
     ) {
-<span class="fc" id="L317">        Expr current = root;</span>
-<span class="fc bfc" id="L318" title="All 2 branches covered.">        for (int childIndex : path.childIndexes()) {</span>
-<span class="fc" id="L319">            List&lt;Expr&gt; children = children(current);</span>
-<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            if (childIndex &gt;= children.size()) {</span>
-<span class="nc" id="L321">                throw invalidPath(path, childIndex);</span>
+<span class="fc" id="L320">        Expr current = root;</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        for (int childIndex : path.childIndexes()) {</span>
+<span class="fc" id="L322">            List&lt;Expr&gt; children = children(current);</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            if (childIndex &gt;= children.size()) {</span>
+<span class="nc" id="L324">                throw invalidPath(path, childIndex);</span>
             }
-<span class="fc" id="L323">            current = children.get(childIndex);</span>
-<span class="fc" id="L324">        }</span>
-<span class="fc" id="L325">        return current;</span>
+<span class="fc" id="L326">            current = children.get(childIndex);</span>
+<span class="fc" id="L327">        }</span>
+<span class="fc" id="L328">        return current;</span>
     }
 
     private static boolean sameContextOutsideOccurrence(
@@ -331,28 +334,28 @@ public final class RepresentationCandidateAssessor {
         ExpressionOccurrencePath path,
         int pathIndex
     ) {
-<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (pathIndex == path.childIndexes().size()) {</span>
-<span class="fc" id="L335">            return true;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (pathIndex == path.childIndexes().size()) {</span>
+<span class="fc" id="L338">            return true;</span>
         }
-<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (!sameContainer(source, candidate)) {</span>
-<span class="nc" id="L338">            return false;</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (!sameContainer(source, candidate)) {</span>
+<span class="nc" id="L341">            return false;</span>
         }
-<span class="fc" id="L340">        List&lt;Expr&gt; sourceChildren = children(source);</span>
-<span class="fc" id="L341">        List&lt;Expr&gt; candidateChildren = children(candidate);</span>
-<span class="fc" id="L342">        int selected = path.childIndexes().get(pathIndex);</span>
-<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        if (selected &gt;= sourceChildren.size()) {</span>
-<span class="nc" id="L344">            return false;</span>
+<span class="fc" id="L343">        List&lt;Expr&gt; sourceChildren = children(source);</span>
+<span class="fc" id="L344">        List&lt;Expr&gt; candidateChildren = children(candidate);</span>
+<span class="fc" id="L345">        int selected = path.childIndexes().get(pathIndex);</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">        if (selected &gt;= sourceChildren.size()) {</span>
+<span class="nc" id="L347">            return false;</span>
         }
-<span class="fc bfc" id="L346" title="All 2 branches covered.">        for (int index = 0; index &lt; sourceChildren.size(); index++) {</span>
-<span class="fc bfc" id="L347" title="All 2 branches covered.">            if (index != selected</span>
-<span class="fc bfc" id="L348" title="All 2 branches covered.">                    &amp;&amp; !sourceChildren.get(index).equals(</span>
-<span class="fc" id="L349">                        candidateChildren.get(index))) {</span>
-<span class="fc" id="L350">                return false;</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        for (int index = 0; index &lt; sourceChildren.size(); index++) {</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">            if (index != selected</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">                    &amp;&amp; !sourceChildren.get(index).equals(</span>
+<span class="fc" id="L352">                        candidateChildren.get(index))) {</span>
+<span class="fc" id="L353">                return false;</span>
             }
         }
-<span class="fc" id="L353">        return sameContextOutsideOccurrence(</span>
-<span class="fc" id="L354">            sourceChildren.get(selected),</span>
-<span class="fc" id="L355">            candidateChildren.get(selected),</span>
+<span class="fc" id="L356">        return sameContextOutsideOccurrence(</span>
+<span class="fc" id="L357">            sourceChildren.get(selected),</span>
+<span class="fc" id="L358">            candidateChildren.get(selected),</span>
             path,
             pathIndex + 1
         );
@@ -362,33 +365,33 @@ public final class RepresentationCandidateAssessor {
         Expr source,
         Expr candidate
     ) {
-<span class="pc bpc" id="L365" title="2 of 4 branches missed.">        if (source instanceof BinaryExpr left</span>
-<span class="fc" id="L366">                &amp;&amp; candidate instanceof BinaryExpr right) {</span>
-<span class="pc bpc" id="L367" title="1 of 2 branches missed.">            return left.operator() == right.operator();</span>
+<span class="pc bpc" id="L368" title="2 of 4 branches missed.">        if (source instanceof BinaryExpr left</span>
+<span class="fc" id="L369">                &amp;&amp; candidate instanceof BinaryExpr right) {</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">            return left.operator() == right.operator();</span>
         }
-<span class="nc bnc" id="L369" title="All 4 branches missed.">        if (source instanceof FunctionExpr left</span>
-<span class="nc" id="L370">                &amp;&amp; candidate instanceof FunctionExpr right) {</span>
-<span class="nc bnc" id="L371" title="All 2 branches missed.">            return left.name().equals(right.name())</span>
-<span class="nc bnc" id="L372" title="All 2 branches missed.">                &amp;&amp; left.arguments().size() == right.arguments().size();</span>
+<span class="nc bnc" id="L372" title="All 4 branches missed.">        if (source instanceof FunctionExpr left</span>
+<span class="nc" id="L373">                &amp;&amp; candidate instanceof FunctionExpr right) {</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">            return left.name().equals(right.name())</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">                &amp;&amp; left.arguments().size() == right.arguments().size();</span>
         }
-<span class="nc" id="L374">        return false;</span>
+<span class="nc" id="L377">        return false;</span>
     }
 
     private static List&lt;Expr&gt; children(Expr expression) {
-<span class="pc bpc" id="L378" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L379">            return List.of(binary.left(), binary.right());</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L382">            return List.of(binary.left(), binary.right());</span>
         }
-<span class="nc bnc" id="L381" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
-<span class="nc" id="L382">            return function.arguments();</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L385">            return function.arguments();</span>
         }
-<span class="nc" id="L384">        return List.of();</span>
+<span class="nc" id="L387">        return List.of();</span>
     }
 
     private static IllegalArgumentException invalidPath(
         ExpressionOccurrencePath path,
         int childIndex
     ) {
-<span class="nc" id="L391">        return new IllegalArgumentException(</span>
+<span class="nc" id="L394">        return new IllegalArgumentException(</span>
             &quot;invalid child &quot; + childIndex + &quot; in occurrence path &quot; + path);
     }
 }
