@@ -242,14 +242,17 @@ public final class SymPyKnowledgeBridgeScenario {
     }
 
     private static Transformation generate(List<RewriteRule> rules) {
-        return new AstRewriteTransformationEngine(rules)
-            .transform(SOURCE_EXPRESSION).stream()
+        List<Transformation> generated = new AstRewriteTransformationEngine(
+            rules
+        ).transform(SOURCE_EXPRESSION).stream()
             .filter(result -> result.rule().equals(FORMATION_RULE_ID))
-            .filter(result -> result.transformedExpression().equals(
-                CANDIDATE_EXPRESSION))
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException(
-                "production AST engine did not generate the candidate"));
+            .toList();
+        requireEqual(1, generated.size(),
+            "formation rule must produce exactly one candidate");
+        Transformation candidate = generated.getFirst();
+        requireEqual(CANDIDATE_EXPRESSION, candidate.transformedExpression(),
+            "formation rule produced an unexpected candidate");
+        return candidate;
     }
 
     private static RepresentationCandidateProposal proposal(
@@ -517,6 +520,15 @@ public final class SymPyKnowledgeBridgeScenario {
         ScenarioContent content,
         String contentHash
     ) {
+        public ScenarioArtifact {
+            content = Objects.requireNonNull(content, "content");
+            String expected = KnownStructureCatalog.sha256(json(content));
+            if (!expected.equals(contentHash)) {
+                throw new IllegalArgumentException(
+                    "scenario contentHash mismatch");
+            }
+        }
+
         public String toCanonicalJson() {
             return json(this);
         }
