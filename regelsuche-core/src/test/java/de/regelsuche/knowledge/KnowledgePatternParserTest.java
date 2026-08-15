@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RecognitionProfile;
 import org.junit.jupiter.api.Test;
 
 final class KnowledgePatternParserTest {
@@ -59,10 +60,33 @@ final class KnowledgePatternParserTest {
                 "sympy.trig.pythagorean"))
             .findFirst()
             .orElseThrow();
-        var expression = new ExpressionParser().parseTerm(
-            "sin(x)^2 + cos(x)^2");
 
-        assertTrue(rule.matches(expression));
-        assertEquals("1", ExpressionFormatter.format(rule.apply(expression)));
+        assertEquals(
+            RecognitionProfile.arithmeticAc(),
+            rule.recognitionProfile()
+        );
+        for (String input : new String[] {
+            "sin(x)^2 + cos(x)^2",
+            "cos(x)^2 + sin(x)^2"
+        }) {
+            var expression = new ExpressionParser().parseTerm(input);
+            assertTrue(rule.matches(expression), input);
+            assertEquals(
+                "1",
+                ExpressionFormatter.format(rule.apply(expression)),
+                input
+            );
+        }
+    }
+
+    @Test
+    void rulesWithoutDeclaredRecognitionRemainExact() {
+        var rule = new KnowledgePackLoader().loadClasspathPacks().stream()
+            .flatMap(pack -> pack.rules().stream())
+            .filter(candidate -> candidate.id().equals("sympy.log.one"))
+            .findFirst()
+            .orElseThrow();
+
+        assertEquals(RecognitionProfile.exact(), rule.recognitionProfile());
     }
 }
