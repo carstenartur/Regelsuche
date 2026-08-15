@@ -63,16 +63,18 @@ public record RepresentationCandidateAssessment(
         &quot;KNOWN_FORM_WITHOUT_NEW_CAPABILITY&quot;;
     public static final String WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS =
         &quot;UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS&quot;;
+    public static final String WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM =
+        &quot;KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM&quot;;
     public static final String WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION =
         &quot;VALIDATION_BELOW_SYMBOLIC_CONFIRMATION&quot;;
 
-<span class="fc" id="L69">    private static final Set&lt;String&gt; COMPRESSION_STATUSES = Set.of(</span>
+<span class="fc" id="L71">    private static final Set&lt;String&gt; COMPRESSION_STATUSES = Set.of(</span>
         COMPRESSION_MATERIAL_MULTI_DIMENSIONAL,
         COMPRESSION_NON_MATERIAL,
         COMPRESSION_BLOCKED_BY_INTRODUCED_SYMBOLS,
         COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION
     );
-<span class="fc" id="L75">    private static final Set&lt;String&gt; CANDIDATE_TYPES = Set.of(</span>
+<span class="fc" id="L77">    private static final Set&lt;String&gt; CANDIDATE_TYPES = Set.of(</span>
         TYPE_WHOLE_EXPRESSION_COMPRESSION,
         TYPE_SUBEXPRESSION_COMPRESSION,
         TYPE_KNOWN_WHOLE_FORM_BRIDGE,
@@ -82,56 +84,57 @@ public record RepresentationCandidateAssessment(
         TYPE_REUSABLE_PARAMETRIC_BRIDGE,
         TYPE_NO_MATERIAL_REPRESENTATION_GAIN
     );
-<span class="fc" id="L85">    private static final Set&lt;String&gt; WARNINGS = Set.of(</span>
+<span class="fc" id="L87">    private static final Set&lt;String&gt; WARNINGS = Set.of(</span>
         WARNING_INTRODUCED_VARIABLE_SYMBOLS,
         WARNING_INTRODUCED_FUNCTION_SYMBOLS,
         WARNING_STRUCTURAL_COMPRESSION_REGRESSION,
         WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY,
         WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS,
+        WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM,
         WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION
     );
 
-<span class="fc" id="L94">    public RepresentationCandidateAssessment {</span>
-<span class="fc" id="L95">        proposal = Objects.requireNonNull(proposal, &quot;proposal&quot;);</span>
-<span class="fc" id="L96">        knownStructureCatalogHash = requireText(</span>
+<span class="fc" id="L97">    public RepresentationCandidateAssessment {</span>
+<span class="fc" id="L98">        proposal = Objects.requireNonNull(proposal, &quot;proposal&quot;);</span>
+<span class="fc" id="L99">        knownStructureCatalogHash = requireText(</span>
             knownStructureCatalogHash, &quot;knownStructureCatalogHash&quot;);
-<span class="fc" id="L98">        wholeSourceMetrics = Objects.requireNonNull(</span>
+<span class="fc" id="L101">        wholeSourceMetrics = Objects.requireNonNull(</span>
             wholeSourceMetrics, &quot;wholeSourceMetrics&quot;);
-<span class="fc" id="L100">        wholeCandidateMetrics = Objects.requireNonNull(</span>
+<span class="fc" id="L103">        wholeCandidateMetrics = Objects.requireNonNull(</span>
             wholeCandidateMetrics, &quot;wholeCandidateMetrics&quot;);
-<span class="fc" id="L102">        scopedSourceMetrics = Objects.requireNonNull(</span>
+<span class="fc" id="L105">        scopedSourceMetrics = Objects.requireNonNull(</span>
             scopedSourceMetrics, &quot;scopedSourceMetrics&quot;);
-<span class="fc" id="L104">        scopedCandidateMetrics = Objects.requireNonNull(</span>
+<span class="fc" id="L107">        scopedCandidateMetrics = Objects.requireNonNull(</span>
             scopedCandidateMetrics, &quot;scopedCandidateMetrics&quot;);
-<span class="fc" id="L106">        wholeCompressionDelta = Objects.requireNonNull(</span>
+<span class="fc" id="L109">        wholeCompressionDelta = Objects.requireNonNull(</span>
             wholeCompressionDelta, &quot;wholeCompressionDelta&quot;);
-<span class="fc" id="L108">        scopedCompressionDelta = Objects.requireNonNull(</span>
+<span class="fc" id="L111">        scopedCompressionDelta = Objects.requireNonNull(</span>
             scopedCompressionDelta, &quot;scopedCompressionDelta&quot;);
-<span class="fc" id="L110">        compressionStatus = vocabulary(</span>
+<span class="fc" id="L113">        compressionStatus = vocabulary(</span>
             compressionStatus, COMPRESSION_STATUSES, &quot;compressionStatus&quot;);
-<span class="fc" id="L112">        sourceStructureMatches = immutable(</span>
+<span class="fc" id="L115">        sourceStructureMatches = immutable(</span>
             sourceStructureMatches, &quot;sourceStructureMatches&quot;);
-<span class="fc" id="L114">        candidateStructureMatches = immutable(</span>
+<span class="fc" id="L117">        candidateStructureMatches = immutable(</span>
             candidateStructureMatches, &quot;candidateStructureMatches&quot;);
-<span class="fc" id="L116">        newlyExposedStructureMatches = immutable(</span>
+<span class="fc" id="L119">        newlyExposedStructureMatches = immutable(</span>
             newlyExposedStructureMatches, &quot;newlyExposedStructureMatches&quot;);
-<span class="fc" id="L118">        newlyUnlockedConsequences = immutable(</span>
+<span class="fc" id="L121">        newlyUnlockedConsequences = immutable(</span>
             newlyUnlockedConsequences, &quot;newlyUnlockedConsequences&quot;);
-<span class="fc" id="L120">        candidateTypes = vocabulary(</span>
+<span class="fc" id="L123">        candidateTypes = vocabulary(</span>
             candidateTypes, CANDIDATE_TYPES, &quot;candidateTypes&quot;, false);
-<span class="fc" id="L122">        introducedVariableSymbols = immutable(</span>
+<span class="fc" id="L125">        introducedVariableSymbols = immutable(</span>
             introducedVariableSymbols, &quot;introducedVariableSymbols&quot;);
-<span class="fc" id="L124">        introducedFunctionSymbols = immutable(</span>
+<span class="fc" id="L127">        introducedFunctionSymbols = immutable(</span>
             introducedFunctionSymbols, &quot;introducedFunctionSymbols&quot;);
-<span class="fc" id="L126">        warnings = vocabulary(warnings, WARNINGS, &quot;warnings&quot;, true);</span>
-<span class="pc bpc" id="L127" title="1 of 4 branches missed.">        if (claimEligible &amp;&amp; !materialRepresentationGain) {</span>
-<span class="nc" id="L128">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L129">        warnings = vocabulary(warnings, WARNINGS, &quot;warnings&quot;, true);</span>
+<span class="pc bpc" id="L130" title="1 of 4 branches missed.">        if (claimEligible &amp;&amp; !materialRepresentationGain) {</span>
+<span class="nc" id="L131">            throw new IllegalArgumentException(</span>
                 &quot;claim eligibility requires material representation gain&quot;);
         }
-<span class="fc" id="L131">    }</span>
+<span class="fc" id="L134">    }</span>
 
     private static &lt;T&gt; List&lt;T&gt; immutable(List&lt;T&gt; values, String field) {
-<span class="fc" id="L134">        return List.copyOf(Objects.requireNonNull(values, field));</span>
+<span class="fc" id="L137">        return List.copyOf(Objects.requireNonNull(values, field));</span>
     }
 
     private static String vocabulary(
@@ -139,11 +142,12 @@ public record RepresentationCandidateAssessment(
         Set&lt;String&gt; allowed,
         String field
     ) {
-<span class="fc" id="L142">        String normalized = requireText(value, field);</span>
-<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (!allowed.contains(normalized)) {</span>
-<span class="nc" id="L144">            throw new IllegalArgumentException(&quot;unsupported &quot; + field + &quot;: &quot; + value);</span>
+<span class="fc" id="L145">        String normalized = requireText(value, field);</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (!allowed.contains(normalized)) {</span>
+<span class="nc" id="L147">            throw new IllegalArgumentException(</span>
+                &quot;unsupported &quot; + field + &quot;: &quot; + value);
         }
-<span class="fc" id="L146">        return normalized;</span>
+<span class="fc" id="L150">        return normalized;</span>
     }
 
     private static List&lt;String&gt; vocabulary(
@@ -152,31 +156,33 @@ public record RepresentationCandidateAssessment(
         String field,
         boolean emptyAllowed
     ) {
-<span class="fc" id="L155">        List&lt;String&gt; copy = immutable(values, field);</span>
-<span class="pc bpc" id="L156" title="1 of 4 branches missed.">        if ((!emptyAllowed &amp;&amp; copy.isEmpty())</span>
-<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                || !allowed.containsAll(copy)</span>
-<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                || new HashSet&lt;&gt;(copy).size() != copy.size()) {</span>
-<span class="nc" id="L159">            throw new IllegalArgumentException(&quot;invalid &quot; + field + &quot;: &quot; + copy);</span>
+<span class="fc" id="L159">        List&lt;String&gt; copy = immutable(values, field);</span>
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">        if ((!emptyAllowed &amp;&amp; copy.isEmpty())</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                || !allowed.containsAll(copy)</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">                || new HashSet&lt;&gt;(copy).size() != copy.size()) {</span>
+<span class="nc" id="L163">            throw new IllegalArgumentException(</span>
+                &quot;invalid &quot; + field + &quot;: &quot; + copy);
         }
-<span class="fc" id="L161">        return copy;</span>
+<span class="fc" id="L166">        return copy;</span>
     }
 
     static List&lt;String&gt; sortedUnique(List&lt;String&gt; values, String field) {
-<span class="fc" id="L165">        Objects.requireNonNull(values, field);</span>
-<span class="fc" id="L166">        TreeSet&lt;String&gt; normalized = new TreeSet&lt;&gt;();</span>
-<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (String value : values) {</span>
-<span class="fc" id="L168">            normalized.add(requireText(value, field + &quot; entry&quot;));</span>
-<span class="fc" id="L169">        }</span>
-<span class="fc" id="L170">        return List.copyOf(normalized);</span>
+<span class="fc" id="L170">        Objects.requireNonNull(values, field);</span>
+<span class="fc" id="L171">        TreeSet&lt;String&gt; normalized = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L173">            normalized.add(requireText(value, field + &quot; entry&quot;));</span>
+<span class="fc" id="L174">        }</span>
+<span class="fc" id="L175">        return List.copyOf(normalized);</span>
     }
 
     static String requireText(String value, String field) {
-<span class="fc" id="L174">        Objects.requireNonNull(value, field);</span>
-<span class="fc" id="L175">        String normalized = value.trim();</span>
-<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (normalized.isEmpty()) {</span>
-<span class="nc" id="L177">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+<span class="fc" id="L179">        Objects.requireNonNull(value, field);</span>
+<span class="fc" id="L180">        String normalized = value.trim();</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (normalized.isEmpty()) {</span>
+<span class="nc" id="L182">            throw new IllegalArgumentException(</span>
+                field + &quot; must not be blank&quot;);
         }
-<span class="fc" id="L179">        return normalized;</span>
+<span class="fc" id="L185">        return normalized;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

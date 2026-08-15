@@ -149,40 +149,41 @@ public final class KnownStructureMatcher {
 <span class="fc" id="L149">                    structure.requiredAssumptions(),</span>
 <span class="fc" id="L150">                    structure.consequenceIds(),</span>
 <span class="fc" id="L151">                    structure.provenance(),</span>
-<span class="fc" id="L152">                    recognitionMode(result.recognitionStrength()),</span>
-<span class="fc" id="L153">                    ExpressionFormatter.format(result.representative()),</span>
-<span class="fc" id="L154">                    result.representativeIndex()</span>
+<span class="fc" id="L152">                    structure.metadata(),</span>
+<span class="fc" id="L153">                    recognitionMode(result.recognitionStrength()),</span>
+<span class="fc" id="L154">                    ExpressionFormatter.format(result.representative()),</span>
+<span class="fc" id="L155">                    result.representativeIndex()</span>
                 );
-<span class="fc" id="L156">                matches.putIfAbsent(match.identity(), match);</span>
-<span class="fc" id="L157">            }</span>
-<span class="fc" id="L158">        }</span>
+<span class="fc" id="L157">                matches.putIfAbsent(match.identity(), match);</span>
+<span class="fc" id="L158">            }</span>
+<span class="fc" id="L159">        }</span>
 
-<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L161">            collect(binary.left(), path.append(0), matches, diagnostics);</span>
-<span class="fc" id="L162">            collect(binary.right(), path.append(1), matches, diagnostics);</span>
-<span class="fc bfc" id="L163" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
-<span class="fc" id="L164">            for (int index = 0;</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">                    index &lt; function.arguments().size();</span>
-<span class="fc" id="L166">                    index++) {</span>
-<span class="fc" id="L167">                collect(</span>
-<span class="fc" id="L168">                    function.arguments().get(index),</span>
-<span class="fc" id="L169">                    path.append(index),</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L162">            collect(binary.left(), path.append(0), matches, diagnostics);</span>
+<span class="fc" id="L163">            collect(binary.right(), path.append(1), matches, diagnostics);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L165">            for (int index = 0;</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                    index &lt; function.arguments().size();</span>
+<span class="fc" id="L167">                    index++) {</span>
+<span class="fc" id="L168">                collect(</span>
+<span class="fc" id="L169">                    function.arguments().get(index),</span>
+<span class="fc" id="L170">                    path.append(index),</span>
                     matches,
                     diagnostics
                 );
             }
         }
-<span class="fc" id="L175">    }</span>
+<span class="fc" id="L176">    }</span>
 
     private static String recognitionMode(
         ExprMatcher.RecognitionStrength strength
     ) {
-<span class="fc bfc" id="L180" title="All 3 branches covered.">        return switch (strength) {</span>
-<span class="fc" id="L181">            case EXACT -&gt; KnownStructureMatch.RECOGNITION_EXACT;</span>
+<span class="fc bfc" id="L181" title="All 3 branches covered.">        return switch (strength) {</span>
+<span class="fc" id="L182">            case EXACT -&gt; KnownStructureMatch.RECOGNITION_EXACT;</span>
             case EQUIVALENCE_AWARE -&gt;
-<span class="fc" id="L183">                KnownStructureMatch.RECOGNITION_EQUIVALENCE_AWARE;</span>
+<span class="fc" id="L184">                KnownStructureMatch.RECOGNITION_EQUIVALENCE_AWARE;</span>
             case BOUNDED_REPRESENTATIVE -&gt;
-<span class="fc" id="L185">                KnownStructureMatch.RECOGNITION_BOUNDED_REPRESENTATIVE;</span>
+<span class="fc" id="L186">                KnownStructureMatch.RECOGNITION_BOUNDED_REPRESENTATIVE;</span>
         };
     }
 
@@ -190,14 +191,14 @@ public final class KnownStructureMatcher {
         List&lt;KnownStructureMatch&gt; matches,
         List&lt;RecognitionDiagnostic&gt; diagnostics
     ) {
-<span class="fc" id="L193">        public ScanResult {</span>
-<span class="fc" id="L194">            matches = List.copyOf(Objects.requireNonNull(matches, &quot;matches&quot;));</span>
-<span class="fc" id="L195">            diagnostics = List.copyOf(</span>
-<span class="fc" id="L196">                Objects.requireNonNull(diagnostics, &quot;diagnostics&quot;));</span>
-<span class="fc" id="L197">        }</span>
+<span class="fc" id="L194">        public ScanResult {</span>
+<span class="fc" id="L195">            matches = List.copyOf(Objects.requireNonNull(matches, &quot;matches&quot;));</span>
+<span class="fc" id="L196">            diagnostics = List.copyOf(</span>
+<span class="fc" id="L197">                Objects.requireNonNull(diagnostics, &quot;diagnostics&quot;));</span>
+<span class="fc" id="L198">        }</span>
 
         public boolean complete() {
-<span class="fc" id="L200">            return diagnostics.isEmpty();</span>
+<span class="fc" id="L201">            return diagnostics.isEmpty();</span>
         }
     }
 
@@ -207,19 +208,19 @@ public final class KnownStructureMatcher {
         String code,
         String matcherDescriptor
     ) {
-<span class="fc" id="L210">        public RecognitionDiagnostic {</span>
-<span class="fc" id="L211">            structureId = RepresentationCandidateAssessment.requireText(</span>
+<span class="fc" id="L211">        public RecognitionDiagnostic {</span>
+<span class="fc" id="L212">            structureId = RepresentationCandidateAssessment.requireText(</span>
                 structureId, &quot;structureId&quot;);
-<span class="fc" id="L213">            occurrencePath = Objects.requireNonNull(</span>
+<span class="fc" id="L214">            occurrencePath = Objects.requireNonNull(</span>
                 occurrencePath, &quot;occurrencePath&quot;);
-<span class="fc" id="L215">            code = RepresentationCandidateAssessment.requireText(</span>
+<span class="fc" id="L216">            code = RepresentationCandidateAssessment.requireText(</span>
                 code, &quot;code&quot;);
-<span class="fc" id="L217">            matcherDescriptor =</span>
-<span class="fc" id="L218">                RepresentationCandidateAssessment.requireText(</span>
+<span class="fc" id="L218">            matcherDescriptor =</span>
+<span class="fc" id="L219">                RepresentationCandidateAssessment.requireText(</span>
                     matcherDescriptor,
                     &quot;matcherDescriptor&quot;
                 );
-<span class="fc" id="L222">        }</span>
+<span class="fc" id="L223">        }</span>
     }
 
     public static final class IncompleteRecognitionException
@@ -229,13 +230,13 @@ public final class KnownStructureMatcher {
         private IncompleteRecognitionException(
             List&lt;RecognitionDiagnostic&gt; diagnostics
         ) {
-<span class="fc" id="L232">            super(&quot;known-structure recognition was inconclusive: &quot;</span>
+<span class="fc" id="L233">            super(&quot;known-structure recognition was inconclusive: &quot;</span>
                 + diagnostics);
-<span class="fc" id="L234">            this.diagnostics = List.copyOf(diagnostics);</span>
-<span class="fc" id="L235">        }</span>
+<span class="fc" id="L235">            this.diagnostics = List.copyOf(diagnostics);</span>
+<span class="fc" id="L236">        }</span>
 
         public List&lt;RecognitionDiagnostic&gt; diagnostics() {
-<span class="nc" id="L238">            return diagnostics;</span>
+<span class="nc" id="L239">            return diagnostics;</span>
         }
     }
 }

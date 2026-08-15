@@ -16,6 +16,35 @@ Nur Regeln mit freigegebenem Status wie `VALIDATED` oder `REVIEWED` dürfen
 registriert werden. Kandidaten bleiben deaktiviert, bis die Review- und
 Validierungsanforderungen erfüllt sind.
 
+## Provenienzgebundene bekannte Strukturen
+
+Ein Knowledge Pack kann zusätzlich bekannte mathematische Strukturen für die
+Repräsentationsanalyse deklarieren. Diese Einträge verwenden den vorhandenen
+`ExprMatcher` und enthalten mindestens:
+
+- eine stabile Struktur-ID und Domäne;
+- ein explizites Erkennungsprofil;
+- erforderliche Annahmen und konkrete Folgefähigkeiten;
+- Quelle, Lizenz, unveränderliche Revision und Übersetzungshinweise;
+- eine minimale unabhängige Evidenzstufe.
+
+Eine erkannte Form ist Klassifikation, kein Beweis. Eine Folgefähigkeit wird erst
+freigeschaltet, wenn die Kandidatenvalidierung die deklarierte Evidenzschwelle
+erreicht. Provenienz und Evidenzpolitik gehen in die content-addressed
+Katalogidentität ein.
+
+Der erste Slice aus SymPys trigonometrischem `fu`-Wissen ist auf SymPy 1.14.0,
+Commit `fe935ceb303891d1f8bea4c03b19fd9ec9464b02`, festgelegt. Er ist
+experimentell und standardmäßig deaktiviert. Regelsuche übernimmt weder die
+Python-Laufzeit noch SymPys globales `simplify()` oder dessen interne
+Ausdrucksrepräsentation.
+
+Für Experimente bleiben drei Informationsregime getrennt:
+
+- katalogblinde Discovery aktiviert den Pack erst nach Candidate Formation;
+- katalogsichtbare Navigation aktiviert ihn ausdrücklich vor der Suche;
+- Rediscovery-Holdouts verbergen Struktur und direkte Regel gemeinsam.
+
 Knowledge Packs sind nicht identisch mit:
 
 - externen Java-Plugins, die Code über `ServiceLoader` laden,

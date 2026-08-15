@@ -13,6 +13,7 @@ import static de.regelsuche.discovery.representation.RepresentationCandidateAsse
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_INTRODUCED_FUNCTION_SYMBOLS;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_INTRODUCED_VARIABLE_SYMBOLS;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_STRUCTURAL_COMPRESSION_REGRESSION;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION;
@@ -20,6 +21,7 @@ import static de.regelsuche.discovery.representation.RepresentationCandidateAsse
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.knowledge.KnowledgePack.KnownStructureEvidence;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.util.Comparator;
@@ -33,67 +35,73 @@ import java.util.TreeSet;
 public final class RepresentationCandidateAssessor {
     private static final int MINIMUM_IMPROVED_DIMENSIONS = 2;
 
-<span class="fc" id="L36">    private final ExpressionParser parser = new ExpressionParser();</span>
-<span class="fc" id="L37">    private final SemanticDescriptionMeasurer measurer =</span>
+<span class="fc" id="L38">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L39">    private final SemanticDescriptionMeasurer measurer =</span>
         new SemanticDescriptionMeasurer();
     private final KnownStructureMatcher matcher;
 
-<span class="fc" id="L41">    public RepresentationCandidateAssessor(KnownStructureCatalog catalog) {</span>
-<span class="fc" id="L42">        matcher = new KnownStructureMatcher(catalog);</span>
-<span class="fc" id="L43">    }</span>
+<span class="fc" id="L43">    public RepresentationCandidateAssessor(KnownStructureCatalog catalog) {</span>
+<span class="fc" id="L44">        matcher = new KnownStructureMatcher(catalog);</span>
+<span class="fc" id="L45">    }</span>
 
     public RepresentationCandidateAssessment assess(
         RepresentationCandidateProposal proposal
     ) {
-<span class="fc" id="L48">        Objects.requireNonNull(proposal, &quot;proposal&quot;);</span>
-<span class="fc" id="L49">        Expr sourceRoot = parser.parseTerm(proposal.sourceExpression());</span>
-<span class="fc" id="L50">        Expr candidateRoot = parser.parseTerm(proposal.candidateExpression());</span>
-<span class="fc" id="L51">        boolean wholeExpression = proposal.wholeExpression();</span>
+<span class="fc" id="L50">        Objects.requireNonNull(proposal, &quot;proposal&quot;);</span>
+<span class="fc" id="L51">        Expr sourceRoot = parser.parseTerm(proposal.sourceExpression());</span>
+<span class="fc" id="L52">        Expr candidateRoot = parser.parseTerm(proposal.candidateExpression());</span>
+<span class="fc" id="L53">        boolean wholeExpression = proposal.wholeExpression();</span>
 
-<span class="fc bfc" id="L53" title="All 4 branches covered.">        if (!wholeExpression &amp;&amp; !sameContextOutsideOccurrence(</span>
-<span class="fc" id="L54">                sourceRoot, candidateRoot, proposal.occurrencePath(), 0)) {</span>
-<span class="fc" id="L55">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L55" title="All 4 branches covered.">        if (!wholeExpression &amp;&amp; !sameContextOutsideOccurrence(</span>
+<span class="fc" id="L56">                sourceRoot, candidateRoot, proposal.occurrencePath(), 0)) {</span>
+<span class="fc" id="L57">            throw new IllegalArgumentException(</span>
                 &quot;source and candidate differ outside occurrence &quot;
-<span class="fc" id="L57">                    + proposal.occurrencePath());</span>
+<span class="fc" id="L59">                    + proposal.occurrencePath());</span>
         }
 
-<span class="fc" id="L60">        SemanticDescriptionMetrics wholeSource = measurer.measure(sourceRoot);</span>
-<span class="fc" id="L61">        SemanticDescriptionMetrics wholeCandidate = measurer.measure(candidateRoot);</span>
-<span class="fc bfc" id="L62" title="All 2 branches covered.">        SemanticDescriptionMetrics scopedSource = wholeExpression</span>
-<span class="fc" id="L63">            ? wholeSource</span>
-<span class="fc" id="L64">            : measurer.measure(resolve(sourceRoot, proposal.occurrencePath()));</span>
-<span class="fc bfc" id="L65" title="All 2 branches covered.">        SemanticDescriptionMetrics scopedCandidate = wholeExpression</span>
-<span class="fc" id="L66">            ? wholeCandidate</span>
-<span class="fc" id="L67">            : measurer.measure(resolve(candidateRoot, proposal.occurrencePath()));</span>
-<span class="fc" id="L68">        SemanticCompressionDelta wholeDelta =</span>
-<span class="fc" id="L69">            SemanticCompressionDelta.between(wholeSource, wholeCandidate);</span>
-<span class="fc" id="L70">        SemanticCompressionDelta scopedDelta =</span>
-<span class="fc" id="L71">            SemanticCompressionDelta.between(scopedSource, scopedCandidate);</span>
+<span class="fc" id="L62">        SemanticDescriptionMetrics wholeSource = measurer.measure(sourceRoot);</span>
+<span class="fc" id="L63">        SemanticDescriptionMetrics wholeCandidate = measurer.measure(</span>
+            candidateRoot);
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        SemanticDescriptionMetrics scopedSource = wholeExpression</span>
+<span class="fc" id="L66">            ? wholeSource</span>
+<span class="fc" id="L67">            : measurer.measure(resolve(sourceRoot, proposal.occurrencePath()));</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        SemanticDescriptionMetrics scopedCandidate = wholeExpression</span>
+<span class="fc" id="L69">            ? wholeCandidate</span>
+<span class="fc" id="L70">            : measurer.measure(resolve(</span>
+<span class="fc" id="L71">                candidateRoot, proposal.occurrencePath()));</span>
+<span class="fc" id="L72">        SemanticCompressionDelta wholeDelta =</span>
+<span class="fc" id="L73">            SemanticCompressionDelta.between(wholeSource, wholeCandidate);</span>
+<span class="fc" id="L74">        SemanticCompressionDelta scopedDelta =</span>
+<span class="fc" id="L75">            SemanticCompressionDelta.between(scopedSource, scopedCandidate);</span>
 
-<span class="fc" id="L73">        List&lt;String&gt; introducedVariables = difference(</span>
-<span class="fc" id="L74">            wholeCandidate.variableSymbols(), wholeSource.variableSymbols());</span>
-<span class="fc" id="L75">        List&lt;String&gt; introducedFunctions = difference(</span>
-<span class="fc" id="L76">            wholeCandidate.functionSymbols(), wholeSource.functionSymbols());</span>
-<span class="fc" id="L77">        String compressionStatus = compressionStatus(</span>
+<span class="fc" id="L77">        List&lt;String&gt; introducedVariables = difference(</span>
+<span class="fc" id="L78">            wholeCandidate.variableSymbols(), wholeSource.variableSymbols());</span>
+<span class="fc" id="L79">        List&lt;String&gt; introducedFunctions = difference(</span>
+<span class="fc" id="L80">            wholeCandidate.functionSymbols(), wholeSource.functionSymbols());</span>
+<span class="fc" id="L81">        String compressionStatus = compressionStatus(</span>
             scopedDelta, wholeDelta, introducedVariables, introducedFunctions);
-<span class="fc" id="L79">        boolean materialCompression =</span>
-<span class="fc" id="L80">            COMPRESSION_MATERIAL_MULTI_DIMENSIONAL.equals(compressionStatus);</span>
+<span class="fc" id="L83">        boolean materialCompression =</span>
+<span class="fc" id="L84">            COMPRESSION_MATERIAL_MULTI_DIMENSIONAL.equals(compressionStatus);</span>
 
-<span class="fc" id="L82">        List&lt;KnownStructureMatch&gt; sourceMatches = matcher.match(sourceRoot);</span>
-<span class="fc" id="L83">        List&lt;KnownStructureMatch&gt; candidateMatches = matcher.match(candidateRoot);</span>
-<span class="fc" id="L84">        List&lt;KnownStructureMatch&gt; newMatches = newlyExposed(</span>
+<span class="fc" id="L86">        List&lt;KnownStructureMatch&gt; sourceMatches = matcher.match(sourceRoot);</span>
+<span class="fc" id="L87">        List&lt;KnownStructureMatch&gt; candidateMatches = matcher.match(candidateRoot);</span>
+<span class="fc" id="L88">        List&lt;KnownStructureMatch&gt; newMatches = newlyExposed(</span>
             sourceMatches, candidateMatches);
-<span class="fc" id="L86">        List&lt;KnownStructureConsequenceUnlock&gt; unlocks = unlocks(</span>
-<span class="fc" id="L87">            sourceMatches, newMatches, proposal.assumptions());</span>
-<span class="fc" id="L88">        List&lt;String&gt; types = candidateTypes(</span>
+<span class="fc" id="L90">        List&lt;KnownStructureConsequenceUnlock&gt; unlocks = unlocks(</span>
+            sourceMatches,
+            newMatches,
+<span class="fc" id="L93">            proposal.assumptions(),</span>
+<span class="fc" id="L94">            proposal.validationStatus()</span>
+        );
+<span class="fc" id="L96">        List&lt;String&gt; types = candidateTypes(</span>
             wholeExpression, materialCompression, newMatches, unlocks);
-<span class="fc bfc" id="L90" title="All 4 branches covered.">        boolean materialGain = materialCompression || !unlocks.isEmpty();</span>
-<span class="fc bfc" id="L91" title="All 4 branches covered.">        boolean claimEligible = materialGain &amp;&amp; proposal.validationStatus().atLeast(</span>
-            CandidateProofStatus.SYMBOLICALLY_VERIFIED);
+<span class="fc bfc" id="L98" title="All 4 branches covered.">        boolean materialGain = materialCompression || !unlocks.isEmpty();</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        boolean claimEligible = materialGain &amp;&amp; proposal.validationStatus()</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            .atLeast(CandidateProofStatus.SYMBOLICALLY_VERIFIED);</span>
 
-<span class="fc" id="L94">        return new RepresentationCandidateAssessment(</span>
+<span class="fc" id="L102">        return new RepresentationCandidateAssessment(</span>
             proposal,
-<span class="fc" id="L96">            matcher.catalogHash(),</span>
+<span class="fc" id="L104">            matcher.catalogHash(),</span>
             wholeSource,
             wholeCandidate,
             scopedSource,
@@ -108,7 +116,7 @@ public final class RepresentationCandidateAssessor {
             types,
             introducedVariables,
             introducedFunctions,
-<span class="fc" id="L111">            warnings(</span>
+<span class="fc" id="L119">            warnings(</span>
                 proposal,
                 compressionStatus,
                 introducedVariables,
@@ -127,15 +135,17 @@ public final class RepresentationCandidateAssessor {
         List&lt;String&gt; introducedVariables,
         List&lt;String&gt; introducedFunctions
     ) {
-<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (scoped.improvedDimensions().size() &lt; MINIMUM_IMPROVED_DIMENSIONS) {</span>
-<span class="fc" id="L131">            return COMPRESSION_NON_MATERIAL;</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (scoped.improvedDimensions().size()</span>
+                &lt; MINIMUM_IMPROVED_DIMENSIONS) {
+<span class="fc" id="L140">            return COMPRESSION_NON_MATERIAL;</span>
         }
-<span class="pc bpc" id="L133" title="1 of 4 branches missed.">        if (!introducedVariables.isEmpty() || !introducedFunctions.isEmpty()) {</span>
-<span class="fc" id="L134">            return COMPRESSION_BLOCKED_BY_INTRODUCED_SYMBOLS;</span>
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">        if (!introducedVariables.isEmpty() || !introducedFunctions.isEmpty()) {</span>
+<span class="fc" id="L143">            return COMPRESSION_BLOCKED_BY_INTRODUCED_SYMBOLS;</span>
         }
-<span class="pc bpc" id="L136" title="2 of 4 branches missed.">        return scoped.hasStructuralRegression() || whole.hasStructuralRegression()</span>
-<span class="nc" id="L137">            ? COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION</span>
-<span class="fc" id="L138">            : COMPRESSION_MATERIAL_MULTI_DIMENSIONAL;</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        return scoped.hasStructuralRegression()</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                || whole.hasStructuralRegression()</span>
+<span class="nc" id="L147">            ? COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION</span>
+<span class="fc" id="L148">            : COMPRESSION_MATERIAL_MULTI_DIMENSIONAL;</span>
     }
 
     private static List&lt;String&gt; candidateTypes(
@@ -144,84 +154,113 @@ public final class RepresentationCandidateAssessor {
         List&lt;KnownStructureMatch&gt; newMatches,
         List&lt;KnownStructureConsequenceUnlock&gt; unlocks
     ) {
-<span class="fc" id="L147">        TreeSet&lt;String&gt; types = new TreeSet&lt;&gt;();</span>
-<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (materialCompression) {</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">            types.add(wholeExpression</span>
-<span class="fc" id="L150">                ? TYPE_WHOLE_EXPRESSION_COMPRESSION</span>
-<span class="fc" id="L151">                : TYPE_SUBEXPRESSION_COMPRESSION);</span>
+<span class="fc" id="L157">        TreeSet&lt;String&gt; types = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (materialCompression) {</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            types.add(wholeExpression</span>
+<span class="fc" id="L160">                ? TYPE_WHOLE_EXPRESSION_COMPRESSION</span>
+<span class="fc" id="L161">                : TYPE_SUBEXPRESSION_COMPRESSION);</span>
         }
-<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (newMatches.stream().anyMatch(KnownStructureMatch::wholeExpression)) {</span>
-<span class="fc" id="L154">            types.add(TYPE_KNOWN_WHOLE_FORM_BRIDGE);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (newMatches.stream().anyMatch(</span>
+                KnownStructureMatch::wholeExpression)) {
+<span class="fc" id="L165">            types.add(TYPE_KNOWN_WHOLE_FORM_BRIDGE);</span>
         }
-<span class="fc bfc" id="L156" title="All 4 branches covered.">        if (newMatches.stream().anyMatch(match -&gt; !match.wholeExpression())) {</span>
-<span class="fc" id="L157">            types.add(TYPE_KNOWN_SUBFORM_BRIDGE);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (newMatches.stream().anyMatch(</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                match -&gt; !match.wholeExpression())) {</span>
+<span class="fc" id="L169">            types.add(TYPE_KNOWN_SUBFORM_BRIDGE);</span>
         }
-<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (!unlocks.isEmpty()) {</span>
-<span class="fc" id="L160">            types.add(TYPE_DOWNSTREAM_CAPABILITY_BRIDGE);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (!unlocks.isEmpty()) {</span>
+<span class="fc" id="L172">            types.add(TYPE_DOWNSTREAM_CAPABILITY_BRIDGE);</span>
         }
-<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (types.isEmpty()) {</span>
-<span class="fc" id="L163">            types.add(TYPE_NO_MATERIAL_REPRESENTATION_GAIN);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (types.isEmpty()) {</span>
+<span class="fc" id="L175">            types.add(TYPE_NO_MATERIAL_REPRESENTATION_GAIN);</span>
         }
-<span class="fc" id="L165">        return List.copyOf(types);</span>
+<span class="fc" id="L177">        return List.copyOf(types);</span>
     }
 
     private static List&lt;KnownStructureMatch&gt; newlyExposed(
         List&lt;KnownStructureMatch&gt; sourceMatches,
         List&lt;KnownStructureMatch&gt; candidateMatches
     ) {
-<span class="fc" id="L172">        Set&lt;String&gt; existing = new HashSet&lt;&gt;();</span>
-<span class="fc" id="L173">        sourceMatches.forEach(match -&gt; existing.add(match.identity()));</span>
-<span class="fc" id="L174">        return candidateMatches.stream()</span>
-<span class="fc bfc" id="L175" title="All 2 branches covered.">            .filter(match -&gt; !existing.contains(match.identity()))</span>
-<span class="fc" id="L176">            .sorted(Comparator</span>
-<span class="fc" id="L177">                .comparing(KnownStructureMatch::structureId)</span>
-<span class="fc" id="L178">                .thenComparing(KnownStructureMatch::occurrencePath)</span>
-<span class="fc" id="L179">                .thenComparing(KnownStructureMatch::identity))</span>
-<span class="fc" id="L180">            .toList();</span>
+<span class="fc" id="L184">        Set&lt;String&gt; existing = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L185">        sourceMatches.forEach(match -&gt; existing.add(match.identity()));</span>
+<span class="fc" id="L186">        return candidateMatches.stream()</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            .filter(match -&gt; !existing.contains(match.identity()))</span>
+<span class="fc" id="L188">            .sorted(Comparator</span>
+<span class="fc" id="L189">                .comparing(KnownStructureMatch::structureId)</span>
+<span class="fc" id="L190">                .thenComparing(KnownStructureMatch::occurrencePath)</span>
+<span class="fc" id="L191">                .thenComparing(KnownStructureMatch::identity))</span>
+<span class="fc" id="L192">            .toList();</span>
     }
 
     private static List&lt;KnownStructureConsequenceUnlock&gt; unlocks(
         List&lt;KnownStructureMatch&gt; sourceMatches,
         List&lt;KnownStructureMatch&gt; newMatches,
-        List&lt;String&gt; assumptions
+        List&lt;String&gt; assumptions,
+        CandidateProofStatus validationStatus
     ) {
-<span class="fc" id="L188">        Set&lt;String&gt; activeAssumptions = Set.copyOf(assumptions);</span>
-<span class="fc" id="L189">        Set&lt;String&gt; existing = new HashSet&lt;&gt;();</span>
-<span class="fc" id="L190">        sourceMatches.stream()</span>
-<span class="fc" id="L191">            .filter(match -&gt; assumptionsSatisfied(match, activeAssumptions))</span>
-<span class="fc" id="L192">            .forEach(match -&gt; match.consequenceIds().forEach(consequence -&gt;</span>
-<span class="fc" id="L193">                existing.add(opportunityIdentity(match, consequence))));</span>
+<span class="fc" id="L201">        Set&lt;String&gt; activeAssumptions = Set.copyOf(assumptions);</span>
+<span class="fc" id="L202">        Set&lt;String&gt; existing = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L203">        sourceMatches.stream()</span>
+<span class="fc" id="L204">            .filter(match -&gt; assumptionsSatisfied(match, activeAssumptions))</span>
+<span class="fc" id="L205">            .filter(match -&gt; evidenceSatisfied(match, validationStatus))</span>
+<span class="fc" id="L206">            .forEach(match -&gt; match.consequenceIds().forEach(consequence -&gt;</span>
+<span class="fc" id="L207">                existing.add(opportunityIdentity(match, consequence))));</span>
 
-<span class="fc" id="L195">        TreeSet&lt;KnownStructureConsequenceUnlock&gt; unlocks = new TreeSet&lt;&gt;();</span>
-<span class="fc" id="L196">        newMatches.stream()</span>
-<span class="fc" id="L197">            .filter(match -&gt; assumptionsSatisfied(match, activeAssumptions))</span>
-<span class="fc" id="L198">            .forEach(match -&gt; match.consequenceIds().forEach(consequence -&gt; {</span>
-<span class="fc" id="L199">                KnownStructureConsequenceUnlock unlock =</span>
+<span class="fc" id="L209">        TreeSet&lt;KnownStructureConsequenceUnlock&gt; unlocks = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L210">        newMatches.stream()</span>
+<span class="fc" id="L211">            .filter(match -&gt; assumptionsSatisfied(match, activeAssumptions))</span>
+<span class="fc" id="L212">            .filter(match -&gt; evidenceSatisfied(match, validationStatus))</span>
+<span class="fc" id="L213">            .forEach(match -&gt; match.consequenceIds().forEach(consequence -&gt; {</span>
+<span class="fc" id="L214">                KnownStructureConsequenceUnlock unlock =</span>
                     new KnownStructureConsequenceUnlock(
                         consequence,
-<span class="fc" id="L202">                        match.structureId(),</span>
-<span class="fc" id="L203">                        match.occurrencePath(),</span>
-<span class="fc" id="L204">                        match.identity()</span>
+<span class="fc" id="L217">                        match.structureId(),</span>
+<span class="fc" id="L218">                        match.occurrencePath(),</span>
+<span class="fc" id="L219">                        match.identity()</span>
                     );
-<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                if (!existing.contains(unlock.opportunityIdentity())) {</span>
-<span class="fc" id="L207">                    unlocks.add(unlock);</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                if (!existing.contains(unlock.opportunityIdentity())) {</span>
+<span class="fc" id="L222">                    unlocks.add(unlock);</span>
                 }
-<span class="fc" id="L209">            }));</span>
-<span class="fc" id="L210">        return List.copyOf(unlocks);</span>
+<span class="fc" id="L224">            }));</span>
+<span class="fc" id="L225">        return List.copyOf(unlocks);</span>
     }
 
     private static String opportunityIdentity(
         KnownStructureMatch match,
         String consequence
     ) {
-<span class="fc" id="L217">        return consequence + &quot;|&quot; + match.identity();</span>
+<span class="fc" id="L232">        return consequence + &quot;|&quot; + match.identity();</span>
     }
 
     private static boolean assumptionsSatisfied(
         KnownStructureMatch match,
         Set&lt;String&gt; activeAssumptions
     ) {
-<span class="fc" id="L224">        return activeAssumptions.containsAll(match.requiredAssumptions());</span>
+<span class="fc" id="L239">        return activeAssumptions.containsAll(match.requiredAssumptions());</span>
+    }
+
+    private static boolean evidenceSatisfied(
+        KnownStructureMatch match,
+        CandidateProofStatus validationStatus
+    ) {
+<span class="fc" id="L246">        return validationStatus.atLeast(requiredStatus(</span>
+<span class="fc" id="L247">            match.metadata().minimumEvidence()));</span>
+    }
+
+    private static CandidateProofStatus requiredStatus(
+        KnownStructureEvidence minimumEvidence
+    ) {
+<span class="pc bpc" id="L253" title="3 of 5 branches missed.">        return switch (minimumEvidence) {</span>
+<span class="fc" id="L254">            case OBSERVED -&gt; CandidateProofStatus.OBSERVED;</span>
+            case VALIDATED_BY_EXAMPLES -&gt;
+<span class="nc" id="L256">                CandidateProofStatus.VALIDATED_BY_EXAMPLES;</span>
+            case SYMBOLICALLY_VERIFIED -&gt;
+<span class="fc" id="L258">                CandidateProofStatus.SYMBOLICALLY_VERIFIED;</span>
+            case FORMALLY_PROVABLE -&gt;
+<span class="nc" id="L260">                CandidateProofStatus.FORMALLY_PROVABLE;</span>
+            case FORMALLY_PROVED -&gt;
+<span class="nc" id="L262">                CandidateProofStatus.FORMALLY_PROVED;</span>
+        };
     }
 
     private static List&lt;String&gt; warnings(
@@ -232,48 +271,58 @@ public final class RepresentationCandidateAssessor {
         List&lt;KnownStructureMatch&gt; newMatches,
         List&lt;KnownStructureConsequenceUnlock&gt; unlocks
     ) {
-<span class="fc" id="L235">        TreeSet&lt;String&gt; warnings = new TreeSet&lt;&gt;();</span>
-<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (!introducedVariables.isEmpty()) {</span>
-<span class="nc" id="L237">            warnings.add(WARNING_INTRODUCED_VARIABLE_SYMBOLS);</span>
+<span class="fc" id="L274">        TreeSet&lt;String&gt; warnings = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        if (!introducedVariables.isEmpty()) {</span>
+<span class="fc" id="L276">            warnings.add(WARNING_INTRODUCED_VARIABLE_SYMBOLS);</span>
         }
-<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (!introducedFunctions.isEmpty()) {</span>
-<span class="fc" id="L240">            warnings.add(WARNING_INTRODUCED_FUNCTION_SYMBOLS);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        if (!introducedFunctions.isEmpty()) {</span>
+<span class="fc" id="L279">            warnings.add(WARNING_INTRODUCED_FUNCTION_SYMBOLS);</span>
         }
-<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION.equals(</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION.equals(</span>
                 compressionStatus)) {
-<span class="nc" id="L244">            warnings.add(WARNING_STRUCTURAL_COMPRESSION_REGRESSION);</span>
+<span class="nc" id="L283">            warnings.add(WARNING_STRUCTURAL_COMPRESSION_REGRESSION);</span>
         }
-<span class="fc" id="L246">        Set&lt;String&gt; assumptions = Set.copyOf(proposal.assumptions());</span>
-<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (newMatches.stream().anyMatch(</span>
-<span class="fc bfc" id="L248" title="All 2 branches covered.">                match -&gt; !assumptionsSatisfied(match, assumptions))) {</span>
-<span class="fc" id="L249">            warnings.add(WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS);</span>
+<span class="fc" id="L285">        Set&lt;String&gt; assumptions = Set.copyOf(proposal.assumptions());</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        if (newMatches.stream().anyMatch(</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                match -&gt; !assumptionsSatisfied(match, assumptions))) {</span>
+<span class="fc" id="L288">            warnings.add(WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS);</span>
         }
-<span class="fc bfc" id="L251" title="All 4 branches covered.">        if (!newMatches.isEmpty() &amp;&amp; unlocks.isEmpty()) {</span>
-<span class="fc" id="L252">            warnings.add(WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY);</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        if (newMatches.stream().anyMatch(match -&gt;</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">                !evidenceSatisfied(match, proposal.validationStatus()))) {</span>
+<span class="fc" id="L292">            warnings.add(WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM);</span>
         }
-<span class="fc bfc" id="L254" title="All 2 branches covered.">        if (!proposal.validationStatus().atLeast(</span>
+<span class="fc bfc" id="L294" title="All 4 branches covered.">        if (!newMatches.isEmpty() &amp;&amp; unlocks.isEmpty()) {</span>
+<span class="fc" id="L295">            warnings.add(WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY);</span>
+        }
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (!proposal.validationStatus().atLeast(</span>
                 CandidateProofStatus.SYMBOLICALLY_VERIFIED)) {
-<span class="fc" id="L256">            warnings.add(WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION);</span>
+<span class="fc" id="L299">            warnings.add(WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION);</span>
         }
-<span class="fc" id="L258">        return List.copyOf(warnings);</span>
+<span class="fc" id="L301">        return List.copyOf(warnings);</span>
     }
 
-    private static List&lt;String&gt; difference(List&lt;String&gt; left, List&lt;String&gt; right) {
-<span class="fc" id="L262">        TreeSet&lt;String&gt; result = new TreeSet&lt;&gt;(left);</span>
-<span class="fc" id="L263">        result.removeAll(right);</span>
-<span class="fc" id="L264">        return List.copyOf(result);</span>
+    private static List&lt;String&gt; difference(
+        List&lt;String&gt; left,
+        List&lt;String&gt; right
+    ) {
+<span class="fc" id="L308">        TreeSet&lt;String&gt; result = new TreeSet&lt;&gt;(left);</span>
+<span class="fc" id="L309">        result.removeAll(right);</span>
+<span class="fc" id="L310">        return List.copyOf(result);</span>
     }
 
-    private static Expr resolve(Expr root, ExpressionOccurrencePath path) {
-<span class="fc" id="L268">        Expr current = root;</span>
-<span class="fc bfc" id="L269" title="All 2 branches covered.">        for (int childIndex : path.childIndexes()) {</span>
-<span class="fc" id="L270">            List&lt;Expr&gt; children = children(current);</span>
-<span class="pc bpc" id="L271" title="1 of 2 branches missed.">            if (childIndex &gt;= children.size()) {</span>
-<span class="nc" id="L272">                throw invalidPath(path, childIndex);</span>
+    private static Expr resolve(
+        Expr root,
+        ExpressionOccurrencePath path
+    ) {
+<span class="fc" id="L317">        Expr current = root;</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        for (int childIndex : path.childIndexes()) {</span>
+<span class="fc" id="L319">            List&lt;Expr&gt; children = children(current);</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            if (childIndex &gt;= children.size()) {</span>
+<span class="nc" id="L321">                throw invalidPath(path, childIndex);</span>
             }
-<span class="fc" id="L274">            current = children.get(childIndex);</span>
-<span class="fc" id="L275">        }</span>
-<span class="fc" id="L276">        return current;</span>
+<span class="fc" id="L323">            current = children.get(childIndex);</span>
+<span class="fc" id="L324">        }</span>
+<span class="fc" id="L325">        return current;</span>
     }
 
     private static boolean sameContextOutsideOccurrence(
@@ -282,59 +331,64 @@ public final class RepresentationCandidateAssessor {
         ExpressionOccurrencePath path,
         int pathIndex
     ) {
-<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (pathIndex == path.childIndexes().size()) {</span>
-<span class="fc" id="L286">            return true;</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (pathIndex == path.childIndexes().size()) {</span>
+<span class="fc" id="L335">            return true;</span>
         }
-<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (!sameContainer(source, candidate)) {</span>
-<span class="nc" id="L289">            return false;</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (!sameContainer(source, candidate)) {</span>
+<span class="nc" id="L338">            return false;</span>
         }
-<span class="fc" id="L291">        List&lt;Expr&gt; sourceChildren = children(source);</span>
-<span class="fc" id="L292">        List&lt;Expr&gt; candidateChildren = children(candidate);</span>
-<span class="fc" id="L293">        int selected = path.childIndexes().get(pathIndex);</span>
-<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (selected &gt;= sourceChildren.size()) {</span>
-<span class="nc" id="L295">            return false;</span>
+<span class="fc" id="L340">        List&lt;Expr&gt; sourceChildren = children(source);</span>
+<span class="fc" id="L341">        List&lt;Expr&gt; candidateChildren = children(candidate);</span>
+<span class="fc" id="L342">        int selected = path.childIndexes().get(pathIndex);</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        if (selected &gt;= sourceChildren.size()) {</span>
+<span class="nc" id="L344">            return false;</span>
         }
-<span class="fc bfc" id="L297" title="All 2 branches covered.">        for (int index = 0; index &lt; sourceChildren.size(); index++) {</span>
-<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (index != selected</span>
-<span class="fc bfc" id="L299" title="All 2 branches covered.">                    &amp;&amp; !sourceChildren.get(index).equals(candidateChildren.get(index))) {</span>
-<span class="fc" id="L300">                return false;</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        for (int index = 0; index &lt; sourceChildren.size(); index++) {</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">            if (index != selected</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">                    &amp;&amp; !sourceChildren.get(index).equals(</span>
+<span class="fc" id="L349">                        candidateChildren.get(index))) {</span>
+<span class="fc" id="L350">                return false;</span>
             }
         }
-<span class="fc" id="L303">        return sameContextOutsideOccurrence(</span>
-<span class="fc" id="L304">            sourceChildren.get(selected),</span>
-<span class="fc" id="L305">            candidateChildren.get(selected),</span>
+<span class="fc" id="L353">        return sameContextOutsideOccurrence(</span>
+<span class="fc" id="L354">            sourceChildren.get(selected),</span>
+<span class="fc" id="L355">            candidateChildren.get(selected),</span>
             path,
             pathIndex + 1
         );
     }
 
-    private static boolean sameContainer(Expr source, Expr candidate) {
-<span class="pc bpc" id="L312" title="2 of 4 branches missed.">        if (source instanceof BinaryExpr left &amp;&amp; candidate instanceof BinaryExpr right) {</span>
-<span class="pc bpc" id="L313" title="1 of 2 branches missed.">            return left.operator() == right.operator();</span>
+    private static boolean sameContainer(
+        Expr source,
+        Expr candidate
+    ) {
+<span class="pc bpc" id="L365" title="2 of 4 branches missed.">        if (source instanceof BinaryExpr left</span>
+<span class="fc" id="L366">                &amp;&amp; candidate instanceof BinaryExpr right) {</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">            return left.operator() == right.operator();</span>
         }
-<span class="nc bnc" id="L315" title="All 4 branches missed.">        if (source instanceof FunctionExpr left</span>
-<span class="nc" id="L316">                &amp;&amp; candidate instanceof FunctionExpr right) {</span>
-<span class="nc bnc" id="L317" title="All 2 branches missed.">            return left.name().equals(right.name())</span>
-<span class="nc bnc" id="L318" title="All 2 branches missed.">                &amp;&amp; left.arguments().size() == right.arguments().size();</span>
+<span class="nc bnc" id="L369" title="All 4 branches missed.">        if (source instanceof FunctionExpr left</span>
+<span class="nc" id="L370">                &amp;&amp; candidate instanceof FunctionExpr right) {</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">            return left.name().equals(right.name())</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                &amp;&amp; left.arguments().size() == right.arguments().size();</span>
         }
-<span class="nc" id="L320">        return false;</span>
+<span class="nc" id="L374">        return false;</span>
     }
 
     private static List&lt;Expr&gt; children(Expr expression) {
-<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L325">            return List.of(binary.left(), binary.right());</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L379">            return List.of(binary.left(), binary.right());</span>
         }
-<span class="nc bnc" id="L327" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
-<span class="nc" id="L328">            return function.arguments();</span>
+<span class="nc bnc" id="L381" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L382">            return function.arguments();</span>
         }
-<span class="nc" id="L330">        return List.of();</span>
+<span class="nc" id="L384">        return List.of();</span>
     }
 
     private static IllegalArgumentException invalidPath(
         ExpressionOccurrencePath path,
         int childIndex
     ) {
-<span class="nc" id="L337">        return new IllegalArgumentException(</span>
+<span class="nc" id="L391">        return new IllegalArgumentException(</span>
             &quot;invalid child &quot; + childIndex + &quot; in occurrence path &quot; + path);
     }
 }

@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnowledgePack.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.knowledge</a> &gt; <span class="el_source">KnowledgePack.java</span></div><h1>KnowledgePack.java</h1><pre class="source lang-java linenums">package de.regelsuche.knowledge;
 
+import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternRewriteRule;
-
 import java.util.List;
+import java.util.Objects;
 
 public record KnowledgePack(
         String packId,
@@ -16,9 +17,29 @@ public record KnowledgePack(
         KnowledgePackMaturity maturity,
         RuleTier tier,
         List&lt;String&gt; categories,
-        List&lt;PatternRewriteRule&gt; rules) {
+        List&lt;PatternRewriteRule&gt; rules,
+        List&lt;KnowledgePack.KnownStructureDefinition&gt; knownStructures) {
 
-    /** Backwards compatible constructor defaulting to the {@link RuleTier#FIRST_PARTY} tier. */
+    /** Backwards-compatible constructor without known-structure contributions. */
+    public KnowledgePack(
+            String packId,
+            String displayName,
+            String sourceProject,
+            String license,
+            String sourceUrl,
+            String sourceVersion,
+            String sourceReference,
+            boolean enabledByDefault,
+            KnowledgePackMaturity maturity,
+            RuleTier tier,
+            List&lt;String&gt; categories,
+            List&lt;PatternRewriteRule&gt; rules) {
+<span class="nc" id="L37">        this(packId, displayName, sourceProject, license, sourceUrl,</span>
+                sourceVersion, sourceReference, enabledByDefault, maturity,
+<span class="nc" id="L39">                tier, categories, rules, List.of());</span>
+<span class="nc" id="L40">    }</span>
+
+    /** Backwards-compatible constructor defaulting to the first-party tier. */
     public KnowledgePack(
             String packId,
             String displayName,
@@ -31,45 +52,171 @@ public record KnowledgePack(
             KnowledgePackMaturity maturity,
             List&lt;String&gt; categories,
             List&lt;PatternRewriteRule&gt; rules) {
-<span class="nc" id="L34">        this(packId, displayName, sourceProject, license, sourceUrl, sourceVersion, sourceReference,</span>
-                enabledByDefault, maturity, RuleTier.FIRST_PARTY, categories, rules);
-<span class="nc" id="L36">    }</span>
+<span class="nc" id="L55">        this(packId, displayName, sourceProject, license, sourceUrl,</span>
+                sourceVersion, sourceReference, enabledByDefault, maturity,
+<span class="nc" id="L57">                RuleTier.FIRST_PARTY, categories, rules, List.of());</span>
+<span class="nc" id="L58">    }</span>
 
-<span class="fc" id="L38">    public KnowledgePack {</span>
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (isBlank(packId)) {</span>
-<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;packId is required&quot;);</span>
+<span class="fc" id="L60">    public KnowledgePack {</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (isBlank(packId)) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(&quot;packId is required&quot;);</span>
         }
-<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (isBlank(displayName)) {</span>
-<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;displayName is required&quot;);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (isBlank(displayName)) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(&quot;displayName is required&quot;);</span>
         }
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (isBlank(sourceProject)) {</span>
-<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;sourceProject is required&quot;);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (isBlank(sourceProject)) {</span>
+<span class="nc" id="L68">            throw new IllegalArgumentException(&quot;sourceProject is required&quot;);</span>
         }
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (isBlank(license)) {</span>
-<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;license is required&quot;);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (isBlank(license)) {</span>
+<span class="nc" id="L71">            throw new IllegalArgumentException(&quot;license is required&quot;);</span>
         }
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (isBlank(sourceUrl)) {</span>
-<span class="nc" id="L52">            throw new IllegalArgumentException(&quot;sourceUrl is required&quot;);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (isBlank(sourceUrl)) {</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(&quot;sourceUrl is required&quot;);</span>
         }
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (isBlank(sourceVersion)) {</span>
-<span class="nc" id="L55">            throw new IllegalArgumentException(&quot;sourceVersion is required&quot;);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (isBlank(sourceVersion)) {</span>
+<span class="nc" id="L77">            throw new IllegalArgumentException(&quot;sourceVersion is required&quot;);</span>
         }
-<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (isBlank(sourceReference)) {</span>
-<span class="nc" id="L58">            throw new IllegalArgumentException(&quot;sourceReference is required&quot;);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (isBlank(sourceReference)) {</span>
+<span class="nc" id="L80">            throw new IllegalArgumentException(&quot;sourceReference is required&quot;);</span>
         }
-<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (maturity == null) {</span>
-<span class="nc" id="L61">            throw new IllegalArgumentException(&quot;maturity is required&quot;);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (maturity == null) {</span>
+<span class="nc" id="L83">            throw new IllegalArgumentException(&quot;maturity is required&quot;);</span>
         }
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        tier = tier == null ? RuleTier.FIRST_PARTY : tier;</span>
-<span class="pc bpc" id="L64" title="3 of 4 branches missed.">        if (tier == RuleTier.KERNEL &amp;&amp; !enabledByDefault) {</span>
-<span class="nc" id="L65">            throw new IllegalArgumentException(&quot;Kernel knowledge pack must be enabled by default: &quot; + packId);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        tier = tier == null ? RuleTier.FIRST_PARTY : tier;</span>
+<span class="pc bpc" id="L86" title="3 of 4 branches missed.">        if (tier == RuleTier.KERNEL &amp;&amp; !enabledByDefault) {</span>
+<span class="nc" id="L87">            throw new IllegalArgumentException(</span>
+                &quot;Kernel knowledge pack must be enabled by default: &quot; + packId);
         }
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        categories = categories == null ? List.of() : List.copyOf(categories);</span>
-<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        rules = rules == null ? List.of() : List.copyOf(rules);</span>
-<span class="fc" id="L69">    }</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        categories = categories == null ? List.of() : List.copyOf(categories);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        rules = rules == null ? List.of() : List.copyOf(rules);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        knownStructures = knownStructures == null</span>
+<span class="nc" id="L93">            ? List.of()</span>
+<span class="fc" id="L94">            : List.copyOf(knownStructures);</span>
+<span class="fc" id="L95">    }</span>
+
+    /** Minimum independent evidence before a known form unlocks capabilities. */
+<span class="fc" id="L98">    public enum KnownStructureEvidence {</span>
+<span class="fc" id="L99">        OBSERVED,</span>
+<span class="fc" id="L100">        VALIDATED_BY_EXAMPLES,</span>
+<span class="fc" id="L101">        SYMBOLICALLY_VERIFIED,</span>
+<span class="fc" id="L102">        FORMALLY_PROVABLE,</span>
+<span class="fc" id="L103">        FORMALLY_PROVED</span>
+    }
+
+    /** Source and policy metadata retained with one imported mathematical form. */
+    public record KnownStructureMetadata(
+        String sourceProject,
+        String license,
+        String sourceUrl,
+        String sourceVersion,
+        String sourceReference,
+        String translationNotes,
+        List&lt;String&gt; enabledRulePackIds,
+        List&lt;String&gt; compatibleBackendIds,
+        KnownStructureEvidence minimumEvidence
+    ) {
+<span class="fc" id="L118">        public KnownStructureMetadata {</span>
+<span class="fc" id="L119">            sourceProject = text(sourceProject, &quot;sourceProject&quot;);</span>
+<span class="fc" id="L120">            license = text(license, &quot;license&quot;);</span>
+<span class="fc" id="L121">            sourceUrl = text(sourceUrl, &quot;sourceUrl&quot;);</span>
+<span class="fc" id="L122">            sourceVersion = text(sourceVersion, &quot;sourceVersion&quot;);</span>
+<span class="fc" id="L123">            sourceReference = text(sourceReference, &quot;sourceReference&quot;);</span>
+<span class="fc" id="L124">            translationNotes = text(translationNotes, &quot;translationNotes&quot;);</span>
+<span class="fc" id="L125">            enabledRulePackIds = normalized(enabledRulePackIds);</span>
+<span class="fc" id="L126">            compatibleBackendIds = normalized(compatibleBackendIds);</span>
+<span class="fc" id="L127">            minimumEvidence = Objects.requireNonNull(</span>
+                minimumEvidence, &quot;minimumEvidence&quot;);
+<span class="fc" id="L129">        }</span>
+
+        public static KnownStructureMetadata legacy(String provenance) {
+<span class="nc" id="L132">            return new KnownStructureMetadata(</span>
+                provenance,
+                &quot;UNSPECIFIED&quot;,
+                &quot;urn:regelsuche:legacy-known-structure&quot;,
+                &quot;legacy&quot;,
+                provenance,
+                &quot;Legacy in-process structure.&quot;,
+<span class="nc" id="L139">                List.of(),</span>
+<span class="nc" id="L140">                List.of(),</span>
+                KnownStructureEvidence.OBSERVED
+            );
+        }
+
+        public String provenanceSummary() {
+<span class="nc" id="L146">            return sourceProject + &quot; &quot; + sourceVersion + &quot; — &quot;</span>
+                + sourceReference + &quot; [&quot; + license + &quot;]&quot;;
+        }
+
+        public String canonicalDescriptor() {
+<span class="nc" id="L151">            StringBuilder value = new StringBuilder();</span>
+<span class="nc" id="L152">            append(value, sourceProject, license, sourceUrl, sourceVersion,</span>
+                sourceReference, translationNotes);
+<span class="nc" id="L154">            appendList(value, enabledRulePackIds);</span>
+<span class="nc" id="L155">            appendList(value, compatibleBackendIds);</span>
+<span class="nc" id="L156">            append(value, minimumEvidence.name());</span>
+<span class="nc" id="L157">            return value.toString();</span>
+        }
+
+        private static List&lt;String&gt; normalized(List&lt;String&gt; values) {
+<span class="fc" id="L161">            return Objects.requireNonNull(values, &quot;values&quot;).stream()</span>
+<span class="fc" id="L162">                .map(value -&gt; text(value, &quot;list entry&quot;))</span>
+<span class="fc" id="L163">                .distinct()</span>
+<span class="fc" id="L164">                .sorted()</span>
+<span class="fc" id="L165">                .toList();</span>
+        }
+
+        private static String text(String value, String field) {
+<span class="fc" id="L169">            String result = Objects.requireNonNull(value, field).trim();</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (result.isEmpty()) {</span>
+<span class="fc" id="L171">                throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+            }
+<span class="fc" id="L173">            return result;</span>
+        }
+
+        private static void appendList(
+            StringBuilder target,
+            List&lt;String&gt; values
+        ) {
+<span class="nc" id="L180">            append(target, Integer.toString(values.size()));</span>
+<span class="nc" id="L181">            values.forEach(value -&gt; append(target, value));</span>
+<span class="nc" id="L182">        }</span>
+
+        private static void append(StringBuilder target, String... values) {
+<span class="nc bnc" id="L185" title="All 2 branches missed.">            for (String value : values) {</span>
+<span class="nc" id="L186">                target.append(value.length()).append(':').append(value);</span>
+            }
+<span class="nc" id="L188">        }</span>
+    }
+
+    /** Pack-neutral known form consumed by representation discovery. */
+    public record KnownStructureDefinition(
+        String id,
+        String domainId,
+        ExprMatcher matcher,
+        List&lt;String&gt; requiredAssumptions,
+        List&lt;String&gt; consequenceIds,
+        KnownStructureMetadata metadata
+    ) {
+<span class="fc" id="L200">        public KnownStructureDefinition {</span>
+<span class="pc bpc" id="L201" title="3 of 6 branches missed.">            if (id == null || id.isBlank()</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                    || domainId == null || domainId.isBlank()) {</span>
+<span class="nc" id="L203">                throw new IllegalArgumentException(&quot;id and domainId are required&quot;);</span>
+            }
+<span class="fc" id="L205">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
+<span class="fc" id="L206">            requiredAssumptions = List.copyOf(</span>
+<span class="fc" id="L207">                Objects.requireNonNull(</span>
+                    requiredAssumptions, &quot;requiredAssumptions&quot;));
+<span class="fc" id="L209">            consequenceIds = List.copyOf(</span>
+<span class="fc" id="L210">                Objects.requireNonNull(consequenceIds, &quot;consequenceIds&quot;));</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            if (consequenceIds.isEmpty()) {</span>
+<span class="nc" id="L212">                throw new IllegalArgumentException(&quot;consequenceIds are required&quot;);</span>
+            }
+<span class="fc" id="L214">            metadata = Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
+<span class="fc" id="L215">        }</span>
+    }
 
     private static boolean isBlank(String value) {
-<span class="pc bpc" id="L72" title="2 of 4 branches missed.">        return value == null || value.isBlank();</span>
+<span class="pc bpc" id="L219" title="2 of 4 branches missed.">        return value == null || value.isBlank();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
