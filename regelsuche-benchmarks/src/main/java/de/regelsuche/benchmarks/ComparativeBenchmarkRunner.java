@@ -24,10 +24,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** Initial executable #235 slice with honest track-scoped capability claims. */
+/** Executable #235 suite with honest track-scoped capability claims. */
 public final class ComparativeBenchmarkRunner {
     public static final String SUITE_ID =
-        "comparative-baselines-initial/v1";
+        "comparative-baselines-initial/v2";
 
     private final List<SearchSystem> searchSystems;
     private final List<ValidationSystem> validationSystems;
@@ -134,6 +134,19 @@ public final class ComparativeBenchmarkRunner {
                     "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
                     "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
                         + SimplificationAssumptionContract.CONTRACT_ID)),
+            SimplificationSystem.internalControl(
+                "randomized-valid-rewrite-control",
+                "1",
+                new DeterministicRandomValidRewriteStrategy(),
+                List.of(
+                    "INTERNAL_RANDOMIZED_CONTROL",
+                    "FIXED_SEED_BOUND_IN_CONFIGURATION_IDENTITY",
+                    "PER_CASE_RANDOM_STATE_RESET",
+                    "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                    "SAME_REWRITE_INVENTORY_AND_SEARCH_BUDGET_AS_REGELSUCHE",
+                    "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
+                        + SimplificationAssumptionContract.CONTRACT_ID,
+                    "CONTROL_IS_NOT_AN_EXTERNAL_SYMBOLIC_SYSTEM")),
             SimplificationSystem.external(
                 simplifier,
                 simplifier.available()
@@ -281,6 +294,7 @@ public final class ComparativeBenchmarkRunner {
                 "PINNED_REFERENCE_FORM_IS_NOT_A_UNIVERSAL_SIMPLICITY_ORDER",
                 "NO_RUNTIME_OR_SCALABILITY_CLAIM",
                 "SHARED_SURFACE_JUDGE_IS_THE_REGELSUCHE_CANONICALIZER",
+                "RANDOM_CONTROL_IS_AN_INTERNAL_VALID_REWRITE_ABLATION",
                 "INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION_NOT_YET_AVAILABLE",
                 "REACHING_A_REFERENCE_FORM_IS_NOT_DISCOVERY_OR_PROOF"));
     }
