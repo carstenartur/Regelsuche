@@ -113,6 +113,9 @@ class TargetFreeRepresentationSearchTest {
         );
 
         assertTrue(result.content().truncated());
+        assertTrue(result.content().truncationReasons().contains(
+            TargetFreeRepresentationSearch.TruncationReason
+                .MAX_RETAINED_STATES));
         assertEquals(1, result.content().states().size());
         assertEquals(1, result.content().transitions().size());
         assertEquals(
