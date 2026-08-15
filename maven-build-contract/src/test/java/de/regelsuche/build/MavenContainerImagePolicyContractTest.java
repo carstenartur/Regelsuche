@@ -179,7 +179,7 @@ class MavenContainerImagePolicyContractTest {
         Files.writeString(
             dockerfile,
             """
-            FROM --platform=linux/amd64 eclipse-temurin:21.0.11_10-jdk-noble AS build
+            FROM --platform=linux/amd64 eclipse-temurin:25.0.3_9-jdk-noble AS build
             FROM build AS reused
             FROM mcr.microsoft.com/playwright/java:v1.60.0-noble@sha256:69df3611cec973e9f7d2c7a9d9d75d9f9553261eb8484ffe37a52af608f9f766 AS runtime
             """,
@@ -187,7 +187,7 @@ class MavenContainerImagePolicyContractTest {
         );
         assertEquals(
             List.of(
-                "eclipse-temurin:21.0.11_10-jdk-noble",
+                "eclipse-temurin:25.0.3_9-jdk-noble",
                 "mcr.microsoft.com/playwright/java:v1.60.0-noble@sha256:69df3611cec973e9f7d2c7a9d9d75d9f9553261eb8484ffe37a52af608f9f766"
             ),
             externalImages(dockerfile)
@@ -220,7 +220,7 @@ class MavenContainerImagePolicyContractTest {
             "example/image@sha256:" + "a".repeat(64)
         ));
         assertTrue(isDigestOrExactVersion(
-            "eclipse-temurin:21.0.11_10-jdk-noble"
+            "eclipse-temurin:25.0.3_9-jdk-noble"
         ));
         assertTrue(isDigestOrExactVersion(
             "registry:5000/example/image:v1.60.0-noble"

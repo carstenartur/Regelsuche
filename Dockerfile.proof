@@ -16,7 +16,7 @@
 #         -t regelsuche-proof-lean .
 
 # ---------- Stage 1: Build (same as Dockerfile) ----------
-FROM eclipse-temurin:21.0.11_10-jdk-noble AS build
+FROM eclipse-temurin:25.0.3_9-jdk-noble AS build
 WORKDIR /workspace
 
 COPY gradlew gradle.properties settings.gradle build.gradle ./
@@ -70,7 +70,7 @@ RUN ./gradlew --no-daemon :app:installDist -x test
 
 
 # ---------- Stage 2: Runtime with provers ----------
-FROM eclipse-temurin:21.0.11_10-jre-noble AS runtime
+FROM eclipse-temurin:25.0.3_9-jre-noble AS runtime
 
 ARG INSTALL_LEAN=false
 ARG ELAN_GIT_SHA=3d5138e1526a569a23901b8ee559032793cf445e

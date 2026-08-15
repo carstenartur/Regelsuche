@@ -207,7 +207,7 @@ docker run --rm \
   --require-ready
 ```
 
-Das Runtime-Image enthält die Java-21-Distribution, nicht den Repository-
+Das Runtime-Image enthält die Java-25-Distribution, nicht den Repository-
 Quellbaum und nicht Gradle. Die Ausgabe wird gegen den checkout-lokalen Lauf
 verglichen.
 

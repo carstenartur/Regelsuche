@@ -6,7 +6,7 @@ The generic discovery-domain evidence gate is repository-owned and executable fr
 bash scripts/run-generic-discovery-domains-verification.sh
 ```
 
-The command requires Java 21. It creates a build-local Python environment pinned to `jsonschema==4.25.1`, runs all generic domain tests, validates the generated evidence, repeats the evidence-producing test and requires byte-identical output.
+The command requires Java 25. It creates a build-local Python environment pinned to `jsonschema==4.25.1`, runs all generic domain tests, validates the generated evidence, repeats the evidence-producing test and requires byte-identical output.
 
 The verifier checks both retained adapters:
 

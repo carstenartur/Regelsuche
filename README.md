@@ -46,7 +46,7 @@ Die ungebundene Variante `docker run --rm -p 8080:8080 regelsuche` veröffentlic
 die Demo auf allen Host-Interfaces. Sie ist für die lokale Standarddemo nicht
 empfohlen und nur in bewusst isolierten Umgebungen sinnvoll.
 
-Ohne Docker genügt mit JDK 21:
+Ohne Docker genügt mit JDK 25:
 
 ```bash
 ./gradlew run

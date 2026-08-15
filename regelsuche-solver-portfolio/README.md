@@ -1,6 +1,6 @@
 # Regelsuche solver portfolio
 
-This Java 21 module implements issue #234 above the canonical contracts in `:regelsuche-solver-ir`.
+This Java 25 module implements issue #234 above the canonical contracts in `:regelsuche-solver-ir`.
 
 It provides machine-readable capability profiles, deterministic portfolio policies, budgets, timeouts, cancellation, exact caching, complete attempt traces, explicit conflict aggregation and a real proof-producing Z3 adapter.
 
