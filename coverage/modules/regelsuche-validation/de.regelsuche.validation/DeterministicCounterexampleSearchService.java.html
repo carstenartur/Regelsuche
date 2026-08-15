@@ -588,7 +588,7 @@ import java.util.Set;
 <span class="fc" id="L588">                    case NON_ZERO, INVERTIBLE -&gt; &quot;(not (= &quot; + smtSubject + &quot; 0))&quot;;</span>
 <span class="fc" id="L589">                    case POSITIVE -&gt; &quot;(&gt; &quot; + smtSubject + &quot; 0)&quot;;</span>
 <span class="fc" id="L590">                    case NON_NEGATIVE -&gt; &quot;(&gt;= &quot; + smtSubject + &quot; 0)&quot;;</span>
-<span class="pc" id="L591">                    default -&gt; &quot;&quot;;</span>
+<span class="nc" id="L591">                    default -&gt; &quot;&quot;;</span>
                 };
 <span class="pc bpc" id="L593" title="1 of 2 branches missed.">                if (!smt.isBlank()) {</span>
 <span class="fc" id="L594">                    encodings.add(new CounterexampleSearchService.ProofEncoding(&quot;smtlib&quot;, smt));</span>

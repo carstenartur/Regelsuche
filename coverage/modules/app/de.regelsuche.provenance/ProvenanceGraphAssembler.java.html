@@ -229,7 +229,7 @@ import java.util.Optional;
 <span class="pc bpc" id="L229" title="2 of 3 branches missed.">            edges.add(new ProvenanceEdge(attemptId, hypothesisId, switch (status) {</span>
 <span class="fc" id="L230">                case COUNTEREXAMPLE_FOUND -&gt; ProvenanceEdgeType.FOUND_COUNTEREXAMPLE;</span>
 <span class="nc" id="L231">                case NO_COUNTEREXAMPLE_FOUND -&gt; ProvenanceEdgeType.NO_COUNTEREXAMPLE_WITHIN_BUDGET;</span>
-<span class="pc" id="L232">                case INCONCLUSIVE -&gt; ProvenanceEdgeType.INCONCLUSIVE_DUE_TO;</span>
+<span class="nc" id="L232">                case INCONCLUSIVE -&gt; ProvenanceEdgeType.INCONCLUSIVE_DUE_TO;</span>
 <span class="fc" id="L233">            }, Map.of(&quot;explanation&quot;, identity.counterexampleExplanation())));</span>
         }
 <span class="fc bfc" id="L235" title="All 2 branches covered.">        if (status == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {</span>

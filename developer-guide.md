@@ -8,7 +8,7 @@ normalen Checkout reproduzierbarer fachlicher und wissenschaftlicher Vertrag.
 
 Für die meisten Änderungen:
 
-- JDK 21;
+- JDK 25;
 - Git;
 - der eingecheckte Gradle Wrapper.
 

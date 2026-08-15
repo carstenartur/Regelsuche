@@ -180,7 +180,7 @@ public class MacroRuleLearningService {
 <span class="nc" id="L180">            case SYMBOLICALLY_VERIFIED, FORMALLY_PROVABLE, FORMALLY_PROVED -&gt; 0.9;</span>
 <span class="fc" id="L181">            case VALIDATED_BY_EXAMPLES -&gt; 0.6;</span>
 <span class="nc" id="L182">            case OBSERVED -&gt; 0.3;</span>
-<span class="pc" id="L183">            case REJECTED -&gt; 0.0;</span>
+<span class="nc" id="L183">            case REJECTED -&gt; 0.0;</span>
         };
 <span class="fc" id="L185">        double confidence = Math.min(1.0, base + 0.1 * Math.max(0, occurrenceCount - 1));</span>
 <span class="fc" id="L186">        double averageImprovement = candidate.averageScoreImprovement();</span>

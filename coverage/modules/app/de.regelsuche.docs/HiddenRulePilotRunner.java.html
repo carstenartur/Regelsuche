@@ -353,7 +353,7 @@ import java.util.Objects;
 <span class="pc bpc" id="L353" title="1 of 2 branches missed.">            boolean positiveProof = switch (status) {</span>
                 case VALIDATED_BY_EXAMPLES, SYMBOLICALLY_VERIFIED,
 <span class="fc" id="L355">                    FORMALLY_PROVABLE, FORMALLY_PROVED -&gt; true;</span>
-<span class="pc" id="L356">                default -&gt; false;</span>
+<span class="nc" id="L356">                default -&gt; false;</span>
             };
 <span class="fc" id="L358">            boolean noCounterexample = counterexampleSearches.stream()</span>
 <span class="pc bpc" id="L359" title="1 of 2 branches missed.">                .noneMatch(search -&gt; search.counterexamplePresent()</span>

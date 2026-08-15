@@ -237,14 +237,14 @@ import java.util.Objects;
 <span class="fc" id="L237">            case PRODUCED -&gt; Disposition.EXECUTED;</span>
 <span class="nc" id="L238">            case UNAVAILABLE -&gt; Disposition.FILTERED_UNSUPPORTED;</span>
 <span class="nc" id="L239">            case TIMEOUT -&gt; Disposition.TIMED_OUT;</span>
-<span class="pc" id="L240">            case ERROR -&gt; Disposition.FAILED;</span>
+<span class="nc" id="L240">            case ERROR -&gt; Disposition.FAILED;</span>
         };
 <span class="pc bpc" id="L242" title="3 of 4 branches missed.">        ObservedVerdict verdict = switch (simplification.outcome()) {</span>
 <span class="pc bpc" id="L243" title="1 of 2 branches missed.">            case PRODUCED -&gt; matched</span>
 <span class="pc" id="L244">                ? ObservedVerdict.TARGET_REACHED : ObservedVerdict.UNKNOWN;</span>
 <span class="nc" id="L245">            case UNAVAILABLE -&gt; ObservedVerdict.UNSUPPORTED;</span>
 <span class="nc" id="L246">            case TIMEOUT -&gt; ObservedVerdict.TIMEOUT;</span>
-<span class="pc" id="L247">            case ERROR -&gt; ObservedVerdict.ERROR;</span>
+<span class="nc" id="L247">            case ERROR -&gt; ObservedVerdict.ERROR;</span>
         };
 <span class="pc bpc" id="L249" title="1 of 2 branches missed.">        int executedWork = produced ? 1 : 0;</span>
 <span class="pc bpc" id="L250" title="1 of 2 branches missed.">        int skippedWork = disposition == Disposition.FILTERED_UNSUPPORTED</span>

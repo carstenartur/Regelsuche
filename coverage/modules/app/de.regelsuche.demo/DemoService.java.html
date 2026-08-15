@@ -286,7 +286,7 @@ public final class DemoService {
 <span class="nc" id="L286">            case &quot;math-inequality&quot; -&gt; workbench.runInequalitySignFlip();</span>
 <span class="nc" id="L287">            case &quot;math-derivative&quot; -&gt; workbench.runDerivativePowerRule();</span>
 <span class="nc" id="L288">            case &quot;math-matrix&quot; -&gt; workbench.runMatrixDistributivity();</span>
-<span class="pc" id="L289">            default -&gt; throw new IllegalArgumentException(&quot;Unknown math-domain demo: &quot; + demo.id());</span>
+<span class="nc" id="L289">            default -&gt; throw new IllegalArgumentException(&quot;Unknown math-domain demo: &quot; + demo.id());</span>
         };
 <span class="fc" id="L291">        long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;</span>
 <span class="fc" id="L292">        DiscoveredTransformation discovered = exec.discoveredTransformation();</span>

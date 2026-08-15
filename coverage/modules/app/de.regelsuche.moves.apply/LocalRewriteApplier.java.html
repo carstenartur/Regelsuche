@@ -207,8 +207,8 @@ public final class LocalRewriteApplier {
 <span class="pc bpc" id="L207" title="1 of 3 branches missed.">                current = switch (index) {</span>
 <span class="fc" id="L208">                    case 0 -&gt; binary.left();</span>
 <span class="fc" id="L209">                    case 1 -&gt; binary.right();</span>
-<span class="pc" id="L210">                    default -&gt; null;</span>
-                };
+<span class="nc" id="L210">                    default -&gt; null;</span>
+<span class="fc" id="L211">                };</span>
 <span class="pc bpc" id="L212" title="1 of 2 branches missed.">            } else if (current instanceof FunctionExpr function) {</span>
 <span class="pc bpc" id="L213" title="1 of 4 branches missed.">                current = index &gt;= 0 &amp;&amp; index &lt; function.arguments().size()</span>
 <span class="fc" id="L214">                        ? function.arguments().get(index)</span>

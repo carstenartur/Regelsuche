@@ -6,7 +6,7 @@ The complete `DOMAIN_GENERIC_DISCOVERY` qualification gate is repository-owned a
 bash scripts/run-domain-generic-qualification-verification.sh
 ```
 
-The command requires Java 21. It creates a build-local Python environment with `jsonschema==4.25.1`, executes the dedicated JUnit characterization and qualification runner, validates the retained evidence, repeats the complete qualification and requires byte-identical output.
+The command requires Java 25. It creates a build-local Python environment with `jsonschema==4.25.1`, executes the dedicated JUnit characterization and qualification runner, validates the retained evidence, repeats the complete qualification and requires byte-identical output.
 
 The verifier checks:
 

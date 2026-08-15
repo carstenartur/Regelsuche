@@ -60,7 +60,7 @@ import java.util.Objects;
         AutonomousCandidateQualificationEvidence evidence
     ) {
 <span class="fc" id="L62">        List&lt;RequirementCheck&gt; checks = existing.checks().stream()</span>
-<span class="fc bfc" id="L63" title="All 4 branches covered.">            .map(check -&gt; switch (check.code()) {</span>
+<span class="pc bpc" id="L63" title="3 of 14 branches missed.">            .map(check -&gt; switch (check.code()) {</span>
 <span class="fc" id="L64">                case &quot;HELD_OUT_FAMILY_OR_CLUSTER&quot; -&gt; new RequirementCheck(</span>
 <span class="fc" id="L65">                    check.code(),</span>
 <span class="pc bpc" id="L66" title="1 of 2 branches missed.">                    evidence.heldOutFamilyOrClusterCount() &gt;= 1,</span>

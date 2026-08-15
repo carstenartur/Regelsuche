@@ -389,7 +389,7 @@ import java.util.stream.Collectors;
 <span class="nc" id="L389">            case RationalNormalizationHypothesisOperator.RULE_ID -&gt; rationalNormalizationHoldouts(operator);</span>
 <span class="pc bpc" id="L390" title="1 of 2 branches missed.">            default -&gt; (operator instanceof DynamicPatternOperator dynOp)</span>
 <span class="fc" id="L391">                ? dynamicHoldouts(hypothesis, dynOp)</span>
-<span class="pc" id="L392">                : List.of();</span>
+<span class="nc" id="L392">                : List.of();</span>
         };
 <span class="pc bpc" id="L394" title="1 of 2 branches missed.">        if (generated.isEmpty()) {</span>
 <span class="nc" id="L395">            return GeneratedHoldoutSuite.empty();</span>

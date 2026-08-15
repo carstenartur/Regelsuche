@@ -367,7 +367,7 @@ public final class SolverPortfolioExecutor {
 <span class="fc" id="L367">            case SYMBOLIC_CONFIRMATION -&gt; BackendRole.SYMBOLIC_CONFIRMATION;</span>
 <span class="fc" id="L368">            case VALIDATION -&gt; BackendRole.ORACLE_VALIDATION;</span>
 <span class="nc" id="L369">            case SEARCH_GUIDANCE -&gt; BackendRole.SEARCH_GUIDANCE;</span>
-<span class="pc" id="L370">            case COUNTEREXAMPLE_SEARCH -&gt; BackendRole.COUNTEREXAMPLE;</span>
+<span class="nc" id="L370">            case COUNTEREXAMPLE_SEARCH -&gt; BackendRole.COUNTEREXAMPLE;</span>
         };
 <span class="fc" id="L372">        return qualifying.stream()</span>
 <span class="fc" id="L373">            .filter(item -&gt; item.profile().roles().contains(preferred))</span>

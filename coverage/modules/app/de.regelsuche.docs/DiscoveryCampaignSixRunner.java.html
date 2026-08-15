@@ -82,7 +82,7 @@ import java.util.Set;
 <span class="pc bpc" id="L82" title="1 of 2 branches missed.">                &amp;&amp; hasParameter(comparison.moveCandidates(), &quot;residue&quot;, &quot;-4&quot;);</span>
 <span class="fc" id="L83">            case &quot;repeated-subexpression&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;x + 1&quot;, &quot;x + 1&quot;);</span>
 <span class="fc" id="L84">            case &quot;common-subexpression&quot; -&gt; hasParameter(comparison.moveCandidates(), &quot;y + 1&quot;, &quot;y + 1&quot;);</span>
-<span class="pc" id="L85">            default -&gt; false;</span>
+<span class="nc" id="L85">            default -&gt; false;</span>
         };
 <span class="fc" id="L87">        String expectedMoveCoverage = expectedCoverage(comparison, probeCase.id());</span>
 
@@ -290,7 +290,7 @@ import java.util.Set;
 <span class="fc" id="L290">            case &quot;complete-square&quot; -&gt; Set.of(canonical(&quot;(x + 3)^2 - 4&quot;));</span>
 <span class="fc" id="L291">            case &quot;repeated-subexpression&quot; -&gt; Set.of(canonical(&quot;(x + 1) * x&quot;));</span>
 <span class="fc" id="L292">            case &quot;common-subexpression&quot; -&gt; Set.of(canonical(&quot;(y + 1) * (x + z)&quot;));</span>
-<span class="pc" id="L293">            default -&gt; Set.of();</span>
+<span class="nc" id="L293">            default -&gt; Set.of();</span>
         };
 <span class="fc" id="L295">        boolean inMove = comparison.moveCandidates().stream()</span>
 <span class="fc" id="L296">            .map(MoveCandidateTransformationEngine.CandidateSummary::transformedExpression)</span>

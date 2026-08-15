@@ -278,8 +278,8 @@ public record ExactSharingRepresentation(
 <span class="pc bpc" id="L278" title="1 of 3 branches missed.">                current = switch (childIndex) {</span>
 <span class="fc" id="L279">                    case 0 -&gt; binary.left();</span>
 <span class="fc" id="L280">                    case 1 -&gt; binary.right();</span>
-<span class="pc" id="L281">                    default -&gt; throw invalidPath(path);</span>
-                };
+<span class="nc" id="L281">                    default -&gt; throw invalidPath(path);</span>
+<span class="fc" id="L282">                };</span>
 <span class="nc bnc" id="L283" title="All 2 branches missed.">            } else if (current instanceof FunctionExpr function</span>
 <span class="nc bnc" id="L284" title="All 2 branches missed.">                    &amp;&amp; childIndex &lt; function.arguments().size()) {</span>
 <span class="nc" id="L285">                current = function.arguments().get(childIndex);</span>

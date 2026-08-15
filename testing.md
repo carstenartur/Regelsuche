@@ -9,12 +9,12 @@ Gradle, JUnit und den versionierten Skripten des Repositorys.
 
 | Ziel | Befehl | Typische Dauer und Voraussetzungen |
 | --- | --- | --- |
-| schneller Modultest | `./gradlew :<modul>:test` | JDK 21 |
-| Anwendungstests | `./gradlew :app:test` | JDK 21 |
-| Browserfluss | `./gradlew :app:e2eTest` | JDK 21, Chromium/Playwright |
-| Containerintegration | `./gradlew :app:dockerE2eTest` | JDK 21, Docker |
-| alle Gradle-Testschichten | `./gradlew test` | JDK 21, je nach Tests Docker/Tools |
-| Tests plus Vertragsprüfung | `./gradlew check` | JDK 21, Python-`venv` |
+| schneller Modultest | `./gradlew :<modul>:test` | JDK 25 |
+| Anwendungstests | `./gradlew :app:test` | JDK 25 |
+| Browserfluss | `./gradlew :app:e2eTest` | JDK 25, Chromium/Playwright |
+| Containerintegration | `./gradlew :app:dockerE2eTest` | JDK 25, Docker |
+| alle Gradle-Testschichten | `./gradlew test` | JDK 25, je nach Tests Docker/Tools |
+| Tests plus Vertragsprüfung | `./gradlew check` | JDK 25, Python-`venv` |
 | strikte Reproduktion | `./gradlew fullCheck` | zusätzlich Docker und externe Solver |
 | autoritativer CI-Lebenszyklus | `./gradlew --no-configuration-cache ciCheck` | vollständige CI-Toolchain |
 

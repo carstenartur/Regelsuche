@@ -105,7 +105,7 @@ public class ProofBridgeService {
 <span class="pc bpc" id="L105" title="2 of 3 branches missed.">            String suffix = switch (attempt.tool()) {</span>
 <span class="fc" id="L106">                case &quot;lean4&quot; -&gt; &quot;.lean&quot;;</span>
 <span class="nc" id="L107">                case &quot;smtlib2&quot; -&gt; &quot;.smt2&quot;;</span>
-<span class="pc" id="L108">                default -&gt; &quot;.txt&quot;;</span>
+<span class="nc" id="L108">                default -&gt; &quot;.txt&quot;;</span>
             };
 <span class="fc" id="L110">            Path target = artifactDirectory.resolve(safeFileName(candidate) + suffix);</span>
 <span class="fc" id="L111">            Files.writeString(target, attempt.artifact(), StandardCharsets.UTF_8);</span>
