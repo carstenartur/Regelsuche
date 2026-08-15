@@ -2,6 +2,7 @@ package de.regelsuche.knowledge;
 
 import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternRewriteRule;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
@@ -122,8 +123,10 @@ public record KnowledgePack(
             sourceVersion = text(sourceVersion, "sourceVersion");
             sourceReference = text(sourceReference, "sourceReference");
             translationNotes = text(translationNotes, "translationNotes");
-            enabledRulePackIds = normalized(enabledRulePackIds);
-            compatibleBackendIds = normalized(compatibleBackendIds);
+            enabledRulePackIds = normalized(
+                enabledRulePackIds, "enabledRulePackIds");
+            compatibleBackendIds = normalized(
+                compatibleBackendIds, "compatibleBackendIds");
             minimumEvidence = Objects.requireNonNull(
                 minimumEvidence, "minimumEvidence");
         }
@@ -157,12 +160,21 @@ public record KnowledgePack(
             return value.toString();
         }
 
-        private static List<String> normalized(List<String> values) {
-            return Objects.requireNonNull(values, "values").stream()
-                .map(value -> text(value, "list entry"))
-                .distinct()
-                .sorted()
+        private static List<String> normalized(
+            List<String> values,
+            String field
+        ) {
+            List<String> result = Objects.requireNonNull(values, field).stream()
+                .map(value -> text(value, field + " entry"))
                 .toList();
+            HashSet<String> unique = new HashSet<>();
+            for (String value : result) {
+                if (!unique.add(value)) {
+                    throw new IllegalArgumentException(
+                        field + " contains duplicate entry: " + value);
+                }
+            }
+            return result.stream().sorted().toList();
         }
 
         private static String text(String value, String field) {

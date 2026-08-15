@@ -135,4 +135,52 @@ final class KnowledgePackCiGateTest {
                 KnowledgePack.KnownStructureEvidence.SYMBOLICALLY_VERIFIED
             ));
     }
+
+    @Test
+    void knownStructureMetadataRejectsNormalizedDuplicateListEntries() {
+        IllegalArgumentException duplicatePack = assertThrows(
+            IllegalArgumentException.class,
+            () -> metadata(
+                List.of(
+                    SYMPY_TRIGONOMETRY,
+                    " " + SYMPY_TRIGONOMETRY + " "
+                ),
+                List.of()
+            )
+        );
+        IllegalArgumentException duplicateBackend = assertThrows(
+            IllegalArgumentException.class,
+            () -> metadata(
+                List.of(),
+                List.of("sympy", " sympy ")
+            )
+        );
+
+        assertEquals(
+            "enabledRulePackIds contains duplicate entry: "
+                + SYMPY_TRIGONOMETRY,
+            duplicatePack.getMessage()
+        );
+        assertEquals(
+            "compatibleBackendIds contains duplicate entry: sympy",
+            duplicateBackend.getMessage()
+        );
+    }
+
+    private static KnowledgePack.KnownStructureMetadata metadata(
+        List<String> enabledRulePackIds,
+        List<String> compatibleBackendIds
+    ) {
+        return new KnowledgePack.KnownStructureMetadata(
+            "SymPy",
+            "BSD-3-Clause",
+            "https://example.invalid",
+            "1",
+            "fixture",
+            "Test fixture.",
+            enabledRulePackIds,
+            compatibleBackendIds,
+            KnowledgePack.KnownStructureEvidence.SYMBOLICALLY_VERIFIED
+        );
+    }
 }
