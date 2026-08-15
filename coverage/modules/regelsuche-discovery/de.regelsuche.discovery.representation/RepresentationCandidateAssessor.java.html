@@ -142,9 +142,9 @@ public final class RepresentationCandidateAssessor {
 <span class="pc bpc" id="L142" title="1 of 4 branches missed.">        if (!introducedVariables.isEmpty() || !introducedFunctions.isEmpty()) {</span>
 <span class="fc" id="L143">            return COMPRESSION_BLOCKED_BY_INTRODUCED_SYMBOLS;</span>
         }
-<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        return scoped.hasStructuralRegression()</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        return scoped.hasStructuralRegression()</span>
 <span class="pc bpc" id="L146" title="1 of 2 branches missed.">                || whole.hasStructuralRegression()</span>
-<span class="nc" id="L147">            ? COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION</span>
+<span class="fc" id="L147">            ? COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION</span>
 <span class="fc" id="L148">            : COMPRESSION_MATERIAL_MULTI_DIMENSIONAL;</span>
     }
 
@@ -278,9 +278,9 @@ public final class RepresentationCandidateAssessor {
 <span class="fc bfc" id="L278" title="All 2 branches covered.">        if (!introducedFunctions.isEmpty()) {</span>
 <span class="fc" id="L279">            warnings.add(WARNING_INTRODUCED_FUNCTION_SYMBOLS);</span>
         }
-<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION.equals(</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION.equals(</span>
                 compressionStatus)) {
-<span class="nc" id="L283">            warnings.add(WARNING_STRUCTURAL_COMPRESSION_REGRESSION);</span>
+<span class="fc" id="L283">            warnings.add(WARNING_STRUCTURAL_COMPRESSION_REGRESSION);</span>
         }
 <span class="fc" id="L285">        Set&lt;String&gt; assumptions = Set.copyOf(proposal.assumptions());</span>
 <span class="fc bfc" id="L286" title="All 2 branches covered.">        if (newMatches.stream().anyMatch(</span>

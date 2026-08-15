@@ -1,0 +1,606 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetFreeSymPyBridgeDiscoveryScenario.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">TargetFreeSymPyBridgeDiscoveryScenario.java</span></div><h1>TargetFreeSymPyBridgeDiscoveryScenario.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM;
+import static de.regelsuche.validation.OracleValidator.OracleValidationStatus.AGREE;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.knowledge.RuleStatus;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.OracleValidator.OracleValidation;
+import de.regelsuche.validation.SymPyOracleValidator;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * End-to-end R2 example in which bounded rewrite enumeration receives neither
+ * a target representation nor the SymPy known-structure catalog.
+ */
+public final class TargetFreeSymPyBridgeDiscoveryScenario {
+    public static final String SCHEMA =
+        &quot;regelsuche.target-free-sympy-bridge-discovery/v1&quot;;
+    public static final String PACK_ID = &quot;sympy-trigonometry&quot;;
+    public static final String STRUCTURE_ID =
+        &quot;sympy.trig.pythagorean-pair&quot;;
+    public static final String CONSEQUENCE_ID =
+        &quot;rule:sympy.trig.pythagorean&quot;;
+    public static final String SOURCE_EXPRESSION =
+        &quot;sin(x)^2 + (cos(x)^2 + 0)&quot;;
+    public static final String FOLLOW_ON_EXPRESSION = &quot;1&quot;;
+    public static final String CLAIM_BOUNDARY =
+        &quot;Bounded target-free rewrite enumeration with post-freeze R2 &quot;
+            + &quot;classification and executable capability evidence; not a &quot;
+            + &quot;held-out superiority, external-novelty or global-optimality &quot;
+            + &quot;claim.&quot;;
+
+<span class="fc" id="L52">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L53">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L54">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L55">        .build();</span>
+
+    private TargetFreeSymPyBridgeDiscoveryScenario() {
+    }
+
+    public static ScenarioArtifact run() {
+<span class="fc" id="L61">        KnowledgePackRegistry registry = new KnowledgePackRegistry();</span>
+<span class="fc" id="L62">        KnowledgePackSelection disabled = KnowledgePackSelection.CORE;</span>
+<span class="fc" id="L63">        KnowledgePackSelection enabled =</span>
+<span class="fc" id="L64">            KnowledgePackSelection.CORE.enablePack(PACK_ID);</span>
+<span class="fc" id="L65">        var disabledBoundary = boundary(registry, disabled);</span>
+<span class="fc" id="L66">        var enabledBoundary = boundary(registry, enabled);</span>
+<span class="fc" id="L67">        requireEqual(</span>
+<span class="fc" id="L68">            disabledBoundary.candidateFormationRuleInventoryHash(),</span>
+<span class="fc" id="L69">            enabledBoundary.candidateFormationRuleInventoryHash(),</span>
+            &quot;R2 formation inventories differ&quot;
+        );
+
+<span class="fc" id="L73">        TargetFreeRepresentationSearch searcher =</span>
+            new TargetFreeRepresentationSearch();
+<span class="fc" id="L75">        var budget = TargetFreeRepresentationSearch.Budget.small();</span>
+<span class="fc" id="L76">        var disabledSearch = searcher.search(</span>
+            SOURCE_EXPRESSION,
+<span class="fc" id="L78">            disabledBoundary.candidateFormationRules(),</span>
+            budget
+        );
+<span class="fc" id="L81">        var enabledSearch = searcher.search(</span>
+            SOURCE_EXPRESSION,
+<span class="fc" id="L83">            enabledBoundary.candidateFormationRules(),</span>
+            budget
+        );
+<span class="fc" id="L86">        requireEqual(</span>
+<span class="fc" id="L87">            disabledSearch.contentHash(),</span>
+<span class="fc" id="L88">            enabledSearch.contentHash(),</span>
+            &quot;target-free search depends on hidden post-freeze knowledge&quot;
+        );
+<span class="fc" id="L91">        requireTrue(</span>
+<span class="fc" id="L92">            enabledSearch.content().candidateStates().stream()</span>
+<span class="fc" id="L93">                .noneMatch(state -&gt;</span>
+<span class="fc" id="L94">                    state.expression().equals(FOLLOW_ON_EXPRESSION)),</span>
+            &quot;formation reached the withheld SymPy consequence&quot;
+        );
+
+<span class="fc" id="L98">        Map&lt;String, RewriteRule&gt; formationRules = ruleIndex(</span>
+<span class="fc" id="L99">            enabledBoundary.candidateFormationRules());</span>
+<span class="fc" id="L100">        SymPyOracleValidator oracle = new SymPyOracleValidator();</span>
+<span class="fc" id="L101">        List&lt;Candidate&gt; candidates = enabledSearch.content()</span>
+<span class="fc" id="L102">            .candidateStates().stream()</span>
+<span class="fc" id="L103">            .map(state -&gt; candidate(</span>
+                state,
+<span class="fc" id="L105">                proofStatus(state, formationRules, oracle)</span>
+            ))
+<span class="fc" id="L107">            .toList();</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        requireTrue(!candidates.isEmpty(),</span>
+            &quot;target-free search produced no candidate representations&quot;);
+
+<span class="fc" id="L111">        List&lt;RepresentationCandidateProposal&gt; proposals = candidates.stream()</span>
+<span class="fc" id="L112">            .map(Candidate::proposal)</span>
+<span class="fc" id="L113">            .toList();</span>
+<span class="fc" id="L114">        var disabledReceipt =</span>
+<span class="fc" id="L115">            disabledBoundary.freezeCandidates(proposals);</span>
+<span class="fc" id="L116">        var enabledReceipt =</span>
+<span class="fc" id="L117">            enabledBoundary.freezeCandidates(proposals);</span>
+<span class="fc" id="L118">        requireEqual(</span>
+<span class="fc" id="L119">            disabledReceipt.candidateSetHash(),</span>
+<span class="fc" id="L120">            enabledReceipt.candidateSetHash(),</span>
+            &quot;candidate freeze differs across pack selections&quot;
+        );
+
+<span class="fc" id="L124">        var disabledDisclosure =</span>
+<span class="fc" id="L125">            disabledBoundary.disclosePostFreeze(disabledReceipt);</span>
+<span class="fc" id="L126">        var enabledDisclosure =</span>
+<span class="fc" id="L127">            enabledBoundary.disclosePostFreeze(enabledReceipt);</span>
+<span class="fc" id="L128">        RepresentationCandidateAssessor disabledAssessor =</span>
+            new RepresentationCandidateAssessor(
+<span class="fc" id="L130">                disabledDisclosure.classificationCatalog());</span>
+<span class="fc" id="L131">        RepresentationCandidateAssessor enabledAssessor =</span>
+            new RepresentationCandidateAssessor(
+<span class="fc" id="L133">                enabledDisclosure.classificationCatalog());</span>
+
+<span class="fc" id="L135">        List&lt;AssessedCandidate&gt; assessed = candidates.stream()</span>
+<span class="fc" id="L136">            .map(candidate -&gt; new AssessedCandidate(</span>
+                candidate,
+<span class="fc" id="L138">                disabledAssessor.assess(candidate.proposal()),</span>
+<span class="fc" id="L139">                enabledAssessor.assess(candidate.proposal())</span>
+            ))
+<span class="fc" id="L141">            .toList();</span>
+<span class="fc" id="L142">        AssessedCandidate discovered = assessed.stream()</span>
+<span class="fc" id="L143">            .filter(value -&gt; hasUnlock(</span>
+<span class="fc" id="L144">                value.enabledAssessment(),</span>
+                STRUCTURE_ID,
+                CONSEQUENCE_ID
+            ))
+<span class="fc" id="L148">            .sorted(Comparator</span>
+<span class="fc" id="L149">                .comparingInt((AssessedCandidate value) -&gt;</span>
+<span class="fc" id="L150">                    value.candidate().state().depth())</span>
+<span class="fc" id="L151">                .thenComparingInt(value -&gt;</span>
+<span class="fc" id="L152">                    value.candidate().state().metrics().tokenCount())</span>
+<span class="fc" id="L153">                .thenComparing(value -&gt;</span>
+<span class="fc" id="L154">                    value.candidate().state().expression()))</span>
+<span class="fc" id="L155">            .findFirst()</span>
+<span class="pc" id="L156">            .orElseThrow(() -&gt; new IllegalStateException(</span>
+                &quot;post-freeze catalog found no executable bridge&quot;));
+
+<span class="fc" id="L159">        var provisional = RepresentationCandidateProposal.whole(</span>
+            SOURCE_EXPRESSION,
+<span class="fc" id="L161">            discovered.candidate().state().expression(),</span>
+<span class="fc" id="L162">            discovered.candidate().state().assumptions(),</span>
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES
+        );
+<span class="fc" id="L165">        RepresentationCandidateAssessment provisionalAssessment =</span>
+<span class="fc" id="L166">            enabledAssessor.assess(provisional);</span>
+<span class="fc" id="L167">        KnownStructureMatch structure = discovered.enabledAssessment()</span>
+<span class="fc" id="L168">            .newlyExposedStructureMatches().stream()</span>
+<span class="fc" id="L169">            .filter(match -&gt; match.structureId().equals(STRUCTURE_ID))</span>
+<span class="fc" id="L170">            .findFirst()</span>
+<span class="fc" id="L171">            .orElseThrow();</span>
+
+<span class="fc" id="L173">        FollowOnEvidence followOn = followOn(</span>
+<span class="fc" id="L174">            enabledBoundary.candidateFormationRules(),</span>
+<span class="fc" id="L175">            disabledDisclosure.classificationSelection(),</span>
+<span class="fc" id="L176">            enabledDisclosure.classificationSelection(),</span>
+<span class="fc" id="L177">            discovered.candidate().state().expression(),</span>
+<span class="fc" id="L178">            disabledDisclosure.classificationRuleInventoryHash(),</span>
+<span class="fc" id="L179">            enabledDisclosure.classificationRuleInventoryHash()</span>
+        );
+<span class="fc" id="L181">        ScenarioContent content = new ScenarioContent(</span>
+            SCHEMA,
+            &quot;target-free-sympy-pythagorean-bridge&quot;,
+            &quot;R2&quot;,
+<span class="fc" id="L185">            enabledSearch.content(),</span>
+<span class="fc" id="L186">            enabledSearch.contentHash(),</span>
+            new FreezeEvidence(
+<span class="fc" id="L188">                disabledBoundary.contentHash(),</span>
+<span class="fc" id="L189">                enabledBoundary.contentHash(),</span>
+<span class="fc" id="L190">                disabledReceipt.candidateSetHash(),</span>
+<span class="fc" id="L191">                disabledReceipt.contentHash(),</span>
+<span class="fc" id="L192">                enabledReceipt.contentHash(),</span>
+<span class="fc" id="L193">                disabledDisclosure.classificationCatalog().contentHash(),</span>
+<span class="fc" id="L194">                enabledDisclosure.classificationCatalog().contentHash()</span>
+            ),
+            new DiscoveredBridge(
+<span class="fc" id="L197">                discovered.candidate().state().stateHash(),</span>
+<span class="fc" id="L198">                discovered.candidate().state().expression(),</span>
+<span class="fc" id="L199">                discovered.candidate().state().depth(),</span>
+<span class="fc" id="L200">                discovered.candidate().state().pathRuleIds(),</span>
+<span class="fc" id="L201">                discovered.candidate().state().primitiveRuleIds(),</span>
+<span class="fc" id="L202">                discovered.candidate().state().assumptions(),</span>
+<span class="fc" id="L203">                discovered.candidate().state().packIds(),</span>
+<span class="fc" id="L204">                discovered.candidate().proposal()</span>
+<span class="fc" id="L205">                    .validationStatus().name(),</span>
+<span class="fc" id="L206">                structure.structureId(),</span>
+<span class="fc" id="L207">                structure.recognitionMode(),</span>
+<span class="fc" id="L208">                structure.metadata().sourceProject(),</span>
+<span class="fc" id="L209">                structure.metadata().sourceReference(),</span>
+<span class="fc" id="L210">                structure.metadata().license(),</span>
+<span class="fc" id="L211">                structure.metadata().minimumEvidence().name(),</span>
+                CONSEQUENCE_ID
+            ),
+            new ClassificationEvidence(
+<span class="fc" id="L215">                targetMatches(discovered.disabledAssessment()),</span>
+<span class="fc" id="L216">                targetMatches(provisionalAssessment),</span>
+<span class="fc" id="L217">                targetUnlocks(provisionalAssessment),</span>
+<span class="fc" id="L218">                provisionalAssessment.warnings(),</span>
+<span class="fc" id="L219">                targetMatches(discovered.enabledAssessment()),</span>
+<span class="fc" id="L220">                targetUnlocks(discovered.enabledAssessment()),</span>
+<span class="fc" id="L221">                discovered.enabledAssessment().warnings()</span>
+            ),
+            followOn,
+            CLAIM_BOUNDARY
+        );
+<span class="fc" id="L226">        ScenarioArtifact artifact = ScenarioArtifact.create(content);</span>
+<span class="fc" id="L227">        validate(artifact);</span>
+<span class="fc" id="L228">        return artifact;</span>
+    }
+
+    public static ScenarioArtifact write(Path output) throws IOException {
+<span class="fc" id="L232">        Objects.requireNonNull(output, &quot;output&quot;);</span>
+<span class="fc" id="L233">        ScenarioArtifact artifact = run();</span>
+<span class="fc" id="L234">        Path absolute = output.toAbsolutePath();</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (absolute.getParent() != null) {</span>
+<span class="fc" id="L236">            Files.createDirectories(absolute.getParent());</span>
+        }
+<span class="fc" id="L238">        Files.writeString(</span>
+            absolute,
+<span class="fc" id="L240">            artifact.toCanonicalJson() + &quot;\n&quot;,</span>
+            StandardCharsets.UTF_8
+        );
+<span class="fc" id="L243">        return artifact;</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        Path output = args.length == 0</span>
+<span class="nc" id="L248">            ? Path.of(</span>
+                &quot;build/reports/representation-discovery/&quot;
+                    + &quot;target-free-sympy-bridge.json&quot;)
+<span class="nc" id="L251">            : Path.of(args[0]);</span>
+<span class="nc" id="L252">        write(output);</span>
+<span class="nc" id="L253">    }</span>
+
+    private static RepresentationDiscoveryInformationBoundary boundary(
+        KnowledgePackRegistry registry,
+        KnowledgePackSelection selection
+    ) {
+<span class="fc" id="L259">        return RepresentationDiscoveryInformationBoundary.fromKnowledgePacks(</span>
+            registry,
+            RepresentationDiscoveryInformationBoundary.Track
+                .R2_CATALOG_BLIND_POST_HOC_BRIDGE,
+            selection,
+<span class="fc" id="L264">            Set.of()</span>
+        );
+    }
+
+    private static Candidate candidate(
+        TargetFreeRepresentationSearch.State state,
+        CandidateProofStatus status
+    ) {
+<span class="fc" id="L272">        return new Candidate(</span>
+            state,
+<span class="fc" id="L274">            RepresentationCandidateProposal.whole(</span>
+                SOURCE_EXPRESSION,
+<span class="fc" id="L276">                state.expression(),</span>
+<span class="fc" id="L277">                state.assumptions(),</span>
+                status
+            )
+        );
+    }
+
+    private static CandidateProofStatus proofStatus(
+        TargetFreeRepresentationSearch.State state,
+        Map&lt;String, RewriteRule&gt; rules,
+        SymPyOracleValidator oracle
+    ) {
+<span class="fc" id="L288">        OracleValidation validation = oracle.validateEquivalence(</span>
+<span class="fc" id="L289">            SOURCE_EXPRESSION, state.expression());</span>
+<span class="fc" id="L290">        boolean validatedPath = state.pathRuleIds().stream()</span>
+<span class="fc" id="L291">            .map(rules::get)</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            .allMatch(rule -&gt; rule != null</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">                &amp;&amp; rule.descriptor().status() == RuleStatus.VALIDATED);</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (state.equivalencePreserving()</span>
+<span class="pc bpc" id="L295" title="2 of 4 branches missed.">                &amp;&amp; state.assumptions().isEmpty()</span>
+                &amp;&amp; validatedPath
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">                &amp;&amp; validation.status() == AGREE) {</span>
+<span class="fc" id="L298">            return CandidateProofStatus.SYMBOLICALLY_VERIFIED;</span>
+        }
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        return validation.status() == AGREE</span>
+<span class="nc" id="L301">            ? CandidateProofStatus.VALIDATED_BY_EXAMPLES</span>
+<span class="nc" id="L302">            : CandidateProofStatus.OBSERVED;</span>
+    }
+
+    private static Map&lt;String, RewriteRule&gt; ruleIndex(
+        List&lt;RewriteRule&gt; rules
+    ) {
+<span class="fc" id="L308">        Map&lt;String, RewriteRule&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">            if (result.put(rule.id(), rule) != null) {</span>
+<span class="nc" id="L311">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L312">                    &quot;duplicate formation rule ID: &quot; + rule.id());</span>
+            }
+<span class="fc" id="L314">        }</span>
+<span class="fc" id="L315">        return Map.copyOf(result);</span>
+    }
+
+    private static FollowOnEvidence followOn(
+        List&lt;RewriteRule&gt; formationRules,
+        KnowledgePackSelection disabled,
+        KnowledgePackSelection enabled,
+        String expression,
+        String disabledInventoryHash,
+        String enabledInventoryHash
+    ) {
+<span class="fc" id="L326">        AstRewriteTransformationEngine formationEngine =</span>
+            new AstRewriteTransformationEngine(formationRules);
+<span class="fc" id="L328">        AstRewriteTransformationEngine disabledEngine =</span>
+<span class="fc" id="L329">            AstRewriteTransformationEngine.withKnowledgePacks(disabled);</span>
+<span class="fc" id="L330">        AstRewriteTransformationEngine enabledEngine =</span>
+<span class="fc" id="L331">            AstRewriteTransformationEngine.withKnowledgePacks(enabled);</span>
+<span class="fc" id="L332">        List&lt;Transformation&gt; formation =</span>
+<span class="fc" id="L333">            formationEngine.transform(expression);</span>
+<span class="fc" id="L334">        List&lt;Transformation&gt; disabledResults =</span>
+<span class="fc" id="L335">            disabledEngine.transform(expression);</span>
+<span class="fc" id="L336">        List&lt;Transformation&gt; enabledResults =</span>
+<span class="fc" id="L337">            enabledEngine.transform(expression);</span>
+<span class="fc" id="L338">        return new FollowOnEvidence(</span>
+<span class="fc" id="L339">            hasTargetRule(formationEngine),</span>
+<span class="fc" id="L340">            hasTargetRule(disabledEngine),</span>
+<span class="fc" id="L341">            hasTargetRule(enabledEngine),</span>
+<span class="fc" id="L342">            targetSuccessors(formation),</span>
+<span class="fc" id="L343">            targetSuccessors(disabledResults),</span>
+<span class="fc" id="L344">            targetSuccessors(enabledResults),</span>
+<span class="fc" id="L345">            formation.size(),</span>
+<span class="fc" id="L346">            disabledResults.size(),</span>
+<span class="fc" id="L347">            enabledResults.size(),</span>
+            disabledInventoryHash,
+            enabledInventoryHash
+        );
+    }
+
+    private static boolean hasTargetRule(
+        AstRewriteTransformationEngine engine
+    ) {
+<span class="fc" id="L356">        return engine.rules().stream()</span>
+<span class="fc" id="L357">            .anyMatch(rule -&gt; rule.id().equals(targetRuleId()));</span>
+    }
+
+    private static List&lt;String&gt; targetSuccessors(
+        List&lt;Transformation&gt; transformations
+    ) {
+<span class="fc" id="L363">        return transformations.stream()</span>
+<span class="fc" id="L364">            .filter(result -&gt; result.rule().equals(targetRuleId()))</span>
+<span class="fc" id="L365">            .map(Transformation::transformedExpression)</span>
+<span class="fc" id="L366">            .distinct()</span>
+<span class="fc" id="L367">            .sorted()</span>
+<span class="fc" id="L368">            .toList();</span>
+    }
+
+    private static String targetRuleId() {
+<span class="fc" id="L372">        return CONSEQUENCE_ID.substring(&quot;rule:&quot;.length());</span>
+    }
+
+    private static boolean hasUnlock(
+        RepresentationCandidateAssessment assessment,
+        String structureId,
+        String consequenceId
+    ) {
+<span class="fc" id="L380">        return assessment.newlyUnlockedConsequences().stream()</span>
+<span class="fc" id="L381">            .anyMatch(unlock -&gt;</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">                unlock.structureId().equals(structureId)</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">                    &amp;&amp; unlock.consequenceId().equals(consequenceId));</span>
+    }
+
+    private static int targetMatches(
+        RepresentationCandidateAssessment assessment
+    ) {
+<span class="fc" id="L389">        return Math.toIntExact(</span>
+<span class="fc" id="L390">            assessment.newlyExposedStructureMatches().stream()</span>
+<span class="fc" id="L391">                .filter(match -&gt; match.structureId().equals(STRUCTURE_ID))</span>
+<span class="fc" id="L392">                .count());</span>
+    }
+
+    private static List&lt;String&gt; targetUnlocks(
+        RepresentationCandidateAssessment assessment
+    ) {
+<span class="fc" id="L398">        return assessment.newlyUnlockedConsequences().stream()</span>
+<span class="fc" id="L399">            .filter(unlock -&gt; unlock.structureId().equals(STRUCTURE_ID))</span>
+<span class="fc" id="L400">            .map(KnownStructureConsequenceUnlock::consequenceId)</span>
+<span class="fc" id="L401">            .distinct()</span>
+<span class="fc" id="L402">            .sorted()</span>
+<span class="fc" id="L403">            .toList();</span>
+    }
+
+    private static void validate(ScenarioArtifact artifact) {
+<span class="fc" id="L407">        ScenarioContent content = artifact.content();</span>
+<span class="fc" id="L408">        ClassificationEvidence classification =</span>
+<span class="fc" id="L409">            content.classification();</span>
+<span class="fc" id="L410">        FollowOnEvidence followOn = content.followOnExecution();</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">        requireTrue(content.search().candidateStates().size() &gt; 1,</span>
+            &quot;target-free search retained too few candidates&quot;);
+<span class="fc" id="L413">        requireTrue(!content.discoveredBridge().pathRuleIds()</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">                .contains(targetRuleId()),</span>
+            &quot;formation path contains the withheld target rule&quot;);
+<span class="fc" id="L416">        requireTrue(!content.discoveredBridge().packIds()</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">                .contains(PACK_ID),</span>
+            &quot;formation path contains the withheld knowledge pack&quot;);
+<span class="fc" id="L419">        requireEqual(0, classification.disabledMatches(),</span>
+            &quot;disabled catalog recognized the target&quot;);
+<span class="fc" id="L421">        requireEqual(1, classification.provisionalMatches(),</span>
+            &quot;enabled catalog did not recognize the target&quot;);
+<span class="fc" id="L423">        requireTrue(classification.provisionalUnlocks().isEmpty(),</span>
+            &quot;below-threshold evidence unlocked a consequence&quot;);
+<span class="fc" id="L425">        requireTrue(classification.provisionalWarnings().contains(</span>
+            WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM),
+            &quot;specific evidence warning is missing&quot;);
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">        requireTrue(!classification.provisionalWarnings().contains(</span>
+            WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY),
+            &quot;generic warning obscures the evidence gate&quot;);
+<span class="fc" id="L431">        requireEqual(List.of(CONSEQUENCE_ID),</span>
+<span class="fc" id="L432">            classification.verifiedUnlocks(),</span>
+            &quot;verified candidate did not unlock the consequence&quot;);
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">        requireTrue(!followOn.formationTargetRulePresent(),</span>
+            &quot;formation leaked the target rule&quot;);
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">        requireTrue(!followOn.disabledTargetRulePresent(),</span>
+            &quot;disabled inventory contains the target rule&quot;);
+<span class="fc" id="L438">        requireTrue(followOn.enabledTargetRulePresent(),</span>
+            &quot;enabled inventory is missing the target rule&quot;);
+<span class="fc" id="L440">        requireEqual(List.of(), followOn.formationTargetSuccessors(),</span>
+            &quot;formation produced a target-rule successor&quot;);
+<span class="fc" id="L442">        requireEqual(List.of(), followOn.disabledTargetSuccessors(),</span>
+            &quot;disabled pack produced a target-rule successor&quot;);
+<span class="fc" id="L444">        requireEqual(List.of(FOLLOW_ON_EXPRESSION),</span>
+<span class="fc" id="L445">            followOn.enabledTargetSuccessors(),</span>
+            &quot;enabled pack did not produce the expected state&quot;);
+<span class="fc" id="L447">    }</span>
+
+    private static String json(Object value) {
+        try {
+<span class="fc" id="L451">            return JSON.writeValueAsString(value);</span>
+<span class="nc" id="L452">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L453">            throw new IllegalStateException(</span>
+                &quot;Unable to render target-free scenario evidence&quot;, exception);
+        }
+    }
+
+    private static void requireTrue(boolean condition, String message) {
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">        if (!condition) {</span>
+<span class="nc" id="L460">            throw new IllegalStateException(message);</span>
+        }
+<span class="fc" id="L462">    }</span>
+
+    private static void requireEqual(
+        Object expected,
+        Object actual,
+        String message
+    ) {
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">        if (!Objects.equals(expected, actual)) {</span>
+<span class="nc" id="L470">            throw new IllegalStateException(</span>
+                message + &quot;: expected=&quot; + expected + &quot;, actual=&quot; + actual);
+        }
+<span class="fc" id="L473">    }</span>
+
+<span class="fc" id="L475">    private record Candidate(</span>
+        TargetFreeRepresentationSearch.State state,
+        RepresentationCandidateProposal proposal
+    ) {
+    }
+
+<span class="fc" id="L481">    private record AssessedCandidate(</span>
+        Candidate candidate,
+        RepresentationCandidateAssessment disabledAssessment,
+        RepresentationCandidateAssessment enabledAssessment
+    ) {
+    }
+
+<span class="fc" id="L488">    public record FreezeEvidence(</span>
+        String disabledBoundaryHash,
+        String enabledBoundaryHash,
+        String candidateSetHash,
+        String disabledFreezeReceiptHash,
+        String enabledFreezeReceiptHash,
+        String disabledCatalogHash,
+        String enabledCatalogHash
+    ) {
+    }
+
+    public record DiscoveredBridge(
+        String stateHash,
+        String expression,
+        int depth,
+        List&lt;String&gt; pathRuleIds,
+        List&lt;String&gt; primitiveRuleIds,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; packIds,
+        String candidateProofStatus,
+        String structureId,
+        String recognitionMode,
+        String sourceProject,
+        String sourceReference,
+        String license,
+        String minimumEvidence,
+        String consequenceId
+    ) {
+<span class="fc" id="L516">        public DiscoveredBridge {</span>
+<span class="fc" id="L517">            pathRuleIds = List.copyOf(pathRuleIds);</span>
+<span class="fc" id="L518">            primitiveRuleIds = List.copyOf(primitiveRuleIds);</span>
+<span class="fc" id="L519">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L520">            packIds = List.copyOf(packIds);</span>
+<span class="fc" id="L521">        }</span>
+    }
+
+    public record ClassificationEvidence(
+        int disabledMatches,
+        int provisionalMatches,
+        List&lt;String&gt; provisionalUnlocks,
+        List&lt;String&gt; provisionalWarnings,
+        int verifiedMatches,
+        List&lt;String&gt; verifiedUnlocks,
+        List&lt;String&gt; verifiedWarnings
+    ) {
+<span class="fc" id="L533">        public ClassificationEvidence {</span>
+<span class="fc" id="L534">            provisionalUnlocks = List.copyOf(provisionalUnlocks);</span>
+<span class="fc" id="L535">            provisionalWarnings = List.copyOf(provisionalWarnings);</span>
+<span class="fc" id="L536">            verifiedUnlocks = List.copyOf(verifiedUnlocks);</span>
+<span class="fc" id="L537">            verifiedWarnings = List.copyOf(verifiedWarnings);</span>
+<span class="fc" id="L538">        }</span>
+    }
+
+    public record FollowOnEvidence(
+        boolean formationTargetRulePresent,
+        boolean disabledTargetRulePresent,
+        boolean enabledTargetRulePresent,
+        List&lt;String&gt; formationTargetSuccessors,
+        List&lt;String&gt; disabledTargetSuccessors,
+        List&lt;String&gt; enabledTargetSuccessors,
+        int formationTotalSuccessors,
+        int disabledTotalSuccessors,
+        int enabledTotalSuccessors,
+        String disabledRuleInventoryHash,
+        String enabledRuleInventoryHash
+    ) {
+<span class="fc" id="L554">        public FollowOnEvidence {</span>
+<span class="fc" id="L555">            formationTargetSuccessors =</span>
+<span class="fc" id="L556">                List.copyOf(formationTargetSuccessors);</span>
+<span class="fc" id="L557">            disabledTargetSuccessors =</span>
+<span class="fc" id="L558">                List.copyOf(disabledTargetSuccessors);</span>
+<span class="fc" id="L559">            enabledTargetSuccessors =</span>
+<span class="fc" id="L560">                List.copyOf(enabledTargetSuccessors);</span>
+<span class="fc" id="L561">        }</span>
+    }
+
+<span class="fc" id="L564">    public record ScenarioContent(</span>
+        String schema,
+        String scenarioId,
+        String informationTrack,
+        TargetFreeRepresentationSearch.SearchContent search,
+        String searchContentHash,
+        FreezeEvidence freeze,
+        DiscoveredBridge discoveredBridge,
+        ClassificationEvidence classification,
+        FollowOnEvidence followOnExecution,
+        String claimBoundary
+    ) {
+    }
+
+    public record ScenarioArtifact(
+        ScenarioContent content,
+        String contentHash
+    ) {
+<span class="fc" id="L582">        public ScenarioArtifact {</span>
+<span class="fc" id="L583">            content = Objects.requireNonNull(content, &quot;content&quot;);</span>
+<span class="fc" id="L584">            contentHash = RepresentationCandidateAssessment.requireText(</span>
+                contentHash, &quot;contentHash&quot;);
+<span class="fc" id="L586">            String expected =</span>
+<span class="fc" id="L587">                KnownStructureCatalog.sha256(json(content));</span>
+<span class="fc bfc" id="L588" title="All 2 branches covered.">            if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L589">                throw new IllegalArgumentException(</span>
+                    &quot;scenario hash does not match canonical content&quot;);
+            }
+<span class="fc" id="L592">        }</span>
+
+        static ScenarioArtifact create(ScenarioContent content) {
+<span class="fc" id="L595">            return new ScenarioArtifact(</span>
+                content,
+<span class="fc" id="L597">                KnownStructureCatalog.sha256(json(content))</span>
+            );
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L602">            return json(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -34,8 +34,8 @@ public class PatternRewriteRule implements RewriteRule {
 <span class="fc" id="L34">    }</span>
 
     public PatternRewriteRule(String id, PatternExpr source, PatternExpr target, RuleDescriptor descriptor) {
-<span class="fc" id="L37">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true, descriptor);</span>
-<span class="fc" id="L38">    }</span>
+<span class="nc" id="L37">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true, descriptor);</span>
+<span class="nc" id="L38">    }</span>
 
     public PatternRewriteRule(
         String id,
@@ -44,8 +44,8 @@ public class PatternRewriteRule implements RewriteRule {
         RuleDescriptor descriptor,
         RecognitionProfile recognitionProfile
     ) {
-<span class="nc" id="L47">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true, descriptor, recognitionProfile);</span>
-<span class="nc" id="L48">    }</span>
+<span class="fc" id="L47">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true, descriptor, recognitionProfile);</span>
+<span class="fc" id="L48">    }</span>
 
     public PatternRewriteRule(
         String id,

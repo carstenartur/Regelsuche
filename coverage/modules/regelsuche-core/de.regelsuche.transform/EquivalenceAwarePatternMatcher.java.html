@@ -276,7 +276,7 @@ public final class EquivalenceAwarePatternMatcher {
     private static int bindingPriority(PatternExpr pattern) {
 <span class="fc bfc" id="L277" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation operation</span>
 <span class="fc bfc" id="L278" title="All 2 branches covered.">                &amp;&amp; operation.operator() == BinaryOperator.POW</span>
-<span class="pc bpc" id="L279" title="1 of 2 branches missed.">                &amp;&amp; operation.left() instanceof PatternExpr.Placeholder</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">                &amp;&amp; operation.left() instanceof PatternExpr.Placeholder</span>
 <span class="pc bpc" id="L280" title="1 of 2 branches missed.">                &amp;&amp; operation.right()</span>
                     instanceof PatternExpr.LiteralNumber) {
 <span class="fc" id="L282">            return 30;</span>
@@ -401,7 +401,7 @@ public final class EquivalenceAwarePatternMatcher {
 <span class="fc bfc" id="L401" title="All 2 branches covered.">                    &amp;&amp; binary.operator() == BinaryOperator.POW;</span>
         }
 <span class="fc" id="L403">        return expression instanceof BinaryExpr binary</span>
-<span class="pc bpc" id="L404" title="1 of 4 branches missed.">            &amp;&amp; binary.operator() == operation.operator();</span>
+<span class="fc bfc" id="L404" title="All 4 branches covered.">            &amp;&amp; binary.operator() == operation.operator();</span>
     }
 
     private static void flattenPattern(

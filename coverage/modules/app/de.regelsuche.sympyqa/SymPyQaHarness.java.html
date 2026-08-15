@@ -162,8 +162,8 @@ public final class SymPyQaHarness {
 <span class="fc" id="L162">        }</span>
 <span class="fc" id="L163">        StringBuilder builder = new StringBuilder(&quot;# Candidate rules\n\n&quot;);</span>
 <span class="fc" id="L164">        counts.forEach((rule, count) -&gt; builder.append(&quot;- &quot;).append(rule).append(&quot;: &quot;).append(count).append('\n'));</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (counts.isEmpty()) {</span>
-<span class="fc" id="L166">            builder.append(&quot;- none\n&quot;);</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (counts.isEmpty()) {</span>
+<span class="nc" id="L166">            builder.append(&quot;- none\n&quot;);</span>
         }
 <span class="fc" id="L168">        return builder.toString();</span>
     }
