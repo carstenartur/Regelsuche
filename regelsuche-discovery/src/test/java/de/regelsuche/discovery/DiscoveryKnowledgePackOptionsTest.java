@@ -1,11 +1,15 @@
 package de.regelsuche.discovery;
 
+import static de.regelsuche.ast.BinaryOperator.ADD;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.discovery.representation.KnownStructure;
 import de.regelsuche.discovery.representation.KnownStructureCatalog;
 import de.regelsuche.discovery.representation.KnownStructureMatch;
 import de.regelsuche.discovery.representation.KnownStructureMatcher;
@@ -14,6 +18,7 @@ import de.regelsuche.discovery.representation.RepresentationCandidateAssessor;
 import de.regelsuche.discovery.representation.RepresentationCandidateProposal;
 import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.knowledge.RuleProfile;
+import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.util.List;
 import java.util.Set;
@@ -58,7 +63,9 @@ class DiscoveryKnowledgePackOptionsTest {
 
         assertTrue(hidden.structures().stream()
             .noneMatch(form -> form.id().startsWith("sympy.")));
-        assertEquals(7, visible.structures().size());
+        assertEquals(7L, visible.structures().stream()
+            .filter(form -> form.id().startsWith("sympy."))
+            .count());
         assertNotEquals(hidden.contentHash(), visible.contentHash());
         assertEquals(KnownStructureMatch.RECOGNITION_EQUIVALENCE_AWARE,
             match.recognitionMode());
@@ -82,7 +89,65 @@ class DiscoveryKnowledgePackOptionsTest {
         assertTrue(provisional.newlyUnlockedConsequences().isEmpty());
         assertTrue(provisional.warnings().contains(
             WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM));
+        assertFalse(provisional.warnings().contains(
+            WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY));
         assertFalse(verified.newlyUnlockedConsequences().isEmpty());
+    }
+
+    @Test
+    void unsatisfiedAssumptionsDoNotAddGenericKnownFormWarning() {
+        KnownStructure guarded = new KnownStructure(
+            "guarded-quotient",
+            "rational",
+            PatternExpr.var("expression"),
+            List.of("x != 0"),
+            List.of("rule:guarded-cancellation"),
+            "test fixture"
+        );
+        RepresentationCandidateAssessment assessment =
+            new RepresentationCandidateAssessor(new KnownStructureCatalog(
+                "warning-fixture-v1",
+                List.of(guarded)
+            )).assess(RepresentationCandidateProposal.whole(
+                "x",
+                "x + 0",
+                List.of(),
+                CandidateProofStatus.SYMBOLICALLY_VERIFIED
+            ));
+
+        assertTrue(assessment.warnings().contains(
+            WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS));
+        assertFalse(assessment.warnings().contains(
+            WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY));
+    }
+
+    @Test
+    void eligibleKnownFormWithoutConsequencesKeepsSpecificWarning() {
+        KnownStructure informational = new KnownStructure(
+            "known-zero-sum",
+            "algebra",
+            PatternExpr.op(
+                ADD,
+                PatternExpr.var("expression"),
+                PatternExpr.num(0)
+            ),
+            List.of(),
+            List.of(),
+            "test fixture"
+        );
+        RepresentationCandidateAssessment assessment =
+            new RepresentationCandidateAssessor(new KnownStructureCatalog(
+                "warning-fixture-v1",
+                List.of(informational)
+            )).assess(RepresentationCandidateProposal.whole(
+                "x",
+                "x + 0",
+                List.of(),
+                CandidateProofStatus.SYMBOLICALLY_VERIFIED
+            ));
+
+        assertTrue(assessment.warnings().contains(
+            WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY));
     }
 
     private static RepresentationCandidateProposal proposal(

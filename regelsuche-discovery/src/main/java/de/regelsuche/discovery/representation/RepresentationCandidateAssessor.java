@@ -291,7 +291,10 @@ public final class RepresentationCandidateAssessor {
                 !evidenceSatisfied(match, proposal.validationStatus()))) {
             warnings.add(WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM);
         }
-        if (!newMatches.isEmpty() && unlocks.isEmpty()) {
+        boolean hasUnlockEligibleMatch = newMatches.stream().anyMatch(match ->
+            assumptionsSatisfied(match, assumptions)
+                && evidenceSatisfied(match, proposal.validationStatus()));
+        if (hasUnlockEligibleMatch && unlocks.isEmpty()) {
             warnings.add(WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY);
         }
         if (!proposal.validationStatus().atLeast(
