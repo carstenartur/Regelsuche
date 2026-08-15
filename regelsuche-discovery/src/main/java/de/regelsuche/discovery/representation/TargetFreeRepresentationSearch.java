@@ -580,25 +580,45 @@ public final class TargetFreeRepresentationSearch {
         List<Transition> transitions,
         List<String> paretoStateHashes
     ) {
-        public SearchContent {
-            schema = RepresentationCandidateAssessment.requireText(
+        public SearchContent(
+            String schema,
+            String sourceExpression,
+            String sourceStateHash,
+            String ruleInventoryHash,
+            Budget budget,
+            int exploredStateCount,
+            int generatedTransitionCount,
+            List<TruncationReason> truncationReasons,
+            List<State> states,
+            List<Transition> transitions,
+            List<String> paretoStateHashes
+        ) {
+            this.schema = RepresentationCandidateAssessment.requireText(
                 schema, "schema");
-            if (!SCHEMA.equals(schema)) {
+            if (!SCHEMA.equals(this.schema)) {
                 throw new IllegalArgumentException(
-                    "unsupported target-free search schema: " + schema);
+                    "unsupported target-free search schema: " + this.schema);
             }
-            sourceExpression =
+            this.sourceExpression =
                 RepresentationCandidateAssessment.requireText(
                     sourceExpression, "sourceExpression");
-            sourceStateHash = requireHash(
+            this.sourceStateHash = requireHash(
                 sourceStateHash, "sourceStateHash");
-            ruleInventoryHash = requireHash(
+            this.ruleInventoryHash = requireHash(
                 ruleInventoryHash, "ruleInventoryHash");
-            budget = Objects.requireNonNull(budget, "budget");
-            truncationReasons = List.copyOf(truncationReasons);
-            states = List.copyOf(states);
-            transitions = List.copyOf(transitions);
-            paretoStateHashes = List.copyOf(paretoStateHashes);
+            this.budget = Objects.requireNonNull(budget, "budget");
+            this.exploredStateCount = exploredStateCount;
+            this.generatedTransitionCount = generatedTransitionCount;
+            this.truncationReasons = List.copyOf(
+                Objects.requireNonNull(
+                    truncationReasons, "truncationReasons"));
+            this.states = List.copyOf(
+                Objects.requireNonNull(states, "states"));
+            this.transitions = List.copyOf(
+                Objects.requireNonNull(transitions, "transitions"));
+            this.paretoStateHashes = List.copyOf(
+                Objects.requireNonNull(
+                    paretoStateHashes, "paretoStateHashes"));
             validateBalance();
         }
 
