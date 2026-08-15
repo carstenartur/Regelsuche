@@ -35,6 +35,16 @@ in `PatternExpr.Operation` übersetzt. Eine falsche Stelligkeit schlägt
 fehlersicher fehl. Andere Namen wie `sin`, `cos`, `log` oder domänenspezifische
 Funktionen bleiben gewöhnliche `PatternExpr.Function`-Knoten.
 
+Ausführbare Patternregeln verwenden standardmäßig das Erkennungsprofil `EXACT`.
+Ein Pack darf das Profil einer einzelnen Regel ausdrücklich über
+`recognition: ARITHMETIC_AC` beziehungsweise `recognition: ALGEBRAIC_AC`
+erweitern. Der Loader übergibt diese Deklaration an `PatternRewriteRule`; fehlt
+sie, bleibt die bisherige exakte Semantik unverändert. Das Erkennungsprofil einer
+bekannten Struktur erweitert eine Folge-Regel nicht automatisch. Klassifikation
+und Ausführung müssen daher bewusst dieselbe zulässige Äquivalenz deklarieren,
+wenn jede erkannte Form unmittelbar ausführbar sein soll. Das Profil gehört zur
+content-addressed Regelinventaridentität.
+
 Damit muss beispielsweise
 
 ```text
@@ -49,9 +59,10 @@ sin(?X)^2 + cos(?X)^2
 
 Die CI charakterisiert sowohl die Gleichheit der beiden Patternformen als auch
 die reale Ausführung einer geladenen funktional notierten Knowledge-Pack-Regel
-gegen einen gewöhnlichen Infix-Ausdruck. Reine Metadaten- oder
-Nicht-Leerheitsprüfungen gelten nicht als Nachweis, dass eine Regel im
-Produktionsmotor ausführbar ist.
+gegen einen gewöhnlichen Infix-Ausdruck. Für AC-deklarierte Regeln wird außerdem
+die vertauschte Operandenreihenfolge ausgeführt; Regeln ohne Deklaration bleiben
+nachweislich exakt. Reine Metadaten- oder Nicht-Leerheitsprüfungen gelten nicht
+als Nachweis, dass eine Regel im Produktionsmotor ausführbar ist.
 
 ## Provenienzgebundene bekannte Strukturen
 
