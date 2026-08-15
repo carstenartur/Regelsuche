@@ -42,7 +42,7 @@ Ausdrucksrepräsentation.
 ## Erzwingbare Informationsregime
 
 `RepresentationDiscoveryInformationBoundary` bindet Regel-Auswahl,
-den tatsächlichen ausführbaren Regelbestand, Formation-Katalog,
+den tatsächlichen ausführbaren AST-Regelbestand, Formation-Katalog,
 Post-Freeze-Katalog und Holdout-Verpflichtung an eine content-addressed Identität.
 Die vier Tracks aus #663 werden damit nicht nur dokumentiert, sondern durch
 verschiedene zugängliche Informationsflächen ausgeführt:
@@ -62,17 +62,25 @@ verschiedene zugängliche Informationsflächen ausgeführt:
   zurückgehalten. Der vollständige Katalog und die Holdout-Details werden erst
   nach dem Kandidaten-Freeze offengelegt.
 
-Die Regel-Inventaridentität umfasst nicht nur Pack-IDs, sondern die kanonischen
-Quell- und Zielpattern, Recognition-Profile, Orientierungs- und Kostenmerkmale
-sowie die vollständigen `RuleDescriptor`-Metadaten. Eine Regeländerung erzeugt
-daher auch bei unveränderter Pack-Auswahl eine neue Experimentidentität.
+Die AST-Regel-Inventaridentität umfasst sowohl die durch
+`AstRewriteTransformationEngine.defaultRules(...)` ausgewählten eingebauten
+Core-Regeln als auch die freigegebenen Knowledge-Pack-Regeln. Bei Pattern-Regeln
+bindet sie Quell- und Zielpattern, Recognition-Profile, Orientierungs- und
+Kostenmerkmale sowie die vollständigen `RuleDescriptor`-Metadaten. Bei
+implementierungsdefinierten Core-Regeln bindet sie die Implementierungsklasse,
+die Core-Pack-Zuordnung und alle öffentlich exponierten Ausführungsmerkmale. Ein
+vollständiges Experiment muss zusätzlich die Repository-Revision binden, welche
+diese Klassen implementiert; dies gehört in das noch ausstehende
+`InformationParityManifest`.
 
 R2 und R4 benötigen ein `CandidateFreezeReceipt`, das sowohl den eingefrorenen
 Kandidatensatz als auch exakt dieselbe Informationsgrenze bindet. Das Receipt
-wird ausschließlich durch `freezeCandidates(...)` ausgegeben und kann nicht über
-einen öffentlichen Konstruktor aus bekannten Hashes nachgebaut werden. Ein
-Receipt aus einem anderen Track oder einer anderen Inventar-Auswahl wird
-abgewiesen.
+wird ausschließlich durch `freezeCandidates(...)` ausgegeben und ist über die
+öffentliche API nicht aus bekannten Hashes konstruierbar. Ein Receipt aus einem
+anderen Track oder einer anderen Inventar-Auswahl wird abgewiesen. Dies ist eine
+API- und Evidenzgrenze, keine kryptografische Isolationsbehauptung; die spätere
+Run-Harness muss Formation und Post-Freeze-Auswertung zusätzlich als getrennte
+Fähigkeitsflächen ausführen.
 
 Bei R2 werden alle Regel-Packs zurückgehalten, die von den verborgenen
 Katalogeinträgen als Folgeinventar deklariert sind. Bei R4 betrifft das die

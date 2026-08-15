@@ -3,6 +3,7 @@ package de.regelsuche.knowledge;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RewriteRule;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -12,21 +13,28 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 
-/** Deterministic content identity for the exact executable rewrite inventory. */
+/**
+ * Deterministic descriptor identity for a concrete rewrite-rule inventory.
+ *
+ * <p>Pattern rules bind their source, target and recognition policy directly.
+ * Implementation-defined rules bind their implementation class and all public
+ * execution metadata. A complete experiment must additionally bind the
+ * repository revision that supplies those implementation classes.</p>
+ */
 public final class RuleInventoryFingerprint {
     private static final String REVISION =
-        "regelsuche.rule-inventory-fingerprint/v1";
+        "regelsuche.rule-inventory-fingerprint/v2";
 
     private RuleInventoryFingerprint() {
     }
 
-    public static String ruleContentHash(PatternRewriteRule rule) {
+    public static String ruleContentHash(RewriteRule rule) {
         return sha256(canonicalRule(
             Objects.requireNonNull(rule, "rule")));
     }
 
     public static String contentHash(
-        Collection<? extends PatternRewriteRule> rules
+        Collection<? extends RewriteRule> rules
     ) {
         Objects.requireNonNull(rules, "rules");
         List<String> descriptors = rules.stream()
@@ -41,17 +49,27 @@ public final class RuleInventoryFingerprint {
         return sha256(inventory.toString());
     }
 
-    private static String canonicalRule(PatternRewriteRule rule) {
+    private static String canonicalRule(RewriteRule rule) {
         StringBuilder descriptor = new StringBuilder();
         append(descriptor, rule.id());
-        append(descriptor, canonicalPattern(rule.source()));
-        append(descriptor, canonicalPattern(rule.target()));
+        append(descriptor, rule.getClass().getName());
+        String corePackId = CoreRuleCatalog.packIdForRule(rule.id());
+        append(descriptor, corePackId == null ? "" : corePackId);
         append(descriptor, rule.kind().name());
         append(descriptor, Boolean.toString(rule.mayIncreaseComplexity()));
         append(descriptor, Integer.toString(rule.estimatedCostDelta()));
         append(descriptor, Boolean.toString(
             rule.isEquivalencePreservingByConstruction()));
-        append(descriptor, canonicalRecognition(rule.recognitionProfile()));
+        append(descriptor, Boolean.toString(rule.mayEmitAssumptions()));
+        if (rule instanceof PatternRewriteRule patternRule) {
+            append(descriptor, "pattern");
+            append(descriptor, canonicalPattern(patternRule.source()));
+            append(descriptor, canonicalPattern(patternRule.target()));
+            append(descriptor,
+                canonicalRecognition(patternRule.recognitionProfile()));
+        } else {
+            append(descriptor, "implementation-defined");
+        }
         append(descriptor, canonicalDescriptor(rule.descriptor()));
         return descriptor.toString();
     }

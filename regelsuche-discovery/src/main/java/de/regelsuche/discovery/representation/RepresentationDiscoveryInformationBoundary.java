@@ -3,7 +3,8 @@ package de.regelsuche.discovery.representation;
 import de.regelsuche.knowledge.KnowledgePackRegistry;
 import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.knowledge.RuleInventoryFingerprint;
-import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteRule;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -25,18 +26,18 @@ import java.util.TreeSet;
  */
 public final class RepresentationDiscoveryInformationBoundary {
     private static final String REVISION =
-        "regelsuche.representation-discovery-information-boundary/v2";
+        "regelsuche.representation-discovery-information-boundary/v3";
     private static final String CANDIDATE_FREEZE_REVISION =
         "regelsuche.representation-candidate-freeze/v1";
     private static final String POST_FREEZE_REVISION =
-        "regelsuche.representation-post-freeze-disclosure/v2";
+        "regelsuche.representation-post-freeze-disclosure/v3";
 
     private final Track track;
     private final KnowledgePackSelection visibleSelection;
     private final KnowledgePackSelection formationSelection;
     private final KnownStructureCatalog formationCatalog;
     private final KnownStructureCatalog postFreezeCatalog;
-    private final List<PatternRewriteRule> formationRules;
+    private final List<RewriteRule> formationRules;
     private final String formationRuleInventoryHash;
     private final String postFreezeRuleInventoryHash;
     private final Set<String> requestedHoldoutStructureIds;
@@ -51,7 +52,7 @@ public final class RepresentationDiscoveryInformationBoundary {
         KnowledgePackSelection formationSelection,
         KnownStructureCatalog formationCatalog,
         KnownStructureCatalog postFreezeCatalog,
-        List<PatternRewriteRule> formationRules,
+        List<RewriteRule> formationRules,
         String postFreezeRuleInventoryHash,
         Set<String> requestedHoldoutStructureIds,
         Set<String> formationExcludedStructureIds,
@@ -69,7 +70,7 @@ public final class RepresentationDiscoveryInformationBoundary {
         Objects.requireNonNull(formationRules, "formationRules");
         this.formationRules = formationRules.stream()
             .map(rule -> Objects.requireNonNull(rule, "formationRule"))
-            .sorted(Comparator.comparing(PatternRewriteRule::id)
+            .sorted(Comparator.comparing(RewriteRule::id)
                 .thenComparing(rule -> rule.descriptor().packId())
                 .thenComparing(RuleInventoryFingerprint::ruleContentHash))
             .toList();
@@ -175,15 +176,18 @@ public final class RepresentationDiscoveryInformationBoundary {
                 "Hidden structures remain visible during formation: " + leaked);
         }
 
+        List<RewriteRule> formationRules = astRuleInventory(
+            registry, formationSelection);
+        List<RewriteRule> postFreezeRules = astRuleInventory(
+            registry, visibleSelection);
         return new RepresentationDiscoveryInformationBoundary(
             track,
             visibleSelection,
             formationSelection,
             formationCatalog,
             postFreezeCatalog,
-            registry.enabledRules(formationSelection),
-            RuleInventoryFingerprint.contentHash(
-                registry.enabledRules(visibleSelection)),
+            formationRules,
+            RuleInventoryFingerprint.contentHash(postFreezeRules),
             requestedHoldouts,
             excluded,
             withheldPacks
@@ -205,12 +209,14 @@ public final class RepresentationDiscoveryInformationBoundary {
     }
 
     /**
-     * Exact executable rules visible to candidate formation.
+     * Exact AST rewrite rules visible to candidate formation.
      *
-     * <p>The returned inventory does not disclose which post-freeze packs were
-     * withheld. R2 and R4 holdout details are released only after freeze.</p>
+     * <p>The inventory combines enabled built-in core rules and enabled
+     * Knowledge-Pack rules in canonical order. It does not disclose which
+     * post-freeze packs were withheld; R2 and R4 holdout details are released
+     * only after freeze.</p>
      */
-    public List<PatternRewriteRule> candidateFormationRules() {
+    public List<RewriteRule> candidateFormationRules() {
         return formationRules;
     }
 
@@ -225,7 +231,7 @@ public final class RepresentationDiscoveryInformationBoundary {
         return formationCatalog;
     }
 
-    /** Exact executable rule inventory available during candidate formation. */
+    /** Exact AST rewrite inventory available during candidate formation. */
     public String candidateFormationRuleInventoryHash() {
         return formationRuleInventoryHash;
     }
@@ -235,7 +241,7 @@ public final class RepresentationDiscoveryInformationBoundary {
         return postFreezeCatalog.contentHash();
     }
 
-    /** Exact executable rule inventory associated with post-freeze knowledge. */
+    /** Exact AST rewrite inventory associated with post-freeze knowledge. */
     public String postFreezeRuleInventoryCommitment() {
         return postFreezeRuleInventoryHash;
     }
@@ -481,6 +487,16 @@ public final class RepresentationDiscoveryInformationBoundary {
         KnownStructureCatalog.appendCanonicalField(
             descriptor, holdoutCommitmentHash);
         return KnownStructureCatalog.sha256(descriptor.toString());
+    }
+
+    private static List<RewriteRule> astRuleInventory(
+        KnowledgePackRegistry registry,
+        KnowledgePackSelection selection
+    ) {
+        List<RewriteRule> rules = new ArrayList<>(
+            AstRewriteTransformationEngine.defaultRules(selection));
+        rules.addAll(registry.enabledRules(selection));
+        return List.copyOf(rules);
     }
 
     private static void validateRequestedHoldouts(

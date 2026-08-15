@@ -17,7 +17,6 @@ import de.regelsuche.discovery.representation.RepresentationDiscoveryInformation
 import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary.CandidateFreezeReceipt;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary.PostFreezeDisclosure;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary.Track;
-import de.regelsuche.knowledge.KnowledgePackRegistry;
 import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.knowledge.RuleProfile;
 import de.regelsuche.validation.CandidateProofStatus;
@@ -31,6 +30,7 @@ class DiscoveryKnowledgePackOptionsTest {
     private static final String SYMPY_TRIGONOMETRY = "sympy-trigonometry";
     private static final String PYTHAGOREAN_PAIR =
         "sympy.trig.pythagorean-pair";
+    private static final String CORE_IDENTITY_RULE = "ast_add_zero_right";
 
     @Test
     void supportsCustomEnabledAndDisabledPacks() {
@@ -114,6 +114,8 @@ class DiscoveryKnowledgePackOptionsTest {
                 Track.R1_TARGET_FREE_COMPRESSION);
         assertTrue(compression.candidateFormationCatalog()
             .structures().isEmpty());
+        assertTrue(hasRule(compression, CORE_IDENTITY_RULE));
+        assertTrue(hasPackRule(compression, SYMPY_TRIGONOMETRY));
         assertEquals(compression.candidateFormationRules().stream()
                 .map(rule -> rule.id())
                 .sorted()
@@ -131,11 +133,10 @@ class DiscoveryKnowledgePackOptionsTest {
             options.representationDiscoveryBoundary(
                 Track.R2_CATALOG_BLIND_POST_HOC_BRIDGE);
         assertTrue(blind.candidateFormationCatalog().structures().isEmpty());
+        assertTrue(hasRule(blind, CORE_IDENTITY_RULE));
+        assertFalse(hasPackRule(blind, SYMPY_TRIGONOMETRY));
         assertNotEquals(blind.candidateFormationRuleInventoryHash(),
             blind.postFreezeRuleInventoryCommitment());
-        assertTrue(blind.candidateFormationRules().stream()
-            .noneMatch(rule -> rule.descriptor().packId().equals(
-                SYMPY_TRIGONOMETRY)));
         CandidateFreezeReceipt blindFreeze =
             blind.freezeCandidates(List.of(candidate));
         PostFreezeDisclosure blindDisclosure =
@@ -154,6 +155,8 @@ class DiscoveryKnowledgePackOptionsTest {
                 Track.R3_CATALOG_VISIBLE_KNOWLEDGE_NAVIGATION);
         assertEquals(7,
             visible.candidateFormationCatalog().structures().size());
+        assertTrue(hasRule(visible, CORE_IDENTITY_RULE));
+        assertTrue(hasPackRule(visible, SYMPY_TRIGONOMETRY));
         assertEquals(visible.candidateFormationRuleInventoryHash(),
             visible.postFreezeRuleInventoryCommitment());
         PostFreezeDisclosure visibleDisclosure =
@@ -179,11 +182,10 @@ class DiscoveryKnowledgePackOptionsTest {
         assertTrue(hidden.candidateFormationCatalog().structures().stream()
             .noneMatch(structure -> structure.id().equals(
                 PYTHAGOREAN_PAIR)));
+        assertTrue(hasRule(hidden, CORE_IDENTITY_RULE));
+        assertFalse(hasPackRule(hidden, SYMPY_TRIGONOMETRY));
         assertNotEquals(hidden.candidateFormationRuleInventoryHash(),
             hidden.postFreezeRuleInventoryCommitment());
-        assertTrue(hidden.candidateFormationRules().stream()
-            .noneMatch(rule -> rule.descriptor().packId().equals(
-                SYMPY_TRIGONOMETRY)));
 
         PostFreezeDisclosure disclosure = hidden.disclosePostFreeze(
             hidden.freezeCandidates(List.of(
@@ -220,6 +222,22 @@ class DiscoveryKnowledgePackOptionsTest {
             () -> options.representationDiscoveryBoundary(
                 Track.R4_HIDDEN_STRUCTURE_REDISCOVERY,
                 Set.of("unknown.structure")));
+    }
+
+    private static boolean hasRule(
+        RepresentationDiscoveryInformationBoundary boundary,
+        String ruleId
+    ) {
+        return boundary.candidateFormationRules().stream()
+            .anyMatch(rule -> rule.id().equals(ruleId));
+    }
+
+    private static boolean hasPackRule(
+        RepresentationDiscoveryInformationBoundary boundary,
+        String packId
+    ) {
+        return boundary.candidateFormationRules().stream()
+            .anyMatch(rule -> rule.descriptor().packId().equals(packId));
     }
 
     private static DiscoveryOptions sympyOptions() {
