@@ -114,6 +114,13 @@ class DiscoveryKnowledgePackOptionsTest {
                 Track.R1_TARGET_FREE_COMPRESSION);
         assertTrue(compression.candidateFormationCatalog()
             .structures().isEmpty());
+        assertEquals(compression.candidateFormationRules().stream()
+                .map(rule -> rule.id())
+                .sorted()
+                .toList(),
+            compression.candidateFormationRules().stream()
+                .map(rule -> rule.id())
+                .toList());
         assertEquals(compression.candidateFormationRuleInventoryHash(),
             compression.postFreezeRuleInventoryCommitment());
         assertTrue(compression.disclosePostFreeze(

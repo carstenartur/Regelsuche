@@ -20,6 +20,11 @@ public final class RuleInventoryFingerprint {
     private RuleInventoryFingerprint() {
     }
 
+    public static String ruleContentHash(PatternRewriteRule rule) {
+        return sha256(canonicalRule(
+            Objects.requireNonNull(rule, "rule")));
+    }
+
     public static String contentHash(
         Collection<? extends PatternRewriteRule> rules
     ) {

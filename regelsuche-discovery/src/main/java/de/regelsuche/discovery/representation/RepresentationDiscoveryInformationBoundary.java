@@ -7,6 +7,7 @@ import de.regelsuche.transform.PatternRewriteRule;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -65,8 +66,13 @@ public final class RepresentationDiscoveryInformationBoundary {
             formationCatalog, "formationCatalog");
         this.postFreezeCatalog = Objects.requireNonNull(
             postFreezeCatalog, "postFreezeCatalog");
-        this.formationRules = List.copyOf(Objects.requireNonNull(
-            formationRules, "formationRules"));
+        Objects.requireNonNull(formationRules, "formationRules");
+        this.formationRules = formationRules.stream()
+            .map(rule -> Objects.requireNonNull(rule, "formationRule"))
+            .sorted(Comparator.comparing(PatternRewriteRule::id)
+                .thenComparing(rule -> rule.descriptor().packId())
+                .thenComparing(RuleInventoryFingerprint::ruleContentHash))
+            .toList();
         this.formationRuleInventoryHash = RuleInventoryFingerprint.contentHash(
             this.formationRules);
         this.postFreezeRuleInventoryHash = requireSha256(
