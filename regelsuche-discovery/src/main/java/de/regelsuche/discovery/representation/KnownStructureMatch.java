@@ -1,5 +1,6 @@
 package de.regelsuche.discovery.representation;
 
+import de.regelsuche.knowledge.KnowledgePack.KnownStructureMetadata;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +18,7 @@ public record KnownStructureMatch(
     List<String> requiredAssumptions,
     List<String> consequenceIds,
     String provenance,
+    KnownStructureMetadata metadata,
     String recognitionMode,
     String matchedRepresentative,
     int representativeIndex
@@ -46,6 +48,7 @@ public record KnownStructureMatch(
             consequenceIds, "consequenceIds");
         provenance = RepresentationCandidateAssessment.requireText(
             provenance, "provenance");
+        metadata = Objects.requireNonNull(metadata, "metadata");
         recognitionMode = RepresentationCandidateAssessment.requireText(
             recognitionMode, "recognitionMode");
         if (!RECOGNITION_MODES.contains(recognitionMode)) {

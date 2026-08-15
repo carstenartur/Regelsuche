@@ -13,6 +13,7 @@ import static de.regelsuche.discovery.representation.RepresentationCandidateAsse
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_INTRODUCED_FUNCTION_SYMBOLS;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_INTRODUCED_VARIABLE_SYMBOLS;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY;
+import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_STRUCTURAL_COMPRESSION_REGRESSION;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_VALIDATION_BELOW_SYMBOLIC_CONFIRMATION;
@@ -20,6 +21,7 @@ import static de.regelsuche.discovery.representation.RepresentationCandidateAsse
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.knowledge.KnowledgePack.KnownStructureEvidence;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.util.Comparator;
@@ -58,13 +60,15 @@ public final class RepresentationCandidateAssessor {
         }
 
         SemanticDescriptionMetrics wholeSource = measurer.measure(sourceRoot);
-        SemanticDescriptionMetrics wholeCandidate = measurer.measure(candidateRoot);
+        SemanticDescriptionMetrics wholeCandidate = measurer.measure(
+            candidateRoot);
         SemanticDescriptionMetrics scopedSource = wholeExpression
             ? wholeSource
             : measurer.measure(resolve(sourceRoot, proposal.occurrencePath()));
         SemanticDescriptionMetrics scopedCandidate = wholeExpression
             ? wholeCandidate
-            : measurer.measure(resolve(candidateRoot, proposal.occurrencePath()));
+            : measurer.measure(resolve(
+                candidateRoot, proposal.occurrencePath()));
         SemanticCompressionDelta wholeDelta =
             SemanticCompressionDelta.between(wholeSource, wholeCandidate);
         SemanticCompressionDelta scopedDelta =
@@ -84,12 +88,16 @@ public final class RepresentationCandidateAssessor {
         List<KnownStructureMatch> newMatches = newlyExposed(
             sourceMatches, candidateMatches);
         List<KnownStructureConsequenceUnlock> unlocks = unlocks(
-            sourceMatches, newMatches, proposal.assumptions());
+            sourceMatches,
+            newMatches,
+            proposal.assumptions(),
+            proposal.validationStatus()
+        );
         List<String> types = candidateTypes(
             wholeExpression, materialCompression, newMatches, unlocks);
         boolean materialGain = materialCompression || !unlocks.isEmpty();
-        boolean claimEligible = materialGain && proposal.validationStatus().atLeast(
-            CandidateProofStatus.SYMBOLICALLY_VERIFIED);
+        boolean claimEligible = materialGain && proposal.validationStatus()
+            .atLeast(CandidateProofStatus.SYMBOLICALLY_VERIFIED);
 
         return new RepresentationCandidateAssessment(
             proposal,
@@ -127,13 +135,15 @@ public final class RepresentationCandidateAssessor {
         List<String> introducedVariables,
         List<String> introducedFunctions
     ) {
-        if (scoped.improvedDimensions().size() < MINIMUM_IMPROVED_DIMENSIONS) {
+        if (scoped.improvedDimensions().size()
+                < MINIMUM_IMPROVED_DIMENSIONS) {
             return COMPRESSION_NON_MATERIAL;
         }
         if (!introducedVariables.isEmpty() || !introducedFunctions.isEmpty()) {
             return COMPRESSION_BLOCKED_BY_INTRODUCED_SYMBOLS;
         }
-        return scoped.hasStructuralRegression() || whole.hasStructuralRegression()
+        return scoped.hasStructuralRegression()
+                || whole.hasStructuralRegression()
             ? COMPRESSION_BLOCKED_BY_STRUCTURAL_REGRESSION
             : COMPRESSION_MATERIAL_MULTI_DIMENSIONAL;
     }
@@ -150,10 +160,12 @@ public final class RepresentationCandidateAssessor {
                 ? TYPE_WHOLE_EXPRESSION_COMPRESSION
                 : TYPE_SUBEXPRESSION_COMPRESSION);
         }
-        if (newMatches.stream().anyMatch(KnownStructureMatch::wholeExpression)) {
+        if (newMatches.stream().anyMatch(
+                KnownStructureMatch::wholeExpression)) {
             types.add(TYPE_KNOWN_WHOLE_FORM_BRIDGE);
         }
-        if (newMatches.stream().anyMatch(match -> !match.wholeExpression())) {
+        if (newMatches.stream().anyMatch(
+                match -> !match.wholeExpression())) {
             types.add(TYPE_KNOWN_SUBFORM_BRIDGE);
         }
         if (!unlocks.isEmpty()) {
@@ -183,18 +195,21 @@ public final class RepresentationCandidateAssessor {
     private static List<KnownStructureConsequenceUnlock> unlocks(
         List<KnownStructureMatch> sourceMatches,
         List<KnownStructureMatch> newMatches,
-        List<String> assumptions
+        List<String> assumptions,
+        CandidateProofStatus validationStatus
     ) {
         Set<String> activeAssumptions = Set.copyOf(assumptions);
         Set<String> existing = new HashSet<>();
         sourceMatches.stream()
             .filter(match -> assumptionsSatisfied(match, activeAssumptions))
+            .filter(match -> evidenceSatisfied(match, validationStatus))
             .forEach(match -> match.consequenceIds().forEach(consequence ->
                 existing.add(opportunityIdentity(match, consequence))));
 
         TreeSet<KnownStructureConsequenceUnlock> unlocks = new TreeSet<>();
         newMatches.stream()
             .filter(match -> assumptionsSatisfied(match, activeAssumptions))
+            .filter(match -> evidenceSatisfied(match, validationStatus))
             .forEach(match -> match.consequenceIds().forEach(consequence -> {
                 KnownStructureConsequenceUnlock unlock =
                     new KnownStructureConsequenceUnlock(
@@ -224,6 +239,30 @@ public final class RepresentationCandidateAssessor {
         return activeAssumptions.containsAll(match.requiredAssumptions());
     }
 
+    private static boolean evidenceSatisfied(
+        KnownStructureMatch match,
+        CandidateProofStatus validationStatus
+    ) {
+        return validationStatus.atLeast(requiredStatus(
+            match.metadata().minimumEvidence()));
+    }
+
+    private static CandidateProofStatus requiredStatus(
+        KnownStructureEvidence minimumEvidence
+    ) {
+        return switch (minimumEvidence) {
+            case OBSERVED -> CandidateProofStatus.OBSERVED;
+            case VALIDATED_BY_EXAMPLES ->
+                CandidateProofStatus.VALIDATED_BY_EXAMPLES;
+            case SYMBOLICALLY_VERIFIED ->
+                CandidateProofStatus.SYMBOLICALLY_VERIFIED;
+            case FORMALLY_PROVABLE ->
+                CandidateProofStatus.FORMALLY_PROVABLE;
+            case FORMALLY_PROVED ->
+                CandidateProofStatus.FORMALLY_PROVED;
+        };
+    }
+
     private static List<String> warnings(
         RepresentationCandidateProposal proposal,
         String compressionStatus,
@@ -248,6 +287,10 @@ public final class RepresentationCandidateAssessor {
                 match -> !assumptionsSatisfied(match, assumptions))) {
             warnings.add(WARNING_UNSATISFIED_KNOWN_STRUCTURE_ASSUMPTIONS);
         }
+        if (newMatches.stream().anyMatch(match ->
+                !evidenceSatisfied(match, proposal.validationStatus()))) {
+            warnings.add(WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM);
+        }
         if (!newMatches.isEmpty() && unlocks.isEmpty()) {
             warnings.add(WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY);
         }
@@ -258,13 +301,19 @@ public final class RepresentationCandidateAssessor {
         return List.copyOf(warnings);
     }
 
-    private static List<String> difference(List<String> left, List<String> right) {
+    private static List<String> difference(
+        List<String> left,
+        List<String> right
+    ) {
         TreeSet<String> result = new TreeSet<>(left);
         result.removeAll(right);
         return List.copyOf(result);
     }
 
-    private static Expr resolve(Expr root, ExpressionOccurrencePath path) {
+    private static Expr resolve(
+        Expr root,
+        ExpressionOccurrencePath path
+    ) {
         Expr current = root;
         for (int childIndex : path.childIndexes()) {
             List<Expr> children = children(current);
@@ -296,7 +345,8 @@ public final class RepresentationCandidateAssessor {
         }
         for (int index = 0; index < sourceChildren.size(); index++) {
             if (index != selected
-                    && !sourceChildren.get(index).equals(candidateChildren.get(index))) {
+                    && !sourceChildren.get(index).equals(
+                        candidateChildren.get(index))) {
                 return false;
             }
         }
@@ -308,8 +358,12 @@ public final class RepresentationCandidateAssessor {
         );
     }
 
-    private static boolean sameContainer(Expr source, Expr candidate) {
-        if (source instanceof BinaryExpr left && candidate instanceof BinaryExpr right) {
+    private static boolean sameContainer(
+        Expr source,
+        Expr candidate
+    ) {
+        if (source instanceof BinaryExpr left
+                && candidate instanceof BinaryExpr right) {
             return left.operator() == right.operator();
         }
         if (source instanceof FunctionExpr left

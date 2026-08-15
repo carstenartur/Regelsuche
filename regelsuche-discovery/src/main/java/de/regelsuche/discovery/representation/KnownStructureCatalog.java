@@ -1,5 +1,7 @@
 package de.regelsuche.discovery.representation;
 
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.KnowledgePackSelection;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -12,6 +14,9 @@ import java.util.Set;
 
 /** Content-addressed catalog used for post-hoc or visible known-form matching. */
 public final class KnownStructureCatalog {
+    private static final String KNOWLEDGE_PACK_REVISION =
+        "knowledge-pack-known-structures/v1";
+
     private final String revision;
     private final List<KnownStructure> structures;
     private final String contentHash;
@@ -30,6 +35,37 @@ public final class KnownStructureCatalog {
 
     public static KnownStructureCatalog empty() {
         return new KnownStructureCatalog("none", List.of());
+    }
+
+    /** Builds a catalog from the explicitly selected knowledge packs. */
+    public static KnownStructureCatalog fromKnowledgePacks(
+        KnowledgePackSelection selection
+    ) {
+        return fromKnowledgePacks(new KnowledgePackRegistry(), selection);
+    }
+
+    /** Builds a catalog from a supplied registry and explicit pack selection. */
+    public static KnownStructureCatalog fromKnowledgePacks(
+        KnowledgePackRegistry registry,
+        KnowledgePackSelection selection
+    ) {
+        Objects.requireNonNull(registry, "registry");
+        Objects.requireNonNull(selection, "selection");
+        List<KnownStructure> structures = registry
+            .enabledKnownStructures(selection)
+            .stream()
+            .map(definition -> new KnownStructure(
+                definition.id(),
+                definition.domainId(),
+                definition.matcher(),
+                definition.requiredAssumptions(),
+                definition.consequenceIds(),
+                definition.metadata().provenanceSummary(),
+                definition.metadata()
+            ))
+            .sorted(Comparator.comparing(KnownStructure::id))
+            .toList();
+        return new KnownStructureCatalog(KNOWLEDGE_PACK_REVISION, structures);
     }
 
     public String revision() {

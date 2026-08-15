@@ -1,8 +1,7 @@
 package de.regelsuche.knowledge;
 
-import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.knowledge.KnowledgePack.KnownStructureDefinition;
 import de.regelsuche.transform.PatternRewriteRule;
-
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -21,7 +20,8 @@ public class KnowledgePackRegistry {
         Map<String, KnowledgePack> indexed = new LinkedHashMap<>();
         for (KnowledgePack pack : packs) {
             if (indexed.put(pack.packId(), pack) != null) {
-                throw new IllegalArgumentException("Duplicate knowledge pack id: " + pack.packId());
+                throw new IllegalArgumentException(
+                    "Duplicate knowledge pack id: " + pack.packId());
             }
         }
         this.packsById = Map.copyOf(indexed);
@@ -41,26 +41,37 @@ public class KnowledgePackRegistry {
         rejectKernelDisable(options);
         Set<String> defaultEnabled = packsById.values().stream()
                 .filter(KnowledgePack::enabledByDefault)
-                .filter(pack -> pack.tier() == RuleTier.KERNEL || options.profile().includeFirstPartyDefaults())
+                .filter(pack -> pack.tier() == RuleTier.KERNEL
+                        || options.profile().includeFirstPartyDefaults())
                 .map(KnowledgePack::packId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         packsById.values().stream()
                 .filter(pack -> pack.tier() == RuleTier.KERNEL)
                 .map(KnowledgePack::packId)
                 .forEach(defaultEnabled::add);
-        Set<String> enabled = options.effectiveEnabledPacks(packsById.keySet(), defaultEnabled);
+        Set<String> enabled = options.effectiveEnabledPacks(
+            packsById.keySet(), defaultEnabled);
         Set<String> explicitlyEnabled = explicitlyEnabledPacks(options);
         return packsById.values().stream()
                 .filter(pack -> enabled.contains(pack.packId()))
-                .filter(pack -> pack.maturity() != KnowledgePackMaturity.EXPERIMENTAL
-                        || explicitlyEnabled.contains(pack.packId()))
+                .filter(pack -> pack.maturity()
+                    != KnowledgePackMaturity.EXPERIMENTAL
+                    || explicitlyEnabled.contains(pack.packId()))
                 .toList();
     }
 
-    public List<PatternRewriteRule> enabledRules(KnowledgePackSelection options) {
+    public List<PatternRewriteRule> enabledRules(
+            KnowledgePackSelection options) {
         return enabledPacks(options).stream()
                 .flatMap(pack -> pack.rules().stream())
                 .filter(rule -> rule.descriptor().eligibleForRegistration())
+                .toList();
+    }
+
+    public List<KnownStructureDefinition> enabledKnownStructures(
+            KnowledgePackSelection options) {
+        return enabledPacks(options).stream()
+                .flatMap(pack -> pack.knownStructures().stream())
                 .toList();
     }
 
@@ -68,13 +79,15 @@ public class KnowledgePackRegistry {
         for (String packId : options.disabledPacks()) {
             KnowledgePack pack = packsById.get(packId);
             if (pack != null && pack.tier() == RuleTier.KERNEL) {
-                throw new IllegalArgumentException("Kernel knowledge pack cannot be disabled: " + packId);
+                throw new IllegalArgumentException(
+                    "Kernel knowledge pack cannot be disabled: " + packId);
             }
         }
     }
 
-    private Set<String> explicitlyEnabledPacks(KnowledgePackSelection options) {
-        Set<String> explicit = new java.util.LinkedHashSet<>(options.enabledPacks());
+    private Set<String> explicitlyEnabledPacks(
+            KnowledgePackSelection options) {
+        Set<String> explicit = new LinkedHashSet<>(options.enabledPacks());
         explicit.addAll(options.profile().enabledPackIds());
         if (options.profile().enableAllPacks()) {
             explicit.addAll(packsById.keySet());

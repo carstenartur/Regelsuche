@@ -1,14 +1,15 @@
 packId: sympy-trigonometry
 displayName: SymPy Trigonometry
 sourceProject: SymPy
-sourceUrl: https://github.com/sympy/sympy
-sourceVersion: "1.14"
-sourceReference: sympy/simplify/trigsimp.py
+sourceUrl: https://github.com/sympy/sympy/blob/fe935ceb303891d1f8bea4c03b19fd9ec9464b02/sympy/simplify/fu.py
+sourceVersion: "1.14.0"
+sourceReference: SymPy tag 1.14.0 at commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02; selected fu.py and trigsimp.py identities were manually reviewed and independently reimplemented.
 license: BSD-3-Clause
 enabledByDefault: false
 maturity: EXPERIMENTAL
 categories:
   - trigonometry
+  - sympy-derived
 rules:
   - id: sympy.trig.pythagorean
     derivationType: REIMPLEMENTED_RULE
@@ -50,9 +51,11 @@ rules:
         - from: "cos(mul(2, t))"
           to: "sub(pow(cos(t), 2), pow(sin(t), 2))"
   - id: sympy.trig.tan_def
+    sourceReference: sympy/simplify/fu.py TR2 at tag 1.14.0 commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02; exact first-power tangent definition only.
     derivationType: REIMPLEMENTED_RULE
     status: VALIDATED
     searchEffects:
+      - NORMALIZING
       - EXPANDING
     riskLevel: low
     rule:
@@ -62,6 +65,51 @@ rules:
       examples:
         - from: "tan(t)"
           to: "div(sin(t), cos(t))"
+  - id: sympy.trig.sec_def
+    sourceReference: sympy/simplify/fu.py TR1 at tag 1.14.0 commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02; secant branch independently reimplemented.
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - NORMALIZING
+      - EXPANDING
+    riskLevel: low
+    rule:
+      from: "sec(?X)"
+      to: "1 / cos(?X)"
+    validation:
+      examples:
+        - from: "sec(t)"
+          to: "1 / cos(t)"
+  - id: sympy.trig.csc_def
+    sourceReference: sympy/simplify/fu.py TR1 at tag 1.14.0 commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02; cosecant branch independently reimplemented.
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - NORMALIZING
+      - EXPANDING
+    riskLevel: low
+    rule:
+      from: "csc(?X)"
+      to: "1 / sin(?X)"
+    validation:
+      examples:
+        - from: "csc(t)"
+          to: "1 / sin(t)"
+  - id: sympy.trig.cot_def
+    sourceReference: sympy/simplify/fu.py TR2 at tag 1.14.0 commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02; cotangent branch independently reimplemented.
+    derivationType: REIMPLEMENTED_RULE
+    status: VALIDATED
+    searchEffects:
+      - NORMALIZING
+      - EXPANDING
+    riskLevel: low
+    rule:
+      from: "cot(?X)"
+      to: "cos(?X) / sin(?X)"
+    validation:
+      examples:
+        - from: "cot(t)"
+          to: "cos(t) / sin(t)"
   - id: sympy.trig.sin_sum
     derivationType: REIMPLEMENTED_RULE
     status: REVIEWED
@@ -114,3 +162,89 @@ rules:
       examples:
         - from: "cos(sub(u, v))"
           to: "add(mul(cos(u), cos(v)), mul(sin(u), sin(v)))"
+knownStructures:
+  - id: sympy.trig.pythagorean-pair
+    domainId: trigonometry
+    pattern: "sin(?X)^2 + cos(?X)^2"
+    recognition: ARITHMETIC_AC
+    consequenceIds:
+      - rule:sympy.trig.pythagorean
+    enabledRulePackIds:
+      - sympy-trigonometry
+    compatibleBackendIds: []
+    minimumEvidence: SYMBOLICALLY_VERIFIED
+    sourceUrl: https://github.com/sympy/sympy/blob/fe935ceb303891d1f8bea4c03b19fd9ec9464b02/sympy/simplify/trigsimp.py
+    sourceReference: Pythagorean trigonometric identity used by SymPy trigsimp at tag 1.14.0 commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02.
+    translationNotes: Reimplemented as an occurrence-local arithmetic-AC recognizer; the match is knowledge classification, not an equivalence proof.
+  - id: sympy.trig.tangent-call
+    domainId: trigonometry
+    pattern: "tan(?X)"
+    recognition: EXACT
+    consequenceIds:
+      - rule:sympy.trig.tan_def
+    enabledRulePackIds:
+      - sympy-trigonometry
+    compatibleBackendIds: []
+    minimumEvidence: SYMBOLICALLY_VERIFIED
+    sourceReference: sympy/simplify/fu.py TR2 tangent branch at tag 1.14.0 commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02.
+    translationNotes: Reimplemented as an exact function-form recognizer whose concrete consequence is the separately governed tangent-definition rule.
+  - id: sympy.trig.secant-call
+    domainId: trigonometry
+    pattern: "sec(?X)"
+    recognition: EXACT
+    consequenceIds:
+      - rule:sympy.trig.sec_def
+    enabledRulePackIds:
+      - sympy-trigonometry
+    compatibleBackendIds: []
+    minimumEvidence: SYMBOLICALLY_VERIFIED
+    sourceReference: sympy/simplify/fu.py TR1 secant branch at tag 1.14.0 commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02.
+    translationNotes: Reimplemented as an exact function-form recognizer; no SymPy runtime or simplify heuristic is imported.
+  - id: sympy.trig.cosecant-call
+    domainId: trigonometry
+    pattern: "csc(?X)"
+    recognition: EXACT
+    consequenceIds:
+      - rule:sympy.trig.csc_def
+    enabledRulePackIds:
+      - sympy-trigonometry
+    compatibleBackendIds: []
+    minimumEvidence: SYMBOLICALLY_VERIFIED
+    sourceReference: sympy/simplify/fu.py TR1 cosecant branch at tag 1.14.0 commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02.
+    translationNotes: Reimplemented as an exact function-form recognizer; no SymPy runtime or simplify heuristic is imported.
+  - id: sympy.trig.cotangent-call
+    domainId: trigonometry
+    pattern: "cot(?X)"
+    recognition: EXACT
+    consequenceIds:
+      - rule:sympy.trig.cot_def
+    enabledRulePackIds:
+      - sympy-trigonometry
+    compatibleBackendIds: []
+    minimumEvidence: SYMBOLICALLY_VERIFIED
+    sourceReference: sympy/simplify/fu.py TR2 cotangent branch at tag 1.14.0 commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02.
+    translationNotes: Reimplemented as an exact function-form recognizer whose concrete consequence is the separately governed cotangent-definition rule.
+  - id: sympy.trig.sine-sum
+    domainId: trigonometry
+    pattern: "sin(?A + ?B)"
+    recognition: ARITHMETIC_AC
+    consequenceIds:
+      - rule:sympy.trig.sin_sum
+    enabledRulePackIds:
+      - sympy-trigonometry
+    compatibleBackendIds: []
+    minimumEvidence: SYMBOLICALLY_VERIFIED
+    sourceReference: SymPy trigonometric sum-angle transformation family at tag 1.14.0 commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02.
+    translationNotes: Reimplemented as an arithmetic-AC argument recognizer; the expansion remains an explicitly selected pack rule.
+  - id: sympy.trig.cosine-sum
+    domainId: trigonometry
+    pattern: "cos(?A + ?B)"
+    recognition: ARITHMETIC_AC
+    consequenceIds:
+      - rule:sympy.trig.cos_sum
+    enabledRulePackIds:
+      - sympy-trigonometry
+    compatibleBackendIds: []
+    minimumEvidence: SYMBOLICALLY_VERIFIED
+    sourceReference: SymPy trigonometric sum-angle transformation family at tag 1.14.0 commit fe935ceb303891d1f8bea4c03b19fd9ec9464b02.
+    translationNotes: Reimplemented as an arithmetic-AC argument recognizer; the expansion remains an explicitly selected pack rule.
