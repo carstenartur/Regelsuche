@@ -61,7 +61,7 @@ Der Extraktor identifiziert eine Sharing-Gelegenheit. Er:
 - führt noch keinen `let`-Ausdruck oder Alias in die Sprache ein;
 - beweist noch keine entsprechende Umformung des Gesamtausdrucks;
 - entscheidet nicht, ob Sharing für ein konkretes Ziel vorzuziehen ist;
-- promoted den Kandidaten nicht zu einer ausführbaren Regel;
+- befördert den Kandidaten nicht zu einer ausführbaren Regel;
 - behauptet keine externe mathematische Neuheit.
 
 Weitere Slices aus #663 können aus der bewahrten Evidence explizite

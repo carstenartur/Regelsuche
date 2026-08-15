@@ -51,15 +51,22 @@ public final class RepeatedStructureExtractor {
             RepresentationCandidateAssessment.requireText(
                 sourceExpression, "sourceExpression"));
         String normalizedSource = ExpressionFormatter.format(root);
+        Map<ValueKey, Integer> occurrenceCounts = new TreeMap<>();
         Map<ValueKey, List<RepeatedStructureExtractionCandidate.Occurrence>>
             occurrencesByValue = new TreeMap<>();
 
         try (ExprValueFactory factory = new ExprValueFactory()) {
             ExprValueFactory.Projection projection = factory.project(root);
-            collect(
+            countOccurrences(
+                root,
+                projection.valuesBySyntaxIdentity(),
+                occurrenceCounts
+            );
+            collectRepeatedOccurrences(
                 root,
                 ExpressionOccurrencePath.root(),
                 projection.valuesBySyntaxIdentity(),
+                occurrenceCounts,
                 occurrencesByValue
             );
         }
@@ -85,10 +92,37 @@ public final class RepeatedStructureExtractor {
             .toList();
     }
 
-    private int collect(
+    private int countOccurrences(
+        Expr expression,
+        Map<Expr, ExprValue> valuesBySyntaxIdentity,
+        Map<ValueKey, Integer> occurrenceCounts
+    ) {
+        int astNodeCount = 1;
+        List<Expr> children = children(expression);
+        for (int index = 0; index < children.size(); index++) {
+            astNodeCount = Math.addExact(
+                astNodeCount,
+                countOccurrences(
+                    children.get(index),
+                    valuesBySyntaxIdentity,
+                    occurrenceCounts
+                )
+            );
+        }
+        if (astNodeCount >= policy.minimumSubtreeNodes()) {
+            ExprValue value = Objects.requireNonNull(
+                valuesBySyntaxIdentity.get(expression),
+                "semantic value for syntax occurrence");
+            occurrenceCounts.merge(value.key(), 1, Integer::sum);
+        }
+        return astNodeCount;
+    }
+
+    private int collectRepeatedOccurrences(
         Expr expression,
         ExpressionOccurrencePath path,
         Map<Expr, ExprValue> valuesBySyntaxIdentity,
+        Map<ValueKey, Integer> occurrenceCounts,
         Map<ValueKey, List<RepeatedStructureExtractionCandidate.Occurrence>>
             occurrencesByValue
     ) {
@@ -97,10 +131,11 @@ public final class RepeatedStructureExtractor {
         for (int index = 0; index < children.size(); index++) {
             astNodeCount = Math.addExact(
                 astNodeCount,
-                collect(
+                collectRepeatedOccurrences(
                     children.get(index),
                     path.append(index),
                     valuesBySyntaxIdentity,
+                    occurrenceCounts,
                     occurrencesByValue
                 )
             );
@@ -109,14 +144,17 @@ public final class RepeatedStructureExtractor {
             ExprValue value = Objects.requireNonNull(
                 valuesBySyntaxIdentity.get(expression),
                 "semantic value for syntax occurrence");
-            occurrencesByValue.computeIfAbsent(
-                value.key(), ignored -> new ArrayList<>()).add(
-                    new RepeatedStructureExtractionCandidate.Occurrence(
-                        path,
-                        ExpressionFormatter.format(expression),
-                        astNodeCount
-                    )
-                );
+            if (occurrenceCounts.getOrDefault(value.key(), 0)
+                >= policy.minimumOccurrences()) {
+                occurrencesByValue.computeIfAbsent(
+                    value.key(), ignored -> new ArrayList<>()).add(
+                        new RepeatedStructureExtractionCandidate.Occurrence(
+                            path,
+                            ExpressionFormatter.format(expression),
+                            astNodeCount
+                        )
+                    );
+            }
         }
         return astNodeCount;
     }
