@@ -16,6 +16,43 @@ Nur Regeln mit freigegebenem Status wie `VALIDATED` oder `REVIEWED` dürfen
 registriert werden. Kandidaten bleiben deaktiviert, bis die Review- und
 Validierungsanforderungen erfüllt sind.
 
+## Pattern-Syntax und AST-Semantik
+
+Regelpattern verwenden dieselbe binäre Operatorstruktur wie der produktive
+Ausdrucks-AST. Neben der Infixschreibweise akzeptiert der Loader die historische
+funktionale Schreibweise als explizite Operator-Aliasse:
+
+| Funktionale Schreibweise | AST-/Infixbedeutung |
+|---|---|
+| `add(A, B)` | `A + B` |
+| `sub(A, B)` | `A - B` |
+| `mul(A, B)` | `A * B` |
+| `div(A, B)` | `A / B` |
+| `pow(A, B)` | `A ^ B` |
+
+Diese fünf Aliasse verlangen exakt zwei Argumente und werden bereits beim Laden
+in `PatternExpr.Operation` übersetzt. Eine falsche Stelligkeit schlägt
+fehlersicher fehl. Andere Namen wie `sin`, `cos`, `log` oder domänenspezifische
+Funktionen bleiben gewöhnliche `PatternExpr.Function`-Knoten.
+
+Damit muss beispielsweise
+
+```text
+add(pow(sin(?X), 2), pow(cos(?X), 2))
+```
+
+gegen denselben produktiven AST matchen wie
+
+```text
+sin(?X)^2 + cos(?X)^2
+```
+
+Die CI charakterisiert sowohl die Gleichheit der beiden Patternformen als auch
+die reale Ausführung einer geladenen funktional notierten Knowledge-Pack-Regel
+gegen einen gewöhnlichen Infix-Ausdruck. Reine Metadaten- oder
+Nicht-Leerheitsprüfungen gelten nicht als Nachweis, dass eine Regel im
+Produktionsmotor ausführbar ist.
+
 ## Provenienzgebundene bekannte Strukturen
 
 Ein Knowledge Pack kann zusätzlich bekannte mathematische Strukturen für die
