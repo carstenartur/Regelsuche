@@ -15,11 +15,16 @@ sin(x)^2 + (cos(x)^2 + 0)
 
 Die Kandidatenbildung erhält keinen SymPy-Katalog und keinen direkten
 trigonometrischen SymPy-Regel-Pack. Der produktive AST-Transformationsmotor
-erzeugt mit der Core-Regel `ast_add_zero_right` den Kandidaten:
+erzeugt mit der Core-Regel `ast_add_zero_right` den kanonisch formatierten
+Kandidaten:
 
 ```text
-sin(x)^2 + cos(x)^2
+sin(x) ^ 2 + cos(x) ^ 2
 ```
+
+Die Formationspolicy wählt die vorab festgelegte primitive Regelanwendung, nicht
+einen erwarteten Zieltext. Der oben angegebene Ausdruck wird anschließend als
+Regressionserwartung geprüft.
 
 Dieser Kandidat wird vor der Post-hoc-Klassifikation content-addressed
 eingefroren. Für den Pack-aus- und Pack-an-Lauf sind Kandidatenmenge und
@@ -73,7 +78,9 @@ regelsuche-discovery/build/reports/representation-discovery/
 ```
 
 Wiederholte Läufe müssen byte-identische JSON-Ausgabe und denselben
-`contentHash` erzeugen.
+`contentHash` erzeugen. Das Artefakt verwendet unabhängig vom Hostsystem einen
+festen LF-Zeilenabschluss; ein nicht zum Inhalt passender Hash wird
+fehlersicher abgewiesen.
 
 ## Claim-Grenze
 
