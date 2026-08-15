@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepeatedStructureExtractionCandidate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepeatedStructureExtractionCandidate.java</span></div><h1>RepeatedStructureExtractionCandidate.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * AST-occurrence-preserving opportunity to replace repeated semantic values by
+ * an explicit shared definition.
+ *
+ * &lt;p&gt;This evidence does not introduce an alias into the mathematical language
+ * and does not claim equivalence or usefulness. It records the exact repeated AST
+ * occurrences and charges both definition and reference costs so an opaque
+ * symbol cannot manufacture compression credit.&lt;/p&gt;
+ */
+public record RepeatedStructureExtractionCandidate(
+    String identity,
+    String sourceExpression,
+    String semanticValueKey,
+    String representativeExpression,
+    List&lt;Occurrence&gt; occurrences,
+    Policy policy,
+    SharingCost sharingCost
+) implements Comparable&lt;RepeatedStructureExtractionCandidate&gt; {
+    public static final String CANDIDATE_TYPE =
+        RepresentationCandidateAssessment.TYPE_REPEATED_STRUCTURE_EXTRACTION;
+    private static final String IDENTITY_REVISION =
+        &quot;regelsuche.repeated-structure-candidate/v1&quot;;
+
+<span class="fc" id="L36">    public RepeatedStructureExtractionCandidate {</span>
+<span class="fc" id="L37">        sourceExpression = RepresentationCandidateAssessment.requireText(</span>
+            sourceExpression, &quot;sourceExpression&quot;);
+<span class="fc" id="L39">        semanticValueKey = RepresentationCandidateAssessment.requireText(</span>
+            semanticValueKey, &quot;semanticValueKey&quot;);
+<span class="fc" id="L41">        representativeExpression = RepresentationCandidateAssessment.requireText(</span>
+            representativeExpression, &quot;representativeExpression&quot;);
+<span class="fc" id="L43">        policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L44">        sharingCost = Objects.requireNonNull(sharingCost, &quot;sharingCost&quot;);</span>
+<span class="fc" id="L45">        occurrences = Objects.requireNonNull(occurrences, &quot;occurrences&quot;).stream()</span>
+<span class="fc" id="L46">            .map(occurrence -&gt; Objects.requireNonNull(</span>
+                occurrence, &quot;occurrence&quot;))
+<span class="fc" id="L48">            .sorted()</span>
+<span class="fc" id="L49">            .toList();</span>
+<span class="fc" id="L50">        validateOccurrences(occurrences, policy);</span>
+<span class="fc" id="L51">        Occurrence representative = representative(occurrences);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (!representative.expression().equals(representativeExpression)) {</span>
+<span class="fc" id="L53">            throw new IllegalArgumentException(</span>
+                &quot;representativeExpression is not the canonical occurrence&quot;);
+        }
+<span class="fc" id="L56">        SharingCost expectedCost = SharingCost.calculate(</span>
+            occurrences, representative, policy);
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (!expectedCost.equals(sharingCost)) {</span>
+<span class="fc" id="L59">            throw new IllegalArgumentException(</span>
+                &quot;sharingCost does not balance with occurrences and policy&quot;);
+        }
+<span class="fc" id="L62">        String expectedIdentity = identityFor(</span>
+            sourceExpression,
+            semanticValueKey,
+            representativeExpression,
+            occurrences,
+            policy,
+            sharingCost
+        );
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (!expectedIdentity.equals(identity)) {</span>
+<span class="fc" id="L71">            throw new IllegalArgumentException(</span>
+                &quot;identity does not match repeated-structure evidence&quot;);
+        }
+<span class="fc" id="L74">    }</span>
+
+    public static RepeatedStructureExtractionCandidate create(
+        String sourceExpression,
+        String semanticValueKey,
+        List&lt;Occurrence&gt; occurrences,
+        Policy policy
+    ) {
+<span class="fc" id="L82">        Objects.requireNonNull(occurrences, &quot;occurrences&quot;);</span>
+<span class="fc" id="L83">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L84">        List&lt;Occurrence&gt; snapshot = occurrences.stream()</span>
+<span class="fc" id="L85">            .map(occurrence -&gt; Objects.requireNonNull(</span>
+                occurrence, &quot;occurrence&quot;))
+<span class="fc" id="L87">            .sorted()</span>
+<span class="fc" id="L88">            .toList();</span>
+<span class="fc" id="L89">        validateOccurrences(snapshot, policy);</span>
+<span class="fc" id="L90">        Occurrence representative = representative(snapshot);</span>
+<span class="fc" id="L91">        SharingCost cost = SharingCost.calculate(</span>
+            snapshot, representative, policy);
+<span class="fc" id="L93">        String normalizedSource = RepresentationCandidateAssessment.requireText(</span>
+            sourceExpression, &quot;sourceExpression&quot;);
+<span class="fc" id="L95">        String normalizedValueKey = RepresentationCandidateAssessment.requireText(</span>
+            semanticValueKey, &quot;semanticValueKey&quot;);
+<span class="fc" id="L97">        String identity = identityFor(</span>
+            normalizedSource,
+            normalizedValueKey,
+<span class="fc" id="L100">            representative.expression(),</span>
+            snapshot,
+            policy,
+            cost
+        );
+<span class="fc" id="L105">        return new RepeatedStructureExtractionCandidate(</span>
+            identity,
+            normalizedSource,
+            normalizedValueKey,
+<span class="fc" id="L109">            representative.expression(),</span>
+            snapshot,
+            policy,
+            cost
+        );
+    }
+
+    public String candidateType() {
+<span class="fc" id="L117">        return CANDIDATE_TYPE;</span>
+    }
+
+    public boolean material() {
+<span class="fc" id="L121">        return sharingCost.material();</span>
+    }
+
+    @Override
+    public int compareTo(RepeatedStructureExtractionCandidate other) {
+<span class="fc" id="L126">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc" id="L127">        int materialComparison = Boolean.compare(</span>
+<span class="fc" id="L128">            other.material(), material());</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (materialComparison != 0) {</span>
+<span class="fc" id="L130">            return materialComparison;</span>
+        }
+<span class="fc" id="L132">        int savingsComparison = Integer.compare(</span>
+<span class="fc" id="L133">            other.sharingCost().netAstNodeSavings(),</span>
+<span class="fc" id="L134">            sharingCost.netAstNodeSavings());</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (savingsComparison != 0) {</span>
+<span class="fc" id="L136">            return savingsComparison;</span>
+        }
+<span class="fc" id="L138">        int representativeComparison = representativeExpression.compareTo(</span>
+<span class="fc" id="L139">            other.representativeExpression());</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        return representativeComparison != 0</span>
+<span class="fc" id="L141">            ? representativeComparison</span>
+<span class="nc" id="L142">            : identity.compareTo(other.identity());</span>
+    }
+
+    private static void validateOccurrences(
+        List&lt;Occurrence&gt; occurrences,
+        Policy policy
+    ) {
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (occurrences.size() &lt; policy.minimumOccurrences()) {</span>
+<span class="fc" id="L150">            throw new IllegalArgumentException(</span>
+                &quot;too few repeated-structure occurrences&quot;);
+        }
+<span class="fc" id="L153">        Set&lt;ExpressionOccurrencePath&gt; paths = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (Occurrence occurrence : occurrences) {</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (occurrence.astNodeCount() &lt; policy.minimumSubtreeNodes()) {</span>
+<span class="fc" id="L156">                throw new IllegalArgumentException(</span>
+                    &quot;occurrence is smaller than the policy minimum&quot;);
+            }
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (!paths.add(occurrence.path())) {</span>
+<span class="fc" id="L160">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate repeated-structure occurrence path: &quot;
+<span class="fc" id="L162">                        + occurrence.path());</span>
+            }
+<span class="fc" id="L164">        }</span>
+<span class="fc" id="L165">    }</span>
+
+    private static Occurrence representative(List&lt;Occurrence&gt; occurrences) {
+<span class="fc" id="L168">        return occurrences.stream()</span>
+<span class="fc" id="L169">            .min(Comparator</span>
+<span class="fc" id="L170">                .comparingInt(Occurrence::astNodeCount)</span>
+<span class="fc" id="L171">                .thenComparing(Occurrence::expression)</span>
+<span class="fc" id="L172">                .thenComparing(Occurrence::path))</span>
+<span class="fc" id="L173">            .orElseThrow();</span>
+    }
+
+    private static String identityFor(
+        String sourceExpression,
+        String semanticValueKey,
+        String representativeExpression,
+        List&lt;Occurrence&gt; occurrences,
+        Policy policy,
+        SharingCost cost
+    ) {
+<span class="fc" id="L184">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L185">        append(descriptor, IDENTITY_REVISION);</span>
+<span class="fc" id="L186">        append(descriptor, sourceExpression);</span>
+<span class="fc" id="L187">        append(descriptor, semanticValueKey);</span>
+<span class="fc" id="L188">        append(descriptor, representativeExpression);</span>
+<span class="fc" id="L189">        append(descriptor, policy.contentHash());</span>
+<span class="fc" id="L190">        append(descriptor, Integer.toString(occurrences.size()));</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (Occurrence occurrence : occurrences) {</span>
+<span class="fc" id="L192">            append(descriptor, occurrence.path().canonical());</span>
+<span class="fc" id="L193">            append(descriptor, occurrence.expression());</span>
+<span class="fc" id="L194">            append(descriptor, Integer.toString(occurrence.astNodeCount()));</span>
+<span class="fc" id="L195">        }</span>
+<span class="fc" id="L196">        append(descriptor, cost.canonicalDescriptor());</span>
+<span class="fc" id="L197">        return sha256(descriptor.toString());</span>
+    }
+
+    private static void append(StringBuilder descriptor, String value) {
+<span class="fc" id="L201">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
+<span class="fc" id="L202">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L203">        descriptor.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L204">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L208">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L209">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L210">                    .digest(value.getBytes(StandardCharsets.UTF_8))</span>
+            );
+<span class="nc" id="L212">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L213">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+        }
+    }
+
+    /** One exact AST occurrence and its deterministic rendered expression. */
+    public record Occurrence(
+        ExpressionOccurrencePath path,
+        String expression,
+        int astNodeCount
+    ) implements Comparable&lt;Occurrence&gt; {
+<span class="fc" id="L223">        public Occurrence {</span>
+<span class="fc" id="L224">            path = Objects.requireNonNull(path, &quot;path&quot;);</span>
+<span class="fc" id="L225">            expression = RepresentationCandidateAssessment.requireText(</span>
+                expression, &quot;expression&quot;);
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            if (astNodeCount &lt; 1) {</span>
+<span class="fc" id="L228">                throw new IllegalArgumentException(</span>
+                    &quot;astNodeCount must be positive&quot;);
+            }
+<span class="fc" id="L231">        }</span>
+
+        @Override
+        public int compareTo(Occurrence other) {
+<span class="fc" id="L235">            Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc" id="L236">            int pathComparison = path.compareTo(other.path());</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            if (pathComparison != 0) {</span>
+<span class="fc" id="L238">                return pathComparison;</span>
+            }
+<span class="fc" id="L240">            int expressionComparison = expression.compareTo(other.expression());</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            return expressionComparison != 0</span>
+<span class="nc" id="L242">                ? expressionComparison</span>
+<span class="fc" id="L243">                : Integer.compare(astNodeCount, other.astNodeCount());</span>
+        }
+    }
+
+    /** Frozen anti-alias-gaming cost policy. */
+    public record Policy(
+        int minimumOccurrences,
+        int minimumSubtreeNodes,
+        int bindingNodeCost,
+        int referenceNodeCost,
+        int minimumNetSavings
+    ) {
+        private static final String REVISION =
+            &quot;regelsuche.repeated-structure-policy/v1&quot;;
+
+<span class="fc" id="L258">        public Policy {</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            if (minimumOccurrences &lt; 2) {</span>
+<span class="fc" id="L260">                throw new IllegalArgumentException(</span>
+                    &quot;minimumOccurrences must be at least two&quot;);
+            }
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            if (minimumSubtreeNodes &lt; 2) {</span>
+<span class="fc" id="L264">                throw new IllegalArgumentException(</span>
+                    &quot;minimumSubtreeNodes must exclude leaves&quot;);
+            }
+<span class="fc bfc" id="L267" title="All 4 branches covered.">            if (bindingNodeCost &lt; 1 || referenceNodeCost &lt; 1) {</span>
+<span class="fc" id="L268">                throw new IllegalArgumentException(</span>
+                    &quot;binding and reference costs must be positive&quot;);
+            }
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            if (minimumNetSavings &lt; 1) {</span>
+<span class="fc" id="L272">                throw new IllegalArgumentException(</span>
+                    &quot;minimumNetSavings must be positive&quot;);
+            }
+<span class="fc" id="L275">        }</span>
+
+        public static Policy standard() {
+<span class="fc" id="L278">            return new Policy(2, 2, 1, 1, 1);</span>
+        }
+
+        public String contentHash() {
+<span class="fc" id="L282">            StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L283">            append(descriptor, REVISION);</span>
+<span class="fc" id="L284">            append(descriptor, Integer.toString(minimumOccurrences));</span>
+<span class="fc" id="L285">            append(descriptor, Integer.toString(minimumSubtreeNodes));</span>
+<span class="fc" id="L286">            append(descriptor, Integer.toString(bindingNodeCost));</span>
+<span class="fc" id="L287">            append(descriptor, Integer.toString(referenceNodeCost));</span>
+<span class="fc" id="L288">            append(descriptor, Integer.toString(minimumNetSavings));</span>
+<span class="fc" id="L289">            return sha256(descriptor.toString());</span>
+        }
+    }
+
+    /** Raw tree-versus-explicit-sharing dimensions. */
+    public record SharingCost(
+        int repeatedTreeCost,
+        int definitionTreeCost,
+        int referenceTreeCost,
+        int explicitSharingTreeCost,
+        int netAstNodeSavings,
+        int minimumNetSavings,
+        boolean material
+    ) {
+<span class="fc" id="L303">        public SharingCost {</span>
+<span class="pc bpc" id="L304" title="4 of 10 branches missed.">            if (repeatedTreeCost &lt; 1 || definitionTreeCost &lt; 1</span>
+                    || referenceTreeCost &lt; 1
+                    || explicitSharingTreeCost &lt; 1
+                    || minimumNetSavings &lt; 1) {
+<span class="fc" id="L308">                throw new IllegalArgumentException(</span>
+                    &quot;sharing costs and threshold must be positive&quot;);
+            }
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            if (explicitSharingTreeCost</span>
+                    != definitionTreeCost + referenceTreeCost) {
+<span class="fc" id="L313">                throw new IllegalArgumentException(</span>
+                    &quot;explicit sharing cost does not balance&quot;);
+            }
+<span class="fc bfc" id="L316" title="All 2 branches covered.">            if (netAstNodeSavings</span>
+                    != repeatedTreeCost - explicitSharingTreeCost) {
+<span class="fc" id="L318">                throw new IllegalArgumentException(</span>
+                    &quot;net savings do not balance&quot;);
+            }
+<span class="fc bfc" id="L321" title="All 4 branches covered.">            if (material != (netAstNodeSavings &gt;= minimumNetSavings)) {</span>
+<span class="fc" id="L322">                throw new IllegalArgumentException(</span>
+                    &quot;material flag does not match the frozen threshold&quot;);
+            }
+<span class="fc" id="L325">        }</span>
+
+        private static SharingCost calculate(
+            List&lt;Occurrence&gt; occurrences,
+            Occurrence representative,
+            Policy policy
+        ) {
+<span class="fc" id="L332">            int repeatedCost = occurrences.stream()</span>
+<span class="fc" id="L333">                .mapToInt(Occurrence::astNodeCount)</span>
+<span class="fc" id="L334">                .reduce(0, Math::addExact);</span>
+<span class="fc" id="L335">            int definitionCost = Math.addExact(</span>
+<span class="fc" id="L336">                representative.astNodeCount(), policy.bindingNodeCost());</span>
+<span class="fc" id="L337">            int referencesCost = Math.multiplyExact(</span>
+<span class="fc" id="L338">                occurrences.size(), policy.referenceNodeCost());</span>
+<span class="fc" id="L339">            int explicitCost = Math.addExact(</span>
+                definitionCost, referencesCost);
+<span class="fc" id="L341">            int netSavings = Math.subtractExact(</span>
+                repeatedCost, explicitCost);
+<span class="fc" id="L343">            return new SharingCost(</span>
+                repeatedCost,
+                definitionCost,
+                referencesCost,
+                explicitCost,
+                netSavings,
+<span class="fc" id="L349">                policy.minimumNetSavings(),</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">                netSavings &gt;= policy.minimumNetSavings()</span>
+            );
+        }
+
+        private String canonicalDescriptor() {
+<span class="fc" id="L355">            StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L356">            append(descriptor, Integer.toString(repeatedTreeCost));</span>
+<span class="fc" id="L357">            append(descriptor, Integer.toString(definitionTreeCost));</span>
+<span class="fc" id="L358">            append(descriptor, Integer.toString(referenceTreeCost));</span>
+<span class="fc" id="L359">            append(descriptor, Integer.toString(explicitSharingTreeCost));</span>
+<span class="fc" id="L360">            append(descriptor, Integer.toString(netAstNodeSavings));</span>
+<span class="fc" id="L361">            append(descriptor, Integer.toString(minimumNetSavings));</span>
+<span class="fc" id="L362">            append(descriptor, Boolean.toString(material));</span>
+<span class="fc" id="L363">            return descriptor.toString();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

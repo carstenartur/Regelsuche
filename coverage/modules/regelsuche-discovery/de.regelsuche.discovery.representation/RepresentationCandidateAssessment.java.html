@@ -178,8 +178,8 @@ public record RepresentationCandidateAssessment(
     static String requireText(String value, String field) {
 <span class="fc" id="L179">        Objects.requireNonNull(value, field);</span>
 <span class="fc" id="L180">        String normalized = value.trim();</span>
-<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (normalized.isEmpty()) {</span>
-<span class="nc" id="L182">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (normalized.isEmpty()) {</span>
+<span class="fc" id="L182">            throw new IllegalArgumentException(</span>
                 field + &quot; must not be blank&quot;);
         }
 <span class="fc" id="L185">        return normalized;</span>
