@@ -83,7 +83,11 @@ Widerlegung noch Zustimmung.
 Evaluator-Menge aus. Seine Identität ist content-addressed und bindet
 Portfolio-Revision, Evaluator-ID, Evaluator-Revision und Implementierungsklasse.
 Eine geänderte Evaluatorauswahl oder Revision erzeugt daher eine andere
-`evaluatorProfileHash`.
+`evaluatorProfileHash`. Weil die Implementierungsklasse Bestandteil dieser
+Identität ist, akzeptiert das Portfolio nur stabile benannte Klassen;
+anonyme, lokale, synthetische, versteckte und dynamische Proxy-Klassen werden
+abgewiesen. Ein Adapter für ein externes System erhält daher eine kleine
+benannte Wrapperklasse statt einer compilerabhängigen Lambda-/Proxy-Identität.
 
 Die Aggregation ist fehlersicher:
 

@@ -154,13 +154,61 @@ class AssumptionEvaluatorPortfolioTest {
     }
 
     @Test
-    void portfolioRejectsMisattributedEvidence() {
+    void portfolioRejectsUnstableAnonymousEvaluatorImplementation() {
+        AssumptionEvaluator anonymous = new AssumptionEvaluator() {
+            @Override
+            public String id() {
+                return "anonymous";
+            }
+
+            @Override
+            public String revision() {
+                return "v1";
+            }
+
+            @Override
+            public AssumptionEvaluationEvidence evaluate(
+                Assumption requiredAssumption,
+                List<Assumption> knownAssumptions
+            ) {
+                return AssumptionEvaluationEvidence.evaluated(
+                    id(), revision(), AssumptionTruthValue.UNKNOWN, "", "");
+            }
+        };
+
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> new AssumptionEvaluatorPortfolio(List.of(anonymous)));
+
+        assertTrue(exception.getMessage().contains("stable named class"));
+    }
+
+    @Test
+    void portfolioRejectsMisattributedEvidenceWithActionableDiagnostic() {
         AssumptionEvaluatorPortfolio portfolio =
             new AssumptionEvaluatorPortfolio(List.of(
                 new MisattributingEvaluator()));
 
-        assertThrows(IllegalArgumentException.class, () ->
-            portfolio.evaluate(Assumption.positive("x"), List.of()));
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> portfolio.evaluate(Assumption.positive("x"), List.of()));
+
+        assertTrue(exception.getMessage().contains("expected declared"));
+        assertTrue(exception.getMessage().contains("evidence declared other"));
+    }
+
+    @Test
+    void portfolioRejectsMisattributedRevisionWithActionableDiagnostic() {
+        AssumptionEvaluatorPortfolio portfolio =
+            new AssumptionEvaluatorPortfolio(List.of(
+                new MisrevisionEvaluator()));
+
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> portfolio.evaluate(Assumption.positive("x"), List.of()));
+
+        assertTrue(exception.getMessage().contains("expected v1"));
+        assertTrue(exception.getMessage().contains("evidence declared v2"));
     }
 
     @Test
@@ -218,6 +266,33 @@ class AssumptionEvaluatorPortfolioTest {
                 revision(),
                 AssumptionTruthValue.UNKNOWN,
                 "misattributed",
+                ""
+            );
+        }
+    }
+
+    private static final class MisrevisionEvaluator
+            implements AssumptionEvaluator {
+        @Override
+        public String id() {
+            return "declared";
+        }
+
+        @Override
+        public String revision() {
+            return "v1";
+        }
+
+        @Override
+        public AssumptionEvaluationEvidence evaluate(
+            Assumption requiredAssumption,
+            List<Assumption> knownAssumptions
+        ) {
+            return AssumptionEvaluationEvidence.evaluated(
+                id(),
+                "v2",
+                AssumptionTruthValue.UNKNOWN,
+                "misattributed revision",
                 ""
             );
         }

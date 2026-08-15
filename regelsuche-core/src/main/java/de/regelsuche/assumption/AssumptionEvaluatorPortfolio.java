@@ -1,5 +1,6 @@
 package de.regelsuche.assumption;
 
+import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -110,13 +111,27 @@ public final class AssumptionEvaluatorPortfolio {
     }
 
     private static EvaluatorBinding bind(AssumptionEvaluator evaluator) {
+        Class<?> implementation = evaluator.getClass();
+        rejectUnstableImplementation(implementation);
         return new EvaluatorBinding(
             evaluator,
             requireText(evaluator.id(), "assumption evaluator id"),
             requireText(
                 evaluator.revision(), "assumption evaluator revision"),
-            evaluator.getClass().getName()
+            implementation.getName()
         );
+    }
+
+    private static void rejectUnstableImplementation(Class<?> implementation) {
+        if (implementation.isAnonymousClass()
+                || implementation.isLocalClass()
+                || implementation.isSynthetic()
+                || implementation.isHidden()
+                || Proxy.isProxyClass(implementation)) {
+            throw new IllegalArgumentException(
+                "assumption evaluator implementation must be a stable named "
+                    + "class: " + implementation.getName());
+        }
     }
 
     private static void rejectDuplicateIds(
@@ -137,11 +152,15 @@ public final class AssumptionEvaluatorPortfolio {
     ) {
         if (!binding.id().equals(evidence.evaluatorId())) {
             throw new IllegalArgumentException(
-                "assumption evaluator returned evidence for another id");
+                "assumption evaluator id mismatch: expected " + binding.id()
+                    + " but evidence declared " + evidence.evaluatorId());
         }
         if (!binding.revision().equals(evidence.evaluatorRevision())) {
             throw new IllegalArgumentException(
-                "assumption evaluator returned evidence for another revision");
+                "assumption evaluator revision mismatch for " + binding.id()
+                    + ": expected " + binding.revision()
+                    + " but evidence declared "
+                    + evidence.evaluatorRevision());
         }
     }
 
