@@ -14,10 +14,12 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeSet;
 
 /**
@@ -65,21 +67,23 @@ public final class TargetFreeRepresentationSearch {
 
         List<State> states = new ArrayList<>();
         List<Transition> transitions = new ArrayList<>();
-        Map<String, State> byExpression = new LinkedHashMap<>();
+        Map<String, State> byStateKey = new LinkedHashMap<>();
         ArrayDeque<State> frontier = new ArrayDeque<>();
         State root = State.root(source, measurer.measure(source));
         states.add(root);
-        byExpression.put(source, root);
+        byStateKey.put(stateDescriptor(source, List.of()), root);
         frontier.add(root);
 
         int explored = 0;
         boolean transitionLimit = false;
         boolean stateLimit = false;
+        boolean depthLimit = false;
         while (!frontier.isEmpty()
                 && explored < budget.maxExploredStates()) {
             State current = frontier.removeFirst();
             explored++;
             if (current.depth() >= budget.maxDepth()) {
+                depthLimit = true;
                 continue;
             }
             List<Transformation> generated = engine
@@ -94,9 +98,13 @@ public final class TargetFreeRepresentationSearch {
                 }
                 String expression = normalize(
                     transformation.transformedExpression());
-                String targetHash = stateHash(expression);
+                List<String> targetAssumptions = union(
+                    current.assumptions(), transformation.assumptions());
+                String stateKey = stateDescriptor(
+                    expression, targetAssumptions);
+                String targetHash = KnownStructureCatalog.sha256(stateKey);
                 TransitionDisposition disposition;
-                if (byExpression.containsKey(expression)) {
+                if (byStateKey.containsKey(stateKey)) {
                     disposition =
                         TransitionDisposition.DUPLICATE_REPRESENTATION;
                 } else if (states.size() >= budget.maxRetainedStates()) {
@@ -111,10 +119,11 @@ public final class TargetFreeRepresentationSearch {
                         expression,
                         current,
                         transformation,
+                        targetAssumptions,
                         measurer.measure(expression)
                     );
                     states.add(discovered);
-                    byExpression.put(expression, discovered);
+                    byStateKey.put(stateKey, discovered);
                     frontier.addLast(discovered);
                 }
                 transitions.add(Transition.of(
@@ -123,6 +132,7 @@ public final class TargetFreeRepresentationSearch {
                     targetHash,
                     expression,
                     transformation,
+                    targetAssumptions,
                     disposition
                 ));
             }
@@ -139,7 +149,8 @@ public final class TargetFreeRepresentationSearch {
             budget,
             explored,
             transitions.size(),
-            transitionLimit || stateLimit || !frontier.isEmpty(),
+            transitionLimit || stateLimit || depthLimit
+                || !frontier.isEmpty(),
             states,
             transitions,
             paretoStateHashes(states)
@@ -175,44 +186,66 @@ public final class TargetFreeRepresentationSearch {
             .toList();
         return candidates.stream()
             .filter(candidate -> candidates.stream().noneMatch(other ->
-                other != candidate
-                    && dominates(other.metrics(), candidate.metrics())))
+                !other.stateHash().equals(candidate.stateHash())
+                    && dominates(other, candidate)))
             .map(State::stateHash)
             .toList();
     }
 
-    private static boolean dominates(
-        SemanticDescriptionMetrics left,
-        SemanticDescriptionMetrics right
-    ) {
+    private static boolean dominates(State left, State right) {
+        SemanticDescriptionMetrics leftMetrics = left.metrics();
+        SemanticDescriptionMetrics rightMetrics = right.metrics();
         boolean noWorse =
-            left.tokenCount() <= right.tokenCount()
-                && left.astNodeCount() <= right.astNodeCount()
-                && left.operatorCount() <= right.operatorCount()
-                && left.numericBitLength() <= right.numericBitLength()
-                && left.distinctSemanticValues()
-                    <= right.distinctSemanticValues()
-                && left.repeatedSemanticValueSavings()
-                    >= right.repeatedSemanticValueSavings();
+            leftMetrics.tokenCount() <= rightMetrics.tokenCount()
+                && leftMetrics.astNodeCount()
+                    <= rightMetrics.astNodeCount()
+                && leftMetrics.operatorCount()
+                    <= rightMetrics.operatorCount()
+                && leftMetrics.numericBitLength()
+                    <= rightMetrics.numericBitLength()
+                && leftMetrics.distinctSemanticValues()
+                    <= rightMetrics.distinctSemanticValues()
+                && leftMetrics.repeatedSemanticValueSavings()
+                    >= rightMetrics.repeatedSemanticValueSavings()
+                && left.assumptions().size()
+                    <= right.assumptions().size();
         boolean better =
-            left.tokenCount() < right.tokenCount()
-                || left.astNodeCount() < right.astNodeCount()
-                || left.operatorCount() < right.operatorCount()
-                || left.numericBitLength() < right.numericBitLength()
-                || left.distinctSemanticValues()
-                    < right.distinctSemanticValues()
-                || left.repeatedSemanticValueSavings()
-                    > right.repeatedSemanticValueSavings();
+            leftMetrics.tokenCount() < rightMetrics.tokenCount()
+                || leftMetrics.astNodeCount()
+                    < rightMetrics.astNodeCount()
+                || leftMetrics.operatorCount()
+                    < rightMetrics.operatorCount()
+                || leftMetrics.numericBitLength()
+                    < rightMetrics.numericBitLength()
+                || leftMetrics.distinctSemanticValues()
+                    < rightMetrics.distinctSemanticValues()
+                || leftMetrics.repeatedSemanticValueSavings()
+                    > rightMetrics.repeatedSemanticValueSavings()
+                || left.assumptions().size()
+                    < right.assumptions().size();
         return noWorse && better;
     }
 
-    private static String stateHash(String expression) {
+    private static String stateDescriptor(
+        String expression,
+        List<String> assumptions
+    ) {
         StringBuilder descriptor = new StringBuilder();
         KnownStructureCatalog.appendCanonicalField(
             descriptor, SCHEMA + "/state");
         KnownStructureCatalog.appendCanonicalField(
             descriptor, expression);
-        return KnownStructureCatalog.sha256(descriptor.toString());
+        KnownStructureCatalog.appendCanonicalList(
+            descriptor, assumptions);
+        return descriptor.toString();
+    }
+
+    private static String stateHash(
+        String expression,
+        List<String> assumptions
+    ) {
+        return KnownStructureCatalog.sha256(
+            stateDescriptor(expression, assumptions));
     }
 
     private static String json(Object value) {
@@ -288,7 +321,7 @@ public final class TargetFreeRepresentationSearch {
         }
 
         public static Budget small() {
-            return new Budget(3, 64, 64, 512, 80, 12);
+            return new Budget(2, 32, 32, 256, 48, 12);
         }
     }
 
@@ -329,6 +362,12 @@ public final class TargetFreeRepresentationSearch {
             assumptions = normalized(assumptions);
             packIds = normalized(packIds);
             metrics = Objects.requireNonNull(metrics, "metrics");
+            String expectedStateHash = TargetFreeRepresentationSearch
+                .stateHash(expression, assumptions);
+            if (!expectedStateHash.equals(stateHash)) {
+                throw new IllegalArgumentException(
+                    "state hash does not match expression and assumptions");
+            }
             boolean hasLineage = !parentStateHash.isEmpty()
                 && !incomingRuleId.isEmpty()
                 && !incomingApplicationKey.isEmpty()
@@ -337,7 +376,11 @@ public final class TargetFreeRepresentationSearch {
             if (depth == 0 && (hasLineage
                     || !parentStateHash.isEmpty()
                     || !incomingRuleId.isEmpty()
-                    || !incomingApplicationKey.isEmpty())) {
+                    || !incomingApplicationKey.isEmpty()
+                    || !pathRuleIds.isEmpty()
+                    || !primitiveRuleIds.isEmpty()
+                    || !assumptions.isEmpty()
+                    || !packIds.isEmpty())) {
                 throw new IllegalArgumentException(
                     "root state must not contain lineage");
             }
@@ -352,7 +395,9 @@ public final class TargetFreeRepresentationSearch {
             SemanticDescriptionMetrics metrics
         ) {
             return new State(
-                1, TargetFreeRepresentationSearch.stateHash(expression),
+                1,
+                TargetFreeRepresentationSearch.stateHash(
+                    expression, List.of()),
                 expression, 0,
                 "", "", "", List.of(), List.of(), List.of(),
                 List.of(), true, metrics);
@@ -364,6 +409,7 @@ public final class TargetFreeRepresentationSearch {
             String expression,
             State parent,
             Transformation transformation,
+            List<String> targetAssumptions,
             SemanticDescriptionMetrics metrics
         ) {
             return new State(
@@ -378,8 +424,7 @@ public final class TargetFreeRepresentationSearch {
                     List.of(transformation.rule())),
                 append(parent.primitiveRuleIds(),
                     transformation.primitiveRuleIds()),
-                union(parent.assumptions(),
-                    transformation.assumptions()),
+                targetAssumptions,
                 union(parent.packIds(),
                     List.of(transformation.packId())),
                 parent.equivalencePreserving()
@@ -422,6 +467,13 @@ public final class TargetFreeRepresentationSearch {
                     applicationKey, "applicationKey");
             primitiveRuleIds = List.copyOf(primitiveRuleIds);
             assumptions = normalized(assumptions);
+            String expectedTargetHash =
+                TargetFreeRepresentationSearch.stateHash(
+                    transformedExpression, assumptions);
+            if (!expectedTargetHash.equals(toStateHash)) {
+                throw new IllegalArgumentException(
+                    "transition target hash does not match representation");
+            }
             packId = RepresentationCandidateAssessment.requireText(
                 packId, "packId");
             license = RepresentationCandidateAssessment.requireText(
@@ -436,6 +488,7 @@ public final class TargetFreeRepresentationSearch {
             String toStateHash,
             String expression,
             Transformation transformation,
+            List<String> targetAssumptions,
             TransitionDisposition disposition
         ) {
             return new Transition(
@@ -446,7 +499,7 @@ public final class TargetFreeRepresentationSearch {
                 transformation.rule(),
                 transformation.applicationKey(),
                 transformation.primitiveRuleIds(),
-                transformation.assumptions(),
+                targetAssumptions,
                 transformation.packId(),
                 transformation.license(),
                 transformation.equivalencePreservingByConstruction(),
@@ -471,6 +524,10 @@ public final class TargetFreeRepresentationSearch {
         public SearchContent {
             schema = RepresentationCandidateAssessment.requireText(
                 schema, "schema");
+            if (!SCHEMA.equals(schema)) {
+                throw new IllegalArgumentException(
+                    "unsupported target-free search schema: " + schema);
+            }
             sourceExpression =
                 RepresentationCandidateAssessment.requireText(
                     sourceExpression, "sourceExpression");
@@ -482,13 +539,113 @@ public final class TargetFreeRepresentationSearch {
             states = List.copyOf(states);
             transitions = List.copyOf(transitions);
             paretoStateHashes = List.copyOf(paretoStateHashes);
+            validateBalance();
+        }
+
+        private void validateBalance() {
             if (exploredStateCount < 1
+                    || exploredStateCount > states.size()
+                    || exploredStateCount > budget.maxExploredStates()
                     || generatedTransitionCount != transitions.size()
+                    || transitions.size()
+                        > budget.maxGeneratedTransitions()
                     || states.isEmpty()
-                    || !states.getFirst().stateHash()
-                        .equals(sourceStateHash)) {
+                    || states.size() > budget.maxRetainedStates()) {
                 throw new IllegalArgumentException(
-                    "target-free search result does not balance");
+                    "target-free search resources do not balance");
+            }
+            State root = states.getFirst();
+            if (root.sequence() != 1
+                    || root.depth() != 0
+                    || !root.expression().equals(sourceExpression)
+                    || !root.stateHash().equals(sourceStateHash)) {
+                throw new IllegalArgumentException(
+                    "target-free search root does not balance");
+            }
+
+            Map<String, State> statesByHash = new LinkedHashMap<>();
+            Set<String> stateDescriptors = new HashSet<>();
+            for (int index = 0; index < states.size(); index++) {
+                State state = states.get(index);
+                if (state.sequence() != index + 1
+                        || state.depth() > budget.maxDepth()
+                        || statesByHash.put(
+                            state.stateHash(), state) != null
+                        || !stateDescriptors.add(stateDescriptor(
+                            state.expression(), state.assumptions()))) {
+                    throw new IllegalArgumentException(
+                        "target-free search states do not balance");
+                }
+            }
+
+            Set<String> acceptedTargets = new HashSet<>();
+            for (int index = 0; index < transitions.size(); index++) {
+                Transition transition = transitions.get(index);
+                if (transition.sequence() != index + 1
+                        || !statesByHash.containsKey(
+                            transition.fromStateHash())) {
+                    throw new IllegalArgumentException(
+                        "target-free search transitions do not balance");
+                }
+                boolean targetRetained = statesByHash.containsKey(
+                    transition.toStateHash());
+                if (transition.disposition()
+                        == TransitionDisposition.STATE_BUDGET_EXHAUSTED) {
+                    if (targetRetained || !truncated) {
+                        throw new IllegalArgumentException(
+                            "state-budget transition must be unretained");
+                    }
+                } else if (!targetRetained) {
+                    throw new IllegalArgumentException(
+                        "accepted or duplicate transition target is missing");
+                }
+                if (transition.disposition()
+                        == TransitionDisposition.ACCEPTED_NEW_STATE
+                        && !acceptedTargets.add(
+                            transition.toStateHash())) {
+                    throw new IllegalArgumentException(
+                        "state has multiple accepting transitions");
+                }
+            }
+
+            for (State state : states.stream()
+                    .filter(value -> value.depth() > 0)
+                    .toList()) {
+                State parent = statesByHash.get(
+                    state.parentStateHash());
+                if (parent == null
+                        || parent.sequence() >= state.sequence()
+                        || parent.depth() + 1 != state.depth()
+                        || !acceptedTargets.contains(
+                            state.stateHash())) {
+                    throw new IllegalArgumentException(
+                        "target-free state lineage does not balance");
+                }
+                boolean lineageTransition = transitions.stream()
+                    .anyMatch(transition ->
+                        transition.disposition()
+                            == TransitionDisposition.ACCEPTED_NEW_STATE
+                            && transition.fromStateHash().equals(
+                                state.parentStateHash())
+                            && transition.toStateHash().equals(
+                                state.stateHash())
+                            && transition.ruleId().equals(
+                                state.incomingRuleId())
+                            && transition.applicationKey().equals(
+                                state.incomingApplicationKey()));
+                if (!lineageTransition) {
+                    throw new IllegalArgumentException(
+                        "target-free state lacks accepting lineage");
+                }
+            }
+
+            List<String> expectedPareto =
+                TargetFreeRepresentationSearch.paretoStateHashes(states);
+            if (!expectedPareto.equals(paretoStateHashes)
+                    || new HashSet<>(paretoStateHashes).size()
+                        != paretoStateHashes.size()) {
+                throw new IllegalArgumentException(
+                    "target-free Pareto archive does not balance");
             }
         }
 
