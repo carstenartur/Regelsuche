@@ -1,0 +1,647 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationDiscoveryInformationBoundary.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationDiscoveryInformationBoundary.java</span></div><h1>RepresentationDiscoveryInformationBoundary.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Content-addressed information boundary for the four representation-discovery
+ * tracks defined by issue #663.
+ *
+ * &lt;p&gt;The post-freeze catalog is deliberately not exposed directly. Callers must
+ * first freeze the complete candidate set and present the resulting receipt.
+ * Catalog-blind and hidden-structure runs additionally withhold every rule pack
+ * declared as a consequence of knowledge that formation is not allowed to see.&lt;/p&gt;
+ */
+public final class RepresentationDiscoveryInformationBoundary {
+    private static final String REVISION =
+        &quot;regelsuche.representation-discovery-information-boundary/v3&quot;;
+    private static final String CANDIDATE_FREEZE_REVISION =
+        &quot;regelsuche.representation-candidate-freeze/v1&quot;;
+    private static final String POST_FREEZE_REVISION =
+        &quot;regelsuche.representation-post-freeze-disclosure/v3&quot;;
+
+    private final Track track;
+    private final KnowledgePackSelection visibleSelection;
+    private final KnowledgePackSelection formationSelection;
+    private final KnownStructureCatalog formationCatalog;
+    private final KnownStructureCatalog postFreezeCatalog;
+    private final List&lt;RewriteRule&gt; formationRules;
+    private final String formationRuleInventoryHash;
+    private final String postFreezeRuleInventoryHash;
+    private final Set&lt;String&gt; requestedHoldoutStructureIds;
+    private final Set&lt;String&gt; formationExcludedStructureIds;
+    private final Set&lt;String&gt; withheldRulePackIds;
+    private final String holdoutCommitmentHash;
+    private final String contentHash;
+
+    private RepresentationDiscoveryInformationBoundary(
+        Track track,
+        KnowledgePackSelection visibleSelection,
+        KnowledgePackSelection formationSelection,
+        KnownStructureCatalog formationCatalog,
+        KnownStructureCatalog postFreezeCatalog,
+        List&lt;RewriteRule&gt; formationRules,
+        String postFreezeRuleInventoryHash,
+        Set&lt;String&gt; requestedHoldoutStructureIds,
+        Set&lt;String&gt; formationExcludedStructureIds,
+        Set&lt;String&gt; withheldRulePackIds
+<span class="fc" id="L60">    ) {</span>
+<span class="fc" id="L61">        this.track = Objects.requireNonNull(track, &quot;track&quot;);</span>
+<span class="fc" id="L62">        this.visibleSelection = Objects.requireNonNull(</span>
+            visibleSelection, &quot;visibleSelection&quot;);
+<span class="fc" id="L64">        this.formationSelection = Objects.requireNonNull(</span>
+            formationSelection, &quot;formationSelection&quot;);
+<span class="fc" id="L66">        this.formationCatalog = Objects.requireNonNull(</span>
+            formationCatalog, &quot;formationCatalog&quot;);
+<span class="fc" id="L68">        this.postFreezeCatalog = Objects.requireNonNull(</span>
+            postFreezeCatalog, &quot;postFreezeCatalog&quot;);
+<span class="fc" id="L70">        Objects.requireNonNull(formationRules, &quot;formationRules&quot;);</span>
+<span class="fc" id="L71">        this.formationRules = formationRules.stream()</span>
+<span class="fc" id="L72">            .map(rule -&gt; Objects.requireNonNull(rule, &quot;formationRule&quot;))</span>
+<span class="fc" id="L73">            .sorted(Comparator.comparing(RewriteRule::id)</span>
+<span class="pc" id="L74">                .thenComparing(rule -&gt; rule.descriptor().packId())</span>
+<span class="fc" id="L75">                .thenComparing(RuleInventoryFingerprint::ruleContentHash))</span>
+<span class="fc" id="L76">            .toList();</span>
+<span class="fc" id="L77">        this.formationRuleInventoryHash = RuleInventoryFingerprint.contentHash(</span>
+            this.formationRules);
+<span class="fc" id="L79">        this.postFreezeRuleInventoryHash = requireSha256(</span>
+            postFreezeRuleInventoryHash, &quot;postFreezeRuleInventoryHash&quot;);
+<span class="fc" id="L81">        this.requestedHoldoutStructureIds = immutableSortedSet(</span>
+            requestedHoldoutStructureIds, &quot;requestedHoldoutStructureIds&quot;);
+<span class="fc" id="L83">        this.formationExcludedStructureIds = immutableSortedSet(</span>
+            formationExcludedStructureIds, &quot;formationExcludedStructureIds&quot;);
+<span class="fc" id="L85">        this.withheldRulePackIds = immutableSortedSet(</span>
+            withheldRulePackIds, &quot;withheldRulePackIds&quot;);
+<span class="fc" id="L87">        this.holdoutCommitmentHash = holdoutCommitment();</span>
+<span class="fc" id="L88">        this.contentHash = boundaryHash();</span>
+<span class="fc" id="L89">    }</span>
+
+    public static RepresentationDiscoveryInformationBoundary fromKnowledgePacks(
+        Track track,
+        KnowledgePackSelection visibleSelection
+    ) {
+<span class="nc" id="L95">        return fromKnowledgePacks(</span>
+            new KnowledgePackRegistry(),
+            track,
+            visibleSelection,
+<span class="nc" id="L99">            Set.of()</span>
+        );
+    }
+
+    public static RepresentationDiscoveryInformationBoundary fromKnowledgePacks(
+        Track track,
+        KnowledgePackSelection visibleSelection,
+        Set&lt;String&gt; hiddenStructureIds
+    ) {
+<span class="fc" id="L108">        return fromKnowledgePacks(</span>
+            new KnowledgePackRegistry(),
+            track,
+            visibleSelection,
+            hiddenStructureIds
+        );
+    }
+
+    public static RepresentationDiscoveryInformationBoundary fromKnowledgePacks(
+        KnowledgePackRegistry registry,
+        Track track,
+        KnowledgePackSelection visibleSelection,
+        Set&lt;String&gt; hiddenStructureIds
+    ) {
+<span class="fc" id="L122">        Objects.requireNonNull(registry, &quot;registry&quot;);</span>
+<span class="fc" id="L123">        Objects.requireNonNull(track, &quot;track&quot;);</span>
+<span class="fc" id="L124">        Objects.requireNonNull(visibleSelection, &quot;visibleSelection&quot;);</span>
+<span class="fc" id="L125">        Set&lt;String&gt; requestedHoldouts = immutableSortedSet(</span>
+            hiddenStructureIds, &quot;hiddenStructureIds&quot;);
+<span class="fc" id="L127">        validateRequestedHoldouts(track, requestedHoldouts);</span>
+
+<span class="fc" id="L129">        KnownStructureCatalog visibleCatalog =</span>
+<span class="fc" id="L130">            KnownStructureCatalog.fromKnowledgePacks(</span>
+                registry, visibleSelection);
+<span class="fc" id="L132">        List&lt;KnownStructure&gt; holdoutStructures = holdoutStructures(</span>
+            visibleCatalog, requestedHoldouts);
+<span class="fc bfc" id="L134" title="All 3 branches covered.">        Set&lt;String&gt; withheldPacks = switch (track) {</span>
+            case R2_CATALOG_BLIND_POST_HOC_BRIDGE -&gt;
+<span class="fc" id="L136">                governingRulePacks(visibleCatalog.structures());</span>
+            case R4_HIDDEN_STRUCTURE_REDISCOVERY -&gt;
+<span class="fc" id="L138">                governingRulePacks(holdoutStructures);</span>
+            case R1_TARGET_FREE_COMPRESSION,
+<span class="fc" id="L140">                 R3_CATALOG_VISIBLE_KNOWLEDGE_NAVIGATION -&gt; Set.of();</span>
+        };
+
+<span class="fc" id="L143">        KnowledgePackSelection formationSelection = visibleSelection;</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        for (String packId : withheldPacks) {</span>
+<span class="fc" id="L145">            formationSelection = formationSelection.disablePack(packId);</span>
+<span class="fc" id="L146">        }</span>
+
+<span class="fc bfc" id="L148" title="All 3 branches covered.">        KnownStructureCatalog formationCatalog = switch (track) {</span>
+            case R1_TARGET_FREE_COMPRESSION,
+                 R2_CATALOG_BLIND_POST_HOC_BRIDGE -&gt;
+<span class="fc" id="L151">                KnownStructureCatalog.empty();</span>
+            case R3_CATALOG_VISIBLE_KNOWLEDGE_NAVIGATION -&gt;
+<span class="fc" id="L153">                visibleCatalog;</span>
+            case R4_HIDDEN_STRUCTURE_REDISCOVERY -&gt;
+<span class="fc" id="L155">                KnownStructureCatalog.fromKnowledgePacks(</span>
+                    registry, formationSelection);
+        };
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        KnownStructureCatalog postFreezeCatalog = switch (track) {</span>
+            case R1_TARGET_FREE_COMPRESSION -&gt;
+<span class="fc" id="L160">                KnownStructureCatalog.empty();</span>
+            case R2_CATALOG_BLIND_POST_HOC_BRIDGE,
+                 R3_CATALOG_VISIBLE_KNOWLEDGE_NAVIGATION,
+                 R4_HIDDEN_STRUCTURE_REDISCOVERY -&gt;
+<span class="fc" id="L164">                visibleCatalog;</span>
+        };
+
+<span class="fc" id="L167">        Set&lt;String&gt; excluded = difference(</span>
+<span class="fc" id="L168">            structureIds(postFreezeCatalog),</span>
+<span class="fc" id="L169">            structureIds(formationCatalog)</span>
+        );
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (track == Track.R4_HIDDEN_STRUCTURE_REDISCOVERY</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                &amp;&amp; !excluded.containsAll(requestedHoldouts)) {</span>
+<span class="nc" id="L173">            Set&lt;String&gt; leaked = new TreeSet&lt;&gt;(requestedHoldouts);</span>
+<span class="nc" id="L174">            leaked.removeAll(excluded);</span>
+<span class="nc" id="L175">            throw new IllegalArgumentException(</span>
+                &quot;Hidden structures remain visible during formation: &quot; + leaked);
+        }
+
+<span class="fc" id="L179">        List&lt;RewriteRule&gt; formationRules = astRuleInventory(</span>
+            registry, formationSelection);
+<span class="fc" id="L181">        List&lt;RewriteRule&gt; postFreezeRules = astRuleInventory(</span>
+            registry, visibleSelection);
+<span class="fc" id="L183">        return new RepresentationDiscoveryInformationBoundary(</span>
+            track,
+            visibleSelection,
+            formationSelection,
+            formationCatalog,
+            postFreezeCatalog,
+            formationRules,
+<span class="fc" id="L190">            RuleInventoryFingerprint.contentHash(postFreezeRules),</span>
+            requestedHoldouts,
+            excluded,
+            withheldPacks
+        );
+    }
+
+    public String revision() {
+<span class="nc" id="L198">        return REVISION;</span>
+    }
+
+    public Track track() {
+<span class="nc" id="L202">        return track;</span>
+    }
+
+    /** Opaque identity of the rule-pack selection used for formation. */
+    public String candidateFormationSelectionCommitment() {
+<span class="nc" id="L207">        return KnownStructureCatalog.sha256(</span>
+<span class="nc" id="L208">            selectionDescriptor(formationSelection));</span>
+    }
+
+    /**
+     * Exact AST rewrite rules visible to candidate formation.
+     *
+     * &lt;p&gt;The inventory combines enabled built-in core rules and enabled
+     * Knowledge-Pack rules in canonical order. It does not disclose which
+     * post-freeze packs were withheld; R2 and R4 holdout details are released
+     * only after freeze.&lt;/p&gt;
+     */
+    public List&lt;RewriteRule&gt; candidateFormationRules() {
+<span class="fc" id="L220">        return formationRules;</span>
+    }
+
+    /** Opaque commitment to the complete post-freeze pack selection. */
+    public String postFreezeSelectionCommitment() {
+<span class="nc" id="L225">        return KnownStructureCatalog.sha256(</span>
+<span class="nc" id="L226">            selectionDescriptor(visibleSelection));</span>
+    }
+
+    /** Catalog candidate formation is permitted to inspect. */
+    public KnownStructureCatalog candidateFormationCatalog() {
+<span class="fc" id="L231">        return formationCatalog;</span>
+    }
+
+    /** Exact AST rewrite inventory available during candidate formation. */
+    public String candidateFormationRuleInventoryHash() {
+<span class="fc" id="L236">        return formationRuleInventoryHash;</span>
+    }
+
+    /** Content commitment for the catalog disclosed after candidate freeze. */
+    public String postFreezeCatalogCommitment() {
+<span class="nc" id="L241">        return postFreezeCatalog.contentHash();</span>
+    }
+
+    /** Exact AST rewrite inventory associated with post-freeze knowledge. */
+    public String postFreezeRuleInventoryCommitment() {
+<span class="fc" id="L246">        return postFreezeRuleInventoryHash;</span>
+    }
+
+    /** Opaque pre-freeze commitment to all holdout and exclusion details. */
+    public String holdoutCommitmentHash() {
+<span class="fc" id="L251">        return holdoutCommitmentHash;</span>
+    }
+
+    /** Identity of track, actual inventories, catalogs and holdout commitment. */
+    public String contentHash() {
+<span class="fc" id="L256">        return contentHash;</span>
+    }
+
+    /** Freezes candidate content without consulting post-freeze knowledge. */
+    public CandidateFreezeReceipt freezeCandidates(
+        Collection&lt;RepresentationCandidateProposal&gt; candidates
+    ) {
+<span class="fc" id="L263">        Objects.requireNonNull(candidates, &quot;candidates&quot;);</span>
+<span class="fc" id="L264">        List&lt;String&gt; descriptors = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        for (RepresentationCandidateProposal candidate : candidates) {</span>
+<span class="fc" id="L266">            descriptors.add(candidateDescriptor(</span>
+<span class="fc" id="L267">                Objects.requireNonNull(candidate, &quot;candidate&quot;)));</span>
+<span class="fc" id="L268">        }</span>
+<span class="fc" id="L269">        Collections.sort(descriptors);</span>
+<span class="fc" id="L270">        StringBuilder candidateSet = new StringBuilder();</span>
+<span class="fc" id="L271">        KnownStructureCatalog.appendCanonicalField(</span>
+            candidateSet, CANDIDATE_FREEZE_REVISION);
+<span class="fc" id="L273">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L274">            candidateSet, Integer.toString(descriptors.size()));</span>
+<span class="fc" id="L275">        descriptors.forEach(descriptor -&gt;</span>
+<span class="fc" id="L276">            KnownStructureCatalog.appendCanonicalField(</span>
+                candidateSet, descriptor));
+<span class="fc" id="L278">        return new CandidateFreezeReceipt(</span>
+            contentHash,
+<span class="fc" id="L280">            KnownStructureCatalog.sha256(candidateSet.toString()),</span>
+<span class="fc" id="L281">            descriptors.size()</span>
+        );
+    }
+
+    /**
+     * Reveals classification knowledge and holdout details only for a receipt
+     * issued under this exact information boundary.
+     */
+    public PostFreezeDisclosure disclosePostFreeze(
+        CandidateFreezeReceipt receipt
+    ) {
+<span class="fc" id="L292">        Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (!contentHash.equals(receipt.boundaryHash())) {</span>
+<span class="fc" id="L294">            throw new IllegalArgumentException(</span>
+                &quot;Candidate freeze receipt belongs to a different &quot;
+                    + &quot;information boundary&quot;);
+        }
+<span class="fc" id="L298">        return new PostFreezeDisclosure(</span>
+            track,
+            contentHash,
+<span class="fc" id="L301">            receipt.contentHash(),</span>
+            visibleSelection,
+            postFreezeCatalog,
+            formationRuleInventoryHash,
+            postFreezeRuleInventoryHash,
+            requestedHoldoutStructureIds,
+            formationExcludedStructureIds,
+            withheldRulePackIds,
+            holdoutCommitmentHash
+        );
+    }
+
+<span class="fc" id="L313">    public enum Track {</span>
+<span class="fc" id="L314">        R1_TARGET_FREE_COMPRESSION(&quot;R1&quot;),</span>
+<span class="fc" id="L315">        R2_CATALOG_BLIND_POST_HOC_BRIDGE(&quot;R2&quot;),</span>
+<span class="fc" id="L316">        R3_CATALOG_VISIBLE_KNOWLEDGE_NAVIGATION(&quot;R3&quot;),</span>
+<span class="fc" id="L317">        R4_HIDDEN_STRUCTURE_REDISCOVERY(&quot;R4&quot;);</span>
+
+        private final String id;
+
+<span class="fc" id="L321">        Track(String id) {</span>
+<span class="fc" id="L322">            this.id = id;</span>
+<span class="fc" id="L323">        }</span>
+
+        public String id() {
+<span class="fc" id="L326">            return id;</span>
+        }
+    }
+
+    /** Opaque receipt issued only by {@link #freezeCandidates(Collection)}. */
+    public static final class CandidateFreezeReceipt {
+        private final String boundaryHash;
+        private final String candidateSetHash;
+        private final int candidateCount;
+
+        private CandidateFreezeReceipt(
+            String boundaryHash,
+            String candidateSetHash,
+            int candidateCount
+<span class="fc" id="L340">        ) {</span>
+<span class="fc" id="L341">            this.boundaryHash = requireSha256(</span>
+                boundaryHash, &quot;boundaryHash&quot;);
+<span class="fc" id="L343">            this.candidateSetHash = requireSha256(</span>
+                candidateSetHash, &quot;candidateSetHash&quot;);
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">            if (candidateCount &lt; 0) {</span>
+<span class="nc" id="L346">                throw new IllegalArgumentException(</span>
+                    &quot;candidateCount must be non-negative&quot;);
+            }
+<span class="fc" id="L349">            this.candidateCount = candidateCount;</span>
+<span class="fc" id="L350">        }</span>
+
+        public String boundaryHash() {
+<span class="fc" id="L353">            return boundaryHash;</span>
+        }
+
+        public String candidateSetHash() {
+<span class="nc" id="L357">            return candidateSetHash;</span>
+        }
+
+        public int candidateCount() {
+<span class="nc" id="L361">            return candidateCount;</span>
+        }
+
+        public String contentHash() {
+<span class="fc" id="L365">            StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L366">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, CANDIDATE_FREEZE_REVISION);
+<span class="fc" id="L368">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, boundaryHash);
+<span class="fc" id="L370">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, candidateSetHash);
+<span class="fc" id="L372">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L373">                descriptor, Integer.toString(candidateCount));</span>
+<span class="fc" id="L374">            return KnownStructureCatalog.sha256(descriptor.toString());</span>
+        }
+    }
+
+    public record PostFreezeDisclosure(
+        Track track,
+        String boundaryHash,
+        String freezeReceiptHash,
+        KnowledgePackSelection classificationSelection,
+        KnownStructureCatalog classificationCatalog,
+        String formationRuleInventoryHash,
+        String classificationRuleInventoryHash,
+        Set&lt;String&gt; requestedHoldoutStructureIds,
+        Set&lt;String&gt; formationExcludedStructureIds,
+        Set&lt;String&gt; withheldRulePackIds,
+        String holdoutCommitmentHash
+    ) {
+<span class="fc" id="L391">        public PostFreezeDisclosure {</span>
+<span class="fc" id="L392">            track = Objects.requireNonNull(track, &quot;track&quot;);</span>
+<span class="fc" id="L393">            boundaryHash = requireSha256(boundaryHash, &quot;boundaryHash&quot;);</span>
+<span class="fc" id="L394">            freezeReceiptHash = requireSha256(</span>
+                freezeReceiptHash, &quot;freezeReceiptHash&quot;);
+<span class="fc" id="L396">            classificationSelection = Objects.requireNonNull(</span>
+                classificationSelection, &quot;classificationSelection&quot;);
+<span class="fc" id="L398">            classificationCatalog = Objects.requireNonNull(</span>
+                classificationCatalog, &quot;classificationCatalog&quot;);
+<span class="fc" id="L400">            formationRuleInventoryHash = requireSha256(</span>
+                formationRuleInventoryHash, &quot;formationRuleInventoryHash&quot;);
+<span class="fc" id="L402">            classificationRuleInventoryHash = requireSha256(</span>
+                classificationRuleInventoryHash,
+                &quot;classificationRuleInventoryHash&quot;
+            );
+<span class="fc" id="L406">            requestedHoldoutStructureIds = immutableSortedSet(</span>
+                requestedHoldoutStructureIds,
+                &quot;requestedHoldoutStructureIds&quot;
+            );
+<span class="fc" id="L410">            formationExcludedStructureIds = immutableSortedSet(</span>
+                formationExcludedStructureIds,
+                &quot;formationExcludedStructureIds&quot;
+            );
+<span class="fc" id="L414">            withheldRulePackIds = immutableSortedSet(</span>
+                withheldRulePackIds,
+                &quot;withheldRulePackIds&quot;
+            );
+<span class="fc" id="L418">            holdoutCommitmentHash = requireSha256(</span>
+                holdoutCommitmentHash, &quot;holdoutCommitmentHash&quot;);
+<span class="fc" id="L420">        }</span>
+
+        public String contentHash() {
+<span class="nc" id="L423">            StringBuilder descriptor = new StringBuilder();</span>
+<span class="nc" id="L424">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, POST_FREEZE_REVISION);
+<span class="nc" id="L426">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="nc" id="L427">                descriptor, track.id());</span>
+<span class="nc" id="L428">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, boundaryHash);
+<span class="nc" id="L430">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, freezeReceiptHash);
+<span class="nc" id="L432">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="nc" id="L433">                descriptor, selectionDescriptor(classificationSelection));</span>
+<span class="nc" id="L434">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="nc" id="L435">                descriptor, classificationCatalog.contentHash());</span>
+<span class="nc" id="L436">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, formationRuleInventoryHash);
+<span class="nc" id="L438">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, classificationRuleInventoryHash);
+<span class="nc" id="L440">            appendSet(descriptor, requestedHoldoutStructureIds);</span>
+<span class="nc" id="L441">            appendSet(descriptor, formationExcludedStructureIds);</span>
+<span class="nc" id="L442">            appendSet(descriptor, withheldRulePackIds);</span>
+<span class="nc" id="L443">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, holdoutCommitmentHash);
+<span class="nc" id="L445">            return KnownStructureCatalog.sha256(descriptor.toString());</span>
+        }
+    }
+
+    private String holdoutCommitment() {
+<span class="fc" id="L450">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L451">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor, REVISION + &quot;/holdout&quot;);
+<span class="fc" id="L453">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L454">            descriptor, track.id());</span>
+<span class="fc" id="L455">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L456">            descriptor, formationCatalog.contentHash());</span>
+<span class="fc" id="L457">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L458">            descriptor, postFreezeCatalog.contentHash());</span>
+<span class="fc" id="L459">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor, formationRuleInventoryHash);
+<span class="fc" id="L461">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor, postFreezeRuleInventoryHash);
+<span class="fc" id="L463">        appendSet(descriptor, requestedHoldoutStructureIds);</span>
+<span class="fc" id="L464">        appendSet(descriptor, formationExcludedStructureIds);</span>
+<span class="fc" id="L465">        appendSet(descriptor, withheldRulePackIds);</span>
+<span class="fc" id="L466">        return KnownStructureCatalog.sha256(descriptor.toString());</span>
+    }
+
+    private String boundaryHash() {
+<span class="fc" id="L470">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L471">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor, REVISION);
+<span class="fc" id="L473">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L474">            descriptor, track.id());</span>
+<span class="fc" id="L475">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L476">            descriptor, selectionDescriptor(visibleSelection));</span>
+<span class="fc" id="L477">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L478">            descriptor, selectionDescriptor(formationSelection));</span>
+<span class="fc" id="L479">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L480">            descriptor, formationCatalog.contentHash());</span>
+<span class="fc" id="L481">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L482">            descriptor, postFreezeCatalog.contentHash());</span>
+<span class="fc" id="L483">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor, formationRuleInventoryHash);
+<span class="fc" id="L485">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor, postFreezeRuleInventoryHash);
+<span class="fc" id="L487">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor, holdoutCommitmentHash);
+<span class="fc" id="L489">        return KnownStructureCatalog.sha256(descriptor.toString());</span>
+    }
+
+    private static List&lt;RewriteRule&gt; astRuleInventory(
+        KnowledgePackRegistry registry,
+        KnowledgePackSelection selection
+    ) {
+<span class="fc" id="L496">        List&lt;RewriteRule&gt; rules = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L497">            AstRewriteTransformationEngine.defaultRules(selection));</span>
+<span class="fc" id="L498">        rules.addAll(registry.enabledRules(selection));</span>
+<span class="fc" id="L499">        return List.copyOf(rules);</span>
+    }
+
+    private static void validateRequestedHoldouts(
+        Track track,
+        Set&lt;String&gt; hiddenStructureIds
+    ) {
+<span class="fc bfc" id="L506" title="All 2 branches covered.">        if (track == Track.R4_HIDDEN_STRUCTURE_REDISCOVERY</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">                &amp;&amp; hiddenStructureIds.isEmpty()) {</span>
+<span class="fc" id="L508">            throw new IllegalArgumentException(</span>
+                &quot;R4 requires at least one hidden structure&quot;);
+        }
+<span class="fc bfc" id="L511" title="All 2 branches covered.">        if (track != Track.R4_HIDDEN_STRUCTURE_REDISCOVERY</span>
+<span class="fc bfc" id="L512" title="All 2 branches covered.">                &amp;&amp; !hiddenStructureIds.isEmpty()) {</span>
+<span class="fc" id="L513">            throw new IllegalArgumentException(</span>
+                &quot;Hidden structures are permitted only for R4&quot;);
+        }
+<span class="fc" id="L516">    }</span>
+
+    private static List&lt;KnownStructure&gt; holdoutStructures(
+        KnownStructureCatalog catalog,
+        Set&lt;String&gt; hiddenStructureIds
+    ) {
+<span class="fc bfc" id="L522" title="All 2 branches covered.">        if (hiddenStructureIds.isEmpty()) {</span>
+<span class="fc" id="L523">            return List.of();</span>
+        }
+<span class="fc" id="L525">        List&lt;KnownStructure&gt; structures = catalog.structures().stream()</span>
+<span class="fc" id="L526">            .filter(structure -&gt; hiddenStructureIds.contains(structure.id()))</span>
+<span class="fc" id="L527">            .toList();</span>
+<span class="fc" id="L528">        Set&lt;String&gt; found = structureIds(structures);</span>
+<span class="fc bfc" id="L529" title="All 2 branches covered.">        if (!found.containsAll(hiddenStructureIds)) {</span>
+<span class="fc" id="L530">            Set&lt;String&gt; missing = new TreeSet&lt;&gt;(hiddenStructureIds);</span>
+<span class="fc" id="L531">            missing.removeAll(found);</span>
+<span class="fc" id="L532">            throw new IllegalArgumentException(</span>
+                &quot;Unknown or disabled hidden structures: &quot; + missing);
+        }
+<span class="fc" id="L535">        return structures;</span>
+    }
+
+    private static Set&lt;String&gt; governingRulePacks(
+        Collection&lt;KnownStructure&gt; structures
+    ) {
+<span class="fc" id="L541">        TreeSet&lt;String&gt; packIds = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">        for (KnownStructure structure : structures) {</span>
+<span class="fc" id="L543">            boolean hasDirectRule = structure.consequenceIds().stream()</span>
+<span class="fc" id="L544">                .anyMatch(consequence -&gt; consequence.startsWith(&quot;rule:&quot;));</span>
+<span class="fc" id="L545">            List&lt;String&gt; declaredPacks = structure.metadata()</span>
+<span class="fc" id="L546">                .enabledRulePackIds();</span>
+<span class="pc bpc" id="L547" title="2 of 4 branches missed.">            if (hasDirectRule &amp;&amp; declaredPacks.isEmpty()) {</span>
+<span class="nc" id="L548">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L549">                    &quot;Hidden structure &quot; + structure.id()</span>
+                        + &quot; has a direct rule consequence but no governing &quot;
+                        + &quot;rule pack&quot;);
+            }
+<span class="fc" id="L553">            packIds.addAll(declaredPacks);</span>
+<span class="fc" id="L554">        }</span>
+<span class="fc" id="L555">        return immutableSortedSet(packIds, &quot;withheldRulePackIds&quot;);</span>
+    }
+
+    private static String candidateDescriptor(
+        RepresentationCandidateProposal candidate
+    ) {
+<span class="fc" id="L561">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L562">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L563">            descriptor, candidate.sourceExpression());</span>
+<span class="fc" id="L564">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L565">            descriptor, candidate.candidateExpression());</span>
+<span class="fc" id="L566">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L567">            descriptor, candidate.occurrencePath().canonical());</span>
+<span class="fc" id="L568">        KnownStructureCatalog.appendCanonicalList(</span>
+<span class="fc" id="L569">            descriptor, candidate.assumptions());</span>
+<span class="fc" id="L570">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L571">            descriptor, candidate.validationStatus().name());</span>
+<span class="fc" id="L572">        return descriptor.toString();</span>
+    }
+
+    private static String selectionDescriptor(
+        KnowledgePackSelection selection
+    ) {
+<span class="fc" id="L578">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L579">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L580">            descriptor, selection.profile().id());</span>
+<span class="fc" id="L581">        appendSet(descriptor, selection.enabledPacks());</span>
+<span class="fc" id="L582">        appendSet(descriptor, selection.disabledPacks());</span>
+<span class="fc" id="L583">        return descriptor.toString();</span>
+    }
+
+    private static Set&lt;String&gt; structureIds(
+        KnownStructureCatalog catalog
+    ) {
+<span class="fc" id="L589">        return structureIds(catalog.structures());</span>
+    }
+
+    private static Set&lt;String&gt; structureIds(
+        Collection&lt;KnownStructure&gt; structures
+    ) {
+<span class="fc" id="L595">        TreeSet&lt;String&gt; ids = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L596">        structures.forEach(structure -&gt; ids.add(structure.id()));</span>
+<span class="fc" id="L597">        return immutableSortedSet(ids, &quot;structureIds&quot;);</span>
+    }
+
+    private static Set&lt;String&gt; difference(
+        Set&lt;String&gt; left,
+        Set&lt;String&gt; right
+    ) {
+<span class="fc" id="L604">        TreeSet&lt;String&gt; values = new TreeSet&lt;&gt;(left);</span>
+<span class="fc" id="L605">        values.removeAll(right);</span>
+<span class="fc" id="L606">        return immutableSortedSet(values, &quot;difference&quot;);</span>
+    }
+
+    private static Set&lt;String&gt; immutableSortedSet(
+        Collection&lt;String&gt; values,
+        String field
+    ) {
+<span class="fc" id="L613">        Objects.requireNonNull(values, field);</span>
+<span class="fc" id="L614">        TreeSet&lt;String&gt; sorted = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L615" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L616">            String normalized = Objects.requireNonNull(value, field).trim();</span>
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">            if (normalized.isEmpty()) {</span>
+<span class="nc" id="L618">                throw new IllegalArgumentException(</span>
+                    field + &quot; must not contain blank entries&quot;);
+            }
+<span class="fc" id="L621">            sorted.add(normalized);</span>
+<span class="fc" id="L622">        }</span>
+<span class="fc" id="L623">        return Collections.unmodifiableSet(</span>
+            new LinkedHashSet&lt;&gt;(sorted));
+    }
+
+    private static void appendSet(
+        StringBuilder descriptor,
+        Collection&lt;String&gt; values
+    ) {
+<span class="fc" id="L631">        KnownStructureCatalog.appendCanonicalList(</span>
+<span class="fc" id="L632">            descriptor, values.stream().sorted().toList());</span>
+<span class="fc" id="L633">    }</span>
+
+    private static String requireSha256(
+        String value,
+        String field
+    ) {
+<span class="fc" id="L639">        String normalized = Objects.requireNonNull(value, field).trim();</span>
+<span class="pc bpc" id="L640" title="1 of 2 branches missed.">        if (!normalized.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L641">            throw new IllegalArgumentException(</span>
+                field + &quot; must be a lowercase SHA-256 identity&quot;);
+        }
+<span class="fc" id="L644">        return normalized;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

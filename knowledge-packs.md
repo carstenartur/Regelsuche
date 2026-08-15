@@ -39,11 +39,49 @@ experimentell und standardmäßig deaktiviert. Regelsuche übernimmt weder die
 Python-Laufzeit noch SymPys globales `simplify()` oder dessen interne
 Ausdrucksrepräsentation.
 
-Für Experimente bleiben drei Informationsregime getrennt:
+## Erzwingbare Informationsregime
 
-- katalogblinde Discovery aktiviert den Pack erst nach Candidate Formation;
-- katalogsichtbare Navigation aktiviert ihn ausdrücklich vor der Suche;
-- Rediscovery-Holdouts verbergen Struktur und direkte Regel gemeinsam.
+`RepresentationDiscoveryInformationBoundary` bindet Regel-Auswahl,
+den tatsächlichen ausführbaren Regelbestand, Formation-Katalog,
+Post-Freeze-Katalog und Holdout-Verpflichtung an eine content-addressed Identität.
+Die vier Tracks aus #663 werden damit nicht nur dokumentiert, sondern durch
+verschiedene zugängliche Informationsflächen ausgeführt:
+
+- **R1 – targetfreie Kompression:** Formation und Auswertung sehen keinen
+  bekannten-Strukturen-Katalog. Der vorab festgelegte primitive Regelbestand
+  bleibt sichtbar und wird als eigener Inventory-Hash gebunden.
+- **R2 – katalogblinde Post-hoc-Brücke:** Formation sieht weder Katalogeinträge
+  noch deren deklarierte Regel-Packs. Erst nachdem der vollständige
+  Kandidatensatz eingefroren wurde, werden der gebundene Katalog, seine
+  Konsequenzen und der zugehörige Regelbestand zur Klassifikation offengelegt.
+- **R3 – katalogsichtbare Wissensnavigation:** Formation und spätere
+  Klassifikation verwenden denselben ausdrücklich ausgewählten Katalog und
+  denselben ausführbaren Regelbestand.
+- **R4 – Hidden-Structure-Rediscovery:** Die festgelegte Struktur und alle von
+  ihr deklarierten direkten Regel-Packs werden während der Formation
+  zurückgehalten. Der vollständige Katalog und die Holdout-Details werden erst
+  nach dem Kandidaten-Freeze offengelegt.
+
+Die Regel-Inventaridentität umfasst nicht nur Pack-IDs, sondern die kanonischen
+Quell- und Zielpattern, Recognition-Profile, Orientierungs- und Kostenmerkmale
+sowie die vollständigen `RuleDescriptor`-Metadaten. Eine Regeländerung erzeugt
+daher auch bei unveränderter Pack-Auswahl eine neue Experimentidentität.
+
+R2 und R4 benötigen ein `CandidateFreezeReceipt`, das sowohl den eingefrorenen
+Kandidatensatz als auch exakt dieselbe Informationsgrenze bindet. Das Receipt
+wird ausschließlich durch `freezeCandidates(...)` ausgegeben und kann nicht über
+einen öffentlichen Konstruktor aus bekannten Hashes nachgebaut werden. Ein
+Receipt aus einem anderen Track oder einer anderen Inventar-Auswahl wird
+abgewiesen.
+
+Bei R2 werden alle Regel-Packs zurückgehalten, die von den verborgenen
+Katalogeinträgen als Folgeinventar deklariert sind. Bei R4 betrifft das die
+angeforderten Holdout-Strukturen. Weil Knowledge Packs die kleinste
+aktivierbare Einheit sind, kann dies konservativ weitere Strukturen desselben
+Packs ausblenden; die tatsächlich ausgeschlossenen Struktur-IDs und Packs werden
+im Post-Freeze-Artefakt ausgewiesen. Falls eine versteckte Struktur eine direkte
+Regel nennt, aber keinen zugehörigen Rule-Pack deklariert, schlägt die
+Konfiguration fehlersicher fehl.
 
 Knowledge Packs sind nicht identisch mit:
 
