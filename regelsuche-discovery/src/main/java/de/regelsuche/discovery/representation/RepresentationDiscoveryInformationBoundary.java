@@ -2,6 +2,7 @@ package de.regelsuche.discovery.representation;
 
 import de.regelsuche.knowledge.KnowledgePackRegistry;
 import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -17,23 +18,24 @@ import java.util.TreeSet;
  *
  * <p>The post-freeze catalog is deliberately not exposed directly. Callers must
  * first freeze the complete candidate set and present the resulting receipt.
- * Hidden-structure runs additionally disable every rule pack declared by the
- * held-out structure so a direct executable consequence cannot leak into
- * candidate formation.</p>
+ * Catalog-blind and hidden-structure runs additionally withhold every rule pack
+ * declared as a consequence of knowledge that formation is not allowed to see.</p>
  */
 public final class RepresentationDiscoveryInformationBoundary {
     private static final String REVISION =
-        "regelsuche.representation-discovery-information-boundary/v1";
+        "regelsuche.representation-discovery-information-boundary/v2";
     private static final String CANDIDATE_FREEZE_REVISION =
         "regelsuche.representation-candidate-freeze/v1";
     private static final String POST_FREEZE_REVISION =
-        "regelsuche.representation-post-freeze-disclosure/v1";
+        "regelsuche.representation-post-freeze-disclosure/v2";
 
     private final Track track;
     private final KnowledgePackSelection visibleSelection;
     private final KnowledgePackSelection formationSelection;
     private final KnownStructureCatalog formationCatalog;
     private final KnownStructureCatalog postFreezeCatalog;
+    private final String formationRuleInventoryHash;
+    private final String postFreezeRuleInventoryHash;
     private final Set<String> requestedHoldoutStructureIds;
     private final Set<String> formationExcludedStructureIds;
     private final Set<String> withheldRulePackIds;
@@ -46,6 +48,8 @@ public final class RepresentationDiscoveryInformationBoundary {
         KnowledgePackSelection formationSelection,
         KnownStructureCatalog formationCatalog,
         KnownStructureCatalog postFreezeCatalog,
+        String formationRuleInventoryHash,
+        String postFreezeRuleInventoryHash,
         Set<String> requestedHoldoutStructureIds,
         Set<String> formationExcludedStructureIds,
         Set<String> withheldRulePackIds
@@ -59,6 +63,10 @@ public final class RepresentationDiscoveryInformationBoundary {
             formationCatalog, "formationCatalog");
         this.postFreezeCatalog = Objects.requireNonNull(
             postFreezeCatalog, "postFreezeCatalog");
+        this.formationRuleInventoryHash = requireSha256(
+            formationRuleInventoryHash, "formationRuleInventoryHash");
+        this.postFreezeRuleInventoryHash = requireSha256(
+            postFreezeRuleInventoryHash, "postFreezeRuleInventoryHash");
         this.requestedHoldoutStructureIds = immutableSortedSet(
             requestedHoldoutStructureIds, "requestedHoldoutStructureIds");
         this.formationExcludedStructureIds = immutableSortedSet(
@@ -112,7 +120,14 @@ public final class RepresentationDiscoveryInformationBoundary {
                 registry, visibleSelection);
         List<KnownStructure> holdoutStructures = holdoutStructures(
             visibleCatalog, requestedHoldouts);
-        Set<String> withheldPacks = governingRulePacks(holdoutStructures);
+        Set<String> withheldPacks = switch (track) {
+            case R2_CATALOG_BLIND_POST_HOC_BRIDGE ->
+                governingRulePacks(visibleCatalog.structures());
+            case R4_HIDDEN_STRUCTURE_REDISCOVERY ->
+                governingRulePacks(holdoutStructures);
+            case R1_TARGET_FREE_COMPRESSION,
+                 R3_CATALOG_VISIBLE_KNOWLEDGE_NAVIGATION -> Set.of();
+        };
 
         KnowledgePackSelection formationSelection = visibleSelection;
         for (String packId : withheldPacks) {
@@ -156,6 +171,8 @@ public final class RepresentationDiscoveryInformationBoundary {
             formationSelection,
             formationCatalog,
             postFreezeCatalog,
+            ruleInventoryHash(registry, formationSelection),
+            ruleInventoryHash(registry, visibleSelection),
             requestedHoldouts,
             excluded,
             withheldPacks
@@ -171,16 +188,16 @@ public final class RepresentationDiscoveryInformationBoundary {
     }
 
     /**
-     * Rule inventory that candidate formation may use.
+     * Rule selection that candidate formation may use.
      *
-     * <p>For R4 this selection has every governing pack of a hidden structure
-     * disabled, thereby withholding its direct executable consequences.</p>
+     * <p>R2 removes packs declared as consequences by every hidden catalog
+     * entry. R4 removes packs declared by the requested holdout structures.</p>
      */
     public KnowledgePackSelection formationSelection() {
         return formationSelection;
     }
 
-    /** Opaque commitment to the full post-freeze pack selection. */
+    /** Opaque commitment to the complete post-freeze pack selection. */
     public String postFreezeSelectionCommitment() {
         return KnownStructureCatalog.sha256(
             selectionDescriptor(visibleSelection));
@@ -191,9 +208,19 @@ public final class RepresentationDiscoveryInformationBoundary {
         return formationCatalog;
     }
 
-    /** Content commitment for the catalog that may be disclosed after freeze. */
+    /** Exact executable rule inventory available during candidate formation. */
+    public String candidateFormationRuleInventoryHash() {
+        return formationRuleInventoryHash;
+    }
+
+    /** Content commitment for the catalog disclosed after candidate freeze. */
     public String postFreezeCatalogCommitment() {
         return postFreezeCatalog.contentHash();
+    }
+
+    /** Exact executable rule inventory associated with post-freeze knowledge. */
+    public String postFreezeRuleInventoryCommitment() {
+        return postFreezeRuleInventoryHash;
     }
 
     /** Opaque pre-freeze commitment to all holdout and exclusion details. */
@@ -201,14 +228,12 @@ public final class RepresentationDiscoveryInformationBoundary {
         return holdoutCommitmentHash;
     }
 
-    /** Identity of track, inventories, catalogs and holdout commitment. */
+    /** Identity of track, actual inventories, catalogs and holdout commitment. */
     public String contentHash() {
         return contentHash;
     }
 
-    /**
-     * Freezes candidate content without consulting the post-freeze catalog.
-     */
+    /** Freezes candidate content without consulting post-freeze knowledge. */
     public CandidateFreezeReceipt freezeCandidates(
         Collection<RepresentationCandidateProposal> candidates
     ) {
@@ -235,8 +260,8 @@ public final class RepresentationDiscoveryInformationBoundary {
     }
 
     /**
-     * Reveals the classification catalog and holdout details only for a receipt
-     * produced under this exact information boundary.
+     * Reveals classification knowledge and holdout details only for a receipt
+     * issued under this exact information boundary.
      */
     public PostFreezeDisclosure disclosePostFreeze(
         CandidateFreezeReceipt receipt
@@ -253,6 +278,8 @@ public final class RepresentationDiscoveryInformationBoundary {
             receipt.contentHash(),
             visibleSelection,
             postFreezeCatalog,
+            formationRuleInventoryHash,
+            postFreezeRuleInventoryHash,
             requestedHoldoutStructureIds,
             formationExcludedStructureIds,
             withheldRulePackIds,
@@ -277,13 +304,7 @@ public final class RepresentationDiscoveryInformationBoundary {
         }
     }
 
-    /**
-     * Opaque receipt issued only by {@link #freezeCandidates(Collection)}.
-     *
-     * <p>The private constructor prevents callers from manufacturing a receipt
-     * merely from public hashes. The receipt remains inspectable and
-     * content-addressed for evidence export.</p>
-     */
+    /** Opaque receipt issued only by {@link #freezeCandidates(Collection)}. */
     public static final class CandidateFreezeReceipt {
         private final String boundaryHash;
         private final String candidateSetHash;
@@ -337,6 +358,8 @@ public final class RepresentationDiscoveryInformationBoundary {
         String freezeReceiptHash,
         KnowledgePackSelection classificationSelection,
         KnownStructureCatalog classificationCatalog,
+        String formationRuleInventoryHash,
+        String classificationRuleInventoryHash,
         Set<String> requestedHoldoutStructureIds,
         Set<String> formationExcludedStructureIds,
         Set<String> withheldRulePackIds,
@@ -351,6 +374,12 @@ public final class RepresentationDiscoveryInformationBoundary {
                 classificationSelection, "classificationSelection");
             classificationCatalog = Objects.requireNonNull(
                 classificationCatalog, "classificationCatalog");
+            formationRuleInventoryHash = requireSha256(
+                formationRuleInventoryHash, "formationRuleInventoryHash");
+            classificationRuleInventoryHash = requireSha256(
+                classificationRuleInventoryHash,
+                "classificationRuleInventoryHash"
+            );
             requestedHoldoutStructureIds = immutableSortedSet(
                 requestedHoldoutStructureIds,
                 "requestedHoldoutStructureIds"
@@ -381,6 +410,10 @@ public final class RepresentationDiscoveryInformationBoundary {
                 descriptor, selectionDescriptor(classificationSelection));
             KnownStructureCatalog.appendCanonicalField(
                 descriptor, classificationCatalog.contentHash());
+            KnownStructureCatalog.appendCanonicalField(
+                descriptor, formationRuleInventoryHash);
+            KnownStructureCatalog.appendCanonicalField(
+                descriptor, classificationRuleInventoryHash);
             appendSet(descriptor, requestedHoldoutStructureIds);
             appendSet(descriptor, formationExcludedStructureIds);
             appendSet(descriptor, withheldRulePackIds);
@@ -397,7 +430,13 @@ public final class RepresentationDiscoveryInformationBoundary {
         KnownStructureCatalog.appendCanonicalField(
             descriptor, track.id());
         KnownStructureCatalog.appendCanonicalField(
+            descriptor, formationCatalog.contentHash());
+        KnownStructureCatalog.appendCanonicalField(
             descriptor, postFreezeCatalog.contentHash());
+        KnownStructureCatalog.appendCanonicalField(
+            descriptor, formationRuleInventoryHash);
+        KnownStructureCatalog.appendCanonicalField(
+            descriptor, postFreezeRuleInventoryHash);
         appendSet(descriptor, requestedHoldoutStructureIds);
         appendSet(descriptor, formationExcludedStructureIds);
         appendSet(descriptor, withheldRulePackIds);
@@ -419,8 +458,20 @@ public final class RepresentationDiscoveryInformationBoundary {
         KnownStructureCatalog.appendCanonicalField(
             descriptor, postFreezeCatalog.contentHash());
         KnownStructureCatalog.appendCanonicalField(
+            descriptor, formationRuleInventoryHash);
+        KnownStructureCatalog.appendCanonicalField(
+            descriptor, postFreezeRuleInventoryHash);
+        KnownStructureCatalog.appendCanonicalField(
             descriptor, holdoutCommitmentHash);
         return KnownStructureCatalog.sha256(descriptor.toString());
+    }
+
+    private static String ruleInventoryHash(
+        KnowledgePackRegistry registry,
+        KnowledgePackSelection selection
+    ) {
+        return RuleInventoryFingerprint.contentHash(
+            registry.enabledRules(selection));
     }
 
     private static void validateRequestedHoldouts(
@@ -460,10 +511,10 @@ public final class RepresentationDiscoveryInformationBoundary {
     }
 
     private static Set<String> governingRulePacks(
-        List<KnownStructure> holdoutStructures
+        Collection<KnownStructure> structures
     ) {
         TreeSet<String> packIds = new TreeSet<>();
-        for (KnownStructure structure : holdoutStructures) {
+        for (KnownStructure structure : structures) {
             boolean hasDirectRule = structure.consequenceIds().stream()
                 .anyMatch(consequence -> consequence.startsWith("rule:"));
             List<String> declaredPacks = structure.metadata()

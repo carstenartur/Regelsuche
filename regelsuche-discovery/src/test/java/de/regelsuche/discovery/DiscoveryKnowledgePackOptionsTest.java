@@ -110,6 +110,8 @@ class DiscoveryKnowledgePackOptionsTest {
                 Track.R1_TARGET_FREE_COMPRESSION);
         assertTrue(compression.candidateFormationCatalog()
             .structures().isEmpty());
+        assertEquals(compression.candidateFormationRuleInventoryHash(),
+            compression.postFreezeRuleInventoryCommitment());
         assertTrue(compression.disclosePostFreeze(
             compression.freezeCandidates(List.of(candidate)))
             .classificationCatalog().structures().isEmpty());
@@ -118,18 +120,34 @@ class DiscoveryKnowledgePackOptionsTest {
             options.representationDiscoveryBoundary(
                 Track.R2_CATALOG_BLIND_POST_HOC_BRIDGE);
         assertTrue(blind.candidateFormationCatalog().structures().isEmpty());
+        assertEquals(Set.of(SYMPY_TRIGONOMETRY),
+            blind.formationSelection().disabledPacks());
+        assertNotEquals(blind.candidateFormationRuleInventoryHash(),
+            blind.postFreezeRuleInventoryCommitment());
+        assertTrue(new KnowledgePackRegistry()
+            .enabledRules(blind.formationSelection()).stream()
+            .noneMatch(rule -> rule.descriptor().packId().equals(
+                SYMPY_TRIGONOMETRY)));
         CandidateFreezeReceipt blindFreeze =
             blind.freezeCandidates(List.of(candidate));
         PostFreezeDisclosure blindDisclosure =
             blind.disclosePostFreeze(blindFreeze);
         assertEquals(7,
             blindDisclosure.classificationCatalog().structures().size());
+        assertEquals(blind.candidateFormationRuleInventoryHash(),
+            blindDisclosure.formationRuleInventoryHash());
+        assertEquals(blind.postFreezeRuleInventoryCommitment(),
+            blindDisclosure.classificationRuleInventoryHash());
+        assertEquals(Set.of(SYMPY_TRIGONOMETRY),
+            blindDisclosure.withheldRulePackIds());
 
         RepresentationDiscoveryInformationBoundary visible =
             options.representationDiscoveryBoundary(
                 Track.R3_CATALOG_VISIBLE_KNOWLEDGE_NAVIGATION);
         assertEquals(7,
             visible.candidateFormationCatalog().structures().size());
+        assertEquals(visible.candidateFormationRuleInventoryHash(),
+            visible.postFreezeRuleInventoryCommitment());
         PostFreezeDisclosure visibleDisclosure =
             visible.disclosePostFreeze(
                 visible.freezeCandidates(List.of(candidate)));
@@ -155,6 +173,8 @@ class DiscoveryKnowledgePackOptionsTest {
         assertTrue(hidden.candidateFormationCatalog().structures().stream()
             .noneMatch(structure -> structure.id().equals(
                 PYTHAGOREAN_PAIR)));
+        assertNotEquals(hidden.candidateFormationRuleInventoryHash(),
+            hidden.postFreezeRuleInventoryCommitment());
         assertTrue(new KnowledgePackRegistry()
             .enabledRules(hidden.formationSelection())
             .stream()
@@ -175,6 +195,10 @@ class DiscoveryKnowledgePackOptionsTest {
                 PYTHAGOREAN_PAIR)));
         assertEquals(hidden.holdoutCommitmentHash(),
             disclosure.holdoutCommitmentHash());
+        assertEquals(hidden.candidateFormationRuleInventoryHash(),
+            disclosure.formationRuleInventoryHash());
+        assertEquals(hidden.postFreezeRuleInventoryCommitment(),
+            disclosure.classificationRuleInventoryHash());
     }
 
     @Test
