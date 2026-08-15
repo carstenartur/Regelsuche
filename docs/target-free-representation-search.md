@@ -65,7 +65,8 @@ Kürzungsheuristik verloren geht.
 - Zustände und deren erste Lineage;
 - primitive Regel-IDs, Annahmen, Pack- und Lizenzinformationen;
 - akzeptierte, duplizierte und budgetbedingt verworfene Übergänge;
-- explizite Trunkierung;
+- explizite Trunkierungsgründe für Tiefe, Zustände, Übergänge und
+  per-State-Nachfolgerlimits;
 - targetfreie Pareto-Zustände.
 
 Die Zustandsidentität besteht aus Darstellung und normalisiertem
