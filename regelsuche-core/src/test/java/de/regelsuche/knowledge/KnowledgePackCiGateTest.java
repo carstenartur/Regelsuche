@@ -2,12 +2,16 @@ package de.regelsuche.knowledge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -82,6 +86,38 @@ final class KnowledgePackCiGateTest {
             "sympy.trig.csc_def",
             "sympy.trig.cot_def"
         )));
+    }
+
+    @Test
+    void ruleInventoryFingerprintBindsExecutableSemantics() {
+        KnowledgePackRegistry registry = new KnowledgePackRegistry();
+        List<PatternRewriteRule> rules = registry.enabledRules(
+            KnowledgePackSelection.CORE.enablePack(SYMPY_TRIGONOMETRY));
+        String originalHash = RuleInventoryFingerprint.contentHash(rules);
+
+        List<PatternRewriteRule> reordered = new ArrayList<>(rules);
+        Collections.reverse(reordered);
+        assertEquals(originalHash,
+            RuleInventoryFingerprint.contentHash(reordered));
+
+        PatternRewriteRule original = rules.get(0);
+        PatternRewriteRule changed = new PatternRewriteRule(
+            original.id(),
+            original.source(),
+            PatternExpr.num(42),
+            original.kind(),
+            original.mayIncreaseComplexity(),
+            original.estimatedCostDelta(),
+            original.isEquivalencePreservingByConstruction(),
+            original.descriptor(),
+            original.recognitionProfile()
+        );
+        List<PatternRewriteRule> mutated = new ArrayList<>(rules);
+        mutated.set(0, changed);
+
+        assertNotEquals(originalHash,
+            RuleInventoryFingerprint.contentHash(mutated));
+        assertTrue(originalHash.matches("sha256:[0-9a-f]{64}"));
     }
 
     @Test

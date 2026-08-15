@@ -1,5 +1,6 @@
 package de.regelsuche.discovery;
 
+import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary;
 import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.knowledge.RuleProfile;
 
@@ -69,5 +70,24 @@ public record DiscoveryOptions(
 
     public KnowledgePackSelection knowledgePackSelection() {
         return new KnowledgePackSelection(ruleProfile, enabledPacks, disabledPacks);
+    }
+
+    public RepresentationDiscoveryInformationBoundary
+            representationDiscoveryBoundary(
+                RepresentationDiscoveryInformationBoundary.Track track
+            ) {
+        return representationDiscoveryBoundary(track, Set.of());
+    }
+
+    public RepresentationDiscoveryInformationBoundary
+            representationDiscoveryBoundary(
+                RepresentationDiscoveryInformationBoundary.Track track,
+                Set<String> hiddenStructureIds
+            ) {
+        return RepresentationDiscoveryInformationBoundary.fromKnowledgePacks(
+            track,
+            knowledgePackSelection(),
+            hiddenStructureIds
+        );
     }
 }
