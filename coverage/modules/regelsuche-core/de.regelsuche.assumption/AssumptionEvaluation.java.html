@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssumptionEvaluation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.assumption</a> &gt; <span class="el_source">AssumptionEvaluation.java</span></div><h1>AssumptionEvaluation.java</h1><pre class="source lang-java linenums">package de.regelsuche.assumption;
+
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/** Deterministic aggregate result for one required assumption. */
+public record AssumptionEvaluation(
+    Assumption requiredAssumption,
+    AssumptionSignature contextSignature,
+    String evaluatorProfileHash,
+    AssumptionTruthValue result,
+    boolean conflicting,
+    List&lt;AssumptionEvaluationEvidence&gt; evidence
+) {
+<span class="fc" id="L18">    public AssumptionEvaluation {</span>
+<span class="fc" id="L19">        Objects.requireNonNull(requiredAssumption, &quot;requiredAssumption&quot;);</span>
+<span class="fc" id="L20">        Objects.requireNonNull(contextSignature, &quot;contextSignature&quot;);</span>
+<span class="fc" id="L21">        evaluatorProfileHash = requireHash(evaluatorProfileHash);</span>
+<span class="fc" id="L22">        Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L23">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L24">        evidence = evidence.stream()</span>
+<span class="fc" id="L25">            .map(item -&gt; Objects.requireNonNull(item, &quot;evidence item&quot;))</span>
+<span class="fc" id="L26">            .sorted(Comparator</span>
+<span class="fc" id="L27">                .comparing(AssumptionEvaluationEvidence::evaluatorId)</span>
+<span class="fc" id="L28">                .thenComparing(</span>
+                    AssumptionEvaluationEvidence::evaluatorRevision))
+<span class="fc" id="L30">            .toList();</span>
+<span class="fc" id="L31">        rejectDuplicateEvaluatorIds(evidence);</span>
+<span class="fc" id="L32">        Aggregate aggregate = aggregate(evidence);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (result != aggregate.result()) {</span>
+<span class="nc" id="L34">            throw new IllegalArgumentException(</span>
+                &quot;result does not match the evaluator evidence&quot;);
+        }
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (conflicting != aggregate.conflicting()) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(</span>
+                &quot;conflicting does not match the evaluator evidence&quot;);
+        }
+<span class="fc" id="L41">    }</span>
+
+    public static AssumptionEvaluation from(
+        Assumption requiredAssumption,
+        AssumptionSignature contextSignature,
+        String evaluatorProfileHash,
+        List&lt;AssumptionEvaluationEvidence&gt; evidence
+    ) {
+<span class="fc" id="L49">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L50">        List&lt;AssumptionEvaluationEvidence&gt; snapshot = evidence.stream()</span>
+<span class="fc" id="L51">            .map(item -&gt; Objects.requireNonNull(item, &quot;evidence item&quot;))</span>
+<span class="fc" id="L52">            .toList();</span>
+<span class="fc" id="L53">        Aggregate aggregate = aggregate(snapshot);</span>
+<span class="fc" id="L54">        return new AssumptionEvaluation(</span>
+            requiredAssumption,
+            contextSignature,
+            evaluatorProfileHash,
+<span class="fc" id="L58">            aggregate.result(),</span>
+<span class="fc" id="L59">            aggregate.conflicting(),</span>
+            snapshot
+        );
+    }
+
+    public boolean isSatisfied() {
+<span class="pc bpc" id="L65" title="2 of 4 branches missed.">        return result == AssumptionTruthValue.TRUE &amp;&amp; !conflicting;</span>
+    }
+
+    public boolean isRejected() {
+<span class="pc bpc" id="L69" title="3 of 4 branches missed.">        return result == AssumptionTruthValue.FALSE &amp;&amp; !conflicting;</span>
+    }
+
+    public boolean isInconclusive() {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        return result == AssumptionTruthValue.UNKNOWN;</span>
+    }
+
+    private static Aggregate aggregate(
+        List&lt;AssumptionEvaluationEvidence&gt; evidence
+    ) {
+<span class="fc" id="L79">        boolean anyTrue = false;</span>
+<span class="fc" id="L80">        boolean anyFalse = false;</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (AssumptionEvaluationEvidence item : evidence) {</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (item.result() == AssumptionTruthValue.TRUE) {</span>
+<span class="fc" id="L83">                anyTrue = true;</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            } else if (item.result() == AssumptionTruthValue.FALSE) {</span>
+<span class="fc" id="L85">                anyFalse = true;</span>
+            }
+<span class="fc" id="L87">        }</span>
+<span class="fc bfc" id="L88" title="All 4 branches covered.">        if (anyTrue &amp;&amp; anyFalse) {</span>
+<span class="fc" id="L89">            return new Aggregate(AssumptionTruthValue.UNKNOWN, true);</span>
+        }
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (anyFalse) {</span>
+<span class="nc" id="L92">            return new Aggregate(AssumptionTruthValue.FALSE, false);</span>
+        }
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (anyTrue) {</span>
+<span class="fc" id="L95">            return new Aggregate(AssumptionTruthValue.TRUE, false);</span>
+        }
+<span class="fc" id="L97">        return new Aggregate(AssumptionTruthValue.UNKNOWN, false);</span>
+    }
+
+    private static void rejectDuplicateEvaluatorIds(
+        List&lt;AssumptionEvaluationEvidence&gt; evidence
+    ) {
+<span class="fc" id="L103">        Set&lt;String&gt; ids = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (AssumptionEvaluationEvidence item : evidence) {</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if (!ids.add(item.evaluatorId())) {</span>
+<span class="nc" id="L106">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate assumption evaluator id: &quot;
+<span class="nc" id="L108">                        + item.evaluatorId());</span>
+            }
+<span class="fc" id="L110">        }</span>
+<span class="fc" id="L111">    }</span>
+
+    private static String requireHash(String value) {
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L115">            throw new IllegalArgumentException(</span>
+                &quot;evaluatorProfileHash must be a sha256 hash&quot;);
+        }
+<span class="fc" id="L118">        return value;</span>
+    }
+
+<span class="fc" id="L121">    private record Aggregate(</span>
+        AssumptionTruthValue result,
+        boolean conflicting
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

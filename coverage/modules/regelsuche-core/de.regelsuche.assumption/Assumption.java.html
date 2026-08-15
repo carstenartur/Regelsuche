@@ -91,7 +91,7 @@ public record Assumption(Kind kind, String expression, List&lt;String&gt; symbol
     }
 
     public static Assumption natural(String symbol) {
-<span class="nc" id="L94">        return new Assumption(Kind.NATURAL, symbol + &quot; ∈ N&quot;, List.of(symbol));</span>
+<span class="fc" id="L94">        return new Assumption(Kind.NATURAL, symbol + &quot; ∈ N&quot;, List.of(symbol));</span>
     }
 
     public static Assumption invertible(String expression) {
@@ -149,7 +149,7 @@ public record Assumption(Kind kind, String expression, List&lt;String&gt; symbol
 <span class="pc bpc" id="L149" title="3 of 5 branches missed.">        return switch (required) {</span>
 <span class="nc bnc" id="L150" title="All 2 branches missed.">            case NON_ZERO -&gt; known == Kind.POSITIVE;</span>
 <span class="nc bnc" id="L151" title="All 2 branches missed.">            case INTEGER -&gt; known == Kind.NATURAL;</span>
-<span class="pc bpc" id="L152" title="3 of 4 branches missed.">            case RATIONAL -&gt; known == Kind.INTEGER || known == Kind.NATURAL;</span>
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">            case RATIONAL -&gt; known == Kind.INTEGER || known == Kind.NATURAL;</span>
 <span class="pc bpc" id="L153" title="5 of 10 branches missed.">            case REAL -&gt; known == Kind.INTEGER || known == Kind.NATURAL</span>
                 || known == Kind.RATIONAL || known == Kind.POSITIVE || known == Kind.NON_NEGATIVE;
 <span class="nc" id="L155">            default -&gt; false;</span>

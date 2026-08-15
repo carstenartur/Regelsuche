@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssumptionEvaluatorPortfolio.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.assumption</a> &gt; <span class="el_source">AssumptionEvaluatorPortfolio.java</span></div><h1>AssumptionEvaluatorPortfolio.java</h1><pre class="source lang-java linenums">package de.regelsuche.assumption;
+
+import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Deterministic, content-addressed portfolio of assumption evaluators.
+ *
+ * &lt;p&gt;A conflict between decisive evaluator results fails closed to
+ * {@link AssumptionTruthValue#UNKNOWN}. Unsupported, timed-out and technical
+ * outcomes are retained as typed evidence and are never treated as true.&lt;/p&gt;
+ */
+public final class AssumptionEvaluatorPortfolio {
+    private static final String REVISION =
+        &quot;regelsuche.assumption-evaluator-portfolio/v1&quot;;
+
+    private final List&lt;EvaluatorBinding&gt; bindings;
+    private final List&lt;AssumptionEvaluator&gt; evaluators;
+    private final String contentHash;
+
+    public AssumptionEvaluatorPortfolio(
+        List&lt;? extends AssumptionEvaluator&gt; evaluators
+<span class="fc" id="L32">    ) {</span>
+<span class="fc" id="L33">        Objects.requireNonNull(evaluators, &quot;evaluators&quot;);</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (evaluators.isEmpty()) {</span>
+<span class="nc" id="L35">            throw new IllegalArgumentException(</span>
+                &quot;at least one assumption evaluator is required&quot;);
+        }
+<span class="fc" id="L38">        this.bindings = evaluators.stream()</span>
+<span class="fc" id="L39">            .map(evaluator -&gt; Objects.requireNonNull(</span>
+                evaluator, &quot;assumption evaluator&quot;))
+<span class="fc" id="L41">            .map(AssumptionEvaluatorPortfolio::bind)</span>
+<span class="fc" id="L42">            .sorted(Comparator</span>
+<span class="fc" id="L43">                .comparing(EvaluatorBinding::id)</span>
+<span class="fc" id="L44">                .thenComparing(EvaluatorBinding::revision))</span>
+<span class="fc" id="L45">            .toList();</span>
+<span class="fc" id="L46">        rejectDuplicateIds(bindings);</span>
+<span class="fc" id="L47">        this.evaluators = bindings.stream()</span>
+<span class="fc" id="L48">            .map(EvaluatorBinding::evaluator)</span>
+<span class="fc" id="L49">            .toList();</span>
+<span class="fc" id="L50">        this.contentHash = sha256(canonicalDescriptor());</span>
+<span class="fc" id="L51">    }</span>
+
+    public static AssumptionEvaluatorPortfolio localOnly() {
+<span class="fc" id="L54">        return new AssumptionEvaluatorPortfolio(</span>
+<span class="fc" id="L55">            List.of(KnownAssumptionEvaluator.INSTANCE));</span>
+    }
+
+    public String contentHash() {
+<span class="fc" id="L59">        return contentHash;</span>
+    }
+
+    public List&lt;AssumptionEvaluator&gt; evaluators() {
+<span class="nc" id="L63">        return evaluators;</span>
+    }
+
+    public AssumptionEvaluation evaluate(
+        Assumption requiredAssumption,
+        AssumptionContext context
+    ) {
+<span class="fc" id="L70">        Objects.requireNonNull(context, &quot;context&quot;);</span>
+<span class="fc" id="L71">        return evaluate(requiredAssumption, context.snapshot());</span>
+    }
+
+    public AssumptionEvaluation evaluate(
+        Assumption requiredAssumption,
+        List&lt;Assumption&gt; knownAssumptions
+    ) {
+<span class="fc" id="L78">        Objects.requireNonNull(requiredAssumption, &quot;requiredAssumption&quot;);</span>
+<span class="fc" id="L79">        Objects.requireNonNull(knownAssumptions, &quot;knownAssumptions&quot;);</span>
+<span class="fc" id="L80">        List&lt;Assumption&gt; contextSnapshot = knownAssumptions.stream()</span>
+<span class="fc" id="L81">            .map(assumption -&gt; Objects.requireNonNull(</span>
+                assumption, &quot;known assumption&quot;))
+<span class="fc" id="L83">            .toList();</span>
+<span class="fc" id="L84">        List&lt;AssumptionEvaluationEvidence&gt; evidence = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (EvaluatorBinding binding : bindings) {</span>
+<span class="fc" id="L86">            AssumptionEvaluationEvidence item = Objects.requireNonNull(</span>
+<span class="fc" id="L87">                binding.evaluator().evaluate(</span>
+                    requiredAssumption, contextSnapshot),
+                &quot;assumption evaluator evidence&quot;);
+<span class="fc" id="L90">            validateAttribution(binding, item);</span>
+<span class="fc" id="L91">            evidence.add(item);</span>
+<span class="fc" id="L92">        }</span>
+<span class="fc" id="L93">        return AssumptionEvaluation.from(</span>
+            requiredAssumption,
+<span class="fc" id="L95">            AssumptionSignature.ofAssumptions(contextSnapshot),</span>
+            contentHash,
+            evidence
+        );
+    }
+
+    private String canonicalDescriptor() {
+<span class="fc" id="L102">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L103">        append(descriptor, REVISION);</span>
+<span class="fc" id="L104">        append(descriptor, Integer.toString(bindings.size()));</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (EvaluatorBinding binding : bindings) {</span>
+<span class="fc" id="L106">            append(descriptor, binding.id());</span>
+<span class="fc" id="L107">            append(descriptor, binding.revision());</span>
+<span class="fc" id="L108">            append(descriptor, binding.implementationClass());</span>
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">        return descriptor.toString();</span>
+    }
+
+    private static EvaluatorBinding bind(AssumptionEvaluator evaluator) {
+<span class="fc" id="L114">        Class&lt;?&gt; implementation = evaluator.getClass();</span>
+<span class="fc" id="L115">        rejectUnstableImplementation(implementation);</span>
+<span class="fc" id="L116">        return new EvaluatorBinding(</span>
+            evaluator,
+<span class="fc" id="L118">            requireText(evaluator.id(), &quot;assumption evaluator id&quot;),</span>
+<span class="fc" id="L119">            requireText(</span>
+<span class="fc" id="L120">                evaluator.revision(), &quot;assumption evaluator revision&quot;),</span>
+<span class="fc" id="L121">            implementation.getName()</span>
+        );
+    }
+
+    private static void rejectUnstableImplementation(Class&lt;?&gt; implementation) {
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (implementation.isAnonymousClass()</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                || implementation.isLocalClass()</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                || implementation.isSynthetic()</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                || implementation.isHidden()</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                || Proxy.isProxyClass(implementation)) {</span>
+<span class="fc" id="L131">            throw new IllegalArgumentException(</span>
+                &quot;assumption evaluator implementation must be a stable named &quot;
+<span class="fc" id="L133">                    + &quot;class: &quot; + implementation.getName());</span>
+        }
+<span class="fc" id="L135">    }</span>
+
+    private static void rejectDuplicateIds(
+        List&lt;EvaluatorBinding&gt; bindings
+    ) {
+<span class="fc" id="L140">        Set&lt;String&gt; ids = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (EvaluatorBinding binding : bindings) {</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (!ids.add(binding.id())) {</span>
+<span class="fc" id="L143">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L144">                    &quot;duplicate assumption evaluator id: &quot; + binding.id());</span>
+            }
+<span class="fc" id="L146">        }</span>
+<span class="fc" id="L147">    }</span>
+
+    private static void validateAttribution(
+        EvaluatorBinding binding,
+        AssumptionEvaluationEvidence evidence
+    ) {
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (!binding.id().equals(evidence.evaluatorId())) {</span>
+<span class="fc" id="L154">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L155">                &quot;assumption evaluator id mismatch: expected &quot; + binding.id()</span>
+<span class="fc" id="L156">                    + &quot; but evidence declared &quot; + evidence.evaluatorId());</span>
+        }
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (!binding.revision().equals(evidence.evaluatorRevision())) {</span>
+<span class="fc" id="L159">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L160">                &quot;assumption evaluator revision mismatch for &quot; + binding.id()</span>
+<span class="fc" id="L161">                    + &quot;: expected &quot; + binding.revision()</span>
+                    + &quot; but evidence declared &quot;
+<span class="fc" id="L163">                    + evidence.evaluatorRevision());</span>
+        }
+<span class="fc" id="L165">    }</span>
+
+    private static String requireText(String value, String field) {
+<span class="pc bpc" id="L168" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L169">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L171">        return value.trim();</span>
+    }
+
+    private static void append(StringBuilder descriptor, String value) {
+<span class="fc" id="L175">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
+<span class="fc" id="L176">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L177">        descriptor.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L178">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L182">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L183">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L184">                    .digest(value.getBytes(StandardCharsets.UTF_8))</span>
+            );
+<span class="nc" id="L186">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L187">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L191">    private record EvaluatorBinding(</span>
+        AssumptionEvaluator evaluator,
+        String id,
+        String revision,
+        String implementationClass
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

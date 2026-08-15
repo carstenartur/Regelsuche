@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KnownAssumptionEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.assumption</a> &gt; <span class="el_source">KnownAssumptionEvaluator.java</span></div><h1>KnownAssumptionEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.assumption;
+
+import java.util.List;
+import java.util.Objects;
+
+/** Evaluates requirements from explicitly known typed assumptions. */
+public final class KnownAssumptionEvaluator implements AssumptionEvaluator {
+<span class="fc" id="L8">    public static final KnownAssumptionEvaluator INSTANCE =</span>
+        new KnownAssumptionEvaluator();
+
+    private static final String ID = &quot;core.known-assumptions&quot;;
+    private static final String REVISION = &quot;known-assumptions/v1&quot;;
+
+    private KnownAssumptionEvaluator() {
+    }
+
+    @Override
+    public String id() {
+<span class="fc" id="L19">        return ID;</span>
+    }
+
+    @Override
+    public String revision() {
+<span class="fc" id="L24">        return REVISION;</span>
+    }
+
+    @Override
+    public AssumptionEvaluationEvidence evaluate(
+        Assumption requiredAssumption,
+        List&lt;Assumption&gt; knownAssumptions
+    ) {
+<span class="fc" id="L32">        Objects.requireNonNull(requiredAssumption, &quot;requiredAssumption&quot;);</span>
+<span class="fc" id="L33">        Objects.requireNonNull(knownAssumptions, &quot;knownAssumptions&quot;);</span>
+<span class="fc" id="L34">        AssumptionTruthValue result = requiredAssumption.truthValueUnder(</span>
+<span class="fc" id="L35">            List.copyOf(knownAssumptions));</span>
+<span class="pc bpc" id="L36" title="1 of 3 branches missed.">        String explanation = switch (result) {</span>
+            case TRUE -&gt;
+<span class="fc" id="L38">                &quot;The explicit typed assumption context satisfies the requirement.&quot;;</span>
+            case FALSE -&gt;
+<span class="nc" id="L40">                &quot;The explicit typed assumption context contradicts the requirement.&quot;;</span>
+            case UNKNOWN -&gt;
+<span class="fc" id="L42">                &quot;The explicit typed assumption context does not decide the requirement.&quot;;</span>
+        };
+<span class="fc" id="L44">        return AssumptionEvaluationEvidence.evaluated(</span>
+<span class="fc" id="L45">            id(), revision(), result, explanation, &quot;&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
