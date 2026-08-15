@@ -104,6 +104,10 @@ class DiscoveryKnowledgePackOptionsTest {
             CandidateFreezeReceipt.class.getDeclaredConstructors())
             .allMatch(constructor ->
                 Modifier.isPrivate(constructor.getModifiers())));
+        assertTrue(Arrays.stream(
+            RepresentationDiscoveryInformationBoundary.class.getMethods())
+            .noneMatch(method -> method.getName().equals(
+                "formationSelection")));
 
         RepresentationDiscoveryInformationBoundary compression =
             options.representationDiscoveryBoundary(
@@ -120,12 +124,9 @@ class DiscoveryKnowledgePackOptionsTest {
             options.representationDiscoveryBoundary(
                 Track.R2_CATALOG_BLIND_POST_HOC_BRIDGE);
         assertTrue(blind.candidateFormationCatalog().structures().isEmpty());
-        assertEquals(Set.of(SYMPY_TRIGONOMETRY),
-            blind.formationSelection().disabledPacks());
         assertNotEquals(blind.candidateFormationRuleInventoryHash(),
             blind.postFreezeRuleInventoryCommitment());
-        assertTrue(new KnowledgePackRegistry()
-            .enabledRules(blind.formationSelection()).stream()
+        assertTrue(blind.candidateFormationRules().stream()
             .noneMatch(rule -> rule.descriptor().packId().equals(
                 SYMPY_TRIGONOMETRY)));
         CandidateFreezeReceipt blindFreeze =
@@ -168,16 +169,12 @@ class DiscoveryKnowledgePackOptionsTest {
                 Set.of(PYTHAGOREAN_PAIR)
             );
 
-        assertTrue(hidden.formationSelection().disabledPacks()
-            .contains(SYMPY_TRIGONOMETRY));
         assertTrue(hidden.candidateFormationCatalog().structures().stream()
             .noneMatch(structure -> structure.id().equals(
                 PYTHAGOREAN_PAIR)));
         assertNotEquals(hidden.candidateFormationRuleInventoryHash(),
             hidden.postFreezeRuleInventoryCommitment());
-        assertTrue(new KnowledgePackRegistry()
-            .enabledRules(hidden.formationSelection())
-            .stream()
+        assertTrue(hidden.candidateFormationRules().stream()
             .noneMatch(rule -> rule.descriptor().packId().equals(
                 SYMPY_TRIGONOMETRY)));
 

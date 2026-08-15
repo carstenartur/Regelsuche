@@ -3,6 +3,7 @@ package de.regelsuche.discovery.representation;
 import de.regelsuche.knowledge.KnowledgePackRegistry;
 import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.transform.PatternRewriteRule;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -34,6 +35,7 @@ public final class RepresentationDiscoveryInformationBoundary {
     private final KnowledgePackSelection formationSelection;
     private final KnownStructureCatalog formationCatalog;
     private final KnownStructureCatalog postFreezeCatalog;
+    private final List<PatternRewriteRule> formationRules;
     private final String formationRuleInventoryHash;
     private final String postFreezeRuleInventoryHash;
     private final Set<String> requestedHoldoutStructureIds;
@@ -48,7 +50,7 @@ public final class RepresentationDiscoveryInformationBoundary {
         KnowledgePackSelection formationSelection,
         KnownStructureCatalog formationCatalog,
         KnownStructureCatalog postFreezeCatalog,
-        String formationRuleInventoryHash,
+        List<PatternRewriteRule> formationRules,
         String postFreezeRuleInventoryHash,
         Set<String> requestedHoldoutStructureIds,
         Set<String> formationExcludedStructureIds,
@@ -63,8 +65,10 @@ public final class RepresentationDiscoveryInformationBoundary {
             formationCatalog, "formationCatalog");
         this.postFreezeCatalog = Objects.requireNonNull(
             postFreezeCatalog, "postFreezeCatalog");
-        this.formationRuleInventoryHash = requireSha256(
-            formationRuleInventoryHash, "formationRuleInventoryHash");
+        this.formationRules = List.copyOf(Objects.requireNonNull(
+            formationRules, "formationRules"));
+        this.formationRuleInventoryHash = RuleInventoryFingerprint.contentHash(
+            this.formationRules);
         this.postFreezeRuleInventoryHash = requireSha256(
             postFreezeRuleInventoryHash, "postFreezeRuleInventoryHash");
         this.requestedHoldoutStructureIds = immutableSortedSet(
@@ -171,8 +175,9 @@ public final class RepresentationDiscoveryInformationBoundary {
             formationSelection,
             formationCatalog,
             postFreezeCatalog,
-            ruleInventoryHash(registry, formationSelection),
-            ruleInventoryHash(registry, visibleSelection),
+            registry.enabledRules(formationSelection),
+            RuleInventoryFingerprint.contentHash(
+                registry.enabledRules(visibleSelection)),
             requestedHoldouts,
             excluded,
             withheldPacks
@@ -187,14 +192,20 @@ public final class RepresentationDiscoveryInformationBoundary {
         return track;
     }
 
+    /** Opaque identity of the rule-pack selection used for formation. */
+    public String candidateFormationSelectionCommitment() {
+        return KnownStructureCatalog.sha256(
+            selectionDescriptor(formationSelection));
+    }
+
     /**
-     * Rule selection that candidate formation may use.
+     * Exact executable rules visible to candidate formation.
      *
-     * <p>R2 removes packs declared as consequences by every hidden catalog
-     * entry. R4 removes packs declared by the requested holdout structures.</p>
+     * <p>The returned inventory does not disclose which post-freeze packs were
+     * withheld. R2 and R4 holdout details are released only after freeze.</p>
      */
-    public KnowledgePackSelection formationSelection() {
-        return formationSelection;
+    public List<PatternRewriteRule> candidateFormationRules() {
+        return formationRules;
     }
 
     /** Opaque commitment to the complete post-freeze pack selection. */
@@ -464,14 +475,6 @@ public final class RepresentationDiscoveryInformationBoundary {
         KnownStructureCatalog.appendCanonicalField(
             descriptor, holdoutCommitmentHash);
         return KnownStructureCatalog.sha256(descriptor.toString());
-    }
-
-    private static String ruleInventoryHash(
-        KnowledgePackRegistry registry,
-        KnowledgePackSelection selection
-    ) {
-        return RuleInventoryFingerprint.contentHash(
-            registry.enabledRules(selection));
     }
 
     private static void validateRequestedHoldouts(
