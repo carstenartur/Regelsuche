@@ -21,6 +21,8 @@ import de.regelsuche.knowledge.KnowledgePackRegistry;
 import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.knowledge.RuleProfile;
 import de.regelsuche.validation.CandidateProofStatus;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -98,6 +100,10 @@ class DiscoveryKnowledgePackOptionsTest {
         DiscoveryOptions options = sympyOptions();
         RepresentationCandidateProposal candidate =
             proposal(CandidateProofStatus.SYMBOLICALLY_VERIFIED);
+        assertTrue(Arrays.stream(
+            CandidateFreezeReceipt.class.getDeclaredConstructors())
+            .allMatch(constructor ->
+                Modifier.isPrivate(constructor.getModifiers())));
 
         RepresentationDiscoveryInformationBoundary compression =
             options.representationDiscoveryBoundary(

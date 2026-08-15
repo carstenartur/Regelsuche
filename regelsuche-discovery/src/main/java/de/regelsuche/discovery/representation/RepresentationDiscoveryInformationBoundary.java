@@ -277,19 +277,44 @@ public final class RepresentationDiscoveryInformationBoundary {
         }
     }
 
-    public record CandidateFreezeReceipt(
-        String boundaryHash,
-        String candidateSetHash,
-        int candidateCount
-    ) {
-        public CandidateFreezeReceipt {
-            boundaryHash = requireSha256(boundaryHash, "boundaryHash");
-            candidateSetHash = requireSha256(
+    /**
+     * Opaque receipt issued only by {@link #freezeCandidates(Collection)}.
+     *
+     * <p>The private constructor prevents callers from manufacturing a receipt
+     * merely from public hashes. The receipt remains inspectable and
+     * content-addressed for evidence export.</p>
+     */
+    public static final class CandidateFreezeReceipt {
+        private final String boundaryHash;
+        private final String candidateSetHash;
+        private final int candidateCount;
+
+        private CandidateFreezeReceipt(
+            String boundaryHash,
+            String candidateSetHash,
+            int candidateCount
+        ) {
+            this.boundaryHash = requireSha256(
+                boundaryHash, "boundaryHash");
+            this.candidateSetHash = requireSha256(
                 candidateSetHash, "candidateSetHash");
             if (candidateCount < 0) {
                 throw new IllegalArgumentException(
                     "candidateCount must be non-negative");
             }
+            this.candidateCount = candidateCount;
+        }
+
+        public String boundaryHash() {
+            return boundaryHash;
+        }
+
+        public String candidateSetHash() {
+            return candidateSetHash;
+        }
+
+        public int candidateCount() {
+            return candidateCount;
         }
 
         public String contentHash() {
