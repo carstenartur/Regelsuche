@@ -78,6 +78,7 @@ public final class TargetFreeRepresentationSearch {
         boolean transitionLimit = false;
         boolean stateLimit = false;
         boolean depthLimit = false;
+        boolean candidateLimit = false;
         while (!frontier.isEmpty()
                 && explored < budget.maxExploredStates()) {
             State current = frontier.removeFirst();
@@ -90,6 +91,8 @@ public final class TargetFreeRepresentationSearch {
                 .transform(current.expression()).stream()
                 .sorted(TRANSFORMATION_ORDER)
                 .toList();
+            candidateLimit |= generated.size()
+                >= budget.maxCandidatesPerState();
             for (Transformation transformation : generated) {
                 if (transitions.size()
                         >= budget.maxGeneratedTransitions()) {
@@ -149,8 +152,14 @@ public final class TargetFreeRepresentationSearch {
             budget,
             explored,
             transitions.size(),
-            transitionLimit || stateLimit || depthLimit
-                || !frontier.isEmpty(),
+            truncationReasons(
+                depthLimit,
+                !frontier.isEmpty()
+                    && explored >= budget.maxExploredStates(),
+                stateLimit,
+                transitionLimit,
+                candidateLimit
+            ),
             states,
             transitions,
             paretoStateHashes(states)
@@ -224,6 +233,48 @@ public final class TargetFreeRepresentationSearch {
                 || left.assumptions().size()
                     < right.assumptions().size();
         return noWorse && better;
+    }
+
+    private static List<TruncationReason> truncationReasons(
+        boolean depthLimit,
+        boolean exploredStateLimit,
+        boolean retainedStateLimit,
+        boolean transitionLimit,
+        boolean candidateLimit
+    ) {
+        List<TruncationReason> reasons = new ArrayList<>();
+        addReason(reasons, depthLimit, TruncationReason.MAX_DEPTH);
+        addReason(
+            reasons,
+            exploredStateLimit,
+            TruncationReason.MAX_EXPLORED_STATES
+        );
+        addReason(
+            reasons,
+            retainedStateLimit,
+            TruncationReason.MAX_RETAINED_STATES
+        );
+        addReason(
+            reasons,
+            transitionLimit,
+            TruncationReason.MAX_GENERATED_TRANSITIONS
+        );
+        addReason(
+            reasons,
+            candidateLimit,
+            TruncationReason.MAX_CANDIDATES_PER_STATE
+        );
+        return List.copyOf(reasons);
+    }
+
+    private static void addReason(
+        List<TruncationReason> reasons,
+        boolean active,
+        TruncationReason reason
+    ) {
+        if (active) {
+            reasons.add(reason);
+        }
     }
 
     private static String stateDescriptor(
@@ -329,6 +380,14 @@ public final class TargetFreeRepresentationSearch {
         ACCEPTED_NEW_STATE,
         DUPLICATE_REPRESENTATION,
         STATE_BUDGET_EXHAUSTED
+    }
+
+    public enum TruncationReason {
+        MAX_DEPTH,
+        MAX_EXPLORED_STATES,
+        MAX_RETAINED_STATES,
+        MAX_GENERATED_TRANSITIONS,
+        MAX_CANDIDATES_PER_STATE
     }
 
     public record State(
@@ -516,7 +575,7 @@ public final class TargetFreeRepresentationSearch {
         Budget budget,
         int exploredStateCount,
         int generatedTransitionCount,
-        boolean truncated,
+        List<TruncationReason> truncationReasons,
         List<State> states,
         List<Transition> transitions,
         List<String> paretoStateHashes
@@ -536,6 +595,7 @@ public final class TargetFreeRepresentationSearch {
             ruleInventoryHash = requireHash(
                 ruleInventoryHash, "ruleInventoryHash");
             budget = Objects.requireNonNull(budget, "budget");
+            truncationReasons = List.copyOf(truncationReasons);
             states = List.copyOf(states);
             transitions = List.copyOf(transitions);
             paretoStateHashes = List.copyOf(paretoStateHashes);
@@ -543,6 +603,15 @@ public final class TargetFreeRepresentationSearch {
         }
 
         private void validateBalance() {
+            if (new HashSet<>(truncationReasons).size()
+                    != truncationReasons.size()
+                    || !truncationReasons.stream()
+                        .sorted()
+                        .toList()
+                        .equals(truncationReasons)) {
+                throw new IllegalArgumentException(
+                    "target-free truncation reasons do not balance");
+            }
             if (exploredStateCount < 1
                     || exploredStateCount > states.size()
                     || exploredStateCount > budget.maxExploredStates()
@@ -591,7 +660,8 @@ public final class TargetFreeRepresentationSearch {
                     transition.toStateHash());
                 if (transition.disposition()
                         == TransitionDisposition.STATE_BUDGET_EXHAUSTED) {
-                    if (targetRetained || !truncated) {
+                    if (targetRetained
+                            || !truncated()) {
                         throw new IllegalArgumentException(
                             "state-budget transition must be unretained");
                     }
@@ -647,6 +717,10 @@ public final class TargetFreeRepresentationSearch {
                 throw new IllegalArgumentException(
                     "target-free Pareto archive does not balance");
             }
+        }
+
+        public boolean truncated() {
+            return !truncationReasons.isEmpty();
         }
 
         public List<State> candidateStates() {
