@@ -138,15 +138,7 @@ class HistoricalWitnessPruningDiagnosticTest {
             "bounded test claim",
             HASH,
             List.of(benchmarkCase));
-        AtlasReport atlas = new AtlasReport(
-            HistoricalRediscoveryAtlas.SCHEMA,
-            corpus.schema(),
-            corpus.contentSha256(),
-            corpus.inventoryRevision(),
-            corpus.claimBoundary(),
-            List.of(),
-            List.of(),
-            assessment());
+        AtlasReport atlas = atlas(corpus, benchmarkCase);
         HistoricalWitnessPruningDiagnostic writer =
             new HistoricalWitnessPruningDiagnostic();
         List<CaseDiagnostic> cases = List.of(diagnostic);
@@ -162,6 +154,103 @@ class HistoricalWitnessPruningDiagnosticTest {
         assertArrayEquals(
             Files.readAllBytes(firstPath),
             Files.readAllBytes(secondPath));
+    }
+
+    private static AtlasReport atlas(Corpus corpus, Case benchmarkCase) {
+        HistoricalRediscoveryAtlas.SearchEvidence notApplicableSearch =
+            new HistoricalRediscoveryAtlas.SearchEvidence(
+                HistoricalRediscoveryAtlas.EvidenceExecution.NOT_APPLICABLE,
+                "",
+                false,
+                "NOT_APPLICABLE",
+                0,
+                0,
+                0,
+                -1,
+                List.of(),
+                List.of(),
+                null,
+                "");
+        HistoricalRediscoveryAtlas.OracleEvidence notApplicableOracle =
+            new HistoricalRediscoveryAtlas.OracleEvidence(
+                HistoricalRediscoveryAtlas.EvidenceExecution.NOT_APPLICABLE,
+                "NOT_APPLICABLE",
+                List.of(),
+                List.of(),
+                0,
+                0,
+                0,
+                0,
+                false,
+                false,
+                "");
+        HistoricalRediscoveryAtlas.SearchEvidence scalar =
+            new HistoricalRediscoveryAtlas.SearchEvidence(
+                HistoricalRediscoveryAtlas.EvidenceExecution.EXECUTED,
+                HistoricalWitnessPruningDiagnostic.SEARCH_POLICY,
+                false,
+                "CANDIDATE_BUDGET",
+                1,
+                1,
+                2,
+                -1,
+                List.of(),
+                List.of(),
+                metrics(1, 1),
+                "");
+        HistoricalRediscoveryAtlas.EngineEvidence production =
+            new HistoricalRediscoveryAtlas.EngineEvidence(
+                HistoricalRediscoveryAtlas.EngineProfile.PRODUCTION_PRIMITIVES,
+                HistoricalRediscoveryAtlas.EvidenceExecution.EXECUTED,
+                "",
+                oracle("x + 1", "witness"),
+                scalar,
+                notApplicableSearch,
+                notApplicableSearch);
+        HistoricalRediscoveryAtlas.EngineEvidence genericBridge =
+            new HistoricalRediscoveryAtlas.EngineEvidence(
+                HistoricalRediscoveryAtlas.EngineProfile.GENERIC_HYPOTHESIS_BRIDGE,
+                HistoricalRediscoveryAtlas.EvidenceExecution.NOT_APPLICABLE,
+                "",
+                notApplicableOracle,
+                notApplicableSearch,
+                notApplicableSearch,
+                notApplicableSearch);
+        HistoricalRediscoveryAtlas.EngineEvidence curatedControl =
+            new HistoricalRediscoveryAtlas.EngineEvidence(
+                HistoricalRediscoveryAtlas.EngineProfile.CURATED_RECOGNITION_CONTROL,
+                HistoricalRediscoveryAtlas.EvidenceExecution.NOT_APPLICABLE,
+                "",
+                notApplicableOracle,
+                notApplicableSearch,
+                notApplicableSearch,
+                notApplicableSearch);
+        HistoricalRediscoveryAtlas.CaseResult caseResult =
+            new HistoricalRediscoveryAtlas.CaseResult(
+                benchmarkCase,
+                new HistoricalRediscoveryAtlas.RepresentationEvidence(
+                    true,
+                    benchmarkCase.source(),
+                    benchmarkCase.target(),
+                    ""),
+                new HistoricalRediscoveryAtlas.EquivalenceEvidence(
+                    true,
+                    true,
+                    "test fixture"),
+                production,
+                genericBridge,
+                curatedControl,
+                HistoricalRediscoveryAtlas.PrimaryStatus
+                    .REACHABLE_BUT_PRODUCTION_SEARCH_MISSED);
+        return new AtlasReport(
+            HistoricalRediscoveryAtlas.SCHEMA,
+            corpus.schema(),
+            corpus.contentSha256(),
+            corpus.inventoryRevision(),
+            corpus.claimBoundary(),
+            List.of(caseResult),
+            List.of(),
+            assessment());
     }
 
     private static HistoricalRediscoveryAtlas.OracleEvidence oracle(
