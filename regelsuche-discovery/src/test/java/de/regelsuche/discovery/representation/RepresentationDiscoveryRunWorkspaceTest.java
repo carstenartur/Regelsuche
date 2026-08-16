@@ -8,6 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactStatus;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryRunComparison.Category;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryRunComparison.Entry;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryRunComparison.Relationship;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryRunOutcome.TerminalState;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace.RunRelation;
 import java.util.ArrayList;
@@ -29,7 +32,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
         RepresentationDiscoveryRunPlan plan = plan(
             sha("budget"),
             42,
-            List.of("sympy:1.14.0", "internal:java21")
+            List.of("sympy:1.14.0", "internal:java25")
         );
         List<RepresentationDiscoveryArtifactReference> artifacts =
             completeArtifacts();
@@ -54,7 +57,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
                 plan(
                     sha("budget"),
                     42,
-                    List.of("internal:java21", "sympy:1.14.0")
+                    List.of("internal:java25", "sympy:1.14.0")
                 ),
                 completedOutcome(),
                 reversedArtifacts,
@@ -482,6 +485,135 @@ class RepresentationDiscoveryRunWorkspaceTest {
         assertFalse(workspace.toCanonicalJson().contains("elapsedMillis"));
     }
 
+    @Test
+    void comparisonSeparatesCanonicalEvidenceAndRejectsTampering() {
+        RepresentationDiscoveryRunWorkspace parent = root();
+        RepresentationDiscoveryRunComparison same =
+            RepresentationDiscoveryRunComparison.compare(parent, parent);
+        assertEquals(Relationship.SAME_RUN, same.relationship());
+        assertTrue(same.changedEntries().isEmpty());
+
+        RepresentationDiscoveryRunWorkspace runtimeOnly =
+            RepresentationDiscoveryRunWorkspace.create(
+                parent.input(),
+                parent.plan(),
+                RepresentationDiscoveryRunOutcome.create(
+                    parent.outcome().state(),
+                    parent.outcome().terminalReason(),
+                    parent.outcome().configuredWork(),
+                    parent.outcome().consumedWork(),
+                    parent.outcome().canonicalWorkLedgerHash(),
+                    sha("other-runtime")
+                ),
+                parent.artifacts(),
+                parent.revisions()
+            );
+        RepresentationDiscoveryRunComparison runtimeComparison =
+            RepresentationDiscoveryRunComparison.compare(
+                parent,
+                runtimeOnly
+            );
+        assertEquals(1, runtimeComparison.changedEntries().size());
+        assertEquals(
+            Category.RUNTIME_DIAGNOSTICS,
+            runtimeComparison.changedEntries().getFirst().category()
+        );
+        assertTrue(runtimeComparison.canonicalChangedEntries().isEmpty());
+
+        RepresentationDiscoveryRunWorkspace budgetChild =
+            RepresentationDiscoveryRunWorkspace
+                .duplicateWithOnePlanChange(
+                    parent,
+                    plan(
+                        sha("budget-v2"),
+                        parent.plan().deterministicSeed(),
+                        parent.plan().backendIdentities()
+                    ),
+                    revisions()
+                );
+        RepresentationDiscoveryRunComparison direct =
+            RepresentationDiscoveryRunComparison.compare(
+                parent,
+                budgetChild
+            );
+        assertEquals(Relationship.DIRECT_LINEAGE, direct.relationship());
+        assertTrue(direct.changedEntries().stream().anyMatch(entry ->
+            entry.category() == Category.PLAN
+                && entry.field().equals("budgetHash")));
+
+        RepresentationDiscoveryRunWorkspace seedChild =
+            RepresentationDiscoveryRunWorkspace
+                .duplicateWithOnePlanChange(
+                    parent,
+                    plan(
+                        parent.plan().budgetHash(),
+                        99,
+                        parent.plan().backendIdentities()
+                    ),
+                    revisions()
+                );
+        assertEquals(
+            Relationship.SIBLING_LINEAGE,
+            RepresentationDiscoveryRunComparison.compare(
+                budgetChild,
+                seedChild
+            ).relationship()
+        );
+        assertNotEquals(
+            direct.contentHash(),
+            RepresentationDiscoveryRunComparison.compare(
+                budgetChild,
+                parent
+            ).contentHash()
+        );
+
+        RepresentationDiscoveryRunWorkspace unavailableArtifacts =
+            RepresentationDiscoveryRunWorkspace.create(
+                parent.input(),
+                parent.plan(),
+                parent.outcome(),
+                RepresentationDiscoveryRunWorkspace.notProducedArtifacts(),
+                parent.revisions()
+            );
+        assertTrue(RepresentationDiscoveryRunComparison.compare(
+            parent,
+            unavailableArtifacts
+        ).canonicalChangedEntries().stream().anyMatch(entry ->
+            entry.category() == Category.ARTIFACT));
+
+        assertThrows(IllegalArgumentException.class, () ->
+            new RepresentationDiscoveryRunComparison(
+                same.schema(),
+                same.leftRunId(),
+                same.rightRunId(),
+                same.relationship(),
+                same.entries(),
+                same.claimBoundary(),
+                sha("forged-comparison")
+            ));
+        List<Entry> incomplete = new ArrayList<>(same.entries());
+        incomplete.removeLast();
+        assertThrows(IllegalArgumentException.class, () ->
+            new RepresentationDiscoveryRunComparison(
+                same.schema(),
+                same.leftRunId(),
+                same.rightRunId(),
+                same.relationship(),
+                incomplete,
+                same.claimBoundary(),
+                same.contentHash()
+            ));
+        Entry first = same.entries().getFirst();
+        assertThrows(IllegalArgumentException.class, () ->
+            new Entry(
+                first.category(),
+                first.field(),
+                first.leftValue(),
+                first.rightValue(),
+                !first.equal()
+            ));
+    }
+
     private static RepresentationDiscoveryRunWorkspace root() {
         return RepresentationDiscoveryRunWorkspace.create(
             expressionInput(),
@@ -503,7 +635,7 @@ class RepresentationDiscoveryRunWorkspaceTest {
         return plan(
             sha("budget"),
             42,
-            List.of("internal:java21", "sympy:1.14.0")
+            List.of("internal:java25", "sympy:1.14.0")
         );
     }
 
