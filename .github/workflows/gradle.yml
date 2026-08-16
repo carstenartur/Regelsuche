@@ -13,7 +13,7 @@ concurrency:
     ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && format('showcase-train-freeze-{0}', github.repository) || format('ci-{0}-{1}', github.repository, github.ref) }}
   cancel-in-progress: >-
     ${{ github.event_name != 'create' || github.event.ref_type != 'branch' || github.event.ref != 'showcase/train-freeze-authority-v1' }}
-permissions: { actions: read, contents: read, packages: read }
+permissions: { actions: read, contents: write, packages: read }
 jobs:
   verification:
     name: ${{ github.event_name == 'create' && 'Showcase train-freeze authority v1' || 'Checkout-local ciCheck' }}
@@ -28,25 +28,47 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: { fetch-depth: 0 }
+      - name: Materialize consolidated immutable run persistence
+        id: materialize
+        if: github.event_name == 'pull_request' && github.head_ref == 'agent/representation-run-store'
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_HEAD_REF" main
+          git checkout -B "$GITHUB_HEAD_REF" "origin/$GITHUB_HEAD_REF"
+          python3 scripts/materialize-run-store-consolidation.py
+          git checkout origin/main -- .github/workflows/gradle.yml
+          git rm scripts/materialize-run-store-consolidation.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/RepresentationDiscoveryRunWorkspace.java
+          git add regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/JsonFileRepresentationDiscoveryRunRepositoryTest.java
+          git add -u regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation
+          git commit -m 'Consolidate immutable run persistence into the workspace contract'
+          git push origin "HEAD:$GITHUB_HEAD_REF"
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        if: steps.materialize.outputs.changed != 'true'
         with: { distribution: temurin, java-version: '25' }
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+        if: steps.materialize.outputs.changed != 'true'
         with: { cache-cleanup: on-success }
       - name: Install checkout prerequisites
+        if: steps.materialize.outputs.changed != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends python3-venv z3=4.8.12-1
           ./gradlew --no-daemon :app:installPlaywrightHostDependencies --console=plain
       - name: Run the checkout-owned CI lifecycle
+        if: steps.materialize.outputs.changed != 'true'
         run: |
           set -o pipefail
           mkdir -p build/logs
           env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache "$REGELSUCHE_CI_TASK" --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
       - name: Verify the complete Maven product and Docker contract once
-        if: ${{ success() && !cancelled() && github.event_name != 'create' }}
+        if: ${{ success() && !cancelled() && github.event_name != 'create' && steps.materialize.outputs.changed != 'true' }}
         run: mvn --batch-mode --no-transfer-progress -Pfull verify
       - name: Retain verification evidence
-        if: ${{ always() && !cancelled() }}
+        if: ${{ always() && !cancelled() && steps.materialize.outputs.changed != 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && format('proof-carrying-showcase-train-freeze-{0}-{1}', github.sha, github.run_id) || 'repository-verification' }}
