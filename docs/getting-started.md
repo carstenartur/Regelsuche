@@ -9,7 +9,7 @@ Solver erforderlich.
 Wähle einen der beiden unterstützten Einstiege:
 
 - **Docker:** aktueller Docker-Daemon; keine lokale Java-Installation nötig.
-- **Lokaler Build:** JDK 21; der Gradle Wrapper wird aus dem Repository benutzt.
+- **Lokaler Build:** JDK 25; der Gradle Wrapper wird aus dem Repository benutzt.
 
 Für `fullCheck`, Datenbanktests und vollständige Forschungsreproduktion werden
 zusätzlich Docker, Python-`venv` und die jeweils dokumentierten externen

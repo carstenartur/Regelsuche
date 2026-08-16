@@ -3,7 +3,7 @@
 Issue [#632](https://github.com/carstenartur/Regelsuche/issues/632) reduces the
 required developer toolchain to:
 
-1. JDK 21;
+1. JDK 25;
 2. Maven 3.9.9 or a newer Maven 3.x release;
 3. Docker only for tests that require a real database, browser, solver or other
    external runtime.
@@ -29,7 +29,7 @@ Jupiter tests with Maven Surefire. The build-contract module additionally checks
 that:
 
 - the declared reactor modules and parent relationships are complete;
-- Java 21 and the Maven 3.9.x range are fail-closed through Maven Enforcer;
+- Java 25 and the Maven 3.9.x range are fail-closed through Maven Enforcer;
 - JUnit is executed through a pinned Surefire version;
 - Maven POMs do not activate plugins or executables that introduce host-side
   scripting runtimes.

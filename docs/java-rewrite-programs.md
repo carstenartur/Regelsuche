@@ -142,17 +142,15 @@ Rule Radar. A later adapter can attach those events beneath the corresponding
 
 ## Java version
 
-The implementation deliberately stays on the repository's Java 21 baseline.
-Records, sealed interfaces and exhaustive pattern matching for `switch` already
-provide the language mechanisms needed for the program AST and interpreter.
-Java 25 adds useful platform capabilities, notably final `ScopedValue`, but it
-is not required here because interpreter context and trace sinks are passed
-explicitly. No preview feature is used.
+The repository targets Java 25 LTS. Records, sealed interfaces and exhaustive
+pattern matching for `switch` provide the language mechanisms needed for the
+program AST and interpreter. Java 25 also provides final `ScopedValue`, but the
+interpreter continues to pass context and trace sinks explicitly. No preview
+feature is used.
 
-A repository-wide Java 25 migration should therefore be handled separately,
-including Gradle, runtime images, proof images, Testcontainers and release
-reproduction. The rewrite-program format remains compatible with such an
-upgrade.
+The rewrite-program format is independent of the concrete JDK patch level and
+remains compatible across the repository's Java 25 toolchain, runtime-image and
+reproduction contracts.
 
 ## Path toward a textual DSL
 
