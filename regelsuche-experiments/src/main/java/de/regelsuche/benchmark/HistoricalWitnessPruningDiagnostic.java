@@ -35,25 +35,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Function;
 
 /**
  * Reruns the retained target-blind scalar search with telemetry and locates the
  * first lost prefix of each target-aware production-oracle witness.
  */
 public final class HistoricalWitnessPruningDiagnostic {
-    private final Function<Case, TransformationEngine> engineFactory;
     private final WitnessPrefixAnalyzer analyzer = new WitnessPrefixAnalyzer();
-
-    public HistoricalWitnessPruningDiagnostic() {
-        this(HistoricalWitnessPruningDiagnostic::productionEngine);
-    }
-
-    HistoricalWitnessPruningDiagnostic(
-        Function<Case, TransformationEngine> engineFactory
-    ) {
-        this.engineFactory = Objects.requireNonNull(engineFactory, "engineFactory");
-    }
 
     public HistoricalWitnessPruningReport run(
         Corpus corpus,
@@ -103,7 +91,7 @@ public final class HistoricalWitnessPruningDiagnostic {
         }
     }
 
-    CaseDiagnostic diagnose(Case benchmarkCase, CaseResult atlasCase) {
+    private CaseDiagnostic diagnose(Case benchmarkCase, CaseResult atlasCase) {
         OracleEvidence oracle = atlasCase.production().oracle();
         SearchEvidence scalar = atlasCase.production().scalar();
         if (!oracle.reachable()) {
@@ -146,7 +134,7 @@ public final class HistoricalWitnessPruningDiagnostic {
         validateWitness(benchmarkCase, oracle);
 
         CountingEngine counting = new CountingEngine(
-            engineFactory.apply(benchmarkCase));
+            productionEngine(benchmarkCase));
         TraceCollector trace = new TraceCollector();
         SearchProblem problem = searchProblem(
             benchmarkCase,
