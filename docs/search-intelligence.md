@@ -83,7 +83,8 @@ The source corpus and strict schemas are:
 
 - `regelsuche-experiments/src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json`;
 - `docs/schemas/regelsuche-historical-rediscovery-corpus-v1.schema.json`;
-- `docs/schemas/regelsuche-historical-rediscovery-run-v1.schema.json`.
+- `docs/schemas/regelsuche-historical-rediscovery-run-v1.schema.json`;
+- `docs/schemas/regelsuche-witness-pruning-diagnostic-v1.schema.json`.
 
 Generated JSON and Markdown retain the corpus hash, witnesses, rule IDs,
 primitive work, search metrics, directionality and one evidence-derived primary
@@ -98,17 +99,44 @@ inventory, claim boundary, case count and assessment decision. Consumers must
 verify the manifest and both payloads; a missing manifest denotes an incomplete
 run rather than reusable evidence.
 
+### First lost oracle-witness prefix
+
+For every production-oracle witness that the retained target-blind scalar search
+does not recover, the same scalar search is rerun with a passive telemetry
+observer. The rerun must reproduce the retained explored-state, engine-call,
+generated-transformation and complete goal-metric ledger exactly. Only after
+that target-blind run has finished is its telemetry compared with the
+previously retained target-aware oracle path.
+
+The diagnostic retains the first missing witness edge and distinguishes, among
+other outcomes:
+
+- a witness transformation rejected by an ordinary safety policy;
+- duplicate or transposition pruning;
+- a per-state candidate ceiling reached before the witness edge;
+- a parent stopped at the depth ceiling;
+- a generated state left queued when the global state budget ended;
+- a production engine that did not emit the oracle edge;
+- a witness parent never reached by the target-blind search.
+
+The canonical artifact is written separately under
+`regelsuche-experiments/build/reports/historical-rediscovery-witness-pruning/`
+as `witness-pruning-diagnostic.json`. It binds the corpus and atlas identities,
+production inventory, search policy, oracle and production work ledgers, case
+balance, first loss event and a SHA-256 content identity. It is downstream
+diagnostic evidence and does not replace or mutate the historical atlas run.
+
 The dedicated `regelsuche-core` oracle and known-derivation tests remain the
 authoritative unit-level contracts. Atlas tests add only corpus, policy and
 cross-layer integration evidence; they do not replace those focused tests.
 
-Generate the atlas with:
+Generate the atlas and witness-prefix diagnostic with:
 
 ```bash
 ./gradlew :regelsuche-experiments:generateHistoricalRediscoveryAtlas
 ```
 
-The output is written under
+The atlas output is written under
 `regelsuche-experiments/build/reports/historical-rediscovery/` and contains:
 
 - `historical-rediscovery-atlas.json`;
@@ -133,10 +161,12 @@ regression for this fail-closed distinction. The aggregate search-policy signal
 requires a target-blind structural-diversity result and is never inferred solely
 from the target-guided control. The aggregate equivalence-discrimination signal
 requires at least one retained negative control; an empty negative-control
-subset cannot pass by vacuous truth. Results establish only bounded reachability
-and search-policy behavior for the frozen representation, inventory and
-budgets. They do not establish external novelty, autonomous rediscovery or
-publication priority.
+subset cannot pass by vacuous truth. A first lost witness prefix identifies only
+where the bounded target-blind execution diverged from a target-aware diagnostic
+path. It is not a proof of global unreachability, autonomous rediscovery,
+mathematical novelty or general search superiority. Results establish only
+bounded reachability and search-policy behavior for the frozen representation,
+inventory and budgets.
 
 ## Universal patterns
 
