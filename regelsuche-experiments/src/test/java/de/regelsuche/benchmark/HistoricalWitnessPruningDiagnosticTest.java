@@ -14,7 +14,6 @@ import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Role;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.TargetRelation;
 import de.regelsuche.benchmark.HistoricalWitnessPruningDiagnostic.CaseDiagnostic;
 import de.regelsuche.benchmark.HistoricalWitnessPruningDiagnostic.LostStep;
-import de.regelsuche.benchmark.HistoricalWitnessPruningDiagnostic.Report;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalMetrics;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
@@ -150,15 +149,18 @@ class HistoricalWitnessPruningDiagnosticTest {
             List.of(),
             List.of(),
             assessment());
-        Report first = Report.create(corpus, atlas, List.of(diagnostic));
-        Report second = Report.create(corpus, atlas, List.of(diagnostic));
         HistoricalWitnessPruningDiagnostic writer =
             new HistoricalWitnessPruningDiagnostic();
-        Path firstPath = writer.write(directory.resolve("first"), first);
-        Path secondPath = writer.write(directory.resolve("second"), second);
+        List<CaseDiagnostic> cases = List.of(diagnostic);
+        String firstHash = writer.contentHash(corpus, atlas, cases);
+        String secondHash = writer.contentHash(corpus, atlas, cases);
+        Path firstPath = writer.write(
+            directory.resolve("first"), corpus, atlas, cases);
+        Path secondPath = writer.write(
+            directory.resolve("second"), corpus, atlas, cases);
 
-        assertEquals(first.contentHash(), second.contentHash());
-        assertTrue(first.contentHash().matches("sha256:[0-9a-f]{64}"));
+        assertEquals(firstHash, secondHash);
+        assertTrue(firstHash.matches("sha256:[0-9a-f]{64}"));
         assertArrayEquals(
             Files.readAllBytes(firstPath),
             Files.readAllBytes(secondPath));
