@@ -49,7 +49,7 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
     @Test
     void saveFindAndListAreCanonicalImmutableAndDeterministic(
         @TempDir Path directory
-    ) {
+    ) throws IOException {
         JsonFileRepresentationDiscoveryRunRepository repository =
             new JsonFileRepresentationDiscoveryRunRepository(directory);
         RepresentationDiscoveryRunWorkspace first = workspace(7);
@@ -67,7 +67,9 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
                     RepresentationDiscoveryRunWorkspace::runId))
                 .toList();
         assertEquals(expected, repository.list());
-        assertEquals(2L, Files.list(directory).count());
+        try (var entries = Files.list(directory)) {
+            assertEquals(2L, entries.count());
+        }
         repository.list().forEach(workspace -> {
             Path retained = runFile(directory, workspace.runId());
             assertTrue(Files.isRegularFile(retained));
