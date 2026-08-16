@@ -118,39 +118,10 @@ UNSUPPORTED
 ## Immutable active selection
 
 `RunSelection` binds candidate, state, edge, AST occurrence and proof-obligation
-selection to one exact Run ID. Candidate, state, edge and proof-obligation
-references are themselves lowercase SHA-256 identities; arbitrary display text
-cannot masquerade as an object identity. The AST occurrence remains an explicit
-path because it addresses syntax rather than an independent content object.
-
-The selection is a separate content-addressed value and does not mutate the
-historical workspace. This is the backend basis for keeping the same candidate
-selected across cockpit, graph, replay, rule-radar and proof views.
-
-## Canonical local retention
-
-`RepresentationDiscoveryRunWorkspaceCodec` is the single strict JSON boundary.
-It rejects duplicate and unknown fields, trailing values, malformed UTF-8,
-forged nested identities and any JSON spelling that is not byte-for-byte equal
-to the canonical representation.
-
-`JsonFileRepresentationDiscoveryRunRepository` retains one canonical file per
-Run ID and provides deterministic `save`, `find` and `list` operations. The
-repository:
-
-- derives filenames only from the lowercase SHA-256 Run ID;
-- treats an identical second save as idempotent;
-- forbids different bytes under an existing identity;
-- commits through a same-directory atomic move where the file system supports
-  it;
-- rejects symbolic repository components and symbolic run files;
-- rejects non-regular or unknown directory entries;
-- cross-checks the filename against the decoded Run ID;
-- applies finite per-workspace byte and total-run limits;
-- returns listed runs in deterministic Run-ID order.
-
-This retention layer is local and immutable. It does not yet define a remote
-catalog, multi-process transaction protocol or authorization policy.
+selection to one exact Run ID. It is a separate content-addressed value and does
+not mutate the historical workspace. This is the backend basis for keeping the
+same candidate selected across cockpit, graph, replay, rule-radar and proof
+views.
 
 ## Test boundary
 
@@ -165,20 +136,15 @@ The focused contract tests characterize:
 - explicit unavailable and incompatible artifact errors;
 - forged artifact, input, plan, outcome, revision, selection and workspace
   identities;
-- strict canonical JSON, duplicate/unknown/trailing field rejection and invalid
-  UTF-8;
-- immutable idempotent save, deterministic listing and filename/Run-ID binding;
-- byte/run ceilings, unexpected entries and symlink attacks;
 - work-budget balance and runtime/canonical-work separation;
 - expression normalization and a generic non-expression input.
 
 ## Claim boundary
 
-This contract establishes run correlation, explicit artifact availability,
-immutable local retention and reproduction identity. It does not establish
-mathematical truth, proof, external novelty, interestingness, usefulness or
-search superiority.
+This contract establishes run correlation, explicit artifact availability and
+reproduction identity. It does not establish mathematical truth, proof,
+external novelty, interestingness, usefulness or search superiority.
 
-The next product slice is to expose the repository through the existing API,
-then adapt the current Workbench views to carry and check the Run ID before
-rendering asynchronous responses.
+The next product slice is to expose the immutable workspace and selection
+through the existing API, then adapt the current Workbench views to carry and
+check the Run ID before rendering asynchronous responses.
