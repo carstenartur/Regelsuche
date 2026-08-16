@@ -36,9 +36,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -46,25 +44,27 @@ import java.util.stream.Collectors;
  * against the same retained target-aware oracle witnesses.
  *
  * <p>Both policies receive the same frozen source, production inventory and
- * declared {@link SearchHeuristic} ceilings. Their actual consumed work remains
- * separate evidence and is never assumed equal merely because the ceilings are
- * equal.</p>
+ * declared search ceilings. Actual consumed work remains separate evidence.</p>
  */
 public final class HistoricalProductionSearchComparison {
-    public static final String SCHEMA =
+    static final String SCHEMA =
         "regelsuche.production-search-comparison/v1";
-    public static final String EVIDENCE_STATUS =
+    static final String EVIDENCE_STATUS =
         "EXECUTED_MATCHED_DECLARED_BUDGET_COMPARISON";
-    public static final String INFORMATION_BOUNDARY =
+    static final String SCALAR_POLICY =
+        "SCALAR_BEST_FIRST_TARGET_BLIND";
+    static final String DIVERSITY_POLICY =
+        "STRUCTURAL_DIVERSITY_TARGET_BLIND";
+    static final String INFORMATION_BOUNDARY =
         "TARGET_BLIND_SEARCHES_ORACLE_POST_HOC_DIAGNOSTIC";
-    public static final String CLAIM_BOUNDARY =
+    static final String CLAIM_BOUNDARY =
         "Scalar best-first and structural-diversity searches receive the same "
             + "frozen source, production inventory and declared heuristic "
             + "budgets without a target. Oracle witnesses are used only after "
             + "both searches finish. Equal declared budgets do not imply equal "
             + "consumed work, and a retained prefix difference is not proof, "
             + "autonomous rediscovery, novelty or general search superiority.";
-    public static final String FILE_NAME =
+    static final String FILE_NAME =
         "production-search-comparison.json";
 
     private final ExpressionParser parser = new ExpressionParser();
@@ -74,8 +74,7 @@ public final class HistoricalProductionSearchComparison {
     private final SymPyEquivalenceService equivalence =
         new SymPyEquivalenceService();
 
-    /** Executes the comparison from the already retained in-memory evidence. */
-    public Report run(
+    Report run(
         Corpus corpus,
         AtlasReport atlas,
         List<HistoricalWitnessPruningDiagnostic.CaseDiagnostic> witnessCases
@@ -86,45 +85,39 @@ public final class HistoricalProductionSearchComparison {
         Map<String, CaseResult> atlasById = atlas.cases().stream()
             .collect(Collectors.toUnmodifiableMap(
                 value -> value.benchmarkCase().id(),
-                Function.identity()));
+                value -> value));
         Map<String, HistoricalWitnessPruningDiagnostic.CaseDiagnostic>
             witnessById = witnessCases.stream()
                 .collect(Collectors.toUnmodifiableMap(
                     HistoricalWitnessPruningDiagnostic.CaseDiagnostic::id,
-                    Function.identity()));
+                    value -> value));
         requireCaseMembership(corpus, atlasById.keySet(), witnessById.keySet());
-
-        List<CaseComparison> comparisons = corpus.cases().stream()
+        List<CaseComparison> cases = corpus.cases().stream()
             .sorted(Comparator.comparing(Case::id))
-            .map(benchmarkCase -> compare(
-                benchmarkCase,
-                atlasById.get(benchmarkCase.id()),
-                witnessById.get(benchmarkCase.id())))
+            .map(value -> compare(
+                value,
+                atlasById.get(value.id()),
+                witnessById.get(value.id())))
             .toList();
         return Report.create(
             corpus,
             atlas,
             HistoricalWitnessPruningDiagnostic.SCHEMA,
             new HistoricalWitnessPruningDiagnostic().contentHash(
-                corpus,
-                atlas,
-                witnessCases),
-            comparisons);
+                corpus, atlas, witnessCases),
+            cases);
     }
 
-    /** Writes and rereads the canonical report bytes. */
-    public Path write(Path directory, Report report) {
-        Path outputDirectory = Objects.requireNonNull(directory, "directory")
-            .toAbsolutePath().normalize();
-        Report safeReport = Objects.requireNonNull(report, "report");
-        Path output = outputDirectory.resolve(FILE_NAME);
+    Path write(Path directory, Report report) {
+        Path output = Objects.requireNonNull(directory, "directory")
+            .toAbsolutePath().normalize().resolve(FILE_NAME);
+        String json = Objects.requireNonNull(report, "report").toCanonicalJson();
         try {
-            Files.createDirectories(outputDirectory);
-            AtomicJsonFile.writeUtf8(output, safeReport.toCanonicalJson());
-            String retained = Files.readString(output, StandardCharsets.UTF_8);
-            if (!safeReport.toCanonicalJson().equals(retained)) {
+            Files.createDirectories(output.getParent());
+            AtomicJsonFile.writeUtf8(output, json);
+            if (!json.equals(Files.readString(output, StandardCharsets.UTF_8))) {
                 throw new IllegalStateException(
-                    "written production search comparison differs from report");
+                    "written production comparison differs from report");
             }
             return output;
         } catch (IOException exception) {
@@ -140,11 +133,10 @@ public final class HistoricalProductionSearchComparison {
     ) {
         SearchEvidence scalarRetained = atlasCase.production().scalar();
         SearchEvidence diversityRetained = atlasCase.production().diversity();
-        List<String> witnessExpressions =
-            atlasCase.production().oracle().witnessExpressions();
-        if (witnessExpressions.size() != witnessCase.witnessStepCount()) {
+        List<String> witness = atlasCase.production().oracle().witnessExpressions();
+        if (witness.size() != witnessCase.witnessStepCount()) {
             throw new IllegalArgumentException(
-                "oracle witness length differs from witness diagnostic: "
+                "oracle witness differs from witness diagnostic: "
                     + benchmarkCase.id());
         }
         requireScalarBinding(scalarRetained, witnessCase);
@@ -156,22 +148,15 @@ public final class HistoricalProductionSearchComparison {
                 benchmarkCase,
                 format(benchmarkCase.source()),
                 counting));
-        Optional<SearchState> diversityMatch = findMatch(
+        SearchState match = findMatch(
             benchmarkCase,
             format(benchmarkCase.target()),
             diversityStates);
         requireDiversityBinding(
-            diversityRetained,
-            diversityStates,
-            diversityMatch,
-            counting);
+            diversityRetained, diversityStates, match, counting);
 
-        int witnessSteps = witnessExpressions.size();
-        int diversityPrefix = witnessSteps == 0
-            ? 0
-            : exploredPrefixLength(witnessExpressions, diversityStates);
+        int witnessSteps = witness.size();
         SearchComparisonEvidence scalar = new SearchComparisonEvidence(
-            SearchPolicy.SCALAR_BEST_FIRST_TARGET_BLIND,
             scalarRetained.reached(),
             witnessCase.exploredPrefixLength(),
             scalarRetained.exploredStates(),
@@ -179,25 +164,24 @@ public final class HistoricalProductionSearchComparison {
             scalarRetained.generatedTransformations(),
             witnessCase.searchTerminalStatus());
         SearchComparisonEvidence diversity = new SearchComparisonEvidence(
-            SearchPolicy.STRUCTURAL_DIVERSITY_TARGET_BLIND,
-            diversityMatch.isPresent(),
-            diversityPrefix,
+            match != null,
+            witnessSteps == 0
+                ? 0
+                : exploredPrefixLength(witness, diversityStates),
             diversityStates.size(),
             counting.calls(),
             counting.generated(),
             diversityStates.isEmpty()
                 ? "NO_STATES"
                 : "COMPLETED_BOUNDED_SEARCH");
-        ComparisonStatus status = classify(witnessSteps, scalar, diversity);
         return new CaseComparison(
             benchmarkCase.id(),
-            status,
+            classify(witnessSteps, scalar, diversity),
             witnessSteps,
             DeclaredBudget.from(benchmarkCase),
             scalar,
             diversity,
-            diversityPrefix - scalar.exploredPrefixLength(),
-            detail(status));
+            diversity.exploredPrefixLength() - scalar.exploredPrefixLength());
     }
 
     private static ComparisonStatus classify(
@@ -227,28 +211,8 @@ public final class HistoricalProductionSearchComparison {
         return ComparisonStatus.DIVERSITY_RETAINS_SHORTER_PREFIX;
     }
 
-    private static String detail(ComparisonStatus status) {
-        return switch (status) {
-            case NOT_APPLICABLE_NO_PRODUCTION_WITNESS ->
-                "the production oracle retained no witness for prefix comparison";
-            case SCALAR_ALREADY_FOUND ->
-                "the target-blind scalar search already reached the relation";
-            case DIVERSITY_RECOVERS_COMPLETE_WITNESS ->
-                "structural diversity retained every state of the oracle witness";
-            case DIVERSITY_FINDS_RELATION_VIA_ALTERNATE_PATH ->
-                "structural diversity reached the relation without retaining the "
-                    + "complete selected oracle witness";
-            case DIVERSITY_EXTENDS_SCALAR_PREFIX ->
-                "structural diversity retained a longer oracle witness prefix";
-            case DIVERSITY_MATCHES_SCALAR_PREFIX ->
-                "both target-blind policies retained the same oracle prefix length";
-            case DIVERSITY_RETAINS_SHORTER_PREFIX ->
-                "structural diversity retained a shorter selected oracle prefix";
-        };
-    }
-
     private int exploredPrefixLength(
-        List<String> witnessExpressions,
+        List<String> witness,
         List<SearchState> states
     ) {
         Set<String> explored = states.stream()
@@ -256,7 +220,7 @@ public final class HistoricalProductionSearchComparison {
             .map(this::expressionKey)
             .collect(Collectors.toCollection(LinkedHashSet::new));
         int prefix = 0;
-        for (String expression : witnessExpressions) {
+        for (String expression : witness) {
             if (!explored.contains(expressionKey(expression))) {
                 break;
             }
@@ -265,21 +229,20 @@ public final class HistoricalProductionSearchComparison {
         return prefix;
     }
 
-    private Optional<SearchState> findMatch(
+    private SearchState findMatch(
         Case benchmarkCase,
         String target,
         List<SearchState> states
     ) {
         return states.stream()
             .filter(state -> matches(
-                benchmarkCase,
-                state.expression(),
-                target))
+                benchmarkCase, state.expression(), target))
             .min(Comparator
                 .comparingInt(SearchState::depth)
                 .thenComparing(SearchState::expression)
                 .thenComparing(state ->
-                    String.join("->", state.appliedRuleIds())));
+                    String.join("->", state.appliedRuleIds())))
+            .orElse(null);
     }
 
     private boolean matches(
@@ -301,53 +264,39 @@ public final class HistoricalProductionSearchComparison {
         SearchEvidence retained,
         HistoricalWitnessPruningDiagnostic.CaseDiagnostic witness
     ) {
-        List<Object> atlasWork = List.of(
-            retained.reached(),
-            retained.exploredStates(),
-            retained.engineCalls(),
-            retained.generatedTransformations());
-        List<Object> witnessWork = List.of(
+        boolean witnessReached =
             HistoricalWitnessPruningDiagnostic.SCALAR_ALREADY_FOUND
-                .equals(witness.status()),
-            witness.searchExploredStates(),
-            witness.engineCalls(),
-            witness.generatedTransformations());
-        if (!atlasWork.equals(witnessWork)) {
+                .equals(witness.status());
+        if (retained.reached() != witnessReached
+                || retained.exploredStates() != witness.searchExploredStates()
+                || retained.engineCalls() != witness.engineCalls()
+                || retained.generatedTransformations()
+                    != witness.generatedTransformations()) {
             throw new IllegalArgumentException(
-                "witness diagnostic does not bind retained scalar evidence");
+                "witness diagnostic does not bind scalar evidence");
         }
     }
 
     private static void requireDiversityBinding(
         SearchEvidence retained,
         List<SearchState> states,
-        Optional<SearchState> match,
+        SearchState match,
         CountingEngine counting
     ) {
         String terminal = states.isEmpty()
             ? "NO_STATES"
             : "COMPLETED_BOUNDED_SEARCH";
-        List<String> path = match.map(SearchState::path).orElse(List.of());
-        List<String> ruleIds = match
-            .map(SearchState::appliedRuleIds)
-            .orElse(List.of());
-        List<Object> expected = List.of(
-            retained.reached(),
-            retained.terminalStatus(),
-            retained.exploredStates(),
-            retained.engineCalls(),
-            retained.generatedTransformations(),
-            retained.path(),
-            retained.ruleIds());
-        List<Object> actual = List.of(
-            match.isPresent(),
-            terminal,
-            states.size(),
-            counting.calls(),
-            counting.generated(),
-            path,
-            ruleIds);
-        if (!expected.equals(actual)) {
+        List<String> path = match == null ? List.of() : match.path();
+        List<String> ruleIds = match == null
+            ? List.of()
+            : match.appliedRuleIds();
+        if (retained.reached() != (match != null)
+                || !retained.terminalStatus().equals(terminal)
+                || retained.exploredStates() != states.size()
+                || retained.engineCalls() != counting.calls()
+                || retained.generatedTransformations() != counting.generated()
+                || !retained.path().equals(path)
+                || !retained.ruleIds().equals(ruleIds)) {
             throw new IllegalStateException(
                 "diversity rerun differs from retained atlas evidence");
         }
@@ -393,22 +342,18 @@ public final class HistoricalProductionSearchComparison {
     }
 
     private static void requireAtlasBinding(Corpus corpus, AtlasReport atlas) {
-        List<Object> expected = List.of(
-            corpus.schema(),
-            corpus.contentSha256(),
-            corpus.inventoryRevision(),
-            corpus.claimBoundary(),
-            corpus.cases().stream().map(Case::id).sorted().toList());
-        List<Object> actual = List.of(
-            atlas.corpusSchema(),
-            atlas.corpusSha256(),
-            atlas.inventoryRevision(),
-            atlas.claimBoundary(),
-            atlas.cases().stream()
-                .map(value -> value.benchmarkCase().id())
-                .sorted()
-                .toList());
-        if (!expected.equals(actual)) {
+        Set<String> corpusIds = corpus.cases().stream()
+            .map(Case::id)
+            .collect(Collectors.toSet());
+        Set<String> atlasIds = atlas.cases().stream()
+            .map(value -> value.benchmarkCase().id())
+            .collect(Collectors.toSet());
+        if (!corpus.schema().equals(atlas.corpusSchema())
+                || !corpus.contentSha256().equals(atlas.corpusSha256())
+                || !corpus.inventoryRevision().equals(atlas.inventoryRevision())
+                || !corpus.claimBoundary().equals(atlas.claimBoundary())
+                || corpus.cases().size() != atlas.cases().size()
+                || !corpusIds.equals(atlasIds)) {
             throw new IllegalArgumentException(
                 "production comparison atlas does not bind the corpus");
         }
@@ -428,7 +373,7 @@ public final class HistoricalProductionSearchComparison {
         }
     }
 
-    public enum ComparisonStatus {
+    enum ComparisonStatus {
         NOT_APPLICABLE_NO_PRODUCTION_WITNESS,
         SCALAR_ALREADY_FOUND,
         DIVERSITY_RECOVERS_COMPLETE_WITNESS,
@@ -438,41 +383,35 @@ public final class HistoricalProductionSearchComparison {
         DIVERSITY_RETAINS_SHORTER_PREFIX
     }
 
-    public enum SearchPolicy {
-        SCALAR_BEST_FIRST_TARGET_BLIND,
-        STRUCTURAL_DIVERSITY_TARGET_BLIND
-    }
-
-    public record DeclaredBudget(
+    record DeclaredBudget(
         int maxDepth,
         int maxVisitedStates,
         int maxCandidatesPerState,
         int maxExpandingSteps,
         int beamWidth
     ) {
-        public DeclaredBudget {
+        DeclaredBudget {
             if (maxDepth < 0
                     || maxVisitedStates < 1
                     || maxCandidatesPerState < 1
                     || maxExpandingSteps < 0
                     || beamWidth < 1) {
                 throw new IllegalArgumentException(
-                    "declared comparison budget is outside its finite range");
+                    "declared budget is outside its finite range");
             }
         }
 
-        private static DeclaredBudget from(Case benchmarkCase) {
+        static DeclaredBudget from(Case value) {
             return new DeclaredBudget(
-                benchmarkCase.searchMaxDepth(),
-                benchmarkCase.searchMaxVisitedStates(),
-                benchmarkCase.maxCandidatesPerState(),
-                benchmarkCase.maxExpandingSteps(),
-                benchmarkCase.beamWidth());
+                value.searchMaxDepth(),
+                value.searchMaxVisitedStates(),
+                value.maxCandidatesPerState(),
+                value.maxExpandingSteps(),
+                value.beamWidth());
         }
     }
 
-    public record SearchComparisonEvidence(
-        SearchPolicy policy,
+    record SearchComparisonEvidence(
         boolean reachedRelation,
         int exploredPrefixLength,
         int exploredStates,
@@ -480,8 +419,7 @@ public final class HistoricalProductionSearchComparison {
         long generatedTransformations,
         String terminalStatus
     ) {
-        public SearchComparisonEvidence {
-            Objects.requireNonNull(policy, "policy");
+        SearchComparisonEvidence {
             terminalStatus = requireText(terminalStatus, "terminalStatus");
             if (exploredPrefixLength < 0
                     || exploredStates < 0
@@ -493,37 +431,37 @@ public final class HistoricalProductionSearchComparison {
         }
     }
 
-    public record CaseComparison(
+    record CaseComparison(
         String id,
         ComparisonStatus status,
         int oracleWitnessStepCount,
         DeclaredBudget declaredBudget,
         SearchComparisonEvidence scalar,
         SearchComparisonEvidence diversity,
-        int prefixDelta,
-        String detail
+        int prefixDelta
     ) {
-        public CaseComparison {
+        CaseComparison {
             id = requireText(id, "id");
             Objects.requireNonNull(status, "status");
             Objects.requireNonNull(declaredBudget, "declaredBudget");
             Objects.requireNonNull(scalar, "scalar");
             Objects.requireNonNull(diversity, "diversity");
-            detail = detail == null ? "" : detail;
             if (oracleWitnessStepCount < 0
                     || scalar.exploredPrefixLength()
                         > oracleWitnessStepCount
                     || diversity.exploredPrefixLength()
                         > oracleWitnessStepCount
                     || prefixDelta != diversity.exploredPrefixLength()
-                        - scalar.exploredPrefixLength()) {
+                        - scalar.exploredPrefixLength()
+                    || status != classify(
+                        oracleWitnessStepCount, scalar, diversity)) {
                 throw new IllegalArgumentException(
-                    "case comparison prefix accounting is inconsistent");
+                    "case comparison evidence is inconsistent");
             }
         }
     }
 
-    public record Summary(
+    record Summary(
         int caseCount,
         Map<ComparisonStatus, Integer> statusCounts,
         int comparableScalarMissCount,
@@ -531,7 +469,7 @@ public final class HistoricalProductionSearchComparison {
         int diversityExtendedPrefixCount,
         int diversityReachedRelationCount
     ) {
-        public Summary {
+        Summary {
             statusCounts = Map.copyOf(
                 Objects.requireNonNull(statusCounts, "statusCounts"));
             if (caseCount < 1
@@ -546,35 +484,31 @@ public final class HistoricalProductionSearchComparison {
             }
         }
 
-        private static Summary derive(List<CaseComparison> cases) {
+        static Summary derive(List<CaseComparison> cases) {
             Map<ComparisonStatus, Integer> counts =
                 new EnumMap<>(ComparisonStatus.class);
             cases.forEach(value ->
                 counts.merge(value.status(), 1, Integer::sum));
-            int comparable = (int) cases.stream()
-                .filter(value -> value.oracleWitnessStepCount() > 0)
-                .filter(value -> !value.scalar().reachedRelation())
-                .count();
-            int complete = counts.getOrDefault(
-                ComparisonStatus.DIVERSITY_RECOVERS_COMPLETE_WITNESS,
-                0);
-            int extended = (int) cases.stream()
-                .filter(value -> value.prefixDelta() > 0)
-                .count();
-            int reached = (int) cases.stream()
-                .filter(value -> value.diversity().reachedRelation())
-                .count();
             return new Summary(
                 cases.size(),
                 counts,
-                comparable,
-                complete,
-                extended,
-                reached);
+                (int) cases.stream()
+                    .filter(value -> value.oracleWitnessStepCount() > 0)
+                    .filter(value -> !value.scalar().reachedRelation())
+                    .count(),
+                counts.getOrDefault(
+                    ComparisonStatus.DIVERSITY_RECOVERS_COMPLETE_WITNESS,
+                    0),
+                (int) cases.stream()
+                    .filter(value -> value.prefixDelta() > 0)
+                    .count(),
+                (int) cases.stream()
+                    .filter(value -> value.diversity().reachedRelation())
+                    .count());
         }
     }
 
-    public record Report(
+    record Report(
         String schema,
         String evidenceStatus,
         String corpusSchema,
@@ -590,61 +524,64 @@ public final class HistoricalProductionSearchComparison {
         Summary summary,
         String contentHash
     ) {
-        public Report {
+        Report {
             if (!SCHEMA.equals(schema)
                     || !EVIDENCE_STATUS.equals(evidenceStatus)
-                    || !HistoricalRediscoveryCorpus.SCHEMA
-                        .equals(corpusSchema)
-                    || !HistoricalRediscoveryAtlas.SCHEMA
-                        .equals(atlasSchema)
+                    || !HistoricalRediscoveryCorpus.SCHEMA.equals(corpusSchema)
+                    || !HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)
                     || !HistoricalWitnessPruningDiagnostic.SCHEMA
                         .equals(witnessDiagnosticSchema)
                     || !INFORMATION_BOUNDARY.equals(informationBoundary)
                     || !CLAIM_BOUNDARY.equals(claimBoundary)) {
                 throw new IllegalArgumentException(
-                    "production comparison contract identity differs");
+                    "production comparison identity differs");
             }
             corpusSha256 = requireRawSha256(
-                corpusSha256,
-                "corpusSha256");
+                corpusSha256, "corpusSha256");
             atlasSha256 = requirePrefixedSha256(
-                atlasSha256,
-                "atlasSha256");
+                atlasSha256, "atlasSha256");
             witnessDiagnosticSha256 = requirePrefixedSha256(
-                witnessDiagnosticSha256,
-                "witnessDiagnosticSha256");
+                witnessDiagnosticSha256, "witnessDiagnosticSha256");
             inventoryRevision = requireText(
-                inventoryRevision,
-                "inventoryRevision");
-            cases = List.copyOf(Objects.requireNonNull(cases, "cases"));
-            Objects.requireNonNull(summary, "summary");
+                inventoryRevision, "inventoryRevision");
+            cases = Objects.requireNonNull(cases, "cases").stream()
+                .sorted(Comparator.comparing(CaseComparison::id))
+                .toList();
+            if (cases.isEmpty()
+                    || new LinkedHashSet<>(cases.stream()
+                        .map(CaseComparison::id).toList()).size()
+                        != cases.size()
+                    || !Summary.derive(cases).equals(summary)) {
+                throw new IllegalArgumentException(
+                    "production comparison case balance differs");
+            }
             contentHash = requirePrefixedSha256(
-                contentHash,
-                "contentHash");
-            String expected = reportHash(
-                corpusSchema,
-                corpusSha256,
-                atlasSchema,
-                atlasSha256,
-                witnessDiagnosticSchema,
-                witnessDiagnosticSha256,
-                inventoryRevision,
-                cases,
-                summary);
-            if (!expected.equals(contentHash)) {
+                contentHash, "contentHash");
+            if (!reportHash(
+                    corpusSchema,
+                    corpusSha256,
+                    atlasSchema,
+                    atlasSha256,
+                    witnessDiagnosticSchema,
+                    witnessDiagnosticSha256,
+                    inventoryRevision,
+                    cases,
+                    summary).equals(contentHash)) {
                 throw new IllegalArgumentException(
                     "production comparison contentHash mismatch");
             }
         }
 
-        private static Report create(
+        static Report create(
             Corpus corpus,
             AtlasReport atlas,
             String witnessSchema,
             String witnessSha256,
             List<CaseComparison> cases
         ) {
-            List<CaseComparison> retained = List.copyOf(cases);
+            List<CaseComparison> retained = cases.stream()
+                .sorted(Comparator.comparing(CaseComparison::id))
+                .toList();
             Summary summary = Summary.derive(retained);
             String atlasSha256 = sha256(atlas.toJson());
             String hash = reportHash(
@@ -674,7 +611,7 @@ public final class HistoricalProductionSearchComparison {
                 hash);
         }
 
-        public String toCanonicalJson() {
+        String toCanonicalJson() {
             return renderReport(
                 corpusSchema,
                 corpusSha256,
@@ -735,6 +672,8 @@ public final class HistoricalProductionSearchComparison {
         writer.property("witnessDiagnosticSchema", witnessSchema);
         writer.property("witnessDiagnosticSha256", witnessSha256);
         writer.property("inventoryRevision", inventoryRevision);
+        writer.property("scalarPolicy", SCALAR_POLICY);
+        writer.property("diversityPolicy", DIVERSITY_POLICY);
         writer.property("informationBoundary", INFORMATION_BOUNDARY);
         writer.property("claimBoundary", CLAIM_BOUNDARY);
         writer.array("cases", array -> cases.forEach(value ->
@@ -750,8 +689,7 @@ public final class HistoricalProductionSearchComparison {
         writer.property("id", value.id());
         writer.property("status", value.status().name());
         writer.property(
-            "oracleWitnessStepCount",
-            value.oracleWitnessStepCount());
+            "oracleWitnessStepCount", value.oracleWitnessStepCount());
         writer.object("declaredBudget", object -> {
             object.property("maxDepth", value.declaredBudget().maxDepth());
             object.property(
@@ -765,27 +703,23 @@ public final class HistoricalProductionSearchComparison {
                 value.declaredBudget().maxExpandingSteps());
             object.property("beamWidth", value.declaredBudget().beamWidth());
         });
-        writer.object("scalar", object ->
-            writeSearch(object, value.scalar()));
-        writer.object("diversity", object ->
-            writeSearch(object, value.diversity()));
+        writer.object("scalar", object -> writeSearch(object, value.scalar()));
+        writer.object(
+            "diversity", object -> writeSearch(object, value.diversity()));
         writer.property("prefixDelta", value.prefixDelta());
-        writer.property("detail", value.detail());
     }
 
     private static void writeSearch(
         JsonWriter writer,
         SearchComparisonEvidence value
     ) {
-        writer.property("policy", value.policy().name());
         writer.property("reachedRelation", value.reachedRelation());
         writer.property(
             "exploredPrefixLength", value.exploredPrefixLength());
         writer.property("exploredStates", value.exploredStates());
         writer.property("engineCalls", value.engineCalls());
         writer.property(
-            "generatedTransformations",
-            value.generatedTransformations());
+            "generatedTransformations", value.generatedTransformations());
         writer.property("terminalStatus", value.terminalStatus());
     }
 
@@ -795,8 +729,7 @@ public final class HistoricalProductionSearchComparison {
             .stream()
             .sorted(Map.Entry.comparingByKey())
             .forEach(entry -> object.property(
-                entry.getKey().name(),
-                entry.getValue())));
+                entry.getKey().name(), entry.getValue())));
         writer.property(
             "comparableScalarMissCount",
             value.comparableScalarMissCount());
@@ -867,11 +800,11 @@ public final class HistoricalProductionSearchComparison {
             return result;
         }
 
-        private int calls() {
+        int calls() {
             return calls;
         }
 
-        private long generated() {
+        long generated() {
             return generated;
         }
     }
