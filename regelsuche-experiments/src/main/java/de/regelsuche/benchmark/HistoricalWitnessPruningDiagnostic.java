@@ -95,12 +95,11 @@ public final class HistoricalWitnessPruningDiagnostic {
         OracleEvidence oracle = atlasCase.production().oracle();
         SearchEvidence scalar = atlasCase.production().scalar();
         if (!oracle.reachable()) {
-            CaseStatus status = oracle.inconclusive()
-                ? CaseStatus.ORACLE_BUDGET_INCONCLUSIVE
-                : oracle.completeClosureExhausted()
-                    ? CaseStatus.ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS
-                    : CaseStatus.ORACLE_NOT_EVALUATED;
-            return notApplicable(benchmarkCase, status, oracle, scalar);
+            return notApplicable(
+                benchmarkCase,
+                unavailableStatus(oracle),
+                oracle,
+                scalar);
         }
         if (benchmarkCase.relation() == Relation.NOT_EQUIVALENT) {
             return new CaseDiagnostic(
@@ -156,6 +155,16 @@ public final class HistoricalWitnessPruningDiagnostic {
             counting.generated());
     }
 
+    private static CaseStatus unavailableStatus(OracleEvidence oracle) {
+        if (oracle.inconclusive()) {
+            return CaseStatus.ORACLE_BUDGET_INCONCLUSIVE;
+        }
+        if (oracle.completeClosureExhausted()) {
+            return CaseStatus.ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS;
+        }
+        return CaseStatus.ORACLE_NOT_EVALUATED;
+    }
+
     private CaseDiagnostic notApplicable(
         Case benchmarkCase,
         CaseStatus status,
@@ -202,10 +211,17 @@ public final class HistoricalWitnessPruningDiagnostic {
         GoalSearchResult rerun,
         CountingEngine counting
     ) {
-        if (retained.exploredStates() != rerun.states().size()
-                || retained.engineCalls() != counting.calls()
-                || retained.generatedTransformations() != counting.generated()
-                || !Objects.equals(retained.metrics(), rerun.metrics())) {
+        List<Object> retainedWork = List.of(
+            retained.exploredStates(),
+            retained.engineCalls(),
+            retained.generatedTransformations(),
+            Objects.requireNonNull(retained.metrics(), "retained.metrics"));
+        List<Object> rerunWork = List.of(
+            rerun.states().size(),
+            counting.calls(),
+            counting.generated(),
+            rerun.metrics());
+        if (!retainedWork.equals(rerunWork)) {
             throw new IllegalStateException(
                 "observer rerun differs from retained target-blind scalar evidence");
         }
@@ -221,11 +237,19 @@ public final class HistoricalWitnessPruningDiagnostic {
     }
 
     private static void requireAtlasBinding(Corpus corpus, AtlasReport atlas) {
-        if (!corpus.schema().equals(atlas.corpusSchema())
-                || !corpus.contentSha256().equals(atlas.corpusSha256())
-                || !corpus.inventoryRevision().equals(atlas.inventoryRevision())
-                || !corpus.claimBoundary().equals(atlas.claimBoundary())
-                || corpus.cases().size() != atlas.cases().size()) {
+        List<Object> corpusBinding = List.of(
+            corpus.schema(),
+            corpus.contentSha256(),
+            corpus.inventoryRevision(),
+            corpus.claimBoundary(),
+            corpus.cases().size());
+        List<Object> atlasBinding = List.of(
+            atlas.corpusSchema(),
+            atlas.corpusSha256(),
+            atlas.inventoryRevision(),
+            atlas.claimBoundary(),
+            atlas.cases().size());
+        if (!corpusBinding.equals(atlasBinding)) {
             throw new IllegalArgumentException(
                 "witness-pruning diagnostic requires the matching atlas");
         }
