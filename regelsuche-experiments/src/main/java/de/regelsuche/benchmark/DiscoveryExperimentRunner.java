@@ -210,6 +210,8 @@ public interface DiscoveryExperimentRunner {
 
         static final String TRANSFORMATION_SKIPPED = "TRANSFORMATION_SKIPPED";
         static final String STATE_PRUNED_DUPLICATE = "STATE_PRUNED_DUPLICATE";
+        static final String STATE_PRUNED_TRANSPOSITION =
+            "STATE_PRUNED_TRANSPOSITION";
         static final String STATE_ENQUEUED_BUT_NOT_EXPLORED =
             "STATE_ENQUEUED_BUT_NOT_EXPLORED";
         static final String TRANSFORMATION_GENERATED_NOT_ENQUEUED =
@@ -238,6 +240,7 @@ public interface DiscoveryExperimentRunner {
         private static final Set<String> LOSS_REASONS = Set.of(
             TRANSFORMATION_SKIPPED,
             STATE_PRUNED_DUPLICATE,
+            STATE_PRUNED_TRANSPOSITION,
             STATE_ENQUEUED_BUT_NOT_EXPLORED,
             TRANSFORMATION_GENERATED_NOT_ENQUEUED,
             CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
@@ -458,6 +461,18 @@ public interface DiscoveryExperimentRunner {
                     before, after, rule, TRANSFORMATION_SKIPPED, generated,
                     "witness transformation was offered but rejected");
             }
+            Optional<SearchEvent> transposition = firstEdgeEvent(
+                events,
+                SearchEventType.STATE_PRUNED_TRANSPOSITION,
+                before, after, rule, generated.sequence());
+            if (transposition.isPresent()) {
+                return lossCase(
+                    benchmarkCase, oracle, search, engineCalls,
+                    generatedTransformations, prefixLength, index,
+                    before, after, rule, STATE_PRUNED_TRANSPOSITION,
+                    transposition.orElseThrow(),
+                    "witness state was removed by transposition memory");
+            }
             Optional<SearchEvent> duplicate = firstEdgeEvent(
                 events,
                 SearchEventType.STATE_PRUNED_DUPLICATE,
@@ -594,7 +609,10 @@ public interface DiscoveryExperimentRunner {
                 .filter(event -> sameExpression(event.parentExpression(), before))
                 .filter(event -> sameExpression(event.expression(), after))
                 .filter(event -> event.ruleId().equals(rule))
-                .min(Comparator.comparingLong(SearchEvent::sequence));
+                .min(Comparator
+                    .comparing((SearchEvent event) ->
+                        !event.pruningReason().isBlank())
+                    .thenComparingLong(SearchEvent::sequence));
         }
 
         private Optional<SearchEvent> firstEdgeEvent(
