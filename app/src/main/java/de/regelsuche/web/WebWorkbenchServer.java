@@ -13,6 +13,7 @@ import de.regelsuche.api.ExportQueryService;
 import de.regelsuche.api.RuleInventoryQueryService;
 import de.regelsuche.api.TransformationQueryService;
 import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace;
 import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.example.AlgebraicExampleGenerator;
 import de.regelsuche.explain.ExplanationService;
@@ -69,6 +70,13 @@ import javax.net.ssl.SSLContext;
  * sufficient for local exploration of discovered transformations.</p>
  */
 public class WebWorkbenchServer {
+    private static final String REPRESENTATION_RUN_CONTEXT =
+        "/api/discovery-runs";
+    private static final String REPRESENTATION_RUN_INDEX_SCHEMA =
+        "regelsuche.representation-discovery-run-index/v1";
+    private static final int DEFAULT_REPRESENTATION_RUN_LIST_LIMIT = 100;
+    private static final int MAX_REPRESENTATION_RUN_LIST_LIMIT = 500;
+
     private final String host;
     private final int port;
     private final ExpressionGraphStore graphStore;
@@ -78,6 +86,7 @@ public class WebWorkbenchServer {
     private final WorkbenchRequestBodies requestBodies;
     private final PluginRuntimeConfig pluginRuntimeConfig;
     private final de.regelsuche.radar.RuleRadarHttpHandler ruleRadarHandler;
+    private final Path representationRunDirectory;
 
     private final TransformationQueryService transformationQuery;
     private final RuleInventoryQueryService inventoryQuery;
@@ -218,6 +227,23 @@ public class WebWorkbenchServer {
             this.pluginRuntimeConfig,
             this.securityConfig.maxRequestBytes()
         );
+        this.representationRunDirectory =
+            defaultRepresentationRunDirectory();
+    }
+
+    private static Path defaultRepresentationRunDirectory() {
+        String configured = System.getProperty(
+            "regelsuche.discovery.runs.directory",
+            ""
+        ).trim();
+        if (!configured.isEmpty()) {
+            return Path.of(configured);
+        }
+        return Path.of(
+            System.getProperty("user.home", "."),
+            ".regelsuche",
+            "discovery-runs"
+        );
     }
 
     private static de.regelsuche.proof.ProofBridgeService defaultProofBridgeService(
@@ -299,6 +325,10 @@ public class WebWorkbenchServer {
         handlers.put("/api/didactic", this::handleDidactic);
         handlers.put("/api/inspect", this::handleInspect);
         handlers.put("/api/rule-radar", ruleRadarHandler);
+        handlers.put(
+            REPRESENTATION_RUN_CONTEXT,
+            this::handleRepresentationDiscoveryRuns
+        );
 
         if (!handlers.keySet().equals(routeRegistry.contexts())) {
             throw new IllegalStateException("OpenAPI contexts do not match server handlers: handlers="
@@ -400,6 +430,292 @@ public class WebWorkbenchServer {
 
     public int boundPort() {
         return server == null ? -1 : server.getAddress().getPort();
+    }
+
+    private void handleRepresentationDiscoveryRuns(
+        HttpExchange exchange
+    ) throws IOException {
+        try {
+            String suffix = representationRunSuffix(exchange);
+            if (!suffix.isEmpty()) {
+                loadRepresentationRun(exchange, suffix);
+            } else if ("GET".equals(exchange.getRequestMethod())) {
+                listRepresentationRuns(exchange);
+            } else {
+                retainRepresentationRun(exchange);
+            }
+        } catch (IllegalArgumentException exception) {
+            sendRepresentationRunError(
+                exchange,
+                400,
+                "INVALID_RUN_WORKSPACE",
+                representationRunErrorMessage(exception)
+            );
+        } catch (IllegalStateException exception) {
+            boolean conflict = representationRunErrorMessage(exception)
+                .startsWith("immutable run identity");
+            sendRepresentationRunError(
+                exchange,
+                conflict ? 409 : 500,
+                conflict
+                    ? "IMMUTABLE_RUN_CONFLICT"
+                    : "RUN_REPOSITORY_FAILURE",
+                representationRunErrorMessage(exception)
+            );
+        }
+    }
+
+    private void retainRepresentationRun(HttpExchange exchange)
+            throws IOException {
+        requireRepresentationRunJson(exchange);
+        byte[] body;
+        try (InputStream input = BoundedRequestBody.open(
+                exchange,
+                securityConfig.maxRequestBytes())) {
+            body = input.readAllBytes();
+        }
+        RepresentationDiscoveryRunWorkspace workspace =
+            RepresentationDiscoveryRunWorkspace.fromCanonicalBytes(body);
+        RepresentationDiscoveryRunWorkspace retained =
+            RepresentationDiscoveryRunWorkspace.retain(
+                representationRunDirectory,
+                workspace
+            );
+        String digest = representationRunDigest(retained.runId());
+        exchange.getResponseHeaders().set(
+            "Location",
+            REPRESENTATION_RUN_CONTEXT + "/" + digest
+        );
+        exchange.getResponseHeaders().set(
+            "ETag",
+            representationRunEtag(retained.runId())
+        );
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        sendJson(exchange, 201, retained.toCanonicalJson());
+    }
+
+    private void listRepresentationRuns(HttpExchange exchange)
+            throws IOException {
+        int offset = representationRunQueryInt(
+            exchange,
+            "offset",
+            0,
+            0,
+            Integer.MAX_VALUE
+        );
+        int limit = representationRunQueryInt(
+            exchange,
+            "limit",
+            DEFAULT_REPRESENTATION_RUN_LIST_LIMIT,
+            1,
+            MAX_REPRESENTATION_RUN_LIST_LIMIT
+        );
+        List<RepresentationDiscoveryRunWorkspace> all =
+            RepresentationDiscoveryRunWorkspace.listRetained(
+                representationRunDirectory
+            );
+        int from = Math.min(offset, all.size());
+        int to = Math.min(all.size(), from + limit);
+
+        JsonWriter writer = new JsonWriter().beginObject()
+            .property("schema", REPRESENTATION_RUN_INDEX_SCHEMA)
+            .property("total", all.size())
+            .property("offset", from)
+            .property("limit", limit)
+            .array("runs", array -> all.subList(from, to).forEach(run ->
+                array.objectValue(object ->
+                    writeRepresentationRunSummary(object, run))))
+            .endObject();
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        sendJson(exchange, 200, writer.toString());
+    }
+
+    private void loadRepresentationRun(
+        HttpExchange exchange,
+        String digest
+    ) throws IOException {
+        if (!digest.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException(
+                "run path must contain a lowercase SHA-256 digest"
+            );
+        }
+        String runId = "sha256:" + digest;
+        var workspace =
+            RepresentationDiscoveryRunWorkspace.findRetained(
+                representationRunDirectory,
+                runId
+            );
+        if (workspace.isEmpty()) {
+            sendRepresentationRunError(
+                exchange,
+                404,
+                "RUN_NOT_FOUND",
+                "representation-discovery run not found"
+            );
+            return;
+        }
+        exchange.getResponseHeaders().set(
+            "ETag",
+            representationRunEtag(runId)
+        );
+        exchange.getResponseHeaders().set(
+            "Cache-Control",
+            "private, max-age=0, must-revalidate"
+        );
+        sendJson(exchange, 200, workspace.get().toCanonicalJson());
+    }
+
+    private static void writeRepresentationRunSummary(
+        JsonWriter writer,
+        RepresentationDiscoveryRunWorkspace run
+    ) {
+        writer.property("runId", run.runId())
+            .property("relation", run.relation().name())
+            .property("parentRunId", run.parentRunId())
+            .property("domainId", run.input().domainId())
+            .property("inputSchema", run.input().inputSchema())
+            .property("displayText", run.input().displayText())
+            .property(
+                "informationTrack",
+                run.plan().informationTrack().name()
+            )
+            .property(
+                "searchStrategyId",
+                run.plan().searchStrategyId()
+            )
+            .property("searchProfileId", run.plan().searchProfileId())
+            .property("objectiveId", run.plan().objectiveId())
+            .property("state", run.outcome().state().name())
+            .property("reason", run.outcome().terminalReason())
+            .property(
+                "configuredWork",
+                run.outcome().configuredWork()
+            )
+            .property("consumedWork", run.outcome().consumedWork())
+            .property(
+                "repositoryCommit",
+                run.revisions().repositoryCommit()
+            )
+            .property(
+                "applicationRevision",
+                run.revisions().applicationRevision()
+            )
+            .array(
+                "artifacts",
+                artifacts -> run.artifacts().forEach(reference ->
+                    artifacts.objectValue(artifact -> artifact
+                        .property("role", reference.role().name())
+                        .property(
+                            "status",
+                            reference.status().name()
+                        )
+                        .property(
+                            "artifactSchema",
+                            reference.artifactSchema()
+                        )
+                        .property(
+                            "contentHash",
+                            reference.targetContentHash()
+                        )
+                        .property("detail", reference.detail())))
+            );
+    }
+
+    private static String representationRunSuffix(
+        HttpExchange exchange
+    ) {
+        String path = exchange.getRequestURI().getPath();
+        if (!path.equals(REPRESENTATION_RUN_CONTEXT)
+                && !path.startsWith(REPRESENTATION_RUN_CONTEXT + "/")) {
+            throw new IllegalArgumentException(
+                "request path is outside the discovery-run context"
+            );
+        }
+        String suffix = path.substring(REPRESENTATION_RUN_CONTEXT.length());
+        if (suffix.startsWith("/")) {
+            suffix = suffix.substring(1);
+        }
+        if (suffix.contains("/")) {
+            throw new IllegalArgumentException(
+                "nested discovery-run paths are not supported"
+            );
+        }
+        return suffix;
+    }
+
+    private int representationRunQueryInt(
+        HttpExchange exchange,
+        String name,
+        int fallback,
+        int minimum,
+        int maximum
+    ) {
+        String value = queryParam(
+            exchange,
+            name,
+            Integer.toString(fallback)
+        );
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed < minimum || parsed > maximum) {
+                throw new IllegalArgumentException(
+                    "query value is outside the supported range"
+                );
+            }
+            return parsed;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(
+                "query value must be an integer",
+                exception
+            );
+        }
+    }
+
+    private static void requireRepresentationRunJson(
+        HttpExchange exchange
+    ) {
+        String contentType = exchange.getRequestHeaders().getFirst(
+            "Content-Type"
+        );
+        if (contentType == null
+                || !contentType.toLowerCase(Locale.ROOT)
+                    .startsWith("application/json")) {
+            throw new IllegalArgumentException(
+                "Content-Type must be application/json"
+            );
+        }
+    }
+
+    private static String representationRunDigest(String runId) {
+        return runId.substring("sha256:".length());
+    }
+
+    private static String representationRunEtag(String runId) {
+        return "\"" + representationRunDigest(runId) + "\"";
+    }
+
+    private static String representationRunErrorMessage(
+        RuntimeException exception
+    ) {
+        String message = exception.getMessage();
+        return message == null || message.isBlank()
+            ? exception.getClass().getSimpleName()
+            : message;
+    }
+
+    private void sendRepresentationRunError(
+        HttpExchange exchange,
+        int status,
+        String code,
+        String message
+    ) throws IOException {
+        JsonWriter writer = new JsonWriter().beginObject()
+            .property("error", true)
+            .property("code", code)
+            .property("message", message)
+            .endObject();
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        sendJson(exchange, status, writer.toString());
     }
 
     private void handleSearch(HttpExchange exchange) throws IOException {

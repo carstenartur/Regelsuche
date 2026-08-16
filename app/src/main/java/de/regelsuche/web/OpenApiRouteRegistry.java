@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -55,14 +56,14 @@ final class OpenApiRouteRegistry {
             if (route.context().equals(context) && route.matches(requestPath)) {
                 allowedMethods.add(route.method());
                 if (route.method().equalsIgnoreCase(requestMethod)) {
-                    return new Match(MatchStatus.ALLOWED, Set.copyOf(allowedMethods), route.operationId());
+                    return new Match(MatchStatus.ALLOWED, allowedMethods, route.operationId());
                 }
             }
         }
         if (allowedMethods.isEmpty()) {
             return new Match(MatchStatus.NOT_FOUND, Set.of(), "");
         }
-        return new Match(MatchStatus.METHOD_NOT_ALLOWED, Set.copyOf(allowedMethods), "");
+        return new Match(MatchStatus.METHOD_NOT_ALLOWED, allowedMethods, "");
     }
 
     private static OpenApiRouteRegistry readPackagedSpecification() {
@@ -170,7 +171,9 @@ final class OpenApiRouteRegistry {
 
     record Match(MatchStatus status, Set<String> allowedMethods, String operationId) {
         Match {
-            allowedMethods = Set.copyOf(allowedMethods);
+            allowedMethods = Collections.unmodifiableSet(
+                new LinkedHashSet<>(allowedMethods)
+            );
             operationId = operationId == null ? "" : operationId;
         }
     }
