@@ -2,6 +2,7 @@ package de.regelsuche.discovery.representation;
 
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.WORKSPACE_SCHEMA;
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.append;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.optionalSha256;
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.optionalText;
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sha256;
@@ -20,12 +21,12 @@ public record RepresentationDiscoveryRunSelection(
 ) {
     public RepresentationDiscoveryRunSelection {
         runId = requireSha256(runId, "runId");
-        candidateId = optionalText(candidateId, "candidateId");
-        stateId = optionalText(stateId, "stateId");
-        edgeId = optionalText(edgeId, "edgeId");
+        candidateId = optionalSha256(candidateId, "candidateId");
+        stateId = optionalSha256(stateId, "stateId");
+        edgeId = optionalSha256(edgeId, "edgeId");
         occurrencePath = optionalText(
             occurrencePath, "occurrencePath");
-        proofObligationId = optionalText(
+        proofObligationId = optionalSha256(
             proofObligationId, "proofObligationId");
         if (allEmpty(
                 candidateId,
@@ -60,12 +61,12 @@ public record RepresentationDiscoveryRunSelection(
         String proofObligationId
     ) {
         String normalizedRunId = requireSha256(runId, "runId");
-        String candidate = optionalText(candidateId, "candidateId");
-        String state = optionalText(stateId, "stateId");
-        String edge = optionalText(edgeId, "edgeId");
+        String candidate = optionalSha256(candidateId, "candidateId");
+        String state = optionalSha256(stateId, "stateId");
+        String edge = optionalSha256(edgeId, "edgeId");
         String occurrence = optionalText(
             occurrencePath, "occurrencePath");
-        String proof = optionalText(
+        String proof = optionalSha256(
             proofObligationId, "proofObligationId");
         return new RepresentationDiscoveryRunSelection(
             normalizedRunId,
