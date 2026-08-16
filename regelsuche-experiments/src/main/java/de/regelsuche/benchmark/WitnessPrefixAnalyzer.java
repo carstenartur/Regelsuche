@@ -24,6 +24,32 @@ import java.util.Set;
 
 /** Derives one first-loss classification from an oracle witness and search trace. */
 final class WitnessPrefixAnalyzer {
+    private static final List<ParentLossRule> PARENT_LOSS_RULES = List.of(
+        new ParentLossRule(
+            SearchEventType.STATE_PRUNED_BUDGET,
+            LossReason.CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
+            "per-state candidate ceiling stopped before the witness edge"),
+        new ParentLossRule(
+            SearchEventType.STATE_PRUNED_DEPTH,
+            LossReason.PARENT_DEPTH_LIMIT,
+            "witness parent reached the configured depth ceiling"),
+        new ParentLossRule(
+            SearchEventType.STATE_PRUNED_TRANSPOSITION,
+            LossReason.PARENT_PRUNED_TRANSPOSITION,
+            "witness parent was rejected by transposition memory"),
+        new ParentLossRule(
+            SearchEventType.STATE_PRUNED_DUPLICATE,
+            LossReason.PARENT_PRUNED_DUPLICATE,
+            "witness parent was rejected as a duplicate"),
+        new ParentLossRule(
+            SearchEventType.STATE_EXPANDED,
+            LossReason.TRANSFORMATION_NOT_GENERATED,
+            "production engine did not emit the oracle witness edge"),
+        new ParentLossRule(
+            SearchEventType.STATE_ENQUEUED,
+            LossReason.PARENT_ENQUEUED_BUT_NOT_EXPLORED,
+            "witness parent remained in the frontier"));
+
     private final ExpressionParser parser = new ExpressionParser();
 
     CaseDiagnostic analyze(
@@ -126,50 +152,19 @@ final class WitnessPrefixAnalyzer {
         String rule,
         List<SearchEvent> events
     ) {
-        Optional<SearchEvent> event = firstStateEvent(
-            events, SearchEventType.STATE_PRUNED_BUDGET, before);
-        if (event.isPresent()) {
-            return loss(index, before, after, rule,
-                LossReason.CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
-                event.orElseThrow(),
-                "per-state candidate ceiling stopped before the witness edge");
-        }
-        event = firstStateEvent(
-            events, SearchEventType.STATE_PRUNED_DEPTH, before);
-        if (event.isPresent()) {
-            return loss(index, before, after, rule,
-                LossReason.PARENT_DEPTH_LIMIT, event.orElseThrow(),
-                "witness parent reached the configured depth ceiling");
-        }
-        event = firstStateEvent(
-            events, SearchEventType.STATE_PRUNED_TRANSPOSITION, before);
-        if (event.isPresent()) {
-            return loss(index, before, after, rule,
-                LossReason.PARENT_PRUNED_TRANSPOSITION,
-                event.orElseThrow(),
-                "witness parent was rejected by transposition memory");
-        }
-        event = firstStateEvent(
-            events, SearchEventType.STATE_PRUNED_DUPLICATE, before);
-        if (event.isPresent()) {
-            return loss(index, before, after, rule,
-                LossReason.PARENT_PRUNED_DUPLICATE,
-                event.orElseThrow(),
-                "witness parent was rejected as a duplicate");
-        }
-        event = firstStateEvent(events, SearchEventType.STATE_EXPANDED, before);
-        if (event.isPresent()) {
-            return loss(index, before, after, rule,
-                LossReason.TRANSFORMATION_NOT_GENERATED,
-                event.orElseThrow(),
-                "production engine did not emit the oracle witness edge");
-        }
-        event = firstStateEvent(events, SearchEventType.STATE_ENQUEUED, before);
-        if (event.isPresent()) {
-            return loss(index, before, after, rule,
-                LossReason.PARENT_ENQUEUED_BUT_NOT_EXPLORED,
-                event.orElseThrow(),
-                "witness parent remained in the frontier");
+        for (ParentLossRule candidate : PARENT_LOSS_RULES) {
+            Optional<SearchEvent> event = firstStateEvent(
+                events, candidate.eventType(), before);
+            if (event.isPresent()) {
+                return loss(
+                    index,
+                    before,
+                    after,
+                    rule,
+                    candidate.reason(),
+                    event.orElseThrow(),
+                    candidate.detail());
+            }
         }
         return loss(index, before, after, rule,
             LossReason.PARENT_NOT_REACHED, null,
@@ -276,4 +271,12 @@ final class WitnessPrefixAnalyzer {
     private String format(String expression) {
         return ExpressionFormatter.format(parser.parseTerm(expression));
     }
+
+    private record ParentLossRule(
+        SearchEventType eventType,
+        LossReason reason,
+        String detail
+    ) {
+    }
+
 }
