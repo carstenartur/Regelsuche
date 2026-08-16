@@ -75,6 +75,20 @@ class KnownDerivationBenchmarkTest {
         assertCase(algebraic, "inconsistent-near-miss", false);
     }
 
+    @Test
+    void visitedStateBudgetIsStrict() {
+        Derivation derivation = derive(
+            "x*x + 2*x*y + y*y",
+            "(x+y)^2",
+            RecognitionProfile.exact(),
+            3,
+            1
+        );
+
+        assertFalse(derivation.found());
+        assertEquals(1, derivation.visitedStates());
+    }
+
     private Summary runCorpus(List<Case> corpus, RecognitionProfile profile) {
         List<Result> results = new ArrayList<>();
         for (Case benchmarkCase : corpus) {
@@ -173,8 +187,24 @@ class KnownDerivationBenchmarkTest {
         return value;
     }
 
-    private Derivation derive(String source, String target, RecognitionProfile profile, int maxDepth) {
-        AstRewriteTransformationEngine engine = new AstRewriteTransformationEngine(curatedRules(profile), 12, 100);
+    private Derivation derive(
+        String source,
+        String target,
+        RecognitionProfile profile,
+        int maxDepth
+    ) {
+        return derive(source, target, profile, maxDepth, MAX_VISITED_STATES);
+    }
+
+    private Derivation derive(
+        String source,
+        String target,
+        RecognitionProfile profile,
+        int maxDepth,
+        int maxVisitedStates
+    ) {
+        AstRewriteTransformationEngine engine = new AstRewriteTransformationEngine(
+            curatedRules(profile), 12, 100);
         String normalizedSource = format(source);
         String normalizedTarget = format(target);
         ArrayDeque<SearchNode> queue = new ArrayDeque<>();
@@ -182,7 +212,7 @@ class KnownDerivationBenchmarkTest {
         queue.add(new SearchNode(normalizedSource, List.of()));
         visited.add(normalizedSource);
 
-        while (!queue.isEmpty() && visited.size() <= MAX_VISITED_STATES) {
+        while (!queue.isEmpty()) {
             SearchNode current = queue.removeFirst();
             if (current.expression().equals(normalizedTarget)) {
                 return new Derivation(true, current.rules(), visited.size());
@@ -192,9 +222,11 @@ class KnownDerivationBenchmarkTest {
             }
             for (Transformation transformation : engine.transform(current.expression())) {
                 String next = transformation.transformedExpression();
-                if (!visited.add(next)) {
+                if (visited.contains(next)
+                        || visited.size() >= maxVisitedStates) {
                     continue;
                 }
+                visited.add(next);
                 List<String> rules = new ArrayList<>(current.rules());
                 rules.add(transformation.rule());
                 queue.addLast(new SearchNode(next, List.copyOf(rules)));
