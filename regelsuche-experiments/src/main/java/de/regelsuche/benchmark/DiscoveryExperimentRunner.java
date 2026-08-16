@@ -51,9 +51,9 @@ public interface DiscoveryExperimentRunner {
 
         HistoricalWitnessPruningDiagnostic pruning =
             new HistoricalWitnessPruningDiagnostic();
-        HistoricalWitnessPruningDiagnostic.Report pruningReport =
+        List<HistoricalWitnessPruningDiagnostic.CaseDiagnostic> pruningCases =
             pruning.run(corpus, report);
-        verifyWitnessPruning(report, pruningReport);
+        verifyWitnessPruning(report, pruningCases);
 
         HistoricalRediscoveryRunArtifact.begin(output);
         HistoricalRediscoveryAtlas.WrittenArtifacts artifacts =
@@ -64,8 +64,11 @@ public interface DiscoveryExperimentRunner {
                 corpus,
                 report,
                 artifacts);
-        Path pruningArtifact =
-            pruning.write(witnessOutput(output), pruningReport);
+        Path pruningArtifact = pruning.write(
+            witnessOutput(output),
+            corpus,
+            report,
+            pruningCases);
 
         System.out.println("historicalRediscoveryAssessment="
             + report.assessment().decision());
@@ -80,7 +83,7 @@ public interface DiscoveryExperimentRunner {
             + verifiedRun.manifest().contentHash());
         System.out.println("historicalWitnessPruning=" + pruningArtifact);
         System.out.println("historicalWitnessPruningHash="
-            + pruningReport.contentHash());
+            + pruning.contentHash(corpus, report, pruningCases));
     }
 
     /**
@@ -120,10 +123,10 @@ public interface DiscoveryExperimentRunner {
 
     private static void verifyWitnessPruning(
         HistoricalRediscoveryAtlas.AtlasReport atlas,
-        HistoricalWitnessPruningDiagnostic.Report diagnostic
+        List<HistoricalWitnessPruningDiagnostic.CaseDiagnostic> diagnostics
     ) {
         Map<String, HistoricalWitnessPruningDiagnostic.CaseDiagnostic> byId =
-            diagnostic.cases().stream().collect(Collectors.toMap(
+            diagnostics.stream().collect(Collectors.toMap(
                 HistoricalWitnessPruningDiagnostic.CaseDiagnostic::id,
                 Function.identity()));
         if (byId.size() != atlas.cases().size()) {
