@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationDiscoveryRunComparison.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationDiscoveryRunComparison.java</span></div><h1>RepresentationDiscoveryRunComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.append;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sha256;
+
+import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/** Content-addressed, non-ranking comparison of two immutable discovery runs. */
+public record RepresentationDiscoveryRunComparison(
+    String schema,
+    String leftRunId,
+    String rightRunId,
+    Relationship relationship,
+    List&lt;Entry&gt; entries,
+    String claimBoundary,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.representation-discovery-run-comparison/v1&quot;;
+    public static final String CLAIM_BOUNDARY =
+        &quot;Raw equality and difference report for two immutable run manifests; &quot;
+            + &quot;not a ranking, mathematical proof, novelty or superiority claim.&quot;;
+
+<span class="fc" id="L30">    private static final Comparator&lt;Entry&gt; ENTRY_ORDER = Comparator</span>
+<span class="fc" id="L31">        .comparing(Entry::category)</span>
+<span class="fc" id="L32">        .thenComparing(Entry::field);</span>
+<span class="fc" id="L33">    private static final List&lt;String&gt; REQUIRED_KEYS = requiredKeys();</span>
+
+<span class="fc" id="L35">    public RepresentationDiscoveryRunComparison {</span>
+<span class="fc" id="L36">        schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(</span>
+                &quot;unsupported discovery-run comparison schema: &quot; + schema);
+        }
+<span class="fc" id="L41">        leftRunId = requireSha256(leftRunId, &quot;leftRunId&quot;);</span>
+<span class="fc" id="L42">        rightRunId = requireSha256(rightRunId, &quot;rightRunId&quot;);</span>
+<span class="fc" id="L43">        relationship = Objects.requireNonNull(relationship, &quot;relationship&quot;);</span>
+<span class="fc" id="L44">        entries = normalizeEntries(entries);</span>
+<span class="fc" id="L45">        claimBoundary = requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (!CLAIM_BOUNDARY.equals(claimBoundary)) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(</span>
+                &quot;unsupported discovery-run comparison claim boundary&quot;);
+        }
+<span class="fc" id="L50">        Relationship expected = relationship(</span>
+            leftRunId,
+            rightRunId,
+<span class="fc" id="L53">            entryValue(entries, Category.LINEAGE, &quot;parentRunId&quot;, true),</span>
+<span class="fc" id="L54">            entryValue(entries, Category.LINEAGE, &quot;parentRunId&quot;, false)</span>
+        );
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (relationship != expected) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(</span>
+                &quot;discovery-run comparison relationship mismatch&quot;);
+        }
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (!relationship.accepts(entries)) {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(</span>
+                &quot;the same content-addressed run cannot differ from itself&quot;);
+        }
+<span class="fc" id="L64">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L65">        if (!comparisonHash(</span>
+                leftRunId,
+                rightRunId,
+                relationship,
+                entries
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            ).equals(contentHash)) {</span>
+<span class="fc" id="L71">            throw new IllegalArgumentException(</span>
+                &quot;discovery-run comparison content hash mismatch&quot;);
+        }
+<span class="fc" id="L74">    }</span>
+
+    public static RepresentationDiscoveryRunComparison compare(
+        RepresentationDiscoveryRunWorkspace left,
+        RepresentationDiscoveryRunWorkspace right
+    ) {
+<span class="fc" id="L80">        RepresentationDiscoveryRunWorkspace normalizedLeft =</span>
+<span class="fc" id="L81">            Objects.requireNonNull(left, &quot;left&quot;);</span>
+<span class="fc" id="L82">        RepresentationDiscoveryRunWorkspace normalizedRight =</span>
+<span class="fc" id="L83">            Objects.requireNonNull(right, &quot;right&quot;);</span>
+<span class="fc" id="L84">        List&lt;Entry&gt; entries = entries(normalizedLeft, normalizedRight);</span>
+<span class="fc" id="L85">        Relationship relationship = relationship(</span>
+<span class="fc" id="L86">            normalizedLeft.runId(),</span>
+<span class="fc" id="L87">            normalizedRight.runId(),</span>
+<span class="fc" id="L88">            normalizedLeft.parentRunId(),</span>
+<span class="fc" id="L89">            normalizedRight.parentRunId()</span>
+        );
+<span class="fc" id="L91">        return new RepresentationDiscoveryRunComparison(</span>
+            SCHEMA,
+<span class="fc" id="L93">            normalizedLeft.runId(),</span>
+<span class="fc" id="L94">            normalizedRight.runId(),</span>
+            relationship,
+            entries,
+            CLAIM_BOUNDARY,
+<span class="fc" id="L98">            comparisonHash(</span>
+<span class="fc" id="L99">                normalizedLeft.runId(),</span>
+<span class="fc" id="L100">                normalizedRight.runId(),</span>
+                relationship,
+                entries
+            )
+        );
+    }
+
+    public List&lt;Entry&gt; changedEntries() {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        return entries.stream().filter(entry -&gt; !entry.equal()).toList();</span>
+    }
+
+    public List&lt;Entry&gt; canonicalChangedEntries() {
+<span class="fc" id="L112">        return changedEntries().stream()</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            .filter(entry -&gt; entry.category() != Category.RUNTIME_DIAGNOSTICS)</span>
+<span class="fc" id="L114">            .toList();</span>
+    }
+
+    private static List&lt;Entry&gt; entries(
+        RepresentationDiscoveryRunWorkspace left,
+        RepresentationDiscoveryRunWorkspace right
+    ) {
+<span class="fc" id="L121">        List&lt;Entry&gt; entries = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L122">        add(entries, Category.WORKSPACE, &quot;schema&quot;, left.schema(), right.schema());</span>
+<span class="fc" id="L123">        add(entries, Category.CLAIM_BOUNDARY, &quot;workspaceClaimBoundary&quot;,</span>
+<span class="fc" id="L124">            left.claimBoundary(), right.claimBoundary());</span>
+<span class="fc" id="L125">        addInputEntries(entries, left.input(), right.input());</span>
+<span class="fc" id="L126">        addLineageEntries(entries, left, right);</span>
+<span class="fc" id="L127">        addPlanEntries(entries, left.plan(), right.plan());</span>
+<span class="fc" id="L128">        addOutcomeEntries(entries, left.outcome(), right.outcome());</span>
+<span class="fc" id="L129">        addRevisionEntries(entries, left.revisions(), right.revisions());</span>
+<span class="fc" id="L130">        addArtifactEntries(entries, left, right);</span>
+<span class="fc" id="L131">        entries.sort(ENTRY_ORDER);</span>
+<span class="fc" id="L132">        return List.copyOf(entries);</span>
+    }
+
+    private static void addInputEntries(
+        List&lt;Entry&gt; entries,
+        RepresentationDiscoveryRunInput left,
+        RepresentationDiscoveryRunInput right
+    ) {
+<span class="fc" id="L140">        add(entries, Category.INPUT, &quot;domainId&quot;,</span>
+<span class="fc" id="L141">            left.domainId(), right.domainId());</span>
+<span class="fc" id="L142">        add(entries, Category.INPUT, &quot;inputSchema&quot;,</span>
+<span class="fc" id="L143">            left.inputSchema(), right.inputSchema());</span>
+<span class="fc" id="L144">        add(entries, Category.INPUT, &quot;canonicalInputHash&quot;,</span>
+<span class="fc" id="L145">            left.canonicalInputHash(), right.canonicalInputHash());</span>
+<span class="fc" id="L146">        add(entries, Category.INPUT, &quot;displayText&quot;,</span>
+<span class="fc" id="L147">            left.displayText(), right.displayText());</span>
+<span class="fc" id="L148">        add(entries, Category.INPUT, &quot;assumptionsHash&quot;,</span>
+<span class="fc" id="L149">            listHash(&quot;assumptions&quot;, left.assumptions()),</span>
+<span class="fc" id="L150">            listHash(&quot;assumptions&quot;, right.assumptions()));</span>
+<span class="fc" id="L151">    }</span>
+
+    private static void addLineageEntries(
+        List&lt;Entry&gt; entries,
+        RepresentationDiscoveryRunWorkspace left,
+        RepresentationDiscoveryRunWorkspace right
+    ) {
+<span class="fc" id="L158">        add(entries, Category.LINEAGE, &quot;relation&quot;,</span>
+<span class="fc" id="L159">            left.relation().name(), right.relation().name());</span>
+<span class="fc" id="L160">        add(entries, Category.LINEAGE, &quot;parentRunId&quot;,</span>
+<span class="fc" id="L161">            left.parentRunId(), right.parentRunId());</span>
+<span class="fc" id="L162">        add(entries, Category.LINEAGE, &quot;parentPlanHash&quot;,</span>
+<span class="fc" id="L163">            left.parentPlanHash(), right.parentPlanHash());</span>
+<span class="fc" id="L164">        add(entries, Category.LINEAGE, &quot;changedPlanParameter&quot;,</span>
+<span class="fc" id="L165">            left.changedPlanParameter(), right.changedPlanParameter());</span>
+<span class="fc" id="L166">    }</span>
+
+    private static void addPlanEntries(
+        List&lt;Entry&gt; entries,
+        RepresentationDiscoveryRunPlan left,
+        RepresentationDiscoveryRunPlan right
+    ) {
+<span class="fc" id="L173">        add(entries, Category.INFORMATION_BOUNDARY, &quot;informationTrack&quot;,</span>
+<span class="fc" id="L174">            left.informationTrack().name(), right.informationTrack().name());</span>
+<span class="fc" id="L175">        add(entries, Category.INFORMATION_BOUNDARY, &quot;informationBoundaryHash&quot;,</span>
+<span class="fc" id="L176">            left.informationBoundaryHash(), right.informationBoundaryHash());</span>
+<span class="fc" id="L177">        add(entries, Category.PLAN, &quot;ruleInventoryHash&quot;,</span>
+<span class="fc" id="L178">            left.ruleInventoryHash(), right.ruleInventoryHash());</span>
+<span class="fc" id="L179">        add(entries, Category.PLAN, &quot;knowledgePackSelectionHash&quot;,</span>
+<span class="fc" id="L180">            left.knowledgePackSelectionHash(), right.knowledgePackSelectionHash());</span>
+<span class="fc" id="L181">        add(entries, Category.PLAN, &quot;knownStructureCatalogHash&quot;,</span>
+<span class="fc" id="L182">            left.knownStructureCatalogHash(), right.knownStructureCatalogHash());</span>
+<span class="fc" id="L183">        add(entries, Category.PLAN, &quot;searchStrategyId&quot;,</span>
+<span class="fc" id="L184">            left.searchStrategyId(), right.searchStrategyId());</span>
+<span class="fc" id="L185">        add(entries, Category.PLAN, &quot;searchProfileId&quot;,</span>
+<span class="fc" id="L186">            left.searchProfileId(), right.searchProfileId());</span>
+<span class="fc" id="L187">        add(entries, Category.PLAN, &quot;objectiveId&quot;,</span>
+<span class="fc" id="L188">            left.objectiveId(), right.objectiveId());</span>
+<span class="fc" id="L189">        add(entries, Category.PLAN, &quot;budgetHash&quot;,</span>
+<span class="fc" id="L190">            left.budgetHash(), right.budgetHash());</span>
+<span class="fc" id="L191">        add(entries, Category.PLAN, &quot;deterministicSeed&quot;,</span>
+<span class="fc" id="L192">            Long.toString(left.deterministicSeed()),</span>
+<span class="fc" id="L193">            Long.toString(right.deterministicSeed()));</span>
+<span class="fc" id="L194">        add(entries, Category.PLAN, &quot;backendIdentitiesHash&quot;,</span>
+<span class="fc" id="L195">            listHash(&quot;backendIdentities&quot;, left.backendIdentities()),</span>
+<span class="fc" id="L196">            listHash(&quot;backendIdentities&quot;, right.backendIdentities()));</span>
+<span class="fc" id="L197">    }</span>
+
+    private static void addOutcomeEntries(
+        List&lt;Entry&gt; entries,
+        RepresentationDiscoveryRunOutcome left,
+        RepresentationDiscoveryRunOutcome right
+    ) {
+<span class="fc" id="L204">        add(entries, Category.OUTCOME, &quot;state&quot;,</span>
+<span class="fc" id="L205">            left.state().name(), right.state().name());</span>
+<span class="fc" id="L206">        add(entries, Category.OUTCOME, &quot;terminalReason&quot;,</span>
+<span class="fc" id="L207">            left.terminalReason(), right.terminalReason());</span>
+<span class="fc" id="L208">        add(entries, Category.OUTCOME, &quot;configuredWork&quot;,</span>
+<span class="fc" id="L209">            Long.toString(left.configuredWork()),</span>
+<span class="fc" id="L210">            Long.toString(right.configuredWork()));</span>
+<span class="fc" id="L211">        add(entries, Category.OUTCOME, &quot;consumedWork&quot;,</span>
+<span class="fc" id="L212">            Long.toString(left.consumedWork()),</span>
+<span class="fc" id="L213">            Long.toString(right.consumedWork()));</span>
+<span class="fc" id="L214">        add(entries, Category.OUTCOME, &quot;canonicalWorkLedgerHash&quot;,</span>
+<span class="fc" id="L215">            left.canonicalWorkLedgerHash(), right.canonicalWorkLedgerHash());</span>
+<span class="fc" id="L216">        add(entries, Category.RUNTIME_DIAGNOSTICS, &quot;runtimeDiagnosticsHash&quot;,</span>
+<span class="fc" id="L217">            left.runtimeDiagnosticsHash(), right.runtimeDiagnosticsHash());</span>
+<span class="fc" id="L218">    }</span>
+
+    private static void addRevisionEntries(
+        List&lt;Entry&gt; entries,
+        RepresentationDiscoveryRevisionEvidence left,
+        RepresentationDiscoveryRevisionEvidence right
+    ) {
+<span class="fc" id="L225">        add(entries, Category.REVISION, &quot;repositoryCommit&quot;,</span>
+<span class="fc" id="L226">            left.repositoryCommit(), right.repositoryCommit());</span>
+<span class="fc" id="L227">        add(entries, Category.REVISION, &quot;applicationRevision&quot;,</span>
+<span class="fc" id="L228">            left.applicationRevision(), right.applicationRevision());</span>
+<span class="fc" id="L229">    }</span>
+
+    private static void addArtifactEntries(
+        List&lt;Entry&gt; entries,
+        RepresentationDiscoveryRunWorkspace left,
+        RepresentationDiscoveryRunWorkspace right
+    ) {
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (ArtifactRole role : ArtifactRole.values()) {</span>
+<span class="fc" id="L237">            RepresentationDiscoveryArtifactReference leftReference =</span>
+<span class="fc" id="L238">                artifact(left, role);</span>
+<span class="fc" id="L239">            RepresentationDiscoveryArtifactReference rightReference =</span>
+<span class="fc" id="L240">                artifact(right, role);</span>
+<span class="fc" id="L241">            String prefix = role.name() + &quot;.&quot;;</span>
+<span class="fc" id="L242">            add(entries, Category.ARTIFACT, prefix + &quot;status&quot;,</span>
+<span class="fc" id="L243">                leftReference.status().name(), rightReference.status().name());</span>
+<span class="fc" id="L244">            add(entries, Category.ARTIFACT, prefix + &quot;artifactSchema&quot;,</span>
+<span class="fc" id="L245">                leftReference.artifactSchema(), rightReference.artifactSchema());</span>
+<span class="fc" id="L246">            add(entries, Category.ARTIFACT, prefix + &quot;targetContentHash&quot;,</span>
+<span class="fc" id="L247">                leftReference.targetContentHash(), rightReference.targetContentHash());</span>
+<span class="fc" id="L248">            add(entries, Category.ARTIFACT, prefix + &quot;detail&quot;,</span>
+<span class="fc" id="L249">                leftReference.detail(), rightReference.detail());</span>
+        }
+<span class="fc" id="L251">    }</span>
+
+    private static RepresentationDiscoveryArtifactReference artifact(
+        RepresentationDiscoveryRunWorkspace workspace,
+        ArtifactRole role
+    ) {
+<span class="fc" id="L257">        return workspace.artifacts().stream()</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            .filter(reference -&gt; reference.role() == role)</span>
+<span class="fc" id="L259">            .findFirst()</span>
+<span class="pc" id="L260">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                &quot;workspace is missing artifact role &quot; + role));
+    }
+
+    private static void add(
+        List&lt;Entry&gt; entries,
+        Category category,
+        String field,
+        String leftValue,
+        String rightValue
+    ) {
+<span class="fc" id="L271">        entries.add(Entry.create(category, field, leftValue, rightValue));</span>
+<span class="fc" id="L272">    }</span>
+
+    private static List&lt;Entry&gt; normalizeEntries(List&lt;Entry&gt; values) {
+<span class="fc" id="L275">        List&lt;Entry&gt; copy = List.copyOf(</span>
+<span class="fc" id="L276">            Objects.requireNonNull(values, &quot;entries&quot;));</span>
+<span class="fc" id="L277">        List&lt;String&gt; keys = copy.stream().map(Entry::key).toList();</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        if (!keys.equals(REQUIRED_KEYS)) {</span>
+<span class="fc" id="L279">            throw new IllegalArgumentException(</span>
+                &quot;comparison entries are incomplete, duplicated or unordered&quot;);
+        }
+<span class="fc" id="L282">        return copy;</span>
+    }
+
+    private static List&lt;String&gt; requiredKeys() {
+<span class="fc" id="L286">        List&lt;String&gt; keys = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L287">        addKeys(keys, Category.WORKSPACE, &quot;schema&quot;);</span>
+<span class="fc" id="L288">        addKeys(keys, Category.INPUT,</span>
+            &quot;domainId&quot;, &quot;inputSchema&quot;, &quot;canonicalInputHash&quot;,
+            &quot;displayText&quot;, &quot;assumptionsHash&quot;);
+<span class="fc" id="L291">        addKeys(keys, Category.LINEAGE,</span>
+            &quot;relation&quot;, &quot;parentRunId&quot;, &quot;parentPlanHash&quot;, &quot;changedPlanParameter&quot;);
+<span class="fc" id="L293">        addKeys(keys, Category.INFORMATION_BOUNDARY,</span>
+            &quot;informationTrack&quot;, &quot;informationBoundaryHash&quot;);
+<span class="fc" id="L295">        addKeys(keys, Category.PLAN,</span>
+            &quot;ruleInventoryHash&quot;, &quot;knowledgePackSelectionHash&quot;,
+            &quot;knownStructureCatalogHash&quot;, &quot;searchStrategyId&quot;, &quot;searchProfileId&quot;,
+            &quot;objectiveId&quot;, &quot;budgetHash&quot;, &quot;deterministicSeed&quot;, &quot;backendIdentitiesHash&quot;);
+<span class="fc" id="L299">        addKeys(keys, Category.OUTCOME,</span>
+            &quot;state&quot;, &quot;terminalReason&quot;, &quot;configuredWork&quot;, &quot;consumedWork&quot;,
+            &quot;canonicalWorkLedgerHash&quot;);
+<span class="fc" id="L302">        addKeys(keys, Category.RUNTIME_DIAGNOSTICS, &quot;runtimeDiagnosticsHash&quot;);</span>
+<span class="fc" id="L303">        addKeys(keys, Category.REVISION, &quot;repositoryCommit&quot;, &quot;applicationRevision&quot;);</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        for (ArtifactRole role : ArtifactRole.values()) {</span>
+<span class="fc" id="L305">            String prefix = role.name() + &quot;.&quot;;</span>
+<span class="fc" id="L306">            addKeys(keys, Category.ARTIFACT,</span>
+                prefix + &quot;status&quot;, prefix + &quot;artifactSchema&quot;,
+                prefix + &quot;targetContentHash&quot;, prefix + &quot;detail&quot;);
+        }
+<span class="fc" id="L310">        addKeys(keys, Category.CLAIM_BOUNDARY, &quot;workspaceClaimBoundary&quot;);</span>
+<span class="fc" id="L311">        keys.sort(String::compareTo);</span>
+<span class="fc" id="L312">        return List.copyOf(keys);</span>
+    }
+
+    private static void addKeys(
+        List&lt;String&gt; keys,
+        Category category,
+        String... fields
+    ) {
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        for (String field : fields) {</span>
+<span class="fc" id="L321">            keys.add(key(category, field));</span>
+        }
+<span class="fc" id="L323">    }</span>
+
+    private static String entryValue(
+        List&lt;Entry&gt; entries,
+        Category category,
+        String field,
+        boolean left
+    ) {
+<span class="fc" id="L331">        Entry entry = entries.get(REQUIRED_KEYS.indexOf(key(category, field)));</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        return left ? entry.leftValue() : entry.rightValue();</span>
+    }
+
+    private static Relationship relationship(
+        String leftRunId,
+        String rightRunId,
+        String leftParentRunId,
+        String rightParentRunId
+    ) {
+<span class="fc bfc" id="L341" title="All 2 branches covered.">        if (leftRunId.equals(rightRunId)) {</span>
+<span class="fc" id="L342">            return Relationship.SAME_RUN;</span>
+        }
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        if (leftRunId.equals(rightParentRunId)</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">                || rightRunId.equals(leftParentRunId)) {</span>
+<span class="fc" id="L346">            return Relationship.DIRECT_LINEAGE;</span>
+        }
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        if (!leftParentRunId.isEmpty()</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">                &amp;&amp; leftParentRunId.equals(rightParentRunId)) {</span>
+<span class="fc" id="L350">            return Relationship.SIBLING_LINEAGE;</span>
+        }
+<span class="fc" id="L352">        return Relationship.UNRELATED;</span>
+    }
+
+    private static String listHash(String field, List&lt;String&gt; values) {
+<span class="fc" id="L356">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L357">        append(descriptor, SCHEMA + &quot;/list/&quot; + field);</span>
+<span class="fc" id="L358">        append(descriptor, Integer.toString(values.size()));</span>
+<span class="fc" id="L359">        values.forEach(value -&gt; append(descriptor, value));</span>
+<span class="fc" id="L360">        return sha256(descriptor.toString());</span>
+    }
+
+    private static String comparisonHash(
+        String leftRunId,
+        String rightRunId,
+        Relationship relationship,
+        List&lt;Entry&gt; entries
+    ) {
+<span class="fc" id="L369">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L370">        append(descriptor, SCHEMA);</span>
+<span class="fc" id="L371">        append(descriptor, leftRunId);</span>
+<span class="fc" id="L372">        append(descriptor, rightRunId);</span>
+<span class="fc" id="L373">        append(descriptor, relationship.name());</span>
+<span class="fc" id="L374">        append(descriptor, Integer.toString(entries.size()));</span>
+<span class="fc" id="L375">        entries.forEach(entry -&gt; entry.appendTo(descriptor));</span>
+<span class="fc" id="L376">        append(descriptor, CLAIM_BOUNDARY);</span>
+<span class="fc" id="L377">        return sha256(descriptor.toString());</span>
+    }
+
+    private static String key(Category category, String field) {
+<span class="fc" id="L381">        return category.ordinal() + &quot;/&quot; + field;</span>
+    }
+
+    public record Entry(
+        Category category,
+        String field,
+        String leftValue,
+        String rightValue,
+        boolean equal
+    ) {
+<span class="fc" id="L391">        public Entry {</span>
+<span class="fc" id="L392">            category = Objects.requireNonNull(category, &quot;category&quot;);</span>
+<span class="fc" id="L393">            field = requireText(field, &quot;field&quot;);</span>
+<span class="fc" id="L394">            leftValue = Objects.requireNonNull(leftValue, &quot;leftValue&quot;);</span>
+<span class="fc" id="L395">            rightValue = Objects.requireNonNull(rightValue, &quot;rightValue&quot;);</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            if (equal != leftValue.equals(rightValue)) {</span>
+<span class="fc" id="L397">                throw new IllegalArgumentException(</span>
+                    &quot;comparison entry equality flag mismatch: &quot; + field);
+            }
+<span class="fc" id="L400">        }</span>
+
+        private static Entry create(
+            Category category,
+            String field,
+            String leftValue,
+            String rightValue
+        ) {
+<span class="fc" id="L408">            return new Entry(</span>
+                category,
+                field,
+                leftValue,
+                rightValue,
+<span class="fc" id="L413">                leftValue.equals(rightValue)</span>
+            );
+        }
+
+        String key() {
+<span class="fc" id="L418">            return RepresentationDiscoveryRunComparison.key(category, field);</span>
+        }
+
+        void appendTo(StringBuilder descriptor) {
+<span class="fc" id="L422">            append(descriptor, category.name());</span>
+<span class="fc" id="L423">            append(descriptor, field);</span>
+<span class="fc" id="L424">            append(descriptor, leftValue);</span>
+<span class="fc" id="L425">            append(descriptor, rightValue);</span>
+<span class="fc" id="L426">            append(descriptor, Boolean.toString(equal));</span>
+<span class="fc" id="L427">        }</span>
+    }
+
+<span class="fc" id="L430">    public enum Category {</span>
+<span class="fc" id="L431">        WORKSPACE,</span>
+<span class="fc" id="L432">        INPUT,</span>
+<span class="fc" id="L433">        LINEAGE,</span>
+<span class="fc" id="L434">        INFORMATION_BOUNDARY,</span>
+<span class="fc" id="L435">        PLAN,</span>
+<span class="fc" id="L436">        OUTCOME,</span>
+<span class="fc" id="L437">        RUNTIME_DIAGNOSTICS,</span>
+<span class="fc" id="L438">        REVISION,</span>
+<span class="fc" id="L439">        ARTIFACT,</span>
+<span class="fc" id="L440">        CLAIM_BOUNDARY</span>
+    }
+
+<span class="fc" id="L443">    public enum Relationship {</span>
+<span class="fc" id="L444">        SAME_RUN {</span>
+            @Override
+            boolean accepts(List&lt;Entry&gt; entries) {
+<span class="fc" id="L447">                return entries.stream().allMatch(Entry::equal);</span>
+            }
+        },
+<span class="fc" id="L450">        DIRECT_LINEAGE,</span>
+<span class="fc" id="L451">        SIBLING_LINEAGE,</span>
+<span class="fc" id="L452">        UNRELATED;</span>
+
+        boolean accepts(List&lt;Entry&gt; entries) {
+<span class="fc" id="L455">            return true;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
