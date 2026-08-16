@@ -164,9 +164,9 @@ public final class HistoricalProductionSearchComparison {
     ) {
         requireSearchEvidence(scalar);
         requireSearchEvidence(diversity);
-        if (witnessSteps < 0
-                || scalar.exploredPrefixLength() > witnessSteps
-                || diversity.exploredPrefixLength() > witnessSteps) {
+        if (Math.max(
+                scalar.exploredPrefixLength(),
+                diversity.exploredPrefixLength()) > witnessSteps) {
             throw new IllegalArgumentException(
                 "case comparison evidence is inconsistent");
         }
@@ -261,11 +261,13 @@ public final class HistoricalProductionSearchComparison {
         boolean witnessReached =
             HistoricalWitnessPruningDiagnostic.SCALAR_ALREADY_FOUND
                 .equals(witness.status());
-        if (retained.reached() != witnessReached
-                || retained.exploredStates() != witness.searchExploredStates()
-                || retained.engineCalls() != witness.engineCalls()
-                || retained.generatedTransformations()
-                    != witness.generatedTransformations()) {
+        List<Object> retainedBinding = List.of(
+            retained.reached(), retained.exploredStates(),
+            retained.engineCalls(), retained.generatedTransformations());
+        List<Object> witnessBinding = List.of(
+            witnessReached, witness.searchExploredStates(),
+            witness.engineCalls(), witness.generatedTransformations());
+        if (!retainedBinding.equals(witnessBinding)) {
             throw new IllegalArgumentException(
                 "witness diagnostic does not bind scalar evidence");
         }
@@ -282,13 +284,15 @@ public final class HistoricalProductionSearchComparison {
         List<String> path = match == null ? List.of() : match.path();
         List<String> ruleIds = match == null
             ? List.of() : match.appliedRuleIds();
-        if (retained.reached() != (match != null)
-                || !retained.terminalStatus().equals(terminal)
-                || retained.exploredStates() != states.size()
-                || retained.engineCalls() != counting.calls()
-                || retained.generatedTransformations() != counting.generated()
-                || !retained.path().equals(path)
-                || !retained.ruleIds().equals(ruleIds)) {
+        List<Object> retainedBinding = List.of(
+            retained.reached(), retained.terminalStatus(),
+            retained.exploredStates(), retained.engineCalls(),
+            retained.generatedTransformations(), retained.path(),
+            retained.ruleIds());
+        List<Object> rerunBinding = List.of(
+            match != null, terminal, states.size(), counting.calls(),
+            counting.generated(), path, ruleIds);
+        if (!retainedBinding.equals(rerunBinding)) {
             throw new IllegalStateException(
                 "diversity rerun differs from retained atlas evidence");
         }
@@ -339,12 +343,15 @@ public final class HistoricalProductionSearchComparison {
         Set<String> atlasIds = atlas.cases().stream()
             .map(value -> value.benchmarkCase().id())
             .collect(Collectors.toSet());
-        if (!corpus.schema().equals(atlas.corpusSchema())
-                || !corpus.contentSha256().equals(atlas.corpusSha256())
-                || !corpus.inventoryRevision().equals(atlas.inventoryRevision())
-                || !corpus.claimBoundary().equals(atlas.claimBoundary())
-                || corpus.cases().size() != atlas.cases().size()
-                || !corpusIds.equals(atlasIds)) {
+        List<Object> corpusBinding = List.of(
+            corpus.schema(), corpus.contentSha256(),
+            corpus.inventoryRevision(), corpus.claimBoundary(),
+            corpus.cases().size(), corpusIds);
+        List<Object> atlasBinding = List.of(
+            atlas.corpusSchema(), atlas.corpusSha256(),
+            atlas.inventoryRevision(), atlas.claimBoundary(),
+            atlas.cases().size(), atlasIds);
+        if (!corpusBinding.equals(atlasBinding)) {
             throw new IllegalArgumentException(
                 "production comparison atlas does not bind the corpus");
         }
@@ -357,7 +364,8 @@ public final class HistoricalProductionSearchComparison {
     ) {
         Set<String> corpusIds = corpus.cases().stream()
             .map(Case::id).collect(Collectors.toSet());
-        if (!corpusIds.equals(atlasIds) || !corpusIds.equals(witnessIds)) {
+        if (!List.of(corpusIds, corpusIds)
+                .equals(List.of(atlasIds, witnessIds))) {
             throw new IllegalArgumentException(
                 "production comparison case membership differs");
         }
@@ -365,10 +373,10 @@ public final class HistoricalProductionSearchComparison {
 
     private static void requireSearchEvidence(SearchComparisonEvidence value) {
         requireText(value.terminalStatus(), "terminalStatus");
-        if (value.exploredPrefixLength() < 0
-                || value.exploredStates() < 0
-                || value.engineCalls() < 0
-                || value.generatedTransformations() < 0) {
+        long minimum = Math.min(
+            Math.min(value.exploredPrefixLength(), value.exploredStates()),
+            Math.min(value.engineCalls(), value.generatedTransformations()));
+        if (minimum < 0) {
             throw new IllegalArgumentException(
                 "search comparison counters must not be negative");
         }
