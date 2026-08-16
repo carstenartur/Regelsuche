@@ -46,20 +46,14 @@ def historicalRediscoveryReportDirectory = layout.buildDirectory.dir(
 def historicalWitnessPruningReportDirectory = layout.buildDirectory.dir(
     'reports/historical-rediscovery-witness-pruning')
 def historicalProductionSearchComparisonReportDirectory = layout.buildDirectory.dir(
-    'reports/historical-production-search-comparison')
+    'reports/historical-rediscovery-production-search-comparison')
 def historicalRediscoveryOutputArgument =
     historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
-def historicalWitnessPruningOutputArgument =
-    historicalWitnessPruningReportDirectory.map { it.asFile.absolutePath }
-def historicalProductionSearchComparisonOutputArgument =
-    historicalProductionSearchComparisonReportDirectory.map {
-        it.asFile.absolutePath
-    }
 
 def generateHistoricalRediscoveryAtlas = tasks.register(
     'generateHistoricalRediscoveryAtlas', JavaExec) {
     group = 'verification'
-    description = 'Executes the frozen historical reachability atlas and witness-prefix diagnosis.'
+    description = 'Executes the frozen historical atlas, witness diagnosis and production-search comparison.'
     dependsOn tasks.named('classes')
     timeout = java.time.Duration.ofMinutes(10)
     classpath = sourceSets.main.runtimeClasspath
@@ -71,36 +65,17 @@ def generateHistoricalRediscoveryAtlas = tasks.register(
         'src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json'))
     outputs.dir(historicalRediscoveryReportDirectory)
     outputs.dir(historicalWitnessPruningReportDirectory)
-}
-
-def generateHistoricalProductionSearchComparison = tasks.register(
-    'generateHistoricalProductionSearchComparison', JavaExec) {
-    group = 'verification'
-    description = 'Compares scalar and structural-diversity retention of frozen oracle witnesses.'
-    dependsOn generateHistoricalRediscoveryAtlas
-    timeout = java.time.Duration.ofMinutes(10)
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'de.regelsuche.benchmark.HistoricalProductionSearchComparison'
-    argumentProviders.add({
-        [
-            historicalRediscoveryOutputArgument.get(),
-            historicalWitnessPruningOutputArgument.get(),
-            historicalProductionSearchComparisonOutputArgument.get()
-        ]
-    } as CommandLineArgumentProvider)
-    inputs.dir(historicalRediscoveryReportDirectory)
-    inputs.dir(historicalWitnessPruningReportDirectory)
     outputs.dir(historicalProductionSearchComparisonReportDirectory)
 }
 
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
-    dependsOn generateHistoricalProductionSearchComparison
+    dependsOn generateHistoricalRediscoveryAtlas
 }
 
 // The repository merge gate invokes the root check rather than every
-// subproject check. Bind the retained experiments explicitly so CI cannot pass
-// without executing the atlas, witness diagnosis and matched-budget comparison.
+// subproject check. Bind the retained experiment explicitly so CI cannot pass
+// without executing the atlas and its fail-closed downstream diagnostics.
 rootProject.tasks.named('check') {
-    dependsOn generateHistoricalProductionSearchComparison
+    dependsOn generateHistoricalRediscoveryAtlas
 }
