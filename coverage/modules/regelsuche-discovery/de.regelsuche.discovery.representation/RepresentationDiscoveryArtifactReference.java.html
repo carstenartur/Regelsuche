@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationDiscoveryArtifactReference.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationDiscoveryArtifactReference.java</span></div><h1>RepresentationDiscoveryArtifactReference.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.WORKSPACE_SCHEMA;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.append;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.optionalText;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sha256;
+
+import java.util.Objects;
+
+/** One explicit product-artifact role in a run workspace. */
+public record RepresentationDiscoveryArtifactReference(
+    ArtifactRole role,
+    ArtifactStatus status,
+    String artifactSchema,
+    String targetContentHash,
+    String detail,
+    String contentHash
+) {
+    private static final String NOT_AVAILABLE_SCHEMA = &quot;NOT_AVAILABLE&quot;;
+
+<span class="fc" id="L23">    public RepresentationDiscoveryArtifactReference {</span>
+<span class="fc" id="L24">        role = Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L25">        status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L26">        artifactSchema = requireText(artifactSchema, &quot;artifactSchema&quot;);</span>
+<span class="fc" id="L27">        targetContentHash = requireSha256(</span>
+            targetContentHash, &quot;targetContentHash&quot;);
+<span class="fc" id="L29">        detail = optionalText(detail, &quot;detail&quot;);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (status == ArtifactStatus.AVAILABLE) {</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if (NOT_AVAILABLE_SCHEMA.equals(artifactSchema)</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">                    || !detail.isEmpty()) {</span>
+<span class="fc" id="L33">                throw new IllegalArgumentException(</span>
+                    &quot;available artifacts require a real schema and no &quot;
+                        + &quot;unavailability detail&quot;);
+            }
+        } else {
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">            if (!NOT_AVAILABLE_SCHEMA.equals(artifactSchema)</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                    || detail.isEmpty()) {</span>
+<span class="nc" id="L40">                throw new IllegalArgumentException(</span>
+                    &quot;unavailable artifacts require NOT_AVAILABLE schema &quot;
+                        + &quot;and a detail&quot;);
+            }
+<span class="fc" id="L44">            String expectedTarget = unavailableTargetHash(</span>
+                role, status, detail);
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (!expectedTarget.equals(targetContentHash)) {</span>
+<span class="fc" id="L47">                throw new IllegalArgumentException(</span>
+                    &quot;unavailable artifact target hash mismatch&quot;);
+            }
+        }
+<span class="fc" id="L51">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L52">        String expected = referenceHash(</span>
+            role,
+            status,
+            artifactSchema,
+            targetContentHash,
+            detail
+        );
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L60">            throw new IllegalArgumentException(</span>
+                &quot;artifact reference content hash mismatch&quot;);
+        }
+<span class="fc" id="L63">    }</span>
+
+    public static RepresentationDiscoveryArtifactReference available(
+        ArtifactRole role,
+        String artifactSchema,
+        String targetContentHash
+    ) {
+<span class="fc" id="L70">        return create(</span>
+            role,
+            ArtifactStatus.AVAILABLE,
+<span class="fc" id="L73">            requireText(artifactSchema, &quot;artifactSchema&quot;),</span>
+<span class="fc" id="L74">            requireSha256(targetContentHash, &quot;targetContentHash&quot;),</span>
+            &quot;&quot;
+        );
+    }
+
+    public static RepresentationDiscoveryArtifactReference notProduced(
+        ArtifactRole role
+    ) {
+<span class="fc" id="L82">        return unavailable(</span>
+            role,
+            ArtifactStatus.NOT_PRODUCED,
+            &quot;NOT_PRODUCED_FOR_THIS_RUN&quot;
+        );
+    }
+
+    public static RepresentationDiscoveryArtifactReference unavailable(
+        ArtifactRole role,
+        ArtifactStatus status,
+        String detail
+    ) {
+<span class="fc" id="L94">        ArtifactRole normalizedRole = Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L95">        ArtifactStatus normalizedStatus = Objects.requireNonNull(</span>
+            status, &quot;status&quot;);
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (normalizedStatus == ArtifactStatus.AVAILABLE) {</span>
+<span class="fc" id="L98">            throw new IllegalArgumentException(</span>
+                &quot;use available(...) for available artifacts&quot;);
+        }
+<span class="fc" id="L101">        String normalizedDetail = requireText(detail, &quot;detail&quot;);</span>
+<span class="fc" id="L102">        return create(</span>
+            normalizedRole,
+            normalizedStatus,
+            NOT_AVAILABLE_SCHEMA,
+<span class="fc" id="L106">            unavailableTargetHash(</span>
+                normalizedRole,
+                normalizedStatus,
+                normalizedDetail
+            ),
+            normalizedDetail
+        );
+    }
+
+    private static RepresentationDiscoveryArtifactReference create(
+        ArtifactRole role,
+        ArtifactStatus status,
+        String artifactSchema,
+        String targetContentHash,
+        String detail
+    ) {
+<span class="fc" id="L122">        String hash = referenceHash(</span>
+            role,
+            status,
+            artifactSchema,
+            targetContentHash,
+            detail
+        );
+<span class="fc" id="L129">        return new RepresentationDiscoveryArtifactReference(</span>
+            role,
+            status,
+            artifactSchema,
+            targetContentHash,
+            detail,
+            hash
+        );
+    }
+
+    private static String unavailableTargetHash(
+        ArtifactRole role,
+        ArtifactStatus status,
+        String detail
+    ) {
+<span class="fc" id="L144">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L145">        append(descriptor, WORKSPACE_SCHEMA + &quot;/unavailable-artifact&quot;);</span>
+<span class="fc" id="L146">        append(descriptor, role.name());</span>
+<span class="fc" id="L147">        append(descriptor, status.name());</span>
+<span class="fc" id="L148">        append(descriptor, detail);</span>
+<span class="fc" id="L149">        return sha256(descriptor.toString());</span>
+    }
+
+    private static String referenceHash(
+        ArtifactRole role,
+        ArtifactStatus status,
+        String artifactSchema,
+        String targetHash,
+        String detail
+    ) {
+<span class="fc" id="L159">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L160">        append(descriptor, WORKSPACE_SCHEMA + &quot;/artifact-reference&quot;);</span>
+<span class="fc" id="L161">        append(descriptor, role.name());</span>
+<span class="fc" id="L162">        append(descriptor, status.name());</span>
+<span class="fc" id="L163">        append(descriptor, artifactSchema);</span>
+<span class="fc" id="L164">        append(descriptor, targetHash);</span>
+<span class="fc" id="L165">        append(descriptor, detail);</span>
+<span class="fc" id="L166">        return sha256(descriptor.toString());</span>
+    }
+
+<span class="fc" id="L169">    public enum ArtifactRole {</span>
+<span class="fc" id="L170">        SEARCH_GRAPH,</span>
+<span class="fc" id="L171">        REPRESENTATION_CANDIDATES,</span>
+<span class="fc" id="L172">        CANDIDATE_DOSSIERS,</span>
+<span class="fc" id="L173">        PATH_REPLAY,</span>
+<span class="fc" id="L174">        RULE_RADAR,</span>
+<span class="fc" id="L175">        PROOF_OBLIGATIONS,</span>
+<span class="fc" id="L176">        EXPORT_BUNDLE,</span>
+<span class="fc" id="L177">        PROGRESS_LEDGER</span>
+    }
+
+<span class="fc" id="L180">    public enum ArtifactStatus {</span>
+<span class="fc" id="L181">        AVAILABLE,</span>
+<span class="fc" id="L182">        NOT_PRODUCED,</span>
+<span class="fc" id="L183">        UNSUPPORTED,</span>
+<span class="fc" id="L184">        FAILED</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

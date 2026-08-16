@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationDiscoveryRunWorkspace.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationDiscoveryRunWorkspace.java</span></div><h1>RepresentationDiscoveryRunWorkspace.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.WORKSPACE_SCHEMA;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.append;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.optionalSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.optionalText;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sha256;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactStatus;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryRunOutcome.TerminalState;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Immutable, content-addressed backend contract for one representation-
+ * discovery run workspace.
+ *
+ * &lt;p&gt;The workspace binds input, information boundary, executable inventories,
+ * search controls, backend identities, terminal accounting, every product
+ * artifact role and code revisions. Artifact absence is explicit; consumers
+ * cannot silently combine a graph, candidate dossier or proof object from a
+ * different run.&lt;/p&gt;
+ */
+public record RepresentationDiscoveryRunWorkspace(
+    String schema,
+    String runId,
+    RunRelation relation,
+    String parentRunId,
+    String parentPlanHash,
+    String changedPlanParameter,
+    RepresentationDiscoveryRunInput input,
+    RepresentationDiscoveryRunPlan plan,
+    RepresentationDiscoveryRunOutcome outcome,
+    List&lt;RepresentationDiscoveryArtifactReference&gt; artifacts,
+    RepresentationDiscoveryRevisionEvidence revisions,
+    String claimBoundary,
+    String contentHash
+) {
+    public static final String SCHEMA = WORKSPACE_SCHEMA;
+    public static final String CLAIM_BOUNDARY =
+        &quot;Immutable run correlation, artifact availability and reproduction &quot;
+            + &quot;evidence; not mathematical truth, proof, novelty, &quot;
+            + &quot;interestingness or search superiority.&quot;;
+
+<span class="fc" id="L56">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L57">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L58">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L59">        .build();</span>
+
+<span class="fc" id="L61">    public RepresentationDiscoveryRunWorkspace {</span>
+<span class="fc" id="L62">        schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(</span>
+                &quot;unsupported run-workspace schema: &quot; + schema);
+        }
+<span class="fc" id="L67">        runId = requireSha256(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L68">        relation = Objects.requireNonNull(relation, &quot;relation&quot;);</span>
+<span class="fc" id="L69">        parentRunId = optionalSha256(parentRunId, &quot;parentRunId&quot;);</span>
+<span class="fc" id="L70">        parentPlanHash = optionalSha256(parentPlanHash, &quot;parentPlanHash&quot;);</span>
+<span class="fc" id="L71">        changedPlanParameter = optionalText(</span>
+            changedPlanParameter, &quot;changedPlanParameter&quot;);
+<span class="fc" id="L73">        validateRelation(</span>
+            relation,
+            runId,
+            parentRunId,
+            parentPlanHash,
+            changedPlanParameter
+        );
+<span class="fc" id="L80">        input = Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L81">        plan = Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L82">        outcome = Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="fc" id="L83">        artifacts = completeArtifacts(artifacts);</span>
+<span class="fc" id="L84">        revisions = Objects.requireNonNull(revisions, &quot;revisions&quot;);</span>
+<span class="fc" id="L85">        claimBoundary = requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (!CLAIM_BOUNDARY.equals(claimBoundary)) {</span>
+<span class="nc" id="L87">            throw new IllegalArgumentException(</span>
+                &quot;unsupported run-workspace claim boundary&quot;);
+        }
+<span class="fc" id="L90">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L91">        String expected = workspaceHash(</span>
+            relation,
+            parentRunId,
+            parentPlanHash,
+            changedPlanParameter,
+            input,
+            plan,
+            outcome,
+            artifacts,
+            revisions
+        );
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        if (!expected.equals(contentHash) || !runId.equals(contentHash)) {</span>
+<span class="fc" id="L103">            throw new IllegalArgumentException(</span>
+                &quot;runId/contentHash does not match workspace content&quot;);
+        }
+<span class="fc" id="L106">    }</span>
+
+    /** Creates an independent root run. */
+    public static RepresentationDiscoveryRunWorkspace create(
+        RepresentationDiscoveryRunInput input,
+        RepresentationDiscoveryRunPlan plan,
+        RepresentationDiscoveryRunOutcome outcome,
+        List&lt;RepresentationDiscoveryArtifactReference&gt; artifacts,
+        RepresentationDiscoveryRevisionEvidence revisions
+    ) {
+<span class="fc" id="L116">        return createInternal(</span>
+            RunRelation.ROOT,
+            &quot;&quot;,
+            &quot;&quot;,
+            &quot;&quot;,
+            input,
+            plan,
+            outcome,
+            artifacts,
+            revisions
+        );
+    }
+
+    /**
+     * Duplicates a run while permitting exactly one visible plan parameter to
+     * change. The new run starts with zero consumed work and every artifact role
+     * explicitly marked {@link ArtifactStatus#NOT_PRODUCED}.
+     */
+    public static RepresentationDiscoveryRunWorkspace duplicateWithOnePlanChange(
+        RepresentationDiscoveryRunWorkspace parent,
+        RepresentationDiscoveryRunPlan revisedPlan,
+        RepresentationDiscoveryRevisionEvidence revisions
+    ) {
+<span class="fc" id="L139">        Objects.requireNonNull(parent, &quot;parent&quot;);</span>
+<span class="fc" id="L140">        Objects.requireNonNull(revisedPlan, &quot;revisedPlan&quot;);</span>
+<span class="fc" id="L141">        String changed = parent.plan().singleChangedParameter(revisedPlan);</span>
+<span class="fc" id="L142">        return createInternal(</span>
+            RunRelation.DUPLICATED_ONE_PARAMETER,
+<span class="fc" id="L144">            parent.runId(),</span>
+<span class="fc" id="L145">            parent.plan().contentHash(),</span>
+            changed,
+<span class="fc" id="L147">            parent.input(),</span>
+            revisedPlan,
+<span class="fc" id="L149">            RepresentationDiscoveryRunOutcome.created(),</span>
+<span class="fc" id="L150">            notProducedArtifacts(),</span>
+            revisions
+        );
+    }
+
+    /**
+     * Creates an immutable continuation revision with the same input and plan.
+     * The parent remains unchanged and the continuation receives its own Run ID.
+     */
+    public static RepresentationDiscoveryRunWorkspace continueFrom(
+        RepresentationDiscoveryRunWorkspace parent,
+        RepresentationDiscoveryRunOutcome outcome,
+        List&lt;RepresentationDiscoveryArtifactReference&gt; artifacts,
+        RepresentationDiscoveryRevisionEvidence revisions
+    ) {
+<span class="fc" id="L165">        Objects.requireNonNull(parent, &quot;parent&quot;);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (Objects.requireNonNull(outcome, &quot;outcome&quot;).state()</span>
+                == TerminalState.CREATED) {
+<span class="fc" id="L168">            throw new IllegalArgumentException(</span>
+                &quot;a continuation must advance beyond CREATED&quot;);
+        }
+<span class="fc" id="L171">        return createInternal(</span>
+            RunRelation.CONTINUATION,
+<span class="fc" id="L173">            parent.runId(),</span>
+<span class="fc" id="L174">            parent.plan().contentHash(),</span>
+            &quot;&quot;,
+<span class="fc" id="L176">            parent.input(),</span>
+<span class="fc" id="L177">            parent.plan(),</span>
+            outcome,
+            artifacts,
+            revisions
+        );
+    }
+
+    /** Returns an available same-run artifact or fails visibly. */
+    public RepresentationDiscoveryArtifactReference requireArtifact(
+        ArtifactRole role,
+        String expectedSchema
+    ) {
+<span class="fc" id="L189">        Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L190">        String schemaName = requireText(expectedSchema, &quot;expectedSchema&quot;);</span>
+<span class="fc" id="L191">        RepresentationDiscoveryArtifactReference reference = artifacts.stream()</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            .filter(candidate -&gt; candidate.role() == role)</span>
+<span class="fc" id="L193">            .findFirst()</span>
+<span class="fc" id="L194">            .orElseThrow();</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (reference.status() != ArtifactStatus.AVAILABLE) {</span>
+<span class="fc" id="L196">            throw new IllegalStateException(</span>
+<span class="fc" id="L197">                &quot;artifact &quot; + role + &quot; is &quot; + reference.status()</span>
+<span class="fc" id="L198">                    + &quot;: &quot; + reference.detail());</span>
+        }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (!reference.artifactSchema().equals(schemaName)) {</span>
+<span class="fc" id="L201">            throw new IllegalStateException(</span>
+                &quot;artifact &quot; + role + &quot; has schema &quot;
+<span class="fc" id="L203">                    + reference.artifactSchema() + &quot;, expected &quot;</span>
+                    + schemaName);
+        }
+<span class="fc" id="L206">        return reference;</span>
+    }
+
+    /** Creates an immutable selection correlated to this exact Run ID. */
+    public RepresentationDiscoveryRunSelection selection(
+        String candidateId,
+        String stateId,
+        String edgeId,
+        String occurrencePath,
+        String proofObligationId
+    ) {
+<span class="fc" id="L217">        return RepresentationDiscoveryRunSelection.create(</span>
+            runId,
+            candidateId,
+            stateId,
+            edgeId,
+            occurrencePath,
+            proofObligationId
+        );
+    }
+
+    public String toCanonicalJson() {
+        try {
+<span class="fc" id="L229">            return JSON.writeValueAsString(this);</span>
+<span class="nc" id="L230">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L231">            throw new IllegalStateException(</span>
+                &quot;Unable to render representation-discovery workspace&quot;,
+                exception
+            );
+        }
+    }
+
+    public static List&lt;RepresentationDiscoveryArtifactReference&gt;
+            notProducedArtifacts() {
+<span class="fc" id="L240">        return EnumSet.allOf(ArtifactRole.class).stream()</span>
+<span class="fc" id="L241">            .map(RepresentationDiscoveryArtifactReference::notProduced)</span>
+<span class="fc" id="L242">            .toList();</span>
+    }
+
+    private static RepresentationDiscoveryRunWorkspace createInternal(
+        RunRelation relation,
+        String parentRunId,
+        String parentPlanHash,
+        String changedPlanParameter,
+        RepresentationDiscoveryRunInput input,
+        RepresentationDiscoveryRunPlan plan,
+        RepresentationDiscoveryRunOutcome outcome,
+        List&lt;RepresentationDiscoveryArtifactReference&gt; artifacts,
+        RepresentationDiscoveryRevisionEvidence revisions
+    ) {
+<span class="fc" id="L256">        Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L257">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L258">        Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="fc" id="L259">        List&lt;RepresentationDiscoveryArtifactReference&gt; complete =</span>
+<span class="fc" id="L260">            completeArtifacts(artifacts);</span>
+<span class="fc" id="L261">        Objects.requireNonNull(revisions, &quot;revisions&quot;);</span>
+<span class="fc" id="L262">        String hash = workspaceHash(</span>
+            relation,
+            parentRunId,
+            parentPlanHash,
+            changedPlanParameter,
+            input,
+            plan,
+            outcome,
+            complete,
+            revisions
+        );
+<span class="fc" id="L273">        return new RepresentationDiscoveryRunWorkspace(</span>
+            SCHEMA,
+            hash,
+            relation,
+            parentRunId,
+            parentPlanHash,
+            changedPlanParameter,
+            input,
+            plan,
+            outcome,
+            complete,
+            revisions,
+            CLAIM_BOUNDARY,
+            hash
+        );
+    }
+
+    private static String workspaceHash(
+        RunRelation relation,
+        String parentRunId,
+        String parentPlanHash,
+        String changedPlanParameter,
+        RepresentationDiscoveryRunInput input,
+        RepresentationDiscoveryRunPlan plan,
+        RepresentationDiscoveryRunOutcome outcome,
+        List&lt;RepresentationDiscoveryArtifactReference&gt; artifacts,
+        RepresentationDiscoveryRevisionEvidence revisions
+    ) {
+<span class="fc" id="L301">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L302">        append(descriptor, SCHEMA);</span>
+<span class="fc" id="L303">        append(descriptor, relation.name());</span>
+<span class="fc" id="L304">        append(descriptor, parentRunId);</span>
+<span class="fc" id="L305">        append(descriptor, parentPlanHash);</span>
+<span class="fc" id="L306">        append(descriptor, changedPlanParameter);</span>
+<span class="fc" id="L307">        append(descriptor, input.contentHash());</span>
+<span class="fc" id="L308">        append(descriptor, plan.contentHash());</span>
+<span class="fc" id="L309">        append(descriptor, outcome.contentHash());</span>
+<span class="fc" id="L310">        append(descriptor, Integer.toString(artifacts.size()));</span>
+<span class="fc" id="L311">        artifacts.forEach(reference -&gt;</span>
+<span class="fc" id="L312">            append(descriptor, reference.contentHash()));</span>
+<span class="fc" id="L313">        append(descriptor, revisions.contentHash());</span>
+<span class="fc" id="L314">        append(descriptor, CLAIM_BOUNDARY);</span>
+<span class="fc" id="L315">        return sha256(descriptor.toString());</span>
+    }
+
+    private static void validateRelation(
+        RunRelation relation,
+        String runId,
+        String parentRunId,
+        String parentPlanHash,
+        String changedPlanParameter
+    ) {
+<span class="pc bpc" id="L325" title="1 of 4 branches missed.">        if (!parentRunId.isEmpty() &amp;&amp; parentRunId.equals(runId)) {</span>
+<span class="nc" id="L326">            throw new IllegalArgumentException(</span>
+                &quot;a workspace cannot be its own parent&quot;);
+        }
+<span class="pc bpc" id="L329" title="1 of 4 branches missed.">        switch (relation) {</span>
+<span class="fc" id="L330">            case ROOT -&gt; validateRootRelation(</span>
+                parentRunId,
+                parentPlanHash,
+                changedPlanParameter
+            );
+<span class="fc" id="L335">            case CONTINUATION -&gt; validateContinuationRelation(</span>
+                parentRunId,
+                parentPlanHash,
+                changedPlanParameter
+            );
+<span class="fc" id="L340">            case DUPLICATED_ONE_PARAMETER -&gt; validateDuplicationRelation(</span>
+                parentRunId,
+                parentPlanHash,
+                changedPlanParameter
+            );
+        }
+<span class="fc" id="L346">    }</span>
+
+    private static void validateRootRelation(
+        String parentRunId,
+        String parentPlanHash,
+        String changedPlanParameter
+    ) {
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        if (!parentRunId.isEmpty()</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">                || !parentPlanHash.isEmpty()</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">                || !changedPlanParameter.isEmpty()) {</span>
+<span class="fc" id="L356">            throw new IllegalArgumentException(</span>
+                &quot;a root run cannot carry parent evidence&quot;);
+        }
+<span class="fc" id="L359">    }</span>
+
+    private static void validateContinuationRelation(
+        String parentRunId,
+        String parentPlanHash,
+        String changedPlanParameter
+    ) {
+<span class="fc" id="L366">        requireParent(parentRunId, parentPlanHash);</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (!changedPlanParameter.isEmpty()) {</span>
+<span class="nc" id="L368">            throw new IllegalArgumentException(</span>
+                &quot;a continuation cannot claim a plan change&quot;);
+        }
+<span class="fc" id="L371">    }</span>
+
+    private static void validateDuplicationRelation(
+        String parentRunId,
+        String parentPlanHash,
+        String changedPlanParameter
+    ) {
+<span class="fc" id="L378">        requireParent(parentRunId, parentPlanHash);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (!RepresentationDiscoveryRunPlan.PARAMETERS.contains(</span>
+                changedPlanParameter)) {
+<span class="nc" id="L381">            throw new IllegalArgumentException(</span>
+                &quot;unsupported changed plan parameter: &quot;
+                    + changedPlanParameter);
+        }
+<span class="fc" id="L385">    }</span>
+
+    private static void requireParent(
+        String parentRunId,
+        String parentPlanHash
+    ) {
+<span class="pc bpc" id="L391" title="2 of 4 branches missed.">        if (parentRunId.isEmpty() || parentPlanHash.isEmpty()) {</span>
+<span class="nc" id="L392">            throw new IllegalArgumentException(</span>
+                &quot;derived runs require parent run and plan identities&quot;);
+        }
+<span class="fc" id="L395">    }</span>
+
+    private static List&lt;RepresentationDiscoveryArtifactReference&gt;
+            completeArtifacts(
+        List&lt;RepresentationDiscoveryArtifactReference&gt; references
+    ) {
+<span class="fc" id="L401">        Objects.requireNonNull(references, &quot;artifacts&quot;);</span>
+<span class="fc" id="L402">        List&lt;RepresentationDiscoveryArtifactReference&gt; sorted =</span>
+<span class="fc" id="L403">            references.stream()</span>
+<span class="fc" id="L404">                .map(reference -&gt; Objects.requireNonNull(</span>
+                    reference, &quot;artifact&quot;))
+<span class="fc" id="L406">                .sorted(Comparator.comparing(reference -&gt;</span>
+<span class="fc" id="L407">                    reference.role().name()))</span>
+<span class="fc" id="L408">                .toList();</span>
+<span class="fc" id="L409">        Set&lt;ArtifactRole&gt; roles = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        for (RepresentationDiscoveryArtifactReference reference : sorted) {</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">            if (!roles.add(reference.role())) {</span>
+<span class="fc" id="L412">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L413">                    &quot;duplicate artifact role: &quot; + reference.role());</span>
+            }
+<span class="fc" id="L415">        }</span>
+<span class="fc" id="L416">        Set&lt;ArtifactRole&gt; missing = EnumSet.allOf(ArtifactRole.class);</span>
+<span class="fc" id="L417">        missing.removeAll(roles);</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (!missing.isEmpty()) {</span>
+<span class="fc" id="L419">            throw new IllegalArgumentException(</span>
+                &quot;missing explicit artifact roles: &quot; + missing);
+        }
+<span class="fc" id="L422">        return sorted;</span>
+    }
+
+<span class="fc" id="L425">    public enum RunRelation {</span>
+<span class="fc" id="L426">        ROOT,</span>
+<span class="fc" id="L427">        DUPLICATED_ONE_PARAMETER,</span>
+<span class="fc" id="L428">        CONTINUATION</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

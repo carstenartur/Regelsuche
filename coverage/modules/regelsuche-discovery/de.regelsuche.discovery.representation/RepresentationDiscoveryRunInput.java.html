@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationDiscoveryRunInput.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationDiscoveryRunInput.java</span></div><h1>RepresentationDiscoveryRunInput.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.WORKSPACE_SCHEMA;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.append;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sortedStrings;
+
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.List;
+
+/** Domain-neutral, content-addressed input reference with a display form. */
+public record RepresentationDiscoveryRunInput(
+    String domainId,
+    String inputSchema,
+    String canonicalInputHash,
+    String displayText,
+    List&lt;String&gt; assumptions,
+    String contentHash
+) {
+    public static final String EXPRESSION_INPUT_SCHEMA =
+        &quot;regelsuche.representation-discovery-expression-input/v1&quot;;
+
+<span class="fc" id="L26">    public RepresentationDiscoveryRunInput {</span>
+<span class="fc" id="L27">        domainId = requireText(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L28">        inputSchema = requireText(inputSchema, &quot;inputSchema&quot;);</span>
+<span class="fc" id="L29">        canonicalInputHash = requireSha256(</span>
+            canonicalInputHash, &quot;canonicalInputHash&quot;);
+<span class="fc" id="L31">        displayText = requireText(displayText, &quot;displayText&quot;);</span>
+<span class="fc" id="L32">        assumptions = sortedStrings(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L33">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (EXPRESSION_INPUT_SCHEMA.equals(inputSchema)) {</span>
+<span class="fc" id="L35">            String normalized = normalizeExpression(displayText);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            if (!normalized.equals(displayText)) {</span>
+<span class="fc" id="L37">                throw new IllegalArgumentException(</span>
+                    &quot;expression input displayText is not normalized&quot;);
+            }
+<span class="fc" id="L40">            String expectedInputHash = expressionInputHash(</span>
+                normalized, assumptions);
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (!expectedInputHash.equals(canonicalInputHash)) {</span>
+<span class="fc" id="L43">                throw new IllegalArgumentException(</span>
+                    &quot;canonical expression input hash mismatch&quot;);
+            }
+        }
+<span class="fc" id="L47">        String expected = inputHash(</span>
+            domainId,
+            inputSchema,
+            canonicalInputHash,
+            displayText,
+            assumptions
+        );
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(</span>
+                &quot;run input content hash mismatch&quot;);
+        }
+<span class="fc" id="L58">    }</span>
+
+    public static RepresentationDiscoveryRunInput create(
+        String domainId,
+        String inputSchema,
+        String canonicalInputHash,
+        String displayText,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L67">        String normalizedDomain = requireText(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L68">        String normalizedSchema = requireText(inputSchema, &quot;inputSchema&quot;);</span>
+<span class="fc" id="L69">        String normalizedHash = requireSha256(</span>
+            canonicalInputHash, &quot;canonicalInputHash&quot;);
+<span class="fc" id="L71">        String normalizedDisplay = requireText(displayText, &quot;displayText&quot;);</span>
+<span class="fc" id="L72">        List&lt;String&gt; normalizedAssumptions = sortedStrings(</span>
+            assumptions, &quot;assumptions&quot;);
+<span class="fc" id="L74">        String hash = inputHash(</span>
+            normalizedDomain,
+            normalizedSchema,
+            normalizedHash,
+            normalizedDisplay,
+            normalizedAssumptions
+        );
+<span class="fc" id="L81">        return new RepresentationDiscoveryRunInput(</span>
+            normalizedDomain,
+            normalizedSchema,
+            normalizedHash,
+            normalizedDisplay,
+            normalizedAssumptions,
+            hash
+        );
+    }
+
+    public static RepresentationDiscoveryRunInput expression(
+        String expression,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L95">        String normalized = normalizeExpression(expression);</span>
+<span class="fc" id="L96">        List&lt;String&gt; normalizedAssumptions = sortedStrings(</span>
+            assumptions, &quot;assumptions&quot;);
+<span class="fc" id="L98">        return create(</span>
+            &quot;expression-rewrite&quot;,
+            EXPRESSION_INPUT_SCHEMA,
+<span class="fc" id="L101">            expressionInputHash(normalized, normalizedAssumptions),</span>
+            normalized,
+            normalizedAssumptions
+        );
+    }
+
+    private static String inputHash(
+        String domainId,
+        String inputSchema,
+        String canonicalInputHash,
+        String displayText,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L114">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L115">        append(descriptor, WORKSPACE_SCHEMA + &quot;/input&quot;);</span>
+<span class="fc" id="L116">        append(descriptor, domainId);</span>
+<span class="fc" id="L117">        append(descriptor, inputSchema);</span>
+<span class="fc" id="L118">        append(descriptor, canonicalInputHash);</span>
+<span class="fc" id="L119">        append(descriptor, displayText);</span>
+<span class="fc" id="L120">        append(descriptor, Integer.toString(assumptions.size()));</span>
+<span class="fc" id="L121">        assumptions.forEach(value -&gt; append(descriptor, value));</span>
+<span class="fc" id="L122">        return sha256(descriptor.toString());</span>
+    }
+
+    private static String expressionInputHash(
+        String expression,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L129">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L130">        append(descriptor, EXPRESSION_INPUT_SCHEMA);</span>
+<span class="fc" id="L131">        append(descriptor, expression);</span>
+<span class="fc" id="L132">        append(descriptor, Integer.toString(assumptions.size()));</span>
+<span class="fc" id="L133">        assumptions.forEach(value -&gt; append(descriptor, value));</span>
+<span class="fc" id="L134">        return sha256(descriptor.toString());</span>
+    }
+
+    private static String normalizeExpression(String expression) {
+<span class="fc" id="L138">        return ExpressionFormatter.format(</span>
+<span class="fc" id="L139">            new ExpressionParser().parseTerm(requireText(</span>
+                expression, &quot;expression&quot;)));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

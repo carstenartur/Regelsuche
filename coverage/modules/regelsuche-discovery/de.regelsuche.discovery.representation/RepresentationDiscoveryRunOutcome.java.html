@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationDiscoveryRunOutcome.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationDiscoveryRunOutcome.java</span></div><h1>RepresentationDiscoveryRunOutcome.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.WORKSPACE_SCHEMA;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.append;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sha256;
+
+import java.util.Objects;
+
+/** Terminal/current state with canonical work and runtime kept separate. */
+public record RepresentationDiscoveryRunOutcome(
+    TerminalState state,
+    String terminalReason,
+    long configuredWork,
+    long consumedWork,
+    String canonicalWorkLedgerHash,
+    String runtimeDiagnosticsHash,
+    String contentHash
+) {
+<span class="fc" id="L21">    public RepresentationDiscoveryRunOutcome {</span>
+<span class="fc" id="L22">        state = Objects.requireNonNull(state, &quot;state&quot;);</span>
+<span class="fc" id="L23">        terminalReason = requireText(terminalReason, &quot;terminalReason&quot;);</span>
+<span class="pc bpc" id="L24" title="2 of 6 branches missed.">        if (configuredWork &lt; 0 || consumedWork &lt; 0</span>
+                || consumedWork &gt; configuredWork) {
+<span class="fc" id="L26">            throw new IllegalArgumentException(</span>
+                &quot;configured and consumed work do not balance&quot;);
+        }
+<span class="pc bpc" id="L29" title="2 of 6 branches missed.">        if (state == TerminalState.CREATED</span>
+                &amp;&amp; (configuredWork != 0
+                    || consumedWork != 0
+<span class="fc bfc" id="L32" title="All 2 branches covered.">                    || !&quot;NOT_STARTED&quot;.equals(terminalReason))) {</span>
+<span class="fc" id="L33">            throw new IllegalArgumentException(</span>
+                &quot;CREATED outcome must be NOT_STARTED with zero work&quot;);
+        }
+<span class="pc bpc" id="L36" title="1 of 6 branches missed.">        if (state == TerminalState.BUDGET_EXHAUSTED</span>
+                &amp;&amp; (configuredWork == 0
+                    || consumedWork != configuredWork)) {
+<span class="fc" id="L39">            throw new IllegalArgumentException(</span>
+                &quot;BUDGET_EXHAUSTED must consume all configured work&quot;);
+        }
+<span class="fc" id="L42">        canonicalWorkLedgerHash = requireSha256(</span>
+            canonicalWorkLedgerHash,
+            &quot;canonicalWorkLedgerHash&quot;
+        );
+<span class="fc" id="L46">        runtimeDiagnosticsHash = requireSha256(</span>
+            runtimeDiagnosticsHash,
+            &quot;runtimeDiagnosticsHash&quot;
+        );
+<span class="fc" id="L50">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L51">        String expected = outcomeHash(</span>
+            state,
+            terminalReason,
+            configuredWork,
+            consumedWork,
+            canonicalWorkLedgerHash,
+            runtimeDiagnosticsHash
+        );
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L60">            throw new IllegalArgumentException(</span>
+                &quot;run outcome content hash mismatch&quot;);
+        }
+<span class="fc" id="L63">    }</span>
+
+    public static RepresentationDiscoveryRunOutcome create(
+        TerminalState state,
+        String terminalReason,
+        long configuredWork,
+        long consumedWork,
+        String canonicalWorkLedgerHash,
+        String runtimeDiagnosticsHash
+    ) {
+<span class="fc" id="L73">        TerminalState normalizedState = Objects.requireNonNull(state, &quot;state&quot;);</span>
+<span class="fc" id="L74">        String reason = requireText(terminalReason, &quot;terminalReason&quot;);</span>
+<span class="fc" id="L75">        String workHash = requireSha256(</span>
+            canonicalWorkLedgerHash, &quot;canonicalWorkLedgerHash&quot;);
+<span class="fc" id="L77">        String runtimeHash = requireSha256(</span>
+            runtimeDiagnosticsHash, &quot;runtimeDiagnosticsHash&quot;);
+<span class="fc" id="L79">        String hash = outcomeHash(</span>
+            normalizedState,
+            reason,
+            configuredWork,
+            consumedWork,
+            workHash,
+            runtimeHash
+        );
+<span class="fc" id="L87">        return new RepresentationDiscoveryRunOutcome(</span>
+            normalizedState,
+            reason,
+            configuredWork,
+            consumedWork,
+            workHash,
+            runtimeHash,
+            hash
+        );
+    }
+
+    public static RepresentationDiscoveryRunOutcome created() {
+<span class="fc" id="L99">        return create(</span>
+            TerminalState.CREATED,
+            &quot;NOT_STARTED&quot;,
+            0,
+            0,
+<span class="fc" id="L104">            sha256(WORKSPACE_SCHEMA + &quot;/work/NOT_STARTED&quot;),</span>
+<span class="fc" id="L105">            sha256(WORKSPACE_SCHEMA + &quot;/runtime/NOT_EVALUATED&quot;)</span>
+        );
+    }
+
+    private static String outcomeHash(
+        TerminalState state,
+        String reason,
+        long configuredWork,
+        long consumedWork,
+        String workHash,
+        String runtimeHash
+    ) {
+<span class="fc" id="L117">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L118">        append(descriptor, WORKSPACE_SCHEMA + &quot;/outcome&quot;);</span>
+<span class="fc" id="L119">        append(descriptor, state.name());</span>
+<span class="fc" id="L120">        append(descriptor, reason);</span>
+<span class="fc" id="L121">        append(descriptor, Long.toString(configuredWork));</span>
+<span class="fc" id="L122">        append(descriptor, Long.toString(consumedWork));</span>
+<span class="fc" id="L123">        append(descriptor, workHash);</span>
+<span class="fc" id="L124">        append(descriptor, runtimeHash);</span>
+<span class="fc" id="L125">        return sha256(descriptor.toString());</span>
+    }
+
+<span class="fc" id="L128">    public enum TerminalState {</span>
+<span class="fc" id="L129">        CREATED,</span>
+<span class="fc" id="L130">        RUNNING,</span>
+<span class="fc" id="L131">        COMPLETED,</span>
+<span class="fc" id="L132">        BUDGET_EXHAUSTED,</span>
+<span class="fc" id="L133">        NO_RESULT,</span>
+<span class="fc" id="L134">        CANCELLED,</span>
+<span class="fc" id="L135">        FAILED,</span>
+<span class="fc" id="L136">        UNSUPPORTED</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

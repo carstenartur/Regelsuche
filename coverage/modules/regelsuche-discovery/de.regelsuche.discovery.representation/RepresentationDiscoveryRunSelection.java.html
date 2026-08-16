@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationDiscoveryRunSelection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationDiscoveryRunSelection.java</span></div><h1>RepresentationDiscoveryRunSelection.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.WORKSPACE_SCHEMA;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.append;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.optionalSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.optionalText;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sha256;
+
+import java.util.List;
+
+/** Immutable active selection correlated to one exact Run ID. */
+public record RepresentationDiscoveryRunSelection(
+    String runId,
+    String candidateId,
+    String stateId,
+    String edgeId,
+    String occurrencePath,
+    String proofObligationId,
+    String contentHash
+) {
+<span class="fc" id="L22">    public RepresentationDiscoveryRunSelection {</span>
+<span class="fc" id="L23">        runId = requireSha256(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L24">        candidateId = optionalSha256(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L25">        stateId = optionalSha256(stateId, &quot;stateId&quot;);</span>
+<span class="fc" id="L26">        edgeId = optionalSha256(edgeId, &quot;edgeId&quot;);</span>
+<span class="fc" id="L27">        occurrencePath = optionalText(</span>
+            occurrencePath, &quot;occurrencePath&quot;);
+<span class="fc" id="L29">        proofObligationId = optionalSha256(</span>
+            proofObligationId, &quot;proofObligationId&quot;);
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (allEmpty(</span>
+                candidateId,
+                stateId,
+                edgeId,
+                occurrencePath,
+                proofObligationId)) {
+<span class="fc" id="L37">            throw new IllegalArgumentException(</span>
+                &quot;a run selection must select at least one object&quot;);
+        }
+<span class="fc" id="L40">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L41">        String expected = selectionHash(</span>
+            runId,
+            candidateId,
+            stateId,
+            edgeId,
+            occurrencePath,
+            proofObligationId
+        );
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L50">            throw new IllegalArgumentException(</span>
+                &quot;run selection content hash mismatch&quot;);
+        }
+<span class="fc" id="L53">    }</span>
+
+    public static RepresentationDiscoveryRunSelection create(
+        String runId,
+        String candidateId,
+        String stateId,
+        String edgeId,
+        String occurrencePath,
+        String proofObligationId
+    ) {
+<span class="fc" id="L63">        String normalizedRunId = requireSha256(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L64">        String candidate = optionalSha256(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L65">        String state = optionalSha256(stateId, &quot;stateId&quot;);</span>
+<span class="fc" id="L66">        String edge = optionalSha256(edgeId, &quot;edgeId&quot;);</span>
+<span class="fc" id="L67">        String occurrence = optionalText(</span>
+            occurrencePath, &quot;occurrencePath&quot;);
+<span class="fc" id="L69">        String proof = optionalSha256(</span>
+            proofObligationId, &quot;proofObligationId&quot;);
+<span class="fc" id="L71">        return new RepresentationDiscoveryRunSelection(</span>
+            normalizedRunId,
+            candidate,
+            state,
+            edge,
+            occurrence,
+            proof,
+<span class="fc" id="L78">            selectionHash(</span>
+                normalizedRunId,
+                candidate,
+                state,
+                edge,
+                occurrence,
+                proof
+            )
+        );
+    }
+
+    private static boolean allEmpty(String... values) {
+<span class="fc" id="L90">        return List.of(values).stream().allMatch(String::isEmpty);</span>
+    }
+
+    private static String selectionHash(
+        String runId,
+        String candidateId,
+        String stateId,
+        String edgeId,
+        String occurrencePath,
+        String proofObligationId
+    ) {
+<span class="fc" id="L101">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L102">        append(descriptor, WORKSPACE_SCHEMA + &quot;/selection&quot;);</span>
+<span class="fc" id="L103">        append(descriptor, runId);</span>
+<span class="fc" id="L104">        append(descriptor, candidateId);</span>
+<span class="fc" id="L105">        append(descriptor, stateId);</span>
+<span class="fc" id="L106">        append(descriptor, edgeId);</span>
+<span class="fc" id="L107">        append(descriptor, occurrencePath);</span>
+<span class="fc" id="L108">        append(descriptor, proofObligationId);</span>
+<span class="fc" id="L109">        return sha256(descriptor.toString());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
