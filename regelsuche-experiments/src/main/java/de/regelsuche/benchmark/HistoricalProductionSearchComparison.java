@@ -150,14 +150,36 @@ public final class HistoricalProductionSearchComparison {
             counting.calls(),
             counting.generated(),
             diversityStates.isEmpty() ? "NO_STATES" : "COMPLETED_BOUNDED_SEARCH");
+        return createCaseComparison(
+            benchmarkCase.id(), witnessSteps, benchmarkCase,
+            scalar, diversity);
+    }
+
+    private static CaseComparison createCaseComparison(
+        String id,
+        int witnessSteps,
+        Case benchmarkCase,
+        SearchComparisonEvidence scalar,
+        SearchComparisonEvidence diversity
+    ) {
+        requireSearchEvidence(scalar);
+        requireSearchEvidence(diversity);
+        if (witnessSteps < 0
+                || scalar.exploredPrefixLength() > witnessSteps
+                || diversity.exploredPrefixLength() > witnessSteps) {
+            throw new IllegalArgumentException(
+                "case comparison evidence is inconsistent");
+        }
+        int delta = diversity.exploredPrefixLength()
+            - scalar.exploredPrefixLength();
         return new CaseComparison(
-            benchmarkCase.id(),
+            requireText(id, "id"),
             classify(witnessSteps, scalar, diversity),
             witnessSteps,
             DeclaredBudget.from(benchmarkCase),
             scalar,
             diversity,
-            diversity.exploredPrefixLength() - scalar.exploredPrefixLength());
+            delta);
     }
 
     private static ComparisonStatus classify(
@@ -341,6 +363,17 @@ public final class HistoricalProductionSearchComparison {
         }
     }
 
+    private static void requireSearchEvidence(SearchComparisonEvidence value) {
+        requireText(value.terminalStatus(), "terminalStatus");
+        if (value.exploredPrefixLength() < 0
+                || value.exploredStates() < 0
+                || value.engineCalls() < 0
+                || value.generatedTransformations() < 0) {
+            throw new IllegalArgumentException(
+                "search comparison counters must not be negative");
+        }
+    }
+
     enum ComparisonStatus {
         NOT_APPLICABLE_NO_PRODUCTION_WITNESS,
         SCALAR_ALREADY_FOUND,
@@ -358,17 +391,6 @@ public final class HistoricalProductionSearchComparison {
         int maxExpandingSteps,
         int beamWidth
     ) {
-        DeclaredBudget {
-            if (maxDepth < 0
-                    || maxVisitedStates < 1
-                    || maxCandidatesPerState < 1
-                    || maxExpandingSteps < 0
-                    || beamWidth < 1) {
-                throw new IllegalArgumentException(
-                    "declared budget is outside its finite range");
-            }
-        }
-
         static DeclaredBudget from(Case value) {
             return new DeclaredBudget(
                 value.searchMaxDepth(),
@@ -387,16 +409,6 @@ public final class HistoricalProductionSearchComparison {
         long generatedTransformations,
         String terminalStatus
     ) {
-        SearchComparisonEvidence {
-            terminalStatus = requireText(terminalStatus, "terminalStatus");
-            if (exploredPrefixLength < 0
-                    || exploredStates < 0
-                    || engineCalls < 0
-                    || generatedTransformations < 0) {
-                throw new IllegalArgumentException(
-                    "search comparison counters must not be negative");
-            }
-        }
     }
 
     record CaseComparison(
@@ -408,23 +420,6 @@ public final class HistoricalProductionSearchComparison {
         SearchComparisonEvidence diversity,
         int prefixDelta
     ) {
-        CaseComparison {
-            id = requireText(id, "id");
-            Objects.requireNonNull(status, "status");
-            Objects.requireNonNull(declaredBudget, "declaredBudget");
-            Objects.requireNonNull(scalar, "scalar");
-            Objects.requireNonNull(diversity, "diversity");
-            if (oracleWitnessStepCount < 0
-                    || scalar.exploredPrefixLength() > oracleWitnessStepCount
-                    || diversity.exploredPrefixLength() > oracleWitnessStepCount
-                    || prefixDelta != diversity.exploredPrefixLength()
-                        - scalar.exploredPrefixLength()
-                    || status != classify(
-                        oracleWitnessStepCount, scalar, diversity)) {
-                throw new IllegalArgumentException(
-                    "case comparison evidence is inconsistent");
-            }
-        }
     }
 
     record Summary(
@@ -435,21 +430,6 @@ public final class HistoricalProductionSearchComparison {
         int diversityExtendedPrefixCount,
         int diversityReachedRelationCount
     ) {
-        Summary {
-            statusCounts = Map.copyOf(
-                Objects.requireNonNull(statusCounts, "statusCounts"));
-            if (caseCount < 1
-                    || statusCounts.values().stream()
-                        .mapToInt(Integer::intValue).sum() != caseCount
-                    || comparableScalarMissCount < 0
-                    || diversityRecoveredCompleteWitnessCount < 0
-                    || diversityExtendedPrefixCount < 0
-                    || diversityReachedRelationCount < 0) {
-                throw new IllegalArgumentException(
-                    "production comparison summary is inconsistent");
-            }
-        }
-
         static Summary derive(List<CaseComparison> cases) {
             Map<ComparisonStatus, Integer> counts =
                 new EnumMap<>(ComparisonStatus.class);
@@ -457,7 +437,7 @@ public final class HistoricalProductionSearchComparison {
                 value.status(), 1, Integer::sum));
             return new Summary(
                 cases.size(),
-                counts,
+                Map.copyOf(counts),
                 (int) cases.stream()
                     .filter(value -> value.oracleWitnessStepCount() > 0)
                     .filter(value -> !value.scalar().reachedRelation())
