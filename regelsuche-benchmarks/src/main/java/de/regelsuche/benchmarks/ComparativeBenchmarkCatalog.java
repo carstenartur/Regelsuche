@@ -286,10 +286,9 @@ final class ComparativeBenchmarkCatalog {
                     "PROJECT_NOVELTY_AND_FALSIFICATION")),
             CoverageGap.create(
                 Track.SIMPLIFICATION_COMPETITION,
-                "The target-free simplification corpus is small and single-domain; equality saturation, randomized-valid competitors and an independent assumption-aware output validator remain unmeasured.",
+                "The target-free simplification corpus is small and single-domain; equality saturation and an independent assumption-aware output validator remain unmeasured. A deterministic seeded randomized-valid rewrite control is now retained.",
                 List.of(
                     "EQUALITY_SATURATION_COMPETITOR_WITH_EXACT_SIDE_CONDITION_PROVENANCE",
-                    "RANDOMIZED_VALID_COMPETITOR",
                     "MULTI_DOMAIN_SIMPLIFICATION_CORPUS",
                     "INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION")),
             CoverageGap.create(

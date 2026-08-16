@@ -2,6 +2,7 @@ package de.regelsuche.benchmarks;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -45,7 +46,7 @@ class ComparativeBenchmarkRunnerTest {
         Report first = runner.run();
         Report second = runner.run();
 
-        assertEquals(29, first.results().size());
+        assertEquals(36, first.results().size());
         assertEquals(3, first.claims().size());
         assertEquals(7, first.coverageGaps().size());
         assertTrue(first.results().stream()
@@ -85,7 +86,7 @@ class ComparativeBenchmarkRunnerTest {
             .orElseThrow();
         assertFalse(parity.targetVisible());
         assertFalse(parity.hiddenReferenceVisible());
-        assertEquals(2L, report.configurations().stream()
+        assertEquals(3L, report.configurations().stream()
             .filter(configuration ->
                 configuration.track() == Track.SIMPLIFICATION_COMPETITION)
             .count());
@@ -94,6 +95,45 @@ class ComparativeBenchmarkRunnerTest {
                 configuration.track() == Track.SIMPLIFICATION_COMPETITION)
             .anyMatch(configuration ->
                 configuration.kind() == SystemKind.EXTERNAL_BASELINE));
+        assertTrue(report.configurations().stream()
+            .filter(configuration ->
+                configuration.track() == Track.SIMPLIFICATION_COMPETITION)
+            .anyMatch(configuration ->
+                configuration.kind() == SystemKind.ABLATION));
+    }
+
+    @Test
+    void randomControlBindsSeedAndResetsForEveryRepeatedRun() {
+        ComparativeBenchmarkRunner firstRunner = runner(true);
+        ComparativeBenchmarkRunner secondRunner = runner(true);
+
+        Report first = firstRunner.run();
+        Report repeatedOnSameRunner = firstRunner.run();
+        Report independent = secondRunner.run();
+
+        assertEquals(first.contentHash(), repeatedOnSameRunner.contentHash());
+        assertEquals(first.contentHash(), independent.contentHash());
+        var randomConfiguration = first.configurations().stream()
+            .filter(configuration -> configuration.backendId().equals(
+                "randomized-valid-rewrite-control"))
+            .findFirst()
+            .orElseThrow();
+        var bestFirstConfiguration = first.configurations().stream()
+            .filter(configuration -> configuration.backendId().equals(
+                "regelsuche-untargeted-best-first"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(SystemKind.ABLATION, randomConfiguration.kind());
+        assertNotEquals(
+            bestFirstConfiguration.policyHash(),
+            randomConfiguration.policyHash()
+        );
+        assertTrue(randomConfiguration.limitations().contains(
+            "FIXED_SEED_BOUND_IN_CONFIGURATION_IDENTITY"));
+        assertEquals(7L, first.results().stream()
+            .filter(result -> result.configurationHash().equals(
+                randomConfiguration.contentHash()))
+            .count());
     }
 
     @Test
@@ -244,6 +284,13 @@ class ComparativeBenchmarkRunnerTest {
                 "test",
                 new BestFirstSearchStrategy(),
                 List.of()),
+            SimplificationSystem.internalControl(
+                "randomized-valid-rewrite-control",
+                "test",
+                new DeterministicRandomValidRewriteStrategy(),
+                List.of(
+                    "FIXED_SEED_BOUND_IN_CONFIGURATION_IDENTITY",
+                    "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE")),
             SimplificationSystem.external(
                 ExternalSymPySimplificationBaseline.detectSystemSymPy(),
                 List.of()));

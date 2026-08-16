@@ -7,9 +7,14 @@ import de.regelsuche.solver.ir.SolverBackend;
 import java.util.List;
 import java.util.Objects;
 
-/** Runtime system descriptors used by the initial comparative benchmark slice. */
+/** Runtime system descriptors used by the comparative benchmark. */
 final class ComparativeBenchmarkSystems {
     private ComparativeBenchmarkSystems() {
+    }
+
+    /** Search strategy whose complete frozen configuration is externally visible. */
+    interface BenchmarkIdentifiedSearchStrategy extends SearchStrategy {
+        String implementationIdentity();
     }
 
     record SearchSystem(
@@ -85,7 +90,11 @@ final class ComparativeBenchmarkSystems {
         /** @return the stable identity of implementation and target-free output selection. */
         String implementationIdentity() {
             if (strategy != null) {
-                return "internal:" + strategy.getClass().getName()
+                String strategyIdentity = strategy
+                        instanceof BenchmarkIdentifiedSearchStrategy identified
+                    ? identified.implementationIdentity()
+                    : strategy.getClass().getName();
+                return "internal:" + strategyIdentity
                     + "\noutputSelection=min-expression-score-then-text-then-depth/v1";
             }
             return "external:" + externalSimplifier.configurationHash()
@@ -100,7 +109,18 @@ final class ComparativeBenchmarkSystems {
         ) {
             return new SimplificationSystem(
                 id, version, SystemKind.REGELSUCHE, strategy, null, true,
-                "java=21\nsearch-kernel=regelsuche-search/v1", limitations);
+                "java=25\nsearch-kernel=regelsuche-search/v1", limitations);
+        }
+
+        static SimplificationSystem internalControl(
+            String id,
+            String version,
+            SearchStrategy strategy,
+            List<String> limitations
+        ) {
+            return new SimplificationSystem(
+                id, version, SystemKind.ABLATION, strategy, null, true,
+                "java=25\nsearch-kernel=regelsuche-search/v1", limitations);
         }
 
         static SimplificationSystem external(

@@ -25,7 +25,7 @@ public final class ComparativeBenchmarkMain {
         new EnumMap<>(Map.of(
             Track.TARGET_DIRECTED_SEARCH, 9L,
             Track.EQUALITY_VALIDATION, 6L,
-            Track.SIMPLIFICATION_COMPETITION, 14L));
+            Track.SIMPLIFICATION_COMPETITION, 21L));
 
     private ComparativeBenchmarkMain() {
     }
