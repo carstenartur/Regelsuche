@@ -21,95 +21,47 @@ class RepresentationDiscoveryRunComparisonTest {
 
     @Test
     void comparesSameRun() {
-        RepresentationDiscoveryRunWorkspace workspace = root(
-            basePlan(),
-            completedOutcome(sha("runtime")),
-            artifacts(false)
-        );
-
-        RepresentationDiscoveryRunComparison comparison =
-            RepresentationDiscoveryRunComparison.compare(
-                workspace,
-                workspace
-            );
+        var workspace = workspace(basePlan(), "runtime", false);
+        var comparison = compare(workspace, workspace);
 
         assertEquals(Relationship.SAME_RUN, comparison.relationship());
         assertTrue(comparison.changedEntries().isEmpty());
         assertTrue(comparison.sameCanonicalEvidence());
-        assertTrue(comparison.contentHash().matches(
-            "sha256:[0-9a-f]{64}"
-        ));
-        assertEquals(comparison,
-            RepresentationDiscoveryRunComparison.compare(
-                workspace,
-                workspace
-            ));
+        assertTrue(comparison.contentHash().matches("sha256:[0-9a-f]{64}"));
+        assertEquals(comparison, compare(workspace, workspace));
     }
 
     @Test
     void separatesRuntimeDiagnostics() {
-        RepresentationDiscoveryRunWorkspace left = root(
-            basePlan(),
-            completedOutcome(sha("runtime-left")),
-            artifacts(false)
+        var comparison = compare(
+            workspace(basePlan(), "runtime-left", false),
+            workspace(basePlan(), "runtime-right", false)
         );
-        RepresentationDiscoveryRunWorkspace right = root(
-            basePlan(),
-            completedOutcome(sha("runtime-right")),
-            artifacts(false)
-        );
-
-        RepresentationDiscoveryRunComparison comparison =
-            RepresentationDiscoveryRunComparison.compare(left, right);
 
         assertEquals(Relationship.UNRELATED, comparison.relationship());
         assertEquals(1, comparison.changedEntries().size());
-        assertEquals(
-            Category.RUNTIME_DIAGNOSTICS,
-            comparison.changedEntries().getFirst().category()
-        );
-        assertEquals(
-            "runtimeDiagnosticsHash",
-            comparison.changedEntries().getFirst().field()
-        );
+        Entry change = comparison.changedEntries().getFirst();
+        assertEquals(Category.RUNTIME_DIAGNOSTICS, change.category());
+        assertEquals("runtimeDiagnosticsHash", change.field());
         assertTrue(comparison.sameCanonicalEvidence());
         assertTrue(comparison.canonicalChangedEntries().isEmpty());
     }
 
     @Test
     void comparesDuplicateLineage() {
-        RepresentationDiscoveryRunWorkspace parent = root(
-            basePlan(),
-            completedOutcome(sha("runtime")),
-            artifacts(true)
-        );
-        RepresentationDiscoveryRunPlan revisedPlan = plan(
-            sha("budget-v2"),
-            parent.plan().deterministicSeed()
-        );
-        RepresentationDiscoveryRunWorkspace duplicate =
-            RepresentationDiscoveryRunWorkspace
-                .duplicateWithOnePlanChange(
-                    parent,
-                    revisedPlan,
-                    revisions()
-                );
-
-        RepresentationDiscoveryRunComparison comparison =
-            RepresentationDiscoveryRunComparison.compare(
+        var parent = workspace(basePlan(), "runtime", true);
+        var duplicate = RepresentationDiscoveryRunWorkspace
+            .duplicateWithOnePlanChange(
                 parent,
-                duplicate
+                plan("budget-v2", parent.plan().deterministicSeed()),
+                revisions()
             );
+        var comparison = compare(parent, duplicate);
 
-        assertEquals(
-            Relationship.DIRECT_LINEAGE,
-            comparison.relationship()
-        );
+        assertEquals(Relationship.DIRECT_LINEAGE, comparison.relationship());
         assertEquals(
             List.of("budgetHash"),
-            comparison.changedEntries(Category.PLAN).stream()
-                .map(Entry::field)
-                .toList()
+            fields(comparison, Category.PLAN)
         );
         assertTrue(comparison.changedEntries(Category.LINEAGE).stream()
             .anyMatch(entry -> entry.field().equals("parentRunId")));
@@ -118,69 +70,41 @@ class RepresentationDiscoveryRunComparisonTest {
 
     @Test
     void comparesSiblingLineage() {
-        RepresentationDiscoveryRunWorkspace parent = root(
-            basePlan(),
-            completedOutcome(sha("runtime")),
-            artifacts(false)
-        );
-        RepresentationDiscoveryRunWorkspace changedBudget =
-            RepresentationDiscoveryRunWorkspace
-                .duplicateWithOnePlanChange(
-                    parent,
-                    plan(sha("budget-v2"), 42),
-                    revisions()
-                );
-        RepresentationDiscoveryRunWorkspace changedSeed =
-            RepresentationDiscoveryRunWorkspace
-                .duplicateWithOnePlanChange(
-                    parent,
-                    plan(sha("budget"), 99),
-                    revisions()
-                );
-
-        RepresentationDiscoveryRunComparison comparison =
-            RepresentationDiscoveryRunComparison.compare(
-                changedBudget,
-                changedSeed
+        var parent = workspace(basePlan(), "runtime", false);
+        var changedBudget = RepresentationDiscoveryRunWorkspace
+            .duplicateWithOnePlanChange(
+                parent,
+                plan("budget-v2", 42),
+                revisions()
             );
+        var changedSeed = RepresentationDiscoveryRunWorkspace
+            .duplicateWithOnePlanChange(
+                parent,
+                plan("budget", 99),
+                revisions()
+            );
+        var comparison = compare(changedBudget, changedSeed);
 
-        assertEquals(
-            Relationship.SIBLING_LINEAGE,
-            comparison.relationship()
-        );
+        assertEquals(Relationship.SIBLING_LINEAGE, comparison.relationship());
         assertEquals(
             List.of("budgetHash", "deterministicSeed"),
-            comparison.changedEntries(Category.PLAN).stream()
-                .map(Entry::field)
-                .toList()
+            fields(comparison, Category.PLAN)
         );
-        assertFalse(comparison.claimBoundary().toLowerCase()
-            .contains("better"));
+        assertFalse(comparison.claimBoundary().toLowerCase().contains("better"));
     }
 
     @Test
     void comparesArtifactAvailability() {
-        RepresentationDiscoveryRunWorkspace left = root(
-            basePlan(),
-            completedOutcome(sha("runtime")),
-            artifacts(false)
+        var comparison = compare(
+            workspace(basePlan(), "runtime", false),
+            workspace(basePlan(), "runtime", true)
         );
-        RepresentationDiscoveryRunWorkspace right = root(
-            basePlan(),
-            completedOutcome(sha("runtime")),
-            artifacts(true)
-        );
+        List<Entry> changes = comparison.changedEntries(Category.ARTIFACT);
 
-        RepresentationDiscoveryRunComparison comparison =
-            RepresentationDiscoveryRunComparison.compare(left, right);
-        List<Entry> artifactChanges = comparison.changedEntries(
-            Category.ARTIFACT
-        );
-
-        assertEquals(4, artifactChanges.size());
-        assertTrue(artifactChanges.stream().allMatch(entry ->
+        assertEquals(4, changes.size());
+        assertTrue(changes.stream().allMatch(entry ->
             entry.field().startsWith("SEARCH_GRAPH.")));
-        assertTrue(artifactChanges.stream().anyMatch(entry ->
+        assertTrue(changes.stream().anyMatch(entry ->
             entry.field().equals("SEARCH_GRAPH.status")
                 && entry.leftValue().equals("NOT_PRODUCED")
                 && entry.rightValue().equals("AVAILABLE")));
@@ -188,49 +112,26 @@ class RepresentationDiscoveryRunComparisonTest {
 
     @Test
     void keepsDirectionalIdentity() {
-        RepresentationDiscoveryRunWorkspace left = root(
-            basePlan(),
-            completedOutcome(sha("runtime-left")),
-            artifacts(false)
+        var left = workspace(basePlan(), "runtime-left", false);
+        var right = workspace(
+            plan("budget-v2", 42),
+            "runtime-right",
+            true
         );
-        RepresentationDiscoveryRunWorkspace right = root(
-            plan(sha("budget-v2"), 42),
-            completedOutcome(sha("runtime-right")),
-            artifacts(true)
-        );
-
-        RepresentationDiscoveryRunComparison forward =
-            RepresentationDiscoveryRunComparison.compare(left, right);
-        RepresentationDiscoveryRunComparison reverse =
-            RepresentationDiscoveryRunComparison.compare(right, left);
+        var forward = compare(left, right);
+        var reverse = compare(right, left);
 
         assertNotEquals(forward.contentHash(), reverse.contentHash());
-        Entry forwardBudget = forward.changedEntries(Category.PLAN)
-            .stream()
-            .filter(entry -> entry.field().equals("budgetHash"))
-            .findFirst()
-            .orElseThrow();
-        Entry reverseBudget = reverse.changedEntries(Category.PLAN)
-            .stream()
-            .filter(entry -> entry.field().equals("budgetHash"))
-            .findFirst()
-            .orElseThrow();
+        Entry forwardBudget = entry(forward, Category.PLAN, "budgetHash");
+        Entry reverseBudget = entry(reverse, Category.PLAN, "budgetHash");
         assertEquals(forwardBudget.leftValue(), reverseBudget.rightValue());
         assertEquals(forwardBudget.rightValue(), reverseBudget.leftValue());
     }
 
     @Test
     void rejectsTampering() {
-        RepresentationDiscoveryRunWorkspace workspace = root(
-            basePlan(),
-            completedOutcome(sha("runtime")),
-            artifacts(false)
-        );
-        RepresentationDiscoveryRunComparison valid =
-            RepresentationDiscoveryRunComparison.compare(
-                workspace,
-                workspace
-            );
+        var workspace = workspace(basePlan(), "runtime", false);
+        var valid = compare(workspace, workspace);
 
         assertThrows(IllegalArgumentException.class, () ->
             new RepresentationDiscoveryRunComparison(
@@ -256,21 +157,48 @@ class RepresentationDiscoveryRunComparisonTest {
                 valid.contentHash()
             ));
 
-        Entry entry = valid.entries().getFirst();
+        Entry first = valid.entries().getFirst();
         assertThrows(IllegalArgumentException.class, () ->
             new Entry(
-                entry.category(),
-                entry.field(),
-                entry.leftValue(),
-                entry.rightValue(),
-                !entry.equal()
+                first.category(),
+                first.field(),
+                first.leftValue(),
+                first.rightValue(),
+                !first.equal()
             ));
     }
 
-    private static RepresentationDiscoveryRunWorkspace root(
+    private static RepresentationDiscoveryRunComparison compare(
+        RepresentationDiscoveryRunWorkspace left,
+        RepresentationDiscoveryRunWorkspace right
+    ) {
+        return RepresentationDiscoveryRunComparison.compare(left, right);
+    }
+
+    private static List<String> fields(
+        RepresentationDiscoveryRunComparison comparison,
+        Category category
+    ) {
+        return comparison.changedEntries(category).stream()
+            .map(Entry::field)
+            .toList();
+    }
+
+    private static Entry entry(
+        RepresentationDiscoveryRunComparison comparison,
+        Category category,
+        String field
+    ) {
+        return comparison.changedEntries(category).stream()
+            .filter(candidate -> candidate.field().equals(field))
+            .findFirst()
+            .orElseThrow();
+    }
+
+    private static RepresentationDiscoveryRunWorkspace workspace(
         RepresentationDiscoveryRunPlan plan,
-        RepresentationDiscoveryRunOutcome outcome,
-        List<RepresentationDiscoveryArtifactReference> artifacts
+        String runtimeTag,
+        boolean graphAvailable
     ) {
         return RepresentationDiscoveryRunWorkspace.create(
             RepresentationDiscoveryRunInput.expression(
@@ -278,18 +206,25 @@ class RepresentationDiscoveryRunComparisonTest {
                 List.of("x is real")
             ),
             plan,
-            outcome,
-            artifacts,
+            RepresentationDiscoveryRunOutcome.create(
+                TerminalState.COMPLETED,
+                "CANDIDATES_RETAINED",
+                100,
+                80,
+                sha("canonical-work-ledger"),
+                sha(runtimeTag)
+            ),
+            artifacts(graphAvailable),
             revisions()
         );
     }
 
     private static RepresentationDiscoveryRunPlan basePlan() {
-        return plan(sha("budget"), 42);
+        return plan("budget", 42);
     }
 
     private static RepresentationDiscoveryRunPlan plan(
-        String budgetHash,
+        String budgetTag,
         long seed
     ) {
         return RepresentationDiscoveryRunPlan.create(
@@ -302,22 +237,9 @@ class RepresentationDiscoveryRunComparisonTest {
             "target-free-breadth-first/v1",
             "pareto-archive/v1",
             "representation-discovery/v1",
-            budgetHash,
+            sha(budgetTag),
             seed,
             List.of("internal:java25", "sympy:1.14.0")
-        );
-    }
-
-    private static RepresentationDiscoveryRunOutcome completedOutcome(
-        String runtimeDiagnosticsHash
-    ) {
-        return RepresentationDiscoveryRunOutcome.create(
-            TerminalState.COMPLETED,
-            "CANDIDATES_RETAINED",
-            100,
-            80,
-            sha("canonical-work-ledger"),
-            runtimeDiagnosticsHash
         );
     }
 
@@ -329,8 +251,9 @@ class RepresentationDiscoveryRunComparisonTest {
                 RepresentationDiscoveryRunWorkspace.notProducedArtifacts()
             );
         if (graphAvailable) {
-            replace(
-                references,
+            references.removeIf(reference ->
+                reference.role() == ArtifactRole.SEARCH_GRAPH);
+            references.add(
                 RepresentationDiscoveryArtifactReference.available(
                     ArtifactRole.SEARCH_GRAPH,
                     "regelsuche.search-graph/v1",
@@ -339,15 +262,6 @@ class RepresentationDiscoveryRunComparisonTest {
             );
         }
         return references;
-    }
-
-    private static void replace(
-        List<RepresentationDiscoveryArtifactReference> references,
-        RepresentationDiscoveryArtifactReference replacement
-    ) {
-        references.removeIf(reference ->
-            reference.role() == replacement.role());
-        references.add(replacement);
     }
 
     private static RepresentationDiscoveryRevisionEvidence revisions() {
