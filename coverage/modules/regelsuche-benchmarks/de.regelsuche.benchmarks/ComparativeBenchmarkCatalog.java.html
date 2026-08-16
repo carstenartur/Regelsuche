@@ -286,70 +286,69 @@ final class ComparativeBenchmarkCatalog {
                     &quot;PROJECT_NOVELTY_AND_FALSIFICATION&quot;)),
 <span class="fc" id="L287">            CoverageGap.create(</span>
                 Track.SIMPLIFICATION_COMPETITION,
-                &quot;The target-free simplification corpus is small and single-domain; equality saturation, randomized-valid competitors and an independent assumption-aware output validator remain unmeasured.&quot;,
+                &quot;The target-free simplification corpus is small and single-domain; equality saturation and an independent assumption-aware output validator remain unmeasured. A deterministic seeded randomized-valid rewrite control is now retained.&quot;,
 <span class="fc" id="L290">                List.of(</span>
                     &quot;EQUALITY_SATURATION_COMPETITOR_WITH_EXACT_SIDE_CONDITION_PROVENANCE&quot;,
-                    &quot;RANDOMIZED_VALID_COMPETITOR&quot;,
                     &quot;MULTI_DOMAIN_SIMPLIFICATION_CORPUS&quot;,
                     &quot;INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION&quot;)),
-<span class="fc" id="L295">            CoverageGap.create(</span>
+<span class="fc" id="L294">            CoverageGap.create(</span>
                 Track.CROSS_FAMILY_TRANSFER,
                 &quot;The fully held-out #222 transfer split is not part of the first executable slice.&quot;,
-<span class="fc" id="L298">                List.of(</span>
+<span class="fc" id="L297">                List.of(</span>
                     &quot;FAMILY_BLIND_FORMATION&quot;,
                     &quot;HELD_OUT_TRANSFER_RESULTS&quot;,
                     &quot;PAIRED_UTILITY&quot;)),
-<span class="fc" id="L302">            CoverageGap.create(</span>
+<span class="fc" id="L301">            CoverageGap.create(</span>
                 Track.AUTONOMOUS_CAMPAIGN,
                 &quot;Controller baselines have not yet consumed the pinned #355 research brief and budget ledger.&quot;,
-<span class="fc" id="L305">                List.of(</span>
+<span class="fc" id="L304">                List.of(</span>
                     &quot;COMMON_RESEARCH_BRIEF&quot;,
                     &quot;COMMON_RESOURCE_LEDGER&quot;,
                     &quot;COMPLETE_RECEIPT_DAG&quot;)),
-<span class="fc" id="L309">            CoverageGap.create(</span>
+<span class="fc" id="L308">            CoverageGap.create(</span>
                 Track.DISCOVERY_COMPONENT_ABLATION,
                 &quot;At least three production discovery-component ablations remain to be measured.&quot;,
-<span class="fc" id="L312">                List.of(</span>
+<span class="fc" id="L311">                List.of(</span>
                     &quot;THREE_COMPONENT_ABLATIONS&quot;,
                     &quot;IDENTICAL_INPUT_EVIDENCE&quot;,
                     &quot;SEPARATE_CORRECTNESS_AND_UTILITY&quot;)),
-<span class="fc" id="L316">            CoverageGap.create(</span>
+<span class="fc" id="L315">            CoverageGap.create(</span>
                 Track.CONTROLLER_ABLATION,
                 &quot;At least two autonomous-controller ablations remain to be measured.&quot;,
-<span class="fc" id="L319">                List.of(</span>
+<span class="fc" id="L318">                List.of(</span>
                     &quot;TWO_CONTROLLER_ABLATIONS&quot;,
                     &quot;BALANCED_RESOURCE_ACCOUNTING&quot;,
                     &quot;DETERMINISTIC_NEXT_PLAN&quot;)));
     }
 
     private static String corpusHash(List&lt;Case&gt; cases) {
-<span class="fc" id="L326">        return SolverIr.sha256(</span>
-<span class="fc" id="L327">            cases.stream().map(Case::contentHash).sorted().toList().toString());</span>
+<span class="fc" id="L325">        return SolverIr.sha256(</span>
+<span class="fc" id="L326">            cases.stream().map(Case::contentHash).sorted().toList().toString());</span>
     }
 
     private static String searchInventoryHash() {
-<span class="fc" id="L331">        List&lt;String&gt; ruleIds = new AstRewriteTransformationEngine().rules()</span>
-<span class="fc" id="L332">            .stream()</span>
-<span class="fc" id="L333">            .map(rule -&gt; rule.id())</span>
-<span class="fc" id="L334">            .sorted()</span>
-<span class="fc" id="L335">            .toList();</span>
-<span class="fc" id="L336">        return SolverIr.sha256(ruleIds.toString());</span>
+<span class="fc" id="L330">        List&lt;String&gt; ruleIds = new AstRewriteTransformationEngine().rules()</span>
+<span class="fc" id="L331">            .stream()</span>
+<span class="fc" id="L332">            .map(rule -&gt; rule.id())</span>
+<span class="fc" id="L333">            .sorted()</span>
+<span class="fc" id="L334">            .toList();</span>
+<span class="fc" id="L335">        return SolverIr.sha256(ruleIds.toString());</span>
     }
 
     private static String searchBudgetHash() {
-<span class="fc" id="L340">        return SolverIr.sha256(</span>
-<span class="fc" id="L341">            &quot;maxDepth=&quot; + SEARCH_BUDGET.maxDepth()</span>
+<span class="fc" id="L339">        return SolverIr.sha256(</span>
+<span class="fc" id="L340">            &quot;maxDepth=&quot; + SEARCH_BUDGET.maxDepth()</span>
                 + &quot;\nmaxVisitedExpressions=&quot;
-<span class="fc" id="L343">                    + SEARCH_BUDGET.maxVisitedExpressions()</span>
+<span class="fc" id="L342">                    + SEARCH_BUDGET.maxVisitedExpressions()</span>
                 + &quot;\nmaxExpandingSteps=&quot;
-<span class="fc" id="L345">                    + SEARCH_BUDGET.maxExpandingSteps()</span>
+<span class="fc" id="L344">                    + SEARCH_BUDGET.maxExpandingSteps()</span>
                 + &quot;\nmaxCandidatesPerState=&quot;
-<span class="fc" id="L347">                    + SEARCH_BUDGET.maxCandidatesPerState()</span>
-<span class="fc" id="L348">                + &quot;\nbeamWidth=&quot; + SEARCH_BUDGET.beamWidth());</span>
+<span class="fc" id="L346">                    + SEARCH_BUDGET.maxCandidatesPerState()</span>
+<span class="fc" id="L347">                + &quot;\nbeamWidth=&quot; + SEARCH_BUDGET.beamWidth());</span>
     }
 
     private static String notApplicable(String name) {
-<span class="fc" id="L352">        return SolverIr.sha256(&quot;NOT_APPLICABLE:&quot; + name);</span>
+<span class="fc" id="L351">        return SolverIr.sha256(&quot;NOT_APPLICABLE:&quot; + name);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

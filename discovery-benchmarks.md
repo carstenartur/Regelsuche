@@ -8,9 +8,9 @@ The authoritative report schema is `regelsuche.comparative-benchmark/v1`. Every 
 NO_UNIVERSAL_SCORE_TRACK_SCOPED_CLAIMS_ONLY
 ```
 
-## First executable slice
+## Executable suite
 
-The initial suite `comparative-baselines-initial/v1` measures three separate tracks.
+The suite `comparative-baselines-initial/v2` measures three separate tracks.
 
 ### Target-directed search
 
@@ -32,28 +32,37 @@ The SymPy adapter rejects assumptions, division, calls and unsupported exponent 
 
 ### Target-free simplification competition
 
-The equality-validation track uses external systems as validators: they receive both sides of a statement and decide equality. That role cannot show how Regelsuche compares as a rewriting system. The `SIMPLIFICATION_COMPETITION` track therefore runs two actual simplifiers:
+The equality-validation track uses external systems as validators: they receive both sides of a statement and decide equality. That role cannot show how Regelsuche compares as a rewriting system. The `SIMPLIFICATION_COMPETITION` track therefore executes three target-free configurations:
 
 1. Regelsuche untargeted best-first search over the default rewrite inventory, through `SearchProblem.withoutTarget()`;
-2. external SymPy in its native `simplify` role, pinned in the same verification environment.
+2. a deterministic seeded randomized-valid rewrite control over the same production inventory and search budget;
+3. external SymPy in its native `simplify` role, pinned in the same verification environment.
 
-Neither competitor receives the pinned reference form. The parity manifest `target-free-simplification/v1` therefore sets `targetVisible=false` and `hiddenReferenceVisible=false`.
+Neither configuration receives the pinned reference form. The parity manifest `target-free-simplification/v1` therefore sets `targetVisible=false` and `hiddenReferenceVisible=false`.
 
-Each competitor contributes exactly one output. SymPy contributes its native `simplify` result. Regelsuche selects one state from its target-free search using a fixed policy that is part of the configuration hash: lowest `ExpressionScorer` total, then normalized expression text, then search depth. A reference-shaped state that was merely visited but not selected does not count as a hit.
+Each configuration contributes exactly one output. SymPy contributes its native `simplify` result. Both internal configurations select one state from their target-free search using the same fixed policy that is part of the configuration hash: lowest `ExpressionScorer` total, then normalized expression text, then search depth. A reference-shaped state that was merely visited but not selected does not count as a hit.
 
 Both selected outputs are compared by the same surface judge, `ExpressionCanonicalizer`. A case is reached when the canonical hash of the selected expression equals the canonical hash of the pinned reference form. This avoids treating notation differences such as SymPy’s `**` and Regelsuche’s `^` as different results.
 
 The reference is intentionally called a **pinned reference form**, not “the simplest form”. The current benchmark does not define a universal simplicity ordering and therefore cannot claim that a different equivalent output is worse in general.
 
+#### Seeded randomized-valid control
+
+The control is reported as `SystemKind.ABLATION`, not as an external system and not as the ordinary Regelsuche configuration. It changes only the bounded scheduling order of production-valid rewrites.
+
+A fresh `RandomMonteCarloSearchStrategy` delegate is created for every case. The frozen base seed is combined with the stable canonical source hash, so repeated calls on the same runner and independent clean runners consume the same per-case random stream. The base seed, derivation policy and delegate identity are part of the configuration policy hash.
+
+The complete contract and claim boundary are documented in [Deterministic randomized-valid simplification control](randomized-valid-simplification-control.md).
+
 #### Assumptions and current validation boundary
 
-Cases may declare assumptions such as `x - 1 != 0` for rational cancellation. The selected Regelsuche path retains the side conditions emitted by its rewrite steps; it only counts when all emitted conditions occur in the case’s canonical assumption contract.
+Cases may declare assumptions such as `x - 1 != 0` for rational cancellation. The selected Regelsuche and randomized-control paths retain the side conditions emitted by their rewrite steps; an output only counts when all emitted conditions occur in the case’s canonical assumption contract.
 
 The external adapter can bind symbol-scoped assumptions directly. Composite declarations such as `x - 1 != 0` cannot currently be represented as SymPy symbol assumptions and remain visible as a configuration limitation. An independent assumption-aware validator for every produced output is therefore still a machine-readable coverage gap. The benchmark does not claim that this gap is already closed.
 
-#### Retained outcome
+#### Retained primary head-to-head outcome
 
-The current pinned corpus contains seven algebraic cases:
+The pinned corpus contains seven algebraic cases. The primary Regelsuche-versus-SymPy result remains unchanged and is not rewritten merely because an additional control is added:
 
 | Case | Family | Regelsuche untargeted best-first | SymPy `simplify` |
 |---|---|---|---|
@@ -65,7 +74,7 @@ The current pinned corpus contains seven algebraic cases:
 | `(x^2 - 1) / (x - 1)` → `x + 1` | rational-cancellation | reached | reached |
 | `(x^3 - 1) / (x - 1)` → `x ^ 2 + x + 1` | polynomial-division | **not reached** | reached |
 
-Regelsuche reaches six of seven pinned reference forms, SymPy reaches seven of seven. The track claim `target-free-simplification-head-to-head` is retained with status `NEGATIVE`; losing evidence is not deleted or converted into a passing claim.
+Regelsuche reaches six of seven pinned reference forms, SymPy reaches seven of seven. The track claim `target-free-simplification-head-to-head` remains `NEGATIVE`; losing evidence is not deleted or converted into a passing claim. The randomized control’s seven per-case results are retained beside the primary configurations in the canonical bundle rather than manually copied into this prose.
 
 #### What the first retained loss diagnosed
 
@@ -107,7 +116,9 @@ An `EXECUTED` but incorrect result is legitimate retained evidence. Deleting it 
 
 Each track has one `InformationParityManifest` containing visibility flags and hashes for the input corpus, inventory, budget, Research Brief, qualification split and mandatory evaluations. Each configuration references exactly one same-track manifest.
 
-The first slice keeps all hidden-reference, family-label, TEST-label, qualification-label and review-label visibility flags false. Target visibility is true only for target-directed search and equality validation. The simplification competition sets it false.
+The current suite keeps all hidden-reference, family-label, TEST-label, qualification-label and review-label visibility flags false. Target visibility is true only for target-directed search and equality validation. The simplification competition sets it false.
+
+The two internal simplification configurations share the exact same input corpus, default rewrite inventory and `SearchHeuristic` budget. Their different scheduling policies remain configuration identities, not hidden information differences.
 
 ## Canonical evidence
 
@@ -140,7 +151,6 @@ Repeated runs with the fixed environment must produce byte-identical bundles. Th
 Unmeasured work is not omitted. The report currently retains machine-readable gaps for:
 
 - an equality-saturation competitor with exact side-condition provenance;
-- a randomized-valid simplification competitor;
 - a multi-domain simplification corpus;
 - independent assumption-aware validation of every simplifier output;
 - hidden-rule rediscovery using the #227 leakage controls;
@@ -149,17 +159,17 @@ Unmeasured work is not omitted. The report currently retains machine-readable ga
 - autonomous campaign-controller comparison over the #355 Research Brief and ledger;
 - discovery-component and controller ablations.
 
-A gap disappears only when its required raw evidence is executed and retained under the corresponding information-parity manifest.
+The randomized-valid simplification control is no longer a coverage gap: it is a configured seven-case matrix whose seed and scheduling policy are content-bound. A remaining gap disappears only when its required raw evidence is executed and retained under the corresponding information-parity manifest.
 
 ## Reproduction and verification
 
-The complete benchmark contract runs from a normal checkout with:
+The complete benchmark contract currently runs from a normal checkout with:
 
 ```bash
 bash scripts/run-comparative-benchmarks-verification.sh
 ```
 
-Required host tools are a reachable Docker daemon, Python `venv` support and Z3 4.8.12. The runner creates a build-local environment with pinned SymPy and `jsonschema`, then:
+Required host tools are a reachable Docker daemon, Python `venv` support and Z3 4.8.12. This is transitional build debt tracked by #632, not the intended final toolchain. The runner creates a build-local environment with pinned SymPy and `jsonschema`, then:
 
 1. runs the benchmark JUnit suite;
 2. writes two independent Gradle evidence bundles;
@@ -169,4 +179,4 @@ Required host tools are a reachable Docker daemon, Python `venv` support and Z3 
 6. generates and validates a third bundle in that image;
 7. requires Docker and Gradle evidence to be byte-identical.
 
-The `Comparative Benchmarks` GitHub workflow only installs the declared host toolchain, invokes the same checkout-owned runner and publishes its output.
+The central GitHub CI is an environment adapter around the checkout-owned verification lifecycle. Migration of this path to the sole Maven/JUnit/Testcontainers contract remains part of #632.

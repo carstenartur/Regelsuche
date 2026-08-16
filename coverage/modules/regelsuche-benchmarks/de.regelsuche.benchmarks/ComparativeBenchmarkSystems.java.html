@@ -7,9 +7,14 @@ import de.regelsuche.solver.ir.SolverBackend;
 import java.util.List;
 import java.util.Objects;
 
-/** Runtime system descriptors used by the initial comparative benchmark slice. */
+/** Runtime system descriptors used by the comparative benchmark. */
 final class ComparativeBenchmarkSystems {
     private ComparativeBenchmarkSystems() {
+    }
+
+    /** Search strategy whose complete frozen configuration is externally visible. */
+    interface BenchmarkIdentifiedSearchStrategy extends SearchStrategy {
+        String implementationIdentity();
     }
 
     record SearchSystem(
@@ -18,12 +23,12 @@ final class ComparativeBenchmarkSystems {
         SearchStrategy strategy,
         List&lt;String&gt; limitations
     ) {
-<span class="fc" id="L21">        SearchSystem {</span>
-<span class="fc" id="L22">            requireText(id, &quot;search system id&quot;);</span>
-<span class="fc" id="L23">            requireText(version, &quot;search system version&quot;);</span>
-<span class="fc" id="L24">            Objects.requireNonNull(strategy, &quot;strategy&quot;);</span>
-<span class="fc" id="L25">            limitations = clean(limitations);</span>
-<span class="fc" id="L26">        }</span>
+<span class="fc" id="L26">        SearchSystem {</span>
+<span class="fc" id="L27">            requireText(id, &quot;search system id&quot;);</span>
+<span class="fc" id="L28">            requireText(version, &quot;search system version&quot;);</span>
+<span class="fc" id="L29">            Objects.requireNonNull(strategy, &quot;strategy&quot;);</span>
+<span class="fc" id="L30">            limitations = clean(limitations);</span>
+<span class="fc" id="L31">        }</span>
     }
 
     record ValidationSystem(
@@ -34,21 +39,21 @@ final class ComparativeBenchmarkSystems {
         String environmentIdentity,
         List&lt;String&gt; limitations
     ) {
-<span class="fc" id="L37">        ValidationSystem {</span>
-<span class="fc" id="L38">            Objects.requireNonNull(backend, &quot;backend&quot;);</span>
-<span class="fc" id="L39">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            roles = roles == null ? List.of() : roles.stream()</span>
-<span class="fc" id="L41">                .filter(Objects::nonNull)</span>
-<span class="fc" id="L42">                .distinct()</span>
-<span class="fc" id="L43">                .sorted(java.util.Comparator.comparing(Enum::name))</span>
-<span class="fc" id="L44">                .toList();</span>
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            if (roles.isEmpty()) {</span>
-<span class="nc" id="L46">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L42">        ValidationSystem {</span>
+<span class="fc" id="L43">            Objects.requireNonNull(backend, &quot;backend&quot;);</span>
+<span class="fc" id="L44">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            roles = roles == null ? List.of() : roles.stream()</span>
+<span class="fc" id="L46">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L47">                .distinct()</span>
+<span class="fc" id="L48">                .sorted(java.util.Comparator.comparing(Enum::name))</span>
+<span class="fc" id="L49">                .toList();</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (roles.isEmpty()) {</span>
+<span class="nc" id="L51">                throw new IllegalArgumentException(</span>
                     &quot;validation system roles must not be empty&quot;);
             }
-<span class="fc" id="L49">            requireText(environmentIdentity, &quot;environmentIdentity&quot;);</span>
-<span class="fc" id="L50">            limitations = clean(limitations);</span>
-<span class="fc" id="L51">        }</span>
+<span class="fc" id="L54">            requireText(environmentIdentity, &quot;environmentIdentity&quot;);</span>
+<span class="fc" id="L55">            limitations = clean(limitations);</span>
+<span class="fc" id="L56">        }</span>
     }
 
     /**
@@ -70,25 +75,29 @@ final class ComparativeBenchmarkSystems {
         String environmentIdentity,
         List&lt;String&gt; limitations
     ) {
-<span class="fc" id="L73">        SimplificationSystem {</span>
-<span class="fc" id="L74">            requireText(id, &quot;simplification system id&quot;);</span>
-<span class="fc" id="L75">            requireText(version, &quot;simplification system version&quot;);</span>
-<span class="fc" id="L76">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="pc bpc" id="L77" title="1 of 6 branches missed.">            if ((strategy == null) == (externalSimplifier == null)) {</span>
-<span class="nc" id="L78">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L78">        SimplificationSystem {</span>
+<span class="fc" id="L79">            requireText(id, &quot;simplification system id&quot;);</span>
+<span class="fc" id="L80">            requireText(version, &quot;simplification system version&quot;);</span>
+<span class="fc" id="L81">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L82" title="1 of 6 branches missed.">            if ((strategy == null) == (externalSimplifier == null)) {</span>
+<span class="nc" id="L83">                throw new IllegalArgumentException(</span>
                     &quot;exactly one simplification competitor implementation is required&quot;);
             }
-<span class="fc" id="L81">            requireText(environmentIdentity, &quot;environmentIdentity&quot;);</span>
-<span class="fc" id="L82">            limitations = clean(limitations);</span>
-<span class="fc" id="L83">        }</span>
+<span class="fc" id="L86">            requireText(environmentIdentity, &quot;environmentIdentity&quot;);</span>
+<span class="fc" id="L87">            limitations = clean(limitations);</span>
+<span class="fc" id="L88">        }</span>
 
         /** @return the stable identity of implementation and target-free output selection. */
         String implementationIdentity() {
-<span class="fc bfc" id="L87" title="All 2 branches covered.">            if (strategy != null) {</span>
-<span class="fc" id="L88">                return &quot;internal:&quot; + strategy.getClass().getName()</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (strategy != null) {</span>
+                String strategyIdentity = strategy
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                        instanceof BenchmarkIdentifiedSearchStrategy identified</span>
+<span class="fc" id="L95">                    ? identified.implementationIdentity()</span>
+<span class="fc" id="L96">                    : strategy.getClass().getName();</span>
+<span class="fc" id="L97">                return &quot;internal:&quot; + strategyIdentity</span>
                     + &quot;\noutputSelection=min-expression-score-then-text-then-depth/v1&quot;;
             }
-<span class="fc" id="L91">            return &quot;external:&quot; + externalSimplifier.configurationHash()</span>
+<span class="fc" id="L100">            return &quot;external:&quot; + externalSimplifier.configurationHash()</span>
                 + &quot;\noutputSelection=native-single-output/v1&quot;;
         }
 
@@ -98,45 +107,56 @@ final class ComparativeBenchmarkSystems {
             SearchStrategy strategy,
             List&lt;String&gt; limitations
         ) {
-<span class="fc" id="L101">            return new SimplificationSystem(</span>
+<span class="fc" id="L110">            return new SimplificationSystem(</span>
                 id, version, SystemKind.REGELSUCHE, strategy, null, true,
-                &quot;java=21\nsearch-kernel=regelsuche-search/v1&quot;, limitations);
+                &quot;java=25\nsearch-kernel=regelsuche-search/v1&quot;, limitations);
+        }
+
+        static SimplificationSystem internalControl(
+            String id,
+            String version,
+            SearchStrategy strategy,
+            List&lt;String&gt; limitations
+        ) {
+<span class="fc" id="L121">            return new SimplificationSystem(</span>
+                id, version, SystemKind.ABLATION, strategy, null, true,
+                &quot;java=25\nsearch-kernel=regelsuche-search/v1&quot;, limitations);
         }
 
         static SimplificationSystem external(
             ExternalSymPySimplificationBaseline simplifier,
             List&lt;String&gt; limitations
         ) {
-<span class="fc" id="L110">            Objects.requireNonNull(simplifier, &quot;simplifier&quot;);</span>
-<span class="fc" id="L111">            return new SimplificationSystem(</span>
-<span class="fc" id="L112">                simplifier.backendId(),</span>
-<span class="fc" id="L113">                simplifier.backendVersion(),</span>
+<span class="fc" id="L130">            Objects.requireNonNull(simplifier, &quot;simplifier&quot;);</span>
+<span class="fc" id="L131">            return new SimplificationSystem(</span>
+<span class="fc" id="L132">                simplifier.backendId(),</span>
+<span class="fc" id="L133">                simplifier.backendVersion(),</span>
                 SystemKind.EXTERNAL_BASELINE,
                 null,
                 simplifier,
-<span class="fc" id="L117">                simplifier.available(),</span>
-<span class="fc" id="L118">                simplifier.environmentIdentity(),</span>
+<span class="fc" id="L137">                simplifier.available(),</span>
+<span class="fc" id="L138">                simplifier.environmentIdentity(),</span>
                 limitations);
         }
     }
 
     private static List&lt;String&gt; clean(List&lt;String&gt; values) {
-<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (values == null) {</span>
-<span class="nc" id="L125">            return List.of();</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L145">            return List.of();</span>
         }
-<span class="fc" id="L127">        return values.stream()</span>
-<span class="fc" id="L128">            .filter(Objects::nonNull)</span>
-<span class="fc" id="L129">            .map(String::trim)</span>
-<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            .filter(value -&gt; !value.isEmpty())</span>
-<span class="fc" id="L131">            .distinct()</span>
-<span class="fc" id="L132">            .sorted()</span>
-<span class="fc" id="L133">            .toList();</span>
+<span class="fc" id="L147">        return values.stream()</span>
+<span class="fc" id="L148">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L149">            .map(String::trim)</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">            .filter(value -&gt; !value.isEmpty())</span>
+<span class="fc" id="L151">            .distinct()</span>
+<span class="fc" id="L152">            .sorted()</span>
+<span class="fc" id="L153">            .toList();</span>
     }
 
     private static void requireText(String value, String name) {
-<span class="pc bpc" id="L137" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L138">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L157" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L158">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L140">    }</span>
+<span class="fc" id="L160">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
