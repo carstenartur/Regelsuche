@@ -6,7 +6,7 @@ The complete Release Readiness gate is repository-owned and executable from a pl
 bash scripts/run-release-readiness-verification.sh
 ```
 
-The command requires Java 21 and a reachable Docker daemon. It manages its pinned Python schema validator in `build/verification-venv`; GitHub Actions is not required.
+The command requires Java 25 and a reachable Docker daemon. It manages its pinned Python schema validator in `build/verification-venv`; GitHub Actions is not required.
 
 The runner performs the complete contract:
 

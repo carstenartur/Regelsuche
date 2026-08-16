@@ -24,7 +24,7 @@ mvn --batch-mode --no-transfer-progress \
   -pl regelsuche-solver-portfolio -am test
 ```
 
-These module test paths use Java 21, Maven Surefire and JUnit Jupiter. They introduce no host-side Python, Bash, Perl, Node/npm, Gradle invocation or GitHub dependency.
+These module test paths use Java 25, Maven Surefire and JUnit Jupiter. They introduce no host-side Python, Bash, Perl, Node/npm, Gradle invocation or GitHub dependency.
 
 ## Solver boundary
 

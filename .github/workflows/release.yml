@@ -311,12 +311,12 @@ jobs:
           python3 .github/scripts/update-release-metadata.py \
             "$DEVELOPMENT_VERSION" --check
 
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         if: steps.release-state.outputs.publication_required == 'true'
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
           cache: maven
 
       - name: Set up Gradle compatibility gate

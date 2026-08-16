@@ -20,10 +20,10 @@ EXPECTED_WRAPPER_SHA256 = (
     "84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae"
 )
 EXPECTED_IMAGE_DIGEST = (
-    "sha256:35685c7e23352983a48882d97cd9875f5284c228db71d1e2476e5e6c1bab1080"
+    "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
 )
 EXPECTED_IMAGE_FROM = (
-    "FROM eclipse-temurin:21.0.11_10-jdk-noble@"
+    "FROM eclipse-temurin:25.0.3_9-jdk-noble@"
     + EXPECTED_IMAGE_DIGEST
     + " AS build"
 )

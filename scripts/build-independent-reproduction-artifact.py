@@ -19,11 +19,11 @@ from typing import Any, Iterable
 MANIFEST_SCHEMA = "regelsuche.independent-reproduction-artifact/v1"
 CLAIM_POLICY = "REPRODUCTION_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"
 BASE_IMAGE = (
-    "eclipse-temurin:21.0.11_10-jdk-noble@"
-    "sha256:35685c7e23352983a48882d97cd9875f5284c228db71d1e2476e5e6c1bab1080"
+    "eclipse-temurin:25.0.3_9-jdk-noble@"
+    "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
 )
 BASE_IMAGE_INDEX_DIGEST = (
-    "sha256:35685c7e23352983a48882d97cd9875f5284c228db71d1e2476e5e6c1bab1080"
+    "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
 )
 GRADLE_DISTRIBUTION = "gradle-9.7.0-bin.zip"
 GRADLE_DISTRIBUTION_SHA256 = (
