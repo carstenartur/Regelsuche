@@ -184,7 +184,7 @@ class OpenApiStaticReferenceTest {
         }
 
         assertTrue(operationCount >= 45, "the first public contract must cover the complete workbench surface");
-        assertEquals(11, requestBodyOperationCount,
+        assertEquals(12, requestBodyOperationCount,
             "all documented JSON request-body operations must retain the common 413 contract");
         assertTrue(usedTags.containsAll(Set.of(
             "Search", "Paths", "Search Graph", "Proof Jobs", "Didactics", "Rule Radar")));
