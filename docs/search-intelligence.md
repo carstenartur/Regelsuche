@@ -1,77 +1,75 @@
 # Search Intelligence
 
-This page is the entry point for the mechanisms that make Regelsuche's search
-selective and diagnosable: profiles, goals, transposition memory, structural
-diversity, bounded reachability and universal patterns.
+## Goals and transforms
 
-For roadmap and historical context see
-[`search-intelligence-roadmap.md`](search-intelligence-roadmap.md). This page
-describes the currently shipped behavior.
+The workbench accepts an optional transformation goal on `POST /api/search`.
+The default is `SIMPLIFY`; supported values are:
 
-## Profile + Goal
+- `SIMPLIFY`
+- `FACTOR`
+- `EXPAND`
+- `CANONICAL_FORM`
+- `TEACHING_FRIENDLY`
 
-A `SearchProfile` selects a strategy and heuristic preset. A
-`TransformationGoal` independently selects the cost model used to compare
-candidates.
+A goal selects a `CostModel` used by all bundled strategies. Search states carry
+per-step provenance (`RewriteKind`, complexity/cost hints and whether a rewrite
+is equivalence-preserving by construction). The response mirrors the goal and
+includes:
 
-| Profile | Strategy | Default goal |
-| --- | --- | --- |
-| `FAST_SIMPLIFY` | BestFirst | `SIMPLIFY` |
-| `DISCOVERY` | Hybrid | `SIMPLIFY` |
-| `DIVERSITY_DISCOVERY` | target-blind structural quality-diversity | `SIMPLIFY` |
-| `TEACHING` | Beam | `TEACHING_FRIENDLY` |
-| `PROOF_ORIENTED` | A* | `PROOF_FRIENDLY` |
-| `EXHAUSTIVE_SMALL` | MCTS | `SIMPLIFY` |
-| `DISCOVERY_PLUS` | BestFirst + transposition table | `SIMPLIFY` |
-| `EQUALITY_SATURATION` | EGraph saturation | `SIMPLIFY` |
+- goal/model metadata;
+- selected-state score and estimated-cost breakdown;
+- a bounded Pareto frontier over score, cost, depth, complexity and proof
+  penalty.
 
-The web UI exposes profile and goal separately. `POST /api/search` accepts both;
-when `goal` is omitted, the profile default applies. Usage guidance is in
-[`user-workflows.md`](user-workflows.md#goal-dropdown).
+## Search profiles and strategies
 
-## Transposition table
+Profiles live in `de.regelsuche.search.SearchProfile` and map to a concrete
+strategy:
 
-`DISCOVERY_PLUS` activates the `TranspositionTable`. It recognizes canonical
-states, prunes already-known-better paths and may retain a non-improving path
-when it introduces a new rule combination. Decisions are exposed at
-`/api/memory/pruning`.
+| Profile | Strategy |
+| --- | --- |
+| `DEFAULT` | `BestFirstSearchStrategy` |
+| `EXHAUSTIVE` | `BreadthFirstSearchStrategy` |
+| `LOW_MEMORY` | `BeamSearchStrategy` |
+| `DEEP_SEARCH` | `AStarSearchStrategy` |
+| `STOCHASTIC` | `RandomMonteCarloSearchStrategy` |
+| `DIVERSITY_DISCOVERY` | `StructuralDiversitySearchStrategy` |
+| `CROSS_FAMILY_DISCOVERY` | `CrossFamilyDiscoverySearchStrategy` |
+| `EQUALITY_SATURATION` | `EGraphSaturationStrategy` |
+| `PROGRAMMED` | `ProgrammedSearchStrategy` |
 
-## Structural diversity
+Callers may alternatively name a strategy directly using `strategy`.
+`SearchStrategyProvider` publishes aliases and metadata for API/UI clients.
 
-`DIVERSITY_DISCOVERY` is a deterministic target-blind diagnostic profile. At
-each depth it retains at most one elite per structural cell instead of reducing
-all survivors to one scalar ranking. Cells use only observable TRAIN-side
-structure:
+`StructuralDiversitySearchStrategy` is a deterministic, target-blind
+quality-diversity control. It retains at most one elite per depth-local structural
+cell using only observable expression/path descriptors such as AST-size band,
+expansion debt, last rewrite kind, denominator count and power count. It does
+not receive a target expression or historical identity. The implementation is a
+bounded diagnostic control for scalar-fitness valleys, not a claim of complete
+MAP-Elites search.
 
-- AST-size band;
-- expansion debt;
-- last rewrite kind;
-- denominator-count band;
-- power-count band.
+`CrossFamilyDiscoverySearchStrategy` is a deterministic bounded control for
+moving between visible expression-structure families. It records only
+currently observed structure dimensions, transformation provenance, novelty
+against earlier visible cells and a bounded quality/archive allocation. It does
+not receive hidden family labels, targets or held-out outcomes and it does not
+itself constitute a held-out cross-family experiment.
 
-No target identity is inspected. The profile is a bounded
-MAP-Elites-style control for scalar-fitness valleys, not a claim to implement
-the complete MAP-Elites algorithm.
+## Historical rediscovery and reachability atlas
 
-## Bounded reachability and historical atlas
+The checkout includes a frozen 14-case diagnostic corpus spanning completing
+squares, factorization, temporary expansion, a Sophie-Germain-type bridge, a
+search-policy fitness-valley control and a false near-miss. Each case fixes the
+source, target, relation, role, provenance and independent oracle/search budgets.
 
-`BoundedRewriteReachabilityOracle` performs deterministic breadth-first
-traversal over the directed successors of a frozen `TransformationEngine`. It
-retains a shortest witness and reports exactly one of:
+For each supported case the atlas records:
 
-- `REACHABLE`;
-- `UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE`, only after complete finite-closure
-  exhaustion;
-- `BUDGET_INCONCLUSIVE`, when a depth or visited-state bound blocks an unseen
-  successor.
-
-The historical rediscovery atlas applies this boundary to a versioned 14-case
-corpus and compares four explicitly separated layers:
-
-1. production-inventory reachability;
-2. target-blind scalar best-first search;
-3. target-blind structural-diversity search;
-4. target-guided search as a diagnostic control.
+1. representation and equivalence evidence;
+2. production-inventory reachability;
+3. target-blind scalar best-first search;
+4. target-blind structural-diversity search;
+5. target-guided search as a diagnostic control.
 
 Preregistered controls add the generic
 `DifferenceOfSquaresPreparationOperator` for the Sophie-Germain case and one
@@ -84,7 +82,8 @@ The source corpus and strict schemas are:
 - `regelsuche-experiments/src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json`;
 - `docs/schemas/regelsuche-historical-rediscovery-corpus-v1.schema.json`;
 - `docs/schemas/regelsuche-historical-rediscovery-run-v1.schema.json`;
-- `docs/schemas/regelsuche-witness-pruning-diagnostic-v1.schema.json`.
+- `docs/schemas/regelsuche-witness-pruning-diagnostic-v1.schema.json`;
+- `docs/schemas/regelsuche-witness-policy-comparison-v1.schema.json`.
 
 Generated JSON and Markdown retain the corpus hash, witnesses, rule IDs,
 primitive work, search metrics, directionality and one evidence-derived primary
@@ -126,14 +125,35 @@ production inventory, search policy, oracle and production work ledgers, case
 balance, first loss event and a SHA-256 content identity. It is downstream
 diagnostic evidence and does not replace or mutate the historical atlas run.
 
+### Scalar versus structural-diversity witness retention
+
+The downstream policy comparison consumes the verified atlas run and the
+content-addressed scalar witness-pruning diagnostic. It reruns only the existing
+target-blind `StructuralDiversitySearchStrategy` and requires its explored-state,
+engine-call and generated-transformation ledger to reproduce the retained atlas
+evidence exactly.
+
+For each eligible oracle witness the comparison records the consecutive prefix
+explored by the scalar and diversity policies, whether diversity reaches the
+retained relation, the prefix gain, both actual work ledgers and the identical
+declared `SearchHeuristic` budget. Equal configured budgets are not mislabeled
+as equal executed work.
+
+The canonical artifact is written under
+`regelsuche-experiments/build/reports/historical-rediscovery-witness-policy-comparison/`
+as `witness-policy-comparison.json`. It distinguishes relation recovery, full
+witness exploration, positive/no/negative prefix gain and non-applicable cases.
+The oracle remains post-hoc diagnostic information and never guides either
+search.
+
 The dedicated `regelsuche-core` oracle and known-derivation tests remain the
 authoritative unit-level contracts. Atlas tests add only corpus, policy and
 cross-layer integration evidence; they do not replace those focused tests.
 
-Generate the atlas and witness-prefix diagnostic with:
+Generate the atlas, witness-prefix diagnostic and policy comparison with:
 
 ```bash
-./gradlew :regelsuche-experiments:generateHistoricalRediscoveryAtlas
+./gradlew :regelsuche-experiments:generateHistoricalWitnessPolicyComparison
 ```
 
 The atlas output is written under
@@ -163,10 +183,11 @@ from the target-guided control. The aggregate equivalence-discrimination signal
 requires at least one retained negative control; an empty negative-control
 subset cannot pass by vacuous truth. A first lost witness prefix identifies only
 where the bounded target-blind execution diverged from a target-aware diagnostic
-path. It is not a proof of global unreachability, autonomous rediscovery,
-mathematical novelty or general search superiority. Results establish only
-bounded reachability and search-policy behavior for the frozen representation,
-inventory and budgets.
+path. A diversity prefix gain establishes only a bounded policy difference under
+the declared corpus and budget; it does not establish global reachability,
+autonomous rediscovery, mathematical novelty or general search superiority.
+Results establish only bounded reachability and search-policy behavior for the
+frozen representation, inventory and budgets.
 
 ## Universal patterns
 
@@ -189,12 +210,71 @@ documented in [`macro-rules.md`](macro-rules.md).
 
 ## Equality-saturation runtime metrics
 
-`EQUALITY_SATURATION` additionally reports:
+In addition to the general search API, equality saturation exposes
+per-rule/per-iteration runtime metrics. `EGraphSaturationStrategy` retains the
+latest `EGraphSaturationResult` and the `/api/search` response includes an
+`egraph` object containing:
 
-- `classesScanned`, `nodesScanned`, `candidateClassesSkipped`;
-- `matchesFound`;
-- `matcherCacheHits`, `matcherCacheMisses`;
-- `saturationIterations`, `rulesFired`.
+- stop reason and iteration count;
+- total e-classes / e-nodes;
+- matches, new e-nodes, merges, duplicates and estimated memory;
+- one entry per iteration;
+- per-rule counters with a derived productive merge rate;
+- per-rule scheduling state: finite fuel, deterministic backoff level and
+  next eligible iteration;
+- a `schedulerPolicy` identifier plus baseline/scheduled match, merge,
+  duplicate and estimated-memory deltas;
+- proof-DAG node/edge counts, checker work, verified root, extraction objective,
+  extracted expression/assumptions and per-proof-kind counts when an extraction
+  was requested;
+- no hidden total work: default runs stop at the configured
+  `MAX_SATURATION_ITERATIONS` or an explicit graph limit; fixed-point detection
+  remains opt-in through `stopAtFixedPoint=true` and is reported separately.
 
-The fields are available in `SaturationStats` and the benchmark JSON/Markdown
-artifacts.
+The default publication-capable EGraph rule pack contains only native pattern
+rewrites. Rules are classified as `NATIVE_SUPPORTED`,
+`EXPLICIT_REFERENCE_BRIDGE`, or `UNSUPPORTED_FOR_SATURATION`. The current run
+records included rules together with excluded rules and their reasons; reference
+bridges remain excluded from the default path and cannot be silently presented
+as complete saturation semantics.
+
+Use `GET /api/egraph/metrics` to retrieve the latest snapshot directly. The
+workbench renders the same counters in the *E-Graph Laufzeitmetriken* panel,
+including scheduler policy, per-rule fuel/backoff and proof-checker status.
+
+## Shared saturation fragment manifest
+
+Regelsuche exports a deterministic manifest for the publication-capable native
+EGraph fragment:
+
+```bash
+./gradlew :regelsuche-search:exportSharedSaturationFragment
+```
+
+The output is written to:
+
+```text
+regelsuche-search/build/reports/egraph/shared-saturation-fragment.json
+```
+
+The manifest contains the exact native rule inventory, excluded rules with
+explicit reasons, supported matcher/guard/assumption features, unsupported
+constructs, certificate availability, and a stable `policyHash`. It is intended
+as the information-parity contract for #235 before adding an external
+term-rewriting or equality-saturation competitor.
+
+## Target-aware best-first diagnostics
+
+`SearchProblem.withTarget(...)` can attach a diagnostic target relation to
+best-first, A* and beam search. Target distance changes ordering only: it cannot
+change rule applicability, candidate validity or evidence. The returned
+`GoalSearchResult` retains:
+
+- target terminal status;
+- first reached state;
+- best distance and best state when the target was not reached;
+- explored, expanded, generated, enqueued, skipped and pruned counters;
+- bounded value-identity cache statistics.
+
+The historical atlas uses this only as a target-aware diagnostic control. Its
+ordinary scalar and structural-diversity configurations remain target-blind.
