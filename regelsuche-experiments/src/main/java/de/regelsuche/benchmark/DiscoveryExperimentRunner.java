@@ -1,6 +1,5 @@
 package de.regelsuche.benchmark;
 
-import de.regelsuche.benchmark.HistoricalWitnessPruningReport.CaseStatus;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +51,7 @@ public interface DiscoveryExperimentRunner {
 
         HistoricalWitnessPruningDiagnostic pruning =
             new HistoricalWitnessPruningDiagnostic();
-        HistoricalWitnessPruningReport pruningReport =
+        HistoricalWitnessPruningDiagnostic.Report pruningReport =
             pruning.run(corpus, report);
         verifyWitnessPruning(report, pruningReport);
 
@@ -65,7 +64,7 @@ public interface DiscoveryExperimentRunner {
                 corpus,
                 report,
                 artifacts);
-        HistoricalWitnessPruningDiagnostic.WrittenArtifact pruningArtifact =
+        Path pruningArtifact =
             pruning.write(witnessOutput(output), pruningReport);
 
         System.out.println("historicalRediscoveryAssessment="
@@ -79,10 +78,9 @@ public interface DiscoveryExperimentRunner {
             + verifiedRun.manifestPath());
         System.out.println("historicalRediscoveryRunHash="
             + verifiedRun.manifest().contentHash());
-        System.out.println("historicalWitnessPruning="
-            + pruningArtifact.path());
+        System.out.println("historicalWitnessPruning=" + pruningArtifact);
         System.out.println("historicalWitnessPruningHash="
-            + pruningArtifact.contentHash());
+            + pruningReport.contentHash());
     }
 
     /**
@@ -122,28 +120,30 @@ public interface DiscoveryExperimentRunner {
 
     private static void verifyWitnessPruning(
         HistoricalRediscoveryAtlas.AtlasReport atlas,
-        HistoricalWitnessPruningReport diagnostic
+        HistoricalWitnessPruningDiagnostic.Report diagnostic
     ) {
-        Map<String, HistoricalWitnessPruningReport.CaseDiagnostic> byId =
+        Map<String, HistoricalWitnessPruningDiagnostic.CaseDiagnostic> byId =
             diagnostic.cases().stream().collect(Collectors.toMap(
-                HistoricalWitnessPruningReport.CaseDiagnostic::id,
+                HistoricalWitnessPruningDiagnostic.CaseDiagnostic::id,
                 Function.identity()));
         if (byId.size() != atlas.cases().size()) {
             throw new IllegalStateException(
                 "witness-pruning diagnostic must balance every atlas case");
         }
         for (HistoricalRediscoveryAtlas.CaseResult result : atlas.cases()) {
-            HistoricalWitnessPruningReport.CaseDiagnostic retained =
+            HistoricalWitnessPruningDiagnostic.CaseDiagnostic retained =
                 byId.get(result.benchmarkCase().id());
             if (retained == null) {
                 throw new IllegalStateException(
                     "missing witness-pruning case "
                         + result.benchmarkCase().id());
             }
-            if (result.status()
-                    == HistoricalRediscoveryAtlas.PrimaryStatus
-                        .REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND
-                    && retained.status() != CaseStatus.WITNESS_PREFIX_LOST) {
+            boolean policySignal = result.status()
+                == HistoricalRediscoveryAtlas.PrimaryStatus
+                    .REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND;
+            boolean lossRetained = HistoricalWitnessPruningDiagnostic
+                .WITNESS_PREFIX_LOST.equals(retained.status());
+            if (policySignal && !lossRetained) {
                 throw new IllegalStateException(
                     "target-blind diversity signal requires a retained "
                         + "scalar witness-prefix loss: "
