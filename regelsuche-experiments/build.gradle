@@ -43,13 +43,15 @@ tasks.named('jacocoTestReport') {
 
 def historicalRediscoveryReportDirectory = layout.buildDirectory.dir(
     'reports/historical-rediscovery')
+def historicalWitnessPruningReportDirectory = layout.buildDirectory.dir(
+    'reports/historical-rediscovery-witness-pruning')
 def historicalRediscoveryOutputArgument =
     historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
 
 def generateHistoricalRediscoveryAtlas = tasks.register(
     'generateHistoricalRediscoveryAtlas', JavaExec) {
     group = 'verification'
-    description = 'Executes the frozen historical reachability and search-policy atlas.'
+    description = 'Executes the frozen historical reachability atlas and witness-prefix diagnosis.'
     dependsOn tasks.named('classes')
     timeout = java.time.Duration.ofMinutes(10)
     classpath = sourceSets.main.runtimeClasspath
@@ -60,6 +62,7 @@ def generateHistoricalRediscoveryAtlas = tasks.register(
     inputs.file(layout.projectDirectory.file(
         'src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json'))
     outputs.dir(historicalRediscoveryReportDirectory)
+    outputs.dir(historicalWitnessPruningReportDirectory)
 }
 
 tasks.named('check') {
