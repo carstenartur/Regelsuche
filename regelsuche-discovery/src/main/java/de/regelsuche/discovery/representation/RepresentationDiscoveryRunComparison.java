@@ -8,7 +8,6 @@ import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunC
 import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -17,10 +16,9 @@ import java.util.Set;
 /**
  * Content-addressed, non-ranking comparison of two immutable discovery runs.
  *
- * <p>The comparison reports raw equality and difference information. Runtime
- * diagnostics are deliberately separated from canonical experiment evidence.
- * No comparison result establishes mathematical truth, novelty or search
- * superiority.</p>
+ * <p>The comparison reports raw field equality. Runtime diagnostics are kept
+ * separate from canonical experiment evidence. A comparison never establishes
+ * mathematical truth, novelty, interestingness or search superiority.</p>
  */
 public record RepresentationDiscoveryRunComparison(
     String schema,
@@ -65,8 +63,8 @@ public record RepresentationDiscoveryRunComparison(
         Relationship expectedRelationship = relationship(
             leftRunId,
             rightRunId,
-            value(entries, Category.LINEAGE, "parentRunId", true),
-            value(entries, Category.LINEAGE, "parentRunId", false)
+            entryValue(entries, Category.LINEAGE, "parentRunId", true),
+            entryValue(entries, Category.LINEAGE, "parentRunId", false)
         );
         if (relationship != expectedRelationship) {
             throw new IllegalArgumentException(
@@ -140,12 +138,11 @@ public record RepresentationDiscoveryRunComparison(
     }
 
     /**
-     * Returns differences that affect the immutable experiment evidence,
-     * excluding non-authoritative runtime diagnostics.
+     * Returns differences that affect immutable experiment evidence, excluding
+     * non-authoritative runtime diagnostics.
      */
     public List<Entry> canonicalChangedEntries() {
-        return entries.stream()
-            .filter(entry -> !entry.equal())
+        return changedEntries().stream()
             .filter(entry -> entry.category()
                 != Category.RUNTIME_DIAGNOSTICS)
             .toList();
@@ -156,15 +153,14 @@ public record RepresentationDiscoveryRunComparison(
         return canonicalChangedEntries().isEmpty();
     }
 
-    /** Returns changed entries in one explicit comparison category. */
+    /** Returns changed entries in one explicit category. */
     public List<Entry> changedEntries(Category category) {
         Category normalizedCategory = Objects.requireNonNull(
             category,
             "category"
         );
-        return entries.stream()
+        return changedEntries().stream()
             .filter(entry -> entry.category() == normalizedCategory)
-            .filter(entry -> !entry.equal())
             .toList();
     }
 
@@ -197,8 +193,6 @@ public record RepresentationDiscoveryRunComparison(
         add(entries, Category.INPUT, "assumptionsHash",
             listHash("assumptions", leftInput.assumptions()),
             listHash("assumptions", rightInput.assumptions()));
-        add(entries, Category.INPUT, "contentHash",
-            leftInput.contentHash(), rightInput.contentHash());
     }
 
     private static void addLineageEntries(
@@ -252,8 +246,6 @@ public record RepresentationDiscoveryRunComparison(
         add(entries, Category.PLAN, "backendIdentitiesHash",
             listHash("backendIdentities", leftPlan.backendIdentities()),
             listHash("backendIdentities", rightPlan.backendIdentities()));
-        add(entries, Category.PLAN, "contentHash",
-            leftPlan.contentHash(), rightPlan.contentHash());
     }
 
     private static void addOutcomeEntries(
@@ -276,8 +268,6 @@ public record RepresentationDiscoveryRunComparison(
         add(entries, Category.OUTCOME, "canonicalWorkLedgerHash",
             leftOutcome.canonicalWorkLedgerHash(),
             rightOutcome.canonicalWorkLedgerHash());
-        add(entries, Category.OUTCOME, "contentHash",
-            leftOutcome.contentHash(), rightOutcome.contentHash());
         add(entries, Category.RUNTIME_DIAGNOSTICS,
             "runtimeDiagnosticsHash",
             leftOutcome.runtimeDiagnosticsHash(),
@@ -299,8 +289,6 @@ public record RepresentationDiscoveryRunComparison(
         add(entries, Category.REVISION, "applicationRevision",
             leftRevision.applicationRevision(),
             rightRevision.applicationRevision());
-        add(entries, Category.REVISION, "contentHash",
-            leftRevision.contentHash(), rightRevision.contentHash());
     }
 
     private static void addArtifactEntries(
@@ -325,8 +313,6 @@ public record RepresentationDiscoveryRunComparison(
                 rightReference.targetContentHash());
             add(entries, Category.ARTIFACT, prefix + "detail",
                 leftReference.detail(), rightReference.detail());
-            add(entries, Category.ARTIFACT, prefix + "contentHash",
-                leftReference.contentHash(), rightReference.contentHash());
         }
     }
 
@@ -395,7 +381,7 @@ public record RepresentationDiscoveryRunComparison(
         addKeys(keys, Category.WORKSPACE, "schema");
         addKeys(keys, Category.INPUT,
             "domainId", "inputSchema", "canonicalInputHash",
-            "displayText", "assumptionsHash", "contentHash");
+            "displayText", "assumptionsHash");
         addKeys(keys, Category.LINEAGE,
             "relation", "parentRunId", "parentPlanHash",
             "changedPlanParameter");
@@ -405,22 +391,21 @@ public record RepresentationDiscoveryRunComparison(
             "ruleInventoryHash", "knowledgePackSelectionHash",
             "knownStructureCatalogHash", "searchStrategyId",
             "searchProfileId", "objectiveId", "budgetHash",
-            "deterministicSeed", "backendIdentitiesHash", "contentHash");
+            "deterministicSeed", "backendIdentitiesHash");
         addKeys(keys, Category.OUTCOME,
             "state", "terminalReason", "configuredWork", "consumedWork",
-            "canonicalWorkLedgerHash", "contentHash");
+            "canonicalWorkLedgerHash");
         addKeys(keys, Category.RUNTIME_DIAGNOSTICS,
             "runtimeDiagnosticsHash");
         addKeys(keys, Category.REVISION,
-            "repositoryCommit", "applicationRevision", "contentHash");
+            "repositoryCommit", "applicationRevision");
         for (ArtifactRole role : ArtifactRole.values()) {
             String prefix = role.name() + ".";
             addKeys(keys, Category.ARTIFACT,
                 prefix + "status",
                 prefix + "artifactSchema",
                 prefix + "targetContentHash",
-                prefix + "detail",
-                prefix + "contentHash");
+                prefix + "detail");
         }
         addKeys(keys, Category.CLAIM_BOUNDARY,
             "workspaceClaimBoundary");
@@ -437,7 +422,7 @@ public record RepresentationDiscoveryRunComparison(
         }
     }
 
-    private static String value(
+    private static String entryValue(
         List<Entry> entries,
         Category category,
         String field,
