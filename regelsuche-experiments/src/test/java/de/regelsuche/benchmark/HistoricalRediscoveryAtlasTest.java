@@ -1,5 +1,6 @@
 package de.regelsuche.benchmark;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -8,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.benchmark.DiscoveryExperimentRunner.HistoricalWitnessPruningDiagnostic;
 import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.PrimaryStatus;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Corpus;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Relation;
@@ -154,6 +156,36 @@ class HistoricalRediscoveryAtlasTest {
 
     @Test
     @Timeout(240)
+    void witnessPruningRetainsFirstLossAndStableArtifact(
+            @TempDir Path directory) throws Exception {
+        Corpus corpus = singleCase("distribution-fitness-valley-control");
+        HistoricalRediscoveryAtlas.AtlasReport atlas =
+            new HistoricalRediscoveryAtlas().run(corpus);
+        HistoricalWitnessPruningDiagnostic diagnostic =
+            new HistoricalWitnessPruningDiagnostic();
+        List<HistoricalWitnessPruningDiagnostic.CaseDiagnostic> cases =
+            diagnostic.run(corpus, atlas);
+
+        assertEquals(1, cases.size());
+        HistoricalWitnessPruningDiagnostic.CaseDiagnostic result = cases.get(0);
+        assertEquals(
+            HistoricalWitnessPruningDiagnostic.WITNESS_PREFIX_LOST,
+            result.status());
+        assertNotNull(result.firstLossIndex());
+        assertFalse(result.firstLossReason().isBlank());
+        assertTrue(result.exploredPrefixLength() < result.witnessStepCount());
+
+        Path first = diagnostic.write(
+            directory.resolve("first"), corpus, atlas, cases);
+        Path second = diagnostic.write(
+            directory.resolve("second"), corpus, atlas, cases);
+        assertArrayEquals(Files.readAllBytes(first), Files.readAllBytes(second));
+        assertTrue(diagnostic.contentHash(corpus, atlas, cases)
+            .matches("sha256:[0-9a-f]{64}"));
+    }
+
+    @Test
+    @Timeout(240)
     void equivalenceDiscriminationRequiresANegativeControl() {
         Corpus full = HistoricalRediscoveryCorpus.load();
         HistoricalRediscoveryCorpus.Case positive =
@@ -284,6 +316,21 @@ class HistoricalRediscoveryAtlasTest {
             cases);
     }
 
+    private static Corpus singleCase(String id) {
+        Corpus full = HistoricalRediscoveryCorpus.load();
+        HistoricalRediscoveryCorpus.Case selected = full.cases().stream()
+            .filter(value -> value.id().equals(id))
+            .findFirst()
+            .orElseThrow();
+        return new Corpus(
+            full.schema(),
+            full.evidenceStatus(),
+            full.inventoryRevision(),
+            full.claimBoundary(),
+            full.contentSha256(),
+            List.of(selected));
+    }
+
     private static Map<String, HistoricalRediscoveryAtlas.CaseResult> byId(
         HistoricalRediscoveryAtlas.AtlasReport report
     ) {
@@ -291,5 +338,4 @@ class HistoricalRediscoveryAtlasTest {
             result -> result.benchmarkCase().id(),
             Function.identity()));
     }
-
 }
