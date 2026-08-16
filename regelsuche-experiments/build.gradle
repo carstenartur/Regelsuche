@@ -66,6 +66,13 @@ def generateHistoricalRediscoveryAtlas = tasks.register(
     outputs.dir(historicalRediscoveryReportDirectory)
     outputs.dir(historicalWitnessPruningReportDirectory)
     outputs.dir(historicalProductionSearchComparisonReportDirectory)
+    doLast {
+        def comparison = historicalProductionSearchComparisonReportDirectory.get()
+            .file('production-search-comparison.json').asFile
+        if (!comparison.isFile()) {
+            throw new GradleException('Missing production-search comparison artifact')
+        }
+    }
 }
 
 tasks.named('check') {
