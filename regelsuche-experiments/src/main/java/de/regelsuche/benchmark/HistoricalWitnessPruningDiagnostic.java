@@ -148,7 +148,7 @@ public final class HistoricalWitnessPruningDiagnostic {
 
     private final ExpressionParser parser = new ExpressionParser();
 
-    public Report run(Corpus corpus, AtlasReport atlas) {
+    public List<CaseDiagnostic> run(Corpus corpus, AtlasReport atlas) {
         Objects.requireNonNull(corpus, "corpus");
         Objects.requireNonNull(atlas, "atlas");
         requireAtlasBinding(corpus, atlas);
@@ -156,7 +156,7 @@ public final class HistoricalWitnessPruningDiagnostic {
             .collect(java.util.stream.Collectors.toUnmodifiableMap(
                 value -> value.benchmarkCase().id(),
                 value -> value));
-        List<CaseDiagnostic> cases = corpus.cases().stream()
+        return corpus.cases().stream()
             .sorted(Comparator.comparing(Case::id))
             .map(value -> diagnose(
                 value,
@@ -164,19 +164,22 @@ public final class HistoricalWitnessPruningDiagnostic {
                     atlasCases.get(value.id()),
                     () -> "missing atlas case " + value.id())))
             .toList();
-        return Report.create(corpus, atlas, cases);
     }
 
-    public Path write(Path directory, Report report) {
+    public Path write(
+        Path directory,
+        Corpus corpus,
+        AtlasReport atlas,
+        List<CaseDiagnostic> cases
+    ) {
         Path outputDirectory = Objects.requireNonNull(directory, "directory")
             .toAbsolutePath().normalize();
-        Objects.requireNonNull(report, "report");
+        String json = toCanonicalJson(corpus, atlas, cases);
         Path output = outputDirectory.resolve(FILE_NAME);
         try {
             Files.createDirectories(outputDirectory);
-            AtomicJsonFile.writeUtf8(output, report.toCanonicalJson());
-            String retained = Files.readString(output, StandardCharsets.UTF_8);
-            if (!report.toCanonicalJson().equals(retained)) {
+            AtomicJsonFile.writeUtf8(output, json);
+            if (!json.equals(Files.readString(output, StandardCharsets.UTF_8))) {
                 throw new IllegalStateException(
                     "written witness-pruning diagnostic differs from report");
             }
@@ -185,6 +188,28 @@ public final class HistoricalWitnessPruningDiagnostic {
             throw new UncheckedIOException(
                 "Could not write witness-pruning diagnostic", exception);
         }
+    }
+
+    public String contentHash(
+        Corpus corpus,
+        AtlasReport atlas,
+        List<CaseDiagnostic> cases
+    ) {
+        validateReportBinding(corpus, atlas, cases);
+        return reportHash(corpus, atlas, cases);
+    }
+
+    String toCanonicalJson(
+        Corpus corpus,
+        AtlasReport atlas,
+        List<CaseDiagnostic> cases
+    ) {
+        validateReportBinding(corpus, atlas, cases);
+        return renderReport(
+            corpus,
+            atlas,
+            cases,
+            reportHash(corpus, atlas, cases));
     }
 
     private CaseDiagnostic diagnose(Case benchmarkCase, CaseResult atlasCase) {
@@ -198,7 +223,7 @@ public final class HistoricalWitnessPruningDiagnostic {
                 scalar);
         }
         if (benchmarkCase.relation() == Relation.NOT_EQUIVALENT) {
-            return new CaseDiagnostic(
+            return CaseDiagnostic.withoutLoss(
                 benchmarkCase.id(),
                 CORRECTNESS_REGRESSION_WITNESS,
                 oracle.status(),
@@ -208,11 +233,10 @@ public final class HistoricalWitnessPruningDiagnostic {
                 scalar.exploredStates(),
                 scalar.engineCalls(),
                 scalar.generatedTransformations(),
-                null,
                 "production oracle reached a target declared non-equivalent");
         }
         if (scalar.reached()) {
-            return new CaseDiagnostic(
+            return CaseDiagnostic.withoutLoss(
                 benchmarkCase.id(),
                 SCALAR_ALREADY_FOUND,
                 oracle.status(),
@@ -222,7 +246,6 @@ public final class HistoricalWitnessPruningDiagnostic {
                 scalar.exploredStates(),
                 scalar.engineCalls(),
                 scalar.generatedTransformations(),
-                null,
                 "the retained scalar search reached the relation; witness-prefix "
                     + "comparison was not required");
         }
@@ -281,21 +304,20 @@ public final class HistoricalWitnessPruningDiagnostic {
                 before = after;
                 continue;
             }
-            return new CaseDiagnostic(
-                benchmarkCase.id(),
-                WITNESS_PREFIX_LOST,
-                oracle.status(),
-                oracle.witnessExpressions().size(),
-                prefixLength,
-                terminalStatus(benchmarkCase, search.metrics()),
-                search.states().size(),
+            return diagnoseLoss(
+                benchmarkCase,
+                oracle,
+                search,
                 engineCalls,
                 generatedTransformations,
-                diagnoseLoss(index, before, after, rule, events),
-                "first target-aware oracle witness edge absent from the "
-                    + "target-blind explored prefix");
+                prefixLength,
+                index,
+                before,
+                after,
+                rule,
+                events);
         }
-        return new CaseDiagnostic(
+        return CaseDiagnostic.withoutLoss(
             benchmarkCase.id(),
             WITNESS_COMPLETELY_EXPLORED,
             oracle.status(),
@@ -305,12 +327,17 @@ public final class HistoricalWitnessPruningDiagnostic {
             search.states().size(),
             engineCalls,
             generatedTransformations,
-            null,
             "all oracle witness states were explored; relation matching must "
                 + "be diagnosed separately");
     }
 
-    private LostStep diagnoseLoss(
+    private CaseDiagnostic diagnoseLoss(
+        Case benchmarkCase,
+        OracleEvidence oracle,
+        GoalSearchResult search,
+        int engineCalls,
+        long generatedTransformations,
+        int prefixLength,
         int index,
         String before,
         String after,
@@ -320,11 +347,28 @@ public final class HistoricalWitnessPruningDiagnostic {
         Optional<SearchEvent> transition = firstTransition(
             events, before, after, rule);
         if (transition.isEmpty()) {
-            return parentLoss(index, before, after, rule, events);
+            return parentLoss(
+                benchmarkCase,
+                oracle,
+                search,
+                engineCalls,
+                generatedTransformations,
+                prefixLength,
+                index,
+                before,
+                after,
+                rule,
+                events);
         }
         SearchEvent generated = transition.orElseThrow();
         if (!generated.pruningReason().isBlank()) {
-            return loss(
+            return lossCase(
+                benchmarkCase,
+                oracle,
+                search,
+                engineCalls,
+                generatedTransformations,
+                prefixLength,
                 index,
                 before,
                 after,
@@ -341,7 +385,13 @@ public final class HistoricalWitnessPruningDiagnostic {
             rule,
             generated.sequence());
         if (duplicate.isPresent()) {
-            return loss(
+            return lossCase(
+                benchmarkCase,
+                oracle,
+                search,
+                engineCalls,
+                generatedTransformations,
+                prefixLength,
                 index,
                 before,
                 after,
@@ -358,7 +408,13 @@ public final class HistoricalWitnessPruningDiagnostic {
             rule,
             generated.sequence());
         if (enqueued.isPresent()) {
-            return loss(
+            return lossCase(
+                benchmarkCase,
+                oracle,
+                search,
+                engineCalls,
+                generatedTransformations,
+                prefixLength,
                 index,
                 before,
                 after,
@@ -367,7 +423,13 @@ public final class HistoricalWitnessPruningDiagnostic {
                 enqueued.orElseThrow(),
                 "witness state remained outside the explored prefix");
         }
-        return loss(
+        return lossCase(
+            benchmarkCase,
+            oracle,
+            search,
+            engineCalls,
+            generatedTransformations,
+            prefixLength,
             index,
             before,
             after,
@@ -377,7 +439,13 @@ public final class HistoricalWitnessPruningDiagnostic {
             "generated witness edge has no enqueue or prune event");
     }
 
-    private LostStep parentLoss(
+    private CaseDiagnostic parentLoss(
+        Case benchmarkCase,
+        OracleEvidence oracle,
+        GoalSearchResult search,
+        int engineCalls,
+        long generatedTransformations,
+        int prefixLength,
         int index,
         String before,
         String after,
@@ -388,7 +456,13 @@ public final class HistoricalWitnessPruningDiagnostic {
             Optional<SearchEvent> event = firstStateEvent(
                 events, PARENT_EVENT_TYPES[position], before);
             if (event.isPresent()) {
-                return loss(
+                return lossCase(
+                    benchmarkCase,
+                    oracle,
+                    search,
+                    engineCalls,
+                    generatedTransformations,
+                    prefixLength,
                     index,
                     before,
                     after,
@@ -398,7 +472,13 @@ public final class HistoricalWitnessPruningDiagnostic {
                     PARENT_DETAILS[position]);
             }
         }
-        return loss(
+        return lossCase(
+            benchmarkCase,
+            oracle,
+            search,
+            engineCalls,
+            generatedTransformations,
+            prefixLength,
             index,
             before,
             after,
@@ -408,17 +488,40 @@ public final class HistoricalWitnessPruningDiagnostic {
             "target-blind search never reached the witness parent");
     }
 
-    private LostStep loss(
+    private CaseDiagnostic lossCase(
+        Case benchmarkCase,
+        OracleEvidence oracle,
+        GoalSearchResult search,
+        int engineCalls,
+        long generatedTransformations,
+        int prefixLength,
         int index,
         String before,
         String after,
         String rule,
         String reason,
         SearchEvent event,
-        String detail
+        String lossDetail
     ) {
-        return new LostStep(
-            index, before, after, rule, reason, event, detail);
+        return new CaseDiagnostic(
+            benchmarkCase.id(),
+            WITNESS_PREFIX_LOST,
+            oracle.status(),
+            oracle.witnessExpressions().size(),
+            prefixLength,
+            terminalStatus(benchmarkCase, search.metrics()),
+            search.states().size(),
+            engineCalls,
+            generatedTransformations,
+            index,
+            before,
+            after,
+            rule,
+            reason,
+            event,
+            lossDetail,
+            "first target-aware oracle witness edge absent from the "
+                + "target-blind explored prefix");
     }
 
     private Optional<SearchEvent> firstTransition(
@@ -576,6 +679,28 @@ public final class HistoricalWitnessPruningDiagnostic {
         }
     }
 
+    private static void validateReportBinding(
+        Corpus corpus,
+        AtlasReport atlas,
+        List<CaseDiagnostic> cases
+    ) {
+        Objects.requireNonNull(corpus, "corpus");
+        Objects.requireNonNull(atlas, "atlas");
+        requireAtlasBinding(corpus, atlas);
+        List<CaseDiagnostic> retained = List.copyOf(
+            Objects.requireNonNull(cases, "cases"));
+        List<String> ids = retained.stream().map(CaseDiagnostic::id).toList();
+        List<String> corpusIds = corpus.cases().stream()
+            .map(Case::id)
+            .sorted()
+            .toList();
+        if (!ids.equals(corpusIds)
+                || new LinkedHashSet<>(ids).size() != ids.size()) {
+            throw new IllegalArgumentException(
+                "diagnostic cases must balance the corpus in canonical order");
+        }
+    }
+
     private boolean sameExpression(String left, String right) {
         return expressionKey(left).equals(expressionKey(right));
     }
@@ -593,86 +718,6 @@ public final class HistoricalWitnessPruningDiagnostic {
         return ExpressionFormatter.format(parser.parseTerm(expression));
     }
 
-    public record Report(
-        String corpusSha256,
-        String atlasSha256,
-        String inventoryRevision,
-        List<CaseDiagnostic> cases,
-        Map<String, Integer> statusCounts,
-        Map<String, Integer> firstLossCounts,
-        String contentHash
-    ) {
-        public Report {
-            requireRawSha256(corpusSha256, "corpusSha256");
-            requirePrefixedSha256(atlasSha256, "atlasSha256");
-            inventoryRevision = requireText(
-                inventoryRevision, "inventoryRevision");
-            cases = List.copyOf(Objects.requireNonNull(cases, "cases"));
-            statusCounts = Map.copyOf(
-                Objects.requireNonNull(statusCounts, "statusCounts"));
-            firstLossCounts = Map.copyOf(
-                Objects.requireNonNull(firstLossCounts, "firstLossCounts"));
-            validateCases(cases, statusCounts, firstLossCounts);
-            requirePrefixedSha256(contentHash, "contentHash");
-            String expected = reportHash(
-                corpusSha256,
-                atlasSha256,
-                inventoryRevision,
-                cases,
-                statusCounts,
-                firstLossCounts);
-            if (!expected.equals(contentHash)) {
-                throw new IllegalArgumentException(
-                    "witness-pruning contentHash mismatch");
-            }
-        }
-
-        static Report create(
-            Corpus corpus,
-            AtlasReport atlas,
-            List<CaseDiagnostic> cases
-        ) {
-            Map<String, Integer> statuses = countValues(
-                cases.stream().map(CaseDiagnostic::status).toList());
-            Map<String, Integer> losses = countValues(cases.stream()
-                .map(CaseDiagnostic::firstLoss)
-                .filter(Objects::nonNull)
-                .map(LostStep::reason)
-                .toList());
-            String atlasHash = sha256(atlas.toJson());
-            String hash = reportHash(
-                corpus.contentSha256(),
-                atlasHash,
-                corpus.inventoryRevision(),
-                cases,
-                statuses,
-                losses);
-            return new Report(
-                corpus.contentSha256(),
-                atlasHash,
-                corpus.inventoryRevision(),
-                cases,
-                statuses,
-                losses,
-                hash);
-        }
-
-        public String schema() {
-            return SCHEMA;
-        }
-
-        public String toCanonicalJson() {
-            return renderReport(
-                corpusSha256,
-                atlasSha256,
-                inventoryRevision,
-                cases,
-                statusCounts,
-                firstLossCounts,
-                contentHash);
-        }
-    }
-
     public record CaseDiagnostic(
         String id,
         String status,
@@ -683,7 +728,13 @@ public final class HistoricalWitnessPruningDiagnostic {
         int searchExploredStates,
         int engineCalls,
         long generatedTransformations,
-        LostStep firstLoss,
+        Integer firstLossIndex,
+        String firstLossExpressionBefore,
+        String firstLossExpressionAfter,
+        String firstLossRuleId,
+        String firstLossReason,
+        SearchEvent firstLossEvent,
+        String firstLossDetail,
         String detail
     ) {
         public CaseDiagnostic {
@@ -694,18 +745,53 @@ public final class HistoricalWitnessPruningDiagnostic {
                 searchTerminalStatus,
                 TERMINAL_STATUSES,
                 "searchTerminalStatus");
+            firstLossDetail = firstLossDetail == null ? "" : firstLossDetail;
             detail = detail == null ? "" : detail;
-            if (witnessStepCount < 0 || exploredPrefixLength < 0
-                    || exploredPrefixLength > witnessStepCount
-                    || searchExploredStates < 0 || engineCalls < 0
-                    || generatedTransformations < 0) {
-                throw new IllegalArgumentException(
-                    "case diagnostic counters are outside their ranges");
-            }
-            if (WITNESS_PREFIX_LOST.equals(status) != (firstLoss != null)) {
-                throw new IllegalArgumentException(
-                    "first loss must exist exactly for WITNESS_PREFIX_LOST");
-            }
+            validateCounters(
+                witnessStepCount,
+                exploredPrefixLength,
+                searchExploredStates,
+                engineCalls,
+                generatedTransformations);
+            validateLoss(
+                status,
+                firstLossIndex,
+                firstLossExpressionBefore,
+                firstLossExpressionAfter,
+                firstLossRuleId,
+                firstLossReason);
+        }
+
+        static CaseDiagnostic withoutLoss(
+            String id,
+            String status,
+            String oracleStatus,
+            int witnessStepCount,
+            int exploredPrefixLength,
+            String terminalStatus,
+            int exploredStates,
+            int engineCalls,
+            long generatedTransformations,
+            String detail
+        ) {
+            return new CaseDiagnostic(
+                id,
+                status,
+                oracleStatus,
+                witnessStepCount,
+                exploredPrefixLength,
+                terminalStatus,
+                exploredStates,
+                engineCalls,
+                generatedTransformations,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "",
+                detail);
         }
 
         static CaseDiagnostic notApplicable(
@@ -714,7 +800,7 @@ public final class HistoricalWitnessPruningDiagnostic {
             String oracleStatus,
             SearchEvidence scalar
         ) {
-            return new CaseDiagnostic(
+            return withoutLoss(
                 id,
                 status,
                 oracleStatus,
@@ -724,103 +810,80 @@ public final class HistoricalWitnessPruningDiagnostic {
                 scalar.exploredStates(),
                 scalar.engineCalls(),
                 scalar.generatedTransformations(),
-                null,
                 "no target-aware production witness is available for prefix diagnosis");
         }
-    }
 
-    public record LostStep(
-        int index,
-        String expressionBefore,
-        String expressionAfter,
-        String ruleId,
-        String reason,
-        SearchEvent event,
-        String detail
-    ) {
-        public LostStep {
+        private static void validateCounters(
+            int witnessStepCount,
+            int exploredPrefixLength,
+            int searchExploredStates,
+            int engineCalls,
+            long generatedTransformations
+        ) {
+            if (witnessStepCount < 0 || exploredPrefixLength < 0
+                    || exploredPrefixLength > witnessStepCount
+                    || searchExploredStates < 0 || engineCalls < 0
+                    || generatedTransformations < 0) {
+                throw new IllegalArgumentException(
+                    "case diagnostic counters are outside their ranges");
+            }
+        }
+
+        private static void validateLoss(
+            String status,
+            Integer index,
+            String before,
+            String after,
+            String ruleId,
+            String reason
+        ) {
+            boolean hasLoss = index != null;
+            if (WITNESS_PREFIX_LOST.equals(status) != hasLoss) {
+                throw new IllegalArgumentException(
+                    "first loss must exist exactly for WITNESS_PREFIX_LOST");
+            }
+            if (!hasLoss) {
+                return;
+            }
             if (index < 0) {
                 throw new IllegalArgumentException(
                     "loss index must not be negative");
             }
-            expressionBefore = requireText(
-                expressionBefore, "expressionBefore");
-            expressionAfter = requireText(expressionAfter, "expressionAfter");
-            ruleId = requireText(ruleId, "ruleId");
-            reason = requireMember(reason, LOSS_REASONS, "reason");
-            detail = detail == null ? "" : detail;
+            requireText(before, "firstLossExpressionBefore");
+            requireText(after, "firstLossExpressionAfter");
+            requireText(ruleId, "firstLossRuleId");
+            requireMember(reason, LOSS_REASONS, "firstLossReason");
         }
-    }
-
-    private static void validateCases(
-        List<CaseDiagnostic> cases,
-        Map<String, Integer> statusCounts,
-        Map<String, Integer> firstLossCounts
-    ) {
-        if (cases.isEmpty()) {
-            throw new IllegalArgumentException("report cases must not be empty");
-        }
-        List<String> ids = cases.stream().map(CaseDiagnostic::id).toList();
-        if (!ids.equals(ids.stream().sorted().toList())
-                || new LinkedHashSet<>(ids).size() != ids.size()) {
-            throw new IllegalArgumentException(
-                "report cases must have unique canonical ordering");
-        }
-        Map<String, Integer> expectedStatuses = countValues(
-            cases.stream().map(CaseDiagnostic::status).toList());
-        Map<String, Integer> expectedLosses = countValues(cases.stream()
-            .map(CaseDiagnostic::firstLoss)
-            .filter(Objects::nonNull)
-            .map(LostStep::reason)
-            .toList());
-        if (!expectedStatuses.equals(statusCounts)
-                || !expectedLosses.equals(firstLossCounts)) {
-            throw new IllegalArgumentException(
-                "report summary differs from retained cases");
-        }
-    }
-
-    private static Map<String, Integer> countValues(List<String> values) {
-        Map<String, Integer> counts = new TreeMap<>();
-        values.forEach(value -> counts.merge(value, 1, Integer::sum));
-        return Map.copyOf(counts);
     }
 
     private static String reportHash(
-        String corpusSha256,
-        String atlasSha256,
-        String inventoryRevision,
-        List<CaseDiagnostic> cases,
-        Map<String, Integer> statusCounts,
-        Map<String, Integer> firstLossCounts
+        Corpus corpus,
+        AtlasReport atlas,
+        List<CaseDiagnostic> cases
     ) {
-        return sha256(renderReport(
-            corpusSha256,
-            atlasSha256,
-            inventoryRevision,
-            cases,
-            statusCounts,
-            firstLossCounts,
-            null));
+        return sha256(renderReport(corpus, atlas, cases, null));
     }
 
     private static String renderReport(
-        String corpusSha256,
-        String atlasSha256,
-        String inventoryRevision,
+        Corpus corpus,
+        AtlasReport atlas,
         List<CaseDiagnostic> cases,
-        Map<String, Integer> statusCounts,
-        Map<String, Integer> firstLossCounts,
         String contentHash
     ) {
+        Map<String, Integer> statusCounts = countValues(
+            cases.stream().map(CaseDiagnostic::status).toList());
+        Map<String, Integer> firstLossCounts = countValues(cases.stream()
+            .map(CaseDiagnostic::firstLossReason)
+            .filter(Objects::nonNull)
+            .toList());
         JsonWriter writer = new JsonWriter().beginObject();
         writer.property("schema", SCHEMA);
         writer.property("evidenceStatus", EVIDENCE_STATUS);
         writer.property("corpusSchema", HistoricalRediscoveryCorpus.SCHEMA);
-        writer.property("corpusSha256", corpusSha256);
+        writer.property("corpusSha256", corpus.contentSha256());
         writer.property("atlasSchema", HistoricalRediscoveryAtlas.SCHEMA);
-        writer.property("atlasSha256", atlasSha256);
-        writer.property("inventoryRevision", inventoryRevision);
+        writer.property("atlasSha256", sha256(atlas.toJson()));
+        writer.property("inventoryRevision", corpus.inventoryRevision());
         writer.property("searchPolicy", SEARCH_POLICY);
         writer.property("claimBoundary", CLAIM_BOUNDARY);
         writer.array("cases", array -> cases.forEach(value ->
@@ -849,27 +912,28 @@ public final class HistoricalWitnessPruningDiagnostic {
         writer.property("engineCalls", value.engineCalls());
         writer.property(
             "generatedTransformations", value.generatedTransformations());
-        if (value.firstLoss() == null) {
+        if (value.firstLossIndex() == null) {
             writer.nullProperty("firstLoss");
         } else {
-            writer.object("firstLoss", object ->
-                writeLoss(object, value.firstLoss()));
+            writer.object("firstLoss", object -> writeLoss(object, value));
         }
         writer.property("detail", value.detail());
     }
 
-    private static void writeLoss(JsonWriter writer, LostStep value) {
-        writer.property("index", value.index());
-        writer.property("expressionBefore", value.expressionBefore());
-        writer.property("expressionAfter", value.expressionAfter());
-        writer.property("ruleId", value.ruleId());
-        writer.property("reason", value.reason());
-        if (value.event() == null) {
+    private static void writeLoss(JsonWriter writer, CaseDiagnostic value) {
+        writer.property("index", value.firstLossIndex());
+        writer.property(
+            "expressionBefore", value.firstLossExpressionBefore());
+        writer.property("expressionAfter", value.firstLossExpressionAfter());
+        writer.property("ruleId", value.firstLossRuleId());
+        writer.property("reason", value.firstLossReason());
+        if (value.firstLossEvent() == null) {
             writer.nullProperty("event");
         } else {
-            writer.object("event", object -> writeEvent(object, value.event()));
+            writer.object("event", object ->
+                writeEvent(object, value.firstLossEvent()));
         }
-        writer.property("detail", value.detail());
+        writer.property("detail", value.firstLossDetail());
     }
 
     private static void writeEvent(JsonWriter writer, SearchEvent value) {
@@ -881,6 +945,12 @@ public final class HistoricalWitnessPruningDiagnostic {
         writer.property("visitedCount", value.visitedCount());
         writer.property("generatedCount", value.generatedCount());
         writer.property("pruningReason", value.pruningReason());
+    }
+
+    private static Map<String, Integer> countValues(List<String> values) {
+        Map<String, Integer> counts = new TreeMap<>();
+        values.forEach(value -> counts.merge(value, 1, Integer::sum));
+        return Map.copyOf(counts);
     }
 
     private static void writeCounts(
@@ -909,20 +979,6 @@ public final class HistoricalWitnessPruningDiagnostic {
             throw new IllegalArgumentException(label + " is unsupported");
         }
         return value;
-    }
-
-    private static void requireRawSha256(String value, String label) {
-        if (value == null || !value.matches("[0-9a-f]{64}")) {
-            throw new IllegalArgumentException(
-                label + " must be lowercase hexadecimal SHA-256");
-        }
-    }
-
-    private static void requirePrefixedSha256(String value, String label) {
-        if (value == null || !value.matches("sha256:[0-9a-f]{64}")) {
-            throw new IllegalArgumentException(
-                label + " must be prefixed SHA-256");
-        }
     }
 
     private static String sha256(String value) {
