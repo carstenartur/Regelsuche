@@ -13,6 +13,8 @@
     "witnessDiagnosticSchema",
     "witnessDiagnosticSha256",
     "inventoryRevision",
+    "scalarPolicy",
+    "diversityPolicy",
     "informationBoundary",
     "claimBoundary",
     "cases",
@@ -47,6 +49,12 @@
     "inventoryRevision": {
       "$ref": "#/$defs/text"
     },
+    "scalarPolicy": {
+      "const": "SCALAR_BEST_FIRST_TARGET_BLIND"
+    },
+    "diversityPolicy": {
+      "const": "STRUCTURAL_DIVERSITY_TARGET_BLIND"
+    },
     "informationBoundary": {
       "const": "TARGET_BLIND_SEARCHES_ORACLE_POST_HOC_DIAGNOSTIC"
     },
@@ -56,8 +64,9 @@
     "cases": {
       "type": "array",
       "minItems": 1,
+      "uniqueItems": true,
       "items": {
-        "$ref": "#/$defs/case"
+        "$ref": "#/$defs/caseComparison"
       }
     },
     "summary": {
@@ -82,7 +91,7 @@
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "status": {
+    "comparisonStatus": {
       "enum": [
         "NOT_APPLICABLE_NO_PRODUCTION_WITNESS",
         "SCALAR_ALREADY_FOUND",
@@ -129,7 +138,6 @@
     "searchEvidence": {
       "type": "object",
       "required": [
-        "policy",
         "reachedRelation",
         "exploredPrefixLength",
         "exploredStates",
@@ -138,12 +146,6 @@
         "terminalStatus"
       ],
       "properties": {
-        "policy": {
-          "enum": [
-            "SCALAR_BEST_FIRST_TARGET_BLIND",
-            "STRUCTURAL_DIVERSITY_TARGET_BLIND"
-          ]
-        },
         "reachedRelation": {
           "type": "boolean"
         },
@@ -169,7 +171,7 @@
       },
       "additionalProperties": false
     },
-    "case": {
+    "caseComparison": {
       "type": "object",
       "required": [
         "id",
@@ -178,15 +180,14 @@
         "declaredBudget",
         "scalar",
         "diversity",
-        "prefixDelta",
-        "detail"
+        "prefixDelta"
       ],
       "properties": {
         "id": {
           "$ref": "#/$defs/text"
         },
         "status": {
-          "$ref": "#/$defs/status"
+          "$ref": "#/$defs/comparisonStatus"
         },
         "oracleWitnessStepCount": {
           "type": "integer",
@@ -203,16 +204,15 @@
         },
         "prefixDelta": {
           "type": "integer"
-        },
-        "detail": {
-          "type": "string",
-          "maxLength": 4096
         }
       },
       "additionalProperties": false
     },
-    "countMap": {
+    "statusCounts": {
       "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/comparisonStatus"
+      },
       "additionalProperties": {
         "type": "integer",
         "minimum": 1
@@ -234,7 +234,7 @@
           "minimum": 1
         },
         "statusCounts": {
-          "$ref": "#/$defs/countMap"
+          "$ref": "#/$defs/statusCounts"
         },
         "comparableScalarMissCount": {
           "type": "integer",
