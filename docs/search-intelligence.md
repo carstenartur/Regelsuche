@@ -84,7 +84,8 @@ The source corpus and strict schemas are:
 - `regelsuche-experiments/src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json`;
 - `docs/schemas/regelsuche-historical-rediscovery-corpus-v1.schema.json`;
 - `docs/schemas/regelsuche-historical-rediscovery-run-v1.schema.json`;
-- `docs/schemas/regelsuche-witness-pruning-diagnostic-v1.schema.json`.
+- `docs/schemas/regelsuche-witness-pruning-diagnostic-v1.schema.json`;
+- `docs/schemas/regelsuche-witness-policy-comparison-v1.schema.json`.
 
 Generated JSON and Markdown retain the corpus hash, witnesses, rule IDs,
 primitive work, search metrics, directionality and one evidence-derived primary
@@ -126,17 +127,50 @@ production inventory, search policy, oracle and production work ledgers, case
 balance, first loss event and a SHA-256 content identity. It is downstream
 diagnostic evidence and does not replace or mutate the historical atlas run.
 
-The dedicated `regelsuche-core` oracle and known-derivation tests remain the
-authoritative unit-level contracts. Atlas tests add only corpus, policy and
-cross-layer integration evidence; they do not replace those focused tests.
+### Scalar versus structural-diversity witness retention
 
-Generate the atlas and witness-prefix diagnostic with:
+The policy comparison consumes the verified manifest-last atlas and the
+content-addressed scalar witness-prefix diagnostic. It then reruns only the
+existing target-blind `StructuralDiversitySearchStrategy` and requires its
+explored-state, engine-call and generated-transformation counts to reproduce the
+retained atlas evidence. No target is attached to either policy.
+
+For every eligible oracle witness the comparison records:
+
+- the identical declared depth, state, candidate, expansion and beam limits;
+- the scalar explored prefix and first loss classification;
+- the structural-diversity explored prefix;
+- the raw actual work of both policies separately;
+- whether diversity reaches the relation, explores the complete witness,
+  extends the scalar prefix, makes no prefix gain or explores a shorter prefix.
+
+Equal configured limits are not mislabeled as equal actual work. The canonical
+artifact is written under
+`regelsuche-experiments/build/reports/historical-witness-policy-comparison/`
+as `witness-policy-comparison.json`. It binds the corpus, verified atlas run,
+atlas bytes, scalar diagnostic, policies, budgets, complete case balance and a
+SHA-256 content identity.
+
+The dedicated `regelsuche-core` oracle and known-derivation tests remain the
+authoritative unit-level contracts. Atlas and comparison tests add only corpus,
+policy and cross-layer integration evidence; they do not replace those focused
+tests.
+
+Generate the atlas and scalar witness-prefix diagnostic with:
 
 ```bash
 ./gradlew :regelsuche-experiments:generateHistoricalRediscoveryAtlas
 ```
 
-The atlas output is written under
+Generate the downstream scalar-versus-diversity comparison with:
+
+```bash
+./gradlew :regelsuche-experiments:generateHistoricalWitnessPolicyComparison
+```
+
+The second task depends on the first and therefore consumes the exact retained
+atlas and scalar diagnostic from the same checkout execution. The atlas output
+is written under
 `regelsuche-experiments/build/reports/historical-rediscovery/` and contains:
 
 - `historical-rediscovery-atlas.json`;
@@ -163,10 +197,12 @@ from the target-guided control. The aggregate equivalence-discrimination signal
 requires at least one retained negative control; an empty negative-control
 subset cannot pass by vacuous truth. A first lost witness prefix identifies only
 where the bounded target-blind execution diverged from a target-aware diagnostic
-path. It is not a proof of global unreachability, autonomous rediscovery,
-mathematical novelty or general search superiority. Results establish only
-bounded reachability and search-policy behavior for the frozen representation,
-inventory and budgets.
+path. A positive prefix gain identifies only that the frozen diversity policy
+retained more of that path under the same declared heuristic limits; raw actual
+work remains separate. Neither result is a proof of global unreachability,
+autonomous rediscovery, mathematical novelty or general search superiority.
+Results establish only bounded reachability and search-policy behavior for the
+frozen representation, inventory and budgets.
 
 ## Universal patterns
 
