@@ -81,6 +81,14 @@ public interface DiscoveryExperimentRunner {
         Path pruningArtifact = pruning.write(
             witnessOutput(output), corpus, report, pruningCases);
 
+        HistoricalProductionSearchComparison comparison =
+            new HistoricalProductionSearchComparison();
+        HistoricalProductionSearchComparison.Report comparisonReport =
+            comparison.run(corpus, report, pruningCases);
+        Path comparisonArtifact = comparison.write(
+            productionComparisonOutput(output),
+            comparisonReport);
+
         System.out.println("historicalRediscoveryAssessment="
             + report.assessment().decision());
         System.out.println("historicalRediscoveryCases=" + report.cases().size());
@@ -95,6 +103,10 @@ public interface DiscoveryExperimentRunner {
         System.out.println("historicalWitnessPruning=" + pruningArtifact);
         System.out.println("historicalWitnessPruningHash="
             + pruning.contentHash(corpus, report, pruningCases));
+        System.out.println("historicalProductionSearchComparison="
+            + comparisonArtifact);
+        System.out.println("historicalProductionSearchComparisonHash="
+            + comparisonReport.contentHash());
     }
 
     private static void verifyRetainedClaims(AtlasReport report) {
@@ -168,6 +180,17 @@ public interface DiscoveryExperimentRunner {
                 "historical rediscovery output must have a file name");
         }
         return normalized.resolveSibling(name + "-witness-pruning");
+    }
+
+    private static Path productionComparisonOutput(Path atlasOutput) {
+        Path normalized = atlasOutput.toAbsolutePath().normalize();
+        Path name = normalized.getFileName();
+        if (name == null) {
+            throw new IllegalArgumentException(
+                "historical rediscovery output must have a file name");
+        }
+        return normalized.resolveSibling(
+            name + "-production-search-comparison");
     }
 
     record ExperimentResult(String seedExpression, boolean success, String summary) {
