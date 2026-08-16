@@ -39,22 +39,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Compares target-blind scalar and structural-diversity production searches
- * against the same retained target-aware oracle witnesses.
- *
- * <p>Both policies receive the same frozen source, production inventory and
- * declared search ceilings. Actual consumed work remains separate evidence.</p>
- */
+/** Compares two target-blind production policies against retained oracle witnesses. */
 public final class HistoricalProductionSearchComparison {
-    static final String SCHEMA =
-        "regelsuche.production-search-comparison/v1";
+    static final String SCHEMA = "regelsuche.production-search-comparison/v1";
     static final String EVIDENCE_STATUS =
         "EXECUTED_MATCHED_DECLARED_BUDGET_COMPARISON";
-    static final String SCALAR_POLICY =
-        "SCALAR_BEST_FIRST_TARGET_BLIND";
-    static final String DIVERSITY_POLICY =
-        "STRUCTURAL_DIVERSITY_TARGET_BLIND";
+    static final String SCALAR_POLICY = "SCALAR_BEST_FIRST_TARGET_BLIND";
+    static final String DIVERSITY_POLICY = "STRUCTURAL_DIVERSITY_TARGET_BLIND";
     static final String INFORMATION_BOUNDARY =
         "TARGET_BLIND_SEARCHES_ORACLE_POST_HOC_DIAGNOSTIC";
     static final String CLAIM_BOUNDARY =
@@ -64,8 +55,7 @@ public final class HistoricalProductionSearchComparison {
             + "both searches finish. Equal declared budgets do not imply equal "
             + "consumed work, and a retained prefix difference is not proof, "
             + "autonomous rediscovery, novelty or general search superiority.";
-    static final String FILE_NAME =
-        "production-search-comparison.json";
+    static final String FILE_NAME = "production-search-comparison.json";
 
     private final ExpressionParser parser = new ExpressionParser();
     private final ExpressionCanonicalizer canonicalizer =
@@ -81,31 +71,25 @@ public final class HistoricalProductionSearchComparison {
     ) {
         Objects.requireNonNull(corpus, "corpus");
         Objects.requireNonNull(atlas, "atlas");
+        Objects.requireNonNull(witnessCases, "witnessCases");
         requireAtlasBinding(corpus, atlas);
         Map<String, CaseResult> atlasById = atlas.cases().stream()
             .collect(Collectors.toUnmodifiableMap(
-                value -> value.benchmarkCase().id(),
-                value -> value));
+                value -> value.benchmarkCase().id(), value -> value));
         Map<String, HistoricalWitnessPruningDiagnostic.CaseDiagnostic>
-            witnessById = witnessCases.stream()
-                .collect(Collectors.toUnmodifiableMap(
+            witnessById = witnessCases.stream().collect(
+                Collectors.toUnmodifiableMap(
                     HistoricalWitnessPruningDiagnostic.CaseDiagnostic::id,
                     value -> value));
         requireCaseMembership(corpus, atlasById.keySet(), witnessById.keySet());
         List<CaseComparison> cases = corpus.cases().stream()
             .sorted(Comparator.comparing(Case::id))
             .map(value -> compare(
-                value,
-                atlasById.get(value.id()),
-                witnessById.get(value.id())))
+                value, atlasById.get(value.id()), witnessById.get(value.id())))
             .toList();
-        return Report.create(
-            corpus,
-            atlas,
-            HistoricalWitnessPruningDiagnostic.SCHEMA,
-            new HistoricalWitnessPruningDiagnostic().contentHash(
-                corpus, atlas, witnessCases),
-            cases);
+        String witnessHash = new HistoricalWitnessPruningDiagnostic()
+            .contentHash(corpus, atlas, witnessCases);
+        return Report.create(corpus, atlas, witnessHash, cases);
     }
 
     Path write(Path directory, Report report) {
@@ -145,13 +129,9 @@ public final class HistoricalProductionSearchComparison {
             productionEngine(benchmarkCase));
         List<SearchState> diversityStates =
             new StructuralDiversitySearchStrategy().search(searchProblem(
-                benchmarkCase,
-                format(benchmarkCase.source()),
-                counting));
+                benchmarkCase, format(benchmarkCase.source()), counting));
         SearchState match = findMatch(
-            benchmarkCase,
-            format(benchmarkCase.target()),
-            diversityStates);
+            benchmarkCase, format(benchmarkCase.target()), diversityStates);
         requireDiversityBinding(
             diversityRetained, diversityStates, match, counting);
 
@@ -165,15 +145,11 @@ public final class HistoricalProductionSearchComparison {
             witnessCase.searchTerminalStatus());
         SearchComparisonEvidence diversity = new SearchComparisonEvidence(
             match != null,
-            witnessSteps == 0
-                ? 0
-                : exploredPrefixLength(witness, diversityStates),
+            witnessSteps == 0 ? 0 : exploredPrefixLength(witness, diversityStates),
             diversityStates.size(),
             counting.calls(),
             counting.generated(),
-            diversityStates.isEmpty()
-                ? "NO_STATES"
-                : "COMPLETED_BOUNDED_SEARCH");
+            diversityStates.isEmpty() ? "NO_STATES" : "COMPLETED_BOUNDED_SEARCH");
         return new CaseComparison(
             benchmarkCase.id(),
             classify(witnessSteps, scalar, diversity),
@@ -200,12 +176,10 @@ public final class HistoricalProductionSearchComparison {
                 ? ComparisonStatus.DIVERSITY_RECOVERS_COMPLETE_WITNESS
                 : ComparisonStatus.DIVERSITY_FINDS_RELATION_VIA_ALTERNATE_PATH;
         }
-        if (diversity.exploredPrefixLength()
-                > scalar.exploredPrefixLength()) {
+        if (diversity.exploredPrefixLength() > scalar.exploredPrefixLength()) {
             return ComparisonStatus.DIVERSITY_EXTENDS_SCALAR_PREFIX;
         }
-        if (diversity.exploredPrefixLength()
-                == scalar.exploredPrefixLength()) {
+        if (diversity.exploredPrefixLength() == scalar.exploredPrefixLength()) {
             return ComparisonStatus.DIVERSITY_MATCHES_SCALAR_PREFIX;
         }
         return ComparisonStatus.DIVERSITY_RETAINS_SHORTER_PREFIX;
@@ -235,10 +209,8 @@ public final class HistoricalProductionSearchComparison {
         List<SearchState> states
     ) {
         return states.stream()
-            .filter(state -> matches(
-                benchmarkCase, state.expression(), target))
-            .min(Comparator
-                .comparingInt(SearchState::depth)
+            .filter(state -> matches(benchmarkCase, state.expression(), target))
+            .min(Comparator.comparingInt(SearchState::depth)
                 .thenComparing(SearchState::expression)
                 .thenComparing(state ->
                     String.join("->", state.appliedRuleIds())))
@@ -284,12 +256,10 @@ public final class HistoricalProductionSearchComparison {
         CountingEngine counting
     ) {
         String terminal = states.isEmpty()
-            ? "NO_STATES"
-            : "COMPLETED_BOUNDED_SEARCH";
+            ? "NO_STATES" : "COMPLETED_BOUNDED_SEARCH";
         List<String> path = match == null ? List.of() : match.path();
         List<String> ruleIds = match == null
-            ? List.of()
-            : match.appliedRuleIds();
+            ? List.of() : match.appliedRuleIds();
         if (retained.reached() != (match != null)
                 || !retained.terminalStatus().equals(terminal)
                 || retained.exploredStates() != states.size()
@@ -343,8 +313,7 @@ public final class HistoricalProductionSearchComparison {
 
     private static void requireAtlasBinding(Corpus corpus, AtlasReport atlas) {
         Set<String> corpusIds = corpus.cases().stream()
-            .map(Case::id)
-            .collect(Collectors.toSet());
+            .map(Case::id).collect(Collectors.toSet());
         Set<String> atlasIds = atlas.cases().stream()
             .map(value -> value.benchmarkCase().id())
             .collect(Collectors.toSet());
@@ -365,8 +334,7 @@ public final class HistoricalProductionSearchComparison {
         Set<String> witnessIds
     ) {
         Set<String> corpusIds = corpus.cases().stream()
-            .map(Case::id)
-            .collect(Collectors.toSet());
+            .map(Case::id).collect(Collectors.toSet());
         if (!corpusIds.equals(atlasIds) || !corpusIds.equals(witnessIds)) {
             throw new IllegalArgumentException(
                 "production comparison case membership differs");
@@ -447,10 +415,8 @@ public final class HistoricalProductionSearchComparison {
             Objects.requireNonNull(scalar, "scalar");
             Objects.requireNonNull(diversity, "diversity");
             if (oracleWitnessStepCount < 0
-                    || scalar.exploredPrefixLength()
-                        > oracleWitnessStepCount
-                    || diversity.exploredPrefixLength()
-                        > oracleWitnessStepCount
+                    || scalar.exploredPrefixLength() > oracleWitnessStepCount
+                    || diversity.exploredPrefixLength() > oracleWitnessStepCount
                     || prefixDelta != diversity.exploredPrefixLength()
                         - scalar.exploredPrefixLength()
                     || status != classify(
@@ -487,8 +453,8 @@ public final class HistoricalProductionSearchComparison {
         static Summary derive(List<CaseComparison> cases) {
             Map<ComparisonStatus, Integer> counts =
                 new EnumMap<>(ComparisonStatus.class);
-            cases.forEach(value ->
-                counts.merge(value.status(), 1, Integer::sum));
+            cases.forEach(value -> counts.merge(
+                value.status(), 1, Integer::sum));
             return new Summary(
                 cases.size(),
                 counts,
@@ -497,72 +463,44 @@ public final class HistoricalProductionSearchComparison {
                     .filter(value -> !value.scalar().reachedRelation())
                     .count(),
                 counts.getOrDefault(
-                    ComparisonStatus.DIVERSITY_RECOVERS_COMPLETE_WITNESS,
-                    0),
+                    ComparisonStatus.DIVERSITY_RECOVERS_COMPLETE_WITNESS, 0),
                 (int) cases.stream()
-                    .filter(value -> value.prefixDelta() > 0)
-                    .count(),
+                    .filter(value -> value.prefixDelta() > 0).count(),
                 (int) cases.stream()
-                    .filter(value -> value.diversity().reachedRelation())
-                    .count());
+                    .filter(value -> value.diversity().reachedRelation()).count());
         }
     }
 
     record Report(
-        String schema,
-        String evidenceStatus,
-        String corpusSchema,
         String corpusSha256,
-        String atlasSchema,
         String atlasSha256,
-        String witnessDiagnosticSchema,
         String witnessDiagnosticSha256,
         String inventoryRevision,
-        String informationBoundary,
-        String claimBoundary,
         List<CaseComparison> cases,
         Summary summary,
         String contentHash
     ) {
         Report {
-            if (!SCHEMA.equals(schema)
-                    || !EVIDENCE_STATUS.equals(evidenceStatus)
-                    || !HistoricalRediscoveryCorpus.SCHEMA.equals(corpusSchema)
-                    || !HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)
-                    || !HistoricalWitnessPruningDiagnostic.SCHEMA
-                        .equals(witnessDiagnosticSchema)
-                    || !INFORMATION_BOUNDARY.equals(informationBoundary)
-                    || !CLAIM_BOUNDARY.equals(claimBoundary)) {
-                throw new IllegalArgumentException(
-                    "production comparison identity differs");
-            }
-            corpusSha256 = requireRawSha256(
-                corpusSha256, "corpusSha256");
-            atlasSha256 = requirePrefixedSha256(
-                atlasSha256, "atlasSha256");
-            witnessDiagnosticSha256 = requirePrefixedSha256(
-                witnessDiagnosticSha256, "witnessDiagnosticSha256");
+            corpusSha256 = requireSha256(corpusSha256, "corpusSha256", false);
+            atlasSha256 = requireSha256(atlasSha256, "atlasSha256", true);
+            witnessDiagnosticSha256 = requireSha256(
+                witnessDiagnosticSha256, "witnessDiagnosticSha256", true);
             inventoryRevision = requireText(
                 inventoryRevision, "inventoryRevision");
             cases = Objects.requireNonNull(cases, "cases").stream()
-                .sorted(Comparator.comparing(CaseComparison::id))
-                .toList();
+                .sorted(Comparator.comparing(CaseComparison::id)).toList();
+            Summary expectedSummary = Summary.derive(cases);
             if (cases.isEmpty()
                     || new LinkedHashSet<>(cases.stream()
-                        .map(CaseComparison::id).toList()).size()
-                        != cases.size()
-                    || !Summary.derive(cases).equals(summary)) {
+                        .map(CaseComparison::id).toList()).size() != cases.size()
+                    || !expectedSummary.equals(summary)) {
                 throw new IllegalArgumentException(
                     "production comparison case balance differs");
             }
-            contentHash = requirePrefixedSha256(
-                contentHash, "contentHash");
+            contentHash = requireSha256(contentHash, "contentHash", true);
             if (!reportHash(
-                    corpusSchema,
                     corpusSha256,
-                    atlasSchema,
                     atlasSha256,
-                    witnessDiagnosticSchema,
                     witnessDiagnosticSha256,
                     inventoryRevision,
                     cases,
@@ -575,37 +513,25 @@ public final class HistoricalProductionSearchComparison {
         static Report create(
             Corpus corpus,
             AtlasReport atlas,
-            String witnessSchema,
             String witnessSha256,
             List<CaseComparison> cases
         ) {
             List<CaseComparison> retained = cases.stream()
-                .sorted(Comparator.comparing(CaseComparison::id))
-                .toList();
+                .sorted(Comparator.comparing(CaseComparison::id)).toList();
             Summary summary = Summary.derive(retained);
             String atlasSha256 = sha256(atlas.toJson());
             String hash = reportHash(
-                corpus.schema(),
                 corpus.contentSha256(),
-                atlas.schema(),
                 atlasSha256,
-                witnessSchema,
                 witnessSha256,
                 corpus.inventoryRevision(),
                 retained,
                 summary);
             return new Report(
-                SCHEMA,
-                EVIDENCE_STATUS,
-                corpus.schema(),
                 corpus.contentSha256(),
-                atlas.schema(),
                 atlasSha256,
-                witnessSchema,
                 witnessSha256,
                 corpus.inventoryRevision(),
-                INFORMATION_BOUNDARY,
-                CLAIM_BOUNDARY,
                 retained,
                 summary,
                 hash);
@@ -613,11 +539,8 @@ public final class HistoricalProductionSearchComparison {
 
         String toCanonicalJson() {
             return renderReport(
-                corpusSchema,
                 corpusSha256,
-                atlasSchema,
                 atlasSha256,
-                witnessDiagnosticSchema,
                 witnessDiagnosticSha256,
                 inventoryRevision,
                 cases,
@@ -627,22 +550,16 @@ public final class HistoricalProductionSearchComparison {
     }
 
     private static String reportHash(
-        String corpusSchema,
         String corpusSha256,
-        String atlasSchema,
         String atlasSha256,
-        String witnessSchema,
         String witnessSha256,
         String inventoryRevision,
         List<CaseComparison> cases,
         Summary summary
     ) {
         return sha256(renderReport(
-            corpusSchema,
             corpusSha256,
-            atlasSchema,
             atlasSha256,
-            witnessSchema,
             witnessSha256,
             inventoryRevision,
             cases,
@@ -651,11 +568,8 @@ public final class HistoricalProductionSearchComparison {
     }
 
     private static String renderReport(
-        String corpusSchema,
         String corpusSha256,
-        String atlasSchema,
         String atlasSha256,
-        String witnessSchema,
         String witnessSha256,
         String inventoryRevision,
         List<CaseComparison> cases,
@@ -665,11 +579,12 @@ public final class HistoricalProductionSearchComparison {
         JsonWriter writer = new JsonWriter().beginObject();
         writer.property("schema", SCHEMA);
         writer.property("evidenceStatus", EVIDENCE_STATUS);
-        writer.property("corpusSchema", corpusSchema);
+        writer.property("corpusSchema", HistoricalRediscoveryCorpus.SCHEMA);
         writer.property("corpusSha256", corpusSha256);
-        writer.property("atlasSchema", atlasSchema);
+        writer.property("atlasSchema", HistoricalRediscoveryAtlas.SCHEMA);
         writer.property("atlasSha256", atlasSha256);
-        writer.property("witnessDiagnosticSchema", witnessSchema);
+        writer.property(
+            "witnessDiagnosticSchema", HistoricalWitnessPruningDiagnostic.SCHEMA);
         writer.property("witnessDiagnosticSha256", witnessSha256);
         writer.property("inventoryRevision", inventoryRevision);
         writer.property("scalarPolicy", SCALAR_POLICY);
@@ -688,24 +603,18 @@ public final class HistoricalProductionSearchComparison {
     private static void writeCase(JsonWriter writer, CaseComparison value) {
         writer.property("id", value.id());
         writer.property("status", value.status().name());
-        writer.property(
-            "oracleWitnessStepCount", value.oracleWitnessStepCount());
+        writer.property("oracleWitnessStepCount", value.oracleWitnessStepCount());
         writer.object("declaredBudget", object -> {
-            object.property("maxDepth", value.declaredBudget().maxDepth());
+            DeclaredBudget budget = value.declaredBudget();
+            object.property("maxDepth", budget.maxDepth());
+            object.property("maxVisitedStates", budget.maxVisitedStates());
             object.property(
-                "maxVisitedStates",
-                value.declaredBudget().maxVisitedStates());
-            object.property(
-                "maxCandidatesPerState",
-                value.declaredBudget().maxCandidatesPerState());
-            object.property(
-                "maxExpandingSteps",
-                value.declaredBudget().maxExpandingSteps());
-            object.property("beamWidth", value.declaredBudget().beamWidth());
+                "maxCandidatesPerState", budget.maxCandidatesPerState());
+            object.property("maxExpandingSteps", budget.maxExpandingSteps());
+            object.property("beamWidth", budget.beamWidth());
         });
         writer.object("scalar", object -> writeSearch(object, value.scalar()));
-        writer.object(
-            "diversity", object -> writeSearch(object, value.diversity()));
+        writer.object("diversity", object -> writeSearch(object, value.diversity()));
         writer.property("prefixDelta", value.prefixDelta());
     }
 
@@ -714,8 +623,7 @@ public final class HistoricalProductionSearchComparison {
         SearchComparisonEvidence value
     ) {
         writer.property("reachedRelation", value.reachedRelation());
-        writer.property(
-            "exploredPrefixLength", value.exploredPrefixLength());
+        writer.property("exploredPrefixLength", value.exploredPrefixLength());
         writer.property("exploredStates", value.exploredStates());
         writer.property("engineCalls", value.engineCalls());
         writer.property(
@@ -726,22 +634,18 @@ public final class HistoricalProductionSearchComparison {
     private static void writeSummary(JsonWriter writer, Summary value) {
         writer.property("caseCount", value.caseCount());
         writer.object("statusCounts", object -> value.statusCounts().entrySet()
-            .stream()
-            .sorted(Map.Entry.comparingByKey())
+            .stream().sorted(Map.Entry.comparingByKey())
             .forEach(entry -> object.property(
                 entry.getKey().name(), entry.getValue())));
         writer.property(
-            "comparableScalarMissCount",
-            value.comparableScalarMissCount());
+            "comparableScalarMissCount", value.comparableScalarMissCount());
         writer.property(
             "diversityRecoveredCompleteWitnessCount",
             value.diversityRecoveredCompleteWitnessCount());
         writer.property(
-            "diversityExtendedPrefixCount",
-            value.diversityExtendedPrefixCount());
+            "diversityExtendedPrefixCount", value.diversityExtendedPrefixCount());
         writer.property(
-            "diversityReachedRelationCount",
-            value.diversityReachedRelationCount());
+            "diversityReachedRelationCount", value.diversityReachedRelationCount());
     }
 
     private static String requireText(String value, String label) {
@@ -751,23 +655,15 @@ public final class HistoricalProductionSearchComparison {
         return value;
     }
 
-    private static String requireRawSha256(String value, String label) {
-        String text = requireText(value, label);
-        if (!text.matches("[0-9a-f]{64}")) {
-            throw new IllegalArgumentException(
-                label + " must be lowercase hexadecimal SHA-256");
-        }
-        return text;
-    }
-
-    private static String requirePrefixedSha256(
+    private static String requireSha256(
         String value,
-        String label
+        String label,
+        boolean prefixed
     ) {
         String text = requireText(value, label);
-        if (!text.matches("sha256:[0-9a-f]{64}")) {
-            throw new IllegalArgumentException(
-                label + " must be prefixed SHA-256");
+        String pattern = prefixed ? "sha256:[0-9a-f]{64}" : "[0-9a-f]{64}";
+        if (!text.matches(pattern)) {
+            throw new IllegalArgumentException(label + " must be a SHA-256");
         }
         return text;
     }
@@ -782,8 +678,7 @@ public final class HistoricalProductionSearchComparison {
         }
     }
 
-    private static final class CountingEngine
-            implements TransformationEngine {
+    private static final class CountingEngine implements TransformationEngine {
         private final TransformationEngine delegate;
         private int calls;
         private long generated;
