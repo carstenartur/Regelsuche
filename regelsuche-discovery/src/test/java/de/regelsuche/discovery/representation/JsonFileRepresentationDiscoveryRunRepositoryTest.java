@@ -25,73 +25,91 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
     @Test
     void codecRoundTripsOnlyCanonicalStrictJson() {
         RepresentationDiscoveryRunWorkspace workspace = workspace(42);
-        RepresentationDiscoveryRunWorkspaceCodec codec =
-            new RepresentationDiscoveryRunWorkspaceCodec();
-        String canonical = codec.encode(workspace);
+        String canonical = workspace.toCanonicalJson();
 
-        assertEquals(workspace, codec.decode(canonical));
-        assertEquals(workspace, codec.decode(codec.encodeBytes(workspace)));
+        assertEquals(
+            workspace,
+            RepresentationDiscoveryRunWorkspace.fromCanonicalJson(canonical)
+        );
+        assertEquals(
+            workspace,
+            RepresentationDiscoveryRunWorkspace.fromCanonicalBytes(
+                canonical.getBytes(StandardCharsets.UTF_8))
+        );
         assertThrows(IllegalArgumentException.class, () ->
-            codec.decode(" " + canonical));
+            RepresentationDiscoveryRunWorkspace.fromCanonicalJson(
+                " " + canonical));
         assertThrows(IllegalArgumentException.class, () ->
-            codec.decode(canonical + "{}"));
+            RepresentationDiscoveryRunWorkspace.fromCanonicalJson(
+                canonical + "{}"));
         assertThrows(IllegalArgumentException.class, () ->
-            codec.decode("{\"unknown\":true," + canonical.substring(1)));
+            RepresentationDiscoveryRunWorkspace.fromCanonicalJson(
+                "{\"unknown\":true," + canonical.substring(1)));
         assertThrows(IllegalArgumentException.class, () ->
-            codec.decode(
+            RepresentationDiscoveryRunWorkspace.fromCanonicalJson(
                 "{\"schema\":\""
                     + RepresentationDiscoveryRunWorkspace.SCHEMA
                     + "\"," + canonical.substring(1)));
         assertThrows(IllegalArgumentException.class, () ->
-            codec.decode(new byte[] {(byte) 0xc3, (byte) 0x28}));
+            RepresentationDiscoveryRunWorkspace.fromCanonicalBytes(
+                new byte[] {(byte) 0xc3, (byte) 0x28}));
     }
 
     @Test
-    void saveFindAndListAreCanonicalImmutableAndDeterministic(
+    void retainFindAndListAreCanonicalImmutableAndDeterministic(
         @TempDir Path directory
     ) throws IOException {
-        JsonFileRepresentationDiscoveryRunRepository repository =
-            new JsonFileRepresentationDiscoveryRunRepository(directory);
         RepresentationDiscoveryRunWorkspace first = workspace(7);
         RepresentationDiscoveryRunWorkspace second = workspace(11);
 
-        repository.save(second);
-        repository.save(first);
-        assertEquals(first, repository.save(first));
-        assertEquals(first, repository.find(first.runId()).orElseThrow());
-        assertTrue(repository.find(sha("missing")).isEmpty());
+        RepresentationDiscoveryRunWorkspace.retain(directory, second);
+        RepresentationDiscoveryRunWorkspace.retain(directory, first);
+        assertEquals(
+            first,
+            RepresentationDiscoveryRunWorkspace.retain(directory, first)
+        );
+        assertEquals(
+            first,
+            RepresentationDiscoveryRunWorkspace.findRetained(
+                directory,
+                first.runId()
+            ).orElseThrow()
+        );
+        assertTrue(
+            RepresentationDiscoveryRunWorkspace.findRetained(
+                directory,
+                sha("missing")
+            ).isEmpty()
+        );
 
         List<RepresentationDiscoveryRunWorkspace> expected =
             List.of(first, second).stream()
                 .sorted(Comparator.comparing(
                     RepresentationDiscoveryRunWorkspace::runId))
                 .toList();
-        assertEquals(expected, repository.list());
+        assertEquals(
+            expected,
+            RepresentationDiscoveryRunWorkspace.listRetained(directory)
+        );
         try (var entries = Files.list(directory)) {
             assertEquals(2L, entries.count());
         }
-        repository.list().forEach(workspace -> {
+        for (RepresentationDiscoveryRunWorkspace workspace : expected) {
             Path retained = runFile(directory, workspace.runId());
             assertTrue(Files.isRegularFile(retained));
-            try {
-                assertEquals(
-                    workspace.toCanonicalJson(),
-                    Files.readString(retained, StandardCharsets.UTF_8)
-                );
-            } catch (IOException exception) {
-                throw new AssertionError(exception);
-            }
-        });
+            assertEquals(
+                workspace.toCanonicalJson(),
+                Files.readString(retained, StandardCharsets.UTF_8)
+            );
+        }
     }
 
     @Test
     void nonCanonicalOrMisnamedRetainedFilesFailClosed(
         @TempDir Path directory
     ) throws IOException {
-        JsonFileRepresentationDiscoveryRunRepository repository =
-            new JsonFileRepresentationDiscoveryRunRepository(directory);
         RepresentationDiscoveryRunWorkspace workspace = workspace(42);
-        repository.save(workspace);
+        RepresentationDiscoveryRunWorkspace.retain(directory, workspace);
         Path retained = runFile(directory, workspace.runId());
 
         Files.writeString(
@@ -100,16 +118,19 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
             StandardCharsets.UTF_8
         );
         assertThrows(IllegalArgumentException.class, () ->
-            repository.find(workspace.runId()));
+            RepresentationDiscoveryRunWorkspace.findRetained(
+                directory,
+                workspace.runId()
+            ));
 
         Files.writeString(
             retained,
             workspace.toCanonicalJson(),
             StandardCharsets.UTF_8
         );
-        Path forgedName = runFile(directory, sha("other-run"));
-        Files.copy(retained, forgedName);
-        assertThrows(IllegalStateException.class, repository::list);
+        Files.copy(retained, runFile(directory, sha("other-run")));
+        assertThrows(IllegalStateException.class, () ->
+            RepresentationDiscoveryRunWorkspace.listRetained(directory));
     }
 
     @Test
@@ -121,29 +142,42 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
         int bytes = first.toCanonicalJson().getBytes(
             StandardCharsets.UTF_8).length;
 
-        JsonFileRepresentationDiscoveryRunRepository tooSmall =
-            new JsonFileRepresentationDiscoveryRunRepository(
-                directory.resolve("small"), bytes - 1, 10);
         assertThrows(IllegalStateException.class, () ->
-            tooSmall.save(first));
+            RepresentationDiscoveryRunWorkspace.retain(
+                directory.resolve("small"),
+                bytes - 1,
+                10,
+                first
+            ));
 
-        JsonFileRepresentationDiscoveryRunRepository oneRun =
-            new JsonFileRepresentationDiscoveryRunRepository(
-                directory.resolve("one"), bytes * 2, 1);
-        oneRun.save(first);
+        Path one = directory.resolve("one");
+        RepresentationDiscoveryRunWorkspace.retain(
+            one,
+            bytes * 2,
+            1,
+            first
+        );
         assertThrows(IllegalStateException.class, () ->
-            oneRun.save(second));
+            RepresentationDiscoveryRunWorkspace.retain(
+                one,
+                bytes * 2,
+                1,
+                second
+            ));
 
-        JsonFileRepresentationDiscoveryRunRepository unexpected =
-            new JsonFileRepresentationDiscoveryRunRepository(
-                directory.resolve("unexpected"));
-        assertTrue(unexpected.list().isEmpty());
+        Path unexpected = directory.resolve("unexpected");
+        assertTrue(
+            RepresentationDiscoveryRunWorkspace.listRetained(
+                unexpected
+            ).isEmpty()
+        );
         Files.writeString(
-            directory.resolve("unexpected").resolve("README.txt"),
+            unexpected.resolve("README.txt"),
             "not a run",
             StandardCharsets.UTF_8
         );
-        assertThrows(IllegalStateException.class, unexpected::list);
+        assertThrows(IllegalStateException.class, () ->
+            RepresentationDiscoveryRunWorkspace.listRetained(unexpected));
     }
 
     @Test
@@ -156,15 +190,12 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
         if (!createSymbolicLink(link, actual)) {
             return;
         }
-        JsonFileRepresentationDiscoveryRunRepository linkedRepository =
-            new JsonFileRepresentationDiscoveryRunRepository(link);
-        assertThrows(IllegalStateException.class, linkedRepository::list);
+        assertThrows(IllegalStateException.class, () ->
+            RepresentationDiscoveryRunWorkspace.listRetained(link));
 
         Path runs = directory.resolve("runs");
-        JsonFileRepresentationDiscoveryRunRepository repository =
-            new JsonFileRepresentationDiscoveryRunRepository(runs);
         RepresentationDiscoveryRunWorkspace workspace = workspace(9);
-        repository.save(workspace);
+        RepresentationDiscoveryRunWorkspace.retain(runs, workspace);
         Path retained = runFile(runs, workspace.runId());
         Path outside = directory.resolve("outside.json");
         Files.writeString(
@@ -177,7 +208,10 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
             return;
         }
         assertThrows(IllegalStateException.class, () ->
-            repository.find(workspace.runId()));
+            RepresentationDiscoveryRunWorkspace.findRetained(
+                runs,
+                workspace.runId()
+            ));
     }
 
     @Test
@@ -185,16 +219,28 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
         @TempDir Path directory
     ) {
         assertThrows(IllegalArgumentException.class, () ->
-            new JsonFileRepresentationDiscoveryRunRepository(
-                directory, 0, 1));
+            RepresentationDiscoveryRunWorkspace.listRetained(
+                directory,
+                0,
+                1
+            ));
         assertThrows(IllegalArgumentException.class, () ->
-            new JsonFileRepresentationDiscoveryRunRepository(
-                directory, 1, 0));
-        JsonFileRepresentationDiscoveryRunRepository repository =
-            new JsonFileRepresentationDiscoveryRunRepository(directory);
+            RepresentationDiscoveryRunWorkspace.listRetained(
+                directory,
+                1,
+                0
+            ));
         assertThrows(IllegalArgumentException.class, () ->
-            repository.find("run-1"));
-        assertFalse(repository.find(sha("absent")).isPresent());
+            RepresentationDiscoveryRunWorkspace.findRetained(
+                directory,
+                "run-1"
+            ));
+        assertFalse(
+            RepresentationDiscoveryRunWorkspace.findRetained(
+                directory,
+                sha("absent")
+            ).isPresent()
+        );
     }
 
     private static boolean createSymbolicLink(Path link, Path target) {

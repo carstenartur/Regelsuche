@@ -9,18 +9,36 @@ import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunC
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sha256;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactStatus;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryRunOutcome.TerminalState;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Immutable, content-addressed backend contract for one representation-
@@ -53,9 +71,19 @@ public record RepresentationDiscoveryRunWorkspace(
             + "evidence; not mathematical truth, proof, novelty, "
             + "interestingness or search superiority.";
 
+    public static final int DEFAULT_MAX_RETAINED_WORKSPACE_BYTES =
+        2_000_000;
+    public static final int DEFAULT_MAX_RETAINED_RUNS = 10_000;
+
+    private static final Pattern RETAINED_FILE_NAME = Pattern.compile(
+        "([0-9a-f]{64})\\.json"
+    );
     private static final JsonMapper JSON = JsonMapper.builder()
+        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
         .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
         .build();
 
     public RepresentationDiscoveryRunWorkspace {
@@ -232,6 +260,388 @@ public record RepresentationDiscoveryRunWorkspace(
                 "Unable to render representation-discovery workspace",
                 exception
             );
+        }
+    }
+
+
+    /** Decodes only the exact canonical JSON representation. */
+    public static RepresentationDiscoveryRunWorkspace fromCanonicalJson(
+        String source
+    ) {
+        Objects.requireNonNull(source, "source");
+        try {
+            RepresentationDiscoveryRunWorkspace workspace = JSON.readValue(
+                source,
+                RepresentationDiscoveryRunWorkspace.class
+            );
+            if (!workspace.toCanonicalJson().equals(source)) {
+                throw new IllegalArgumentException(
+                    "run workspace JSON is not canonical");
+            }
+            return workspace;
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException(
+                "invalid representation-discovery run workspace JSON",
+                exception
+            );
+        }
+    }
+
+    /** Decodes canonical JSON while rejecting malformed UTF-8. */
+    public static RepresentationDiscoveryRunWorkspace fromCanonicalBytes(
+        byte[] source
+    ) {
+        Objects.requireNonNull(source, "source");
+        try {
+            String text = StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(source))
+                .toString();
+            return fromCanonicalJson(text);
+        } catch (CharacterCodingException exception) {
+            throw new IllegalArgumentException(
+                "run workspace is not valid UTF-8",
+                exception
+            );
+        }
+    }
+
+    /** Retains canonical bytes under the immutable Run ID. */
+    public static RepresentationDiscoveryRunWorkspace retain(
+        Path directory,
+        RepresentationDiscoveryRunWorkspace workspace
+    ) {
+        return retain(
+            directory,
+            DEFAULT_MAX_RETAINED_WORKSPACE_BYTES,
+            DEFAULT_MAX_RETAINED_RUNS,
+            workspace
+        );
+    }
+
+    /** Retains a workspace under explicit finite repository limits. */
+    public static synchronized RepresentationDiscoveryRunWorkspace retain(
+        Path directory,
+        int maxWorkspaceBytes,
+        int maxRuns,
+        RepresentationDiscoveryRunWorkspace workspace
+    ) {
+        validateRetainedLimits(maxWorkspaceBytes, maxRuns);
+        Objects.requireNonNull(workspace, "workspace");
+        byte[] canonical = workspace.toCanonicalJson().getBytes(
+            StandardCharsets.UTF_8);
+        requireWithinRetainedByteLimit(canonical.length, maxWorkspaceBytes);
+        Path root = ensureRetainedDirectory(directory);
+        Path target = retainedPath(root, workspace.runId());
+        if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+            return requireIdenticalRetained(
+                target,
+                canonical,
+                workspace.runId(),
+                maxWorkspaceBytes
+            );
+        }
+        if (validatedRetainedEntries(root, maxRuns).size() >= maxRuns) {
+            throw new IllegalStateException(
+                "representation-discovery run repository limit exceeded: "
+                    + maxRuns);
+        }
+
+        Path temporary = null;
+        try {
+            temporary = Files.createTempFile(root, ".run-workspace-", ".tmp");
+            if (Files.isSymbolicLink(temporary)) {
+                throw new IllegalStateException(
+                    "temporary run-workspace file is symbolic: " + temporary);
+            }
+            Files.write(
+                temporary,
+                canonical,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE
+            );
+            moveRetainedWithoutReplacement(temporary, target);
+            temporary = null;
+            return workspace;
+        } catch (FileAlreadyExistsException exception) {
+            return requireIdenticalRetained(
+                target,
+                canonical,
+                workspace.runId(),
+                maxWorkspaceBytes
+            );
+        } catch (IOException exception) {
+            throw new IllegalStateException(
+                "unable to retain representation-discovery run "
+                    + workspace.runId(),
+                exception
+            );
+        } finally {
+            deleteTemporaryRetainedFile(temporary);
+        }
+    }
+
+    /** Finds one retained workspace using the default finite limits. */
+    public static Optional<RepresentationDiscoveryRunWorkspace> findRetained(
+        Path directory,
+        String runId
+    ) {
+        return findRetained(
+            directory,
+            DEFAULT_MAX_RETAINED_WORKSPACE_BYTES,
+            DEFAULT_MAX_RETAINED_RUNS,
+            runId
+        );
+    }
+
+    /** Finds one retained workspace using explicit finite limits. */
+    public static synchronized Optional<RepresentationDiscoveryRunWorkspace>
+            findRetained(
+        Path directory,
+        int maxWorkspaceBytes,
+        int maxRuns,
+        String runId
+    ) {
+        validateRetainedLimits(maxWorkspaceBytes, maxRuns);
+        String normalized = requireSha256(runId, "runId");
+        Path root = ensureRetainedDirectory(directory);
+        Path target = retainedPath(root, normalized);
+        if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+            return Optional.empty();
+        }
+        return Optional.of(loadRetained(
+            target,
+            normalized,
+            maxWorkspaceBytes
+        ));
+    }
+
+    /** Lists retained workspaces in deterministic Run-ID order. */
+    public static List<RepresentationDiscoveryRunWorkspace> listRetained(
+        Path directory
+    ) {
+        return listRetained(
+            directory,
+            DEFAULT_MAX_RETAINED_WORKSPACE_BYTES,
+            DEFAULT_MAX_RETAINED_RUNS
+        );
+    }
+
+    /** Lists retained workspaces under explicit finite limits. */
+    public static synchronized List<RepresentationDiscoveryRunWorkspace>
+            listRetained(
+        Path directory,
+        int maxWorkspaceBytes,
+        int maxRuns
+    ) {
+        validateRetainedLimits(maxWorkspaceBytes, maxRuns);
+        Path root = ensureRetainedDirectory(directory);
+        return validatedRetainedEntries(root, maxRuns).stream()
+            .map(path -> loadRetained(
+                path,
+                retainedRunId(path),
+                maxWorkspaceBytes
+            ))
+            .toList();
+    }
+
+    private static RepresentationDiscoveryRunWorkspace requireIdenticalRetained(
+        Path target,
+        byte[] expected,
+        String runId,
+        int maxWorkspaceBytes
+    ) {
+        RepresentationDiscoveryRunWorkspace retained = loadRetained(
+            target,
+            runId,
+            maxWorkspaceBytes
+        );
+        byte[] actual = readRetainedBytes(target, maxWorkspaceBytes);
+        if (!Arrays.equals(actual, expected)) {
+            throw new IllegalStateException(
+                "immutable run identity already contains different bytes: "
+                    + runId);
+        }
+        return retained;
+    }
+
+    private static RepresentationDiscoveryRunWorkspace loadRetained(
+        Path path,
+        String expectedRunId,
+        int maxWorkspaceBytes
+    ) {
+        requireRegularRetainedFile(path);
+        RepresentationDiscoveryRunWorkspace workspace = fromCanonicalBytes(
+            readRetainedBytes(path, maxWorkspaceBytes)
+        );
+        if (!expectedRunId.equals(workspace.runId())) {
+            throw new IllegalStateException(
+                "run-workspace filename and Run ID differ: " + path);
+        }
+        return workspace;
+    }
+
+    private static byte[] readRetainedBytes(
+        Path path,
+        int maxWorkspaceBytes
+    ) {
+        requireRegularRetainedFile(path);
+        try {
+            long size = Files.size(path);
+            requireWithinRetainedByteLimit(size, maxWorkspaceBytes);
+            byte[] bytes = Files.readAllBytes(path);
+            requireWithinRetainedByteLimit(bytes.length, maxWorkspaceBytes);
+            return bytes;
+        } catch (IOException exception) {
+            throw new IllegalStateException(
+                "unable to read retained run workspace: " + path,
+                exception
+            );
+        }
+    }
+
+    private static List<Path> validatedRetainedEntries(
+        Path root,
+        int maxRuns
+    ) {
+        try (var stream = Files.list(root)) {
+            List<Path> entries = stream
+                .sorted(Comparator.comparing(path ->
+                    path.getFileName().toString()))
+                .toList();
+            if (entries.size() > maxRuns) {
+                throw new IllegalStateException(
+                    "representation-discovery run repository limit exceeded: "
+                        + entries.size() + " > " + maxRuns);
+            }
+            for (Path entry : entries) {
+                requireRegularRetainedFile(entry);
+                if (!RETAINED_FILE_NAME.matcher(
+                        entry.getFileName().toString()).matches()) {
+                    throw new IllegalStateException(
+                        "unexpected run repository entry: " + entry);
+                }
+            }
+            return entries;
+        } catch (IOException exception) {
+            throw new IllegalStateException(
+                "unable to list representation-discovery runs",
+                exception
+            );
+        }
+    }
+
+    private static Path ensureRetainedDirectory(Path directory) {
+        Path absolute = Objects.requireNonNull(directory, "directory")
+            .toAbsolutePath()
+            .normalize();
+        rejectSymbolicRetainedComponents(absolute);
+        try {
+            if (!Files.exists(absolute, LinkOption.NOFOLLOW_LINKS)) {
+                Files.createDirectories(absolute);
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException(
+                "unable to create run repository directory: " + absolute,
+                exception
+            );
+        }
+        rejectSymbolicRetainedComponents(absolute);
+        if (!Files.isDirectory(absolute, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IllegalStateException(
+                "run repository path is not a real directory: " + absolute);
+        }
+        return absolute;
+    }
+
+    private static void rejectSymbolicRetainedComponents(Path absolute) {
+        Path current = absolute.getRoot();
+        for (Path component : absolute) {
+            current = current == null
+                ? component
+                : current.resolve(component);
+            if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)
+                    && Files.isSymbolicLink(current)) {
+                throw new IllegalStateException(
+                    "run repository contains symbolic path component: "
+                        + current);
+            }
+        }
+    }
+
+    private static void requireRegularRetainedFile(Path path) {
+        if (Files.isSymbolicLink(path)
+                || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IllegalStateException(
+                "run repository entry is not a real regular file: " + path);
+        }
+    }
+
+    private static Path retainedPath(Path root, String runId) {
+        String normalized = requireSha256(runId, "runId");
+        String digest = normalized.substring("sha256:".length());
+        Path path = root.resolve(digest + ".json").normalize();
+        if (!root.equals(path.getParent())) {
+            throw new IllegalArgumentException(
+                "run workspace path escapes repository directory");
+        }
+        return path;
+    }
+
+    private static String retainedRunId(Path path) {
+        Matcher matcher = RETAINED_FILE_NAME.matcher(
+            path.getFileName().toString());
+        if (!matcher.matches()) {
+            throw new IllegalStateException(
+                "invalid run repository filename: " + path);
+        }
+        return "sha256:" + matcher.group(1);
+    }
+
+    private static void validateRetainedLimits(
+        int maxWorkspaceBytes,
+        int maxRuns
+    ) {
+        if (maxWorkspaceBytes < 1) {
+            throw new IllegalArgumentException(
+                "maxWorkspaceBytes must be positive");
+        }
+        if (maxRuns < 1) {
+            throw new IllegalArgumentException("maxRuns must be positive");
+        }
+    }
+
+    private static void requireWithinRetainedByteLimit(
+        long length,
+        int maxWorkspaceBytes
+    ) {
+        if (length > maxWorkspaceBytes) {
+            throw new IllegalStateException(
+                "run workspace exceeds byte limit " + maxWorkspaceBytes
+                    + ": " + length);
+        }
+    }
+
+    private static void moveRetainedWithoutReplacement(
+        Path source,
+        Path target
+    ) throws IOException {
+        try {
+            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException exception) {
+            Files.move(source, target);
+        }
+    }
+
+    private static void deleteTemporaryRetainedFile(Path temporary) {
+        if (temporary == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(temporary);
+        } catch (IOException exception) {
+            // A leftover non-canonical entry is rejected by list/find.
         }
     }
 
