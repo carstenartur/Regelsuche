@@ -26,7 +26,7 @@ class RepresentationDiscoveryRunComparisonTest {
 
         assertEquals(Relationship.SAME_RUN, comparison.relationship());
         assertTrue(comparison.changedEntries().isEmpty());
-        assertTrue(comparison.sameCanonicalEvidence());
+        assertTrue(comparison.canonicalChangedEntries().isEmpty());
         assertTrue(comparison.contentHash().matches("sha256:[0-9a-f]{64}"));
         assertEquals(comparison, compare(workspace, workspace));
     }
@@ -43,7 +43,6 @@ class RepresentationDiscoveryRunComparisonTest {
         Entry change = comparison.changedEntries().getFirst();
         assertEquals(Category.RUNTIME_DIAGNOSTICS, change.category());
         assertEquals("runtimeDiagnosticsHash", change.field());
-        assertTrue(comparison.sameCanonicalEvidence());
         assertTrue(comparison.canonicalChangedEntries().isEmpty());
     }
 
@@ -63,9 +62,9 @@ class RepresentationDiscoveryRunComparisonTest {
             List.of("budgetHash"),
             fields(comparison, Category.PLAN)
         );
-        assertTrue(comparison.changedEntries(Category.LINEAGE).stream()
+        assertTrue(changed(comparison, Category.LINEAGE).stream()
             .anyMatch(entry -> entry.field().equals("parentRunId")));
-        assertFalse(comparison.sameCanonicalEvidence());
+        assertFalse(comparison.canonicalChangedEntries().isEmpty());
     }
 
     @Test
@@ -99,7 +98,7 @@ class RepresentationDiscoveryRunComparisonTest {
             workspace(basePlan(), "runtime", false),
             workspace(basePlan(), "runtime", true)
         );
-        List<Entry> changes = comparison.changedEntries(Category.ARTIFACT);
+        List<Entry> changes = changed(comparison, Category.ARTIFACT);
 
         assertEquals(4, changes.size());
         assertTrue(changes.stream().allMatch(entry ->
@@ -175,11 +174,20 @@ class RepresentationDiscoveryRunComparisonTest {
         return RepresentationDiscoveryRunComparison.compare(left, right);
     }
 
+    private static List<Entry> changed(
+        RepresentationDiscoveryRunComparison comparison,
+        Category category
+    ) {
+        return comparison.changedEntries().stream()
+            .filter(entry -> entry.category() == category)
+            .toList();
+    }
+
     private static List<String> fields(
         RepresentationDiscoveryRunComparison comparison,
         Category category
     ) {
-        return comparison.changedEntries(category).stream()
+        return changed(comparison, category).stream()
             .map(Entry::field)
             .toList();
     }
@@ -189,7 +197,7 @@ class RepresentationDiscoveryRunComparisonTest {
         Category category,
         String field
     ) {
-        return comparison.changedEntries(category).stream()
+        return changed(comparison, category).stream()
             .filter(candidate -> candidate.field().equals(field))
             .findFirst()
             .orElseThrow();
