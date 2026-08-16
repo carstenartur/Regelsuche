@@ -9,6 +9,7 @@
     {"url": "/", "description": "Aktuelle lokale Workbench-Instanz"}
   ],
   "tags": [
+    {"name": "Discovery Runs", "description": "Immutable representation-discovery run workspaces and retained history."},
     {"name": "Search", "description": "Mathematische Suche und Discovery starten."},
     {"name": "Paths", "description": "Gefundene Rechenwege, Replay und Vergleich."},
     {"name": "Search Graph", "description": "Roher und semantisch aufbereiteter Suchgraph."},
@@ -28,6 +29,56 @@
     {"name": "Rule Radar", "description": "Positionsgebundene AST-Kandidaten, Anwendung und begrenzte Suche."}
   ],
   "paths": {
+    "/api/discovery-runs": {
+      "get": {
+        "tags": ["Discovery Runs"],
+        "operationId": "listRepresentationDiscoveryRuns",
+        "summary": "Unveränderliche Discovery-Runs auflisten",
+        "description": "Liefert eine deterministisch nach Run-ID sortierte, begrenzte Historie ohne die vollständigen Run-Dokumente zu duplizieren.",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "parameters": [
+          {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 0, "default": 0}},
+          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 1, "maximum": 500, "default": 100}}
+        ],
+        "responses": {
+          "200": {"description": "Begrenzte Run-Historie", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequestText"},
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"}
+        }
+      },
+      "post": {
+        "tags": ["Discovery Runs"],
+        "operationId": "retainRepresentationDiscoveryRun",
+        "summary": "Kanonischen Discovery-Run unveränderlich ablegen",
+        "description": "Akzeptiert ausschließlich das exakte kanonische Run-Workspace-JSON. Ein identischer zweiter Upload ist idempotent; andere Bytes unter derselben Run-ID werden abgewiesen.",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+        "responses": {
+          "201": {"description": "Run unveränderlich abgelegt", "headers": {"Location": {"schema": {"type": "string"}}, "ETag": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequestText"},
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"},
+          "409": {"description": "Die Run-ID ist bereits mit anderen Bytes belegt", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "413": {"$ref": "#/components/responses/PayloadTooLarge"}
+        }
+      }
+    },
+    "/api/discovery-runs/{runDigest}": {
+      "get": {
+        "tags": ["Discovery Runs"],
+        "operationId": "getRepresentationDiscoveryRun",
+        "summary": "Exaktes kanonisches Discovery-Run-Dokument laden",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "parameters": [
+          {"name": "runDigest", "in": "path", "required": true, "description": "64-stelliger kleingeschriebener SHA-256-Digest ohne Präfix", "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+        ],
+        "responses": {
+          "200": {"description": "Kanonischer Run-Workspace", "headers": {"ETag": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequestText"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"}
+        }
+      }
+    },
     "/api/search": {
       "post": {
         "tags": ["Search"],
