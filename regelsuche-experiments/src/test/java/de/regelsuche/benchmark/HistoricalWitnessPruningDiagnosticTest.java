@@ -12,12 +12,9 @@ import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Corpus;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Relation;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Role;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.TargetRelation;
-import de.regelsuche.benchmark.HistoricalWitnessPruningReport.CaseDiagnostic;
-import de.regelsuche.benchmark.HistoricalWitnessPruningReport.CaseStatus;
-import de.regelsuche.benchmark.HistoricalWitnessPruningReport.EventSnapshot;
-import de.regelsuche.benchmark.HistoricalWitnessPruningReport.LossReason;
-import de.regelsuche.benchmark.HistoricalWitnessPruningReport.LostStep;
-import de.regelsuche.benchmark.HistoricalWitnessPruningReport.TargetBlindTerminalStatus;
+import de.regelsuche.benchmark.HistoricalWitnessPruningDiagnostic.CaseDiagnostic;
+import de.regelsuche.benchmark.HistoricalWitnessPruningDiagnostic.LostStep;
+import de.regelsuche.benchmark.HistoricalWitnessPruningDiagnostic.Report;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalMetrics;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
@@ -38,9 +35,10 @@ class HistoricalWitnessPruningDiagnosticTest {
 
     @Test
     void candidateBudgetStopsBeforeTheWitnessEdge() {
-        Case benchmarkCase = benchmarkCase("candidate-budget", "x", "x + 1", 5);
-        GoalMetrics metrics = metrics(1, 1);
-        GoalSearchResult search = search(List.of(state("x")), metrics);
+        Case benchmarkCase = benchmarkCase(
+            "candidate-budget", "x", "x + 1", 5);
+        GoalSearchResult search = search(
+            List.of(state("x")), metrics(1, 1));
         SearchEvent budget = event(
             1,
             SearchEventType.STATE_PRUNED_BUDGET,
@@ -49,30 +47,31 @@ class HistoricalWitnessPruningDiagnosticTest {
             "",
             "max-candidates-per-state");
 
-        CaseDiagnostic result = new WitnessPrefixAnalyzer().analyze(
-            benchmarkCase,
-            oracle("x + 1", "z-witness"),
-            search,
-            List.of(budget),
-            1,
-            2);
+        CaseDiagnostic result = new HistoricalWitnessPruningDiagnostic()
+            .analyzeWitness(
+                benchmarkCase,
+                oracle("x + 1", "z-witness"),
+                search,
+                List.of(budget),
+                1,
+                2);
 
-        assertEquals(CaseStatus.WITNESS_PREFIX_LOST, result.status());
         assertEquals(
-            LossReason.CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
+            HistoricalWitnessPruningDiagnostic.WITNESS_PREFIX_LOST,
+            result.status());
+        assertEquals(
+            HistoricalWitnessPruningDiagnostic
+                .CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
             result.firstLoss().reason());
-        assertEquals(
-            TargetBlindTerminalStatus.CANDIDATE_BUDGET,
-            result.searchTerminalStatus());
+        assertEquals("CANDIDATE_BUDGET", result.searchTerminalStatus());
     }
 
     @Test
     void stateBudgetLeavesTheWitnessQueuedButUnexplored() {
         Case benchmarkCase = benchmarkCase(
             "state-budget", "x + 0", "x + y - y", 2);
-        GoalMetrics metrics = metrics(2, 0);
         GoalSearchResult search = search(
-            List.of(state("x + 0"), state("x")), metrics);
+            List.of(state("x + 0"), state("x")), metrics(2, 0));
         SearchEvent generated = event(
             1,
             SearchEventType.TRANSFORMATION_GENERATED,
@@ -88,33 +87,40 @@ class HistoricalWitnessPruningDiagnosticTest {
             "expand-root",
             "");
 
-        CaseDiagnostic result = new WitnessPrefixAnalyzer().analyze(
-            benchmarkCase,
-            oracle("x + y - y", "expand-root"),
-            search,
-            List.of(generated, enqueued),
-            1,
-            2);
+        CaseDiagnostic result = new HistoricalWitnessPruningDiagnostic()
+            .analyzeWitness(
+                benchmarkCase,
+                oracle("x + y - y", "expand-root"),
+                search,
+                List.of(generated, enqueued),
+                1,
+                2);
 
         assertEquals(
-            LossReason.STATE_ENQUEUED_BUT_NOT_EXPLORED,
+            HistoricalWitnessPruningDiagnostic
+                .STATE_ENQUEUED_BUT_NOT_EXPLORED,
             result.firstLoss().reason());
-        assertEquals(
-            TargetBlindTerminalStatus.STATE_BUDGET,
-            result.searchTerminalStatus());
+        assertEquals("STATE_BUDGET", result.searchTerminalStatus());
     }
 
     @Test
     void reportIsContentAddressedAndByteStable(@TempDir Path directory)
             throws Exception {
         Case benchmarkCase = benchmarkCase("stable", "x", "x + 1", 5);
+        SearchEvent event = event(
+            1,
+            SearchEventType.STATE_PRUNED_BUDGET,
+            "x",
+            "",
+            "",
+            "max-candidates-per-state");
         CaseDiagnostic diagnostic = new CaseDiagnostic(
             benchmarkCase.id(),
-            CaseStatus.WITNESS_PREFIX_LOST,
+            HistoricalWitnessPruningDiagnostic.WITNESS_PREFIX_LOST,
             "REACHABLE",
             1,
             0,
-            TargetBlindTerminalStatus.CANDIDATE_BUDGET,
+            "CANDIDATE_BUDGET",
             1,
             1,
             2,
@@ -123,10 +129,9 @@ class HistoricalWitnessPruningDiagnosticTest {
                 "x",
                 "x + 1",
                 "witness",
-                LossReason.CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
-                new EventSnapshot(
-                    "STATE_PRUNED_BUDGET", 1, 0, 0, 0, 1, 1,
-                    "max-candidates-per-state"),
+                HistoricalWitnessPruningDiagnostic
+                    .CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
+                event,
                 "candidate budget"),
             "first loss");
         Corpus corpus = new Corpus(
@@ -145,16 +150,12 @@ class HistoricalWitnessPruningDiagnosticTest {
             List.of(),
             List.of(),
             assessment());
-        HistoricalWitnessPruningReport first =
-            HistoricalWitnessPruningReport.create(
-                corpus, atlas, List.of(diagnostic));
-        HistoricalWitnessPruningReport second =
-            HistoricalWitnessPruningReport.create(
-                corpus, atlas, List.of(diagnostic));
+        Report first = Report.create(corpus, atlas, List.of(diagnostic));
+        Report second = Report.create(corpus, atlas, List.of(diagnostic));
         HistoricalWitnessPruningDiagnostic writer =
             new HistoricalWitnessPruningDiagnostic();
-        Path firstPath = writer.write(directory.resolve("first"), first).path();
-        Path secondPath = writer.write(directory.resolve("second"), second).path();
+        Path firstPath = writer.write(directory.resolve("first"), first);
+        Path secondPath = writer.write(directory.resolve("second"), second);
 
         assertEquals(first.contentHash(), second.contentHash());
         assertTrue(first.contentHash().matches("sha256:[0-9a-f]{64}"));
