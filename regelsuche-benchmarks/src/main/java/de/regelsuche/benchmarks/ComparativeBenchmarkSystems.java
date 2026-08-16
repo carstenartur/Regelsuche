@@ -109,7 +109,7 @@ final class ComparativeBenchmarkSystems {
         ) {
             return new SimplificationSystem(
                 id, version, SystemKind.REGELSUCHE, strategy, null, true,
-                "java=21\nsearch-kernel=regelsuche-search/v1", limitations);
+                "java=25\nsearch-kernel=regelsuche-search/v1", limitations);
         }
 
         static SimplificationSystem internalControl(
@@ -120,7 +120,7 @@ final class ComparativeBenchmarkSystems {
         ) {
             return new SimplificationSystem(
                 id, version, SystemKind.ABLATION, strategy, null, true,
-                "java=21\nsearch-kernel=regelsuche-search/v1", limitations);
+                "java=25\nsearch-kernel=regelsuche-search/v1", limitations);
         }
 
         static SimplificationSystem external(
