@@ -9,18 +9,36 @@ import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunC
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sha256;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactStatus;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryRunOutcome.TerminalState;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Immutable, content-addressed backend contract for one representation-
@@ -53,42 +71,52 @@ public record RepresentationDiscoveryRunWorkspace(
             + &quot;evidence; not mathematical truth, proof, novelty, &quot;
             + &quot;interestingness or search superiority.&quot;;
 
-<span class="fc" id="L56">    private static final JsonMapper JSON = JsonMapper.builder()</span>
-<span class="fc" id="L57">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
-<span class="fc" id="L58">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
-<span class="fc" id="L59">        .build();</span>
+    public static final int DEFAULT_MAX_RETAINED_WORKSPACE_BYTES =
+        2_000_000;
+    public static final int DEFAULT_MAX_RETAINED_RUNS = 10_000;
 
-<span class="fc" id="L61">    public RepresentationDiscoveryRunWorkspace {</span>
-<span class="fc" id="L62">        schema = requireText(schema, &quot;schema&quot;);</span>
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L64">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L78">    private static final Pattern RETAINED_FILE_NAME = Pattern.compile(</span>
+        &quot;([0-9a-f]{64})\\.json&quot;
+    );
+<span class="fc" id="L81">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L82">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L83">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L84">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L85">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L86">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L87">        .build();</span>
+
+<span class="fc" id="L89">    public RepresentationDiscoveryRunWorkspace {</span>
+<span class="fc" id="L90">        schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L92">            throw new IllegalArgumentException(</span>
                 &quot;unsupported run-workspace schema: &quot; + schema);
         }
-<span class="fc" id="L67">        runId = requireSha256(runId, &quot;runId&quot;);</span>
-<span class="fc" id="L68">        relation = Objects.requireNonNull(relation, &quot;relation&quot;);</span>
-<span class="fc" id="L69">        parentRunId = optionalSha256(parentRunId, &quot;parentRunId&quot;);</span>
-<span class="fc" id="L70">        parentPlanHash = optionalSha256(parentPlanHash, &quot;parentPlanHash&quot;);</span>
-<span class="fc" id="L71">        changedPlanParameter = optionalText(</span>
+<span class="fc" id="L95">        runId = requireSha256(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L96">        relation = Objects.requireNonNull(relation, &quot;relation&quot;);</span>
+<span class="fc" id="L97">        parentRunId = optionalSha256(parentRunId, &quot;parentRunId&quot;);</span>
+<span class="fc" id="L98">        parentPlanHash = optionalSha256(parentPlanHash, &quot;parentPlanHash&quot;);</span>
+<span class="fc" id="L99">        changedPlanParameter = optionalText(</span>
             changedPlanParameter, &quot;changedPlanParameter&quot;);
-<span class="fc" id="L73">        validateRelation(</span>
+<span class="fc" id="L101">        validateRelation(</span>
             relation,
             runId,
             parentRunId,
             parentPlanHash,
             changedPlanParameter
         );
-<span class="fc" id="L80">        input = Objects.requireNonNull(input, &quot;input&quot;);</span>
-<span class="fc" id="L81">        plan = Objects.requireNonNull(plan, &quot;plan&quot;);</span>
-<span class="fc" id="L82">        outcome = Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
-<span class="fc" id="L83">        artifacts = completeArtifacts(artifacts);</span>
-<span class="fc" id="L84">        revisions = Objects.requireNonNull(revisions, &quot;revisions&quot;);</span>
-<span class="fc" id="L85">        claimBoundary = requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
-<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (!CLAIM_BOUNDARY.equals(claimBoundary)) {</span>
-<span class="nc" id="L87">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L108">        input = Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L109">        plan = Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L110">        outcome = Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="fc" id="L111">        artifacts = completeArtifacts(artifacts);</span>
+<span class="fc" id="L112">        revisions = Objects.requireNonNull(revisions, &quot;revisions&quot;);</span>
+<span class="fc" id="L113">        claimBoundary = requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (!CLAIM_BOUNDARY.equals(claimBoundary)) {</span>
+<span class="nc" id="L115">            throw new IllegalArgumentException(</span>
                 &quot;unsupported run-workspace claim boundary&quot;);
         }
-<span class="fc" id="L90">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L91">        String expected = workspaceHash(</span>
+<span class="fc" id="L118">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L119">        String expected = workspaceHash(</span>
             relation,
             parentRunId,
             parentPlanHash,
@@ -99,11 +127,11 @@ public record RepresentationDiscoveryRunWorkspace(
             artifacts,
             revisions
         );
-<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        if (!expected.equals(contentHash) || !runId.equals(contentHash)) {</span>
-<span class="fc" id="L103">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L130" title="1 of 4 branches missed.">        if (!expected.equals(contentHash) || !runId.equals(contentHash)) {</span>
+<span class="fc" id="L131">            throw new IllegalArgumentException(</span>
                 &quot;runId/contentHash does not match workspace content&quot;);
         }
-<span class="fc" id="L106">    }</span>
+<span class="fc" id="L134">    }</span>
 
     /** Creates an independent root run. */
     public static RepresentationDiscoveryRunWorkspace create(
@@ -113,7 +141,7 @@ public record RepresentationDiscoveryRunWorkspace(
         List&lt;RepresentationDiscoveryArtifactReference&gt; artifacts,
         RepresentationDiscoveryRevisionEvidence revisions
     ) {
-<span class="fc" id="L116">        return createInternal(</span>
+<span class="fc" id="L144">        return createInternal(</span>
             RunRelation.ROOT,
             &quot;&quot;,
             &quot;&quot;,
@@ -136,18 +164,18 @@ public record RepresentationDiscoveryRunWorkspace(
         RepresentationDiscoveryRunPlan revisedPlan,
         RepresentationDiscoveryRevisionEvidence revisions
     ) {
-<span class="fc" id="L139">        Objects.requireNonNull(parent, &quot;parent&quot;);</span>
-<span class="fc" id="L140">        Objects.requireNonNull(revisedPlan, &quot;revisedPlan&quot;);</span>
-<span class="fc" id="L141">        String changed = parent.plan().singleChangedParameter(revisedPlan);</span>
-<span class="fc" id="L142">        return createInternal(</span>
+<span class="fc" id="L167">        Objects.requireNonNull(parent, &quot;parent&quot;);</span>
+<span class="fc" id="L168">        Objects.requireNonNull(revisedPlan, &quot;revisedPlan&quot;);</span>
+<span class="fc" id="L169">        String changed = parent.plan().singleChangedParameter(revisedPlan);</span>
+<span class="fc" id="L170">        return createInternal(</span>
             RunRelation.DUPLICATED_ONE_PARAMETER,
-<span class="fc" id="L144">            parent.runId(),</span>
-<span class="fc" id="L145">            parent.plan().contentHash(),</span>
+<span class="fc" id="L172">            parent.runId(),</span>
+<span class="fc" id="L173">            parent.plan().contentHash(),</span>
             changed,
-<span class="fc" id="L147">            parent.input(),</span>
+<span class="fc" id="L175">            parent.input(),</span>
             revisedPlan,
-<span class="fc" id="L149">            RepresentationDiscoveryRunOutcome.created(),</span>
-<span class="fc" id="L150">            notProducedArtifacts(),</span>
+<span class="fc" id="L177">            RepresentationDiscoveryRunOutcome.created(),</span>
+<span class="fc" id="L178">            notProducedArtifacts(),</span>
             revisions
         );
     }
@@ -162,19 +190,19 @@ public record RepresentationDiscoveryRunWorkspace(
         List&lt;RepresentationDiscoveryArtifactReference&gt; artifacts,
         RepresentationDiscoveryRevisionEvidence revisions
     ) {
-<span class="fc" id="L165">        Objects.requireNonNull(parent, &quot;parent&quot;);</span>
-<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (Objects.requireNonNull(outcome, &quot;outcome&quot;).state()</span>
+<span class="fc" id="L193">        Objects.requireNonNull(parent, &quot;parent&quot;);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (Objects.requireNonNull(outcome, &quot;outcome&quot;).state()</span>
                 == TerminalState.CREATED) {
-<span class="fc" id="L168">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L196">            throw new IllegalArgumentException(</span>
                 &quot;a continuation must advance beyond CREATED&quot;);
         }
-<span class="fc" id="L171">        return createInternal(</span>
+<span class="fc" id="L199">        return createInternal(</span>
             RunRelation.CONTINUATION,
-<span class="fc" id="L173">            parent.runId(),</span>
-<span class="fc" id="L174">            parent.plan().contentHash(),</span>
+<span class="fc" id="L201">            parent.runId(),</span>
+<span class="fc" id="L202">            parent.plan().contentHash(),</span>
             &quot;&quot;,
-<span class="fc" id="L176">            parent.input(),</span>
-<span class="fc" id="L177">            parent.plan(),</span>
+<span class="fc" id="L204">            parent.input(),</span>
+<span class="fc" id="L205">            parent.plan(),</span>
             outcome,
             artifacts,
             revisions
@@ -186,24 +214,24 @@ public record RepresentationDiscoveryRunWorkspace(
         ArtifactRole role,
         String expectedSchema
     ) {
-<span class="fc" id="L189">        Objects.requireNonNull(role, &quot;role&quot;);</span>
-<span class="fc" id="L190">        String schemaName = requireText(expectedSchema, &quot;expectedSchema&quot;);</span>
-<span class="fc" id="L191">        RepresentationDiscoveryArtifactReference reference = artifacts.stream()</span>
-<span class="fc bfc" id="L192" title="All 2 branches covered.">            .filter(candidate -&gt; candidate.role() == role)</span>
-<span class="fc" id="L193">            .findFirst()</span>
-<span class="fc" id="L194">            .orElseThrow();</span>
-<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (reference.status() != ArtifactStatus.AVAILABLE) {</span>
-<span class="fc" id="L196">            throw new IllegalStateException(</span>
-<span class="fc" id="L197">                &quot;artifact &quot; + role + &quot; is &quot; + reference.status()</span>
-<span class="fc" id="L198">                    + &quot;: &quot; + reference.detail());</span>
+<span class="fc" id="L217">        Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L218">        String schemaName = requireText(expectedSchema, &quot;expectedSchema&quot;);</span>
+<span class="fc" id="L219">        RepresentationDiscoveryArtifactReference reference = artifacts.stream()</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            .filter(candidate -&gt; candidate.role() == role)</span>
+<span class="fc" id="L221">            .findFirst()</span>
+<span class="fc" id="L222">            .orElseThrow();</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (reference.status() != ArtifactStatus.AVAILABLE) {</span>
+<span class="fc" id="L224">            throw new IllegalStateException(</span>
+<span class="fc" id="L225">                &quot;artifact &quot; + role + &quot; is &quot; + reference.status()</span>
+<span class="fc" id="L226">                    + &quot;: &quot; + reference.detail());</span>
         }
-<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (!reference.artifactSchema().equals(schemaName)) {</span>
-<span class="fc" id="L201">            throw new IllegalStateException(</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (!reference.artifactSchema().equals(schemaName)) {</span>
+<span class="fc" id="L229">            throw new IllegalStateException(</span>
                 &quot;artifact &quot; + role + &quot; has schema &quot;
-<span class="fc" id="L203">                    + reference.artifactSchema() + &quot;, expected &quot;</span>
+<span class="fc" id="L231">                    + reference.artifactSchema() + &quot;, expected &quot;</span>
                     + schemaName);
         }
-<span class="fc" id="L206">        return reference;</span>
+<span class="fc" id="L234">        return reference;</span>
     }
 
     /** Creates an immutable selection correlated to this exact Run ID. */
@@ -214,7 +242,7 @@ public record RepresentationDiscoveryRunWorkspace(
         String occurrencePath,
         String proofObligationId
     ) {
-<span class="fc" id="L217">        return RepresentationDiscoveryRunSelection.create(</span>
+<span class="fc" id="L245">        return RepresentationDiscoveryRunSelection.create(</span>
             runId,
             candidateId,
             stateId,
@@ -226,20 +254,402 @@ public record RepresentationDiscoveryRunWorkspace(
 
     public String toCanonicalJson() {
         try {
-<span class="fc" id="L229">            return JSON.writeValueAsString(this);</span>
-<span class="nc" id="L230">        } catch (JsonProcessingException exception) {</span>
-<span class="nc" id="L231">            throw new IllegalStateException(</span>
+<span class="fc" id="L257">            return JSON.writeValueAsString(this);</span>
+<span class="nc" id="L258">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L259">            throw new IllegalStateException(</span>
                 &quot;Unable to render representation-discovery workspace&quot;,
                 exception
             );
         }
     }
 
+
+    /** Decodes only the exact canonical JSON representation. */
+    public static RepresentationDiscoveryRunWorkspace fromCanonicalJson(
+        String source
+    ) {
+<span class="fc" id="L271">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+        try {
+<span class="fc" id="L273">            RepresentationDiscoveryRunWorkspace workspace = JSON.readValue(</span>
+                source,
+                RepresentationDiscoveryRunWorkspace.class
+            );
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            if (!workspace.toCanonicalJson().equals(source)) {</span>
+<span class="fc" id="L278">                throw new IllegalArgumentException(</span>
+                    &quot;run workspace JSON is not canonical&quot;);
+            }
+<span class="fc" id="L281">            return workspace;</span>
+<span class="fc" id="L282">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L283">            throw new IllegalArgumentException(</span>
+                &quot;invalid representation-discovery run workspace JSON&quot;,
+                exception
+            );
+        }
+    }
+
+    /** Decodes canonical JSON while rejecting malformed UTF-8. */
+    public static RepresentationDiscoveryRunWorkspace fromCanonicalBytes(
+        byte[] source
+    ) {
+<span class="fc" id="L294">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+        try {
+<span class="fc" id="L296">            String text = StandardCharsets.UTF_8.newDecoder()</span>
+<span class="fc" id="L297">                .onMalformedInput(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L298">                .onUnmappableCharacter(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L299">                .decode(ByteBuffer.wrap(source))</span>
+<span class="fc" id="L300">                .toString();</span>
+<span class="fc" id="L301">            return fromCanonicalJson(text);</span>
+<span class="fc" id="L302">        } catch (CharacterCodingException exception) {</span>
+<span class="fc" id="L303">            throw new IllegalArgumentException(</span>
+                &quot;run workspace is not valid UTF-8&quot;,
+                exception
+            );
+        }
+    }
+
+    /** Retains canonical bytes under the immutable Run ID. */
+    public static RepresentationDiscoveryRunWorkspace retain(
+        Path directory,
+        RepresentationDiscoveryRunWorkspace workspace
+    ) {
+<span class="fc" id="L315">        return retain(</span>
+            directory,
+            DEFAULT_MAX_RETAINED_WORKSPACE_BYTES,
+            DEFAULT_MAX_RETAINED_RUNS,
+            workspace
+        );
+    }
+
+    /** Retains a workspace under explicit finite repository limits. */
+    public static synchronized RepresentationDiscoveryRunWorkspace retain(
+        Path directory,
+        int maxWorkspaceBytes,
+        int maxRuns,
+        RepresentationDiscoveryRunWorkspace workspace
+    ) {
+<span class="fc" id="L330">        validateRetainedLimits(maxWorkspaceBytes, maxRuns);</span>
+<span class="fc" id="L331">        Objects.requireNonNull(workspace, &quot;workspace&quot;);</span>
+<span class="fc" id="L332">        byte[] canonical = workspace.toCanonicalJson().getBytes(</span>
+            StandardCharsets.UTF_8);
+<span class="fc" id="L334">        requireWithinRetainedByteLimit(canonical.length, maxWorkspaceBytes);</span>
+<span class="fc" id="L335">        Path root = ensureRetainedDirectory(directory);</span>
+<span class="fc" id="L336">        Path target = retainedPath(root, workspace.runId());</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L338">            return requireIdenticalRetained(</span>
+                target,
+                canonical,
+<span class="fc" id="L341">                workspace.runId(),</span>
+                maxWorkspaceBytes
+            );
+        }
+<span class="fc bfc" id="L345" title="All 2 branches covered.">        if (validatedRetainedEntries(root, maxRuns).size() &gt;= maxRuns) {</span>
+<span class="fc" id="L346">            throw new IllegalStateException(</span>
+                &quot;representation-discovery run repository limit exceeded: &quot;
+                    + maxRuns);
+        }
+
+<span class="fc" id="L351">        Path temporary = null;</span>
+        try {
+<span class="fc" id="L353">            temporary = Files.createTempFile(root, &quot;.run-workspace-&quot;, &quot;.tmp&quot;);</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            if (Files.isSymbolicLink(temporary)) {</span>
+<span class="nc" id="L355">                throw new IllegalStateException(</span>
+                    &quot;temporary run-workspace file is symbolic: &quot; + temporary);
+            }
+<span class="fc" id="L358">            Files.write(</span>
+                temporary,
+                canonical,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE
+            );
+<span class="fc" id="L364">            moveRetainedWithoutReplacement(temporary, target);</span>
+<span class="fc" id="L365">            temporary = null;</span>
+<span class="fc" id="L366">            return workspace;</span>
+<span class="nc" id="L367">        } catch (FileAlreadyExistsException exception) {</span>
+<span class="nc" id="L368">            return requireIdenticalRetained(</span>
+                target,
+                canonical,
+<span class="nc" id="L371">                workspace.runId(),</span>
+                maxWorkspaceBytes
+            );
+<span class="nc" id="L374">        } catch (IOException exception) {</span>
+<span class="nc" id="L375">            throw new IllegalStateException(</span>
+                &quot;unable to retain representation-discovery run &quot;
+<span class="nc" id="L377">                    + workspace.runId(),</span>
+                exception
+            );
+        } finally {
+<span class="fc" id="L381">            deleteTemporaryRetainedFile(temporary);</span>
+        }
+    }
+
+    /** Finds one retained workspace using the default finite limits. */
+    public static Optional&lt;RepresentationDiscoveryRunWorkspace&gt; findRetained(
+        Path directory,
+        String runId
+    ) {
+<span class="fc" id="L390">        return findRetained(</span>
+            directory,
+            DEFAULT_MAX_RETAINED_WORKSPACE_BYTES,
+            DEFAULT_MAX_RETAINED_RUNS,
+            runId
+        );
+    }
+
+    /** Finds one retained workspace using explicit finite limits. */
+    public static synchronized Optional&lt;RepresentationDiscoveryRunWorkspace&gt;
+            findRetained(
+        Path directory,
+        int maxWorkspaceBytes,
+        int maxRuns,
+        String runId
+    ) {
+<span class="fc" id="L406">        validateRetainedLimits(maxWorkspaceBytes, maxRuns);</span>
+<span class="fc" id="L407">        String normalized = requireSha256(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L408">        Path root = ensureRetainedDirectory(directory);</span>
+<span class="fc" id="L409">        Path target = retainedPath(root, normalized);</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L411">            return Optional.empty();</span>
+        }
+<span class="fc" id="L413">        return Optional.of(loadRetained(</span>
+            target,
+            normalized,
+            maxWorkspaceBytes
+        ));
+    }
+
+    /** Lists retained workspaces in deterministic Run-ID order. */
+    public static List&lt;RepresentationDiscoveryRunWorkspace&gt; listRetained(
+        Path directory
+    ) {
+<span class="fc" id="L424">        return listRetained(</span>
+            directory,
+            DEFAULT_MAX_RETAINED_WORKSPACE_BYTES,
+            DEFAULT_MAX_RETAINED_RUNS
+        );
+    }
+
+    /** Lists retained workspaces under explicit finite limits. */
+    public static synchronized List&lt;RepresentationDiscoveryRunWorkspace&gt;
+            listRetained(
+        Path directory,
+        int maxWorkspaceBytes,
+        int maxRuns
+    ) {
+<span class="fc" id="L438">        validateRetainedLimits(maxWorkspaceBytes, maxRuns);</span>
+<span class="fc" id="L439">        Path root = ensureRetainedDirectory(directory);</span>
+<span class="fc" id="L440">        return validatedRetainedEntries(root, maxRuns).stream()</span>
+<span class="fc" id="L441">            .map(path -&gt; loadRetained(</span>
+                path,
+<span class="fc" id="L443">                retainedRunId(path),</span>
+                maxWorkspaceBytes
+            ))
+<span class="fc" id="L446">            .toList();</span>
+    }
+
+    private static RepresentationDiscoveryRunWorkspace requireIdenticalRetained(
+        Path target,
+        byte[] expected,
+        String runId,
+        int maxWorkspaceBytes
+    ) {
+<span class="fc" id="L455">        RepresentationDiscoveryRunWorkspace retained = loadRetained(</span>
+            target,
+            runId,
+            maxWorkspaceBytes
+        );
+<span class="fc" id="L460">        byte[] actual = readRetainedBytes(target, maxWorkspaceBytes);</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">        if (!Arrays.equals(actual, expected)) {</span>
+<span class="nc" id="L462">            throw new IllegalStateException(</span>
+                &quot;immutable run identity already contains different bytes: &quot;
+                    + runId);
+        }
+<span class="fc" id="L466">        return retained;</span>
+    }
+
+    private static RepresentationDiscoveryRunWorkspace loadRetained(
+        Path path,
+        String expectedRunId,
+        int maxWorkspaceBytes
+    ) {
+<span class="fc" id="L474">        requireRegularRetainedFile(path);</span>
+<span class="fc" id="L475">        RepresentationDiscoveryRunWorkspace workspace = fromCanonicalBytes(</span>
+<span class="fc" id="L476">            readRetainedBytes(path, maxWorkspaceBytes)</span>
+        );
+<span class="fc bfc" id="L478" title="All 2 branches covered.">        if (!expectedRunId.equals(workspace.runId())) {</span>
+<span class="fc" id="L479">            throw new IllegalStateException(</span>
+                &quot;run-workspace filename and Run ID differ: &quot; + path);
+        }
+<span class="fc" id="L482">        return workspace;</span>
+    }
+
+    private static byte[] readRetainedBytes(
+        Path path,
+        int maxWorkspaceBytes
+    ) {
+<span class="fc" id="L489">        requireRegularRetainedFile(path);</span>
+        try {
+<span class="fc" id="L491">            long size = Files.size(path);</span>
+<span class="fc" id="L492">            requireWithinRetainedByteLimit(size, maxWorkspaceBytes);</span>
+<span class="fc" id="L493">            byte[] bytes = Files.readAllBytes(path);</span>
+<span class="fc" id="L494">            requireWithinRetainedByteLimit(bytes.length, maxWorkspaceBytes);</span>
+<span class="fc" id="L495">            return bytes;</span>
+<span class="nc" id="L496">        } catch (IOException exception) {</span>
+<span class="nc" id="L497">            throw new IllegalStateException(</span>
+                &quot;unable to read retained run workspace: &quot; + path,
+                exception
+            );
+        }
+    }
+
+    private static List&lt;Path&gt; validatedRetainedEntries(
+        Path root,
+        int maxRuns
+    ) {
+<span class="fc" id="L508">        try (var stream = Files.list(root)) {</span>
+<span class="fc" id="L509">            List&lt;Path&gt; entries = stream</span>
+<span class="fc" id="L510">                .sorted(Comparator.comparing(path -&gt;</span>
+<span class="fc" id="L511">                    path.getFileName().toString()))</span>
+<span class="fc" id="L512">                .toList();</span>
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">            if (entries.size() &gt; maxRuns) {</span>
+<span class="nc" id="L514">                throw new IllegalStateException(</span>
+                    &quot;representation-discovery run repository limit exceeded: &quot;
+<span class="nc" id="L516">                        + entries.size() + &quot; &gt; &quot; + maxRuns);</span>
+            }
+<span class="fc bfc" id="L518" title="All 2 branches covered.">            for (Path entry : entries) {</span>
+<span class="fc" id="L519">                requireRegularRetainedFile(entry);</span>
+<span class="fc" id="L520">                if (!RETAINED_FILE_NAME.matcher(</span>
+<span class="fc bfc" id="L521" title="All 2 branches covered.">                        entry.getFileName().toString()).matches()) {</span>
+<span class="fc" id="L522">                    throw new IllegalStateException(</span>
+                        &quot;unexpected run repository entry: &quot; + entry);
+                }
+<span class="fc" id="L525">            }</span>
+<span class="fc" id="L526">            return entries;</span>
+<span class="nc" id="L527">        } catch (IOException exception) {</span>
+<span class="nc" id="L528">            throw new IllegalStateException(</span>
+                &quot;unable to list representation-discovery runs&quot;,
+                exception
+            );
+        }
+    }
+
+    private static Path ensureRetainedDirectory(Path directory) {
+<span class="fc" id="L536">        Path absolute = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L537">            .toAbsolutePath()</span>
+<span class="fc" id="L538">            .normalize();</span>
+<span class="fc" id="L539">        rejectSymbolicRetainedComponents(absolute);</span>
+        try {
+<span class="fc bfc" id="L541" title="All 2 branches covered.">            if (!Files.exists(absolute, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L542">                Files.createDirectories(absolute);</span>
+            }
+<span class="nc" id="L544">        } catch (IOException exception) {</span>
+<span class="nc" id="L545">            throw new IllegalStateException(</span>
+                &quot;unable to create run repository directory: &quot; + absolute,
+                exception
+            );
+<span class="fc" id="L549">        }</span>
+<span class="fc" id="L550">        rejectSymbolicRetainedComponents(absolute);</span>
+<span class="pc bpc" id="L551" title="1 of 2 branches missed.">        if (!Files.isDirectory(absolute, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="nc" id="L552">            throw new IllegalStateException(</span>
+                &quot;run repository path is not a real directory: &quot; + absolute);
+        }
+<span class="fc" id="L555">        return absolute;</span>
+    }
+
+    private static void rejectSymbolicRetainedComponents(Path absolute) {
+<span class="fc" id="L559">        Path current = absolute.getRoot();</span>
+<span class="fc bfc" id="L560" title="All 2 branches covered.">        for (Path component : absolute) {</span>
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">            current = current == null</span>
+<span class="nc" id="L562">                ? component</span>
+<span class="fc" id="L563">                : current.resolve(component);</span>
+<span class="fc bfc" id="L564" title="All 2 branches covered.">            if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="fc bfc" id="L565" title="All 2 branches covered.">                    &amp;&amp; Files.isSymbolicLink(current)) {</span>
+<span class="fc" id="L566">                throw new IllegalStateException(</span>
+                    &quot;run repository contains symbolic path component: &quot;
+                        + current);
+            }
+<span class="fc" id="L570">        }</span>
+<span class="fc" id="L571">    }</span>
+
+    private static void requireRegularRetainedFile(Path path) {
+<span class="fc bfc" id="L574" title="All 2 branches covered.">        if (Files.isSymbolicLink(path)</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">                || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L576">            throw new IllegalStateException(</span>
+                &quot;run repository entry is not a real regular file: &quot; + path);
+        }
+<span class="fc" id="L579">    }</span>
+
+    private static Path retainedPath(Path root, String runId) {
+<span class="fc" id="L582">        String normalized = requireSha256(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L583">        String digest = normalized.substring(&quot;sha256:&quot;.length());</span>
+<span class="fc" id="L584">        Path path = root.resolve(digest + &quot;.json&quot;).normalize();</span>
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">        if (!root.equals(path.getParent())) {</span>
+<span class="nc" id="L586">            throw new IllegalArgumentException(</span>
+                &quot;run workspace path escapes repository directory&quot;);
+        }
+<span class="fc" id="L589">        return path;</span>
+    }
+
+    private static String retainedRunId(Path path) {
+<span class="fc" id="L593">        Matcher matcher = RETAINED_FILE_NAME.matcher(</span>
+<span class="fc" id="L594">            path.getFileName().toString());</span>
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">        if (!matcher.matches()) {</span>
+<span class="nc" id="L596">            throw new IllegalStateException(</span>
+                &quot;invalid run repository filename: &quot; + path);
+        }
+<span class="fc" id="L599">        return &quot;sha256:&quot; + matcher.group(1);</span>
+    }
+
+    private static void validateRetainedLimits(
+        int maxWorkspaceBytes,
+        int maxRuns
+    ) {
+<span class="fc bfc" id="L606" title="All 2 branches covered.">        if (maxWorkspaceBytes &lt; 1) {</span>
+<span class="fc" id="L607">            throw new IllegalArgumentException(</span>
+                &quot;maxWorkspaceBytes must be positive&quot;);
+        }
+<span class="fc bfc" id="L610" title="All 2 branches covered.">        if (maxRuns &lt; 1) {</span>
+<span class="fc" id="L611">            throw new IllegalArgumentException(&quot;maxRuns must be positive&quot;);</span>
+        }
+<span class="fc" id="L613">    }</span>
+
+    private static void requireWithinRetainedByteLimit(
+        long length,
+        int maxWorkspaceBytes
+    ) {
+<span class="fc bfc" id="L619" title="All 2 branches covered.">        if (length &gt; maxWorkspaceBytes) {</span>
+<span class="fc" id="L620">            throw new IllegalStateException(</span>
+                &quot;run workspace exceeds byte limit &quot; + maxWorkspaceBytes
+                    + &quot;: &quot; + length);
+        }
+<span class="fc" id="L624">    }</span>
+
+    private static void moveRetainedWithoutReplacement(
+        Path source,
+        Path target
+    ) throws IOException {
+        try {
+<span class="fc" id="L631">            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);</span>
+<span class="nc" id="L632">        } catch (AtomicMoveNotSupportedException exception) {</span>
+<span class="nc" id="L633">            Files.move(source, target);</span>
+<span class="fc" id="L634">        }</span>
+<span class="fc" id="L635">    }</span>
+
+    private static void deleteTemporaryRetainedFile(Path temporary) {
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">        if (temporary == null) {</span>
+<span class="fc" id="L639">            return;</span>
+        }
+        try {
+<span class="nc" id="L642">            Files.deleteIfExists(temporary);</span>
+<span class="nc" id="L643">        } catch (IOException exception) {</span>
+            // A leftover non-canonical entry is rejected by list/find.
+<span class="nc" id="L645">        }</span>
+<span class="nc" id="L646">    }</span>
+
     public static List&lt;RepresentationDiscoveryArtifactReference&gt;
             notProducedArtifacts() {
-<span class="fc" id="L240">        return EnumSet.allOf(ArtifactRole.class).stream()</span>
-<span class="fc" id="L241">            .map(RepresentationDiscoveryArtifactReference::notProduced)</span>
-<span class="fc" id="L242">            .toList();</span>
+<span class="fc" id="L650">        return EnumSet.allOf(ArtifactRole.class).stream()</span>
+<span class="fc" id="L651">            .map(RepresentationDiscoveryArtifactReference::notProduced)</span>
+<span class="fc" id="L652">            .toList();</span>
     }
 
     private static RepresentationDiscoveryRunWorkspace createInternal(
@@ -253,13 +663,13 @@ public record RepresentationDiscoveryRunWorkspace(
         List&lt;RepresentationDiscoveryArtifactReference&gt; artifacts,
         RepresentationDiscoveryRevisionEvidence revisions
     ) {
-<span class="fc" id="L256">        Objects.requireNonNull(input, &quot;input&quot;);</span>
-<span class="fc" id="L257">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
-<span class="fc" id="L258">        Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
-<span class="fc" id="L259">        List&lt;RepresentationDiscoveryArtifactReference&gt; complete =</span>
-<span class="fc" id="L260">            completeArtifacts(artifacts);</span>
-<span class="fc" id="L261">        Objects.requireNonNull(revisions, &quot;revisions&quot;);</span>
-<span class="fc" id="L262">        String hash = workspaceHash(</span>
+<span class="fc" id="L666">        Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L667">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L668">        Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="fc" id="L669">        List&lt;RepresentationDiscoveryArtifactReference&gt; complete =</span>
+<span class="fc" id="L670">            completeArtifacts(artifacts);</span>
+<span class="fc" id="L671">        Objects.requireNonNull(revisions, &quot;revisions&quot;);</span>
+<span class="fc" id="L672">        String hash = workspaceHash(</span>
             relation,
             parentRunId,
             parentPlanHash,
@@ -270,7 +680,7 @@ public record RepresentationDiscoveryRunWorkspace(
             complete,
             revisions
         );
-<span class="fc" id="L273">        return new RepresentationDiscoveryRunWorkspace(</span>
+<span class="fc" id="L683">        return new RepresentationDiscoveryRunWorkspace(</span>
             SCHEMA,
             hash,
             relation,
@@ -298,21 +708,21 @@ public record RepresentationDiscoveryRunWorkspace(
         List&lt;RepresentationDiscoveryArtifactReference&gt; artifacts,
         RepresentationDiscoveryRevisionEvidence revisions
     ) {
-<span class="fc" id="L301">        StringBuilder descriptor = new StringBuilder();</span>
-<span class="fc" id="L302">        append(descriptor, SCHEMA);</span>
-<span class="fc" id="L303">        append(descriptor, relation.name());</span>
-<span class="fc" id="L304">        append(descriptor, parentRunId);</span>
-<span class="fc" id="L305">        append(descriptor, parentPlanHash);</span>
-<span class="fc" id="L306">        append(descriptor, changedPlanParameter);</span>
-<span class="fc" id="L307">        append(descriptor, input.contentHash());</span>
-<span class="fc" id="L308">        append(descriptor, plan.contentHash());</span>
-<span class="fc" id="L309">        append(descriptor, outcome.contentHash());</span>
-<span class="fc" id="L310">        append(descriptor, Integer.toString(artifacts.size()));</span>
-<span class="fc" id="L311">        artifacts.forEach(reference -&gt;</span>
-<span class="fc" id="L312">            append(descriptor, reference.contentHash()));</span>
-<span class="fc" id="L313">        append(descriptor, revisions.contentHash());</span>
-<span class="fc" id="L314">        append(descriptor, CLAIM_BOUNDARY);</span>
-<span class="fc" id="L315">        return sha256(descriptor.toString());</span>
+<span class="fc" id="L711">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L712">        append(descriptor, SCHEMA);</span>
+<span class="fc" id="L713">        append(descriptor, relation.name());</span>
+<span class="fc" id="L714">        append(descriptor, parentRunId);</span>
+<span class="fc" id="L715">        append(descriptor, parentPlanHash);</span>
+<span class="fc" id="L716">        append(descriptor, changedPlanParameter);</span>
+<span class="fc" id="L717">        append(descriptor, input.contentHash());</span>
+<span class="fc" id="L718">        append(descriptor, plan.contentHash());</span>
+<span class="fc" id="L719">        append(descriptor, outcome.contentHash());</span>
+<span class="fc" id="L720">        append(descriptor, Integer.toString(artifacts.size()));</span>
+<span class="fc" id="L721">        artifacts.forEach(reference -&gt;</span>
+<span class="fc" id="L722">            append(descriptor, reference.contentHash()));</span>
+<span class="fc" id="L723">        append(descriptor, revisions.contentHash());</span>
+<span class="fc" id="L724">        append(descriptor, CLAIM_BOUNDARY);</span>
+<span class="fc" id="L725">        return sha256(descriptor.toString());</span>
     }
 
     private static void validateRelation(
@@ -322,110 +732,110 @@ public record RepresentationDiscoveryRunWorkspace(
         String parentPlanHash,
         String changedPlanParameter
     ) {
-<span class="pc bpc" id="L325" title="1 of 4 branches missed.">        if (!parentRunId.isEmpty() &amp;&amp; parentRunId.equals(runId)) {</span>
-<span class="nc" id="L326">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L735" title="1 of 4 branches missed.">        if (!parentRunId.isEmpty() &amp;&amp; parentRunId.equals(runId)) {</span>
+<span class="nc" id="L736">            throw new IllegalArgumentException(</span>
                 &quot;a workspace cannot be its own parent&quot;);
         }
-<span class="pc bpc" id="L329" title="1 of 4 branches missed.">        switch (relation) {</span>
-<span class="fc" id="L330">            case ROOT -&gt; validateRootRelation(</span>
+<span class="pc bpc" id="L739" title="1 of 4 branches missed.">        switch (relation) {</span>
+<span class="fc" id="L740">            case ROOT -&gt; validateRootRelation(</span>
                 parentRunId,
                 parentPlanHash,
                 changedPlanParameter
             );
-<span class="fc" id="L335">            case CONTINUATION -&gt; validateContinuationRelation(</span>
+<span class="fc" id="L745">            case CONTINUATION -&gt; validateContinuationRelation(</span>
                 parentRunId,
                 parentPlanHash,
                 changedPlanParameter
             );
-<span class="fc" id="L340">            case DUPLICATED_ONE_PARAMETER -&gt; validateDuplicationRelation(</span>
+<span class="fc" id="L750">            case DUPLICATED_ONE_PARAMETER -&gt; validateDuplicationRelation(</span>
                 parentRunId,
                 parentPlanHash,
                 changedPlanParameter
             );
         }
-<span class="fc" id="L346">    }</span>
+<span class="fc" id="L756">    }</span>
 
     private static void validateRootRelation(
         String parentRunId,
         String parentPlanHash,
         String changedPlanParameter
     ) {
-<span class="fc bfc" id="L353" title="All 2 branches covered.">        if (!parentRunId.isEmpty()</span>
-<span class="pc bpc" id="L354" title="1 of 2 branches missed.">                || !parentPlanHash.isEmpty()</span>
-<span class="pc bpc" id="L355" title="1 of 2 branches missed.">                || !changedPlanParameter.isEmpty()) {</span>
-<span class="fc" id="L356">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L763" title="All 2 branches covered.">        if (!parentRunId.isEmpty()</span>
+<span class="pc bpc" id="L764" title="1 of 2 branches missed.">                || !parentPlanHash.isEmpty()</span>
+<span class="pc bpc" id="L765" title="1 of 2 branches missed.">                || !changedPlanParameter.isEmpty()) {</span>
+<span class="fc" id="L766">            throw new IllegalArgumentException(</span>
                 &quot;a root run cannot carry parent evidence&quot;);
         }
-<span class="fc" id="L359">    }</span>
+<span class="fc" id="L769">    }</span>
 
     private static void validateContinuationRelation(
         String parentRunId,
         String parentPlanHash,
         String changedPlanParameter
     ) {
-<span class="fc" id="L366">        requireParent(parentRunId, parentPlanHash);</span>
-<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (!changedPlanParameter.isEmpty()) {</span>
-<span class="nc" id="L368">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L776">        requireParent(parentRunId, parentPlanHash);</span>
+<span class="pc bpc" id="L777" title="1 of 2 branches missed.">        if (!changedPlanParameter.isEmpty()) {</span>
+<span class="nc" id="L778">            throw new IllegalArgumentException(</span>
                 &quot;a continuation cannot claim a plan change&quot;);
         }
-<span class="fc" id="L371">    }</span>
+<span class="fc" id="L781">    }</span>
 
     private static void validateDuplicationRelation(
         String parentRunId,
         String parentPlanHash,
         String changedPlanParameter
     ) {
-<span class="fc" id="L378">        requireParent(parentRunId, parentPlanHash);</span>
-<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (!RepresentationDiscoveryRunPlan.PARAMETERS.contains(</span>
+<span class="fc" id="L788">        requireParent(parentRunId, parentPlanHash);</span>
+<span class="pc bpc" id="L789" title="1 of 2 branches missed.">        if (!RepresentationDiscoveryRunPlan.PARAMETERS.contains(</span>
                 changedPlanParameter)) {
-<span class="nc" id="L381">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L791">            throw new IllegalArgumentException(</span>
                 &quot;unsupported changed plan parameter: &quot;
                     + changedPlanParameter);
         }
-<span class="fc" id="L385">    }</span>
+<span class="fc" id="L795">    }</span>
 
     private static void requireParent(
         String parentRunId,
         String parentPlanHash
     ) {
-<span class="pc bpc" id="L391" title="2 of 4 branches missed.">        if (parentRunId.isEmpty() || parentPlanHash.isEmpty()) {</span>
-<span class="nc" id="L392">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L801" title="2 of 4 branches missed.">        if (parentRunId.isEmpty() || parentPlanHash.isEmpty()) {</span>
+<span class="nc" id="L802">            throw new IllegalArgumentException(</span>
                 &quot;derived runs require parent run and plan identities&quot;);
         }
-<span class="fc" id="L395">    }</span>
+<span class="fc" id="L805">    }</span>
 
     private static List&lt;RepresentationDiscoveryArtifactReference&gt;
             completeArtifacts(
         List&lt;RepresentationDiscoveryArtifactReference&gt; references
     ) {
-<span class="fc" id="L401">        Objects.requireNonNull(references, &quot;artifacts&quot;);</span>
-<span class="fc" id="L402">        List&lt;RepresentationDiscoveryArtifactReference&gt; sorted =</span>
-<span class="fc" id="L403">            references.stream()</span>
-<span class="fc" id="L404">                .map(reference -&gt; Objects.requireNonNull(</span>
+<span class="fc" id="L811">        Objects.requireNonNull(references, &quot;artifacts&quot;);</span>
+<span class="fc" id="L812">        List&lt;RepresentationDiscoveryArtifactReference&gt; sorted =</span>
+<span class="fc" id="L813">            references.stream()</span>
+<span class="fc" id="L814">                .map(reference -&gt; Objects.requireNonNull(</span>
                     reference, &quot;artifact&quot;))
-<span class="fc" id="L406">                .sorted(Comparator.comparing(reference -&gt;</span>
-<span class="fc" id="L407">                    reference.role().name()))</span>
-<span class="fc" id="L408">                .toList();</span>
-<span class="fc" id="L409">        Set&lt;ArtifactRole&gt; roles = new HashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L410" title="All 2 branches covered.">        for (RepresentationDiscoveryArtifactReference reference : sorted) {</span>
-<span class="fc bfc" id="L411" title="All 2 branches covered.">            if (!roles.add(reference.role())) {</span>
-<span class="fc" id="L412">                throw new IllegalArgumentException(</span>
-<span class="fc" id="L413">                    &quot;duplicate artifact role: &quot; + reference.role());</span>
+<span class="fc" id="L816">                .sorted(Comparator.comparing(reference -&gt;</span>
+<span class="fc" id="L817">                    reference.role().name()))</span>
+<span class="fc" id="L818">                .toList();</span>
+<span class="fc" id="L819">        Set&lt;ArtifactRole&gt; roles = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L820" title="All 2 branches covered.">        for (RepresentationDiscoveryArtifactReference reference : sorted) {</span>
+<span class="fc bfc" id="L821" title="All 2 branches covered.">            if (!roles.add(reference.role())) {</span>
+<span class="fc" id="L822">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L823">                    &quot;duplicate artifact role: &quot; + reference.role());</span>
             }
-<span class="fc" id="L415">        }</span>
-<span class="fc" id="L416">        Set&lt;ArtifactRole&gt; missing = EnumSet.allOf(ArtifactRole.class);</span>
-<span class="fc" id="L417">        missing.removeAll(roles);</span>
-<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (!missing.isEmpty()) {</span>
-<span class="fc" id="L419">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L825">        }</span>
+<span class="fc" id="L826">        Set&lt;ArtifactRole&gt; missing = EnumSet.allOf(ArtifactRole.class);</span>
+<span class="fc" id="L827">        missing.removeAll(roles);</span>
+<span class="fc bfc" id="L828" title="All 2 branches covered.">        if (!missing.isEmpty()) {</span>
+<span class="fc" id="L829">            throw new IllegalArgumentException(</span>
                 &quot;missing explicit artifact roles: &quot; + missing);
         }
-<span class="fc" id="L422">        return sorted;</span>
+<span class="fc" id="L832">        return sorted;</span>
     }
 
-<span class="fc" id="L425">    public enum RunRelation {</span>
-<span class="fc" id="L426">        ROOT,</span>
-<span class="fc" id="L427">        DUPLICATED_ONE_PARAMETER,</span>
-<span class="fc" id="L428">        CONTINUATION</span>
+<span class="fc" id="L835">    public enum RunRelation {</span>
+<span class="fc" id="L836">        ROOT,</span>
+<span class="fc" id="L837">        DUPLICATED_ONE_PARAMETER,</span>
+<span class="fc" id="L838">        CONTINUATION</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
