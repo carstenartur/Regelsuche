@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.production-search-comparison/v1",
+  "title": "Regelsuche production search comparison v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "evidenceStatus",
+    "corpusSchema",
+    "corpusSha256",
+    "atlasSchema",
+    "atlasSha256",
+    "witnessDiagnosticSchema",
+    "witnessDiagnosticSha256",
+    "inventoryRevision",
+    "informationBoundary",
+    "claimBoundary",
+    "cases",
+    "summary",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.production-search-comparison/v1"
+    },
+    "evidenceStatus": {
+      "const": "EXECUTED_MATCHED_DECLARED_BUDGET_COMPARISON"
+    },
+    "corpusSchema": {
+      "const": "regelsuche.historical-rediscovery-corpus/v1"
+    },
+    "corpusSha256": {
+      "$ref": "#/$defs/rawSha256"
+    },
+    "atlasSchema": {
+      "const": "regelsuche.historical-rediscovery-atlas/v1"
+    },
+    "atlasSha256": {
+      "$ref": "#/$defs/prefixedSha256"
+    },
+    "witnessDiagnosticSchema": {
+      "const": "regelsuche.witness-pruning-diagnostic/v1"
+    },
+    "witnessDiagnosticSha256": {
+      "$ref": "#/$defs/prefixedSha256"
+    },
+    "inventoryRevision": {
+      "$ref": "#/$defs/text"
+    },
+    "informationBoundary": {
+      "const": "TARGET_BLIND_SEARCHES_ORACLE_POST_HOC_DIAGNOSTIC"
+    },
+    "claimBoundary": {
+      "const": "Scalar best-first and structural-diversity searches receive the same frozen source, production inventory and declared heuristic budgets without a target. Oracle witnesses are used only after both searches finish. Equal declared budgets do not imply equal consumed work, and a retained prefix difference is not proof, autonomous rediscovery, novelty or general search superiority."
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/prefixedSha256"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "rawSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prefixedSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "status": {
+      "enum": [
+        "NOT_APPLICABLE_NO_PRODUCTION_WITNESS",
+        "SCALAR_ALREADY_FOUND",
+        "DIVERSITY_RECOVERS_COMPLETE_WITNESS",
+        "DIVERSITY_FINDS_RELATION_VIA_ALTERNATE_PATH",
+        "DIVERSITY_EXTENDS_SCALAR_PREFIX",
+        "DIVERSITY_MATCHES_SCALAR_PREFIX",
+        "DIVERSITY_RETAINS_SHORTER_PREFIX"
+      ]
+    },
+    "declaredBudget": {
+      "type": "object",
+      "required": [
+        "maxDepth",
+        "maxVisitedStates",
+        "maxCandidatesPerState",
+        "maxExpandingSteps",
+        "beamWidth"
+      ],
+      "properties": {
+        "maxDepth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxVisitedStates": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxCandidatesPerState": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxExpandingSteps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "beamWidth": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "searchEvidence": {
+      "type": "object",
+      "required": [
+        "policy",
+        "reachedRelation",
+        "exploredPrefixLength",
+        "exploredStates",
+        "engineCalls",
+        "generatedTransformations",
+        "terminalStatus"
+      ],
+      "properties": {
+        "policy": {
+          "enum": [
+            "SCALAR_BEST_FIRST_TARGET_BLIND",
+            "STRUCTURAL_DIVERSITY_TARGET_BLIND"
+          ]
+        },
+        "reachedRelation": {
+          "type": "boolean"
+        },
+        "exploredPrefixLength": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exploredStates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "engineCalls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generatedTransformations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "terminalStatus": {
+          "$ref": "#/$defs/text"
+        }
+      },
+      "additionalProperties": false
+    },
+    "case": {
+      "type": "object",
+      "required": [
+        "id",
+        "status",
+        "oracleWitnessStepCount",
+        "declaredBudget",
+        "scalar",
+        "diversity",
+        "prefixDelta",
+        "detail"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/text"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "oracleWitnessStepCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "declaredBudget": {
+          "$ref": "#/$defs/declaredBudget"
+        },
+        "scalar": {
+          "$ref": "#/$defs/searchEvidence"
+        },
+        "diversity": {
+          "$ref": "#/$defs/searchEvidence"
+        },
+        "prefixDelta": {
+          "type": "integer"
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      },
+      "additionalProperties": false
+    },
+    "countMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "caseCount",
+        "statusCounts",
+        "comparableScalarMissCount",
+        "diversityRecoveredCompleteWitnessCount",
+        "diversityExtendedPrefixCount",
+        "diversityReachedRelationCount"
+      ],
+      "properties": {
+        "caseCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "statusCounts": {
+          "$ref": "#/$defs/countMap"
+        },
+        "comparableScalarMissCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "diversityRecoveredCompleteWitnessCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "diversityExtendedPrefixCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "diversityReachedRelationCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
