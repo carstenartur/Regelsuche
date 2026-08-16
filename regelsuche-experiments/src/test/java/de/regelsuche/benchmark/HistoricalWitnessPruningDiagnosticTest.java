@@ -13,7 +13,6 @@ import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Relation;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Role;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.TargetRelation;
 import de.regelsuche.benchmark.HistoricalWitnessPruningDiagnostic.CaseDiagnostic;
-import de.regelsuche.benchmark.HistoricalWitnessPruningDiagnostic.LostStep;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalMetrics;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
@@ -61,7 +60,7 @@ class HistoricalWitnessPruningDiagnosticTest {
         assertEquals(
             HistoricalWitnessPruningDiagnostic
                 .CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
-            result.firstLoss().reason());
+            result.firstLossReason());
         assertEquals("CANDIDATE_BUDGET", result.searchTerminalStatus());
     }
 
@@ -98,7 +97,7 @@ class HistoricalWitnessPruningDiagnosticTest {
         assertEquals(
             HistoricalWitnessPruningDiagnostic
                 .STATE_ENQUEUED_BUT_NOT_EXPLORED,
-            result.firstLoss().reason());
+            result.firstLossReason());
         assertEquals("STATE_BUDGET", result.searchTerminalStatus());
     }
 
@@ -123,15 +122,14 @@ class HistoricalWitnessPruningDiagnosticTest {
             1,
             1,
             2,
-            new LostStep(
-                0,
-                "x",
-                "x + 1",
-                "witness",
-                HistoricalWitnessPruningDiagnostic
-                    .CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
-                event,
-                "candidate budget"),
+            0,
+            "x",
+            "x + 1",
+            "witness",
+            HistoricalWitnessPruningDiagnostic
+                .CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
+            event,
+            "candidate budget",
             "first loss");
         Corpus corpus = new Corpus(
             HistoricalRediscoveryCorpus.SCHEMA,
