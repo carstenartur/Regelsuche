@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.witness-pruning-diagnostic/v1",
+  "title": "Regelsuche witness pruning diagnostic v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "evidenceStatus",
+    "corpusSchema",
+    "corpusSha256",
+    "atlasSchema",
+    "atlasSha256",
+    "inventoryRevision",
+    "searchPolicy",
+    "claimBoundary",
+    "cases",
+    "summary",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.witness-pruning-diagnostic/v1"
+    },
+    "evidenceStatus": {
+      "const": "EXECUTED_TARGET_AWARE_ORACLE_DIAGNOSTIC"
+    },
+    "corpusSchema": {
+      "const": "regelsuche.historical-rediscovery-corpus/v1"
+    },
+    "corpusSha256": {
+      "$ref": "#/$defs/rawSha256"
+    },
+    "atlasSchema": {
+      "const": "regelsuche.historical-rediscovery-atlas/v1"
+    },
+    "atlasSha256": {
+      "$ref": "#/$defs/prefixedSha256"
+    },
+    "inventoryRevision": {
+      "$ref": "#/$defs/text"
+    },
+    "searchPolicy": {
+      "const": "SCALAR_BEST_FIRST_TARGET_BLIND"
+    },
+    "claimBoundary": {
+      "const": "The target-aware oracle supplies a bounded witness only for diagnosis. The compared scalar search remains target-blind. A lost prefix is not global unreachability, and an explored witness is not autonomous rediscovery, proof or mathematical novelty."
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/prefixedSha256"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "rawSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prefixedSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "caseStatus": {
+      "enum": [
+        "ORACLE_NOT_EVALUATED",
+        "ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS",
+        "ORACLE_BUDGET_INCONCLUSIVE",
+        "SCALAR_ALREADY_FOUND",
+        "WITNESS_PREFIX_LOST",
+        "WITNESS_COMPLETELY_EXPLORED",
+        "CORRECTNESS_REGRESSION_WITNESS"
+      ]
+    },
+    "lossReason": {
+      "enum": [
+        "TRANSFORMATION_SKIPPED",
+        "STATE_PRUNED_DUPLICATE",
+        "STATE_ENQUEUED_BUT_NOT_EXPLORED",
+        "TRANSFORMATION_GENERATED_NOT_ENQUEUED",
+        "CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE",
+        "PARENT_DEPTH_LIMIT",
+        "PARENT_PRUNED_TRANSPOSITION",
+        "PARENT_PRUNED_DUPLICATE",
+        "TRANSFORMATION_NOT_GENERATED",
+        "PARENT_ENQUEUED_BUT_NOT_EXPLORED",
+        "PARENT_NOT_REACHED"
+      ]
+    },
+    "terminalStatus": {
+      "enum": [
+        "NOT_EVALUATED",
+        "SCALAR_FOUND",
+        "STATE_BUDGET",
+        "CANDIDATE_BUDGET",
+        "DEPTH_BUDGET",
+        "NO_TRANSFORMATIONS",
+        "FRONTIER_EXHAUSTED"
+      ]
+    },
+    "event": {
+      "type": "object",
+      "required": [
+        "type",
+        "sequence",
+        "depth",
+        "score",
+        "frontierSize",
+        "visitedCount",
+        "generatedCount",
+        "pruningReason"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "score": {
+          "type": "integer"
+        },
+        "frontierSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "visitedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generatedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pruningReason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "lostStep": {
+      "type": "object",
+      "required": [
+        "index",
+        "expressionBefore",
+        "expressionAfter",
+        "ruleId",
+        "reason",
+        "event",
+        "detail"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expressionBefore": {
+          "$ref": "#/$defs/text"
+        },
+        "expressionAfter": {
+          "$ref": "#/$defs/text"
+        },
+        "ruleId": {
+          "$ref": "#/$defs/text"
+        },
+        "reason": {
+          "$ref": "#/$defs/lossReason"
+        },
+        "event": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/event"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "case": {
+      "type": "object",
+      "required": [
+        "id",
+        "status",
+        "oracleStatus",
+        "witnessStepCount",
+        "exploredPrefixLength",
+        "searchTerminalStatus",
+        "searchExploredStates",
+        "engineCalls",
+        "generatedTransformations",
+        "firstLoss",
+        "detail"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/text"
+        },
+        "status": {
+          "$ref": "#/$defs/caseStatus"
+        },
+        "oracleStatus": {
+          "$ref": "#/$defs/text"
+        },
+        "witnessStepCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exploredPrefixLength": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "searchTerminalStatus": {
+          "$ref": "#/$defs/terminalStatus"
+        },
+        "searchExploredStates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "engineCalls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generatedTransformations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "firstLoss": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/lostStep"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "WITNESS_PREFIX_LOST"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "firstLoss": {
+                "$ref": "#/$defs/lostStep"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "firstLoss": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "countMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "caseCount",
+        "statusCounts",
+        "firstLossCounts"
+      ],
+      "properties": {
+        "caseCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "statusCounts": {
+          "$ref": "#/$defs/countMap"
+        },
+        "firstLossCounts": {
+          "$ref": "#/$defs/countMap"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
