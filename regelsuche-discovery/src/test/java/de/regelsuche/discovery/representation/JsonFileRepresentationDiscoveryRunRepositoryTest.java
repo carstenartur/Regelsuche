@@ -97,6 +97,10 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
         for (RepresentationDiscoveryRunWorkspace workspace : expected) {
             Path retained = runFile(directory, workspace.runId());
             assertTrue(Files.isRegularFile(retained));
+            assertTrue(
+                retained.getFileName().toString().matches(
+                    "[0-9a-f]{64}\\.json")
+            );
             assertEquals(
                 workspace.toCanonicalJson(),
                 Files.readString(retained, StandardCharsets.UTF_8)
