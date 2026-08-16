@@ -45,8 +45,14 @@ def historicalRediscoveryReportDirectory = layout.buildDirectory.dir(
     'reports/historical-rediscovery')
 def historicalWitnessPruningReportDirectory = layout.buildDirectory.dir(
     'reports/historical-rediscovery-witness-pruning')
+def historicalWitnessPolicyReportDirectory = layout.buildDirectory.dir(
+    'reports/historical-rediscovery-witness-policy-comparison')
 def historicalRediscoveryOutputArgument =
     historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
+def historicalWitnessPruningJson = layout.buildDirectory.file(
+    'reports/historical-rediscovery-witness-pruning/witness-pruning-diagnostic.json')
+def historicalWitnessPolicyOutputArgument =
+    historicalWitnessPolicyReportDirectory.map { it.asFile.absolutePath }
 
 def generateHistoricalRediscoveryAtlas = tasks.register(
     'generateHistoricalRediscoveryAtlas', JavaExec) {
@@ -65,14 +71,34 @@ def generateHistoricalRediscoveryAtlas = tasks.register(
     outputs.dir(historicalWitnessPruningReportDirectory)
 }
 
+def generateHistoricalWitnessPolicyComparison = tasks.register(
+    'generateHistoricalWitnessPolicyComparison', JavaExec) {
+    group = 'verification'
+    description = 'Compares scalar and structural-diversity oracle-witness prefix retention.'
+    dependsOn generateHistoricalRediscoveryAtlas
+    timeout = java.time.Duration.ofMinutes(5)
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.HistoricalWitnessPolicyComparison'
+    argumentProviders.add({
+        [
+            historicalRediscoveryOutputArgument.get(),
+            historicalWitnessPruningJson.get().asFile.absolutePath,
+            historicalWitnessPolicyOutputArgument.get()
+        ]
+    } as CommandLineArgumentProvider)
+    inputs.dir(historicalRediscoveryReportDirectory)
+    inputs.file(historicalWitnessPruningJson)
+    outputs.dir(historicalWitnessPolicyReportDirectory)
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
-    dependsOn generateHistoricalRediscoveryAtlas
+    dependsOn generateHistoricalWitnessPolicyComparison
 }
 
 // The repository merge gate invokes the root check rather than every
 // subproject check. Bind the retained experiment explicitly so CI cannot pass
 // without executing the atlas and its fail-closed claim validation.
 rootProject.tasks.named('check') {
-    dependsOn generateHistoricalRediscoveryAtlas
+    dependsOn generateHistoricalWitnessPolicyComparison
 }
