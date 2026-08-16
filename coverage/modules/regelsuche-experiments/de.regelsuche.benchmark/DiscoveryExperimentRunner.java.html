@@ -1,115 +1,1087 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryExperimentRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">DiscoveryExperimentRunner.java</span></div><h1>DiscoveryExperimentRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
 
+import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.AtlasReport;
+import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.CaseResult;
+import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.OracleEvidence;
+import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.SearchEvidence;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Case;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Corpus;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Relation;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalMetrics;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.search.telemetry.SearchEvent;
+import de.regelsuche.search.telemetry.SearchEventType;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.AstRewriteTransformationEngines;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
- * Stable port for running discovery experiments over a seed corpus.
- *
- * &lt;p&gt;Introduced as part of Teil 0 of the Discovery Epic (issue #41,
- * &quot;Interfaces zuerst&quot;): planned experiment-runner / replay / report
- * features depend on this abstraction so the corpus source, the search
- * driver and the result sink stay decoupled and individually replaceable.
- *
- * &lt;p&gt;The runner is intentionally minimal: it consumes seed expressions and
- * returns a result summary. Concrete implementations choose how to wire
- * search strategies, repositories and trace stores.
+ * Stable port and checkout-owned command entry point for retained discovery
+ * experiments.
  */
 public interface DiscoveryExperimentRunner {
 
-    /**
-     * Execute the experiment for the given {@code seedExpressions}.
-     *
-     * @return one {@link ExperimentResult} per seed, in the same order as
-     *     the input list.
-     */
     List&lt;ExperimentResult&gt; run(List&lt;String&gt; seedExpressions);
 
-    /**
-     * Checkout-owned command entry point for retained discovery experiments.
-     *
-     * &lt;p&gt;The first command is deliberately explicit so additional experiments
-     * can share the entry point without inventing one public launcher class per
-     * report.&lt;/p&gt;
-     */
     static void main(String[] args) {
-<span class="nc bnc" id="L36" title="All 4 branches missed.">        if (args.length == 0 || !&quot;historical-rediscovery&quot;.equals(args[0])) {</span>
-<span class="nc" id="L37">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">        if (args.length == 0 || !&quot;historical-rediscovery&quot;.equals(args[0])) {</span>
+<span class="fc" id="L58">            throw new IllegalArgumentException(</span>
                 &quot;expected command: historical-rediscovery [output-directory]&quot;);
         }
-<span class="nc bnc" id="L40" title="All 2 branches missed.">        Path output = args.length &gt;= 2</span>
-<span class="nc" id="L41">            ? Path.of(args[1])</span>
-<span class="nc" id="L42">            : Path.of(&quot;build/reports/historical-rediscovery&quot;);</span>
-        HistoricalRediscoveryCorpus.Corpus corpus =
-<span class="nc" id="L44">            HistoricalRediscoveryCorpus.load();</span>
-<span class="nc" id="L45">        HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();</span>
-<span class="nc" id="L46">        HistoricalRediscoveryAtlas.AtlasReport report = atlas.run(corpus);</span>
-<span class="nc" id="L47">        verifyRetainedClaims(report);</span>
-<span class="nc" id="L48">        HistoricalRediscoveryRunArtifact.begin(output);</span>
-<span class="nc" id="L49">        HistoricalRediscoveryAtlas.WrittenArtifacts artifacts =</span>
-<span class="nc" id="L50">            atlas.write(output, report);</span>
-<span class="nc" id="L51">        HistoricalRediscoveryRunArtifact.VerifiedRun verifiedRun =</span>
-<span class="nc" id="L52">            HistoricalRediscoveryRunArtifact.commit(</span>
-                output,
-                corpus,
-                report,
-                artifacts);
-<span class="nc" id="L57">        System.out.println(&quot;historicalRediscoveryAssessment=&quot;</span>
-<span class="nc" id="L58">            + report.assessment().decision());</span>
-<span class="nc" id="L59">        System.out.println(&quot;historicalRediscoveryCases=&quot; + report.cases().size());</span>
-<span class="nc" id="L60">        System.out.println(&quot;historicalRediscoveryJson=&quot;</span>
-<span class="nc" id="L61">            + artifacts.json().toAbsolutePath().normalize());</span>
-<span class="nc" id="L62">        System.out.println(&quot;historicalRediscoveryMarkdown=&quot;</span>
-<span class="nc" id="L63">            + artifacts.markdown().toAbsolutePath().normalize());</span>
-<span class="nc" id="L64">        System.out.println(&quot;historicalRediscoveryRun=&quot;</span>
-<span class="nc" id="L65">            + verifiedRun.manifestPath());</span>
-<span class="nc" id="L66">        System.out.println(&quot;historicalRediscoveryRunHash=&quot;</span>
-<span class="nc" id="L67">            + verifiedRun.manifest().contentHash());</span>
-<span class="nc" id="L68">    }</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        Path output = args.length &gt;= 2</span>
+<span class="nc" id="L62">            ? Path.of(args[1])</span>
+<span class="nc" id="L63">            : Path.of(&quot;build/reports/historical-rediscovery&quot;);</span>
+<span class="nc" id="L64">        Corpus corpus = HistoricalRediscoveryCorpus.load();</span>
+<span class="nc" id="L65">        HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();</span>
+<span class="nc" id="L66">        AtlasReport report = atlas.run(corpus);</span>
+<span class="nc" id="L67">        verifyRetainedClaims(report);</span>
 
-    /**
-     * Prevents aggregate or per-case claims that are stronger than the
-     * retained evidence used to derive them.
-     */
-    private static void verifyRetainedClaims(
-        HistoricalRediscoveryAtlas.AtlasReport report
-    ) {
-<span class="nc" id="L77">        boolean targetBlindDiversitySignal = false;</span>
-<span class="nc bnc" id="L78" title="All 2 branches missed.">        for (HistoricalRediscoveryAtlas.CaseResult result : report.cases()) {</span>
-<span class="nc bnc" id="L79" title="All 3 branches missed.">            switch (result.status()) {</span>
+<span class="nc" id="L69">        HistoricalWitnessPruningDiagnostic pruning =</span>
+            new HistoricalWitnessPruningDiagnostic();
+<span class="nc" id="L71">        List&lt;HistoricalWitnessPruningDiagnostic.CaseDiagnostic&gt; pruningCases =</span>
+<span class="nc" id="L72">            pruning.run(corpus, report);</span>
+<span class="nc" id="L73">        verifyWitnessPruning(report, pruningCases);</span>
+
+<span class="nc" id="L75">        HistoricalRediscoveryRunArtifact.begin(output);</span>
+<span class="nc" id="L76">        HistoricalRediscoveryAtlas.WrittenArtifacts artifacts =</span>
+<span class="nc" id="L77">            atlas.write(output, report);</span>
+<span class="nc" id="L78">        HistoricalRediscoveryRunArtifact.VerifiedRun verifiedRun =</span>
+<span class="nc" id="L79">            HistoricalRediscoveryRunArtifact.commit(</span>
+                output, corpus, report, artifacts);
+<span class="nc" id="L81">        Path pruningArtifact = pruning.write(</span>
+<span class="nc" id="L82">            witnessOutput(output), corpus, report, pruningCases);</span>
+
+<span class="nc" id="L84">        System.out.println(&quot;historicalRediscoveryAssessment=&quot;</span>
+<span class="nc" id="L85">            + report.assessment().decision());</span>
+<span class="nc" id="L86">        System.out.println(&quot;historicalRediscoveryCases=&quot; + report.cases().size());</span>
+<span class="nc" id="L87">        System.out.println(&quot;historicalRediscoveryJson=&quot;</span>
+<span class="nc" id="L88">            + artifacts.json().toAbsolutePath().normalize());</span>
+<span class="nc" id="L89">        System.out.println(&quot;historicalRediscoveryMarkdown=&quot;</span>
+<span class="nc" id="L90">            + artifacts.markdown().toAbsolutePath().normalize());</span>
+<span class="nc" id="L91">        System.out.println(&quot;historicalRediscoveryRun=&quot;</span>
+<span class="nc" id="L92">            + verifiedRun.manifestPath());</span>
+<span class="nc" id="L93">        System.out.println(&quot;historicalRediscoveryRunHash=&quot;</span>
+<span class="nc" id="L94">            + verifiedRun.manifest().contentHash());</span>
+<span class="nc" id="L95">        System.out.println(&quot;historicalWitnessPruning=&quot; + pruningArtifact);</span>
+<span class="nc" id="L96">        System.out.println(&quot;historicalWitnessPruningHash=&quot;</span>
+<span class="nc" id="L97">            + pruning.contentHash(corpus, report, pruningCases));</span>
+<span class="nc" id="L98">    }</span>
+
+    private static void verifyRetainedClaims(AtlasReport report) {
+<span class="nc" id="L101">        boolean targetBlindDiversitySignal = false;</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        for (CaseResult result : report.cases()) {</span>
+<span class="nc bnc" id="L103" title="All 3 branches missed.">            switch (result.status()) {</span>
                 case GENERIC_BRIDGE_REQUIRED_AND_FOUND,
                      CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE -&gt; {
-<span class="nc bnc" id="L82" title="All 2 branches missed.">                    if (!result.production().oracle().completeClosureExhausted()) {</span>
-<span class="nc" id="L83">                        throw new IllegalStateException(</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                    if (!result.production().oracle().completeClosureExhausted()) {</span>
+<span class="nc" id="L107">                        throw new IllegalStateException(</span>
                             &quot;claim requires complete production closure: &quot;
-<span class="nc" id="L85">                                + result.benchmarkCase().id()</span>
+<span class="nc" id="L109">                                + result.benchmarkCase().id()</span>
                                 + &quot; has production oracle status &quot;
-<span class="nc" id="L87">                                + result.production().oracle().status());</span>
+<span class="nc" id="L111">                                + result.production().oracle().status());</span>
                     }
                 }
                 case REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND -&gt;
-<span class="nc" id="L91">                    targetBlindDiversitySignal = true;</span>
+<span class="nc" id="L115">                    targetBlindDiversitySignal = true;</span>
                 default -&gt; {
                     // No additional cross-case claim invariant.
                 }
             }
-<span class="nc" id="L96">        }</span>
-<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (report.assessment().searchPolicyDifferenceIdentified()</span>
+<span class="nc" id="L120">        }</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (report.assessment().searchPolicyDifferenceIdentified()</span>
                 != targetBlindDiversitySignal) {
-<span class="nc" id="L99">            throw new IllegalStateException(</span>
+<span class="nc" id="L123">            throw new IllegalStateException(</span>
                 &quot;search-policy claim must be backed by a target-blind &quot;
                     + &quot;structural-diversity result&quot;);
         }
-<span class="nc" id="L103">    }</span>
+<span class="nc" id="L127">    }</span>
+
+    private static void verifyWitnessPruning(
+        AtlasReport atlas,
+        List&lt;HistoricalWitnessPruningDiagnostic.CaseDiagnostic&gt; diagnostics
+    ) {
+<span class="nc" id="L133">        Map&lt;String, HistoricalWitnessPruningDiagnostic.CaseDiagnostic&gt; byId =</span>
+<span class="nc" id="L134">            diagnostics.stream().collect(Collectors.toMap(</span>
+                HistoricalWitnessPruningDiagnostic.CaseDiagnostic::id,
+<span class="nc" id="L136">                Function.identity()));</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (byId.size() != atlas.cases().size()) {</span>
+<span class="nc" id="L138">            throw new IllegalStateException(</span>
+                &quot;witness-pruning diagnostic must balance every atlas case&quot;);
+        }
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        for (CaseResult result : atlas.cases()) {</span>
+<span class="nc" id="L142">            HistoricalWitnessPruningDiagnostic.CaseDiagnostic retained =</span>
+<span class="nc" id="L143">                byId.get(result.benchmarkCase().id());</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (retained == null) {</span>
+<span class="nc" id="L145">                throw new IllegalStateException(</span>
+                    &quot;missing witness-pruning case &quot;
+<span class="nc" id="L147">                        + result.benchmarkCase().id());</span>
+            }
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            boolean policySignal = result.status()</span>
+                == HistoricalRediscoveryAtlas.PrimaryStatus
+                    .REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND;
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (policySignal</span>
+                    &amp;&amp; !HistoricalWitnessPruningDiagnostic.WITNESS_PREFIX_LOST
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                        .equals(retained.status())) {</span>
+<span class="nc" id="L155">                throw new IllegalStateException(</span>
+                    &quot;target-blind diversity signal requires a retained &quot;
+                        + &quot;scalar witness-prefix loss: &quot;
+<span class="nc" id="L158">                        + result.benchmarkCase().id());</span>
+            }
+<span class="nc" id="L160">        }</span>
+<span class="nc" id="L161">    }</span>
+
+    private static Path witnessOutput(Path atlasOutput) {
+<span class="nc" id="L164">        Path normalized = atlasOutput.toAbsolutePath().normalize();</span>
+<span class="nc" id="L165">        Path name = normalized.getFileName();</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L167">            throw new IllegalArgumentException(</span>
+                &quot;historical rediscovery output must have a file name&quot;);
+        }
+<span class="nc" id="L170">        return normalized.resolveSibling(name + &quot;-witness-pruning&quot;);</span>
+    }
+
+<span class="fc" id="L173">    record ExperimentResult(String seedExpression, boolean success, String summary) {</span>
+    }
 
     /**
-     * Outcome of a single seed run.
+     * Locates the first lost prefix of a target-aware oracle witness in the
+     * unchanged target-blind scalar production search.
      *
-     * @param seedExpression the input the runner was started with
-     * @param success whether the run reached a useful terminal state
-     * @param summary short, human-readable result description
+     * &lt;p&gt;The implementation is intentionally colocated with the retained
+     * experiment command instead of introducing another top-level experiment
+     * authority.&lt;/p&gt;
      */
-<span class="fc" id="L112">    record ExperimentResult(String seedExpression, boolean success, String summary) {</span>
+<span class="fc" id="L184">    final class HistoricalWitnessPruningDiagnostic {</span>
+        static final String SCHEMA =
+            &quot;regelsuche.witness-pruning-diagnostic/v1&quot;;
+        static final String EVIDENCE_STATUS =
+            &quot;EXECUTED_TARGET_AWARE_ORACLE_DIAGNOSTIC&quot;;
+        static final String SEARCH_POLICY =
+            &quot;SCALAR_BEST_FIRST_TARGET_BLIND&quot;;
+        static final String FILE_NAME =
+            &quot;witness-pruning-diagnostic.json&quot;;
+        static final String CLAIM_BOUNDARY =
+            &quot;The target-aware oracle supplies a bounded witness only for diagnosis. &quot;
+                + &quot;The compared scalar search remains target-blind. A lost prefix &quot;
+                + &quot;is not global unreachability, and an explored witness is not &quot;
+                + &quot;autonomous rediscovery, proof or mathematical novelty.&quot;;
+
+        static final String ORACLE_NOT_EVALUATED = &quot;ORACLE_NOT_EVALUATED&quot;;
+        static final String ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS =
+            &quot;ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS&quot;;
+        static final String ORACLE_BUDGET_INCONCLUSIVE =
+            &quot;ORACLE_BUDGET_INCONCLUSIVE&quot;;
+        static final String SCALAR_ALREADY_FOUND = &quot;SCALAR_ALREADY_FOUND&quot;;
+        static final String WITNESS_PREFIX_LOST = &quot;WITNESS_PREFIX_LOST&quot;;
+        static final String WITNESS_COMPLETELY_EXPLORED =
+            &quot;WITNESS_COMPLETELY_EXPLORED&quot;;
+        static final String CORRECTNESS_REGRESSION_WITNESS =
+            &quot;CORRECTNESS_REGRESSION_WITNESS&quot;;
+
+        static final String TRANSFORMATION_SKIPPED = &quot;TRANSFORMATION_SKIPPED&quot;;
+        static final String STATE_PRUNED_DUPLICATE = &quot;STATE_PRUNED_DUPLICATE&quot;;
+        static final String STATE_PRUNED_TRANSPOSITION =
+            &quot;STATE_PRUNED_TRANSPOSITION&quot;;
+        static final String STATE_ENQUEUED_BUT_NOT_EXPLORED =
+            &quot;STATE_ENQUEUED_BUT_NOT_EXPLORED&quot;;
+        static final String TRANSFORMATION_GENERATED_NOT_ENQUEUED =
+            &quot;TRANSFORMATION_GENERATED_NOT_ENQUEUED&quot;;
+        static final String CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE =
+            &quot;CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE&quot;;
+        static final String PARENT_DEPTH_LIMIT = &quot;PARENT_DEPTH_LIMIT&quot;;
+        static final String PARENT_PRUNED_TRANSPOSITION =
+            &quot;PARENT_PRUNED_TRANSPOSITION&quot;;
+        static final String PARENT_PRUNED_DUPLICATE =
+            &quot;PARENT_PRUNED_DUPLICATE&quot;;
+        static final String TRANSFORMATION_NOT_GENERATED =
+            &quot;TRANSFORMATION_NOT_GENERATED&quot;;
+        static final String PARENT_ENQUEUED_BUT_NOT_EXPLORED =
+            &quot;PARENT_ENQUEUED_BUT_NOT_EXPLORED&quot;;
+        static final String PARENT_NOT_REACHED = &quot;PARENT_NOT_REACHED&quot;;
+
+<span class="fc" id="L232">        private static final Set&lt;String&gt; CASE_STATUSES = Set.of(</span>
+            ORACLE_NOT_EVALUATED,
+            ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS,
+            ORACLE_BUDGET_INCONCLUSIVE,
+            SCALAR_ALREADY_FOUND,
+            WITNESS_PREFIX_LOST,
+            WITNESS_COMPLETELY_EXPLORED,
+            CORRECTNESS_REGRESSION_WITNESS);
+<span class="fc" id="L240">        private static final Set&lt;String&gt; LOSS_REASONS = Set.of(</span>
+            TRANSFORMATION_SKIPPED,
+            STATE_PRUNED_DUPLICATE,
+            STATE_PRUNED_TRANSPOSITION,
+            STATE_ENQUEUED_BUT_NOT_EXPLORED,
+            TRANSFORMATION_GENERATED_NOT_ENQUEUED,
+            CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
+            PARENT_DEPTH_LIMIT,
+            PARENT_PRUNED_TRANSPOSITION,
+            PARENT_PRUNED_DUPLICATE,
+            TRANSFORMATION_NOT_GENERATED,
+            PARENT_ENQUEUED_BUT_NOT_EXPLORED,
+            PARENT_NOT_REACHED);
+<span class="fc" id="L253">        private static final Set&lt;String&gt; TERMINAL_STATUSES = Set.of(</span>
+            &quot;NOT_EVALUATED&quot;,
+            &quot;SCALAR_FOUND&quot;,
+            &quot;STATE_BUDGET&quot;,
+            &quot;CANDIDATE_BUDGET&quot;,
+            &quot;DEPTH_BUDGET&quot;,
+            &quot;NO_TRANSFORMATIONS&quot;,
+            &quot;FRONTIER_EXHAUSTED&quot;);
+
+<span class="fc" id="L262">        private final ExpressionParser parser = new ExpressionParser();</span>
+
+        List&lt;CaseDiagnostic&gt; run(Corpus corpus, AtlasReport atlas) {
+<span class="fc" id="L265">            Objects.requireNonNull(corpus, &quot;corpus&quot;);</span>
+<span class="fc" id="L266">            Objects.requireNonNull(atlas, &quot;atlas&quot;);</span>
+<span class="fc" id="L267">            requireAtlasBinding(corpus, atlas);</span>
+<span class="fc" id="L268">            Map&lt;String, CaseResult&gt; atlasCases = atlas.cases().stream()</span>
+<span class="fc" id="L269">                .collect(Collectors.toUnmodifiableMap(</span>
+<span class="fc" id="L270">                    value -&gt; value.benchmarkCase().id(),</span>
+<span class="fc" id="L271">                    Function.identity()));</span>
+<span class="fc" id="L272">            return corpus.cases().stream()</span>
+<span class="fc" id="L273">                .sorted(Comparator.comparing(Case::id))</span>
+<span class="fc" id="L274">                .map(value -&gt; diagnose(</span>
+                    value,
+<span class="fc" id="L276">                    Objects.requireNonNull(</span>
+<span class="fc" id="L277">                        atlasCases.get(value.id()),</span>
+<span class="nc" id="L278">                        () -&gt; &quot;missing atlas case &quot; + value.id())))</span>
+<span class="fc" id="L279">                .toList();</span>
+        }
+
+        Path write(
+            Path directory,
+            Corpus corpus,
+            AtlasReport atlas,
+            List&lt;CaseDiagnostic&gt; cases
+        ) {
+<span class="fc" id="L288">            Path outputDirectory = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L289">                .toAbsolutePath().normalize();</span>
+<span class="fc" id="L290">            String json = toCanonicalJson(corpus, atlas, cases);</span>
+<span class="fc" id="L291">            Path output = outputDirectory.resolve(FILE_NAME);</span>
+            try {
+<span class="fc" id="L293">                Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L294">                AtomicJsonFile.writeUtf8(output, json);</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">                if (!json.equals(Files.readString(output, StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L296">                    throw new IllegalStateException(</span>
+                        &quot;written witness-pruning diagnostic differs from report&quot;);
+                }
+<span class="fc" id="L299">                return output;</span>
+<span class="nc" id="L300">            } catch (IOException exception) {</span>
+<span class="nc" id="L301">                throw new UncheckedIOException(</span>
+                    &quot;Could not write witness-pruning diagnostic&quot;, exception);
+            }
+        }
+
+        String contentHash(
+            Corpus corpus,
+            AtlasReport atlas,
+            List&lt;CaseDiagnostic&gt; cases
+        ) {
+<span class="fc" id="L311">            validateReportBinding(corpus, atlas, cases);</span>
+<span class="fc" id="L312">            return reportHash(corpus, atlas, cases);</span>
+        }
+
+        String toCanonicalJson(
+            Corpus corpus,
+            AtlasReport atlas,
+            List&lt;CaseDiagnostic&gt; cases
+        ) {
+<span class="fc" id="L320">            validateReportBinding(corpus, atlas, cases);</span>
+<span class="fc" id="L321">            return renderReport(</span>
+<span class="fc" id="L322">                corpus, atlas, cases, reportHash(corpus, atlas, cases));</span>
+        }
+
+        private CaseDiagnostic diagnose(Case benchmarkCase, CaseResult atlasCase) {
+<span class="fc" id="L326">            OracleEvidence oracle = atlasCase.production().oracle();</span>
+<span class="fc" id="L327">            SearchEvidence scalar = atlasCase.production().scalar();</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            if (!oracle.reachable()) {</span>
+<span class="nc" id="L329">                return CaseDiagnostic.notApplicable(</span>
+<span class="nc" id="L330">                    benchmarkCase.id(), unavailableStatus(oracle),</span>
+<span class="nc" id="L331">                    oracle.status(), scalar);</span>
+            }
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">            if (benchmarkCase.relation() == Relation.NOT_EQUIVALENT) {</span>
+<span class="nc" id="L334">                return CaseDiagnostic.withoutLoss(</span>
+<span class="nc" id="L335">                    benchmarkCase.id(),</span>
+                    CORRECTNESS_REGRESSION_WITNESS,
+<span class="nc" id="L337">                    oracle.status(),</span>
+<span class="nc" id="L338">                    oracle.witnessExpressions().size(),</span>
+                    0,
+                    &quot;NOT_EVALUATED&quot;,
+<span class="nc" id="L341">                    scalar.exploredStates(),</span>
+<span class="nc" id="L342">                    scalar.engineCalls(),</span>
+<span class="nc" id="L343">                    scalar.generatedTransformations(),</span>
+                    &quot;production oracle reached a target declared non-equivalent&quot;);
+            }
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">            if (scalar.reached()) {</span>
+<span class="nc" id="L347">                return CaseDiagnostic.withoutLoss(</span>
+<span class="nc" id="L348">                    benchmarkCase.id(),</span>
+                    SCALAR_ALREADY_FOUND,
+<span class="nc" id="L350">                    oracle.status(),</span>
+<span class="nc" id="L351">                    oracle.witnessExpressions().size(),</span>
+                    0,
+                    &quot;SCALAR_FOUND&quot;,
+<span class="nc" id="L354">                    scalar.exploredStates(),</span>
+<span class="nc" id="L355">                    scalar.engineCalls(),</span>
+<span class="nc" id="L356">                    scalar.generatedTransformations(),</span>
+                    &quot;the retained scalar search already reached the relation&quot;);
+            }
+<span class="fc" id="L359">            validateWitness(benchmarkCase, oracle);</span>
+<span class="fc" id="L360">            CountingEngine counting = new CountingEngine(</span>
+<span class="fc" id="L361">                productionEngine(benchmarkCase));</span>
+<span class="fc" id="L362">            List&lt;SearchEvent&gt; events = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L363">            SearchProblem problem = searchProblem(</span>
+                benchmarkCase,
+<span class="fc" id="L365">                atlasCase.representation().formattedSource(),</span>
+<span class="fc" id="L366">                counting).withObserver(events::add);</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">            if (problem.target() != null) {</span>
+<span class="nc" id="L368">                throw new IllegalStateException(</span>
+                    &quot;witness comparison search must remain target-blind&quot;);
+            }
+<span class="fc" id="L371">            GoalSearchResult rerun = new BestFirstSearchStrategy()</span>
+<span class="fc" id="L372">                .searchWithDiagnostics(problem);</span>
+<span class="fc" id="L373">            requireSameScalarRun(</span>
+<span class="fc" id="L374">                scalar, rerun, counting.calls(), counting.generated());</span>
+<span class="fc" id="L375">            return analyzeWitness(</span>
+                benchmarkCase,
+                oracle,
+                rerun,
+                events,
+<span class="fc" id="L380">                counting.calls(),</span>
+<span class="fc" id="L381">                counting.generated());</span>
+        }
+
+        CaseDiagnostic analyzeWitness(
+            Case benchmarkCase,
+            OracleEvidence oracle,
+            GoalSearchResult search,
+            List&lt;SearchEvent&gt; events,
+            int engineCalls,
+            long generatedTransformations
+        ) {
+<span class="fc" id="L392">            Set&lt;String&gt; explored = search.states().stream()</span>
+<span class="fc" id="L393">                .map(SearchState::expression)</span>
+<span class="fc" id="L394">                .map(this::expressionKey)</span>
+<span class="fc" id="L395">                .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L396">            String before = format(benchmarkCase.source());</span>
+<span class="fc" id="L397">            int prefixLength = 0;</span>
+<span class="fc" id="L398">            for (int index = 0;</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">                    index &lt; oracle.witnessExpressions().size();</span>
+<span class="fc" id="L400">                    index++) {</span>
+<span class="fc" id="L401">                String after = format(oracle.witnessExpressions().get(index));</span>
+<span class="fc" id="L402">                String rule = oracle.witnessRuleIds().get(index);</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">                if (explored.contains(expressionKey(after))) {</span>
+<span class="fc" id="L404">                    prefixLength++;</span>
+<span class="fc" id="L405">                    before = after;</span>
+                } else {
+<span class="fc" id="L407">                    return diagnoseLoss(</span>
+                        benchmarkCase,
+                        oracle,
+                        search,
+                        engineCalls,
+                        generatedTransformations,
+                        prefixLength,
+                        index,
+                        before,
+                        after,
+                        rule,
+                        events);
+                }
+            }
+<span class="fc" id="L421">            return CaseDiagnostic.withoutLoss(</span>
+<span class="fc" id="L422">                benchmarkCase.id(),</span>
+                WITNESS_COMPLETELY_EXPLORED,
+<span class="fc" id="L424">                oracle.status(),</span>
+<span class="fc" id="L425">                oracle.witnessExpressions().size(),</span>
+                prefixLength,
+<span class="fc" id="L427">                terminalStatus(benchmarkCase, search.metrics()),</span>
+<span class="fc" id="L428">                search.states().size(),</span>
+                engineCalls,
+                generatedTransformations,
+                &quot;all oracle witness states were explored; relation matching &quot;
+                    + &quot;must be diagnosed separately&quot;);
+        }
+
+        private CaseDiagnostic diagnoseLoss(
+            Case benchmarkCase,
+            OracleEvidence oracle,
+            GoalSearchResult search,
+            int engineCalls,
+            long generatedTransformations,
+            int prefixLength,
+            int index,
+            String before,
+            String after,
+            String rule,
+            List&lt;SearchEvent&gt; events
+        ) {
+<span class="fc" id="L448">            Optional&lt;SearchEvent&gt; transition = firstTransition(</span>
+                events, before, after, rule);
+<span class="fc bfc" id="L450" title="All 2 branches covered.">            if (transition.isEmpty()) {</span>
+<span class="fc" id="L451">                return parentLoss(</span>
+                    benchmarkCase, oracle, search, engineCalls,
+                    generatedTransformations, prefixLength, index,
+                    before, after, rule, events);
+            }
+<span class="fc" id="L456">            SearchEvent generated = transition.orElseThrow();</span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">            if (!generated.pruningReason().isBlank()) {</span>
+<span class="nc" id="L458">                return lossCase(</span>
+                    benchmarkCase, oracle, search, engineCalls,
+                    generatedTransformations, prefixLength, index,
+                    before, after, rule, TRANSFORMATION_SKIPPED, generated,
+                    &quot;witness transformation was offered but rejected&quot;);
+            }
+<span class="fc" id="L464">            Optional&lt;SearchEvent&gt; transposition = firstEdgeEvent(</span>
+                events,
+                SearchEventType.STATE_PRUNED_TRANSPOSITION,
+<span class="fc" id="L467">                before, after, rule, generated.sequence());</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">            if (transposition.isPresent()) {</span>
+<span class="nc" id="L469">                return lossCase(</span>
+                    benchmarkCase, oracle, search, engineCalls,
+                    generatedTransformations, prefixLength, index,
+                    before, after, rule, STATE_PRUNED_TRANSPOSITION,
+<span class="nc" id="L473">                    transposition.orElseThrow(),</span>
+                    &quot;witness state was removed by transposition memory&quot;);
+            }
+<span class="fc" id="L476">            Optional&lt;SearchEvent&gt; duplicate = firstEdgeEvent(</span>
+                events,
+                SearchEventType.STATE_PRUNED_DUPLICATE,
+<span class="fc" id="L479">                before, after, rule, generated.sequence());</span>
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            if (duplicate.isPresent()) {</span>
+<span class="nc" id="L481">                return lossCase(</span>
+                    benchmarkCase, oracle, search, engineCalls,
+                    generatedTransformations, prefixLength, index,
+                    before, after, rule, STATE_PRUNED_DUPLICATE,
+<span class="nc" id="L485">                    duplicate.orElseThrow(),</span>
+                    &quot;witness state was removed by visited-state identity&quot;);
+            }
+<span class="fc" id="L488">            Optional&lt;SearchEvent&gt; enqueued = firstEdgeEvent(</span>
+                events,
+                SearchEventType.STATE_ENQUEUED,
+<span class="fc" id="L491">                before, after, rule, generated.sequence());</span>
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">            if (enqueued.isPresent()) {</span>
+<span class="fc" id="L493">                return lossCase(</span>
+                    benchmarkCase, oracle, search, engineCalls,
+                    generatedTransformations, prefixLength, index,
+                    before, after, rule, STATE_ENQUEUED_BUT_NOT_EXPLORED,
+<span class="fc" id="L497">                    enqueued.orElseThrow(),</span>
+                    &quot;witness state remained outside the explored prefix&quot;);
+            }
+<span class="nc" id="L500">            return lossCase(</span>
+                benchmarkCase, oracle, search, engineCalls,
+                generatedTransformations, prefixLength, index,
+                before, after, rule, TRANSFORMATION_GENERATED_NOT_ENQUEUED,
+                generated,
+                &quot;generated witness edge has no enqueue or prune event&quot;);
+        }
+
+        private CaseDiagnostic parentLoss(
+            Case benchmarkCase,
+            OracleEvidence oracle,
+            GoalSearchResult search,
+            int engineCalls,
+            long generatedTransformations,
+            int prefixLength,
+            int index,
+            String before,
+            String after,
+            String rule,
+            List&lt;SearchEvent&gt; events
+        ) {
+<span class="fc" id="L521">            List&lt;ParentOutcome&gt; outcomes = List.of(</span>
+                new ParentOutcome(
+                    SearchEventType.STATE_PRUNED_BUDGET,
+                    CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
+                    &quot;per-state candidate ceiling stopped before the witness edge&quot;),
+                new ParentOutcome(
+                    SearchEventType.STATE_PRUNED_DEPTH,
+                    PARENT_DEPTH_LIMIT,
+                    &quot;witness parent reached the configured depth ceiling&quot;),
+                new ParentOutcome(
+                    SearchEventType.STATE_PRUNED_TRANSPOSITION,
+                    PARENT_PRUNED_TRANSPOSITION,
+                    &quot;witness parent was rejected by transposition memory&quot;),
+                new ParentOutcome(
+                    SearchEventType.STATE_PRUNED_DUPLICATE,
+                    PARENT_PRUNED_DUPLICATE,
+                    &quot;witness parent was rejected as a duplicate&quot;),
+                new ParentOutcome(
+                    SearchEventType.STATE_EXPANDED,
+                    TRANSFORMATION_NOT_GENERATED,
+                    &quot;production engine did not emit the oracle witness edge&quot;),
+                new ParentOutcome(
+                    SearchEventType.STATE_ENQUEUED,
+                    PARENT_ENQUEUED_BUT_NOT_EXPLORED,
+                    &quot;witness parent remained in the frontier&quot;));
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">            for (ParentOutcome outcome : outcomes) {</span>
+<span class="fc" id="L547">                Optional&lt;SearchEvent&gt; event = firstStateEvent(</span>
+<span class="fc" id="L548">                    events, outcome.type(), before);</span>
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">                if (event.isPresent()) {</span>
+<span class="fc" id="L550">                    return lossCase(</span>
+                        benchmarkCase, oracle, search, engineCalls,
+                        generatedTransformations, prefixLength, index,
+<span class="fc" id="L553">                        before, after, rule, outcome.reason(),</span>
+<span class="fc" id="L554">                        event.orElseThrow(), outcome.detail());</span>
+                }
+<span class="nc" id="L556">            }</span>
+<span class="nc" id="L557">            return lossCase(</span>
+                benchmarkCase, oracle, search, engineCalls,
+                generatedTransformations, prefixLength, index,
+                before, after, rule, PARENT_NOT_REACHED, null,
+                &quot;target-blind search never reached the witness parent&quot;);
+        }
+
+        private CaseDiagnostic lossCase(
+            Case benchmarkCase,
+            OracleEvidence oracle,
+            GoalSearchResult search,
+            int engineCalls,
+            long generatedTransformations,
+            int prefixLength,
+            int index,
+            String before,
+            String after,
+            String rule,
+            String reason,
+            SearchEvent event,
+            String lossDetail
+        ) {
+<span class="fc" id="L579">            return new CaseDiagnostic(</span>
+<span class="fc" id="L580">                benchmarkCase.id(),</span>
+                WITNESS_PREFIX_LOST,
+<span class="fc" id="L582">                oracle.status(),</span>
+<span class="fc" id="L583">                oracle.witnessExpressions().size(),</span>
+                prefixLength,
+<span class="fc" id="L585">                terminalStatus(benchmarkCase, search.metrics()),</span>
+<span class="fc" id="L586">                search.states().size(),</span>
+                engineCalls,
+                generatedTransformations,
+<span class="fc" id="L589">                index,</span>
+                before,
+                after,
+                rule,
+                reason,
+                event,
+                lossDetail,
+                &quot;first target-aware oracle witness edge absent from the &quot;
+                    + &quot;target-blind explored prefix&quot;);
+        }
+
+        private Optional&lt;SearchEvent&gt; firstTransition(
+            List&lt;SearchEvent&gt; events,
+            String before,
+            String after,
+            String rule
+        ) {
+<span class="fc" id="L606">            return events.stream()</span>
+<span class="fc" id="L607">                .filter(event -&gt;</span>
+<span class="fc bfc" id="L608" title="All 2 branches covered.">                    event.type() == SearchEventType.TRANSFORMATION_GENERATED)</span>
+<span class="fc" id="L609">                .filter(event -&gt; sameExpression(event.parentExpression(), before))</span>
+<span class="fc" id="L610">                .filter(event -&gt; sameExpression(event.expression(), after))</span>
+<span class="fc" id="L611">                .filter(event -&gt; event.ruleId().equals(rule))</span>
+<span class="fc" id="L612">                .min(Comparator</span>
+<span class="fc" id="L613">                    .comparing((SearchEvent event) -&gt;</span>
+<span class="nc bnc" id="L614" title="All 2 branches missed.">                        !event.pruningReason().isBlank())</span>
+<span class="fc" id="L615">                    .thenComparingLong(SearchEvent::sequence));</span>
+        }
+
+        private Optional&lt;SearchEvent&gt; firstEdgeEvent(
+            List&lt;SearchEvent&gt; events,
+            SearchEventType type,
+            String before,
+            String after,
+            String rule,
+            long afterSequence
+        ) {
+<span class="fc" id="L626">            return events.stream()</span>
+<span class="fc bfc" id="L627" title="All 2 branches covered.">                .filter(event -&gt; event.sequence() &gt; afterSequence)</span>
+<span class="fc bfc" id="L628" title="All 2 branches covered.">                .filter(event -&gt; event.type() == type)</span>
+<span class="fc" id="L629">                .filter(event -&gt; sameExpression(event.parentExpression(), before))</span>
+<span class="fc" id="L630">                .filter(event -&gt; sameExpression(event.expression(), after))</span>
+<span class="fc" id="L631">                .filter(event -&gt; event.ruleId().equals(rule))</span>
+<span class="fc" id="L632">                .min(Comparator.comparingLong(SearchEvent::sequence));</span>
+        }
+
+        private Optional&lt;SearchEvent&gt; firstStateEvent(
+            List&lt;SearchEvent&gt; events,
+            SearchEventType type,
+            String expression
+        ) {
+<span class="fc" id="L640">            return events.stream()</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">                .filter(event -&gt; event.type() == type)</span>
+<span class="fc" id="L642">                .filter(event -&gt; sameExpression(event.expression(), expression))</span>
+<span class="fc" id="L643">                .min(Comparator.comparingLong(SearchEvent::sequence));</span>
+        }
+
+        private static String unavailableStatus(OracleEvidence oracle) {
+<span class="nc bnc" id="L647" title="All 2 branches missed.">            if (oracle.inconclusive()) {</span>
+<span class="nc" id="L648">                return ORACLE_BUDGET_INCONCLUSIVE;</span>
+            }
+<span class="nc bnc" id="L650" title="All 2 branches missed.">            if (oracle.completeClosureExhausted()) {</span>
+<span class="nc" id="L651">                return ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS;</span>
+            }
+<span class="nc" id="L653">            return ORACLE_NOT_EVALUATED;</span>
+        }
+
+        private static String terminalStatus(
+            Case benchmarkCase,
+            GoalMetrics metrics
+        ) {
+<span class="fc" id="L660">            if (metrics.exploredStates()</span>
+<span class="fc bfc" id="L661" title="All 2 branches covered.">                    &gt;= benchmarkCase.searchMaxVisitedStates()) {</span>
+<span class="fc" id="L662">                return &quot;STATE_BUDGET&quot;;</span>
+            }
+<span class="fc bfc" id="L664" title="All 2 branches covered.">            if (metrics.candidateBudgetPrunes() &gt; 0) {</span>
+<span class="fc" id="L665">                return &quot;CANDIDATE_BUDGET&quot;;</span>
+            }
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">            if (metrics.depthPrunes() &gt; 0) {</span>
+<span class="nc" id="L668">                return &quot;DEPTH_BUDGET&quot;;</span>
+            }
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">            if (metrics.expandedStates() &gt; 0</span>
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">                    &amp;&amp; metrics.generatedTransformations() == 0) {</span>
+<span class="nc" id="L672">                return &quot;NO_TRANSFORMATIONS&quot;;</span>
+            }
+<span class="fc" id="L674">            return &quot;FRONTIER_EXHAUSTED&quot;;</span>
+        }
+
+        private static SearchProblem searchProblem(
+            Case benchmarkCase,
+            String source,
+            TransformationEngine engine
+        ) {
+<span class="fc" id="L682">            return new SearchProblem(</span>
+                source,
+                engine,
+                new ExpressionScorer(),
+                new ExpressionCanonicalizer(),
+                new SearchHeuristic(
+<span class="fc" id="L688">                    benchmarkCase.searchMaxDepth(),</span>
+<span class="fc" id="L689">                    benchmarkCase.searchMaxVisitedStates(),</span>
+                    1,
+<span class="fc" id="L691">                    benchmarkCase.maxExpandingSteps(),</span>
+<span class="fc" id="L692">                    benchmarkCase.maxCandidatesPerState(),</span>
+<span class="fc" id="L693">                    benchmarkCase.beamWidth()));</span>
+        }
+
+        private static TransformationEngine productionEngine(
+            Case benchmarkCase
+        ) {
+<span class="fc" id="L699">            return AstRewriteTransformationEngines.production(</span>
+<span class="fc" id="L700">                AstRewriteTransformationEngine.defaultRules(),</span>
+                128,
+<span class="fc" id="L702">                Math.max(200, benchmarkCase.maxCandidatesPerState() * 2));</span>
+        }
+
+        private static void requireSameScalarRun(
+            SearchEvidence retained,
+            GoalSearchResult rerun,
+            int engineCalls,
+            long generatedTransformations
+        ) {
+<span class="fc" id="L711">            List&lt;Object&gt; retainedWork = List.of(</span>
+<span class="fc" id="L712">                retained.exploredStates(),</span>
+<span class="fc" id="L713">                retained.engineCalls(),</span>
+<span class="fc" id="L714">                retained.generatedTransformations(),</span>
+<span class="fc" id="L715">                Objects.requireNonNull(retained.metrics(), &quot;retained.metrics&quot;));</span>
+<span class="fc" id="L716">            List&lt;Object&gt; rerunWork = List.of(</span>
+<span class="fc" id="L717">                rerun.states().size(),</span>
+<span class="fc" id="L718">                engineCalls,</span>
+<span class="fc" id="L719">                generatedTransformations,</span>
+<span class="fc" id="L720">                rerun.metrics());</span>
+<span class="pc bpc" id="L721" title="1 of 2 branches missed.">            if (!retainedWork.equals(rerunWork)) {</span>
+<span class="nc" id="L722">                throw new IllegalStateException(</span>
+                    &quot;observer rerun differs from retained target-blind scalar evidence&quot;);
+            }
+<span class="fc" id="L725">        }</span>
+
+        private static void validateWitness(
+            Case benchmarkCase,
+            OracleEvidence oracle
+        ) {
+<span class="pc bpc" id="L731" title="1 of 2 branches missed.">            if (oracle.witnessExpressions().isEmpty()</span>
+<span class="fc" id="L732">                    || oracle.witnessExpressions().size()</span>
+<span class="pc bpc" id="L733" title="1 of 2 branches missed.">                        != oracle.witnessRuleIds().size()) {</span>
+<span class="nc" id="L734">                throw new IllegalStateException(</span>
+                    &quot;reachable oracle witness is incomplete for &quot;
+<span class="nc" id="L736">                        + benchmarkCase.id());</span>
+            }
+<span class="fc" id="L738">        }</span>
+
+        private static void requireAtlasBinding(
+            Corpus corpus,
+            AtlasReport atlas
+        ) {
+<span class="fc" id="L744">            List&lt;Object&gt; corpusBinding = List.of(</span>
+<span class="fc" id="L745">                corpus.schema(),</span>
+<span class="fc" id="L746">                corpus.contentSha256(),</span>
+<span class="fc" id="L747">                corpus.inventoryRevision(),</span>
+<span class="fc" id="L748">                corpus.claimBoundary(),</span>
+<span class="fc" id="L749">                corpus.cases().size());</span>
+<span class="fc" id="L750">            List&lt;Object&gt; atlasBinding = List.of(</span>
+<span class="fc" id="L751">                atlas.corpusSchema(),</span>
+<span class="fc" id="L752">                atlas.corpusSha256(),</span>
+<span class="fc" id="L753">                atlas.inventoryRevision(),</span>
+<span class="fc" id="L754">                atlas.claimBoundary(),</span>
+<span class="fc" id="L755">                atlas.cases().size());</span>
+<span class="pc bpc" id="L756" title="1 of 2 branches missed.">            if (!corpusBinding.equals(atlasBinding)) {</span>
+<span class="nc" id="L757">                throw new IllegalArgumentException(</span>
+                    &quot;witness-pruning diagnostic requires the matching atlas&quot;);
+            }
+<span class="fc" id="L760">            Set&lt;String&gt; corpusIds = corpus.cases().stream()</span>
+<span class="fc" id="L761">                .map(Case::id)</span>
+<span class="fc" id="L762">                .collect(Collectors.toSet());</span>
+<span class="fc" id="L763">            Set&lt;String&gt; atlasIds = atlas.cases().stream()</span>
+<span class="fc" id="L764">                .map(result -&gt; result.benchmarkCase().id())</span>
+<span class="fc" id="L765">                .collect(Collectors.toSet());</span>
+<span class="pc bpc" id="L766" title="1 of 2 branches missed.">            if (!corpusIds.equals(atlasIds)) {</span>
+<span class="nc" id="L767">                throw new IllegalArgumentException(</span>
+                    &quot;witness-pruning atlas case membership differs from corpus&quot;);
+            }
+<span class="fc" id="L770">        }</span>
+
+        private static void validateReportBinding(
+            Corpus corpus,
+            AtlasReport atlas,
+            List&lt;CaseDiagnostic&gt; cases
+        ) {
+<span class="fc" id="L777">            Objects.requireNonNull(corpus, &quot;corpus&quot;);</span>
+<span class="fc" id="L778">            Objects.requireNonNull(atlas, &quot;atlas&quot;);</span>
+<span class="fc" id="L779">            requireAtlasBinding(corpus, atlas);</span>
+<span class="fc" id="L780">            List&lt;CaseDiagnostic&gt; retained = List.copyOf(</span>
+<span class="fc" id="L781">                Objects.requireNonNull(cases, &quot;cases&quot;));</span>
+<span class="fc" id="L782">            List&lt;String&gt; ids = retained.stream()</span>
+<span class="fc" id="L783">                .map(CaseDiagnostic::id)</span>
+<span class="fc" id="L784">                .toList();</span>
+<span class="fc" id="L785">            List&lt;String&gt; corpusIds = corpus.cases().stream()</span>
+<span class="fc" id="L786">                .map(Case::id)</span>
+<span class="fc" id="L787">                .sorted()</span>
+<span class="fc" id="L788">                .toList();</span>
+<span class="pc bpc" id="L789" title="1 of 2 branches missed.">            if (!ids.equals(corpusIds)</span>
+<span class="pc bpc" id="L790" title="1 of 2 branches missed.">                    || new LinkedHashSet&lt;&gt;(ids).size() != ids.size()) {</span>
+<span class="nc" id="L791">                throw new IllegalArgumentException(</span>
+                    &quot;diagnostic cases must balance the corpus in canonical order&quot;);
+            }
+<span class="fc" id="L794">        }</span>
+
+        private boolean sameExpression(String left, String right) {
+<span class="fc" id="L797">            return expressionKey(left).equals(expressionKey(right));</span>
+        }
+
+        private String expressionKey(String expression) {
+            try {
+<span class="fc" id="L802">                return format(expression);</span>
+<span class="nc" id="L803">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L804">                return Objects.requireNonNull(expression, &quot;expression&quot;)</span>
+<span class="nc" id="L805">                    .trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+            }
+        }
+
+        private String format(String expression) {
+<span class="fc" id="L810">            return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+        }
+
+        record CaseDiagnostic(
+            String id,
+            String status,
+            String oracleStatus,
+            int witnessStepCount,
+            int exploredPrefixLength,
+            String searchTerminalStatus,
+            int searchExploredStates,
+            int engineCalls,
+            long generatedTransformations,
+            Integer firstLossIndex,
+            String firstLossExpressionBefore,
+            String firstLossExpressionAfter,
+            String firstLossRuleId,
+            String firstLossReason,
+            SearchEvent firstLossEvent,
+            String firstLossDetail,
+            String detail
+        ) {
+<span class="fc" id="L832">            CaseDiagnostic {</span>
+<span class="fc" id="L833">                id = requireText(id, &quot;id&quot;);</span>
+<span class="fc" id="L834">                status = requireMember(status, CASE_STATUSES, &quot;status&quot;);</span>
+<span class="fc" id="L835">                oracleStatus = requireText(oracleStatus, &quot;oracleStatus&quot;);</span>
+<span class="fc" id="L836">                searchTerminalStatus = requireMember(</span>
+                    searchTerminalStatus,
+                    TERMINAL_STATUSES,
+                    &quot;searchTerminalStatus&quot;);
+<span class="pc bpc" id="L840" title="1 of 2 branches missed.">                firstLossDetail = firstLossDetail == null</span>
+<span class="pc" id="L841">                    ? &quot;&quot; : firstLossDetail;</span>
+<span class="pc bpc" id="L842" title="1 of 2 branches missed.">                detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="pc bpc" id="L843" title="6 of 12 branches missed.">                if (witnessStepCount &lt; 0 || exploredPrefixLength &lt; 0</span>
+                        || exploredPrefixLength &gt; witnessStepCount
+                        || searchExploredStates &lt; 0 || engineCalls &lt; 0
+                        || generatedTransformations &lt; 0) {
+<span class="nc" id="L847">                    throw new IllegalArgumentException(</span>
+                        &quot;case diagnostic counters are outside their ranges&quot;);
+                }
+<span class="fc bfc" id="L850" title="All 2 branches covered.">                boolean hasLoss = firstLossIndex != null;</span>
+<span class="pc bpc" id="L851" title="1 of 2 branches missed.">                if (WITNESS_PREFIX_LOST.equals(status) != hasLoss) {</span>
+<span class="nc" id="L852">                    throw new IllegalArgumentException(</span>
+                        &quot;first loss must exist exactly for WITNESS_PREFIX_LOST&quot;);
+                }
+<span class="fc bfc" id="L855" title="All 2 branches covered.">                if (hasLoss) {</span>
+<span class="pc bpc" id="L856" title="1 of 2 branches missed.">                    if (firstLossIndex &lt; 0) {</span>
+<span class="nc" id="L857">                        throw new IllegalArgumentException(</span>
+                            &quot;loss index must not be negative&quot;);
+                    }
+<span class="fc" id="L860">                    requireText(</span>
+                        firstLossExpressionBefore,
+                        &quot;firstLossExpressionBefore&quot;);
+<span class="fc" id="L863">                    requireText(</span>
+                        firstLossExpressionAfter,
+                        &quot;firstLossExpressionAfter&quot;);
+<span class="fc" id="L866">                    requireText(firstLossRuleId, &quot;firstLossRuleId&quot;);</span>
+<span class="fc" id="L867">                    requireMember(</span>
+                        firstLossReason, LOSS_REASONS, &quot;firstLossReason&quot;);
+                }
+<span class="fc" id="L870">            }</span>
+
+            static CaseDiagnostic withoutLoss(
+                String id,
+                String status,
+                String oracleStatus,
+                int witnessStepCount,
+                int exploredPrefixLength,
+                String terminalStatus,
+                int exploredStates,
+                int engineCalls,
+                long generatedTransformations,
+                String detail
+            ) {
+<span class="fc" id="L884">                return new CaseDiagnostic(</span>
+                    id, status, oracleStatus, witnessStepCount,
+                    exploredPrefixLength, terminalStatus, exploredStates,
+                    engineCalls, generatedTransformations, null, null, null,
+                    null, null, null, &quot;&quot;, detail);
+            }
+
+            static CaseDiagnostic notApplicable(
+                String id,
+                String status,
+                String oracleStatus,
+                SearchEvidence scalar
+            ) {
+<span class="nc" id="L897">                return withoutLoss(</span>
+                    id, status, oracleStatus, 0, 0, &quot;NOT_EVALUATED&quot;,
+<span class="nc" id="L899">                    scalar.exploredStates(), scalar.engineCalls(),</span>
+<span class="nc" id="L900">                    scalar.generatedTransformations(),</span>
+                    &quot;no target-aware production witness is available for &quot;
+                        + &quot;prefix diagnosis&quot;);
+            }
+        }
+
+        private static String reportHash(
+            Corpus corpus,
+            AtlasReport atlas,
+            List&lt;CaseDiagnostic&gt; cases
+        ) {
+<span class="fc" id="L911">            return sha256(renderReport(corpus, atlas, cases, null));</span>
+        }
+
+        private static String renderReport(
+            Corpus corpus,
+            AtlasReport atlas,
+            List&lt;CaseDiagnostic&gt; cases,
+            String contentHash
+        ) {
+<span class="fc" id="L920">            Map&lt;String, Integer&gt; statusCounts = countValues(</span>
+<span class="fc" id="L921">                cases.stream().map(CaseDiagnostic::status).toList());</span>
+<span class="fc" id="L922">            Map&lt;String, Integer&gt; firstLossCounts = countValues(cases.stream()</span>
+<span class="fc" id="L923">                .map(CaseDiagnostic::firstLossReason)</span>
+<span class="fc" id="L924">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L925">                .toList());</span>
+<span class="fc" id="L926">            JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L927">            writer.property(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L928">            writer.property(&quot;evidenceStatus&quot;, EVIDENCE_STATUS);</span>
+<span class="fc" id="L929">            writer.property(&quot;corpusSchema&quot;, HistoricalRediscoveryCorpus.SCHEMA);</span>
+<span class="fc" id="L930">            writer.property(&quot;corpusSha256&quot;, corpus.contentSha256());</span>
+<span class="fc" id="L931">            writer.property(&quot;atlasSchema&quot;, HistoricalRediscoveryAtlas.SCHEMA);</span>
+<span class="fc" id="L932">            writer.property(&quot;atlasSha256&quot;, sha256(atlas.toJson()));</span>
+<span class="fc" id="L933">            writer.property(&quot;inventoryRevision&quot;, corpus.inventoryRevision());</span>
+<span class="fc" id="L934">            writer.property(&quot;searchPolicy&quot;, SEARCH_POLICY);</span>
+<span class="fc" id="L935">            writer.property(&quot;claimBoundary&quot;, CLAIM_BOUNDARY);</span>
+<span class="fc" id="L936">            writer.array(&quot;cases&quot;, array -&gt; cases.forEach(value -&gt;</span>
+<span class="fc" id="L937">                array.objectValue(object -&gt; writeCase(object, value))));</span>
+<span class="fc" id="L938">            writer.object(&quot;summary&quot;, summary -&gt; {</span>
+<span class="fc" id="L939">                summary.property(&quot;caseCount&quot;, cases.size());</span>
+<span class="fc" id="L940">                summary.object(&quot;statusCounts&quot;, counts -&gt;</span>
+<span class="fc" id="L941">                    writeCounts(counts, statusCounts));</span>
+<span class="fc" id="L942">                summary.object(&quot;firstLossCounts&quot;, counts -&gt;</span>
+<span class="fc" id="L943">                    writeCounts(counts, firstLossCounts));</span>
+<span class="fc" id="L944">            });</span>
+<span class="fc bfc" id="L945" title="All 2 branches covered.">            if (contentHash != null) {</span>
+<span class="fc" id="L946">                writer.property(&quot;contentHash&quot;, contentHash);</span>
+            }
+<span class="fc" id="L948">            return writer.endObject().toString();</span>
+        }
+
+        private static void writeCase(
+            JsonWriter writer,
+            CaseDiagnostic value
+        ) {
+<span class="fc" id="L955">            writer.property(&quot;id&quot;, value.id());</span>
+<span class="fc" id="L956">            writer.property(&quot;status&quot;, value.status());</span>
+<span class="fc" id="L957">            writer.property(&quot;oracleStatus&quot;, value.oracleStatus());</span>
+<span class="fc" id="L958">            writer.property(&quot;witnessStepCount&quot;, value.witnessStepCount());</span>
+<span class="fc" id="L959">            writer.property(</span>
+<span class="fc" id="L960">                &quot;exploredPrefixLength&quot;, value.exploredPrefixLength());</span>
+<span class="fc" id="L961">            writer.property(</span>
+<span class="fc" id="L962">                &quot;searchTerminalStatus&quot;, value.searchTerminalStatus());</span>
+<span class="fc" id="L963">            writer.property(</span>
+<span class="fc" id="L964">                &quot;searchExploredStates&quot;, value.searchExploredStates());</span>
+<span class="fc" id="L965">            writer.property(&quot;engineCalls&quot;, value.engineCalls());</span>
+<span class="fc" id="L966">            writer.property(</span>
+<span class="fc" id="L967">                &quot;generatedTransformations&quot;, value.generatedTransformations());</span>
+<span class="pc bpc" id="L968" title="1 of 2 branches missed.">            if (value.firstLossIndex() == null) {</span>
+<span class="nc" id="L969">                writer.nullProperty(&quot;firstLoss&quot;);</span>
+            } else {
+<span class="fc" id="L971">                writer.object(&quot;firstLoss&quot;, object -&gt; writeLoss(object, value));</span>
+            }
+<span class="fc" id="L973">            writer.property(&quot;detail&quot;, value.detail());</span>
+<span class="fc" id="L974">        }</span>
+
+        private static void writeLoss(
+            JsonWriter writer,
+            CaseDiagnostic value
+        ) {
+<span class="fc" id="L980">            writer.property(&quot;index&quot;, value.firstLossIndex());</span>
+<span class="fc" id="L981">            writer.property(</span>
+<span class="fc" id="L982">                &quot;expressionBefore&quot;, value.firstLossExpressionBefore());</span>
+<span class="fc" id="L983">            writer.property(</span>
+<span class="fc" id="L984">                &quot;expressionAfter&quot;, value.firstLossExpressionAfter());</span>
+<span class="fc" id="L985">            writer.property(&quot;ruleId&quot;, value.firstLossRuleId());</span>
+<span class="fc" id="L986">            writer.property(&quot;reason&quot;, value.firstLossReason());</span>
+<span class="pc bpc" id="L987" title="1 of 2 branches missed.">            if (value.firstLossEvent() == null) {</span>
+<span class="nc" id="L988">                writer.nullProperty(&quot;event&quot;);</span>
+            } else {
+<span class="fc" id="L990">                writer.object(&quot;event&quot;, object -&gt;</span>
+<span class="fc" id="L991">                    writeEvent(object, value.firstLossEvent()));</span>
+            }
+<span class="fc" id="L993">            writer.property(&quot;detail&quot;, value.firstLossDetail());</span>
+<span class="fc" id="L994">        }</span>
+
+        private static void writeEvent(JsonWriter writer, SearchEvent value) {
+<span class="fc" id="L997">            writer.property(&quot;type&quot;, value.type().name());</span>
+<span class="fc" id="L998">            writer.property(&quot;sequence&quot;, value.sequence());</span>
+<span class="fc" id="L999">            writer.property(&quot;depth&quot;, value.depth());</span>
+<span class="fc" id="L1000">            writer.property(&quot;score&quot;, value.score());</span>
+<span class="fc" id="L1001">            writer.property(&quot;frontierSize&quot;, value.frontierSize());</span>
+<span class="fc" id="L1002">            writer.property(&quot;visitedCount&quot;, value.visitedCount());</span>
+<span class="fc" id="L1003">            writer.property(&quot;generatedCount&quot;, value.generatedCount());</span>
+<span class="fc" id="L1004">            writer.property(&quot;pruningReason&quot;, value.pruningReason());</span>
+<span class="fc" id="L1005">        }</span>
+
+        private static Map&lt;String, Integer&gt; countValues(List&lt;String&gt; values) {
+<span class="fc" id="L1008">            Map&lt;String, Integer&gt; counts = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L1009">            values.forEach(value -&gt; counts.merge(value, 1, Integer::sum));</span>
+<span class="fc" id="L1010">            return Map.copyOf(counts);</span>
+        }
+
+        private static void writeCounts(
+            JsonWriter writer,
+            Map&lt;String, Integer&gt; counts
+        ) {
+<span class="fc" id="L1017">            counts.entrySet().stream()</span>
+<span class="fc" id="L1018">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L1019">                .forEach(entry -&gt; writer.property(</span>
+<span class="fc" id="L1020">                    entry.getKey(), entry.getValue()));</span>
+<span class="fc" id="L1021">        }</span>
+
+        private static String requireText(String value, String label) {
+<span class="pc bpc" id="L1024" title="2 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L1025">                throw new IllegalArgumentException(</span>
+                    label + &quot; must not be blank&quot;);
+            }
+<span class="fc" id="L1028">            return value;</span>
+        }
+
+        private static String requireMember(
+            String value,
+            Set&lt;String&gt; allowed,
+            String label
+        ) {
+<span class="pc bpc" id="L1036" title="1 of 2 branches missed.">            if (!allowed.contains(value)) {</span>
+<span class="nc" id="L1037">                throw new IllegalArgumentException(label + &quot; is unsupported&quot;);</span>
+            }
+<span class="fc" id="L1039">            return value;</span>
+        }
+
+        private static String sha256(String value) {
+            try {
+<span class="fc" id="L1044">                return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L1045">                    MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="fc" id="L1046">                        value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L1047">            } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L1048">                throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+            }
+        }
+
+<span class="fc" id="L1052">        private record ParentOutcome(</span>
+            SearchEventType type,
+            String reason,
+            String detail
+        ) {
+        }
+
+        private static final class CountingEngine
+                implements TransformationEngine {
+            private final TransformationEngine delegate;
+            private int calls;
+            private long generated;
+
+<span class="fc" id="L1065">            private CountingEngine(TransformationEngine delegate) {</span>
+<span class="fc" id="L1066">                this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="fc" id="L1067">            }</span>
+
+            @Override
+            public List&lt;Transformation&gt; transform(String expression) {
+<span class="fc" id="L1071">                calls++;</span>
+<span class="fc" id="L1072">                List&lt;Transformation&gt; result = delegate.transform(expression);</span>
+<span class="fc" id="L1073">                generated += result.size();</span>
+<span class="fc" id="L1074">                return result;</span>
+            }
+
+            private int calls() {
+<span class="fc" id="L1078">                return calls;</span>
+            }
+
+            private long generated() {
+<span class="fc" id="L1082">                return generated;</span>
+            }
+        }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
