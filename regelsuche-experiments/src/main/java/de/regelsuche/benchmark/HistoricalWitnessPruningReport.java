@@ -14,7 +14,14 @@ import java.util.Map;
 import java.util.Objects;
 
 /** Content-addressed result of the historical witness-prefix diagnosis. */
-public final class HistoricalWitnessPruningReport {
+public record HistoricalWitnessPruningReport(
+    String corpusSha256,
+    String atlasSha256,
+    String inventoryRevision,
+    List<CaseDiagnostic> cases,
+    Summary summary,
+    String contentHash
+) {
     public static final String SCHEMA =
         "regelsuche.witness-pruning-diagnostic/v1";
     public static final String EVIDENCE_STATUS =
@@ -29,53 +36,25 @@ public final class HistoricalWitnessPruningReport {
             + "is not global unreachability, and an explored witness is not "
             + "autonomous rediscovery, proof or mathematical novelty.";
 
-    private final String corpusSchema;
-    private final String corpusSha256;
-    private final String atlasSchema;
-    private final String atlasSha256;
-    private final String inventoryRevision;
-    private final List<CaseDiagnostic> cases;
-    private final Summary summary;
-    private final String contentHash;
-
-    private HistoricalWitnessPruningReport(
-        String corpusSchema,
-        String corpusSha256,
-        String atlasSchema,
-        String atlasSha256,
-        String inventoryRevision,
-        List<CaseDiagnostic> cases,
-        Summary summary,
-        String contentHash
-    ) {
-        if (!HistoricalRediscoveryCorpus.SCHEMA.equals(corpusSchema)) {
-            throw new IllegalArgumentException("unsupported corpus schema");
-        }
+    public HistoricalWitnessPruningReport {
         requireRawSha256(corpusSha256, "corpusSha256");
-        if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)) {
-            throw new IllegalArgumentException("unsupported atlas schema");
-        }
         requirePrefixedSha256(atlasSha256, "atlasSha256");
-        this.inventoryRevision = requireText(
-            inventoryRevision, "inventoryRevision");
-        this.cases = List.copyOf(Objects.requireNonNull(cases, "cases"));
-        this.summary = Objects.requireNonNull(summary, "summary");
-        if (this.cases.isEmpty() || summary.caseCount() != this.cases.size()) {
+        inventoryRevision = requireText(inventoryRevision, "inventoryRevision");
+        cases = List.copyOf(Objects.requireNonNull(cases, "cases"));
+        Objects.requireNonNull(summary, "summary");
+        if (cases.isEmpty() || summary.caseCount() != cases.size()) {
             throw new IllegalArgumentException("report case accounting differs");
         }
-        List<String> ids = this.cases.stream().map(CaseDiagnostic::id).toList();
+        List<String> ids = cases.stream().map(CaseDiagnostic::id).toList();
         if (!ids.equals(ids.stream().sorted().toList())
                 || new LinkedHashSet<>(ids).size() != ids.size()) {
             throw new IllegalArgumentException(
                 "report cases must have unique canonical ordering");
         }
         requirePrefixedSha256(contentHash, "contentHash");
-        this.corpusSchema = corpusSchema;
-        this.corpusSha256 = corpusSha256;
-        this.atlasSchema = atlasSchema;
-        this.atlasSha256 = atlasSha256;
-        this.contentHash = contentHash;
-        if (!sha256(render(false)).equals(contentHash)) {
+        String expected = reportHash(
+            corpusSha256, atlasSha256, inventoryRevision, cases, summary);
+        if (!expected.equals(contentHash)) {
             throw new IllegalArgumentException(
                 "witness-pruning contentHash mismatch");
         }
@@ -88,98 +67,65 @@ public final class HistoricalWitnessPruningReport {
     ) {
         Summary summary = Summary.derive(cases);
         String atlasHash = sha256(atlas.toJson());
-        String placeholder = "sha256:" + "0".repeat(64);
-        HistoricalWitnessPruningReport unsigned =
-            new HistoricalWitnessPruningReport(
-                corpus.schema(),
-                corpus.contentSha256(),
-                atlas.schema(),
-                atlasHash,
-                corpus.inventoryRevision(),
-                cases,
-                summary,
-                placeholder,
-                false);
+        String hash = reportHash(
+            corpus.contentSha256(),
+            atlasHash,
+            corpus.inventoryRevision(),
+            cases,
+            summary);
         return new HistoricalWitnessPruningReport(
-            unsigned.corpusSchema,
-            unsigned.corpusSha256,
-            unsigned.atlasSchema,
-            unsigned.atlasSha256,
-            unsigned.inventoryRevision,
-            unsigned.cases,
-            unsigned.summary,
-            sha256(unsigned.render(false)));
-    }
-
-    private HistoricalWitnessPruningReport(
-        String corpusSchema,
-        String corpusSha256,
-        String atlasSchema,
-        String atlasSha256,
-        String inventoryRevision,
-        List<CaseDiagnostic> cases,
-        Summary summary,
-        String contentHash,
-        boolean validateHash
-    ) {
-        if (!HistoricalRediscoveryCorpus.SCHEMA.equals(corpusSchema)) {
-            throw new IllegalArgumentException("unsupported corpus schema");
-        }
-        requireRawSha256(corpusSha256, "corpusSha256");
-        if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)) {
-            throw new IllegalArgumentException("unsupported atlas schema");
-        }
-        requirePrefixedSha256(atlasSha256, "atlasSha256");
-        this.corpusSchema = corpusSchema;
-        this.corpusSha256 = corpusSha256;
-        this.atlasSchema = atlasSchema;
-        this.atlasSha256 = atlasSha256;
-        this.inventoryRevision = requireText(
-            inventoryRevision, "inventoryRevision");
-        this.cases = List.copyOf(Objects.requireNonNull(cases, "cases"));
-        this.summary = Objects.requireNonNull(summary, "summary");
-        this.contentHash = contentHash;
-        if (validateHash && !sha256(render(false)).equals(contentHash)) {
-            throw new IllegalArgumentException(
-                "witness-pruning contentHash mismatch");
-        }
+            corpus.contentSha256(),
+            atlasHash,
+            corpus.inventoryRevision(),
+            cases,
+            summary,
+            hash);
     }
 
     public String schema() {
         return SCHEMA;
     }
 
-    public String corpusSha256() {
-        return corpusSha256;
-    }
-
-    public String atlasSha256() {
-        return atlasSha256;
-    }
-
-    public List<CaseDiagnostic> cases() {
-        return cases;
-    }
-
-    public Summary summary() {
-        return summary;
-    }
-
-    public String contentHash() {
-        return contentHash;
-    }
-
     public String toCanonicalJson() {
-        return render(true);
+        return render(
+            corpusSha256,
+            atlasSha256,
+            inventoryRevision,
+            cases,
+            summary,
+            contentHash);
     }
 
-    private String render(boolean includeHash) {
+    private static String reportHash(
+        String corpusSha256,
+        String atlasSha256,
+        String inventoryRevision,
+        List<CaseDiagnostic> cases,
+        Summary summary
+    ) {
+        return sha256(render(
+            corpusSha256,
+            atlasSha256,
+            inventoryRevision,
+            cases,
+            summary,
+            null));
+    }
+
+    private static String render(
+        String corpusSha256,
+        String atlasSha256,
+        String inventoryRevision,
+        List<CaseDiagnostic> cases,
+        Summary summary,
+        String contentHash
+    ) {
         JsonWriter writer = new JsonWriter().beginObject();
         writer.property("schema", SCHEMA);
         writer.property("evidenceStatus", EVIDENCE_STATUS);
-        writer.property("corpusSchema", corpusSchema);
+        writer.property("corpusSchema", HistoricalRediscoveryCorpus.SCHEMA);
         writer.property("corpusSha256", corpusSha256);
-        writer.property("atlasSchema", atlasSchema);
+        writer.property("atlasSchema", HistoricalRediscoveryAtlas.SCHEMA);
         writer.property("atlasSha256", atlasSha256);
         writer.property("inventoryRevision", inventoryRevision);
         writer.property("searchPolicy", SEARCH_POLICY);
@@ -187,7 +133,7 @@ public final class HistoricalWitnessPruningReport {
         writer.array("cases", array -> cases.forEach(value ->
             array.objectValue(object -> writeCase(object, value))));
         writer.object("summary", object -> writeSummary(object, summary));
-        if (includeHash) {
+        if (contentHash != null) {
             writer.property("contentHash", contentHash);
         }
         return writer.endObject().toString();
@@ -240,14 +186,20 @@ public final class HistoricalWitnessPruningReport {
 
     private static void writeSummary(JsonWriter writer, Summary value) {
         writer.property("caseCount", value.caseCount());
-        writer.object("statusCounts", counts -> value.statusCounts().entrySet()
-            .stream().sorted(Map.Entry.comparingByKey())
-            .forEach(entry -> counts.property(
-                entry.getKey().name(), entry.getValue())));
-        writer.object("firstLossCounts", counts -> value.firstLossCounts().entrySet()
-            .stream().sorted(Map.Entry.comparingByKey())
-            .forEach(entry -> counts.property(
-                entry.getKey().name(), entry.getValue())));
+        writer.object("statusCounts", counts -> writeCounts(
+            counts, value.statusCounts()));
+        writer.object("firstLossCounts", counts -> writeCounts(
+            counts, value.firstLossCounts()));
+    }
+
+    private static <E extends Enum<E>> void writeCounts(
+        JsonWriter writer,
+        Map<E, Integer> counts
+    ) {
+        counts.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> writer.property(
+                entry.getKey().name(), entry.getValue()));
     }
 
     public enum CaseStatus {
