@@ -1,7 +1,11 @@
 package de.regelsuche.benchmark;
 
+import de.regelsuche.benchmark.HistoricalWitnessPruningReport.CaseStatus;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Stable port for running discovery experiments over a seed corpus.
@@ -45,6 +49,13 @@ public interface DiscoveryExperimentRunner {
         HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();
         HistoricalRediscoveryAtlas.AtlasReport report = atlas.run(corpus);
         verifyRetainedClaims(report);
+
+        HistoricalWitnessPruningDiagnostic pruning =
+            new HistoricalWitnessPruningDiagnostic();
+        HistoricalWitnessPruningReport pruningReport =
+            pruning.run(corpus, report);
+        verifyWitnessPruning(report, pruningReport);
+
         HistoricalRediscoveryRunArtifact.begin(output);
         HistoricalRediscoveryAtlas.WrittenArtifacts artifacts =
             atlas.write(output, report);
@@ -54,6 +65,9 @@ public interface DiscoveryExperimentRunner {
                 corpus,
                 report,
                 artifacts);
+        HistoricalWitnessPruningDiagnostic.WrittenArtifact pruningArtifact =
+            pruning.write(witnessOutput(output), pruningReport);
+
         System.out.println("historicalRediscoveryAssessment="
             + report.assessment().decision());
         System.out.println("historicalRediscoveryCases=" + report.cases().size());
@@ -65,6 +79,10 @@ public interface DiscoveryExperimentRunner {
             + verifiedRun.manifestPath());
         System.out.println("historicalRediscoveryRunHash="
             + verifiedRun.manifest().contentHash());
+        System.out.println("historicalWitnessPruning="
+            + pruningArtifact.path());
+        System.out.println("historicalWitnessPruningHash="
+            + pruningArtifact.contentHash());
     }
 
     /**
@@ -100,6 +118,48 @@ public interface DiscoveryExperimentRunner {
                 "search-policy claim must be backed by a target-blind "
                     + "structural-diversity result");
         }
+    }
+
+    private static void verifyWitnessPruning(
+        HistoricalRediscoveryAtlas.AtlasReport atlas,
+        HistoricalWitnessPruningReport diagnostic
+    ) {
+        Map<String, HistoricalWitnessPruningReport.CaseDiagnostic> byId =
+            diagnostic.cases().stream().collect(Collectors.toMap(
+                HistoricalWitnessPruningReport.CaseDiagnostic::id,
+                Function.identity()));
+        if (byId.size() != atlas.cases().size()) {
+            throw new IllegalStateException(
+                "witness-pruning diagnostic must balance every atlas case");
+        }
+        for (HistoricalRediscoveryAtlas.CaseResult result : atlas.cases()) {
+            HistoricalWitnessPruningReport.CaseDiagnostic retained =
+                byId.get(result.benchmarkCase().id());
+            if (retained == null) {
+                throw new IllegalStateException(
+                    "missing witness-pruning case "
+                        + result.benchmarkCase().id());
+            }
+            if (result.status()
+                    == HistoricalRediscoveryAtlas.PrimaryStatus
+                        .REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND
+                    && retained.status() != CaseStatus.WITNESS_PREFIX_LOST) {
+                throw new IllegalStateException(
+                    "target-blind diversity signal requires a retained "
+                        + "scalar witness-prefix loss: "
+                        + result.benchmarkCase().id());
+            }
+        }
+    }
+
+    private static Path witnessOutput(Path atlasOutput) {
+        Path normalized = atlasOutput.toAbsolutePath().normalize();
+        Path name = normalized.getFileName();
+        if (name == null) {
+            throw new IllegalArgumentException(
+                "historical rediscovery output must have a file name");
+        }
+        return normalized.resolveSibling(name + "-witness-pruning");
     }
 
     /**
