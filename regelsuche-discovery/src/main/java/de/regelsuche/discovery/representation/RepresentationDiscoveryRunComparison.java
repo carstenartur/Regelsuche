@@ -399,7 +399,7 @@ public record RepresentationDiscoveryRunComparison(
             }
         }
 
-        public static Entry create(
+        private static Entry create(
             Category category,
             String field,
             String leftValue,
