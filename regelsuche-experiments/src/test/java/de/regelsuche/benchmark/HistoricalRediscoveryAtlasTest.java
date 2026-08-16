@@ -14,14 +14,20 @@ import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.PrimaryStatus;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Corpus;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Relation;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Role;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.TargetRelation;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.SearchProfile;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalMetrics;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.search.strategy.StructuralDiversitySearchStrategy;
+import de.regelsuche.search.telemetry.SearchEvent;
+import de.regelsuche.search.telemetry.SearchEventType;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
@@ -185,6 +191,113 @@ class HistoricalRediscoveryAtlasTest {
     }
 
     @Test
+    void witnessPruningClassifiesCandidateBudgetBeforeWitnessEdge() {
+        HistoricalRediscoveryCorpus.Case benchmarkCase = diagnosticCase(
+            "candidate-budget", "x", "x + 1", 5);
+        GoalSearchResult search = diagnosticSearch(
+            List.of(diagnosticState("x")),
+            diagnosticMetrics(1, 1));
+        SearchEvent budget = diagnosticEvent(
+            1,
+            SearchEventType.STATE_PRUNED_BUDGET,
+            "x",
+            "",
+            "",
+            "max-candidates-per-state");
+
+        HistoricalWitnessPruningDiagnostic.CaseDiagnostic result =
+            new HistoricalWitnessPruningDiagnostic().analyzeWitness(
+                benchmarkCase,
+                diagnosticOracle("x + 1", "z-witness"),
+                search,
+                List.of(budget),
+                1,
+                2);
+
+        assertEquals(
+            HistoricalWitnessPruningDiagnostic.WITNESS_PREFIX_LOST,
+            result.status());
+        assertEquals(
+            HistoricalWitnessPruningDiagnostic
+                .CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
+            result.firstLossReason());
+        assertEquals("CANDIDATE_BUDGET", result.searchTerminalStatus());
+    }
+
+    @Test
+    void witnessPruningClassifiesQueuedButUnexploredWitnessState() {
+        HistoricalRediscoveryCorpus.Case benchmarkCase = diagnosticCase(
+            "state-budget", "x + 0", "x + y - y", 2);
+        GoalSearchResult search = diagnosticSearch(
+            List.of(diagnosticState("x + 0"), diagnosticState("x")),
+            diagnosticMetrics(2, 0));
+        SearchEvent generated = diagnosticEvent(
+            1,
+            SearchEventType.TRANSFORMATION_GENERATED,
+            "x + y - y",
+            "x + 0",
+            "expand-root",
+            "");
+        SearchEvent enqueued = diagnosticEvent(
+            2,
+            SearchEventType.STATE_ENQUEUED,
+            "x + y - y",
+            "x + 0",
+            "expand-root",
+            "");
+
+        HistoricalWitnessPruningDiagnostic.CaseDiagnostic result =
+            new HistoricalWitnessPruningDiagnostic().analyzeWitness(
+                benchmarkCase,
+                diagnosticOracle("x + y - y", "expand-root"),
+                search,
+                List.of(generated, enqueued),
+                1,
+                2);
+
+        assertEquals(
+            HistoricalWitnessPruningDiagnostic
+                .STATE_ENQUEUED_BUT_NOT_EXPLORED,
+            result.firstLossReason());
+        assertEquals("STATE_BUDGET", result.searchTerminalStatus());
+    }
+
+    @Test
+    void witnessPruningRecognizesACompletelyExploredWitness() {
+        HistoricalRediscoveryCorpus.Case benchmarkCase = diagnosticCase(
+            "complete-witness", "x", "x + 1", 5);
+        GoalSearchResult search = diagnosticSearch(
+            List.of(diagnosticState("x"), diagnosticState("x + 1")),
+            diagnosticMetrics(2, 0));
+
+        HistoricalWitnessPruningDiagnostic.CaseDiagnostic result =
+            new HistoricalWitnessPruningDiagnostic().analyzeWitness(
+                benchmarkCase,
+                diagnosticOracle("x + 1", "witness"),
+                search,
+                List.of(),
+                1,
+                1);
+
+        assertEquals(
+            HistoricalWitnessPruningDiagnostic.WITNESS_COMPLETELY_EXPLORED,
+            result.status());
+        assertEquals(1, result.exploredPrefixLength());
+        assertNull(result.firstLossIndex());
+        assertEquals("FRONTIER_EXHAUSTED", result.searchTerminalStatus());
+    }
+
+    @Test
+    void experimentRunnerRejectsUnknownCommands() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> DiscoveryExperimentRunner.main(new String[0]));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> DiscoveryExperimentRunner.main(new String[] {"unknown"}));
+    }
+
+    @Test
     @Timeout(240)
     void equivalenceDiscriminationRequiresANegativeControl() {
         Corpus full = HistoricalRediscoveryCorpus.load();
@@ -232,6 +345,131 @@ class HistoricalRediscoveryAtlasTest {
         assertTrue(result.production().oracle().inconclusive());
         assertTrue(result.curatedControl().oracle().reachable());
         assertEquals(PrimaryStatus.BUDGET_INCONCLUSIVE, result.status());
+    }
+
+    private static HistoricalRediscoveryAtlas.OracleEvidence diagnosticOracle(
+        String expression,
+        String rule
+    ) {
+        return new HistoricalRediscoveryAtlas.OracleEvidence(
+            HistoricalRediscoveryAtlas.EvidenceExecution.EXECUTED,
+            "REACHABLE",
+            List.of(expression),
+            List.of(rule),
+            1,
+            2,
+            2,
+            1,
+            false,
+            false,
+            "");
+    }
+
+    private static GoalSearchResult diagnosticSearch(
+        List<SearchState> states,
+        GoalMetrics metrics
+    ) {
+        return new GoalSearchResult(
+            states,
+            null,
+            null,
+            -1,
+            GoalStatus.UNTARGETED,
+            metrics);
+    }
+
+    private static GoalMetrics diagnosticMetrics(
+        int exploredStates,
+        int candidateBudgetPrunes
+    ) {
+        return new GoalMetrics(
+            exploredStates,
+            1,
+            2,
+            1,
+            0,
+            0,
+            0,
+            0,
+            candidateBudgetPrunes,
+            0,
+            0,
+            0,
+            0,
+            0);
+    }
+
+    private static SearchState diagnosticState(String expression) {
+        return new SearchState(
+            expression,
+            0,
+            null,
+            List.of(),
+            List.of(),
+            Set.of(),
+            0,
+            "hash-" + expression,
+            "",
+            "",
+            RewriteKind.NORMALIZE,
+            false,
+            0,
+            true,
+            0);
+    }
+
+    private static SearchEvent diagnosticEvent(
+        long sequence,
+        SearchEventType type,
+        String expression,
+        String parent,
+        String rule,
+        String reason
+    ) {
+        return new SearchEvent(
+            sequence,
+            type,
+            expression,
+            "hash-" + expression,
+            0,
+            0,
+            "hash-" + parent,
+            parent,
+            rule,
+            RewriteKind.NORMALIZE,
+            false,
+            0,
+            true,
+            List.of(),
+            1,
+            1,
+            1,
+            reason);
+    }
+
+    private static HistoricalRediscoveryCorpus.Case diagnosticCase(
+        String id,
+        String source,
+        String target,
+        int maxVisitedStates
+    ) {
+        return new HistoricalRediscoveryCorpus.Case(
+            id,
+            "SYNTHETIC_CONTROL",
+            source,
+            target,
+            Relation.EQUIVALENT,
+            Role.SEARCH_POLICY_CONTROL,
+            "FIRST_LOST_WITNESS_PREFIX",
+            "TEST_FIXTURE",
+            TargetRelation.SYNTAX_EXACT,
+            2,
+            20,
+            2,
+            maxVisitedStates,
+            8,
+            2,
+            2);
     }
 
     private static Transformation transformation(
