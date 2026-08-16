@@ -16,11 +16,11 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class RepresentationDiscoveryRunComparisonTest {
-    private static final String REPOSITORY_COMMIT =
+    private static final String COMMIT =
         "0123456789abcdef0123456789abcdef01234567";
 
     @Test
-    void sameRunHasNoDifferences() {
+    void comparesSameRun() {
         RepresentationDiscoveryRunWorkspace workspace = root(
             basePlan(),
             completedOutcome(sha("runtime")),
@@ -47,7 +47,7 @@ class RepresentationDiscoveryRunComparisonTest {
     }
 
     @Test
-    void runtimeDiagnosticsRemainNonAuthoritative() {
+    void separatesRuntimeDiagnostics() {
         RepresentationDiscoveryRunWorkspace left = root(
             basePlan(),
             completedOutcome(sha("runtime-left")),
@@ -77,7 +77,7 @@ class RepresentationDiscoveryRunComparisonTest {
     }
 
     @Test
-    void duplicateReportsOneVisiblePlanChangeAndDirectLineage() {
+    void comparesDuplicateLineage() {
         RepresentationDiscoveryRunWorkspace parent = root(
             basePlan(),
             completedOutcome(sha("runtime")),
@@ -117,7 +117,7 @@ class RepresentationDiscoveryRunComparisonTest {
     }
 
     @Test
-    void siblingRunsAreRecognizedWithoutRankingThem() {
+    void comparesSiblingLineage() {
         RepresentationDiscoveryRunWorkspace parent = root(
             basePlan(),
             completedOutcome(sha("runtime")),
@@ -159,7 +159,7 @@ class RepresentationDiscoveryRunComparisonTest {
     }
 
     @Test
-    void artifactAvailabilityDifferencesStayExplicit() {
+    void comparesArtifactAvailability() {
         RepresentationDiscoveryRunWorkspace left = root(
             basePlan(),
             completedOutcome(sha("runtime")),
@@ -187,7 +187,7 @@ class RepresentationDiscoveryRunComparisonTest {
     }
 
     @Test
-    void reverseComparisonHasASeparateDirectionalIdentity() {
+    void keepsDirectionalIdentity() {
         RepresentationDiscoveryRunWorkspace left = root(
             basePlan(),
             completedOutcome(sha("runtime-left")),
@@ -220,7 +220,7 @@ class RepresentationDiscoveryRunComparisonTest {
     }
 
     @Test
-    void forgedOrIncompleteComparisonsFailClosed() {
+    void rejectsTampering() {
         RepresentationDiscoveryRunWorkspace workspace = root(
             basePlan(),
             completedOutcome(sha("runtime")),
@@ -352,7 +352,7 @@ class RepresentationDiscoveryRunComparisonTest {
 
     private static RepresentationDiscoveryRevisionEvidence revisions() {
         return RepresentationDiscoveryRevisionEvidence.create(
-            REPOSITORY_COMMIT,
+            COMMIT,
             "Regelsuche-workbench/0.3-SNAPSHOT"
         );
     }
