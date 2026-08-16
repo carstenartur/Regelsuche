@@ -115,11 +115,18 @@ public final class HistoricalWitnessPruningDiagnostic {
             return notApplicable(benchmarkCase, status, oracle, scalar);
         }
         if (benchmarkCase.relation() == Relation.NOT_EQUIVALENT) {
-            return notApplicable(
-                benchmarkCase,
+            return new CaseDiagnostic(
+                benchmarkCase.id(),
                 CaseStatus.CORRECTNESS_REGRESSION_WITNESS,
-                oracle,
-                scalar);
+                oracle.status(),
+                oracle.witnessExpressions().size(),
+                0,
+                TargetBlindTerminalStatus.NOT_EVALUATED,
+                scalar.exploredStates(),
+                scalar.engineCalls(),
+                scalar.generatedTransformations(),
+                null,
+                "production oracle reached a target declared non-equivalent");
         }
         if (scalar.reached()) {
             return new CaseDiagnostic(
@@ -127,13 +134,14 @@ public final class HistoricalWitnessPruningDiagnostic {
                 CaseStatus.SCALAR_ALREADY_FOUND,
                 oracle.status(),
                 oracle.witnessExpressions().size(),
-                oracle.witnessExpressions().size(),
+                0,
                 TargetBlindTerminalStatus.SCALAR_FOUND,
                 scalar.exploredStates(),
                 scalar.engineCalls(),
                 scalar.generatedTransformations(),
                 null,
-                "the retained target-blind scalar search already reached the relation");
+                "the retained scalar search reached the relation; witness-prefix "
+                    + "comparison was not required");
         }
         validateWitness(benchmarkCase, oracle);
 
