@@ -74,6 +74,15 @@ def historicalRewriteArchitectureDecisionInputs = [
         it.file('equal-work-search-comparison.json')
     }
 ]
+def historicalRepositoryRevision = providers.environmentVariable('GITHUB_SHA')
+    .map { value ->
+        if (!(value ==~ /[0-9a-f]{40}/)) {
+            throw new GradleException(
+                'GITHUB_SHA must be a lowercase 40-character commit SHA')
+        }
+        value
+    }
+    .orElse('WORKTREE')
 
 def generateHistoricalRediscoveryAtlas = tasks.register(
     'generateHistoricalRediscoveryAtlas', JavaExec) {
@@ -137,13 +146,15 @@ def generateHistoricalRewriteArchitectureDecision = tasks.register(
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'de.regelsuche.benchmark.HistoricalRewriteArchitectureDecision'
     argumentProviders.add({
-        ['rewrite-architecture-decision']
-            + historicalRewriteArchitectureDecisionInputs.collect {
-                it.get().asFile.absolutePath
-            }
-            + [historicalRewriteArchitectureDecisionReportDirectory.get()
-                .asFile.absolutePath]
+        [
+            'rewrite-architecture-decision',
+            historicalRepositoryRevision.get()
+        ] + historicalRewriteArchitectureDecisionInputs.collect {
+            it.get().asFile.absolutePath
+        } + [historicalRewriteArchitectureDecisionReportDirectory.get()
+            .asFile.absolutePath]
     } as CommandLineArgumentProvider)
+    inputs.property('repositoryRevision', historicalRepositoryRevision)
     inputs.files(historicalRewriteArchitectureDecisionInputs)
     outputs.dir(historicalRewriteArchitectureDecisionReportDirectory)
     doLast {
