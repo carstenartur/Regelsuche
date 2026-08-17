@@ -159,6 +159,20 @@ class TargetFreeSymPyBridgeDiscoveryScenarioTest {
             workspace.plan().ruleInventoryHash()
         );
         assertEquals(
+            KnownStructureCatalog.sha256(
+                RepresentationDiscoveryRunWorkspace.SCHEMA
+                    + "/budget/" + canonical(search.budget())
+            ),
+            workspace.plan().budgetHash()
+        );
+        assertEquals(
+            KnownStructureCatalog.sha256(
+                RepresentationDiscoveryRunWorkspace.SCHEMA
+                    + "/runtime/NOT_EVALUATED"
+            ),
+            workspace.outcome().runtimeDiagnosticsHash()
+        );
+        assertEquals(
             (long) search.budget().maxGeneratedTransitions(),
             workspace.outcome().configuredWork()
         );
@@ -218,9 +232,7 @@ class TargetFreeSymPyBridgeDiscoveryScenarioTest {
         );
     }
 
-    private static String canonical(
-        TargetFreeSymPyBridgeDiscoveryScenario.ScenarioContent content
-    ) throws Exception {
+    private static String canonical(Object content) throws Exception {
         return com.fasterxml.jackson.databind.json.JsonMapper.builder()
             .enable(com.fasterxml.jackson.databind.MapperFeature
                 .SORT_PROPERTIES_ALPHABETICALLY)
