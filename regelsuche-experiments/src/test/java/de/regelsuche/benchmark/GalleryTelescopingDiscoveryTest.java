@@ -71,11 +71,41 @@ class HistoricalProductionSearchComparisonTest {
     @Timeout(240)
     void frozenPolicyControlIsPositiveAndByteStable(@TempDir Path directory)
             throws Exception {
+        Report report = compareCase("distribution-fitness-valley-control");
+        HistoricalProductionSearchComparison comparison =
+            new HistoricalProductionSearchComparison();
+        assertEquals(
+            ComparisonStatus.DIVERSITY_RECOVERS_COMPLETE_WITNESS,
+            report.cases().get(0).status());
+        assertTrue(report.cases().get(0).prefixDelta() > 0);
+        assertTrue(report.summary().diversityReachedRelationCount() > 0);
+        assertTrue(report.toCanonicalJson().matches(
+            ".*\"contentHash\":\"sha256:[0-9a-f]{64}\"}\\z"));
+
+        Path first = comparison.write(directory.resolve("first"), report);
+        Path second = comparison.write(directory.resolve("second"), report);
+        assertArrayEquals(
+            Files.readAllBytes(first),
+            Files.readAllBytes(second));
+    }
+
+    @Test
+    void semanticScalarMatchDoesNotRequireAnOracleWitness() throws Exception {
+        Report report = compareCase("sophie-germain");
+        var result = report.cases().get(0);
+
+        assertEquals(
+            ComparisonStatus.NOT_APPLICABLE_NO_PRODUCTION_WITNESS,
+            result.status());
+        assertTrue(result.scalar().reachedRelation());
+        assertEquals(0, result.oracleWitnessStepCount());
+    }
+
+    private static Report compareCase(String id) throws Exception {
         HistoricalRediscoveryCorpus.Corpus full =
             HistoricalRediscoveryCorpus.load();
         HistoricalRediscoveryCorpus.Case selected = full.cases().stream()
-            .filter(value -> value.id().equals(
-                "distribution-fitness-valley-control"))
+            .filter(value -> value.id().equals(id))
             .findFirst()
             .orElseThrow();
         HistoricalRediscoveryCorpus.Corpus corpus =
@@ -91,22 +121,7 @@ class HistoricalProductionSearchComparisonTest {
         DiscoveryExperimentRunner.HistoricalWitnessPruningDiagnostic pruning =
             new DiscoveryExperimentRunner.HistoricalWitnessPruningDiagnostic();
         var pruningCases = pruning.run(corpus, atlas);
-
-        HistoricalProductionSearchComparison comparison =
-            new HistoricalProductionSearchComparison();
-        Report report = comparison.run(corpus, atlas, pruningCases);
-        assertEquals(
-            ComparisonStatus.DIVERSITY_RECOVERS_COMPLETE_WITNESS,
-            report.cases().get(0).status());
-        assertTrue(report.cases().get(0).prefixDelta() > 0);
-        assertTrue(report.summary().diversityReachedRelationCount() > 0);
-        assertTrue(report.toCanonicalJson().matches(
-            ".*\"contentHash\":\"sha256:[0-9a-f]{64}\"}\\z"));
-
-        Path first = comparison.write(directory.resolve("first"), report);
-        Path second = comparison.write(directory.resolve("second"), report);
-        assertArrayEquals(
-            Files.readAllBytes(first),
-            Files.readAllBytes(second));
+        return new HistoricalProductionSearchComparison().run(
+            corpus, atlas, pruningCases);
     }
 }
