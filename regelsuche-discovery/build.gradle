@@ -72,10 +72,23 @@ def verificationPython = verificationVenvDirectory.map { directory ->
         .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
     new File(directory.asFile, executable)
 }
-def checkoutGitRevision = providers.exec {
+def checkoutGitStatus = providers.exec {
+    workingDir repositoryRootDirectory.asFile
+    commandLine 'git', 'status', '--porcelain', '--untracked-files=normal'
+}.standardOutput.asText.map { value -> value.trim() }
+def checkoutHeadRevision = providers.exec {
     workingDir repositoryRootDirectory.asFile
     commandLine 'git', 'rev-parse', 'HEAD'
 }.standardOutput.asText.map { value -> value.trim() }
+def checkoutGitRevision = checkoutGitStatus.flatMap { status ->
+    if (!status.isEmpty()) {
+        throw new GradleException(
+            'Cannot bind representation-discovery evidence to a dirty '
+                + 'checkout. Commit, stash or remove local changes, or pass '
+                + 'an explicit authoritative repository revision.')
+    }
+    checkoutHeadRevision
+}
 def targetFreeRepositoryRevision = providers
     .gradleProperty('regelsucheRepositoryRevision')
     .orElse(providers.environmentVariable(
