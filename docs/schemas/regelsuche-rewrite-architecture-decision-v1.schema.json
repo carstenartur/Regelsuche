@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.rewrite-architecture-decision/v1",
+  "title": "Regelsuche rewrite architecture decision v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "evidenceStatus",
+    "corpusSchema",
+    "corpusSha256",
+    "inventoryRevision",
+    "sourceIdentities",
+    "measuredDistribution",
+    "decisions",
+    "claimBoundary",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.rewrite-architecture-decision/v1"
+    },
+    "evidenceStatus": {
+      "const": "DERIVED_FROM_EXECUTED_HISTORICAL_DIAGNOSTICS"
+    },
+    "corpusSchema": {
+      "const": "regelsuche.historical-rediscovery-corpus/v1"
+    },
+    "corpusSha256": {
+      "$ref": "#/$defs/rawSha256"
+    },
+    "inventoryRevision": {
+      "$ref": "#/$defs/text"
+    },
+    "sourceIdentities": {
+      "$ref": "#/$defs/sourceIdentities"
+    },
+    "measuredDistribution": {
+      "$ref": "#/$defs/measuredDistribution"
+    },
+    "decisions": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/decision"
+      }
+    },
+    "claimBoundary": {
+      "const": "This artifact is a reversible implementation-priority decision derived from the frozen historical diagnostic corpus and its retained search evidence. It is not mathematical proof, autonomous rediscovery, external novelty, a complete causal model or a claim of general search or architecture superiority."
+    },
+    "contentHash": {
+      "$ref": "#/$defs/prefixedSha256"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "rawSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prefixedSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sourceIdentities": {
+      "type": "object",
+      "required": [
+        "atlasRunContentHash",
+        "atlasSha256",
+        "witnessDiagnosticContentHash",
+        "productionComparisonContentHash",
+        "equalWorkComparisonContentHash"
+      ],
+      "properties": {
+        "atlasRunContentHash": {
+          "$ref": "#/$defs/prefixedSha256"
+        },
+        "atlasSha256": {
+          "$ref": "#/$defs/prefixedSha256"
+        },
+        "witnessDiagnosticContentHash": {
+          "$ref": "#/$defs/prefixedSha256"
+        },
+        "productionComparisonContentHash": {
+          "$ref": "#/$defs/prefixedSha256"
+        },
+        "equalWorkComparisonContentHash": {
+          "$ref": "#/$defs/prefixedSha256"
+        }
+      },
+      "additionalProperties": false
+    },
+    "measuredDistribution": {
+      "type": "object",
+      "required": [
+        "caseCount",
+        "noProductionWitnessCount",
+        "scalarAlreadyReachedCount",
+        "oracleWitnessScalarMissCount",
+        "witnessPrefixLostCount",
+        "diversityRecoveredCompleteWitnessCount",
+        "checkpointCount",
+        "equalConsumedWorkCheckpointCount",
+        "equalWorkDiversityAdvantageCount",
+        "equalWorkDiversityCompleteWitnessCount"
+      ],
+      "properties": {
+        "caseCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "noProductionWitnessCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scalarAlreadyReachedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "oracleWitnessScalarMissCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "witnessPrefixLostCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "diversityRecoveredCompleteWitnessCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checkpointCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "equalConsumedWorkCheckpointCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "equalWorkDiversityAdvantageCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "equalWorkDiversityCompleteWitnessCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "track": {
+      "enum": [
+        "DIRECTED_INVENTORY_DIRECTIONALITY_DIAGNOSIS",
+        "PARETO_COMPLEXITY_DEBT_SEARCH_CONTROL",
+        "TARGET_FREE_REPRESENTATION_DISCOVERY",
+        "EXACT_VALUE_ARENA_SEARCH_QUOTIENT",
+        "NATIVE_AC_CONDITIONAL_PROOF_EGRAPH",
+        "BROAD_RUNTIME_OPTIMIZATION"
+      ]
+    },
+    "disposition": {
+      "enum": [
+        "SELECTED_NEXT_REVERSIBLE_TRANCHE",
+        "REQUIRED_NEXT_EVALUATION",
+        "DEFERRED_NO_CAUSAL_EVIDENCE",
+        "DEFERRED_PENDING_LAYER_PROFILE"
+      ]
+    },
+    "decision": {
+      "type": "object",
+      "required": [
+        "track",
+        "disposition",
+        "relatedIssue",
+        "evidenceCodes",
+        "reason"
+      ],
+      "properties": {
+        "track": {
+          "$ref": "#/$defs/track"
+        },
+        "disposition": {
+          "$ref": "#/$defs/disposition"
+        },
+        "relatedIssue": {
+          "type": "string",
+          "pattern": "^#[0-9]+$"
+        },
+        "evidenceCodes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]+$"
+          }
+        },
+        "reason": {
+          "$ref": "#/$defs/text"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
