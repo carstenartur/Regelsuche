@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-/** Derives a fail-closed architecture decision from retained #620 evidence. */
 public final class HistoricalRewriteArchitectureDecision {
     static final String SCHEMA =
         "regelsuche.rewrite-architecture-decision/v1";
@@ -43,9 +42,8 @@ public final class HistoricalRewriteArchitectureDecision {
         if (args.length != 7
                 || !"rewrite-architecture-decision".equals(args[0])) {
             throw new IllegalArgumentException(
-                "expected rewrite-architecture-decision <atlas-run> <atlas> "
-                    + "<witness-diagnostic> <production-comparison> "
-                    + "<equal-work-comparison> <output-directory>");
+                "usage: rewrite-architecture-decision <run> <atlas> <witness> "
+                    + "<comparison> <equal-work> <output>");
         }
         Report report = derive(
             Path.of(args[1]), Path.of(args[2]), Path.of(args[3]),
@@ -179,7 +177,7 @@ public final class HistoricalRewriteArchitectureDecision {
             return output;
         } catch (IOException exception) {
             throw new UncheckedIOException(
-                "Could not write rewrite architecture decision", exception);
+                "Could not write architecture decision", exception);
         }
     }
 
@@ -198,7 +196,7 @@ public final class HistoricalRewriteArchitectureDecision {
                 || distribution.equalWorkDiversityAdvantageCount() < 1
                 || distribution.equalWorkDiversityCompleteWitnessCount() < 1) {
             throw new IllegalArgumentException(
-                "historical evidence does not support decision revision v1");
+                "insufficient evidence for decision v1");
         }
     }
 
@@ -210,7 +208,7 @@ public final class HistoricalRewriteArchitectureDecision {
             }
         }
         throw new IllegalArgumentException(
-            "atlas run is missing artifact role " + role);
+            "atlas run is missing role " + role);
     }
 
     private static String same(String key, Document first, Document... rest) {
@@ -386,7 +384,7 @@ public final class HistoricalRewriteArchitectureDecision {
 
     private static String text(String value, String label) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(label + " must not be blank");
+            throw new IllegalArgumentException("blank " + label);
         }
         return value.trim();
     }
@@ -394,7 +392,7 @@ public final class HistoricalRewriteArchitectureDecision {
     private static String rawSha(String value, String label) {
         String result = text(value, label);
         if (!result.matches("[0-9a-f]{64}")) {
-            throw new IllegalArgumentException(label + " must be raw SHA-256");
+            throw new IllegalArgumentException("invalid raw SHA-256: " + label);
         }
         return result;
     }
@@ -403,7 +401,7 @@ public final class HistoricalRewriteArchitectureDecision {
         String result = text(value, label);
         if (!result.matches("sha256:[0-9a-f]{64}")) {
             throw new IllegalArgumentException(
-                label + " must be prefixed SHA-256");
+                "invalid prefixed SHA-256: " + label);
         }
         return result;
     }
@@ -476,7 +474,7 @@ public final class HistoricalRewriteArchitectureDecision {
             for (int value : values) {
                 if (value < 0) {
                     throw new IllegalArgumentException(
-                        "distribution counters must not be negative");
+                        "negative distribution counter");
                 }
             }
             if (caseCount < 1
@@ -491,7 +489,7 @@ public final class HistoricalRewriteArchitectureDecision {
                     || equalWorkDiversityCompleteWitnessCount
                         > equalWorkDiversityAdvantageCount) {
                 throw new IllegalArgumentException(
-                    "distribution is internally inconsistent");
+                    "inconsistent distribution");
             }
         }
     }
@@ -509,7 +507,7 @@ public final class HistoricalRewriteArchitectureDecision {
             relatedIssue = text(relatedIssue, "relatedIssue");
             if (!relatedIssue.matches("#[0-9]+")) {
                 throw new IllegalArgumentException(
-                    "relatedIssue must be an issue reference");
+                    "invalid relatedIssue");
             }
             evidenceCodes = List.copyOf(
                 Objects.requireNonNull(evidenceCodes, "evidenceCodes"));
@@ -517,7 +515,7 @@ public final class HistoricalRewriteArchitectureDecision {
                     || new LinkedHashSet<>(evidenceCodes).size()
                         != evidenceCodes.size()) {
                 throw new IllegalArgumentException(
-                    "evidenceCodes must be non-empty and unique");
+                    "invalid evidenceCodes");
             }
             reason = text(reason, "reason");
         }
@@ -545,7 +543,7 @@ public final class HistoricalRewriteArchitectureDecision {
                         .map(Decision::track).toList()).size() != 6
                     || !dispositions.equals(EnumSet.allOf(Disposition.class))) {
                 throw new IllegalArgumentException(
-                    "decision matrix differs from revision v1");
+                    "invalid decision matrix v1");
             }
             contentHash = prefixedSha(contentHash, "contentHash");
             requireEqual(
@@ -587,7 +585,7 @@ public final class HistoricalRewriteArchitectureDecision {
             String suffix = ",\"contentHash\":\"" + hash + "\"}";
             if (!raw.endsWith(suffix)) {
                 throw new IllegalArgumentException(
-                    label + " contentHash is not the final canonical field");
+                    "non-final contentHash: " + label);
             }
             String withoutHash = raw.substring(
                 0, raw.length() - suffix.length()) + "}";
@@ -618,19 +616,19 @@ public final class HistoricalRewriteArchitectureDecision {
                 return new View(new JsonReader(json).readObject());
             } catch (IllegalArgumentException exception) {
                 throw new IllegalArgumentException(
-                    label + " is not strict JSON", exception);
+                    "invalid JSON: " + label, exception);
             }
         }
 
         static View of(Object raw, String label) {
             if (!(raw instanceof Map<?, ?> map)) {
-                throw new IllegalArgumentException(label + " must be an object");
+                throw new IllegalArgumentException("object required: " + label);
             }
             Map<String, Object> values = new LinkedHashMap<>();
             map.forEach((key, value) -> {
                 if (!(key instanceof String text)) {
                     throw new IllegalArgumentException(
-                        label + " contains a non-string key");
+                        "non-string key: " + label);
                 }
                 values.put(text, value);
             });
@@ -640,7 +638,7 @@ public final class HistoricalRewriteArchitectureDecision {
         String text(String key) {
             Object raw = values.get(key);
             if (!(raw instanceof String value)) {
-                throw new IllegalArgumentException(key + " must be text");
+                throw new IllegalArgumentException("text required: " + key);
             }
             return HistoricalRewriteArchitectureDecision.text(value, key);
         }
@@ -648,12 +646,12 @@ public final class HistoricalRewriteArchitectureDecision {
         int integer(String key) {
             Object raw = values.get(key);
             if (!(raw instanceof Number number)) {
-                throw new IllegalArgumentException(key + " must be numeric");
+                throw new IllegalArgumentException("number required: " + key);
             }
             double decimal = number.doubleValue();
             int value = number.intValue();
             if (!Double.isFinite(decimal) || decimal != value) {
-                throw new IllegalArgumentException(key + " must be an integer");
+                throw new IllegalArgumentException("integer required: " + key);
             }
             return value;
         }
@@ -665,7 +663,7 @@ public final class HistoricalRewriteArchitectureDecision {
         boolean bool(String key) {
             Object raw = values.get(key);
             if (!(raw instanceof Boolean value)) {
-                throw new IllegalArgumentException(key + " must be boolean");
+                throw new IllegalArgumentException("boolean required: " + key);
             }
             return value;
         }
@@ -677,7 +675,7 @@ public final class HistoricalRewriteArchitectureDecision {
         List<?> array(String key) {
             Object raw = values.get(key);
             if (!(raw instanceof List<?> list)) {
-                throw new IllegalArgumentException(key + " must be an array");
+                throw new IllegalArgumentException("array required: " + key);
             }
             return List.copyOf(list);
         }
@@ -690,11 +688,11 @@ public final class HistoricalRewriteArchitectureDecision {
             if (!Files.isRegularFile(normalized)
                     || Files.size(normalized) > MAX_INPUT_BYTES) {
                 throw new IllegalArgumentException(
-                    label + " must be a bounded regular file");
+                    "invalid bounded file: " + label);
             }
             return Files.readString(normalized, StandardCharsets.UTF_8);
         } catch (IOException exception) {
-            throw new UncheckedIOException("Could not read " + label, exception);
+            throw new UncheckedIOException("Read failed: " + label, exception);
         }
     }
 }
