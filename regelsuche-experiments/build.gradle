@@ -45,13 +45,15 @@ def historicalRediscoveryReportDirectory = layout.buildDirectory.dir(
     'reports/historical-rediscovery')
 def historicalWitnessPruningReportDirectory = layout.buildDirectory.dir(
     'reports/historical-rediscovery-witness-pruning')
+def historicalProductionSearchComparisonReportDirectory = layout.buildDirectory.dir(
+    'reports/historical-rediscovery-production-search-comparison')
 def historicalRediscoveryOutputArgument =
     historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
 
 def generateHistoricalRediscoveryAtlas = tasks.register(
     'generateHistoricalRediscoveryAtlas', JavaExec) {
     group = 'verification'
-    description = 'Executes the frozen historical reachability atlas and witness-prefix diagnosis.'
+    description = 'Executes the frozen historical atlas, witness diagnosis and production-search comparison.'
     dependsOn tasks.named('classes')
     timeout = java.time.Duration.ofMinutes(10)
     classpath = sourceSets.main.runtimeClasspath
@@ -63,6 +65,14 @@ def generateHistoricalRediscoveryAtlas = tasks.register(
         'src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json'))
     outputs.dir(historicalRediscoveryReportDirectory)
     outputs.dir(historicalWitnessPruningReportDirectory)
+    outputs.dir(historicalProductionSearchComparisonReportDirectory)
+    doLast {
+        def comparison = historicalProductionSearchComparisonReportDirectory.get()
+            .file('production-search-comparison.json').asFile
+        if (!comparison.isFile()) {
+            throw new GradleException('Missing production-search comparison artifact')
+        }
+    }
 }
 
 tasks.named('check') {
@@ -72,7 +82,7 @@ tasks.named('check') {
 
 // The repository merge gate invokes the root check rather than every
 // subproject check. Bind the retained experiment explicitly so CI cannot pass
-// without executing the atlas and its fail-closed claim validation.
+// without executing the atlas and its fail-closed downstream diagnostics.
 rootProject.tasks.named('check') {
     dependsOn generateHistoricalRediscoveryAtlas
 }
