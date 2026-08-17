@@ -84,7 +84,8 @@ The source corpus and strict schemas are:
 - `regelsuche-experiments/src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json`;
 - `docs/schemas/regelsuche-historical-rediscovery-corpus-v1.schema.json`;
 - `docs/schemas/regelsuche-historical-rediscovery-run-v1.schema.json`;
-- `docs/schemas/regelsuche-witness-pruning-diagnostic-v1.schema.json`.
+- `docs/schemas/regelsuche-witness-pruning-diagnostic-v1.schema.json`;
+- `docs/schemas/regelsuche-production-search-comparison-v1.schema.json`.
 
 Generated JSON and Markdown retain the corpus hash, witnesses, rule IDs,
 primitive work, search metrics, directionality and one evidence-derived primary
@@ -126,11 +127,35 @@ production inventory, search policy, oracle and production work ledgers, case
 balance, first loss event and a SHA-256 content identity. It is downstream
 diagnostic evidence and does not replace or mutate the historical atlas run.
 
+### Matched declared-budget production-search comparison
+
+The next downstream diagnostic compares the scalar witness prefix with a fresh
+run of `StructuralDiversitySearchStrategy`. Both target-blind policies use the
+same source, production rule inventory and declared `SearchHeuristic` ceilings.
+The diversity rerun must reproduce the diversity result, explored-state count,
+engine-call count, generated-transformation count, selected path and rule IDs
+already retained in the atlas.
+
+The report keeps declared ceilings and consumed work separate for each policy.
+It classifies whether structural diversity:
+
+- recovers the complete selected oracle witness;
+- reaches the relation through another path;
+- retains a longer, equal or shorter oracle-witness prefix;
+- is not comparable because the production oracle retained no witness;
+- or is unnecessary because scalar best-first already reached the relation.
+
+The content-addressed artifact is written under
+`regelsuche-experiments/build/reports/historical-rediscovery-production-search-comparison/`
+as `production-search-comparison.json`. It binds the corpus, atlas and
+witness-diagnostic identities, exact information boundary, per-case declared
+budgets, both consumed-work ledgers and the complete status balance.
+
 The dedicated `regelsuche-core` oracle and known-derivation tests remain the
 authoritative unit-level contracts. Atlas tests add only corpus, policy and
 cross-layer integration evidence; they do not replace those focused tests.
 
-Generate the atlas and witness-prefix diagnostic with:
+Generate the atlas and both downstream diagnostics with:
 
 ```bash
 ./gradlew :regelsuche-experiments:generateHistoricalRediscoveryAtlas
@@ -142,6 +167,9 @@ The atlas output is written under
 - `historical-rediscovery-atlas.json`;
 - `historical-rediscovery-atlas.md`;
 - `historical-rediscovery-run.json`.
+
+The witness-prefix and matched-budget artifacts use their separate sibling
+report directories described above.
 
 The ordinary checkout-owned merge gate remains:
 
@@ -163,10 +191,12 @@ from the target-guided control. The aggregate equivalence-discrimination signal
 requires at least one retained negative control; an empty negative-control
 subset cannot pass by vacuous truth. A first lost witness prefix identifies only
 where the bounded target-blind execution diverged from a target-aware diagnostic
-path. It is not a proof of global unreachability, autonomous rediscovery,
-mathematical novelty or general search superiority. Results establish only
-bounded reachability and search-policy behavior for the frozen representation,
-inventory and budgets.
+path. Equal declared search ceilings do not mean that scalar and diversity
+consumed equal work; the report retains those ledgers independently. A longer or
+complete diversity prefix is not a proof of global reachability, autonomous
+rediscovery, mathematical novelty or general search superiority. Results
+establish only bounded reachability and search-policy behavior for the frozen
+representation, inventory and budgets.
 
 ## Universal patterns
 
