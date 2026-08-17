@@ -49,11 +49,30 @@ def historicalProductionSearchComparisonReportDirectory = layout.buildDirectory.
     'reports/historical-rediscovery-production-search-comparison')
 def historicalEqualWorkSearchComparisonReportDirectory = layout.buildDirectory.dir(
     'reports/historical-rediscovery-equal-work-search-comparison')
+def historicalRewriteArchitectureDecisionReportDirectory = layout.buildDirectory.dir(
+    'reports/historical-rewrite-architecture-decision')
 def historicalRediscoveryOutputArgument =
     historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
 def historicalEqualWorkOutputArgument =
     historicalEqualWorkSearchComparisonReportDirectory.map {
         it.asFile.absolutePath
+    }
+def historicalAtlasRunFile = historicalRediscoveryReportDirectory.map {
+    it.file('historical-rediscovery-run.json')
+}
+def historicalAtlasJsonFile = historicalRediscoveryReportDirectory.map {
+    it.file('historical-rediscovery-atlas.json')
+}
+def historicalWitnessPruningFile = historicalWitnessPruningReportDirectory.map {
+    it.file('witness-pruning-diagnostic.json')
+}
+def historicalProductionSearchComparisonFile =
+    historicalProductionSearchComparisonReportDirectory.map {
+        it.file('production-search-comparison.json')
+    }
+def historicalEqualWorkSearchComparisonFile =
+    historicalEqualWorkSearchComparisonReportDirectory.map {
+        it.file('equal-work-search-comparison.json')
     }
 
 def generateHistoricalRediscoveryAtlas = tasks.register(
@@ -108,16 +127,55 @@ def generateHistoricalEqualWorkSearchComparison = tasks.register(
     }
 }
 
+def generateHistoricalRewriteArchitectureDecision = tasks.register(
+    'generateHistoricalRewriteArchitectureDecision', JavaExec) {
+    group = 'verification'
+    description = 'Derives the evidence-bound rewrite architecture decision from retained historical diagnostics.'
+    dependsOn generateHistoricalEqualWorkSearchComparison
+    dependsOn tasks.named('testClasses')
+    timeout = java.time.Duration.ofMinutes(1)
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.HistoricalRewriteArchitectureDecision'
+    argumentProviders.add({
+        [
+            'rewrite-architecture-decision',
+            historicalAtlasRunFile.get().asFile.absolutePath,
+            historicalAtlasJsonFile.get().asFile.absolutePath,
+            historicalWitnessPruningFile.get().asFile.absolutePath,
+            historicalProductionSearchComparisonFile.get().asFile.absolutePath,
+            historicalEqualWorkSearchComparisonFile.get().asFile.absolutePath,
+            historicalRewriteArchitectureDecisionReportDirectory.get()
+                .asFile.absolutePath
+        ]
+    } as CommandLineArgumentProvider)
+    inputs.files(
+        historicalAtlasRunFile,
+        historicalAtlasJsonFile,
+        historicalWitnessPruningFile,
+        historicalProductionSearchComparisonFile,
+        historicalEqualWorkSearchComparisonFile)
+    outputs.dir(historicalRewriteArchitectureDecisionReportDirectory)
+    doLast {
+        def decision = historicalRewriteArchitectureDecisionReportDirectory.get()
+            .file('rewrite-architecture-decision.json').asFile
+        if (!decision.isFile()) {
+            throw new GradleException('Missing rewrite architecture decision artifact')
+        }
+    }
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
     dependsOn generateHistoricalRediscoveryAtlas
     dependsOn generateHistoricalEqualWorkSearchComparison
+    dependsOn generateHistoricalRewriteArchitectureDecision
 }
 
 // The repository merge gate invokes the root check rather than every
-// subproject check. Bind both retained experiment tasks explicitly so CI cannot
-// pass without executing the atlas and its fail-closed downstream diagnostics.
+// subproject check. Bind the retained experiment chain explicitly so CI cannot
+// pass without executing the atlas and its fail-closed downstream decisions.
 rootProject.tasks.named('check') {
     dependsOn generateHistoricalRediscoveryAtlas
     dependsOn generateHistoricalEqualWorkSearchComparison
+    dependsOn generateHistoricalRewriteArchitectureDecision
 }
