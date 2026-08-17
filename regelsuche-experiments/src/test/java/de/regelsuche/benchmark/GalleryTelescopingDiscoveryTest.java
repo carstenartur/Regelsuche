@@ -2,10 +2,12 @@ package de.regelsuche.benchmark;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.benchmark.HistoricalEqualWorkSearchComparison.CaseStatus;
+import de.regelsuche.benchmark.HistoricalEqualWorkSearchComparison.Outcome;
 import de.regelsuche.benchmark.HistoricalProductionSearchComparison.ComparisonStatus;
-import de.regelsuche.benchmark.HistoricalProductionSearchComparison.Report;
 import de.regelsuche.example.SeedExpression;
 import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.DiscoveryEvidenceKind;
@@ -71,7 +73,9 @@ class HistoricalProductionSearchComparisonTest {
     @Timeout(240)
     void frozenPolicyControlIsPositiveAndByteStable(@TempDir Path directory)
             throws Exception {
-        Report report = compareCase("distribution-fitness-valley-control");
+        ComparisonFixture fixture = compareCase(
+            "distribution-fitness-valley-control");
+        var report = fixture.primary();
         HistoricalProductionSearchComparison comparison =
             new HistoricalProductionSearchComparison();
         assertEquals(
@@ -91,17 +95,59 @@ class HistoricalProductionSearchComparisonTest {
 
     @Test
     void semanticScalarMatchDoesNotRequireAnOracleWitness() throws Exception {
-        Report report = compareCase("sophie-germain");
-        var result = report.cases().get(0);
+        ComparisonFixture fixture = compareCase("sophie-germain");
+        var result = fixture.primary().cases().get(0);
+        var equalWork = fixture.equalWork().cases().get(0);
 
         assertEquals(
             ComparisonStatus.NOT_APPLICABLE_NO_PRODUCTION_WITNESS,
             result.status());
         assertTrue(result.scalar().reachedRelation());
         assertEquals(0, result.oracleWitnessStepCount());
+        assertEquals(CaseStatus.NO_PRODUCTION_WITNESS, equalWork.status());
+        assertTrue(equalWork.checkpoints().isEmpty());
     }
 
-    private static Report compareCase(String id) throws Exception {
+    @Test
+    @Timeout(240)
+    void diversityAdvantageSurvivesAnEqualConsumedWorkCheckpoint(
+        @TempDir Path directory
+    ) throws Exception {
+        ComparisonFixture fixture = compareCase(
+            "distribution-fitness-valley-control");
+        var report = fixture.equalWork();
+        var result = report.cases().get(0);
+
+        assertEquals(
+            CaseStatus.EXECUTED_ORACLE_WITNESS_SCALAR_MISS,
+            result.status());
+        var checkpoint = result.checkpoints().stream()
+            .filter(value -> value.equalConsumedWork())
+            .filter(value -> value.outcome()
+                == Outcome.DIVERSITY_ONLY_COMPLETE_WITNESS)
+            .findFirst()
+            .orElseThrow();
+        assertFalse(checkpoint.scalar().reachedRelation());
+        assertTrue(checkpoint.diversity().reachedRelation());
+        assertEquals(
+            checkpoint.scalar().engineCalls(),
+            checkpoint.diversity().engineCalls());
+        assertEquals(
+            checkpoint.scalar().admittedPrimitiveSteps(),
+            checkpoint.diversity().admittedPrimitiveSteps());
+        assertTrue(
+            report.summary().equalWorkDiversityCompleteWitnessCount() > 0);
+
+        HistoricalEqualWorkSearchComparison comparison =
+            new HistoricalEqualWorkSearchComparison();
+        Path first = comparison.write(directory.resolve("first"), report);
+        Path second = comparison.write(directory.resolve("second"), report);
+        assertArrayEquals(
+            Files.readAllBytes(first),
+            Files.readAllBytes(second));
+    }
+
+    private static ComparisonFixture compareCase(String id) throws Exception {
         HistoricalRediscoveryCorpus.Corpus full =
             HistoricalRediscoveryCorpus.load();
         HistoricalRediscoveryCorpus.Case selected = full.cases().stream()
@@ -121,7 +167,49 @@ class HistoricalProductionSearchComparisonTest {
         DiscoveryExperimentRunner.HistoricalWitnessPruningDiagnostic pruning =
             new DiscoveryExperimentRunner.HistoricalWitnessPruningDiagnostic();
         var pruningCases = pruning.run(corpus, atlas);
-        return new HistoricalProductionSearchComparison().run(
-            corpus, atlas, pruningCases);
+        HistoricalProductionSearchComparison primary =
+            new HistoricalProductionSearchComparison();
+        var primaryReport = primary.run(corpus, atlas, pruningCases);
+        var equalWorkReport =
+            new HistoricalEqualWorkSearchComparison().run(corpus, atlas);
+        return new ComparisonFixture(primaryReport, equalWorkReport);
+    }
+
+    private record ComparisonFixture(
+        HistoricalProductionSearchComparison.Report primary,
+        HistoricalEqualWorkSearchComparison.Report equalWork
+    ) {
+    }
+}
+
+class MacroImpactBenchmarkTest {
+    @Test
+    void reportsMacroReuseBridgeUsageAndSearchReduction() {
+        DiscoveryBenchmarkResult withoutMacro = new DiscoveryBenchmarkRunner()
+            .run(new DiscoveryBenchmarkCase(
+                "without-macro",
+                "input",
+                "target",
+                List.of(
+                    List.of("input", "sophie_germain_bridge", "middle", "target"),
+                    List.of("input", "alt", "target")),
+                Set.of(DiscoveryExpectation.BRIDGE_REQUIRED),
+                List.of("sophie_germain_bridge"),
+                Set.of(),
+                Set.of()));
+        DiscoveryBenchmarkResult withMacro = new DiscoveryBenchmarkRunner()
+            .run(new DiscoveryBenchmarkCase(
+                "with-macro",
+                "input",
+                "target",
+                List.of(List.of("input", "macro_sophie", "target")),
+                Set.of(DiscoveryExpectation.MACRO_REUSE_REQUIRED),
+                List.of(),
+                Set.of("macro_sophie"),
+                Set.of("macro_sophie")));
+
+        assertEquals(1, withoutMacro.bridgeCount());
+        assertEquals(1, withMacro.macroReuseCount());
+        assertTrue(withMacro.statesExplored() < withoutMacro.statesExplored());
     }
 }
