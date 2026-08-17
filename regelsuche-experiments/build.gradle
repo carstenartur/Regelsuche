@@ -23,6 +23,12 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+sourceSets {
+    test {
+        java.srcDir 'src/checkout/java'
+    }
+}
+
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
