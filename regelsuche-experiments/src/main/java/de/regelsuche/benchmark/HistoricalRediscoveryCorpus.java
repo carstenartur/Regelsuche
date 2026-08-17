@@ -549,10 +549,17 @@ final class HistoricalProductionSearchComparison {
         SearchEvidence retained,
         HistoricalWitnessPruningDiagnostic.CaseDiagnostic witness
     ) {
-        boolean witnessReached =
+        String status = witness.status();
+        boolean statusRequiresScalarHit =
             HistoricalWitnessPruningDiagnostic.SCALAR_ALREADY_FOUND
-                .equals(witness.status());
-        if (retained.reached() != witnessReached
+                .equals(status);
+        boolean statusRequiresScalarMiss =
+            HistoricalWitnessPruningDiagnostic.WITNESS_PREFIX_LOST
+                .equals(status)
+                || HistoricalWitnessPruningDiagnostic.WITNESS_COMPLETELY_EXPLORED
+                    .equals(status);
+        if ((statusRequiresScalarHit && !retained.reached())
+                || (statusRequiresScalarMiss && retained.reached())
                 || retained.exploredStates() != witness.searchExploredStates()
                 || retained.engineCalls() != witness.engineCalls()
                 || retained.generatedTransformations()
