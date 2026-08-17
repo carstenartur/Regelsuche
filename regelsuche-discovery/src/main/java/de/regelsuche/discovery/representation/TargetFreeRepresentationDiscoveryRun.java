@@ -8,6 +8,7 @@ import static de.regelsuche.discovery.representation.RepresentationDiscoveryArti
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.REPRESENTATION_CANDIDATES;
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.RULE_RADAR;
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.SEARCH_GRAPH;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.WORKSPACE_SCHEMA;
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunOutcome.TerminalState.COMPLETED;
 
@@ -246,13 +247,13 @@ public final class TargetFreeRepresentationDiscoveryRun {
         TargetFreeRepresentationSearch.Budget budget
     ) {
         return KnownStructureCatalog.sha256(
-            SCHEMA + "/budget/" + json(budget)
+            WORKSPACE_SCHEMA + "/budget/" + json(budget)
         );
     }
 
     private static String runtimeDiagnosticsHash() {
         return KnownStructureCatalog.sha256(
-            SCHEMA + "/runtime-diagnostics/NOT_MEASURED"
+            WORKSPACE_SCHEMA + "/runtime/NOT_EVALUATED"
         );
     }
 
