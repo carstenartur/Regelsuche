@@ -47,8 +47,14 @@ def historicalWitnessPruningReportDirectory = layout.buildDirectory.dir(
     'reports/historical-rediscovery-witness-pruning')
 def historicalProductionSearchComparisonReportDirectory = layout.buildDirectory.dir(
     'reports/historical-rediscovery-production-search-comparison')
+def historicalEqualWorkSearchComparisonReportDirectory = layout.buildDirectory.dir(
+    'reports/historical-rediscovery-equal-work-search-comparison')
 def historicalRediscoveryOutputArgument =
     historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
+def historicalEqualWorkOutputArgument =
+    historicalEqualWorkSearchComparisonReportDirectory.map {
+        it.asFile.absolutePath
+    }
 
 def generateHistoricalRediscoveryAtlas = tasks.register(
     'generateHistoricalRediscoveryAtlas', JavaExec) {
@@ -75,14 +81,43 @@ def generateHistoricalRediscoveryAtlas = tasks.register(
     }
 }
 
+def generateHistoricalEqualWorkSearchComparison = tasks.register(
+    'generateHistoricalEqualWorkSearchComparison', JavaExec) {
+    group = 'verification'
+    description = 'Executes fixed admitted-work checkpoints for the historical search-policy control.'
+    dependsOn generateHistoricalRediscoveryAtlas
+    dependsOn tasks.named('classes')
+    timeout = java.time.Duration.ofMinutes(10)
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.HistoricalEqualWorkSearchComparison'
+    argumentProviders.add({
+        [
+            'equal-work-search-comparison',
+            historicalEqualWorkOutputArgument.get()
+        ]
+    } as CommandLineArgumentProvider)
+    inputs.file(layout.projectDirectory.file(
+        'src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json'))
+    outputs.dir(historicalEqualWorkSearchComparisonReportDirectory)
+    doLast {
+        def report = historicalEqualWorkSearchComparisonReportDirectory.get()
+            .file('equal-work-search-comparison.json').asFile
+        if (!report.isFile()) {
+            throw new GradleException('Missing equal-work search comparison artifact')
+        }
+    }
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
     dependsOn generateHistoricalRediscoveryAtlas
+    dependsOn generateHistoricalEqualWorkSearchComparison
 }
 
 // The repository merge gate invokes the root check rather than every
-// subproject check. Bind the retained experiment explicitly so CI cannot pass
-// without executing the atlas and its fail-closed downstream diagnostics.
+// subproject check. Bind both retained experiment tasks explicitly so CI cannot
+// pass without executing the atlas and its fail-closed downstream diagnostics.
 rootProject.tasks.named('check') {
     dependsOn generateHistoricalRediscoveryAtlas
+    dependsOn generateHistoricalEqualWorkSearchComparison
 }
