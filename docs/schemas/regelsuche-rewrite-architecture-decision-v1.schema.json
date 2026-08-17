@@ -6,6 +6,7 @@
   "required": [
     "schema",
     "evidenceStatus",
+    "repositoryRevision",
     "corpusSchema",
     "corpusSha256",
     "inventoryRevision",
@@ -21,6 +22,9 @@
     },
     "evidenceStatus": {
       "const": "DERIVED_FROM_EXECUTED_HISTORICAL_DIAGNOSTICS"
+    },
+    "repositoryRevision": {
+      "$ref": "#/$defs/repositoryRevision"
     },
     "corpusSchema": {
       "const": "regelsuche.historical-rediscovery-corpus/v1"
@@ -59,6 +63,10 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 4096
+    },
+    "repositoryRevision": {
+      "type": "string",
+      "pattern": "^(?:WORKTREE|[0-9a-f]{40})$"
     },
     "rawSha256": {
       "type": "string",
