@@ -49,12 +49,40 @@ def historicalProductionSearchComparisonReportDirectory = layout.buildDirectory.
     'reports/historical-rediscovery-production-search-comparison')
 def historicalEqualWorkSearchComparisonReportDirectory = layout.buildDirectory.dir(
     'reports/historical-rediscovery-equal-work-search-comparison')
+def historicalRewriteArchitectureDecisionReportDirectory = layout.buildDirectory.dir(
+    'reports/historical-rewrite-architecture-decision')
 def historicalRediscoveryOutputArgument =
     historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
 def historicalEqualWorkOutputArgument =
     historicalEqualWorkSearchComparisonReportDirectory.map {
         it.asFile.absolutePath
     }
+def historicalRewriteArchitectureDecisionInputs = [
+    historicalRediscoveryReportDirectory.map {
+        it.file('historical-rediscovery-run.json')
+    },
+    historicalRediscoveryReportDirectory.map {
+        it.file('historical-rediscovery-atlas.json')
+    },
+    historicalWitnessPruningReportDirectory.map {
+        it.file('witness-pruning-diagnostic.json')
+    },
+    historicalProductionSearchComparisonReportDirectory.map {
+        it.file('production-search-comparison.json')
+    },
+    historicalEqualWorkSearchComparisonReportDirectory.map {
+        it.file('equal-work-search-comparison.json')
+    }
+]
+def historicalRepositoryRevision = providers.environmentVariable('GITHUB_SHA')
+    .map { value ->
+        if (!(value ==~ /[0-9a-f]{40}/)) {
+            throw new GradleException(
+                'GITHUB_SHA must be a lowercase 40-character commit SHA')
+        }
+        value
+    }
+    .orElse('WORKTREE')
 
 def generateHistoricalRediscoveryAtlas = tasks.register(
     'generateHistoricalRediscoveryAtlas', JavaExec) {
@@ -108,16 +136,42 @@ def generateHistoricalEqualWorkSearchComparison = tasks.register(
     }
 }
 
-tasks.named('check') {
-    dependsOn tasks.named('jacocoTestReport')
-    dependsOn generateHistoricalRediscoveryAtlas
+def generateHistoricalRewriteArchitectureDecision = tasks.register(
+    'generateHistoricalRewriteArchitectureDecision', JavaExec) {
+    group = 'verification'
+    description = 'Derives the evidence-bound rewrite architecture decision from retained historical diagnostics.'
     dependsOn generateHistoricalEqualWorkSearchComparison
+    dependsOn tasks.named('testClasses')
+    timeout = java.time.Duration.ofMinutes(1)
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.HistoricalRewriteArchitectureDecision'
+    argumentProviders.add({
+        [
+            'rewrite-architecture-decision',
+            historicalRepositoryRevision.get()
+        ] + historicalRewriteArchitectureDecisionInputs.collect {
+            it.get().asFile.absolutePath
+        } + [historicalRewriteArchitectureDecisionReportDirectory.get()
+            .asFile.absolutePath]
+    } as CommandLineArgumentProvider)
+    inputs.property('repositoryRevision', historicalRepositoryRevision)
+    inputs.files(historicalRewriteArchitectureDecisionInputs)
+    outputs.dir(historicalRewriteArchitectureDecisionReportDirectory)
+    doLast {
+        def decision = historicalRewriteArchitectureDecisionReportDirectory.get()
+            .file('rewrite-architecture-decision.json').asFile
+        if (!decision.isFile()) {
+            throw new GradleException('Missing rewrite architecture decision artifact')
+        }
+    }
 }
 
-// The repository merge gate invokes the root check rather than every
-// subproject check. Bind both retained experiment tasks explicitly so CI cannot
-// pass without executing the atlas and its fail-closed downstream diagnostics.
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestReport')
+    dependsOn generateHistoricalRewriteArchitectureDecision
+}
+
+// The final decision task depends transitively on both historical generators.
 rootProject.tasks.named('check') {
-    dependsOn generateHistoricalRediscoveryAtlas
-    dependsOn generateHistoricalEqualWorkSearchComparison
+    dependsOn generateHistoricalRewriteArchitectureDecision
 }
