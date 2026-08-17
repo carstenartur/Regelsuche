@@ -181,3 +181,35 @@ class HistoricalProductionSearchComparisonTest {
     ) {
     }
 }
+
+class MacroImpactBenchmarkTest {
+    @Test
+    void reportsMacroReuseBridgeUsageAndSearchReduction() {
+        DiscoveryBenchmarkResult withoutMacro = new DiscoveryBenchmarkRunner()
+            .run(new DiscoveryBenchmarkCase(
+                "without-macro",
+                "input",
+                "target",
+                List.of(
+                    List.of("input", "sophie_germain_bridge", "middle", "target"),
+                    List.of("input", "alt", "target")),
+                Set.of(DiscoveryExpectation.BRIDGE_REQUIRED),
+                List.of("sophie_germain_bridge"),
+                Set.of(),
+                Set.of()));
+        DiscoveryBenchmarkResult withMacro = new DiscoveryBenchmarkRunner()
+            .run(new DiscoveryBenchmarkCase(
+                "with-macro",
+                "input",
+                "target",
+                List.of(List.of("input", "macro_sophie", "target")),
+                Set.of(DiscoveryExpectation.MACRO_REUSE_REQUIRED),
+                List.of(),
+                Set.of("macro_sophie"),
+                Set.of("macro_sophie")));
+
+        assertEquals(1, withoutMacro.bridgeCount());
+        assertEquals(1, withMacro.macroReuseCount());
+        assertTrue(withMacro.statesExplored() < withoutMacro.statesExplored());
+    }
+}
