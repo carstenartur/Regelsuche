@@ -2,6 +2,11 @@ package de.regelsuche.discovery.representation;
 
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.CANDIDATE_DOSSIERS;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.PROGRESS_LEDGER;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.REPRESENTATION_CANDIDATES;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.SEARCH_GRAPH;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunOutcome.TerminalState.COMPLETED;
 import static de.regelsuche.discovery.representation.TargetFreeSymPyBridgeDiscoveryScenario.CLAIM_BOUNDARY;
 import static de.regelsuche.discovery.representation.TargetFreeSymPyBridgeDiscoveryScenario.CONSEQUENCE_ID;
 import static de.regelsuche.discovery.representation.TargetFreeSymPyBridgeDiscoveryScenario.FOLLOW_ON_EXPRESSION;
@@ -25,6 +30,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 class TargetFreeSymPyBridgeDiscoveryScenarioTest {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String REPOSITORY_REVISION =
+        "0123456789abcdef0123456789abcdef01234567";
 
     @Test
     void postFreezeKnowledgeFindsAndExecutesAnUnguidedBridge()
@@ -118,6 +125,96 @@ class TargetFreeSymPyBridgeDiscoveryScenarioTest {
                     artifact.content(),
                     "sha256:" + "0".repeat(64)
                 )
+        );
+    }
+
+    @Test
+    void bindsTheScenarioToOneImmutableRunWorkspace(
+        @TempDir Path temporary
+    ) throws Exception {
+        var bundle = TargetFreeRepresentationDiscoveryRun.write(
+            temporary,
+            REPOSITORY_REVISION
+        );
+        var scenario = bundle.scenario();
+        var search = scenario.content().search();
+        var workspace = bundle.workspace();
+
+        assertEquals(COMPLETED, workspace.outcome().state());
+        assertEquals(
+            REPOSITORY_REVISION,
+            workspace.revisions().repositoryCommit()
+        );
+        assertEquals(
+            TargetFreeRepresentationDiscoveryRun.SCHEMA,
+            workspace.revisions().applicationRevision()
+        );
+        assertEquals(
+            RepresentationDiscoveryInformationBoundary.Track
+                .R2_CATALOG_BLIND_POST_HOC_BRIDGE,
+            workspace.plan().informationTrack()
+        );
+        assertEquals(
+            search.ruleInventoryHash(),
+            workspace.plan().ruleInventoryHash()
+        );
+        assertEquals(
+            (long) search.budget().maxGeneratedTransitions(),
+            workspace.outcome().configuredWork()
+        );
+        assertEquals(
+            (long) search.generatedTransitionCount(),
+            workspace.outcome().consumedWork()
+        );
+        assertEquals(
+            scenario.content().searchContentHash(),
+            workspace.outcome().canonicalWorkLedgerHash()
+        );
+        assertEquals(
+            scenario.content().searchContentHash(),
+            workspace.requireArtifact(
+                SEARCH_GRAPH,
+                TargetFreeRepresentationSearch.SCHEMA
+            ).targetContentHash()
+        );
+        assertEquals(
+            scenario.content().searchContentHash(),
+            workspace.requireArtifact(
+                REPRESENTATION_CANDIDATES,
+                TargetFreeRepresentationSearch.SCHEMA
+            ).targetContentHash()
+        );
+        assertEquals(
+            scenario.contentHash(),
+            workspace.requireArtifact(
+                CANDIDATE_DOSSIERS,
+                TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA
+            ).targetContentHash()
+        );
+        assertEquals(
+            scenario.content().searchContentHash(),
+            workspace.requireArtifact(
+                PROGRESS_LEDGER,
+                TargetFreeRepresentationSearch.SCHEMA
+            ).targetContentHash()
+        );
+
+        Path scenarioPath = temporary.resolve(
+            TargetFreeRepresentationDiscoveryRun.SCENARIO_FILE_NAME
+        );
+        Path workspacePath = temporary.resolve(
+            TargetFreeRepresentationDiscoveryRun.WORKSPACE_FILE_NAME
+        );
+        assertTrue(Files.readString(scenarioPath).endsWith("\n"));
+        assertEquals(
+            workspace,
+            RepresentationDiscoveryRunWorkspace.fromCanonicalJson(
+                Files.readString(workspacePath)
+            )
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> TargetFreeRepresentationDiscoveryRun.run("WORKTREE")
         );
     }
 
