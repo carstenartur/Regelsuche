@@ -219,12 +219,31 @@ class TargetFreeSymPyBridgeDiscoveryScenarioTest {
         Path workspacePath = temporary.resolve(
             TargetFreeRepresentationDiscoveryRun.WORKSPACE_FILE_NAME
         );
+        Path runRepository = temporary.resolve(
+            TargetFreeRepresentationDiscoveryRun.RUN_REPOSITORY_DIRECTORY
+        );
         assertTrue(Files.readString(scenarioPath).endsWith("\n"));
         assertEquals(
             workspace,
             RepresentationDiscoveryRunWorkspace.fromCanonicalJson(
                 Files.readString(workspacePath)
             )
+        );
+        assertEquals(
+            workspace,
+            RepresentationDiscoveryRunWorkspace.findRetained(
+                runRepository,
+                workspace.runId()
+            ).orElseThrow()
+        );
+
+        TargetFreeRepresentationDiscoveryRun.write(
+            temporary,
+            REPOSITORY_REVISION
+        );
+        assertEquals(
+            List.of(workspace),
+            RepresentationDiscoveryRunWorkspace.listRetained(runRepository)
         );
         assertThrows(
             IllegalArgumentException.class,
