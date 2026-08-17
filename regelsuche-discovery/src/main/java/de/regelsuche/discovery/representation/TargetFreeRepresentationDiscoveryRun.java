@@ -42,6 +42,7 @@ public final class TargetFreeRepresentationDiscoveryRun {
     public static final String SCENARIO_FILE_NAME =
         "target-free-sympy-bridge.json";
     public static final String WORKSPACE_FILE_NAME = "run-workspace.json";
+    public static final String RUN_REPOSITORY_DIRECTORY = "runs";
 
     private static final String SEARCH_PROFILE_ID =
         "SMALL_BOUNDED_ENUMERATION_V1";
@@ -120,6 +121,17 @@ public final class TargetFreeRepresentationDiscoveryRun {
         AtomicJsonFile.writeUtf8(workspacePath, workspaceJson);
         requireWritten(scenarioPath, scenarioJson);
         requireWritten(workspacePath, workspaceJson);
+
+        RepresentationDiscoveryRunWorkspace retained =
+            RepresentationDiscoveryRunWorkspace.retain(
+                root.resolve(RUN_REPOSITORY_DIRECTORY),
+                bundle.workspace()
+            );
+        if (!bundle.workspace().equals(retained)) {
+            throw new IllegalStateException(
+                "retained run repository changed the immutable workspace"
+            );
+        }
 
         RepresentationDiscoveryRunWorkspace decoded =
             RepresentationDiscoveryRunWorkspace.fromCanonicalJson(
