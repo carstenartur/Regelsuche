@@ -86,9 +86,9 @@ def generateHistoricalEqualWorkSearchComparison = tasks.register(
     group = 'verification'
     description = 'Executes fixed admitted-work checkpoints for the historical search-policy control.'
     dependsOn generateHistoricalRediscoveryAtlas
-    dependsOn tasks.named('classes')
+    dependsOn tasks.named('testClasses')
     timeout = java.time.Duration.ofMinutes(10)
-    classpath = sourceSets.main.runtimeClasspath
+    classpath = sourceSets.test.runtimeClasspath
     mainClass = 'de.regelsuche.benchmark.HistoricalEqualWorkSearchComparison'
     argumentProviders.add({
         [
