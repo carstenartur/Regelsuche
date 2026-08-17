@@ -57,23 +57,23 @@ def historicalEqualWorkOutputArgument =
     historicalEqualWorkSearchComparisonReportDirectory.map {
         it.asFile.absolutePath
     }
-def historicalAtlasRunFile = historicalRediscoveryReportDirectory.map {
-    it.file('historical-rediscovery-run.json')
-}
-def historicalAtlasJsonFile = historicalRediscoveryReportDirectory.map {
-    it.file('historical-rediscovery-atlas.json')
-}
-def historicalWitnessPruningFile = historicalWitnessPruningReportDirectory.map {
-    it.file('witness-pruning-diagnostic.json')
-}
-def historicalProductionSearchComparisonFile =
+def historicalRewriteArchitectureDecisionInputs = [
+    historicalRediscoveryReportDirectory.map {
+        it.file('historical-rediscovery-run.json')
+    },
+    historicalRediscoveryReportDirectory.map {
+        it.file('historical-rediscovery-atlas.json')
+    },
+    historicalWitnessPruningReportDirectory.map {
+        it.file('witness-pruning-diagnostic.json')
+    },
     historicalProductionSearchComparisonReportDirectory.map {
         it.file('production-search-comparison.json')
-    }
-def historicalEqualWorkSearchComparisonFile =
+    },
     historicalEqualWorkSearchComparisonReportDirectory.map {
         it.file('equal-work-search-comparison.json')
     }
+]
 
 def generateHistoricalRediscoveryAtlas = tasks.register(
     'generateHistoricalRediscoveryAtlas', JavaExec) {
@@ -137,23 +137,14 @@ def generateHistoricalRewriteArchitectureDecision = tasks.register(
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'de.regelsuche.benchmark.HistoricalRewriteArchitectureDecision'
     argumentProviders.add({
-        [
-            'rewrite-architecture-decision',
-            historicalAtlasRunFile.get().asFile.absolutePath,
-            historicalAtlasJsonFile.get().asFile.absolutePath,
-            historicalWitnessPruningFile.get().asFile.absolutePath,
-            historicalProductionSearchComparisonFile.get().asFile.absolutePath,
-            historicalEqualWorkSearchComparisonFile.get().asFile.absolutePath,
-            historicalRewriteArchitectureDecisionReportDirectory.get()
-                .asFile.absolutePath
-        ]
+        ['rewrite-architecture-decision']
+            + historicalRewriteArchitectureDecisionInputs.collect {
+                it.get().asFile.absolutePath
+            }
+            + [historicalRewriteArchitectureDecisionReportDirectory.get()
+                .asFile.absolutePath]
     } as CommandLineArgumentProvider)
-    inputs.files(
-        historicalAtlasRunFile,
-        historicalAtlasJsonFile,
-        historicalWitnessPruningFile,
-        historicalProductionSearchComparisonFile,
-        historicalEqualWorkSearchComparisonFile)
+    inputs.files(historicalRewriteArchitectureDecisionInputs)
     outputs.dir(historicalRewriteArchitectureDecisionReportDirectory)
     doLast {
         def decision = historicalRewriteArchitectureDecisionReportDirectory.get()
