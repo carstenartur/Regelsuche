@@ -1,0 +1,343 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.equal-work-search-comparison/v1",
+  "title": "Regelsuche equal-work search comparison v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "evidenceStatus",
+    "corpusSchema",
+    "corpusSha256",
+    "atlasSchema",
+    "atlasSha256",
+    "inventoryRevision",
+    "workUnit",
+    "informationBoundary",
+    "claimBoundary",
+    "primitiveCheckpoints",
+    "cases",
+    "summary",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.equal-work-search-comparison/v1"
+    },
+    "evidenceStatus": {
+      "const": "EXECUTED_TARGET_BLIND_FIXED_ADMITTED_WORK_CHECKPOINTS"
+    },
+    "corpusSchema": {
+      "const": "regelsuche.historical-rediscovery-corpus/v1"
+    },
+    "corpusSha256": {
+      "$ref": "#/$defs/rawSha256"
+    },
+    "atlasSchema": {
+      "const": "regelsuche.historical-rediscovery-atlas/v1"
+    },
+    "atlasSha256": {
+      "$ref": "#/$defs/prefixedSha256"
+    },
+    "inventoryRevision": {
+      "$ref": "#/$defs/text"
+    },
+    "workUnit": {
+      "const": "ENGINE_CALLS_AND_ADMITTED_PRIMITIVE_REWRITE_STEPS"
+    },
+    "informationBoundary": {
+      "const": "TARGET_BLIND_SEARCHES_ORACLE_POST_HOC"
+    },
+    "claimBoundary": {
+      "const": "Both target-blind searches receive the same frozen source, production inventory and deterministic ceilings for engine calls and admitted primitive rewrite steps. Candidate lists are materialized before the deterministic prefix is admitted, so this does not equalize matcher runtime, allocation or total CPU work. Oracle witnesses and targets are inspected only after search completion. A retained checkpoint advantage is not proof, autonomous rediscovery, novelty or general superiority."
+    },
+    "primitiveCheckpoints": {
+      "const": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ]
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/prefixedSha256"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "rawSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prefixedSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "caseStatus": {
+      "enum": [
+        "NO_PRODUCTION_WITNESS",
+        "SCALAR_ALREADY_REACHED",
+        "EXECUTED_ORACLE_WITNESS_SCALAR_MISS"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "BOTH_COMPLETE_WITNESS",
+        "DIVERSITY_ONLY_COMPLETE_WITNESS",
+        "SCALAR_ONLY_COMPLETE_WITNESS",
+        "DIVERSITY_LONGER_PREFIX",
+        "SCALAR_LONGER_PREFIX",
+        "EQUAL_PREFIX"
+      ]
+    },
+    "policy": {
+      "type": "object",
+      "required": [
+        "reachedRelation",
+        "witnessPrefixLength",
+        "exploredStates",
+        "engineCalls",
+        "admittedPrimitiveSteps",
+        "primitiveBudgetReached",
+        "engineCallBudgetReached",
+        "terminalStatus"
+      ],
+      "properties": {
+        "reachedRelation": {
+          "type": "boolean"
+        },
+        "witnessPrefixLength": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exploredStates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "engineCalls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "admittedPrimitiveSteps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "primitiveBudgetReached": {
+          "type": "boolean"
+        },
+        "engineCallBudgetReached": {
+          "type": "boolean"
+        },
+        "terminalStatus": {
+          "$ref": "#/$defs/text"
+        }
+      },
+      "additionalProperties": false
+    },
+    "checkpoint": {
+      "type": "object",
+      "required": [
+        "primitiveBudget",
+        "engineCallBudget",
+        "scalar",
+        "diversity",
+        "equalConsumedWork",
+        "outcome"
+      ],
+      "properties": {
+        "primitiveBudget": {
+          "enum": [
+            1,
+            2,
+            4,
+            8,
+            16,
+            32
+          ]
+        },
+        "engineCallBudget": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "scalar": {
+          "$ref": "#/$defs/policy"
+        },
+        "diversity": {
+          "$ref": "#/$defs/policy"
+        },
+        "equalConsumedWork": {
+          "type": "boolean"
+        },
+        "outcome": {
+          "$ref": "#/$defs/outcome"
+        }
+      },
+      "additionalProperties": false
+    },
+    "case": {
+      "type": "object",
+      "required": [
+        "id",
+        "status",
+        "atlasStatus",
+        "oracleStatus",
+        "oracleWitnessStepCount",
+        "checkpoints"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/text"
+        },
+        "status": {
+          "$ref": "#/$defs/caseStatus"
+        },
+        "oracleStatus": {
+          "$ref": "#/$defs/text"
+        },
+        "oracleWitnessStepCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checkpoints": {
+          "type": "array",
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/checkpoint"
+          }
+        },
+        "atlasStatus": {
+          "$ref": "#/$defs/text"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "NO_PRODUCTION_WITNESS"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "oracleWitnessStepCount": {
+                "const": 0
+              },
+              "checkpoints": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SCALAR_ALREADY_REACHED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "oracleWitnessStepCount": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "checkpoints": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "EXECUTED_ORACLE_WITNESS_SCALAR_MISS"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "oracleWitnessStepCount": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "checkpoints": {
+                "minItems": 6,
+                "maxItems": 6
+              }
+            }
+          }
+        }
+      ]
+    },
+    "statusCounts": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/caseStatus"
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "caseCount",
+        "statusCounts",
+        "checkpointCount",
+        "equalConsumedWorkCount",
+        "equalWorkDiversityAdvantageCount",
+        "equalWorkDiversityCompleteWitnessCount"
+      ],
+      "properties": {
+        "caseCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "statusCounts": {
+          "$ref": "#/$defs/statusCounts"
+        },
+        "checkpointCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "equalConsumedWorkCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "equalWorkDiversityAdvantageCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "equalWorkDiversityCompleteWitnessCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
