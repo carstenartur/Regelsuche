@@ -39,28 +39,31 @@ public final class HistoricalRewriteArchitectureDecision {
         "regelsuche.historical-rediscovery-atlas/v1";
 
     public static void main(String[] args) {
-        if (args.length != 7
+        if (args.length != 8
                 || !"rewrite-architecture-decision".equals(args[0])) {
             throw new IllegalArgumentException(
-                "usage: rewrite-architecture-decision <run> <atlas> <witness> "
-                    + "<comparison> <equal-work> <output>");
+                "usage: rewrite-architecture-decision <repository-revision> "
+                    + "<run> <atlas> <witness> <comparison> <equal-work> <output>");
         }
         Report report = derive(
-            Path.of(args[1]), Path.of(args[2]), Path.of(args[3]),
-            Path.of(args[4]), Path.of(args[5]));
-        Path output = write(Path.of(args[6]), report);
+            args[1],
+            Path.of(args[2]), Path.of(args[3]), Path.of(args[4]),
+            Path.of(args[5]), Path.of(args[6]));
+        Path output = write(Path.of(args[7]), report);
         System.out.println("historicalRewriteArchitectureDecision=" + output);
         System.out.println("historicalRewriteArchitectureDecisionHash="
-            + report.contentHash);
+            + report.contentHash());
     }
 
     static Report derive(
+        String repositoryRevision,
         Path runPath,
         Path atlasPath,
         Path witnessPath,
         Path productionPath,
         Path equalWorkPath
     ) {
+        repositoryRevision = revision(repositoryRevision);
         Document run = Document.hashed(
             runPath,
             "atlas run",
@@ -93,44 +96,44 @@ public final class HistoricalRewriteArchitectureDecision {
             "inventoryRevision", run, atlas, witness, production, equalWork);
         requireEqual(
             "SCALAR_BEST_FIRST_TARGET_BLIND",
-            production.root.text("scalarPolicy"),
+            production.root().text("scalarPolicy"),
             "production scalar policy");
         requireEqual(
             "STRUCTURAL_DIVERSITY_TARGET_BLIND",
-            production.root.text("diversityPolicy"),
+            production.root().text("diversityPolicy"),
             "production diversity policy");
         requireEqual(
             "ENGINE_CALLS_AND_ADMITTED_PRIMITIVE_REWRITE_STEPS",
-            equalWork.root.text("workUnit"),
+            equalWork.root().text("workUnit"),
             "equal-work work unit");
 
-        String atlasHash = sha256(atlas.raw);
+        String atlasHash = sha256(atlas.raw());
         requireEqual(
             atlasHash,
             artifactHash(run, "ATLAS_JSON"),
             "atlas-run payload identity");
         requireEqual(
-            run.root.text("assessmentDecision"),
-            atlas.root.object("assessment").text("decision"),
+            run.root().text("assessmentDecision"),
+            atlas.root().object("assessment").text("decision"),
             "atlas assessment identity");
-        requireEqual(atlasHash, witness.root.text("atlasSha256"), "witness atlas");
+        requireEqual(atlasHash, witness.root().text("atlasSha256"), "witness atlas");
         requireEqual(
-            atlasHash, production.root.text("atlasSha256"), "production atlas");
+            atlasHash, production.root().text("atlasSha256"), "production atlas");
         requireEqual(
-            atlasHash, equalWork.root.text("atlasSha256"), "equal-work atlas");
+            atlasHash, equalWork.root().text("atlasSha256"), "equal-work atlas");
         requireEqual(
-            witness.contentHash,
-            production.root.text("witnessDiagnosticSha256"),
+            witness.contentHash(),
+            production.root().text("witnessDiagnosticSha256"),
             "production witness identity");
 
-        View witnessSummary = witness.root.object("summary");
-        View productionSummary = production.root.object("summary");
-        View equalSummary = equalWork.root.object("summary");
+        View witnessSummary = witness.root().object("summary");
+        View productionSummary = production.root().object("summary");
+        View equalSummary = equalWork.root().object("summary");
         View equalStatuses = equalSummary.object("statusCounts");
         View witnessStatuses = witnessSummary.object("statusCounts");
         int caseCount = equalSummary.integer("caseCount");
-        requireEqual(caseCount, atlas.root.array("cases").size(), "atlas cases");
-        requireEqual(caseCount, run.root.integer("caseCount"), "run cases");
+        requireEqual(caseCount, atlas.root().array("cases").size(), "atlas cases");
+        requireEqual(caseCount, run.root().integer("caseCount"), "run cases");
         requireEqual(
             caseCount, witnessSummary.integer("caseCount"), "witness cases");
         requireEqual(
@@ -151,16 +154,18 @@ public final class HistoricalRewriteArchitectureDecision {
             equalSummary.integer("equalWorkDiversityAdvantageCount"),
             equalSummary.integer(
                 "equalWorkDiversityCompleteWitnessCount"));
-        requireDecisionEvidence(atlas.root.object("assessment"), distribution);
+        requireDecisionEvidence(atlas.root().object("assessment"), distribution);
 
         Sources sources = new Sources(
-            run.contentHash, atlasHash, witness.contentHash,
-            production.contentHash, equalWork.contentHash);
+            run.contentHash(), atlasHash, witness.contentHash(),
+            production.contentHash(), equalWork.contentHash());
         List<Decision> decisions = decisions();
-        String hash = sha256(render(
-            corpusHash, inventory, sources, distribution, decisions, null));
+        String hash = reportHash(
+            repositoryRevision, corpusHash, inventory,
+            sources, distribution, decisions);
         return new Report(
-            corpusHash, inventory, sources, distribution, decisions, hash);
+            repositoryRevision, corpusHash, inventory,
+            sources, distribution, decisions, hash);
     }
 
     static Path write(Path directory, Report report) {
@@ -189,19 +194,19 @@ public final class HistoricalRewriteArchitectureDecision {
                 || !assessment.bool("missingInventoryLayerIdentified")
                 || !assessment.bool("searchPolicyDifferenceIdentified")
                 || !assessment.bool("negativeControlPassed")
-                || distribution.noProductionWitnessCount < 1
-                || distribution.oracleWitnessScalarMissCount < 1
-                || distribution.witnessPrefixLostCount < 1
-                || distribution.diversityRecoveredCompleteWitnessCount < 1
-                || distribution.equalWorkDiversityAdvantageCount < 1
-                || distribution.equalWorkDiversityCompleteWitnessCount < 1) {
+                || distribution.noProductionWitnessCount() < 1
+                || distribution.oracleWitnessScalarMissCount() < 1
+                || distribution.witnessPrefixLostCount() < 1
+                || distribution.diversityRecoveredCompleteWitnessCount() < 1
+                || distribution.equalWorkDiversityAdvantageCount() < 1
+                || distribution.equalWorkDiversityCompleteWitnessCount() < 1) {
             throw new IllegalArgumentException(
                 "insufficient evidence for decision v1");
         }
     }
 
     private static String artifactHash(Document run, String role) {
-        for (Object raw : run.root.array("artifacts")) {
+        for (Object raw : run.root().array("artifacts")) {
             View artifact = View.of(raw, "artifact");
             if (role.equals(artifact.text("role"))) {
                 return prefixedSha(artifact.text("byteHash"), role + " hash");
@@ -212,9 +217,9 @@ public final class HistoricalRewriteArchitectureDecision {
     }
 
     private static String same(String key, Document first, Document... rest) {
-        String expected = first.root.text(key);
+        String expected = first.root().text(key);
         for (Document value : rest) {
-            requireEqual(expected, value.root.text(key), key);
+            requireEqual(expected, value.root().text(key), key);
         }
         return expected;
     }
@@ -275,7 +280,21 @@ public final class HistoricalRewriteArchitectureDecision {
                     + "depth, coverage or proof strength."));
     }
 
+    private static String reportHash(
+        String repositoryRevision,
+        String corpusHash,
+        String inventory,
+        Sources sources,
+        Distribution distribution,
+        List<Decision> decisions
+    ) {
+        return sha256(render(
+            repositoryRevision, corpusHash, inventory,
+            sources, distribution, decisions, null));
+    }
+
     private static String render(
+        String repositoryRevision,
         String corpusHash,
         String inventory,
         Sources sources,
@@ -286,6 +305,7 @@ public final class HistoricalRewriteArchitectureDecision {
         JsonWriter writer = new JsonWriter().beginObject();
         writer.property("schema", SCHEMA);
         writer.property("evidenceStatus", EVIDENCE_STATUS);
+        writer.property("repositoryRevision", repositoryRevision);
         writer.property("corpusSchema", CORPUS_SCHEMA);
         writer.property("corpusSha256", corpusHash);
         writer.property("inventoryRevision", inventory);
@@ -302,52 +322,52 @@ public final class HistoricalRewriteArchitectureDecision {
     }
 
     private static void write(JsonWriter writer, Sources value) {
-        writer.property("atlasRunContentHash", value.atlasRunContentHash);
-        writer.property("atlasSha256", value.atlasSha256);
+        writer.property("atlasRunContentHash", value.atlasRunContentHash());
+        writer.property("atlasSha256", value.atlasSha256());
         writer.property(
             "witnessDiagnosticContentHash",
-            value.witnessDiagnosticContentHash);
+            value.witnessDiagnosticContentHash());
         writer.property(
             "productionComparisonContentHash",
-            value.productionComparisonContentHash);
+            value.productionComparisonContentHash());
         writer.property(
             "equalWorkComparisonContentHash",
-            value.equalWorkComparisonContentHash);
+            value.equalWorkComparisonContentHash());
     }
 
     private static void write(JsonWriter writer, Distribution value) {
-        writer.property("caseCount", value.caseCount);
+        writer.property("caseCount", value.caseCount());
         writer.property(
-            "noProductionWitnessCount", value.noProductionWitnessCount);
+            "noProductionWitnessCount", value.noProductionWitnessCount());
         writer.property(
-            "scalarAlreadyReachedCount", value.scalarAlreadyReachedCount);
+            "scalarAlreadyReachedCount", value.scalarAlreadyReachedCount());
         writer.property(
             "oracleWitnessScalarMissCount",
-            value.oracleWitnessScalarMissCount);
+            value.oracleWitnessScalarMissCount());
         writer.property(
-            "witnessPrefixLostCount", value.witnessPrefixLostCount);
+            "witnessPrefixLostCount", value.witnessPrefixLostCount());
         writer.property(
             "diversityRecoveredCompleteWitnessCount",
-            value.diversityRecoveredCompleteWitnessCount);
-        writer.property("checkpointCount", value.checkpointCount);
+            value.diversityRecoveredCompleteWitnessCount());
+        writer.property("checkpointCount", value.checkpointCount());
         writer.property(
             "equalConsumedWorkCheckpointCount",
-            value.equalConsumedWorkCheckpointCount);
+            value.equalConsumedWorkCheckpointCount());
         writer.property(
             "equalWorkDiversityAdvantageCount",
-            value.equalWorkDiversityAdvantageCount);
+            value.equalWorkDiversityAdvantageCount());
         writer.property(
             "equalWorkDiversityCompleteWitnessCount",
-            value.equalWorkDiversityCompleteWitnessCount);
+            value.equalWorkDiversityCompleteWitnessCount());
     }
 
     private static void write(JsonWriter writer, Decision value) {
-        writer.property("track", value.track);
-        writer.property("disposition", value.disposition.name());
-        writer.property("relatedIssue", value.relatedIssue);
+        writer.property("track", value.track());
+        writer.property("disposition", value.disposition().name());
+        writer.property("relatedIssue", value.relatedIssue());
         writer.array("evidenceCodes", array ->
-            value.evidenceCodes.forEach(array::value));
-        writer.property("reason", value.reason);
+            value.evidenceCodes().forEach(array::value));
+        writer.property("reason", value.reason());
     }
 
     private static void requireEqual(
@@ -366,6 +386,16 @@ public final class HistoricalRewriteArchitectureDecision {
             throw new IllegalArgumentException("blank " + label);
         }
         return value.trim();
+    }
+
+    private static String revision(String value) {
+        String result = text(value, "repositoryRevision");
+        if (!result.equals("WORKTREE")
+                && !result.matches("[0-9a-f]{40}")) {
+            throw new IllegalArgumentException(
+                "repositoryRevision must be WORKTREE or a commit SHA");
+        }
+        return result;
     }
 
     private static String rawSha(String value, String label) {
@@ -501,6 +531,7 @@ public final class HistoricalRewriteArchitectureDecision {
     }
 
     record Report(
+        String repositoryRevision,
         String corpusSha256,
         String inventoryRevision,
         Sources sources,
@@ -509,6 +540,7 @@ public final class HistoricalRewriteArchitectureDecision {
         String contentHash
     ) {
         Report {
+            repositoryRevision = revision(repositoryRevision);
             corpusSha256 = rawSha(corpusSha256, "corpusSha256");
             inventoryRevision = text(inventoryRevision, "inventoryRevision");
             Objects.requireNonNull(sources, "sources");
@@ -526,17 +558,17 @@ public final class HistoricalRewriteArchitectureDecision {
             }
             contentHash = prefixedSha(contentHash, "contentHash");
             requireEqual(
-                sha256(render(
-                    corpusSha256, inventoryRevision, sources,
-                    distribution, decisions, null)),
+                reportHash(
+                    repositoryRevision, corpusSha256, inventoryRevision,
+                    sources, distribution, decisions),
                 contentHash,
                 "decision contentHash");
         }
 
         String json() {
             return render(
-                corpusSha256, inventoryRevision, sources,
-                distribution, decisions, contentHash);
+                repositoryRevision, corpusSha256, inventoryRevision,
+                sources, distribution, decisions, contentHash);
         }
     }
 
@@ -571,7 +603,6 @@ public final class HistoricalRewriteArchitectureDecision {
             requireEqual(hash, sha256(withoutHash), label + " contentHash");
             return new Document(raw, root, hash);
         }
-
     }
 
     private record View(Map<String, Object> values) {
