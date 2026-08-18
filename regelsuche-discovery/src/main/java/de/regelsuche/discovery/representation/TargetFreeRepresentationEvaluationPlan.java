@@ -213,7 +213,7 @@ public final class TargetFreeRepresentationEvaluationPlan {
                 Objects.requireNonNull(source, "source"),
                 Objects.requireNonNull(type, "type")
             );
-        } catch (JsonProcessingException exception) {
+        } catch (IOException exception) {
             throw new IllegalArgumentException("invalid " + label, exception);
         }
     }
