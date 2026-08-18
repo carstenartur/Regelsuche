@@ -1,0 +1,806 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetFreeRepresentationEvaluationPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">TargetFreeRepresentationEvaluationPlan.java</span></div><h1>TargetFreeRepresentationEvaluationPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sortedStrings;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary.Track;
+import de.regelsuche.search.strategy.SearchStrategy;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Generates the frozen, target-blind representation-discovery evaluation plan.
+ *
+ * &lt;p&gt;The generator loads the preregistration and candidate-formation resources,
+ * but deliberately never opens the post-freeze qualification resource. The
+ * resulting plan contains only its opaque byte hash and length.&lt;/p&gt;
+ */
+public final class TargetFreeRepresentationEvaluationPlan {
+    public static final String SCHEMA =
+        &quot;regelsuche.target-free-representation-evaluation-plan/v1&quot;;
+    public static final String FILE_NAME =
+        &quot;representation-discovery-plan.json&quot;;
+    public static final String PREREGISTRATION_RESOURCE =
+        &quot;/de/regelsuche/discovery/representation/&quot;
+            + &quot;target-free-representation-preregistration-v1.json&quot;;
+    public static final long PREREGISTRATION_BYTE_LENGTH = 1019L;
+    public static final String PREREGISTRATION_SHA256 =
+        &quot;sha256:1bd103fbedb176a374bc61bfb851977444eb1918d4d03bb372e7b2abb8fdf51d&quot;;
+    public static final String FORMATION_SCHEMA =
+        &quot;regelsuche.target-free-representation-formation/v1&quot;;
+    public static final String PREREGISTRATION_SCHEMA =
+        &quot;regelsuche.target-free-representation-preregistration/v1&quot;;
+    public static final String EVIDENCE_STATUS = &quot;FROZEN_NOT_EXECUTED&quot;;
+    public static final String ENTRY_STATUS = &quot;REMAINING&quot;;
+    public static final String TERMINAL_REASON = &quot;NOT_EXECUTED&quot;;
+    public static final String QUALIFICATION_DISCLOSURE = &quot;NOT_DISCLOSED&quot;;
+
+<span class="fc" id="L58">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L59">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L60">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L61">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L62">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L63">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L64">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)</span>
+<span class="fc" id="L65">        .build();</span>
+
+    private TargetFreeRepresentationEvaluationPlan() {
+    }
+
+    public static EvaluationPlan create(String repositoryRevision) {
+<span class="fc" id="L71">        String revision = requireRepositoryRevision(repositoryRevision);</span>
+<span class="fc" id="L72">        byte[] preregistrationBytes = readResource(PREREGISTRATION_RESOURCE);</span>
+<span class="fc" id="L73">        requireResourceBinding(</span>
+            preregistrationBytes,
+            PREREGISTRATION_BYTE_LENGTH,
+            PREREGISTRATION_SHA256,
+            &quot;preregistration&quot;
+        );
+<span class="fc" id="L79">        Preregistration preregistration = decode(</span>
+            preregistrationBytes,
+            Preregistration.class,
+            &quot;target-free representation preregistration&quot;
+        );
+<span class="fc" id="L84">        byte[] formationBytes = readResource(</span>
+<span class="fc" id="L85">            preregistration.formationResource());</span>
+<span class="fc" id="L86">        requireResourceBinding(</span>
+            formationBytes,
+<span class="fc" id="L88">            preregistration.formationByteLength(),</span>
+<span class="fc" id="L89">            preregistration.formationSha256(),</span>
+            &quot;formation&quot;
+        );
+<span class="fc" id="L92">        Formation formation = decode(</span>
+            formationBytes,
+            Formation.class,
+            &quot;target-free representation formation&quot;
+        );
+<span class="fc" id="L97">        validateCounts(preregistration, formation);</span>
+<span class="fc" id="L98">        formation.policies().forEach(</span>
+            TargetFreeRepresentationEvaluationPlan::requireAdapter);
+
+<span class="fc" id="L101">        String preregistrationHash = sha256(preregistrationBytes);</span>
+<span class="fc" id="L102">        List&lt;PlanEntry&gt; entries = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L103">        int sequence = 1;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (CaseDefinition benchmarkCase : formation.cases()) {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (PolicyDefinition policy : formation.policies()) {</span>
+<span class="fc" id="L106">                entries.add(new PlanEntry(</span>
+                    sequence++,
+<span class="fc" id="L108">                    configurationId(</span>
+                        preregistrationHash,
+<span class="fc" id="L110">                        benchmarkCase.id(),</span>
+<span class="fc" id="L111">                        policy.id()</span>
+                    ),
+<span class="fc" id="L113">                    benchmarkCase.id(),</span>
+<span class="fc" id="L114">                    policy.id(),</span>
+                    ENTRY_STATUS,
+                    TERMINAL_REASON
+                ));
+<span class="fc" id="L118">            }</span>
+<span class="fc" id="L119">        }</span>
+<span class="fc" id="L120">        PlanContent content = new PlanContent(</span>
+            SCHEMA,
+            EVIDENCE_STATUS,
+            revision,
+            PREREGISTRATION_RESOURCE,
+            preregistrationHash,
+<span class="fc" id="L126">            preregistration.formationResource(),</span>
+<span class="fc" id="L127">            preregistration.formationSha256(),</span>
+<span class="fc" id="L128">            preregistration.formationByteLength(),</span>
+<span class="fc" id="L129">            preregistration.qualificationResource(),</span>
+<span class="fc" id="L130">            preregistration.qualificationSha256(),</span>
+<span class="fc" id="L131">            preregistration.qualificationByteLength(),</span>
+            QUALIFICATION_DISCLOSURE,
+<span class="fc" id="L133">            formation.informationBoundary(),</span>
+<span class="fc" id="L134">            formation.cases(),</span>
+<span class="fc" id="L135">            formation.policies(),</span>
+            entries,
+<span class="fc" id="L137">            List.of(new StatusCount(ENTRY_STATUS, entries.size())),</span>
+<span class="fc" id="L138">            preregistration.configuredCaseCount(),</span>
+<span class="fc" id="L139">            preregistration.configuredPolicyCount(),</span>
+<span class="fc" id="L140">            preregistration.configuredEntryCount(),</span>
+<span class="fc" id="L141">            preregistration.claimBoundary()</span>
+        );
+<span class="fc" id="L143">        return EvaluationPlan.create(content);</span>
+    }
+
+    public static EvaluationPlan write(
+        Path directory,
+        String repositoryRevision
+    ) throws IOException {
+<span class="fc" id="L150">        Path root = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L151">            .toAbsolutePath().normalize();</span>
+<span class="fc" id="L152">        Files.createDirectories(root);</span>
+<span class="fc" id="L153">        EvaluationPlan plan = create(repositoryRevision);</span>
+<span class="fc" id="L154">        String canonical = plan.toCanonicalJson();</span>
+<span class="fc" id="L155">        Path target = root.resolve(FILE_NAME);</span>
+<span class="fc" id="L156">        AtomicJsonFile.writeUtf8(target, canonical);</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (!Files.isRegularFile(target)</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                || !canonical.equals(Files.readString(</span>
+                    target,
+                    StandardCharsets.UTF_8))) {
+<span class="nc" id="L161">            throw new IllegalStateException(</span>
+                &quot;written representation-discovery plan changed: &quot; + target);
+        }
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (!plan.equals(EvaluationPlan.fromCanonicalJson(canonical))) {</span>
+<span class="nc" id="L165">            throw new IllegalStateException(</span>
+                &quot;representation-discovery plan changed during round-trip&quot;);
+        }
+<span class="fc" id="L168">        return plan;</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (args.length != 2) {</span>
+<span class="nc" id="L173">            throw new IllegalArgumentException(</span>
+                &quot;usage: &lt;repository-commit&gt; &lt;output-directory&gt;&quot;);
+        }
+<span class="nc" id="L176">        EvaluationPlan plan = write(Path.of(args[1]), args[0]);</span>
+<span class="nc" id="L177">        System.out.println(</span>
+            &quot;targetFreeRepresentationEvaluationPlanHash=&quot;
+<span class="nc" id="L179">                + plan.contentHash()</span>
+        );
+<span class="nc" id="L181">        System.out.println(</span>
+            &quot;targetFreeRepresentationEvaluationConfigurations=&quot;
+<span class="nc" id="L183">                + plan.content().configuredEntryCount()</span>
+        );
+<span class="nc" id="L185">    }</span>
+
+    static byte[] readResource(String resource) {
+<span class="fc" id="L188">        String path = requireResourcePath(resource, &quot;resource&quot;);</span>
+<span class="fc" id="L189">        try (InputStream input =</span>
+                TargetFreeRepresentationEvaluationPlan.class
+<span class="fc" id="L191">                    .getResourceAsStream(path)) {</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (input == null) {</span>
+<span class="nc" id="L193">                throw new IllegalStateException(</span>
+                    &quot;missing representation-discovery resource &quot; + path);
+            }
+<span class="fc" id="L196">            return input.readAllBytes();</span>
+<span class="nc" id="L197">        } catch (IOException exception) {</span>
+<span class="nc" id="L198">            throw new IllegalStateException(</span>
+                &quot;cannot read representation-discovery resource &quot; + path,
+                exception
+            );
+        }
+    }
+
+    static String sha256(byte[] source) {
+<span class="fc" id="L206">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+        try {
+<span class="fc" id="L208">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L209">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(source));</span>
+<span class="nc" id="L210">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L211">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static &lt;T&gt; T decode(
+        byte[] source,
+        Class&lt;T&gt; type,
+        String label
+    ) {
+        try {
+<span class="fc" id="L221">            return JSON.readValue(</span>
+<span class="fc" id="L222">                Objects.requireNonNull(source, &quot;source&quot;),</span>
+<span class="fc" id="L223">                Objects.requireNonNull(type, &quot;type&quot;)</span>
+            );
+<span class="nc" id="L225">        } catch (IOException exception) {</span>
+<span class="nc" id="L226">            throw new IllegalArgumentException(&quot;invalid &quot; + label, exception);</span>
+        }
+    }
+
+    private static String canonical(Object value) {
+        try {
+<span class="fc" id="L232">            return JSON.writeValueAsString(</span>
+<span class="fc" id="L233">                Objects.requireNonNull(value, &quot;value&quot;));</span>
+<span class="nc" id="L234">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L235">            throw new IllegalStateException(</span>
+                &quot;unable to render representation-discovery plan&quot;,
+                exception
+            );
+        }
+    }
+
+    private static void validateCounts(
+        Preregistration preregistration,
+        Formation formation
+    ) {
+<span class="fc" id="L246">        if (formation.cases().size()</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                != preregistration.configuredCaseCount()) {</span>
+<span class="nc" id="L248">            throw new IllegalArgumentException(</span>
+                &quot;formation case count differs from preregistration&quot;);
+        }
+<span class="fc" id="L251">        if (formation.policies().size()</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                != preregistration.configuredPolicyCount()) {</span>
+<span class="nc" id="L253">            throw new IllegalArgumentException(</span>
+                &quot;formation policy count differs from preregistration&quot;);
+        }
+<span class="fc" id="L256">        int matrix = Math.multiplyExact(</span>
+<span class="fc" id="L257">            formation.cases().size(),</span>
+<span class="fc" id="L258">            formation.policies().size()</span>
+        );
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        if (matrix != preregistration.configuredEntryCount()) {</span>
+<span class="nc" id="L261">            throw new IllegalArgumentException(</span>
+                &quot;formation matrix differs from preregistration&quot;);
+        }
+<span class="fc" id="L264">    }</span>
+
+    private static void requireResourceBinding(
+        byte[] bytes,
+        long expectedLength,
+        String expectedHash,
+        String label
+    ) {
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        if (bytes.length != expectedLength) {</span>
+<span class="nc" id="L273">            throw new IllegalArgumentException(</span>
+                label + &quot; byte length differs: expected=&quot; + expectedLength
+                    + &quot;, actual=&quot; + bytes.length);
+        }
+<span class="fc" id="L277">        String actualHash = sha256(bytes);</span>
+<span class="fc" id="L278">        if (!requireSha256(expectedHash, label + &quot;Sha256&quot;)</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">                .equals(actualHash)) {</span>
+<span class="nc" id="L280">            throw new IllegalArgumentException(</span>
+                label + &quot; byte hash differs: expected=&quot; + expectedHash
+                    + &quot;, actual=&quot; + actualHash);
+        }
+<span class="fc" id="L284">    }</span>
+
+    private static void requireAdapter(PolicyDefinition policy) {
+        try {
+<span class="fc" id="L288">            Class&lt;?&gt; adapter = Class.forName(</span>
+<span class="fc" id="L289">                policy.adapter(),</span>
+                false,
+<span class="fc" id="L291">                TargetFreeRepresentationEvaluationPlan.class.getClassLoader()</span>
+            );
+<span class="fc" id="L293">            requireAdapterInterface(policy, adapter);</span>
+<span class="pc bpc" id="L294" title="1 of 3 branches missed.">            switch (policy.adapterConstructor()) {</span>
+<span class="fc" id="L295">                case NO_ARGUMENT -&gt; adapter.getConstructor();</span>
+<span class="fc" id="L296">                case LONG_SEED -&gt; adapter.getConstructor(long.class);</span>
+            }
+<span class="nc" id="L298">        } catch (ReflectiveOperationException exception) {</span>
+<span class="nc" id="L299">            throw new IllegalArgumentException(</span>
+                &quot;configured target-blind policy adapter contract is &quot;
+<span class="nc" id="L301">                    + &quot;unavailable: &quot; + policy.adapter(),</span>
+                exception
+            );
+<span class="fc" id="L304">        }</span>
+<span class="fc" id="L305">    }</span>
+
+    private static void requireAdapterInterface(
+        PolicyDefinition policy,
+        Class&lt;?&gt; adapter
+    ) {
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        boolean matches = switch (policy.adapterInterface()) {</span>
+            case TARGET_FREE_REPRESENTATION_SEARCH -&gt;
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">                adapter == TargetFreeRepresentationSearch.class;</span>
+            case SEARCH_STRATEGY -&gt;
+<span class="fc" id="L315">                SearchStrategy.class.isAssignableFrom(adapter);</span>
+        };
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (!matches) {</span>
+<span class="nc" id="L318">            throw new IllegalArgumentException(</span>
+                &quot;configured target-blind policy adapter has the wrong &quot;
+<span class="nc" id="L320">                    + &quot;invocation interface: &quot; + policy.adapter());</span>
+        }
+<span class="fc" id="L322">    }</span>
+
+    private static String configurationId(
+        String preregistrationHash,
+        String caseId,
+        String policyId
+    ) {
+<span class="fc" id="L329">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L330">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor,
+            SCHEMA + &quot;/configuration&quot;
+        );
+<span class="fc" id="L334">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor,
+<span class="fc" id="L336">            requireSha256(</span>
+                preregistrationHash,
+                &quot;preregistrationHash&quot;
+            )
+        );
+<span class="fc" id="L341">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor,
+<span class="fc" id="L343">            requireText(caseId, &quot;caseId&quot;)</span>
+        );
+<span class="fc" id="L345">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor,
+<span class="fc" id="L347">            requireText(policyId, &quot;policyId&quot;)</span>
+        );
+<span class="fc" id="L349">        return KnownStructureCatalog.sha256(descriptor.toString());</span>
+    }
+
+    private static String requireRepositoryRevision(String value) {
+<span class="fc" id="L353">        String revision = requireText(value, &quot;repositoryRevision&quot;);</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (!revision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="fc" id="L355">            throw new IllegalArgumentException(</span>
+                &quot;repositoryRevision must be a lowercase 40-character &quot;
+                    + &quot;Git commit SHA&quot;);
+        }
+<span class="fc" id="L359">        return revision;</span>
+    }
+
+    private static String requireResourcePath(
+        String value,
+        String field
+    ) {
+<span class="fc" id="L366">        String resource = requireText(value, field);</span>
+<span class="pc bpc" id="L367" title="2 of 4 branches missed.">        if (!resource.startsWith(&quot;/&quot;) || !resource.endsWith(&quot;.json&quot;)</span>
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">                || resource.contains(&quot;..&quot;)) {</span>
+<span class="nc" id="L369">            throw new IllegalArgumentException(</span>
+                field + &quot; must be an absolute classpath JSON resource&quot;);
+        }
+<span class="fc" id="L372">        return resource;</span>
+    }
+
+    private static List&lt;CaseDefinition&gt; canonicalCases(
+        List&lt;CaseDefinition&gt; values
+    ) {
+<span class="fc" id="L378">        Objects.requireNonNull(values, &quot;cases&quot;);</span>
+<span class="fc" id="L379">        List&lt;CaseDefinition&gt; sorted = values.stream()</span>
+<span class="fc" id="L380">            .map(value -&gt; Objects.requireNonNull(value, &quot;case&quot;))</span>
+<span class="fc" id="L381">            .sorted(Comparator.comparing(CaseDefinition::id))</span>
+<span class="fc" id="L382">            .toList();</span>
+<span class="fc" id="L383">        requireUnique(</span>
+<span class="fc" id="L384">            sorted.stream().map(CaseDefinition::id).toList(),</span>
+            &quot;case&quot;
+        );
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">        if (sorted.isEmpty()) {</span>
+<span class="nc" id="L388">            throw new IllegalArgumentException(&quot;cases must not be empty&quot;);</span>
+        }
+<span class="fc" id="L390">        return sorted;</span>
+    }
+
+    private static List&lt;PolicyDefinition&gt; canonicalPolicies(
+        List&lt;PolicyDefinition&gt; values
+    ) {
+<span class="fc" id="L396">        Objects.requireNonNull(values, &quot;policies&quot;);</span>
+<span class="fc" id="L397">        List&lt;PolicyDefinition&gt; sorted = values.stream()</span>
+<span class="fc" id="L398">            .map(value -&gt; Objects.requireNonNull(value, &quot;policy&quot;))</span>
+<span class="fc" id="L399">            .sorted(Comparator.comparing(PolicyDefinition::id))</span>
+<span class="fc" id="L400">            .toList();</span>
+<span class="fc" id="L401">        requireUnique(</span>
+<span class="fc" id="L402">            sorted.stream().map(PolicyDefinition::id).toList(),</span>
+            &quot;policy&quot;
+        );
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">        if (sorted.isEmpty()) {</span>
+<span class="nc" id="L406">            throw new IllegalArgumentException(&quot;policies must not be empty&quot;);</span>
+        }
+<span class="fc" id="L408">        return sorted;</span>
+    }
+
+    private static void requireUnique(
+        List&lt;String&gt; values,
+        String label
+    ) {
+<span class="fc" id="L415">        Set&lt;String&gt; identities = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">            if (!identities.add(value)) {</span>
+<span class="nc" id="L418">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate &quot; + label + &quot; identity: &quot; + value);
+            }
+<span class="fc" id="L421">        }</span>
+<span class="fc" id="L422">    }</span>
+
+    public record Preregistration(
+        String schema,
+        String evidenceStatus,
+        String formationResource,
+        String formationSha256,
+        long formationByteLength,
+        String qualificationResource,
+        String qualificationSha256,
+        long qualificationByteLength,
+        int configuredCaseCount,
+        int configuredPolicyCount,
+        int configuredEntryCount,
+        String requiredEntryStatus,
+        String requiredTerminalReason,
+        String claimBoundary
+    ) {
+<span class="fc" id="L440">        public Preregistration {</span>
+<span class="fc" id="L441">            schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">            if (!PREREGISTRATION_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L443">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported preregistration schema: &quot; + schema);
+            }
+<span class="fc" id="L446">            evidenceStatus = requireText(</span>
+                evidenceStatus, &quot;evidenceStatus&quot;);
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">            if (!EVIDENCE_STATUS.equals(evidenceStatus)) {</span>
+<span class="nc" id="L449">                throw new IllegalArgumentException(</span>
+                    &quot;preregistration must remain FROZEN_NOT_EXECUTED&quot;);
+            }
+<span class="fc" id="L452">            formationResource = requireResourcePath(</span>
+                formationResource, &quot;formationResource&quot;);
+<span class="fc" id="L454">            formationSha256 = requireSha256(</span>
+                formationSha256, &quot;formationSha256&quot;);
+<span class="fc" id="L456">            qualificationResource = requireResourcePath(</span>
+                qualificationResource, &quot;qualificationResource&quot;);
+<span class="fc" id="L458">            qualificationSha256 = requireSha256(</span>
+                qualificationSha256, &quot;qualificationSha256&quot;);
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">            if (formationResource.equals(qualificationResource)) {</span>
+<span class="nc" id="L461">                throw new IllegalArgumentException(</span>
+                    &quot;formation and qualification resources must be separate&quot;);
+            }
+<span class="pc bpc" id="L464" title="2 of 4 branches missed.">            if (formationByteLength &lt; 1 || qualificationByteLength &lt; 1) {</span>
+<span class="nc" id="L465">                throw new IllegalArgumentException(</span>
+                    &quot;resource byte lengths must be positive&quot;);
+            }
+<span class="pc bpc" id="L468" title="2 of 4 branches missed.">            if (configuredCaseCount &lt; 1 || configuredPolicyCount &lt; 1</span>
+                    || configuredEntryCount
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">                        != Math.multiplyExact(</span>
+                            configuredCaseCount,
+                            configuredPolicyCount)) {
+<span class="nc" id="L473">                throw new IllegalArgumentException(</span>
+                    &quot;configured matrix does not balance&quot;);
+            }
+<span class="fc" id="L476">            requiredEntryStatus = requireText(</span>
+                requiredEntryStatus, &quot;requiredEntryStatus&quot;);
+<span class="fc" id="L478">            requiredTerminalReason = requireText(</span>
+                requiredTerminalReason, &quot;requiredTerminalReason&quot;);
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            if (!ENTRY_STATUS.equals(requiredEntryStatus)</span>
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">                    || !TERMINAL_REASON.equals(requiredTerminalReason)) {</span>
+<span class="nc" id="L482">                throw new IllegalArgumentException(</span>
+                    &quot;preregistration may only describe unexecuted entries&quot;);
+            }
+<span class="fc" id="L485">            claimBoundary = requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="fc" id="L486">        }</span>
+    }
+
+    public record Formation(
+        String schema,
+        String evidenceStatus,
+        String informationBoundary,
+        List&lt;CaseDefinition&gt; cases,
+        List&lt;PolicyDefinition&gt; policies
+    ) {
+<span class="fc" id="L496">        public Formation {</span>
+<span class="fc" id="L497">            schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">            if (!FORMATION_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L499">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported formation schema: &quot; + schema);
+            }
+<span class="fc" id="L502">            evidenceStatus = requireText(</span>
+                evidenceStatus, &quot;evidenceStatus&quot;);
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">            if (!EVIDENCE_STATUS.equals(evidenceStatus)) {</span>
+<span class="nc" id="L505">                throw new IllegalArgumentException(</span>
+                    &quot;formation must remain FROZEN_NOT_EXECUTED&quot;);
+            }
+<span class="fc" id="L508">            informationBoundary = requireText(</span>
+                informationBoundary, &quot;informationBoundary&quot;);
+<span class="fc" id="L510">            cases = canonicalCases(cases);</span>
+<span class="fc" id="L511">            policies = canonicalPolicies(policies);</span>
+<span class="fc" id="L512">        }</span>
+    }
+
+    public record CaseDefinition(
+        String id,
+        String sourceExpression,
+        List&lt;String&gt; assumptions,
+        Track informationTrack,
+        WorkBudget budget
+    ) {
+<span class="fc" id="L522">        public CaseDefinition {</span>
+<span class="fc" id="L523">            id = requireText(id, &quot;case id&quot;);</span>
+<span class="fc" id="L524">            sourceExpression = requireText(</span>
+                sourceExpression, &quot;sourceExpression&quot;);
+<span class="fc" id="L526">            assumptions = sortedStrings(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L527">            informationTrack = Objects.requireNonNull(</span>
+                informationTrack, &quot;informationTrack&quot;);
+<span class="pc bpc" id="L529" title="1 of 4 branches missed.">            if (informationTrack</span>
+                    != Track.R1_TARGET_FREE_COMPRESSION
+                    &amp;&amp; informationTrack
+                        != Track.R2_CATALOG_BLIND_POST_HOC_BRIDGE) {
+<span class="nc" id="L533">                throw new IllegalArgumentException(</span>
+                    &quot;evaluation formation supports only R1 and R2&quot;);
+            }
+<span class="fc" id="L536">            budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L537">        }</span>
+    }
+
+    public record WorkBudget(
+        int maxDepth,
+        int maxExploredStates,
+        int maxRetainedStates,
+        int maxGeneratedTransitions,
+        int maxCandidatesPerState,
+        int maxAstSizeIncreasePerStep
+    ) {
+<span class="fc" id="L548">        public WorkBudget {</span>
+<span class="pc bpc" id="L549" title="6 of 12 branches missed.">            if (maxDepth &lt; 0</span>
+                    || maxExploredStates &lt; 1
+                    || maxRetainedStates &lt; 1
+                    || maxGeneratedTransitions &lt; 1
+                    || maxCandidatesPerState &lt; 1
+                    || maxAstSizeIncreasePerStep &lt; 0) {
+<span class="nc" id="L555">                throw new IllegalArgumentException(</span>
+                    &quot;work budget is outside its declared finite range&quot;);
+            }
+<span class="fc" id="L558">        }</span>
+    }
+
+    public record PolicyDefinition(
+        String id,
+        String adapter,
+        AdapterConstructor adapterConstructor,
+        AdapterInterface adapterInterface,
+        long deterministicSeed,
+        String selectionBoundary
+    ) {
+<span class="fc" id="L569">        public PolicyDefinition {</span>
+<span class="fc" id="L570">            id = requireText(id, &quot;policy id&quot;);</span>
+<span class="fc" id="L571">            adapter = requireText(adapter, &quot;adapter&quot;);</span>
+<span class="fc" id="L572">            adapterConstructor = Objects.requireNonNull(</span>
+                adapterConstructor,
+                &quot;adapterConstructor&quot;
+            );
+<span class="fc" id="L576">            adapterInterface = Objects.requireNonNull(</span>
+                adapterInterface,
+                &quot;adapterInterface&quot;
+            );
+<span class="pc bpc" id="L580" title="1 of 4 branches missed.">            if (adapterConstructor == AdapterConstructor.NO_ARGUMENT</span>
+                    &amp;&amp; deterministicSeed != 0) {
+<span class="nc" id="L582">                throw new IllegalArgumentException(</span>
+                    &quot;no-argument policies must use the zero seed sentinel&quot;);
+            }
+<span class="fc" id="L585">            selectionBoundary = requireText(</span>
+                selectionBoundary, &quot;selectionBoundary&quot;);
+<span class="fc" id="L587">        }</span>
+    }
+
+    public record PlanEntry(
+        int sequence,
+        String configurationId,
+        String caseId,
+        String policyId,
+        String status,
+        String terminalReason
+    ) {
+<span class="fc" id="L598">        public PlanEntry {</span>
+<span class="pc bpc" id="L599" title="1 of 2 branches missed.">            if (sequence &lt; 1) {</span>
+<span class="nc" id="L600">                throw new IllegalArgumentException(</span>
+                    &quot;entry sequence must be positive&quot;);
+            }
+<span class="fc" id="L603">            configurationId = requireSha256(</span>
+                configurationId, &quot;configurationId&quot;);
+<span class="fc" id="L605">            caseId = requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L606">            policyId = requireText(policyId, &quot;policyId&quot;);</span>
+<span class="fc" id="L607">            status = requireText(status, &quot;status&quot;);</span>
+<span class="fc" id="L608">            terminalReason = requireText(</span>
+                terminalReason, &quot;terminalReason&quot;);
+<span class="fc bfc" id="L610" title="All 2 branches covered.">            if (!ENTRY_STATUS.equals(status)</span>
+<span class="pc bpc" id="L611" title="1 of 2 branches missed.">                    || !TERMINAL_REASON.equals(terminalReason)) {</span>
+<span class="fc" id="L612">                throw new IllegalArgumentException(</span>
+                    &quot;evaluation-plan entries must remain unexecuted&quot;);
+            }
+<span class="fc" id="L615">        }</span>
+    }
+
+    public record StatusCount(String status, int count) {
+<span class="fc" id="L619">        public StatusCount {</span>
+<span class="fc" id="L620">            status = requireText(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L621" title="2 of 4 branches missed.">            if (!ENTRY_STATUS.equals(status) || count &lt; 1) {</span>
+<span class="nc" id="L622">                throw new IllegalArgumentException(</span>
+                    &quot;status count must describe remaining entries&quot;);
+            }
+<span class="fc" id="L625">        }</span>
+    }
+
+    public record PlanContent(
+        String schema,
+        String evidenceStatus,
+        String repositoryRevision,
+        String preregistrationResource,
+        String preregistrationHash,
+        String formationResource,
+        String formationHash,
+        long formationByteLength,
+        String qualificationResource,
+        String qualificationHash,
+        long qualificationByteLength,
+        String qualificationDisclosure,
+        String informationBoundary,
+        List&lt;CaseDefinition&gt; cases,
+        List&lt;PolicyDefinition&gt; policies,
+        List&lt;PlanEntry&gt; entries,
+        List&lt;StatusCount&gt; statusCounts,
+        int configuredCaseCount,
+        int configuredPolicyCount,
+        int configuredEntryCount,
+        String claimBoundary
+    ) {
+<span class="fc" id="L651">        public PlanContent {</span>
+<span class="fc" id="L652">            schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="pc bpc" id="L653" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L654">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported evaluation-plan schema: &quot; + schema);
+            }
+<span class="fc" id="L657">            evidenceStatus = requireText(</span>
+                evidenceStatus, &quot;evidenceStatus&quot;);
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">            if (!EVIDENCE_STATUS.equals(evidenceStatus)) {</span>
+<span class="nc" id="L660">                throw new IllegalArgumentException(</span>
+                    &quot;evaluation plan must remain FROZEN_NOT_EXECUTED&quot;);
+            }
+<span class="fc" id="L663">            repositoryRevision = requireRepositoryRevision(</span>
+                repositoryRevision);
+<span class="fc" id="L665">            preregistrationResource = requireResourcePath(</span>
+                preregistrationResource, &quot;preregistrationResource&quot;);
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">            if (!PREREGISTRATION_RESOURCE.equals(</span>
+                    preregistrationResource)) {
+<span class="nc" id="L669">                throw new IllegalArgumentException(</span>
+                    &quot;unexpected preregistration resource&quot;);
+            }
+<span class="fc" id="L672">            preregistrationHash = requireSha256(</span>
+                preregistrationHash, &quot;preregistrationHash&quot;);
+<span class="fc" id="L674">            formationResource = requireResourcePath(</span>
+                formationResource, &quot;formationResource&quot;);
+<span class="fc" id="L676">            formationHash = requireSha256(</span>
+                formationHash, &quot;formationHash&quot;);
+<span class="fc" id="L678">            qualificationResource = requireResourcePath(</span>
+                qualificationResource, &quot;qualificationResource&quot;);
+<span class="fc" id="L680">            qualificationHash = requireSha256(</span>
+                qualificationHash, &quot;qualificationHash&quot;);
+<span class="pc bpc" id="L682" title="3 of 6 branches missed.">            if (formationResource.equals(qualificationResource)</span>
+                    || formationByteLength &lt; 1
+                    || qualificationByteLength &lt; 1) {
+<span class="nc" id="L685">                throw new IllegalArgumentException(</span>
+                    &quot;resource bindings are invalid&quot;);
+            }
+<span class="fc" id="L688">            qualificationDisclosure = requireText(</span>
+                qualificationDisclosure, &quot;qualificationDisclosure&quot;);
+<span class="pc bpc" id="L690" title="1 of 2 branches missed.">            if (!QUALIFICATION_DISCLOSURE.equals(</span>
+                    qualificationDisclosure)) {
+<span class="nc" id="L692">                throw new IllegalArgumentException(</span>
+                    &quot;qualification must remain undisclosed&quot;);
+            }
+<span class="fc" id="L695">            informationBoundary = requireText(</span>
+                informationBoundary, &quot;informationBoundary&quot;);
+<span class="fc" id="L697">            cases = canonicalCases(cases);</span>
+<span class="fc" id="L698">            policies = canonicalPolicies(policies);</span>
+<span class="pc bpc" id="L699" title="1 of 2 branches missed.">            if (configuredCaseCount != cases.size()</span>
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">                    || configuredPolicyCount != policies.size()</span>
+                    || configuredEntryCount
+<span class="pc bpc" id="L702" title="1 of 2 branches missed.">                        != Math.multiplyExact(</span>
+                            configuredCaseCount,
+                            configuredPolicyCount)) {
+<span class="nc" id="L705">                throw new IllegalArgumentException(</span>
+                    &quot;evaluation-plan matrix counts do not balance&quot;);
+            }
+<span class="fc" id="L708">            entries = List.copyOf(</span>
+<span class="fc" id="L709">                Objects.requireNonNull(entries, &quot;entries&quot;));</span>
+<span class="fc" id="L710">            List&lt;PlanEntry&gt; expected = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L711">            int sequence = 1;</span>
+<span class="fc bfc" id="L712" title="All 2 branches covered.">            for (CaseDefinition benchmarkCase : cases) {</span>
+<span class="fc bfc" id="L713" title="All 2 branches covered.">                for (PolicyDefinition policy : policies) {</span>
+<span class="fc" id="L714">                    expected.add(new PlanEntry(</span>
+                        sequence++,
+<span class="fc" id="L716">                        configurationId(</span>
+                            preregistrationHash,
+<span class="fc" id="L718">                            benchmarkCase.id(),</span>
+<span class="fc" id="L719">                            policy.id()</span>
+                        ),
+<span class="fc" id="L721">                        benchmarkCase.id(),</span>
+<span class="fc" id="L722">                        policy.id(),</span>
+                        ENTRY_STATUS,
+                        TERMINAL_REASON
+                    ));
+<span class="fc" id="L726">                }</span>
+<span class="fc" id="L727">            }</span>
+<span class="pc bpc" id="L728" title="1 of 2 branches missed.">            if (!expected.equals(entries)</span>
+<span class="pc bpc" id="L729" title="1 of 2 branches missed.">                    || entries.size() != configuredEntryCount) {</span>
+<span class="nc" id="L730">                throw new IllegalArgumentException(</span>
+                    &quot;evaluation-plan entries are not the exact matrix&quot;);
+            }
+<span class="fc" id="L733">            statusCounts = List.copyOf(</span>
+<span class="fc" id="L734">                Objects.requireNonNull(statusCounts, &quot;statusCounts&quot;));</span>
+<span class="pc bpc" id="L735" title="1 of 2 branches missed.">            if (!statusCounts.equals(List.of(</span>
+                    new StatusCount(
+                        ENTRY_STATUS,
+                        configuredEntryCount)))) {
+<span class="nc" id="L739">                throw new IllegalArgumentException(</span>
+                    &quot;evaluation-plan status counts do not balance&quot;);
+            }
+<span class="fc" id="L742">            claimBoundary = requireText(</span>
+                claimBoundary, &quot;claimBoundary&quot;);
+<span class="fc" id="L744">        }</span>
+    }
+
+    public record EvaluationPlan(
+        PlanContent content,
+        String contentHash
+    ) {
+<span class="fc" id="L751">        public EvaluationPlan {</span>
+<span class="fc" id="L752">            content = Objects.requireNonNull(content, &quot;content&quot;);</span>
+<span class="fc" id="L753">            contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L754">            String expected = sha256(</span>
+<span class="fc" id="L755">                canonical(content).getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc bfc" id="L756" title="All 2 branches covered.">            if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L757">                throw new IllegalArgumentException(</span>
+                    &quot;evaluation-plan content hash mismatch&quot;);
+            }
+<span class="fc" id="L760">        }</span>
+
+        public static EvaluationPlan create(PlanContent content) {
+<span class="fc" id="L763">            Objects.requireNonNull(content, &quot;content&quot;);</span>
+<span class="fc" id="L764">            return new EvaluationPlan(</span>
+                content,
+<span class="fc" id="L766">                sha256(canonical(content).getBytes(</span>
+                    StandardCharsets.UTF_8))
+            );
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L772">            return canonical(this);</span>
+        }
+
+        public static EvaluationPlan fromCanonicalJson(String source) {
+<span class="fc" id="L776">            String json = Objects.requireNonNull(source, &quot;source&quot;);</span>
+            try {
+<span class="fc" id="L778">                EvaluationPlan plan = JSON.readValue(</span>
+                    json,
+                    EvaluationPlan.class
+                );
+<span class="fc bfc" id="L782" title="All 2 branches covered.">                if (!plan.toCanonicalJson().equals(json)) {</span>
+<span class="fc" id="L783">                    throw new IllegalArgumentException(</span>
+                        &quot;evaluation-plan JSON is not canonical&quot;);
+                }
+<span class="fc" id="L786">                return plan;</span>
+<span class="fc" id="L787">            } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L788">                throw new IllegalArgumentException(</span>
+                    &quot;invalid representation-discovery evaluation plan&quot;,
+                    exception
+                );
+            }
+        }
+    }
+
+<span class="fc" id="L796">    public enum AdapterConstructor {</span>
+<span class="fc" id="L797">        NO_ARGUMENT,</span>
+<span class="fc" id="L798">        LONG_SEED</span>
+    }
+
+<span class="fc" id="L801">    public enum AdapterInterface {</span>
+<span class="fc" id="L802">        TARGET_FREE_REPRESENTATION_SEARCH,</span>
+<span class="fc" id="L803">        SEARCH_STRATEGY</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
