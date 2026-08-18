@@ -9,13 +9,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Set;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class TargetFreeRepresentationCandidateFreezeTest {
     private static final String REPOSITORY_REVISION =
         "0123456789abcdef0123456789abcdef01234567";
+    private static final List<String> CASE_IDS = List.of(
+        "assumption-sensitive-cancellation-control",
+        "catalog-blind-trigonometric-bridge",
+        "neutral-element-compression",
+        "occurrence-local-square-bridge",
+        "repeated-term-compression",
+        "telescoping-capability-bridge"
+    );
+    private static final List<String> POLICY_IDS = List.of(
+        "BOUNDED_ENUMERATION_V1",
+        "RANDOM_MONTE_CARLO_V1",
+        "SCALAR_BEST_FIRST_V1",
+        "STRUCTURAL_DIVERSITY_V1"
+    );
 
     @Test
     void executesAndFreezesTheExactTargetBlindMatrix() {
@@ -43,6 +57,15 @@ class TargetFreeRepresentationCandidateFreezeTest {
                 .distinct()
                 .count()
         );
+        assertEquals(
+            CASE_IDS.stream()
+                .flatMap(caseId -> POLICY_IDS.stream()
+                    .map(policyId -> caseId + "/" + policyId))
+                .toList(),
+            content.entries().stream()
+                .map(entry -> entry.caseId() + "/" + entry.policyId())
+                .toList()
+        );
         assertTrue(content.entries().stream().allMatch(entry ->
             entry.candidateCount() == entry.candidates().size()
                 && entry.candidateBatchHash().startsWith("sha256:")
@@ -50,18 +73,6 @@ class TargetFreeRepresentationCandidateFreezeTest {
                 && entry.candidateFreezeReceiptHash().startsWith("sha256:")
                 && entry.work().contentHash().startsWith("sha256:")
         ));
-        assertEquals(
-            Set.of(
-                "BOUNDED_ENUMERATION_V1",
-                "RANDOM_MONTE_CARLO_V1",
-                "SCALAR_BEST_FIRST_V1",
-                "STRUCTURAL_DIVERSITY_V1"
-            ),
-            content.entries().stream()
-                .map(TargetFreeRepresentationCandidateFreeze
-                    .ExecutionEntry::policyId)
-                .collect(java.util.stream.Collectors.toSet())
-        );
 
         var neutralEnumeration = content.entries().stream()
             .filter(entry -> entry.caseId().equals(
