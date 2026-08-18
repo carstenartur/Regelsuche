@@ -63,6 +63,8 @@ def domainExportReportDirectory = layout.buildDirectory.dir(
     'reports/domain-discovery-export')
 def domainExportVerificationReportDirectory = layout.buildDirectory.dir(
     'reports/domain-discovery-export-verification')
+def targetFreeRepresentationRunReportDirectory = layout.buildDirectory.dir(
+    'reports/representation-discovery/target-free-run')
 def verificationVenvDirectory = rootProject.layout.buildDirectory.dir(
     'verification-venv')
 def verificationPython = verificationVenvDirectory.map { directory ->
@@ -70,6 +72,38 @@ def verificationPython = verificationVenvDirectory.map { directory ->
         .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
     new File(directory.asFile, executable)
 }
+def checkoutGitStatus = providers.exec {
+    workingDir repositoryRootDirectory.asFile
+    commandLine 'git', 'status', '--porcelain', '--untracked-files=normal'
+}.standardOutput.asText.map { value -> value.trim() }
+def checkoutHeadRevision = providers.exec {
+    workingDir repositoryRootDirectory.asFile
+    commandLine 'git', 'rev-parse', 'HEAD'
+}.standardOutput.asText.map { value -> value.trim() }
+def checkoutGitRevision = checkoutGitStatus.flatMap { status ->
+    if (!status.isEmpty()) {
+        throw new GradleException(
+            'Cannot bind representation-discovery evidence to a dirty '
+                + 'checkout. Commit, stash or remove local changes, or pass '
+                + 'an explicit authoritative repository revision.')
+    }
+    checkoutHeadRevision
+}
+def targetFreeRepositoryRevision = providers
+    .gradleProperty('regelsucheRepositoryRevision')
+    .orElse(providers.environmentVariable(
+        'REGELSUCHE_AUTHORITY_GITHUB_SHA'))
+    .orElse(providers.environmentVariable('GITHUB_SHA'))
+    .orElse(checkoutGitRevision)
+    .map { value ->
+        def revision = value.trim()
+        if (!(revision ==~ /[0-9a-f]{40}/)) {
+            throw new GradleException(
+                'Representation-discovery repository revision must be a '
+                    + 'lowercase 40-character Git commit SHA')
+        }
+        revision
+    }
 
 def verifyDomainDiscoveryExportEvidence = tasks.register(
     'verifyDomainDiscoveryExportEvidence',
@@ -91,10 +125,47 @@ def verifyDomainDiscoveryExportEvidence = tasks.register(
     }
 }
 
+def generateTargetFreeRepresentationDiscoveryRun = tasks.register(
+    'generateTargetFreeRepresentationDiscoveryRun',
+    JavaExec
+) {
+    group = 'verification'
+    description = 'Executes the target-free R2 bridge and binds it to one immutable discovery-run workspace.'
+    dependsOn tasks.named('classes')
+    timeout = java.time.Duration.ofMinutes(2)
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.discovery.representation.TargetFreeRepresentationDiscoveryRun'
+    argumentProviders.add({
+        [
+            targetFreeRepositoryRevision.get(),
+            targetFreeRepresentationRunReportDirectory.get()
+                .asFile.absolutePath
+        ]
+    } as CommandLineArgumentProvider)
+    inputs.property('repositoryRevision', targetFreeRepositoryRevision)
+    outputs.dir(targetFreeRepresentationRunReportDirectory)
+    doLast {
+        def reportDirectory =
+            targetFreeRepresentationRunReportDirectory.get()
+        [
+            'target-free-sympy-bridge.json',
+            'run-workspace.json'
+        ].each { fileName ->
+            if (!reportDirectory.file(fileName).asFile.isFile()) {
+                throw new GradleException(
+                    "Missing target-free run artifact: ${fileName}")
+            }
+        }
+    }
+}
+
 tasks.named('check') {
-    dependsOn tasks.named('jacocoTestReport'), verifyDomainDiscoveryExportEvidence
+    dependsOn tasks.named('jacocoTestReport'),
+        verifyDomainDiscoveryExportEvidence,
+        generateTargetFreeRepresentationDiscoveryRun
 }
 
 rootProject.tasks.named('check') {
-    dependsOn verifyDomainDiscoveryExportEvidence
+    dependsOn verifyDomainDiscoveryExportEvidence,
+        generateTargetFreeRepresentationDiscoveryRun
 }
