@@ -93,21 +93,29 @@
   "policies": [
     {
       "adapter": "de.regelsuche.discovery.representation.TargetFreeRepresentationSearch",
+      "adapterConstructor": "NO_ARGUMENT",
+      "deterministicSeed": 0,
       "id": "BOUNDED_ENUMERATION_V1",
       "selectionBoundary": "RETAIN_ALL_DISTINCT_REPRESENTATIONS_AND_RAW_PARETO_ARCHIVE"
     },
     {
       "adapter": "de.regelsuche.search.strategy.RandomMonteCarloSearchStrategy",
+      "adapterConstructor": "LONG_SEED",
+      "deterministicSeed": 0,
       "id": "RANDOM_MONTE_CARLO_V1",
       "selectionBoundary": "TARGET_BLIND_DETERMINISTIC_SEED_RANDOM_VALID_REWRITE_CONTROL"
     },
     {
       "adapter": "de.regelsuche.search.strategy.BestFirstSearchStrategy",
+      "adapterConstructor": "NO_ARGUMENT",
+      "deterministicSeed": 0,
       "id": "SCALAR_BEST_FIRST_V1",
       "selectionBoundary": "TARGET_BLIND_FROZEN_SCALAR_DESCRIPTION_COST"
     },
     {
       "adapter": "de.regelsuche.search.strategy.StructuralDiversitySearchStrategy",
+      "adapterConstructor": "NO_ARGUMENT",
+      "deterministicSeed": 0,
       "id": "STRUCTURAL_DIVERSITY_V1",
       "selectionBoundary": "TARGET_BLIND_FROZEN_STRUCTURAL_DESCRIPTOR_ARCHIVE"
     }
