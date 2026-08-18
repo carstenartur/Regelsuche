@@ -1,13 +1,16 @@
 package de.regelsuche.build;
 
+import static de.regelsuche.build.MavenPomTestSupport.directChild;
+import static de.regelsuche.build.MavenPomTestSupport.directChildText;
+import static de.regelsuche.build.MavenPomTestSupport.directChildTexts;
+import static de.regelsuche.build.MavenPomTestSupport.parse;
+import static de.regelsuche.build.MavenPomTestSupport.repositoryRoot;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -17,16 +20,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
 
 class MavenBuildContractTest {
     private static final List<String> EXPECTED_MODULES = List.of(
@@ -123,19 +121,30 @@ class MavenBuildContractTest {
         assertEquals(EXPECTED_MODULES, modules);
         for (String module : modules) {
             Path pom = root.resolve(module).resolve("pom.xml");
-            assertTrue(Files.isRegularFile(pom), () -> "missing module POM: " + pom);
+            assertTrue(
+                Files.isRegularFile(pom),
+                () -> "missing module POM: " + pom
+            );
             Element declaredParent = directChild(
                 parse(pom).getDocumentElement(),
                 "parent");
-            assertNotNull(declaredParent, () -> "module has no parent: " + module);
-            assertEquals("de.regelsuche", directChildText(declaredParent, "groupId"));
+            assertNotNull(
+                declaredParent,
+                () -> "module has no parent: " + module
+            );
+            assertEquals(
+                "de.regelsuche",
+                directChildText(declaredParent, "groupId")
+            );
             assertEquals(
                 "regelsuche-parent",
-                directChildText(declaredParent, "artifactId"));
+                directChildText(declaredParent, "artifactId")
+            );
             assertEquals(
                 parentVersion,
                 directChildText(declaredParent, "version"),
-                () -> "module parent version differs from root POM: " + module);
+                () -> "module parent version differs from root POM: " + module
+            );
         }
     }
 
@@ -148,13 +157,15 @@ class MavenBuildContractTest {
         REQUIRED_PROPERTIES.forEach((name, expected) -> assertEquals(
             expected,
             directChildText(properties, name),
-            () -> "unexpected parent property " + name));
+            () -> "unexpected parent property " + name
+        ));
 
         Map<String, String> actual = buildPluginVersions(project);
         assertTrue(
             actual.entrySet().containsAll(REQUIRED_PLUGIN_VERSIONS.entrySet()),
             () -> "required lifecycle plugin versions are missing: expected="
-                + REQUIRED_PLUGIN_VERSIONS + ", actual=" + actual);
+                + REQUIRED_PLUGIN_VERSIONS + ", actual=" + actual
+        );
     }
 
     @Test
@@ -213,14 +224,18 @@ class MavenBuildContractTest {
             Document document,
             Path pom) {
         for (String elementName : COMMAND_ELEMENT_NAMES) {
-            NodeList elements = document.getElementsByTagNameNS("*", elementName);
+            NodeList elements = document.getElementsByTagNameNS(
+                "*",
+                elementName
+            );
             for (int index = 0; index < elements.getLength(); index++) {
                 for (String token : commandTokens(
                         elements.item(index).getTextContent())) {
                     assertFalse(
                         FORBIDDEN_HOST_RUNTIMES.contains(token),
                         () -> pom + " invokes forbidden host runtime " + token
-                            + " through <" + elementName + ">");
+                            + " through <" + elementName + ">"
+                    );
                 }
             }
         }
@@ -231,7 +246,8 @@ class MavenBuildContractTest {
                 document.getDocumentElement())) {
             assertFalse(
                 FORBIDDEN_BUILD_PLUGINS.contains(coordinate),
-                () -> pom + " activates forbidden build plugin " + coordinate);
+                () -> pom + " activates forbidden build plugin " + coordinate
+            );
         }
     }
 
@@ -259,40 +275,6 @@ class MavenBuildContractTest {
             tokens.add(token);
         }
         return tokens;
-    }
-
-    private static Path repositoryRoot() {
-        String configured = System.getProperty("regelsuche.repositoryRoot");
-        assertNotNull(
-            configured,
-            "Maven must expose maven.multiModuleProjectDirectory to tests");
-        Path root = Path.of(configured).toAbsolutePath().normalize();
-        assertTrue(
-            Files.isRegularFile(root.resolve("pom.xml")),
-            () -> "no root pom.xml below " + root);
-        return root;
-    }
-
-    private static Document parse(Path path)
-            throws ParserConfigurationException, IOException, SAXException {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setNamespaceAware(true);
-        factory.setXIncludeAware(false);
-        factory.setExpandEntityReferences(false);
-        factory.setFeature(
-            "http://apache.org/xml/features/disallow-doctype-decl",
-            true);
-        factory.setFeature(
-            "http://xml.org/sax/features/external-general-entities",
-            false);
-        factory.setFeature(
-            "http://xml.org/sax/features/external-parameter-entities",
-            false);
-        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-        try (InputStream input = Files.newInputStream(path)) {
-            return factory.newDocumentBuilder().parse(input);
-        }
     }
 
     private static Set<String> buildPluginCoordinates(Element project) {
@@ -326,41 +308,5 @@ class MavenBuildContractTest {
             plugins.putIfAbsent(groupId + ":" + artifactId, plugin);
         }
         return plugins;
-    }
-
-    private static Element directChild(Element parent, String localName) {
-        if (parent == null) {
-            return null;
-        }
-        for (Node child = parent.getFirstChild();
-                child != null;
-                child = child.getNextSibling()) {
-            if (child instanceof Element element
-                    && localName.equals(element.getLocalName())) {
-                return element;
-            }
-        }
-        return null;
-    }
-
-    private static String directChildText(Element parent, String localName) {
-        Element child = directChild(parent, localName);
-        return child == null ? null : child.getTextContent().trim();
-    }
-
-    private static List<String> directChildTexts(
-            Element parent,
-            String localName) {
-        assertNotNull(parent);
-        List<String> values = new ArrayList<>();
-        for (Node child = parent.getFirstChild();
-                child != null;
-                child = child.getNextSibling()) {
-            if (child instanceof Element element
-                    && localName.equals(element.getLocalName())) {
-                values.add(element.getTextContent().trim());
-            }
-        }
-        return List.copyOf(values);
     }
 }

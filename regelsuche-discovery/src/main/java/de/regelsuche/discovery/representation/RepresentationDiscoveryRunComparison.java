@@ -378,7 +378,7 @@ public record RepresentationDiscoveryRunComparison(
     }
 
     private static String key(Category category, String field) {
-        return category.ordinal() + "/" + field;
+        return "%04d/%s".formatted(category.ordinal(), field);
     }
 
     public record Entry(

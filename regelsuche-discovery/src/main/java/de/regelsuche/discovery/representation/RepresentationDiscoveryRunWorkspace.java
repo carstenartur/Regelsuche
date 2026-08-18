@@ -263,7 +263,6 @@ public record RepresentationDiscoveryRunWorkspace(
         }
     }
 
-
     /** Decodes only the exact canonical JSON representation. */
     public static RepresentationDiscoveryRunWorkspace fromCanonicalJson(
         String source
@@ -446,24 +445,63 @@ public record RepresentationDiscoveryRunWorkspace(
             .toList();
     }
 
+    /** Lists one deterministic page without decoding workspaces outside it. */
+    public static RetainedPage listRetainedPage(
+        Path directory,
+        int offset,
+        int limit
+    ) {
+        return listRetainedPage(
+            directory,
+            DEFAULT_MAX_RETAINED_WORKSPACE_BYTES,
+            DEFAULT_MAX_RETAINED_RUNS,
+            offset,
+            limit
+        );
+    }
+
+    /** Lists one deterministic page under explicit finite repository limits. */
+    public static synchronized RetainedPage listRetainedPage(
+        Path directory,
+        int maxWorkspaceBytes,
+        int maxRuns,
+        int offset,
+        int limit
+    ) {
+        validateRetainedLimits(maxWorkspaceBytes, maxRuns);
+        validatePage(offset, limit);
+        Path root = ensureRetainedDirectory(directory);
+        List<Path> entries = validatedRetainedEntries(root, maxRuns);
+        int from = Math.min(offset, entries.size());
+        int to = (int) Math.min(
+            entries.size(),
+            (long) from + limit
+        );
+        List<RepresentationDiscoveryRunWorkspace> runs = entries
+            .subList(from, to)
+            .stream()
+            .map(path -> loadRetained(
+                path,
+                retainedRunId(path),
+                maxWorkspaceBytes
+            ))
+            .toList();
+        return new RetainedPage(entries.size(), from, limit, runs);
+    }
+
     private static RepresentationDiscoveryRunWorkspace requireIdenticalRetained(
         Path target,
         byte[] expected,
         String runId,
         int maxWorkspaceBytes
     ) {
-        RepresentationDiscoveryRunWorkspace retained = loadRetained(
-            target,
-            runId,
-            maxWorkspaceBytes
-        );
         byte[] actual = readRetainedBytes(target, maxWorkspaceBytes);
         if (!Arrays.equals(actual, expected)) {
-            throw new IllegalStateException(
+            throw new ImmutableRunConflictException(
                 "immutable run identity already contains different bytes: "
                     + runId);
         }
-        return retained;
+        return decodeRetained(actual, target, runId);
     }
 
     private static RepresentationDiscoveryRunWorkspace loadRetained(
@@ -471,10 +509,19 @@ public record RepresentationDiscoveryRunWorkspace(
         String expectedRunId,
         int maxWorkspaceBytes
     ) {
-        requireRegularRetainedFile(path);
-        RepresentationDiscoveryRunWorkspace workspace = fromCanonicalBytes(
-            readRetainedBytes(path, maxWorkspaceBytes)
+        return decodeRetained(
+            readRetainedBytes(path, maxWorkspaceBytes),
+            path,
+            expectedRunId
         );
+    }
+
+    private static RepresentationDiscoveryRunWorkspace decodeRetained(
+        byte[] bytes,
+        Path path,
+        String expectedRunId
+    ) {
+        RepresentationDiscoveryRunWorkspace workspace = fromCanonicalBytes(bytes);
         if (!expectedRunId.equals(workspace.runId())) {
             throw new IllegalStateException(
                 "run-workspace filename and Run ID differ: " + path);
@@ -609,6 +656,15 @@ public record RepresentationDiscoveryRunWorkspace(
         }
         if (maxRuns < 1) {
             throw new IllegalArgumentException("maxRuns must be positive");
+        }
+    }
+
+    private static void validatePage(int offset, int limit) {
+        if (offset < 0) {
+            throw new IllegalArgumentException("offset must not be negative");
+        }
+        if (limit < 1) {
+            throw new IllegalArgumentException("limit must be positive");
         }
     }
 
@@ -830,6 +886,34 @@ public record RepresentationDiscoveryRunWorkspace(
                 "missing explicit artifact roles: " + missing);
         }
         return sorted;
+    }
+
+    /** One bounded, deterministic page of retained workspaces. */
+    public record RetainedPage(
+        int total,
+        int offset,
+        int limit,
+        List<RepresentationDiscoveryRunWorkspace> runs
+    ) {
+        public RetainedPage {
+            if (total < 0 || offset < 0 || offset > total || limit < 1) {
+                throw new IllegalArgumentException(
+                    "invalid retained run page bounds");
+            }
+            runs = List.copyOf(Objects.requireNonNull(runs, "runs"));
+            if (runs.size() > limit || runs.size() > total - offset) {
+                throw new IllegalArgumentException(
+                    "retained run page contents exceed its bounds");
+            }
+        }
+    }
+
+    /** Signals that an immutable Run ID already stores different bytes. */
+    public static final class ImmutableRunConflictException
+            extends IllegalStateException {
+        public ImmutableRunConflictException(String message) {
+            super(message);
+        }
     }
 
     public enum RunRelation {

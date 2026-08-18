@@ -42,7 +42,7 @@
         ],
         "responses": {
           "200": {"description": "Begrenzte Run-Historie", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
-          "400": {"$ref": "#/components/responses/BadRequestText"},
+          "400": {"$ref": "#/components/responses/BadRequestJson"},
           "405": {"$ref": "#/components/responses/MethodNotAllowed"}
         }
       },
@@ -55,7 +55,7 @@
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
         "responses": {
           "201": {"description": "Run unveränderlich abgelegt", "headers": {"Location": {"schema": {"type": "string"}}, "ETag": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
-          "400": {"$ref": "#/components/responses/BadRequestText"},
+          "400": {"$ref": "#/components/responses/BadRequestJson"},
           "405": {"$ref": "#/components/responses/MethodNotAllowed"},
           "409": {"description": "Die Run-ID ist bereits mit anderen Bytes belegt", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
           "413": {"$ref": "#/components/responses/PayloadTooLarge"}
@@ -73,7 +73,7 @@
         ],
         "responses": {
           "200": {"description": "Kanonischer Run-Workspace", "headers": {"ETag": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
-          "400": {"$ref": "#/components/responses/BadRequestText"},
+          "400": {"$ref": "#/components/responses/BadRequestJson"},
           "404": {"$ref": "#/components/responses/NotFound"},
           "405": {"$ref": "#/components/responses/MethodNotAllowed"}
         }
@@ -688,7 +688,7 @@
         "content": {"text/plain": {"schema": {"type": "string"}}}
       },
       "BadRequestJson": {
-        "description": "Ungültige, unvollständige oder syntaktisch mehrdeutige Rule-Radar-Eingabe",
+        "description": "Ungültige, unvollständige oder syntaktisch mehrdeutige JSON-Eingabe",
         "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}
       },
       "NotFound": {"description": "Ressource wurde nicht gefunden", "content": {"text/plain": {"schema": {"type": "string"}}}},

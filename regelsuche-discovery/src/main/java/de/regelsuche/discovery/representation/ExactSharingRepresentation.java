@@ -59,10 +59,13 @@ public record ExactSharingRepresentation(
         identity = requireHash(identity, "identity");
         candidateIdentity = requireHash(
             candidateIdentity, "candidateIdentity");
-        sourceExpression = normalize(sourceExpression);
+        sourceExpression = normalize(sourceExpression, "sourceExpression");
         semanticValueKey = requireText(
             semanticValueKey, "semanticValueKey");
-        definitionExpression = normalize(definitionExpression);
+        definitionExpression = normalize(
+            definitionExpression,
+            "definitionExpression"
+        );
         referencePaths = Objects.requireNonNull(
             referencePaths, "referencePaths").stream()
             .map(path -> Objects.requireNonNull(path, "referencePath"))
@@ -127,7 +130,10 @@ public record ExactSharingRepresentation(
             .map(RepeatedStructureExtractionCandidate.Occurrence::path)
             .sorted()
             .toList();
-        String source = normalize(candidate.sourceExpression());
+        String source = normalize(
+            candidate.sourceExpression(),
+            "sourceExpression"
+        );
         String sourceHash = treeHash(source);
         String identity = identityFor(
             candidate.identity(),
@@ -339,13 +345,14 @@ public record ExactSharingRepresentation(
     }
 
     private static String treeHash(String normalizedExpression) {
-        return KnownStructureCatalog.sha256(
-            SCHEMA + "/tree\n" + normalizedExpression);
+        StringBuilder descriptor = new StringBuilder();
+        append(descriptor, SCHEMA + "/tree");
+        append(descriptor, normalizedExpression);
+        return KnownStructureCatalog.sha256(descriptor.toString());
     }
 
-    private static String normalize(String expression) {
-        return ExpressionFormatter.format(parse(requireText(
-            expression, "expression")));
+    private static String normalize(String expression, String field) {
+        return ExpressionFormatter.format(parse(requireText(expression, field)));
     }
 
     private static Expr parse(String expression) {

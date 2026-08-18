@@ -62,6 +62,7 @@
     },
     "cases": {
       "type": "array",
+      "description": "Case ids are unique and sorted by the generator and are revalidated by consumers. JSON Schema uniqueItems only rejects duplicate complete objects; it cannot express uniqueness by the nested id property.",
       "minItems": 1,
       "uniqueItems": true,
       "items": {
@@ -218,6 +219,7 @@
         },
         "checkpoints": {
           "type": "array",
+          "description": "Primitive budgets are unique and sorted by the generator and are revalidated by consumers. JSON Schema uniqueItems only rejects duplicate complete checkpoint objects; it cannot express uniqueness by primitiveBudget.",
           "maxItems": 6,
           "uniqueItems": true,
           "items": {
