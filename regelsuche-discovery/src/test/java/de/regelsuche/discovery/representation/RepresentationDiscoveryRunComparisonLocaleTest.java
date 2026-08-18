@@ -11,17 +11,20 @@ import org.junit.jupiter.api.Test;
 class RepresentationDiscoveryRunComparisonLocaleTest {
 
     @Test
-    void canonicalEntryKeyUsesAsciiDigitsUnderNonLatinDefaultLocale()
+    void canonicalEntryKeyUsesAsciiDigitsUnderNonLatinFormatLocale()
             throws Exception {
-        Locale previous = Locale.getDefault();
+        Locale previous = Locale.getDefault(Locale.Category.FORMAT);
         try {
-            Locale.setDefault(Locale.forLanguageTag("ar-EG"));
+            Locale.setDefault(
+                Locale.Category.FORMAT,
+                Locale.forLanguageTag("ar-EG")
+            );
             assertEquals(
                 "0009/workspaceClaimBoundary",
                 key(Category.CLAIM_BOUNDARY, "workspaceClaimBoundary")
             );
         } finally {
-            Locale.setDefault(previous);
+            Locale.setDefault(Locale.Category.FORMAT, previous);
         }
     }
 
