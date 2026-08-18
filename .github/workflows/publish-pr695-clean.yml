@@ -1,0 +1,82 @@
+name: Publish clean PR 695 source
+
+on:
+  push:
+    branches:
+      - automation/pr695-clean-publisher
+    paths:
+      - 'automation-trigger/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-clean-pr695
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the current PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: agent/pr693-pre-freeze-hardening
+          fetch-depth: 0
+
+      - name: Build and publish the clean hardening commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_head="$(git rev-parse HEAD)"
+          temp="$(mktemp -d)"
+          cat .github/patches/pr693-pre-freeze-hardening/part*.b64 \
+            | base64 --decode > "$temp/hardening.patch"
+          cp .github/patches/pr693-pre-freeze-hardening/final-doc.b64 \
+            "$temp/final-doc.b64"
+          echo '66e9650b7b02d41e4f6dfc242014c7c3e0bfc1bfff4c9ae45c96b75bf947d671  hardening.patch' \
+            | (cd "$temp" && sha256sum --check --strict)
+
+          git fetch origin main agent/pr693-pre-freeze-hardening
+          test "$(git rev-parse origin/agent/pr693-pre-freeze-hardening)" = "$source_head"
+          git checkout -B agent/pr693-pre-freeze-hardening origin/main
+          git apply --check \
+            --exclude=docs/target-free-representation-evaluation.md \
+            "$temp/hardening.patch"
+          git apply \
+            --exclude=docs/target-free-representation-evaluation.md \
+            "$temp/hardening.patch"
+          base64 --decode "$temp/final-doc.b64" \
+            > docs/target-free-representation-evaluation.md
+
+          cat > "$temp/SHA256SUMS" <<'SUMS'
+          ed271f431b9207e55dfa8b8d67f4275d3d490a70d3c92102485c86b061adeef7  regelsuche-core/src/main/resources/rules/packs/sympy-rational.rules.yaml
+          240dbf62c1e3a9099d6ba3182b53d1e0a9870964aefeb87ebdd2c73a1dc726a9  regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlan.java
+          74dc8849481a1a9dcff2e5935154a352cbf49fe857dc8eaa56866ceb737d7778  regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-formation-v1.json
+          0097cd62f529bb61b623106eafb05ac9fe86e6186026e2eca1cbe0cd183a84e1  regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-preregistration-v1.json
+          c20d3ae748fca3509927f41da9c607f8a14353467a530b83d4c9fab93804d833  regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-qualification-v1.json
+          1e87e85c710fc14bdefe5ee566cc34c45d18705c77ca4dac10bc13da1b67a2c8  regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlanTest.java
+          557bd827c5eb662da1fc3f0cce0fbc263420226f2a1df26054f057df93a5dd93  regelsuche-search/src/main/java/de/regelsuche/search/strategy/RandomMonteCarloSearchStrategy.java
+          687aebb98819bab2efd3ec8945b55f9c7ed20f8aa86f78452f7f92ed5a121b7a  regelsuche-search/src/test/java/de/regelsuche/search/strategy/SearchStrategyTest.java
+          f5c687a25bf52f7ea9128b4c1bf1a310a02d349c57b9ed42b3c9077b7615f9b3  docs/target-free-representation-evaluation.md
+          SUMS
+          sha256sum --check --strict "$temp/SHA256SUMS"
+          git diff --check
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            regelsuche-core/src/main/resources/rules/packs/sympy-rational.rules.yaml \
+            regelsuche-search/src/main/java/de/regelsuche/search/strategy/RandomMonteCarloSearchStrategy.java \
+            regelsuche-search/src/test/java/de/regelsuche/search/strategy/SearchStrategyTest.java \
+            regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlan.java \
+            regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-formation-v1.json \
+            regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-qualification-v1.json \
+            regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-preregistration-v1.json \
+            regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlanTest.java \
+            docs/target-free-representation-evaluation.md
+          git commit -m 'Harden target-free evaluation before execution'
+          git push \
+            --force-with-lease=refs/heads/agent/pr693-pre-freeze-hardening:"$source_head" \
+            origin HEAD:refs/heads/agent/pr693-pre-freeze-hardening
