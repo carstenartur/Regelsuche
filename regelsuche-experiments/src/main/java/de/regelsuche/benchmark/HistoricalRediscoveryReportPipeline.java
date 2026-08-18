@@ -29,6 +29,15 @@ public final class HistoricalRediscoveryReportPipeline {
         Corpus corpus = HistoricalRediscoveryCorpus.load();
         HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();
         AtlasReport report = atlas.run(corpus);
+        print(execute(output, corpus, atlas, report));
+    }
+
+    static Execution execute(
+        Path output,
+        Corpus corpus,
+        HistoricalRediscoveryAtlas atlas,
+        AtlasReport report
+    ) {
         verifyRetainedClaims(report);
 
         HistoricalWitnessPruningDiagnostic pruning =
@@ -53,6 +62,11 @@ public final class HistoricalRediscoveryReportPipeline {
             report,
             pruningCases
         );
+        String pruningContentHash = pruning.contentHash(
+            corpus,
+            report,
+            pruningCases
+        );
 
         HistoricalProductionSearchComparison productionComparison =
             new HistoricalProductionSearchComparison();
@@ -72,29 +86,44 @@ public final class HistoricalRediscoveryReportPipeline {
             equalWorkReport
         );
 
+        return new Execution(
+            report,
+            artifacts,
+            verifiedRun,
+            pruningArtifact,
+            pruningContentHash,
+            productionArtifact,
+            productionReport,
+            equalWorkArtifact,
+            equalWorkReport
+        );
+    }
+
+    private static void print(Execution execution) {
         System.out.println("historicalRediscoveryAssessment="
-            + report.assessment().decision());
+            + execution.report().assessment().decision());
         System.out.println("historicalRediscoveryCases="
-            + report.cases().size());
+            + execution.report().cases().size());
         System.out.println("historicalRediscoveryJson="
-            + artifacts.json().toAbsolutePath().normalize());
+            + execution.artifacts().json().toAbsolutePath().normalize());
         System.out.println("historicalRediscoveryMarkdown="
-            + artifacts.markdown().toAbsolutePath().normalize());
+            + execution.artifacts().markdown().toAbsolutePath().normalize());
         System.out.println("historicalRediscoveryRun="
-            + verifiedRun.manifestPath());
+            + execution.verifiedRun().manifestPath());
         System.out.println("historicalRediscoveryRunHash="
-            + verifiedRun.manifest().contentHash());
-        System.out.println("historicalWitnessPruning=" + pruningArtifact);
+            + execution.verifiedRun().manifest().contentHash());
+        System.out.println("historicalWitnessPruning="
+            + execution.pruningArtifact());
         System.out.println("historicalWitnessPruningHash="
-            + pruning.contentHash(corpus, report, pruningCases));
+            + execution.pruningContentHash());
         System.out.println("historicalProductionSearchComparison="
-            + productionArtifact);
+            + execution.productionArtifact());
         System.out.println("historicalProductionSearchComparisonHash="
-            + productionReport.contentHash());
+            + execution.productionReport().contentHash());
         System.out.println("historicalEqualWorkSearchComparison="
-            + equalWorkArtifact);
+            + execution.equalWorkArtifact());
         System.out.println("historicalEqualWorkSearchComparisonHash="
-            + equalWorkReport.contentHash());
+            + execution.equalWorkReport().contentHash());
     }
 
     private static void verifyRetainedClaims(AtlasReport report) {
@@ -176,5 +205,18 @@ public final class HistoricalRediscoveryReportPipeline {
             );
         }
         return normalized.resolveSibling(name + suffix);
+    }
+
+    record Execution(
+        AtlasReport report,
+        HistoricalRediscoveryAtlas.WrittenArtifacts artifacts,
+        HistoricalRediscoveryRunArtifact.VerifiedRun verifiedRun,
+        Path pruningArtifact,
+        String pruningContentHash,
+        Path productionArtifact,
+        HistoricalProductionSearchComparison.Report productionReport,
+        Path equalWorkArtifact,
+        HistoricalEqualWorkSearchComparison.Report equalWorkReport
+    ) {
     }
 }
