@@ -366,17 +366,17 @@ public interface DiscoveryExperimentRunner {
 <span class="nc" id="L366">                    scalar.generatedTransformations(),</span>
                     &quot;production oracle reached a target declared non-equivalent&quot;);
             }
-<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            if (scalar.reached()) {</span>
-<span class="nc" id="L370">                return CaseDiagnostic.withoutLoss(</span>
-<span class="nc" id="L371">                    benchmarkCase.id(),</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">            if (scalar.reached()) {</span>
+<span class="fc" id="L370">                return CaseDiagnostic.withoutLoss(</span>
+<span class="fc" id="L371">                    benchmarkCase.id(),</span>
                     SCALAR_ALREADY_FOUND,
-<span class="nc" id="L373">                    oracle.status(),</span>
-<span class="nc" id="L374">                    oracle.witnessExpressions().size(),</span>
+<span class="fc" id="L373">                    oracle.status(),</span>
+<span class="fc" id="L374">                    oracle.witnessExpressions().size(),</span>
                     0,
                     &quot;SCALAR_FOUND&quot;,
-<span class="nc" id="L377">                    scalar.exploredStates(),</span>
-<span class="nc" id="L378">                    scalar.engineCalls(),</span>
-<span class="nc" id="L379">                    scalar.generatedTransformations(),</span>
+<span class="fc" id="L377">                    scalar.exploredStates(),</span>
+<span class="fc" id="L378">                    scalar.engineCalls(),</span>
+<span class="fc" id="L379">                    scalar.generatedTransformations(),</span>
                     &quot;the retained scalar search already reached the relation&quot;);
             }
 <span class="fc" id="L382">            validateWitness(benchmarkCase, oracle);</span>

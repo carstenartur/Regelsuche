@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HistoricalRediscoveryReportPipeline.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">HistoricalRediscoveryReportPipeline.java</span></div><h1>HistoricalRediscoveryReportPipeline.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.benchmark.DiscoveryExperimentRunner.HistoricalWitnessPruningDiagnostic;
+import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.AtlasReport;
+import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.CaseResult;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Corpus;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * Executes the retained historical diagnostics from one in-memory atlas run.
+ */
+public final class HistoricalRediscoveryReportPipeline {
+    private HistoricalRediscoveryReportPipeline() {
+    }
+
+    public static void main(String[] args) {
+<span class="pc bpc" id="L21" title="1 of 4 branches missed.">        if (args.length == 0 || !&quot;historical-rediscovery&quot;.equals(args[0])) {</span>
+<span class="fc" id="L22">            throw new IllegalArgumentException(</span>
+                &quot;expected command: historical-rediscovery [output-directory]&quot;
+            );
+        }
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        Path output = args.length &gt;= 2</span>
+<span class="nc" id="L27">            ? Path.of(args[1])</span>
+<span class="nc" id="L28">            : Path.of(&quot;build/reports/historical-rediscovery&quot;);</span>
+<span class="nc" id="L29">        Corpus corpus = HistoricalRediscoveryCorpus.load();</span>
+<span class="nc" id="L30">        HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();</span>
+<span class="nc" id="L31">        AtlasReport report = atlas.run(corpus);</span>
+<span class="nc" id="L32">        print(execute(output, corpus, atlas, report));</span>
+<span class="nc" id="L33">    }</span>
+
+    static Execution execute(
+        Path output,
+        Corpus corpus,
+        HistoricalRediscoveryAtlas atlas,
+        AtlasReport report
+    ) {
+<span class="fc" id="L41">        verifyRetainedClaims(report);</span>
+
+<span class="fc" id="L43">        HistoricalWitnessPruningDiagnostic pruning =</span>
+            new HistoricalWitnessPruningDiagnostic();
+<span class="fc" id="L45">        List&lt;HistoricalWitnessPruningDiagnostic.CaseDiagnostic&gt; pruningCases =</span>
+<span class="fc" id="L46">            pruning.run(corpus, report);</span>
+<span class="fc" id="L47">        verifyWitnessPruning(report, pruningCases);</span>
+
+<span class="fc" id="L49">        HistoricalRediscoveryRunArtifact.begin(output);</span>
+<span class="fc" id="L50">        HistoricalRediscoveryAtlas.WrittenArtifacts artifacts =</span>
+<span class="fc" id="L51">            atlas.write(output, report);</span>
+<span class="fc" id="L52">        HistoricalRediscoveryRunArtifact.VerifiedRun verifiedRun =</span>
+<span class="fc" id="L53">            HistoricalRediscoveryRunArtifact.commit(</span>
+                output,
+                corpus,
+                report,
+                artifacts
+            );
+<span class="fc" id="L59">        Path pruningArtifact = pruning.write(</span>
+<span class="fc" id="L60">            siblingOutput(output, &quot;-witness-pruning&quot;),</span>
+            corpus,
+            report,
+            pruningCases
+        );
+<span class="fc" id="L65">        String pruningContentHash = pruning.contentHash(</span>
+            corpus,
+            report,
+            pruningCases
+        );
+
+<span class="fc" id="L71">        HistoricalProductionSearchComparison productionComparison =</span>
+            new HistoricalProductionSearchComparison();
+<span class="fc" id="L73">        HistoricalProductionSearchComparison.Report productionReport =</span>
+<span class="fc" id="L74">            productionComparison.run(corpus, report, pruningCases);</span>
+<span class="fc" id="L75">        Path productionArtifact = productionComparison.write(</span>
+<span class="fc" id="L76">            siblingOutput(output, &quot;-production-search-comparison&quot;),</span>
+            productionReport
+        );
+
+<span class="fc" id="L80">        HistoricalEqualWorkSearchComparison equalWorkComparison =</span>
+            new HistoricalEqualWorkSearchComparison();
+<span class="fc" id="L82">        HistoricalEqualWorkSearchComparison.Report equalWorkReport =</span>
+<span class="fc" id="L83">            equalWorkComparison.run(corpus, report);</span>
+<span class="fc" id="L84">        Path equalWorkArtifact = equalWorkComparison.write(</span>
+<span class="fc" id="L85">            siblingOutput(output, &quot;-equal-work-search-comparison&quot;),</span>
+            equalWorkReport
+        );
+
+<span class="fc" id="L89">        return new Execution(</span>
+            report,
+            artifacts,
+            verifiedRun,
+            pruningArtifact,
+            pruningContentHash,
+            productionArtifact,
+            productionReport,
+            equalWorkArtifact,
+            equalWorkReport
+        );
+    }
+
+    private static void print(Execution execution) {
+<span class="nc" id="L103">        System.out.println(&quot;historicalRediscoveryAssessment=&quot;</span>
+<span class="nc" id="L104">            + execution.report().assessment().decision());</span>
+<span class="nc" id="L105">        System.out.println(&quot;historicalRediscoveryCases=&quot;</span>
+<span class="nc" id="L106">            + execution.report().cases().size());</span>
+<span class="nc" id="L107">        System.out.println(&quot;historicalRediscoveryJson=&quot;</span>
+<span class="nc" id="L108">            + execution.artifacts().json().toAbsolutePath().normalize());</span>
+<span class="nc" id="L109">        System.out.println(&quot;historicalRediscoveryMarkdown=&quot;</span>
+<span class="nc" id="L110">            + execution.artifacts().markdown().toAbsolutePath().normalize());</span>
+<span class="nc" id="L111">        System.out.println(&quot;historicalRediscoveryRun=&quot;</span>
+<span class="nc" id="L112">            + execution.verifiedRun().manifestPath());</span>
+<span class="nc" id="L113">        System.out.println(&quot;historicalRediscoveryRunHash=&quot;</span>
+<span class="nc" id="L114">            + execution.verifiedRun().manifest().contentHash());</span>
+<span class="nc" id="L115">        System.out.println(&quot;historicalWitnessPruning=&quot;</span>
+<span class="nc" id="L116">            + execution.pruningArtifact());</span>
+<span class="nc" id="L117">        System.out.println(&quot;historicalWitnessPruningHash=&quot;</span>
+<span class="nc" id="L118">            + execution.pruningContentHash());</span>
+<span class="nc" id="L119">        System.out.println(&quot;historicalProductionSearchComparison=&quot;</span>
+<span class="nc" id="L120">            + execution.productionArtifact());</span>
+<span class="nc" id="L121">        System.out.println(&quot;historicalProductionSearchComparisonHash=&quot;</span>
+<span class="nc" id="L122">            + execution.productionReport().contentHash());</span>
+<span class="nc" id="L123">        System.out.println(&quot;historicalEqualWorkSearchComparison=&quot;</span>
+<span class="nc" id="L124">            + execution.equalWorkArtifact());</span>
+<span class="nc" id="L125">        System.out.println(&quot;historicalEqualWorkSearchComparisonHash=&quot;</span>
+<span class="nc" id="L126">            + execution.equalWorkReport().contentHash());</span>
+<span class="nc" id="L127">    }</span>
+
+    private static void verifyRetainedClaims(AtlasReport report) {
+<span class="fc" id="L130">        boolean targetBlindDiversitySignal = false;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (CaseResult result : report.cases()) {</span>
+<span class="fc bfc" id="L132" title="All 3 branches covered.">            switch (result.status()) {</span>
+                case GENERIC_BRIDGE_REQUIRED_AND_FOUND,
+                     CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE -&gt; {
+<span class="fc" id="L135">                    if (!result.production().oracle()</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                            .completeClosureExhausted()) {</span>
+<span class="nc" id="L137">                        throw new IllegalStateException(</span>
+                            &quot;claim requires complete production closure: &quot;
+<span class="nc" id="L139">                                + result.benchmarkCase().id()</span>
+                                + &quot; has production oracle status &quot;
+<span class="nc" id="L141">                                + result.production().oracle().status()</span>
+                        );
+                    }
+                }
+                case REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND -&gt;
+<span class="fc" id="L146">                    targetBlindDiversitySignal = true;</span>
+                default -&gt; {
+                    // No additional cross-case claim invariant.
+                }
+            }
+<span class="fc" id="L151">        }</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (report.assessment().searchPolicyDifferenceIdentified()</span>
+                != targetBlindDiversitySignal) {
+<span class="fc" id="L154">            throw new IllegalStateException(</span>
+                &quot;search-policy claim must be backed by a target-blind &quot;
+                    + &quot;structural-diversity result&quot;
+            );
+        }
+<span class="fc" id="L159">    }</span>
+
+    private static void verifyWitnessPruning(
+        AtlasReport atlas,
+        List&lt;HistoricalWitnessPruningDiagnostic.CaseDiagnostic&gt; diagnostics
+    ) {
+<span class="fc" id="L165">        Map&lt;String, HistoricalWitnessPruningDiagnostic.CaseDiagnostic&gt; byId =</span>
+<span class="fc" id="L166">            diagnostics.stream().collect(Collectors.toMap(</span>
+                HistoricalWitnessPruningDiagnostic.CaseDiagnostic::id,
+<span class="fc" id="L168">                Function.identity()</span>
+            ));
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (byId.size() != atlas.cases().size()) {</span>
+<span class="fc" id="L171">            throw new IllegalStateException(</span>
+                &quot;witness-pruning diagnostic must balance every atlas case&quot;
+            );
+        }
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        for (CaseResult result : atlas.cases()) {</span>
+<span class="fc" id="L176">            HistoricalWitnessPruningDiagnostic.CaseDiagnostic retained =</span>
+<span class="fc" id="L177">                byId.get(result.benchmarkCase().id());</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (retained == null) {</span>
+<span class="fc" id="L179">                throw new IllegalStateException(</span>
+                    &quot;missing witness-pruning case &quot;
+<span class="fc" id="L181">                        + result.benchmarkCase().id()</span>
+                );
+            }
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            boolean policySignal = result.status()</span>
+                == HistoricalRediscoveryAtlas.PrimaryStatus
+                    .REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND;
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (policySignal</span>
+                    &amp;&amp; !HistoricalWitnessPruningDiagnostic.WITNESS_PREFIX_LOST
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                        .equals(retained.status())) {</span>
+<span class="fc" id="L190">                throw new IllegalStateException(</span>
+                    &quot;target-blind diversity signal requires a retained &quot;
+                        + &quot;scalar witness-prefix loss: &quot;
+<span class="fc" id="L193">                        + result.benchmarkCase().id()</span>
+                );
+            }
+<span class="fc" id="L196">        }</span>
+<span class="fc" id="L197">    }</span>
+
+    private static Path siblingOutput(Path atlasOutput, String suffix) {
+<span class="fc" id="L200">        Path normalized = atlasOutput.toAbsolutePath().normalize();</span>
+<span class="fc" id="L201">        Path name = normalized.getFileName();</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (name == null) {</span>
+<span class="fc" id="L203">            throw new IllegalArgumentException(</span>
+                &quot;historical rediscovery output must have a file name&quot;
+            );
+        }
+<span class="fc" id="L207">        return normalized.resolveSibling(name + suffix);</span>
+    }
+
+<span class="fc" id="L210">    record Execution(</span>
+        AtlasReport report,
+        HistoricalRediscoveryAtlas.WrittenArtifacts artifacts,
+        HistoricalRediscoveryRunArtifact.VerifiedRun verifiedRun,
+        Path pruningArtifact,
+        String pruningContentHash,
+        Path productionArtifact,
+        HistoricalProductionSearchComparison.Report productionReport,
+        Path equalWorkArtifact,
+        HistoricalEqualWorkSearchComparison.Report equalWorkReport
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

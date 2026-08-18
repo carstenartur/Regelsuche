@@ -43,12 +43,99 @@
     },
     "decisions": {
       "type": "array",
+      "description": "Exactly one decision is required for each fixed architecture track.",
       "minItems": 6,
       "maxItems": 6,
       "uniqueItems": true,
       "items": {
         "$ref": "#/$defs/decision"
-      }
+      },
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "track": {
+                "const": "DIRECTED_INVENTORY_DIRECTIONALITY_DIAGNOSIS"
+              }
+            },
+            "required": [
+              "track"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "track": {
+                "const": "PARETO_COMPLEXITY_DEBT_SEARCH_CONTROL"
+              }
+            },
+            "required": [
+              "track"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "track": {
+                "const": "TARGET_FREE_REPRESENTATION_DISCOVERY"
+              }
+            },
+            "required": [
+              "track"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "track": {
+                "const": "EXACT_VALUE_ARENA_SEARCH_QUOTIENT"
+              }
+            },
+            "required": [
+              "track"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "track": {
+                "const": "NATIVE_AC_CONDITIONAL_PROOF_EGRAPH"
+              }
+            },
+            "required": [
+              "track"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "track": {
+                "const": "BROAD_RUNTIME_OPTIMIZATION"
+              }
+            },
+            "required": [
+              "track"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
     },
     "claimBoundary": {
       "const": "This artifact is a reversible implementation-priority decision derived from the frozen historical diagnostic corpus and its retained search evidence. It is not mathematical proof, autonomous rediscovery, external novelty, a complete causal model or a claim of general search or architecture superiority."

@@ -481,8 +481,8 @@ public final class HistoricalRediscoveryCorpus {
 <span class="fc bfc" id="L481" title="All 2 branches covered.">        if (witnessSteps == 0) {</span>
 <span class="fc" id="L482">            return ComparisonStatus.NOT_APPLICABLE_NO_PRODUCTION_WITNESS;</span>
         }
-<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (scalar.reachedRelation()) {</span>
-<span class="nc" id="L485">            return ComparisonStatus.SCALAR_ALREADY_FOUND;</span>
+<span class="fc bfc" id="L484" title="All 2 branches covered.">        if (scalar.reachedRelation()) {</span>
+<span class="fc" id="L485">            return ComparisonStatus.SCALAR_ALREADY_FOUND;</span>
         }
 <span class="pc bpc" id="L487" title="1 of 2 branches missed.">        if (diversity.reachedRelation()) {</span>
 <span class="pc bpc" id="L488" title="1 of 2 branches missed.">            return diversity.exploredPrefixLength() == witnessSteps</span>
@@ -558,7 +558,7 @@ public final class HistoricalRediscoveryCorpus {
 <span class="fc bfc" id="L558" title="All 2 branches covered.">                .equals(status)</span>
                 || HistoricalWitnessPruningDiagnostic.WITNESS_COMPLETELY_EXPLORED
 <span class="pc bpc" id="L560" title="1 of 2 branches missed.">                    .equals(status);</span>
-<span class="pc bpc" id="L561" title="3 of 6 branches missed.">        if ((statusRequiresScalarHit &amp;&amp; !retained.reached())</span>
+<span class="pc bpc" id="L561" title="1 of 6 branches missed.">        if ((statusRequiresScalarHit &amp;&amp; !retained.reached())</span>
 <span class="pc bpc" id="L562" title="1 of 2 branches missed.">                || (statusRequiresScalarMiss &amp;&amp; retained.reached())</span>
 <span class="pc bpc" id="L563" title="1 of 2 branches missed.">                || retained.exploredStates() != witness.searchExploredStates()</span>
 <span class="pc bpc" id="L564" title="1 of 2 branches missed.">                || retained.engineCalls() != witness.engineCalls()</span>
@@ -774,7 +774,7 @@ public final class HistoricalRediscoveryCorpus {
                 counts,
 <span class="fc" id="L775">                (int) cases.stream()</span>
 <span class="fc bfc" id="L776" title="All 2 branches covered.">                    .filter(value -&gt; value.oracleWitnessStepCount() &gt; 0)</span>
-<span class="pc bpc" id="L777" title="1 of 2 branches missed.">                    .filter(value -&gt; !value.scalar().reachedRelation())</span>
+<span class="fc bfc" id="L777" title="All 2 branches covered.">                    .filter(value -&gt; !value.scalar().reachedRelation())</span>
 <span class="fc" id="L778">                    .count(),</span>
 <span class="fc" id="L779">                counts.getOrDefault(</span>
 <span class="fc" id="L780">                    ComparisonStatus.DIVERSITY_RECOVERS_COMPLETE_WITNESS, 0),</span>

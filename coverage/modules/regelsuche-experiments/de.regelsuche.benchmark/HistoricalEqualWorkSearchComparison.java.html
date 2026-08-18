@@ -1,0 +1,858 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HistoricalEqualWorkSearchComparison.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">HistoricalEqualWorkSearchComparison.java</span></div><h1>HistoricalEqualWorkSearchComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.AtlasReport;
+import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.CaseResult;
+import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.OracleEvidence;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Case;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Corpus;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.TargetRelation;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.search.strategy.StructuralDiversitySearchStrategy;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.AstRewriteTransformationEngines;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.HexFormat;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Target-blind scalar/diversity comparison at fixed admitted-work checkpoints.
+ * Candidate lists are materialized before this diagnostic admits a deterministic
+ * prefix, so the report equalizes admitted work rather than CPU or matcher work.
+ */
+<span class="fc" id="L48">public final class HistoricalEqualWorkSearchComparison {</span>
+    public static final String SCHEMA =
+        &quot;regelsuche.equal-work-search-comparison/v1&quot;;
+    public static final String FILE_NAME = &quot;equal-work-search-comparison.json&quot;;
+<span class="fc" id="L52">    public static final List&lt;Integer&gt; CHECKPOINTS =</span>
+<span class="fc" id="L53">        List.of(1, 2, 4, 8, 16, 32);</span>
+    public static final String CLAIM_BOUNDARY =
+        &quot;Both target-blind searches receive the same frozen source, production &quot;
+            + &quot;inventory and deterministic ceilings for engine calls and admitted &quot;
+            + &quot;primitive rewrite steps. Candidate lists are materialized before &quot;
+            + &quot;the deterministic prefix is admitted, so this does not equalize &quot;
+            + &quot;matcher runtime, allocation or total CPU work. Oracle witnesses &quot;
+            + &quot;and targets are inspected only after search completion. A retained &quot;
+            + &quot;checkpoint advantage is not proof, autonomous rediscovery, novelty &quot;
+            + &quot;or general superiority.&quot;;
+
+<span class="fc" id="L64">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L65">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+<span class="fc" id="L67">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+<span class="fc" id="L68">    private final SymPyEquivalenceService equivalence =</span>
+        new SymPyEquivalenceService();
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (args.length == 0</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                || !&quot;equal-work-search-comparison&quot;.equals(args[0])) {</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(</span>
+                &quot;expected equal-work-search-comparison [output-directory]&quot;);
+        }
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        Path output = args.length &gt; 1</span>
+<span class="nc" id="L78">            ? Path.of(args[1])</span>
+<span class="nc" id="L79">            : Path.of(&quot;build/reports/&quot;</span>
+                + &quot;historical-rediscovery-equal-work-search-comparison&quot;);
+<span class="nc" id="L81">        Corpus corpus = HistoricalRediscoveryCorpus.load();</span>
+<span class="nc" id="L82">        AtlasReport atlas = new HistoricalRediscoveryAtlas().run(corpus);</span>
+<span class="nc" id="L83">        HistoricalEqualWorkSearchComparison comparison =</span>
+            new HistoricalEqualWorkSearchComparison();
+<span class="nc" id="L85">        Report report = comparison.run(corpus, atlas);</span>
+<span class="nc" id="L86">        System.out.println(&quot;historicalEqualWorkSearchComparison=&quot;</span>
+<span class="nc" id="L87">            + comparison.write(output, report));</span>
+<span class="nc" id="L88">        System.out.println(&quot;historicalEqualWorkSearchComparisonHash=&quot;</span>
+<span class="nc" id="L89">            + report.contentHash());</span>
+<span class="nc" id="L90">    }</span>
+
+    Report run(Corpus corpus, AtlasReport atlas) {
+<span class="fc" id="L93">        requireBinding(corpus, atlas);</span>
+<span class="fc" id="L94">        Map&lt;String, CaseResult&gt; byId = atlas.cases().stream()</span>
+<span class="fc" id="L95">            .collect(Collectors.toUnmodifiableMap(</span>
+<span class="fc" id="L96">                value -&gt; value.benchmarkCase().id(), value -&gt; value));</span>
+<span class="fc" id="L97">        List&lt;EqualWorkCase&gt; cases = corpus.cases().stream()</span>
+<span class="fc" id="L98">            .sorted(Comparator.comparing(Case::id))</span>
+<span class="fc" id="L99">            .map(value -&gt; compare(</span>
+                value,
+<span class="fc" id="L101">                Objects.requireNonNull(byId.get(value.id()))))</span>
+<span class="fc" id="L102">            .toList();</span>
+<span class="fc" id="L103">        return Report.create(corpus, atlas, cases);</span>
+    }
+
+    Path write(Path directory, Report report) {
+<span class="fc" id="L107">        Path output = directory.toAbsolutePath().normalize().resolve(FILE_NAME);</span>
+<span class="fc" id="L108">        String json = report.toCanonicalJson();</span>
+        try {
+<span class="fc" id="L110">            Files.createDirectories(output.getParent());</span>
+<span class="fc" id="L111">            AtomicJsonFile.writeUtf8(output, json);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (!json.equals(Files.readString(</span>
+                    output, StandardCharsets.UTF_8))) {
+<span class="nc" id="L114">                throw new IllegalStateException(</span>
+                    &quot;equal-work report changed on write&quot;);
+            }
+<span class="fc" id="L117">            return output;</span>
+<span class="nc" id="L118">        } catch (IOException exception) {</span>
+<span class="nc" id="L119">            throw new UncheckedIOException(</span>
+                &quot;Could not write equal-work report&quot;, exception);
+        }
+    }
+
+    private EqualWorkCase compare(Case benchmarkCase, CaseResult atlasCase) {
+<span class="fc" id="L125">        OracleEvidence oracle = atlasCase.production().oracle();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (!oracle.reachable()) {</span>
+<span class="fc" id="L127">            return EqualWorkCase.skipped(</span>
+<span class="fc" id="L128">                benchmarkCase.id(),</span>
+                CaseStatus.NO_PRODUCTION_WITNESS,
+<span class="fc" id="L130">                atlasCase.status().name(),</span>
+<span class="fc" id="L131">                oracle.status(),</span>
+                0);
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (atlasCase.production().scalar().reached()) {</span>
+<span class="fc" id="L135">            return EqualWorkCase.skipped(</span>
+<span class="fc" id="L136">                benchmarkCase.id(),</span>
+                CaseStatus.SCALAR_ALREADY_REACHED,
+<span class="fc" id="L138">                atlasCase.status().name(),</span>
+<span class="fc" id="L139">                oracle.status(),</span>
+<span class="fc" id="L140">                oracle.witnessExpressions().size());</span>
+        }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (oracle.witnessExpressions().isEmpty()) {</span>
+<span class="nc" id="L143">            throw new IllegalStateException(</span>
+<span class="nc" id="L144">                &quot;reachable oracle witness is empty for &quot; + benchmarkCase.id());</span>
+        }
+<span class="fc" id="L146">        List&lt;Checkpoint&gt; checkpoints = CHECKPOINTS.stream()</span>
+<span class="fc" id="L147">            .map(budget -&gt; checkpoint(benchmarkCase, atlasCase, budget))</span>
+<span class="fc" id="L148">            .toList();</span>
+<span class="fc" id="L149">        return new EqualWorkCase(</span>
+<span class="fc" id="L150">            benchmarkCase.id(),</span>
+            CaseStatus.EXECUTED_ORACLE_WITNESS_SCALAR_MISS,
+<span class="fc" id="L152">            atlasCase.status().name(),</span>
+<span class="fc" id="L153">            oracle.status(),</span>
+<span class="fc" id="L154">            oracle.witnessExpressions().size(),</span>
+            checkpoints);
+    }
+
+    private Checkpoint checkpoint(
+        Case benchmarkCase,
+        CaseResult atlasCase,
+        int primitiveBudget
+    ) {
+<span class="fc" id="L163">        int callBudget = Math.max(</span>
+<span class="fc" id="L164">            1, Math.min(primitiveBudget, benchmarkCase.searchMaxVisitedStates()));</span>
+<span class="fc" id="L165">        List&lt;String&gt; witness = atlasCase.production().oracle()</span>
+<span class="fc" id="L166">            .witnessExpressions();</span>
+<span class="fc" id="L167">        String source = atlasCase.representation().formattedSource();</span>
+<span class="fc" id="L168">        String target = atlasCase.representation().formattedTarget();</span>
+<span class="fc" id="L169">        Policy scalar = runScalar(</span>
+            benchmarkCase, source, target, witness, primitiveBudget, callBudget);
+<span class="fc" id="L171">        Policy diversity = runDiversity(</span>
+            benchmarkCase, source, target, witness, primitiveBudget, callBudget);
+<span class="fc" id="L173">        return Checkpoint.create(</span>
+<span class="fc" id="L174">            primitiveBudget, callBudget, witness.size(), scalar, diversity);</span>
+    }
+
+    private Policy runScalar(
+        Case benchmarkCase,
+        String source,
+        String target,
+        List&lt;String&gt; witness,
+        int primitiveBudget,
+        int callBudget
+    ) {
+<span class="fc" id="L185">        FixedWorkEngine engine = engine(</span>
+            benchmarkCase, primitiveBudget, callBudget);
+<span class="fc" id="L187">        SearchProblem problem = problem(benchmarkCase, source, engine);</span>
+<span class="fc" id="L188">        requireTargetBlind(problem);</span>
+<span class="fc" id="L189">        var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);</span>
+<span class="fc" id="L190">        String terminal = terminalStatus(</span>
+<span class="fc" id="L191">            benchmarkCase, result.states(), engine);</span>
+<span class="fc" id="L192">        return policy(</span>
+<span class="fc" id="L193">            benchmarkCase, target, witness, result.states(), engine, terminal);</span>
+    }
+
+    private Policy runDiversity(
+        Case benchmarkCase,
+        String source,
+        String target,
+        List&lt;String&gt; witness,
+        int primitiveBudget,
+        int callBudget
+    ) {
+<span class="fc" id="L204">        FixedWorkEngine engine = engine(</span>
+            benchmarkCase, primitiveBudget, callBudget);
+<span class="fc" id="L206">        SearchProblem problem = problem(benchmarkCase, source, engine);</span>
+<span class="fc" id="L207">        requireTargetBlind(problem);</span>
+<span class="fc" id="L208">        List&lt;SearchState&gt; states = new StructuralDiversitySearchStrategy()</span>
+<span class="fc" id="L209">            .search(problem);</span>
+<span class="fc" id="L210">        return policy(</span>
+            benchmarkCase, target, witness, states, engine,
+<span class="fc" id="L212">            terminalStatus(benchmarkCase, states, engine));</span>
+    }
+
+    private static String terminalStatus(
+        Case benchmarkCase,
+        List&lt;SearchState&gt; states,
+        FixedWorkEngine engine
+    ) {
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (states.size() &gt;= benchmarkCase.searchMaxVisitedStates()) {</span>
+<span class="fc" id="L221">            return &quot;STATE_BUDGET&quot;;</span>
+        }
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        return engine.budgetReached()</span>
+<span class="pc" id="L224">            ? &quot;WORK_BUDGET&quot; : &quot;FRONTIER_EXHAUSTED&quot;;</span>
+    }
+
+    private Policy policy(
+        Case benchmarkCase,
+        String target,
+        List&lt;String&gt; witness,
+        List&lt;SearchState&gt; states,
+        FixedWorkEngine engine,
+        String terminal
+    ) {
+<span class="fc" id="L235">        return new Policy(</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            findMatch(benchmarkCase, target, states) != null,</span>
+<span class="fc" id="L237">            prefix(witness, states),</span>
+<span class="fc" id="L238">            states.size(),</span>
+<span class="fc" id="L239">            engine.calls(),</span>
+<span class="fc" id="L240">            engine.steps(),</span>
+<span class="fc" id="L241">            engine.primitiveBudgetReached(),</span>
+<span class="fc" id="L242">            engine.callBudgetReached(),</span>
+            terminal);
+    }
+
+    private SearchProblem problem(
+        Case benchmarkCase,
+        String source,
+        TransformationEngine engine
+    ) {
+<span class="fc" id="L251">        return new SearchProblem(</span>
+            source,
+            engine,
+            scorer,
+            canonicalizer,
+            new SearchHeuristic(
+<span class="fc" id="L257">                benchmarkCase.searchMaxDepth(),</span>
+<span class="fc" id="L258">                benchmarkCase.searchMaxVisitedStates(),</span>
+                1,
+<span class="fc" id="L260">                benchmarkCase.maxExpandingSteps(),</span>
+<span class="fc" id="L261">                benchmarkCase.maxCandidatesPerState(),</span>
+<span class="fc" id="L262">                benchmarkCase.beamWidth()));</span>
+    }
+
+    private FixedWorkEngine engine(Case value, int steps, int calls) {
+<span class="fc" id="L266">        TransformationEngine delegate = AstRewriteTransformationEngines.production(</span>
+<span class="fc" id="L267">            AstRewriteTransformationEngine.defaultRules(),</span>
+            128,
+<span class="fc" id="L269">            Math.max(200, value.maxCandidatesPerState() * 2));</span>
+<span class="fc" id="L270">        return new FixedWorkEngine(delegate, steps, calls);</span>
+    }
+
+    private int prefix(List&lt;String&gt; witness, List&lt;SearchState&gt; states) {
+<span class="fc" id="L274">        Set&lt;String&gt; explored = states.stream()</span>
+<span class="fc" id="L275">            .map(SearchState::expression)</span>
+<span class="fc" id="L276">            .map(this::key)</span>
+<span class="fc" id="L277">            .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L278">        int result = 0;</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        for (String expression : witness) {</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (!explored.contains(key(expression))) {</span>
+<span class="fc" id="L281">                break;</span>
+            }
+<span class="fc" id="L283">            result++;</span>
+<span class="fc" id="L284">        }</span>
+<span class="fc" id="L285">        return result;</span>
+    }
+
+    private SearchState findMatch(
+        Case benchmarkCase,
+        String target,
+        List&lt;SearchState&gt; states
+    ) {
+<span class="fc" id="L293">        return states.stream()</span>
+<span class="fc" id="L294">            .filter(state -&gt; matches(benchmarkCase, state.expression(), target))</span>
+<span class="fc" id="L295">            .min(Comparator.comparingInt(SearchState::depth)</span>
+<span class="fc" id="L296">                .thenComparing(SearchState::expression)</span>
+<span class="pc" id="L297">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds())))</span>
+<span class="fc" id="L298">            .orElse(null);</span>
+    }
+
+    private boolean matches(Case value, String expression, String target) {
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (value.targetRelation() == TargetRelation.SYNTAX_EXACT) {</span>
+            try {
+<span class="fc" id="L304">                return format(expression).equals(target);</span>
+<span class="nc" id="L305">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L306">                return false;</span>
+            }
+        }
+<span class="nc" id="L309">        return equivalence.areEquivalent(expression, target);</span>
+    }
+
+    private String key(String expression) {
+        try {
+<span class="fc" id="L314">            return format(expression);</span>
+<span class="nc" id="L315">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L316">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+        }
+    }
+
+    private String format(String expression) {
+<span class="fc" id="L321">        return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+    }
+
+    private static void requireTargetBlind(SearchProblem problem) {
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if (problem.target() != null) {</span>
+<span class="nc" id="L326">            throw new IllegalStateException(</span>
+                &quot;equal-work search must be target-blind&quot;);
+        }
+<span class="fc" id="L329">    }</span>
+
+    private static void requireBinding(Corpus corpus, AtlasReport atlas) {
+<span class="fc" id="L332">        Set&lt;String&gt; corpusIds = corpus.cases().stream()</span>
+<span class="fc" id="L333">            .map(Case::id).collect(Collectors.toSet());</span>
+<span class="fc" id="L334">        Set&lt;String&gt; atlasIds = atlas.cases().stream()</span>
+<span class="fc" id="L335">            .map(value -&gt; value.benchmarkCase().id()).collect(Collectors.toSet());</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        if (!corpus.schema().equals(atlas.corpusSchema())</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">                || !corpus.contentSha256().equals(atlas.corpusSha256())</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">                || !corpus.inventoryRevision().equals(atlas.inventoryRevision())</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">                || !corpus.claimBoundary().equals(atlas.claimBoundary())</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">                || !corpusIds.equals(atlasIds)) {</span>
+<span class="nc" id="L341">            throw new IllegalArgumentException(</span>
+                &quot;atlas does not bind equal-work corpus&quot;);
+        }
+<span class="fc" id="L344">    }</span>
+
+<span class="fc" id="L346">    public enum CaseStatus {</span>
+<span class="fc" id="L347">        NO_PRODUCTION_WITNESS,</span>
+<span class="fc" id="L348">        SCALAR_ALREADY_REACHED,</span>
+<span class="fc" id="L349">        EXECUTED_ORACLE_WITNESS_SCALAR_MISS</span>
+    }
+
+<span class="fc" id="L352">    public enum Outcome {</span>
+<span class="fc" id="L353">        BOTH_COMPLETE_WITNESS,</span>
+<span class="fc" id="L354">        DIVERSITY_ONLY_COMPLETE_WITNESS,</span>
+<span class="fc" id="L355">        SCALAR_ONLY_COMPLETE_WITNESS,</span>
+<span class="fc" id="L356">        DIVERSITY_LONGER_PREFIX,</span>
+<span class="fc" id="L357">        SCALAR_LONGER_PREFIX,</span>
+<span class="fc" id="L358">        EQUAL_PREFIX</span>
+    }
+
+    public record Policy(
+        boolean reachedRelation,
+        int witnessPrefixLength,
+        int exploredStates,
+        int engineCalls,
+        int admittedPrimitiveSteps,
+        boolean primitiveBudgetReached,
+        boolean engineCallBudgetReached,
+        String terminalStatus
+    ) {
+<span class="fc" id="L371">        public Policy {</span>
+<span class="fc" id="L372">            terminalStatus = requireText(terminalStatus, &quot;terminalStatus&quot;);</span>
+<span class="pc bpc" id="L373" title="4 of 8 branches missed.">            if (witnessPrefixLength &lt; 0 || exploredStates &lt; 0</span>
+                    || engineCalls &lt; 0 || admittedPrimitiveSteps &lt; 0) {
+<span class="nc" id="L375">                throw new IllegalArgumentException(</span>
+                    &quot;policy counters must not be negative&quot;);
+            }
+<span class="fc" id="L378">        }</span>
+    }
+
+    public record Checkpoint(
+        int primitiveBudget,
+        int engineCallBudget,
+        Policy scalar,
+        Policy diversity,
+        boolean equalConsumedWork,
+        Outcome outcome
+    ) {
+<span class="fc" id="L389">        public Checkpoint {</span>
+<span class="pc bpc" id="L390" title="3 of 6 branches missed.">            if (!CHECKPOINTS.contains(primitiveBudget)</span>
+                    || engineCallBudget &lt; 1
+                    || engineCallBudget &gt; primitiveBudget) {
+<span class="nc" id="L393">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint budgets are outside the preregistration&quot;);
+            }
+<span class="fc" id="L396">            Objects.requireNonNull(scalar, &quot;scalar&quot;);</span>
+<span class="fc" id="L397">            Objects.requireNonNull(diversity, &quot;diversity&quot;);</span>
+<span class="fc" id="L398">            Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="fc" id="L399">            requireWithinBudget(</span>
+                scalar, primitiveBudget, engineCallBudget, &quot;scalar&quot;);
+<span class="fc" id="L401">            requireWithinBudget(</span>
+                diversity, primitiveBudget, engineCallBudget, &quot;diversity&quot;);
+<span class="fc" id="L403">            boolean expectedEqual = scalar.engineCalls()</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">                    == diversity.engineCalls()</span>
+<span class="fc" id="L405">                &amp;&amp; scalar.admittedPrimitiveSteps()</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">                    == diversity.admittedPrimitiveSteps();</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            if (equalConsumedWork != expectedEqual) {</span>
+<span class="nc" id="L408">                throw new IllegalArgumentException(</span>
+                    &quot;equalConsumedWork differs from the policy ledgers&quot;);
+            }
+<span class="fc" id="L411">        }</span>
+
+        private static void requireWithinBudget(
+            Policy policy,
+            int primitiveBudget,
+            int callBudget,
+            String label
+        ) {
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">            if (policy.engineCalls() &gt; callBudget</span>
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">                    || policy.admittedPrimitiveSteps() &gt; primitiveBudget</span>
+<span class="fc" id="L421">                    || policy.primitiveBudgetReached()</span>
+<span class="pc bpc" id="L422" title="1 of 4 branches missed.">                        != (policy.admittedPrimitiveSteps() &gt;= primitiveBudget)</span>
+<span class="fc" id="L423">                    || policy.engineCallBudgetReached()</span>
+<span class="pc bpc" id="L424" title="1 of 4 branches missed.">                        != (policy.engineCalls() &gt;= callBudget)) {</span>
+<span class="nc" id="L425">                throw new IllegalArgumentException(</span>
+                    label + &quot; policy differs from the checkpoint budget&quot;);
+            }
+<span class="fc" id="L428">        }</span>
+
+        static Checkpoint create(
+            int primitiveBudget,
+            int callBudget,
+            int witnessSteps,
+            Policy scalar,
+            Policy diversity
+        ) {
+<span class="fc bfc" id="L437" title="All 2 branches covered.">            boolean equal = scalar.engineCalls() == diversity.engineCalls()</span>
+<span class="fc" id="L438">                &amp;&amp; scalar.admittedPrimitiveSteps()</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">                    == diversity.admittedPrimitiveSteps();</span>
+<span class="fc" id="L440">            return new Checkpoint(</span>
+                primitiveBudget,
+                callBudget,
+                scalar,
+                diversity,
+                equal,
+<span class="fc" id="L446">                outcome(witnessSteps, scalar, diversity));</span>
+        }
+
+        private static Outcome outcome(
+            int witnessSteps,
+            Policy scalar,
+            Policy diversity
+        ) {
+<span class="fc" id="L454">            boolean scalarComplete =</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">                scalar.witnessPrefixLength() == witnessSteps;</span>
+<span class="fc" id="L456">            boolean diversityComplete =</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">                diversity.witnessPrefixLength() == witnessSteps;</span>
+<span class="pc bpc" id="L458" title="3 of 4 branches missed.">            if (scalarComplete &amp;&amp; diversityComplete) {</span>
+<span class="nc" id="L459">                return Outcome.BOTH_COMPLETE_WITNESS;</span>
+            }
+<span class="fc bfc" id="L461" title="All 2 branches covered.">            if (diversityComplete) {</span>
+<span class="fc" id="L462">                return Outcome.DIVERSITY_ONLY_COMPLETE_WITNESS;</span>
+            }
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">            if (scalarComplete) {</span>
+<span class="nc" id="L465">                return Outcome.SCALAR_ONLY_COMPLETE_WITNESS;</span>
+            }
+<span class="fc" id="L467">            if (diversity.witnessPrefixLength()</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">                    &gt; scalar.witnessPrefixLength()) {</span>
+<span class="nc" id="L469">                return Outcome.DIVERSITY_LONGER_PREFIX;</span>
+            }
+<span class="fc" id="L471">            if (scalar.witnessPrefixLength()</span>
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">                    &gt; diversity.witnessPrefixLength()) {</span>
+<span class="nc" id="L473">                return Outcome.SCALAR_LONGER_PREFIX;</span>
+            }
+<span class="fc" id="L475">            return Outcome.EQUAL_PREFIX;</span>
+        }
+    }
+
+    public record EqualWorkCase(
+        String id,
+        CaseStatus status,
+        String atlasStatus,
+        String oracleStatus,
+        int oracleWitnessStepCount,
+        List&lt;Checkpoint&gt; checkpoints
+    ) {
+<span class="fc" id="L487">        public EqualWorkCase {</span>
+<span class="fc" id="L488">            id = requireText(id, &quot;id&quot;);</span>
+<span class="fc" id="L489">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L490">            atlasStatus = requireText(atlasStatus, &quot;atlasStatus&quot;);</span>
+<span class="fc" id="L491">            oracleStatus = requireText(oracleStatus, &quot;oracleStatus&quot;);</span>
+<span class="fc" id="L492">            checkpoints = List.copyOf(</span>
+<span class="fc" id="L493">                Objects.requireNonNull(checkpoints, &quot;checkpoints&quot;));</span>
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">            if (oracleWitnessStepCount &lt; 0) {</span>
+<span class="nc" id="L495">                throw new IllegalArgumentException(</span>
+                    &quot;oracleWitnessStepCount must not be negative&quot;);
+            }
+<span class="fc bfc" id="L498" title="All 2 branches covered.">            boolean executed = status</span>
+                == CaseStatus.EXECUTED_ORACLE_WITNESS_SCALAR_MISS;
+<span class="fc bfc" id="L500" title="All 2 branches covered.">            boolean witnessRequired = status != CaseStatus.NO_PRODUCTION_WITNESS;</span>
+<span class="pc bpc" id="L501" title="1 of 6 branches missed.">            if (executed != !checkpoints.isEmpty()</span>
+<span class="pc bpc" id="L502" title="3 of 10 branches missed.">                    || executed &amp;&amp; checkpoints.size() != CHECKPOINTS.size()</span>
+                    || witnessRequired &amp;&amp; oracleWitnessStepCount &lt; 1
+                    || !witnessRequired &amp;&amp; oracleWitnessStepCount != 0) {
+<span class="nc" id="L505">                throw new IllegalArgumentException(</span>
+                    &quot;case status and checkpoint evidence differ&quot;);
+            }
+<span class="fc bfc" id="L508" title="All 2 branches covered.">            for (Checkpoint checkpoint : checkpoints) {</span>
+<span class="fc" id="L509">                Outcome expected = Checkpoint.outcome(</span>
+                    oracleWitnessStepCount,
+<span class="fc" id="L511">                    checkpoint.scalar(),</span>
+<span class="fc" id="L512">                    checkpoint.diversity());</span>
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">                if (checkpoint.outcome() != expected</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">                        || checkpoint.scalar().witnessPrefixLength()</span>
+                            &gt; oracleWitnessStepCount
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">                        || checkpoint.diversity().witnessPrefixLength()</span>
+                            &gt; oracleWitnessStepCount) {
+<span class="nc" id="L518">                    throw new IllegalArgumentException(</span>
+                        &quot;checkpoint outcome differs from witness evidence&quot;);
+                }
+<span class="fc" id="L521">            }</span>
+<span class="fc" id="L522">        }</span>
+
+        static EqualWorkCase skipped(
+            String id,
+            CaseStatus status,
+            String atlasStatus,
+            String oracleStatus,
+            int oracleWitnessStepCount
+        ) {
+<span class="fc" id="L531">            return new EqualWorkCase(</span>
+                id, status, atlasStatus, oracleStatus,
+<span class="fc" id="L533">                oracleWitnessStepCount, List.of());</span>
+        }
+    }
+
+    public record Summary(
+        int caseCount,
+        Map&lt;CaseStatus, Integer&gt; statusCounts,
+        int checkpointCount,
+        int equalConsumedWorkCount,
+        int equalWorkDiversityAdvantageCount,
+        int equalWorkDiversityCompleteWitnessCount
+    ) {
+<span class="fc" id="L545">        public Summary {</span>
+<span class="fc" id="L546">            statusCounts = Map.copyOf(</span>
+<span class="fc" id="L547">                Objects.requireNonNull(statusCounts, &quot;statusCounts&quot;));</span>
+<span class="pc bpc" id="L548" title="5 of 10 branches missed.">            if (caseCount &lt; 1 || checkpointCount &lt; 0</span>
+                    || equalConsumedWorkCount &lt; 0
+                    || equalWorkDiversityAdvantageCount &lt; 0
+                    || equalWorkDiversityCompleteWitnessCount &lt; 0
+<span class="fc" id="L552">                    || statusCounts.values().stream()</span>
+<span class="pc bpc" id="L553" title="4 of 8 branches missed.">                        .mapToInt(Integer::intValue).sum() != caseCount</span>
+                    || equalConsumedWorkCount &gt; checkpointCount
+                    || equalWorkDiversityAdvantageCount
+                        &gt; equalConsumedWorkCount
+                    || equalWorkDiversityCompleteWitnessCount
+                        &gt; equalWorkDiversityAdvantageCount) {
+<span class="nc" id="L559">                throw new IllegalArgumentException(</span>
+                    &quot;equal-work summary is inconsistent&quot;);
+            }
+<span class="fc" id="L562">        }</span>
+
+        static Summary derive(List&lt;EqualWorkCase&gt; cases) {
+<span class="fc" id="L565">            Map&lt;CaseStatus, Integer&gt; counts = new EnumMap&lt;&gt;(CaseStatus.class);</span>
+<span class="fc" id="L566">            cases.forEach(value -&gt; counts.merge(</span>
+<span class="fc" id="L567">                value.status(), 1, Integer::sum));</span>
+<span class="fc" id="L568">            List&lt;Checkpoint&gt; checkpoints = cases.stream()</span>
+<span class="fc" id="L569">                .flatMap(value -&gt; value.checkpoints().stream()).toList();</span>
+<span class="fc" id="L570">            int equal = (int) checkpoints.stream()</span>
+<span class="fc" id="L571">                .filter(Checkpoint::equalConsumedWork).count();</span>
+<span class="fc" id="L572">            int advantage = (int) checkpoints.stream()</span>
+<span class="fc" id="L573">                .filter(Checkpoint::equalConsumedWork)</span>
+<span class="fc bfc" id="L574" title="All 2 branches covered.">                .filter(value -&gt; value.outcome()</span>
+                    == Outcome.DIVERSITY_ONLY_COMPLETE_WITNESS
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">                    || value.outcome() == Outcome.DIVERSITY_LONGER_PREFIX)</span>
+<span class="fc" id="L577">                .count();</span>
+<span class="fc" id="L578">            int complete = (int) checkpoints.stream()</span>
+<span class="fc" id="L579">                .filter(Checkpoint::equalConsumedWork)</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">                .filter(value -&gt; value.outcome()</span>
+                    == Outcome.DIVERSITY_ONLY_COMPLETE_WITNESS)
+<span class="fc" id="L582">                .count();</span>
+<span class="fc" id="L583">            return new Summary(</span>
+<span class="fc" id="L584">                cases.size(), Map.copyOf(counts), checkpoints.size(),</span>
+                equal, advantage, complete);
+        }
+    }
+
+    public record Report(
+        String corpusSha256,
+        String atlasSha256,
+        String inventoryRevision,
+        List&lt;EqualWorkCase&gt; cases,
+        Summary summary,
+        String contentHash
+    ) {
+<span class="fc" id="L597">        public Report {</span>
+<span class="fc" id="L598">            corpusSha256 = requireSha256(</span>
+                corpusSha256, &quot;corpusSha256&quot;, false);
+<span class="fc" id="L600">            atlasSha256 = requireSha256(</span>
+                atlasSha256, &quot;atlasSha256&quot;, true);
+<span class="fc" id="L602">            inventoryRevision = requireText(</span>
+                inventoryRevision, &quot;inventoryRevision&quot;);
+<span class="fc" id="L604">            cases = Objects.requireNonNull(cases, &quot;cases&quot;).stream()</span>
+<span class="fc" id="L605">                .sorted(Comparator.comparing(EqualWorkCase::id)).toList();</span>
+<span class="pc bpc" id="L606" title="1 of 2 branches missed.">            if (cases.isEmpty()</span>
+<span class="fc" id="L607">                    || new LinkedHashSet&lt;&gt;(cases.stream()</span>
+<span class="fc" id="L608">                        .map(EqualWorkCase::id).toList()).size()</span>
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">                        != cases.size()</span>
+<span class="pc bpc" id="L610" title="1 of 2 branches missed.">                    || !Summary.derive(cases).equals(</span>
+<span class="fc" id="L611">                        Objects.requireNonNull(summary, &quot;summary&quot;))) {</span>
+<span class="nc" id="L612">                throw new IllegalArgumentException(</span>
+                    &quot;equal-work report case balance differs&quot;);
+            }
+<span class="fc" id="L615">            contentHash = requireSha256(</span>
+                contentHash, &quot;contentHash&quot;, true);
+<span class="fc" id="L617">            if (!hash(</span>
+                    corpusSha256, atlasSha256, inventoryRevision,
+<span class="pc bpc" id="L619" title="1 of 2 branches missed.">                    cases, summary).equals(contentHash)) {</span>
+<span class="nc" id="L620">                throw new IllegalArgumentException(</span>
+                    &quot;equal-work report contentHash mismatch&quot;);
+            }
+<span class="fc" id="L623">        }</span>
+
+        static Report create(
+            Corpus corpus,
+            AtlasReport atlas,
+            List&lt;EqualWorkCase&gt; cases
+        ) {
+<span class="fc" id="L630">            List&lt;EqualWorkCase&gt; sorted = cases.stream()</span>
+<span class="fc" id="L631">                .sorted(Comparator.comparing(EqualWorkCase::id)).toList();</span>
+<span class="fc" id="L632">            Summary summary = Summary.derive(sorted);</span>
+<span class="fc" id="L633">            String atlasSha = sha256(atlas.toJson());</span>
+<span class="fc" id="L634">            return new Report(</span>
+<span class="fc" id="L635">                corpus.contentSha256(),</span>
+                atlasSha,
+<span class="fc" id="L637">                corpus.inventoryRevision(),</span>
+                sorted,
+                summary,
+<span class="fc" id="L640">                hash(</span>
+<span class="fc" id="L641">                    corpus.contentSha256(),</span>
+                    atlasSha,
+<span class="fc" id="L643">                    corpus.inventoryRevision(),</span>
+                    sorted,
+                    summary));
+        }
+
+        String toCanonicalJson() {
+<span class="fc" id="L649">            return render(</span>
+                corpusSha256, atlasSha256, inventoryRevision,
+                cases, summary, contentHash);
+        }
+    }
+
+    private static String hash(
+        String corpusSha256,
+        String atlasSha256,
+        String inventoryRevision,
+        List&lt;EqualWorkCase&gt; cases,
+        Summary summary
+    ) {
+<span class="fc" id="L662">        return sha256(render(</span>
+            corpusSha256, atlasSha256, inventoryRevision,
+            cases, summary, null));
+    }
+
+    private static String render(
+        String corpusSha256,
+        String atlasSha256,
+        String inventoryRevision,
+        List&lt;EqualWorkCase&gt; cases,
+        Summary summary,
+        String contentHash
+    ) {
+<span class="fc" id="L675">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L676">        writer.property(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L677">        writer.property(</span>
+            &quot;evidenceStatus&quot;,
+            &quot;EXECUTED_TARGET_BLIND_FIXED_ADMITTED_WORK_CHECKPOINTS&quot;);
+<span class="fc" id="L680">        writer.property(&quot;corpusSchema&quot;, HistoricalRediscoveryCorpus.SCHEMA);</span>
+<span class="fc" id="L681">        writer.property(&quot;corpusSha256&quot;, corpusSha256);</span>
+<span class="fc" id="L682">        writer.property(&quot;atlasSchema&quot;, HistoricalRediscoveryAtlas.SCHEMA);</span>
+<span class="fc" id="L683">        writer.property(&quot;atlasSha256&quot;, atlasSha256);</span>
+<span class="fc" id="L684">        writer.property(&quot;inventoryRevision&quot;, inventoryRevision);</span>
+<span class="fc" id="L685">        writer.property(</span>
+            &quot;workUnit&quot;,
+            &quot;ENGINE_CALLS_AND_ADMITTED_PRIMITIVE_REWRITE_STEPS&quot;);
+<span class="fc" id="L688">        writer.property(</span>
+            &quot;informationBoundary&quot;, &quot;TARGET_BLIND_SEARCHES_ORACLE_POST_HOC&quot;);
+<span class="fc" id="L690">        writer.property(&quot;claimBoundary&quot;, CLAIM_BOUNDARY);</span>
+<span class="fc" id="L691">        writer.array(&quot;primitiveCheckpoints&quot;, array -&gt;</span>
+<span class="fc" id="L692">            CHECKPOINTS.forEach(array::numberValue));</span>
+<span class="fc" id="L693">        writer.array(&quot;cases&quot;, array -&gt; cases.forEach(value -&gt;</span>
+<span class="fc" id="L694">            array.objectValue(object -&gt; writeCase(object, value))));</span>
+<span class="fc" id="L695">        writer.object(&quot;summary&quot;, object -&gt; writeSummary(object, summary));</span>
+<span class="fc bfc" id="L696" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L697">            writer.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L699">        return writer.endObject().toString();</span>
+    }
+
+    private static void writeCase(JsonWriter writer, EqualWorkCase value) {
+<span class="fc" id="L703">        writer.property(&quot;id&quot;, value.id());</span>
+<span class="fc" id="L704">        writer.property(&quot;status&quot;, value.status().name());</span>
+<span class="fc" id="L705">        writer.property(&quot;atlasStatus&quot;, value.atlasStatus());</span>
+<span class="fc" id="L706">        writer.property(&quot;oracleStatus&quot;, value.oracleStatus());</span>
+<span class="fc" id="L707">        writer.property(</span>
+<span class="fc" id="L708">            &quot;oracleWitnessStepCount&quot;, value.oracleWitnessStepCount());</span>
+<span class="fc" id="L709">        writer.array(&quot;checkpoints&quot;, array -&gt; value.checkpoints().forEach(item -&gt;</span>
+<span class="fc" id="L710">            array.objectValue(object -&gt; writeCheckpoint(object, item))));</span>
+<span class="fc" id="L711">    }</span>
+
+    private static void writeCheckpoint(JsonWriter writer, Checkpoint value) {
+<span class="fc" id="L714">        writer.property(&quot;primitiveBudget&quot;, value.primitiveBudget());</span>
+<span class="fc" id="L715">        writer.property(&quot;engineCallBudget&quot;, value.engineCallBudget());</span>
+<span class="fc" id="L716">        writer.object(&quot;scalar&quot;, object -&gt; writePolicy(object, value.scalar()));</span>
+<span class="fc" id="L717">        writer.object(</span>
+<span class="fc" id="L718">            &quot;diversity&quot;, object -&gt; writePolicy(object, value.diversity()));</span>
+<span class="fc" id="L719">        writer.property(&quot;equalConsumedWork&quot;, value.equalConsumedWork());</span>
+<span class="fc" id="L720">        writer.property(&quot;outcome&quot;, value.outcome().name());</span>
+<span class="fc" id="L721">    }</span>
+
+    private static void writePolicy(JsonWriter writer, Policy value) {
+<span class="fc" id="L724">        writer.property(&quot;reachedRelation&quot;, value.reachedRelation());</span>
+<span class="fc" id="L725">        writer.property(&quot;witnessPrefixLength&quot;, value.witnessPrefixLength());</span>
+<span class="fc" id="L726">        writer.property(&quot;exploredStates&quot;, value.exploredStates());</span>
+<span class="fc" id="L727">        writer.property(&quot;engineCalls&quot;, value.engineCalls());</span>
+<span class="fc" id="L728">        writer.property(</span>
+<span class="fc" id="L729">            &quot;admittedPrimitiveSteps&quot;, value.admittedPrimitiveSteps());</span>
+<span class="fc" id="L730">        writer.property(</span>
+<span class="fc" id="L731">            &quot;primitiveBudgetReached&quot;, value.primitiveBudgetReached());</span>
+<span class="fc" id="L732">        writer.property(</span>
+<span class="fc" id="L733">            &quot;engineCallBudgetReached&quot;, value.engineCallBudgetReached());</span>
+<span class="fc" id="L734">        writer.property(&quot;terminalStatus&quot;, value.terminalStatus());</span>
+<span class="fc" id="L735">    }</span>
+
+    private static void writeSummary(JsonWriter writer, Summary value) {
+<span class="fc" id="L738">        writer.property(&quot;caseCount&quot;, value.caseCount());</span>
+<span class="fc" id="L739">        writer.object(&quot;statusCounts&quot;, object -&gt; value.statusCounts().entrySet()</span>
+<span class="fc" id="L740">            .stream().sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L741">            .forEach(entry -&gt; object.property(</span>
+<span class="fc" id="L742">                entry.getKey().name(), entry.getValue())));</span>
+<span class="fc" id="L743">        writer.property(&quot;checkpointCount&quot;, value.checkpointCount());</span>
+<span class="fc" id="L744">        writer.property(</span>
+<span class="fc" id="L745">            &quot;equalConsumedWorkCount&quot;, value.equalConsumedWorkCount());</span>
+<span class="fc" id="L746">        writer.property(</span>
+            &quot;equalWorkDiversityAdvantageCount&quot;,
+<span class="fc" id="L748">            value.equalWorkDiversityAdvantageCount());</span>
+<span class="fc" id="L749">        writer.property(</span>
+            &quot;equalWorkDiversityCompleteWitnessCount&quot;,
+<span class="fc" id="L751">            value.equalWorkDiversityCompleteWitnessCount());</span>
+<span class="fc" id="L752">    }</span>
+
+    private static String requireText(String value, String label) {
+<span class="pc bpc" id="L755" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L756">            throw new IllegalArgumentException(label + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L758">        return value.trim();</span>
+    }
+
+    private static String requireSha256(
+        String value,
+        String label,
+        boolean prefixed
+    ) {
+<span class="fc" id="L766">        String text = requireText(value, label);</span>
+<span class="fc bfc" id="L767" title="All 2 branches covered.">        String pattern = prefixed</span>
+<span class="fc" id="L768">            ? &quot;sha256:[0-9a-f]{64}&quot; : &quot;[0-9a-f]{64}&quot;;</span>
+<span class="pc bpc" id="L769" title="1 of 2 branches missed.">        if (!text.matches(pattern)) {</span>
+<span class="nc" id="L770">            throw new IllegalArgumentException(label + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L772">        return text;</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L777">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L778">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="fc" id="L779">                    value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L780">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L781">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static final class FixedWorkEngine
+            implements TransformationEngine {
+<span class="fc" id="L787">        private static final Comparator&lt;Transformation&gt; ORDER = Comparator</span>
+<span class="fc" id="L788">            .comparing(Transformation::rule)</span>
+<span class="fc" id="L789">            .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L790">            .thenComparing(Transformation::applicationKey);</span>
+
+        private final TransformationEngine delegate;
+        private final int primitiveBudget;
+        private final int callBudget;
+        private int calls;
+        private int steps;
+
+        private FixedWorkEngine(
+            TransformationEngine delegate,
+            int primitiveBudget,
+            int callBudget
+<span class="fc" id="L802">        ) {</span>
+<span class="fc" id="L803">            this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="pc bpc" id="L804" title="3 of 6 branches missed.">            if (!CHECKPOINTS.contains(primitiveBudget)</span>
+                    || callBudget &lt; 1 || callBudget &gt; primitiveBudget) {
+<span class="nc" id="L806">                throw new IllegalArgumentException(</span>
+                    &quot;fixed-work budgets are outside the preregistration&quot;);
+            }
+<span class="fc" id="L809">            this.primitiveBudget = primitiveBudget;</span>
+<span class="fc" id="L810">            this.callBudget = callBudget;</span>
+<span class="fc" id="L811">        }</span>
+
+        @Override
+        public List&lt;Transformation&gt; transform(String expression) {
+<span class="fc bfc" id="L815" title="All 2 branches covered.">            if (budgetReached()) {</span>
+<span class="fc" id="L816">                return List.of();</span>
+            }
+<span class="fc" id="L818">            calls++;</span>
+<span class="fc" id="L819">            List&lt;Transformation&gt; candidates = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L820">                delegate.transform(expression));</span>
+<span class="fc" id="L821">            candidates.sort(ORDER);</span>
+<span class="fc" id="L822">            List&lt;Transformation&gt; admitted = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L823" title="All 2 branches covered.">            for (Transformation candidate : candidates) {</span>
+<span class="fc" id="L824">                int cost = candidate.primitiveStepCount();</span>
+<span class="pc bpc" id="L825" title="1 of 2 branches missed.">                if (steps + cost &gt; primitiveBudget) {</span>
+<span class="nc" id="L826">                    break;</span>
+                }
+<span class="fc" id="L828">                admitted.add(candidate);</span>
+<span class="fc" id="L829">                steps += cost;</span>
+<span class="fc bfc" id="L830" title="All 2 branches covered.">                if (primitiveBudgetReached()) {</span>
+<span class="fc" id="L831">                    break;</span>
+                }
+<span class="fc" id="L833">            }</span>
+<span class="fc" id="L834">            return List.copyOf(admitted);</span>
+        }
+
+        int calls() {
+<span class="fc" id="L838">            return calls;</span>
+        }
+
+        int steps() {
+<span class="fc" id="L842">            return steps;</span>
+        }
+
+        boolean primitiveBudgetReached() {
+<span class="fc bfc" id="L846" title="All 2 branches covered.">            return steps &gt;= primitiveBudget;</span>
+        }
+
+        boolean callBudgetReached() {
+<span class="fc bfc" id="L850" title="All 2 branches covered.">            return calls &gt;= callBudget;</span>
+        }
+
+        boolean budgetReached() {
+<span class="pc bpc" id="L854" title="1 of 4 branches missed.">            return primitiveBudgetReached() || callBudgetReached();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
