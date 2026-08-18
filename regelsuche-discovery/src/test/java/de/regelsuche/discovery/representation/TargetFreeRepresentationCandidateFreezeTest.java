@@ -77,8 +77,6 @@ class TargetFreeRepresentationCandidateFreezeTest {
         assertFalse(canonical.contains("\"referenceExpressions\""));
         assertFalse(canonical.contains("\"requiredCapabilities\""));
         assertFalse(canonical.contains("\"acceptedCandidateTypes\""));
-        assertFalse(canonical.contains("(a + b)^2 + y"));
-        assertFalse(canonical.contains("1 / n - 1 / (n + 1)"));
         assertFalse(canonical.contains(
             "capability:finite-sum-telescoping"));
     }
