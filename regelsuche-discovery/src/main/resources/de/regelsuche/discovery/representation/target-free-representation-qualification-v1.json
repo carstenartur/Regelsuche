@@ -58,14 +58,14 @@
       "forbiddenOutcomes": [
         "WRONG_OCCURRENCE_PROVENANCE"
       ],
-      "id": "occurrence-local-square-bridge",
+      "id": "occurrence-local-trigonometric-bridge",
       "minimumTokenSavings": 0,
       "referenceExpressions": [
-        "(a + b)^2 + y"
+        "y + (sin(x)^2 + cos(x)^2)"
       ],
       "requiredAssumptions": [],
       "requiredCapabilities": [
-        "structure:perfect-square"
+        "rule:sympy.trig.pythagorean"
       ]
     },
     {
@@ -93,14 +93,14 @@
       "id": "telescoping-capability-bridge",
       "minimumTokenSavings": 0,
       "referenceExpressions": [
-        "1 / n - 1 / (n + 1)"
+        "1 / (n * (n + 1))"
       ],
       "requiredAssumptions": [
         "n != 0",
         "n + 1 != 0"
       ],
       "requiredCapabilities": [
-        "capability:finite-sum-telescoping"
+        "rule:sympy.rational.partial_fraction.telescoping"
       ]
     }
   ],

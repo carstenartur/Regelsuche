@@ -4,20 +4,25 @@ import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 
 public class RandomMonteCarloSearchStrategy implements SearchStrategy {
-    private final Random random;
+    private final long seed;
 
     public RandomMonteCarloSearchStrategy(long seed) {
-        this.random = new Random(seed);
+        this.seed = seed;
     }
 
     @Override
     public List<SearchState> search(SearchProblem problem) {
+        Objects.requireNonNull(problem, "problem");
+        Random random = new Random(seed);
         String root = problem.rootExpression().trim().replaceAll("\\s+", " ");
         SearchState rootState = new SearchState(
             root,
@@ -55,8 +60,15 @@ public class RandomMonteCarloSearchStrategy implements SearchStrategy {
             if (current.depth() >= problem.heuristic().maxDepth()) {
                 continue;
             }
-            List<Transformation> transformations = new ArrayList<>(problem.engine().transform(current.expression()));
-            java.util.Collections.shuffle(transformations, random);
+            List<Transformation> transformations = new ArrayList<>(
+                problem.engine().transform(current.expression()));
+            transformations.sort(Comparator
+                .comparing(Transformation::rule)
+                .thenComparing(Transformation::transformedExpression)
+                .thenComparing(Transformation::applicationKey)
+                .thenComparing(value -> String.join(
+                    "\u0001", value.primitiveRuleIds())));
+            Collections.shuffle(transformations, random);
             int generated = 0;
             for (Transformation transformation : transformations) {
                 if (generated >= problem.heuristic().maxCandidatesPerState()) {
@@ -85,6 +97,8 @@ public class RandomMonteCarloSearchStrategy implements SearchStrategy {
                 appliedRuleKinds.add(transformation.kind());
                 List<Boolean> equivalenceFlags = new ArrayList<>(current.equivalencePreservingFlags());
                 equivalenceFlags.add(transformation.equivalencePreservingByConstruction());
+                List<String> assumptions = new ArrayList<>(current.assumptions());
+                assumptions.addAll(transformation.assumptions());
                 SearchState nextState = new SearchState(
                     nextExpression,
                     current.depth() + 1,
@@ -102,7 +116,8 @@ public class RandomMonteCarloSearchStrategy implements SearchStrategy {
                     transformation.equivalencePreservingByConstruction(),
                     improvement,
                     appliedRuleKinds,
-                    equivalenceFlags
+                    equivalenceFlags,
+                    assumptions
                 );
                 if (!visited.contains(stateKey(nextState))) {
                     frontier.add(nextState);
@@ -114,6 +129,9 @@ public class RandomMonteCarloSearchStrategy implements SearchStrategy {
     }
 
     private String stateKey(SearchState state) {
-        return state.canonicalHash() + ":" + state.appliedRuleApplications();
+        return state.canonicalHash() + ":"
+            + state.assumptionFingerprint() + ":"
+            + String.join(",", state.appliedRuleApplications().stream()
+                .sorted().toList());
     }
 }
