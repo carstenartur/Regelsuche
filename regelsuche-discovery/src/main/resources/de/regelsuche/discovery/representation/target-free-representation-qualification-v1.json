@@ -1,0 +1,110 @@
+{
+  "cases": [
+    {
+      "acceptedCandidateTypes": [
+        "WHOLE_EXPRESSION_COMPRESSION"
+      ],
+      "forbiddenOutcomes": [
+        "ASSUMPTION_DROPPED"
+      ],
+      "id": "assumption-sensitive-cancellation-control",
+      "minimumTokenSavings": 1,
+      "referenceExpressions": [
+        "1"
+      ],
+      "requiredAssumptions": [
+        "x != 0"
+      ],
+      "requiredCapabilities": []
+    },
+    {
+      "acceptedCandidateTypes": [
+        "KNOWN_WHOLE_FORM_BRIDGE",
+        "DOWNSTREAM_CAPABILITY_BRIDGE"
+      ],
+      "forbiddenOutcomes": [
+        "FORMATION_USED_POST_FREEZE_RULE"
+      ],
+      "id": "catalog-blind-trigonometric-bridge",
+      "minimumTokenSavings": 0,
+      "referenceExpressions": [
+        "sin(x)^2 + cos(x)^2"
+      ],
+      "requiredAssumptions": [],
+      "requiredCapabilities": [
+        "rule:sympy.trig.pythagorean"
+      ]
+    },
+    {
+      "acceptedCandidateTypes": [
+        "WHOLE_EXPRESSION_COMPRESSION"
+      ],
+      "forbiddenOutcomes": [
+        "ALIAS_ONLY_COMPRESSION"
+      ],
+      "id": "neutral-element-compression",
+      "minimumTokenSavings": 1,
+      "referenceExpressions": [
+        "x"
+      ],
+      "requiredAssumptions": [],
+      "requiredCapabilities": []
+    },
+    {
+      "acceptedCandidateTypes": [
+        "KNOWN_SUBFORM_BRIDGE",
+        "SUBEXPRESSION_COMPRESSION"
+      ],
+      "forbiddenOutcomes": [
+        "WRONG_OCCURRENCE_PROVENANCE"
+      ],
+      "id": "occurrence-local-square-bridge",
+      "minimumTokenSavings": 0,
+      "referenceExpressions": [
+        "(a + b)^2 + y"
+      ],
+      "requiredAssumptions": [],
+      "requiredCapabilities": [
+        "structure:perfect-square"
+      ]
+    },
+    {
+      "acceptedCandidateTypes": [
+        "WHOLE_EXPRESSION_COMPRESSION"
+      ],
+      "forbiddenOutcomes": [
+        "ALPHA_OR_AC_ONLY_GAIN"
+      ],
+      "id": "repeated-term-compression",
+      "minimumTokenSavings": 1,
+      "referenceExpressions": [
+        "2 * x"
+      ],
+      "requiredAssumptions": [],
+      "requiredCapabilities": []
+    },
+    {
+      "acceptedCandidateTypes": [
+        "DOWNSTREAM_CAPABILITY_BRIDGE"
+      ],
+      "forbiddenOutcomes": [
+        "LABEL_WITHOUT_EXECUTABLE_CONSEQUENCE"
+      ],
+      "id": "telescoping-capability-bridge",
+      "minimumTokenSavings": 0,
+      "referenceExpressions": [
+        "1 / n - 1 / (n + 1)"
+      ],
+      "requiredAssumptions": [
+        "n != 0",
+        "n + 1 != 0"
+      ],
+      "requiredCapabilities": [
+        "capability:finite-sum-telescoping"
+      ]
+    }
+  ],
+  "claimBoundary": "Qualification is consulted only after every configured candidate batch is frozen. Reference representations and expected capability relations may classify frozen candidates but cannot influence formation or survivor selection.",
+  "evidenceStatus": "SEALED_POST_FREEZE",
+  "schema": "regelsuche.target-free-representation-qualification/v1"
+}
