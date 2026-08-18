@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetFreeRepresentationDiscoveryRun.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">TargetFreeRepresentationDiscoveryRun.java</span></div><h1>TargetFreeRepresentationDiscoveryRun.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.CANDIDATE_DOSSIERS;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.EXPORT_BUNDLE;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.PATH_REPLAY;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.PROGRESS_LEDGER;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.PROOF_OBLIGATIONS;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.REPRESENTATION_CANDIDATES;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.RULE_RADAR;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.SEARCH_GRAPH;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.WORKSPACE_SCHEMA;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunOutcome.TerminalState.COMPLETED;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Binds the existing target-free R2 search and post-freeze bridge evidence to
+ * one immutable representation-discovery run workspace.
+ *
+ * &lt;p&gt;The workspace reuses the canonical target-free search artifact as its
+ * mathematical-work ledger. Runtime diagnostics remain a separate explicitly
+ * unmeasured identity. The resulting run is not proof, novelty, global
+ * optimality or a general search-superiority claim.&lt;/p&gt;
+ */
+public final class TargetFreeRepresentationDiscoveryRun {
+    public static final String SCHEMA =
+        &quot;regelsuche.target-free-representation-discovery-run/v1&quot;;
+    public static final String SCENARIO_FILE_NAME =
+        &quot;target-free-sympy-bridge.json&quot;;
+    public static final String WORKSPACE_FILE_NAME = &quot;run-workspace.json&quot;;
+    public static final String RUN_REPOSITORY_DIRECTORY = &quot;runs&quot;;
+
+    private static final String SEARCH_PROFILE_ID =
+        &quot;SMALL_BOUNDED_ENUMERATION_V1&quot;;
+    private static final String OBJECTIVE_ID =
+        &quot;RAW_SEMANTIC_PARETO_ARCHIVE&quot;;
+    private static final long DETERMINISTIC_SEED = 0L;
+<span class="fc" id="L52">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L53">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L54">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L55">        .build();</span>
+
+    private TargetFreeRepresentationDiscoveryRun() {
+    }
+
+    public static RunBundle run(String repositoryRevision) {
+<span class="fc" id="L61">        String revision = requireRepositoryRevision(repositoryRevision);</span>
+        TargetFreeSymPyBridgeDiscoveryScenario.ScenarioArtifact scenario =
+<span class="fc" id="L63">            TargetFreeSymPyBridgeDiscoveryScenario.run();</span>
+        RepresentationDiscoveryInformationBoundary boundary =
+<span class="fc" id="L65">            enabledBoundary();</span>
+<span class="fc" id="L66">        validateScenarioBinding(scenario, boundary);</span>
+
+<span class="fc" id="L68">        TargetFreeRepresentationSearch.SearchContent search =</span>
+<span class="fc" id="L69">            scenario.content().search();</span>
+<span class="fc" id="L70">        String searchHash = scenario.content().searchContentHash();</span>
+<span class="fc" id="L71">        RepresentationDiscoveryRunWorkspace workspace =</span>
+<span class="fc" id="L72">            RepresentationDiscoveryRunWorkspace.create(</span>
+<span class="fc" id="L73">                RepresentationDiscoveryRunInput.expression(</span>
+<span class="fc" id="L74">                    search.sourceExpression(),</span>
+<span class="fc" id="L75">                    List.of()</span>
+                ),
+<span class="fc" id="L77">                RepresentationDiscoveryRunPlan.create(</span>
+<span class="fc" id="L78">                    boundary.track(),</span>
+<span class="fc" id="L79">                    boundary.contentHash(),</span>
+<span class="fc" id="L80">                    search.ruleInventoryHash(),</span>
+<span class="fc" id="L81">                    boundary.candidateFormationSelectionCommitment(),</span>
+<span class="fc" id="L82">                    boundary.postFreezeCatalogCommitment(),</span>
+                    TargetFreeRepresentationSearch.SCHEMA,
+                    SEARCH_PROFILE_ID,
+                    OBJECTIVE_ID,
+<span class="fc" id="L86">                    budgetHash(search.budget()),</span>
+                    DETERMINISTIC_SEED,
+<span class="fc" id="L88">                    List.of(&quot;sympy-oracle-validator/v1&quot;)</span>
+                ),
+<span class="fc" id="L90">                RepresentationDiscoveryRunOutcome.create(</span>
+                    COMPLETED,
+<span class="fc" id="L92">                    terminalReason(search),</span>
+<span class="fc" id="L93">                    search.budget().maxGeneratedTransitions(),</span>
+<span class="fc" id="L94">                    search.generatedTransitionCount(),</span>
+                    searchHash,
+<span class="fc" id="L96">                    runtimeDiagnosticsHash()</span>
+                ),
+<span class="fc" id="L98">                artifactReferences(scenario),</span>
+<span class="fc" id="L99">                RepresentationDiscoveryRevisionEvidence.create(</span>
+                    revision,
+                    SCHEMA
+                )
+            );
+<span class="fc" id="L104">        return new RunBundle(scenario, workspace);</span>
+    }
+
+    public static RunBundle write(
+        Path directory,
+        String repositoryRevision
+    ) throws IOException {
+<span class="fc" id="L111">        Path root = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L112">            .toAbsolutePath().normalize();</span>
+<span class="fc" id="L113">        Files.createDirectories(root);</span>
+<span class="fc" id="L114">        RunBundle bundle = run(repositoryRevision);</span>
+
+<span class="fc" id="L116">        String scenarioJson = bundle.scenario().toCanonicalJson() + &quot;\n&quot;;</span>
+<span class="fc" id="L117">        String workspaceJson = bundle.workspace().toCanonicalJson();</span>
+<span class="fc" id="L118">        Path scenarioPath = root.resolve(SCENARIO_FILE_NAME);</span>
+<span class="fc" id="L119">        Path workspacePath = root.resolve(WORKSPACE_FILE_NAME);</span>
+<span class="fc" id="L120">        AtomicJsonFile.writeUtf8(scenarioPath, scenarioJson);</span>
+<span class="fc" id="L121">        AtomicJsonFile.writeUtf8(workspacePath, workspaceJson);</span>
+<span class="fc" id="L122">        requireWritten(scenarioPath, scenarioJson);</span>
+<span class="fc" id="L123">        requireWritten(workspacePath, workspaceJson);</span>
+
+<span class="fc" id="L125">        RepresentationDiscoveryRunWorkspace retained =</span>
+<span class="fc" id="L126">            RepresentationDiscoveryRunWorkspace.retain(</span>
+<span class="fc" id="L127">                root.resolve(RUN_REPOSITORY_DIRECTORY),</span>
+<span class="fc" id="L128">                bundle.workspace()</span>
+            );
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (!bundle.workspace().equals(retained)) {</span>
+<span class="nc" id="L131">            throw new IllegalStateException(</span>
+                &quot;retained run repository changed the immutable workspace&quot;
+            );
+        }
+
+<span class="fc" id="L136">        RepresentationDiscoveryRunWorkspace decoded =</span>
+<span class="fc" id="L137">            RepresentationDiscoveryRunWorkspace.fromCanonicalJson(</span>
+                workspaceJson
+            );
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (!bundle.workspace().equals(decoded)) {</span>
+<span class="nc" id="L141">            throw new IllegalStateException(</span>
+                &quot;retained run workspace changed during canonical round-trip&quot;
+            );
+        }
+<span class="fc" id="L145">        return bundle;</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (args.length != 2) {</span>
+<span class="nc" id="L150">            throw new IllegalArgumentException(</span>
+                &quot;usage: &lt;repository-commit&gt; &lt;output-directory&gt;&quot;
+            );
+        }
+<span class="nc" id="L154">        RunBundle bundle = write(Path.of(args[1]), args[0]);</span>
+<span class="nc" id="L155">        System.out.println(</span>
+<span class="nc" id="L156">            &quot;targetFreeRepresentationRunId=&quot; + bundle.workspace().runId()</span>
+        );
+<span class="nc" id="L158">        System.out.println(</span>
+            &quot;targetFreeRepresentationSearchHash=&quot;
+<span class="nc" id="L160">                + bundle.scenario().content().searchContentHash()</span>
+        );
+<span class="nc" id="L162">    }</span>
+
+    private static RepresentationDiscoveryInformationBoundary
+            enabledBoundary() {
+<span class="fc" id="L166">        KnowledgePackSelection selection =</span>
+<span class="fc" id="L167">            KnowledgePackSelection.CORE.enablePack(</span>
+                TargetFreeSymPyBridgeDiscoveryScenario.PACK_ID
+            );
+<span class="fc" id="L170">        return RepresentationDiscoveryInformationBoundary</span>
+<span class="fc" id="L171">            .fromKnowledgePacks(</span>
+                new KnowledgePackRegistry(),
+                RepresentationDiscoveryInformationBoundary.Track
+                    .R2_CATALOG_BLIND_POST_HOC_BRIDGE,
+                selection,
+<span class="fc" id="L176">                Set.of()</span>
+            );
+    }
+
+    private static void validateScenarioBinding(
+        TargetFreeSymPyBridgeDiscoveryScenario.ScenarioArtifact scenario,
+        RepresentationDiscoveryInformationBoundary boundary
+    ) {
+<span class="fc" id="L184">        TargetFreeSymPyBridgeDiscoveryScenario.ScenarioContent content =</span>
+<span class="fc" id="L185">            Objects.requireNonNull(scenario, &quot;scenario&quot;).content();</span>
+<span class="fc" id="L186">        requireEqual(</span>
+<span class="fc" id="L187">            boundary.track().id(),</span>
+<span class="fc" id="L188">            content.informationTrack(),</span>
+            &quot;scenario information track&quot;
+        );
+<span class="fc" id="L191">        requireEqual(</span>
+<span class="fc" id="L192">            boundary.contentHash(),</span>
+<span class="fc" id="L193">            content.freeze().enabledBoundaryHash(),</span>
+            &quot;scenario information boundary&quot;
+        );
+<span class="fc" id="L196">        requireEqual(</span>
+<span class="fc" id="L197">            boundary.candidateFormationRuleInventoryHash(),</span>
+<span class="fc" id="L198">            content.search().ruleInventoryHash(),</span>
+            &quot;scenario formation inventory&quot;
+        );
+<span class="fc" id="L201">        requireEqual(</span>
+<span class="fc" id="L202">            boundary.postFreezeCatalogCommitment(),</span>
+<span class="fc" id="L203">            content.freeze().enabledCatalogHash(),</span>
+            &quot;scenario post-freeze catalog&quot;
+        );
+<span class="fc" id="L206">        requireEqual(</span>
+<span class="fc" id="L207">            content.searchContentHash(),</span>
+<span class="fc" id="L208">            KnownStructureCatalog.sha256(json(content.search())),</span>
+            &quot;scenario search content&quot;
+        );
+<span class="fc" id="L211">    }</span>
+
+    private static List&lt;RepresentationDiscoveryArtifactReference&gt;
+            artifactReferences(
+        TargetFreeSymPyBridgeDiscoveryScenario.ScenarioArtifact scenario
+    ) {
+<span class="fc" id="L217">        String searchHash = scenario.content().searchContentHash();</span>
+<span class="fc" id="L218">        return List.of(</span>
+<span class="fc" id="L219">            RepresentationDiscoveryArtifactReference.available(</span>
+                SEARCH_GRAPH,
+                TargetFreeRepresentationSearch.SCHEMA,
+                searchHash
+            ),
+<span class="fc" id="L224">            RepresentationDiscoveryArtifactReference.available(</span>
+                REPRESENTATION_CANDIDATES,
+                TargetFreeRepresentationSearch.SCHEMA,
+                searchHash
+            ),
+<span class="fc" id="L229">            RepresentationDiscoveryArtifactReference.available(</span>
+                CANDIDATE_DOSSIERS,
+                TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA,
+<span class="fc" id="L232">                scenario.contentHash()</span>
+            ),
+<span class="fc" id="L234">            RepresentationDiscoveryArtifactReference.notProduced(PATH_REPLAY),</span>
+<span class="fc" id="L235">            RepresentationDiscoveryArtifactReference.notProduced(RULE_RADAR),</span>
+<span class="fc" id="L236">            RepresentationDiscoveryArtifactReference.notProduced(</span>
+                PROOF_OBLIGATIONS
+            ),
+<span class="fc" id="L239">            RepresentationDiscoveryArtifactReference.notProduced(</span>
+                EXPORT_BUNDLE
+            ),
+<span class="fc" id="L242">            RepresentationDiscoveryArtifactReference.available(</span>
+                PROGRESS_LEDGER,
+                TargetFreeRepresentationSearch.SCHEMA,
+                searchHash
+            )
+        );
+    }
+
+    private static String terminalReason(
+        TargetFreeRepresentationSearch.SearchContent search
+    ) {
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        return search.truncated()</span>
+<span class="fc" id="L254">            ? &quot;BOUNDED_SEARCH_COMPLETED_WITH_TRUNCATION&quot;</span>
+<span class="nc" id="L255">            : &quot;BOUNDED_SEARCH_FRONTIER_EXHAUSTED&quot;;</span>
+    }
+
+    private static String budgetHash(
+        TargetFreeRepresentationSearch.Budget budget
+    ) {
+<span class="fc" id="L261">        return KnownStructureCatalog.sha256(</span>
+<span class="fc" id="L262">            WORKSPACE_SCHEMA + &quot;/budget/&quot; + json(budget)</span>
+        );
+    }
+
+    private static String runtimeDiagnosticsHash() {
+<span class="fc" id="L267">        return KnownStructureCatalog.sha256(</span>
+            WORKSPACE_SCHEMA + &quot;/runtime/NOT_EVALUATED&quot;
+        );
+    }
+
+    private static String requireRepositoryRevision(String value) {
+<span class="fc" id="L273">        String revision = requireText(value, &quot;repositoryRevision&quot;);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (!revision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="fc" id="L275">            throw new IllegalArgumentException(</span>
+                &quot;repositoryRevision must be a lowercase 40-character &quot;
+                    + &quot;Git commit SHA&quot;
+            );
+        }
+<span class="fc" id="L280">        return revision;</span>
+    }
+
+    private static void requireWritten(
+        Path path,
+        String expected
+    ) throws IOException {
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path)</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                || !expected.equals(Files.readString(</span>
+                    path,
+                    StandardCharsets.UTF_8))) {
+<span class="nc" id="L291">            throw new IllegalStateException(</span>
+                &quot;retained target-free run artifact changed: &quot; + path
+            );
+        }
+<span class="fc" id="L295">    }</span>
+
+    private static void requireEqual(
+        Object expected,
+        Object actual,
+        String label
+    ) {
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (!Objects.equals(expected, actual)) {</span>
+<span class="nc" id="L303">            throw new IllegalStateException(</span>
+                label + &quot; differs: expected=&quot; + expected
+                    + &quot;, actual=&quot; + actual
+            );
+        }
+<span class="fc" id="L308">    }</span>
+
+    private static String json(Object value) {
+        try {
+<span class="fc" id="L312">            return JSON.writeValueAsString(value);</span>
+<span class="nc" id="L313">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L314">            throw new IllegalStateException(</span>
+                &quot;Unable to render target-free run evidence&quot;,
+                exception
+            );
+        }
+    }
+
+    public record RunBundle(
+        TargetFreeSymPyBridgeDiscoveryScenario.ScenarioArtifact scenario,
+        RepresentationDiscoveryRunWorkspace workspace
+    ) {
+<span class="fc" id="L325">        public RunBundle {</span>
+<span class="fc" id="L326">            scenario = Objects.requireNonNull(scenario, &quot;scenario&quot;);</span>
+<span class="fc" id="L327">            workspace = Objects.requireNonNull(workspace, &quot;workspace&quot;);</span>
+<span class="fc" id="L328">            String searchHash = scenario.content().searchContentHash();</span>
+<span class="fc" id="L329">            requireEqual(</span>
+<span class="fc" id="L330">                scenario.content().freeze().enabledBoundaryHash(),</span>
+<span class="fc" id="L331">                workspace.plan().informationBoundaryHash(),</span>
+                &quot;workspace information boundary&quot;
+            );
+<span class="fc" id="L334">            requireEqual(</span>
+<span class="fc" id="L335">                scenario.content().search().ruleInventoryHash(),</span>
+<span class="fc" id="L336">                workspace.plan().ruleInventoryHash(),</span>
+                &quot;workspace formation inventory&quot;
+            );
+<span class="fc" id="L339">            requireEqual(</span>
+<span class="fc" id="L340">                scenario.content().freeze().enabledCatalogHash(),</span>
+<span class="fc" id="L341">                workspace.plan().knownStructureCatalogHash(),</span>
+                &quot;workspace post-freeze catalog&quot;
+            );
+<span class="fc" id="L344">            requireEqual(</span>
+<span class="fc" id="L345">                scenario.content().search().sourceExpression(),</span>
+<span class="fc" id="L346">                workspace.input().displayText(),</span>
+                &quot;workspace source input&quot;
+            );
+<span class="fc" id="L349">            requireEqual(</span>
+                searchHash,
+<span class="fc" id="L351">                workspace.requireArtifact(</span>
+                    SEARCH_GRAPH,
+                    TargetFreeRepresentationSearch.SCHEMA
+<span class="fc" id="L354">                ).targetContentHash(),</span>
+                &quot;workspace search graph&quot;
+            );
+<span class="fc" id="L357">            requireEqual(</span>
+                searchHash,
+<span class="fc" id="L359">                workspace.requireArtifact(</span>
+                    REPRESENTATION_CANDIDATES,
+                    TargetFreeRepresentationSearch.SCHEMA
+<span class="fc" id="L362">                ).targetContentHash(),</span>
+                &quot;workspace representation candidates&quot;
+            );
+<span class="fc" id="L365">            requireEqual(</span>
+<span class="fc" id="L366">                scenario.contentHash(),</span>
+<span class="fc" id="L367">                workspace.requireArtifact(</span>
+                    CANDIDATE_DOSSIERS,
+                    TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA
+<span class="fc" id="L370">                ).targetContentHash(),</span>
+                &quot;workspace candidate dossier&quot;
+            );
+<span class="fc" id="L373">            requireEqual(</span>
+                searchHash,
+<span class="fc" id="L375">                workspace.requireArtifact(</span>
+                    PROGRESS_LEDGER,
+                    TargetFreeRepresentationSearch.SCHEMA
+<span class="fc" id="L378">                ).targetContentHash(),</span>
+                &quot;workspace progress ledger&quot;
+            );
+<span class="fc" id="L381">            requireEqual(</span>
+                searchHash,
+<span class="fc" id="L383">                workspace.outcome().canonicalWorkLedgerHash(),</span>
+                &quot;workspace canonical work ledger&quot;
+            );
+<span class="fc" id="L386">            requireEqual(</span>
+<span class="fc" id="L387">                scenario.content().search().generatedTransitionCount(),</span>
+<span class="fc" id="L388">                Math.toIntExact(workspace.outcome().consumedWork()),</span>
+                &quot;workspace consumed work&quot;
+            );
+<span class="fc" id="L391">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

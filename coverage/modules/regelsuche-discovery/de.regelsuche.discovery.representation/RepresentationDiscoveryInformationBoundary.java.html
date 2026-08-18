@@ -199,13 +199,13 @@ public final class RepresentationDiscoveryInformationBoundary {
     }
 
     public Track track() {
-<span class="nc" id="L202">        return track;</span>
+<span class="fc" id="L202">        return track;</span>
     }
 
     /** Opaque identity of the rule-pack selection used for formation. */
     public String candidateFormationSelectionCommitment() {
-<span class="nc" id="L207">        return KnownStructureCatalog.sha256(</span>
-<span class="nc" id="L208">            selectionDescriptor(formationSelection));</span>
+<span class="fc" id="L207">        return KnownStructureCatalog.sha256(</span>
+<span class="fc" id="L208">            selectionDescriptor(formationSelection));</span>
     }
 
     /**
@@ -238,7 +238,7 @@ public final class RepresentationDiscoveryInformationBoundary {
 
     /** Content commitment for the catalog disclosed after candidate freeze. */
     public String postFreezeCatalogCommitment() {
-<span class="nc" id="L241">        return postFreezeCatalog.contentHash();</span>
+<span class="fc" id="L241">        return postFreezeCatalog.contentHash();</span>
     }
 
     /** Exact AST rewrite inventory associated with post-freeze knowledge. */
