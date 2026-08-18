@@ -444,6 +444,13 @@ public class WebWorkbenchServer {
             } else {
                 retainRepresentationRun(exchange);
             }
+        } catch (InvalidRepresentationRunDigestException exception) {
+            sendRepresentationRunError(
+                exchange,
+                400,
+                "INVALID_RUN_DIGEST",
+                representationRunErrorMessage(exception)
+            );
         } catch (IllegalArgumentException exception) {
             sendRepresentationRunError(
                 exchange,
@@ -451,15 +458,19 @@ public class WebWorkbenchServer {
                 "INVALID_RUN_WORKSPACE",
                 representationRunErrorMessage(exception)
             );
-        } catch (IllegalStateException exception) {
-            boolean conflict = representationRunErrorMessage(exception)
-                .startsWith("immutable run identity");
+        } catch (RepresentationDiscoveryRunWorkspace
+                .ImmutableRunConflictException exception) {
             sendRepresentationRunError(
                 exchange,
-                conflict ? 409 : 500,
-                conflict
-                    ? "IMMUTABLE_RUN_CONFLICT"
-                    : "RUN_REPOSITORY_FAILURE",
+                409,
+                "IMMUTABLE_RUN_CONFLICT",
+                representationRunErrorMessage(exception)
+            );
+        } catch (IllegalStateException exception) {
+            sendRepresentationRunError(
+                exchange,
+                500,
+                "RUN_REPOSITORY_FAILURE",
                 representationRunErrorMessage(exception)
             );
         }
@@ -510,19 +521,19 @@ public class WebWorkbenchServer {
             1,
             MAX_REPRESENTATION_RUN_LIST_LIMIT
         );
-        List<RepresentationDiscoveryRunWorkspace> all =
-            RepresentationDiscoveryRunWorkspace.listRetained(
-                representationRunDirectory
+        RepresentationDiscoveryRunWorkspace.RetainedPage page =
+            RepresentationDiscoveryRunWorkspace.listRetainedPage(
+                representationRunDirectory,
+                offset,
+                limit
             );
-        int from = Math.min(offset, all.size());
-        int to = Math.min(all.size(), from + limit);
 
         JsonWriter writer = new JsonWriter().beginObject()
             .property("schema", REPRESENTATION_RUN_INDEX_SCHEMA)
-            .property("total", all.size())
-            .property("offset", from)
-            .property("limit", limit)
-            .array("runs", array -> all.subList(from, to).forEach(run ->
+            .property("total", page.total())
+            .property("offset", page.offset())
+            .property("limit", page.limit())
+            .array("runs", array -> page.runs().forEach(run ->
                 array.objectValue(object ->
                     writeRepresentationRunSummary(object, run))))
             .endObject();
@@ -535,7 +546,7 @@ public class WebWorkbenchServer {
         String digest
     ) throws IOException {
         if (!digest.matches("[0-9a-f]{64}")) {
-            throw new IllegalArgumentException(
+            throw new InvalidRepresentationRunDigestException(
                 "run path must contain a lowercase SHA-256 digest"
             );
         }
@@ -659,13 +670,14 @@ public class WebWorkbenchServer {
             int parsed = Integer.parseInt(value);
             if (parsed < minimum || parsed > maximum) {
                 throw new IllegalArgumentException(
-                    "query value is outside the supported range"
+                    "query parameter '" + name + "' must be between "
+                        + minimum + " and " + maximum
                 );
             }
             return parsed;
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException(
-                "query value must be an integer",
+                "query parameter '" + name + "' must be an integer",
                 exception
             );
         }
@@ -701,6 +713,13 @@ public class WebWorkbenchServer {
         return message == null || message.isBlank()
             ? exception.getClass().getSimpleName()
             : message;
+    }
+
+    private static final class InvalidRepresentationRunDigestException
+            extends IllegalArgumentException {
+        private InvalidRepresentationRunDigestException(String message) {
+            super(message);
+        }
     }
 
     private void sendRepresentationRunError(

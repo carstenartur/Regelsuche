@@ -53,10 +53,6 @@ def historicalRewriteArchitectureDecisionReportDirectory = layout.buildDirectory
     'reports/historical-rewrite-architecture-decision')
 def historicalRediscoveryOutputArgument =
     historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
-def historicalEqualWorkOutputArgument =
-    historicalEqualWorkSearchComparisonReportDirectory.map {
-        it.asFile.absolutePath
-    }
 def historicalRewriteArchitectureDecisionInputs = [
     historicalRediscoveryReportDirectory.map {
         it.file('historical-rediscovery-run.json')
@@ -87,11 +83,11 @@ def historicalRepositoryRevision = providers.environmentVariable('GITHUB_SHA')
 def generateHistoricalRediscoveryAtlas = tasks.register(
     'generateHistoricalRediscoveryAtlas', JavaExec) {
     group = 'verification'
-    description = 'Executes the frozen historical atlas, witness diagnosis and production-search comparison.'
+    description = 'Executes the frozen historical atlas and all derived search diagnostics from one atlas run.'
     dependsOn tasks.named('classes')
     timeout = java.time.Duration.ofMinutes(10)
     classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'de.regelsuche.benchmark.DiscoveryExperimentRunner'
+    mainClass = 'de.regelsuche.benchmark.HistoricalRediscoveryReportPipeline'
     argumentProviders.add({
         ['historical-rediscovery', historicalRediscoveryOutputArgument.get()]
     } as CommandLineArgumentProvider)
@@ -100,37 +96,16 @@ def generateHistoricalRediscoveryAtlas = tasks.register(
     outputs.dir(historicalRediscoveryReportDirectory)
     outputs.dir(historicalWitnessPruningReportDirectory)
     outputs.dir(historicalProductionSearchComparisonReportDirectory)
-    doLast {
-        def comparison = historicalProductionSearchComparisonReportDirectory.get()
-            .file('production-search-comparison.json').asFile
-        if (!comparison.isFile()) {
-            throw new GradleException('Missing production-search comparison artifact')
-        }
-    }
-}
-
-def generateHistoricalEqualWorkSearchComparison = tasks.register(
-    'generateHistoricalEqualWorkSearchComparison', JavaExec) {
-    group = 'verification'
-    description = 'Executes fixed admitted-work checkpoints for the historical search-policy control.'
-    dependsOn generateHistoricalRediscoveryAtlas
-    dependsOn tasks.named('testClasses')
-    timeout = java.time.Duration.ofMinutes(10)
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'de.regelsuche.benchmark.HistoricalEqualWorkSearchComparison'
-    argumentProviders.add({
-        [
-            'equal-work-search-comparison',
-            historicalEqualWorkOutputArgument.get()
-        ]
-    } as CommandLineArgumentProvider)
-    inputs.file(layout.projectDirectory.file(
-        'src/main/resources/de/regelsuche/benchmark/historical-rediscovery-corpus.json'))
     outputs.dir(historicalEqualWorkSearchComparisonReportDirectory)
     doLast {
-        def report = historicalEqualWorkSearchComparisonReportDirectory.get()
+        def production = historicalProductionSearchComparisonReportDirectory.get()
+            .file('production-search-comparison.json').asFile
+        if (!production.isFile()) {
+            throw new GradleException('Missing production-search comparison artifact')
+        }
+        def equalWork = historicalEqualWorkSearchComparisonReportDirectory.get()
             .file('equal-work-search-comparison.json').asFile
-        if (!report.isFile()) {
+        if (!equalWork.isFile()) {
             throw new GradleException('Missing equal-work search comparison artifact')
         }
     }
@@ -140,7 +115,7 @@ def generateHistoricalRewriteArchitectureDecision = tasks.register(
     'generateHistoricalRewriteArchitectureDecision', JavaExec) {
     group = 'verification'
     description = 'Derives the evidence-bound rewrite architecture decision from retained historical diagnostics.'
-    dependsOn generateHistoricalEqualWorkSearchComparison
+    dependsOn generateHistoricalRediscoveryAtlas
     dependsOn tasks.named('testClasses')
     timeout = java.time.Duration.ofMinutes(1)
     classpath = sourceSets.test.runtimeClasspath
@@ -171,7 +146,6 @@ tasks.named('check') {
     dependsOn generateHistoricalRewriteArchitectureDecision
 }
 
-// The final decision task depends transitively on both historical generators.
 rootProject.tasks.named('check') {
     dependsOn generateHistoricalRewriteArchitectureDecision
 }

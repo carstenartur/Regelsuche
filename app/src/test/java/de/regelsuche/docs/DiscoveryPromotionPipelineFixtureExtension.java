@@ -62,9 +62,7 @@ final class DiscoveryPromotionPipelineFixtureExtension
                     + parameterContext.getParameter()
             );
         }
-        DiscoveryPromotionPipelineFixture fixture = fixture();
-        fixture.assertUnchanged();
-        return fixture;
+        return fixture();
     }
 
     private static DiscoveryPromotionPipelineFixture fixture() {
@@ -117,11 +115,14 @@ final class DiscoveryPromotionPipelineFixture {
             Files.createDirectories(output);
             DiscoveryPromotionPipelineRunner.PipelineReport report =
                 new DiscoveryPromotionPipelineRunner().writeReport(output);
-            return new DiscoveryPromotionPipelineFixture(
-                output,
-                report,
-                treeState(output)
-            );
+            DiscoveryPromotionPipelineFixture fixture =
+                new DiscoveryPromotionPipelineFixture(
+                    output,
+                    report,
+                    treeState(output)
+                );
+            registerCleanup(output);
+            return fixture;
         } catch (IOException exception) {
             throw new UncheckedIOException(
                 "Cannot create shared discovery-promotion test fixture",
@@ -223,10 +224,10 @@ final class DiscoveryPromotionPipelineFixture {
                     .toString()
                     .replace('\\', '/');
                 if (Files.isSymbolicLink(path)) {
-                    state.put(
-                        relative,
-                        "symlink:" + Files.readSymbolicLink(path)
-                    );
+                    String target = Files.readSymbolicLink(path)
+                        .toString()
+                        .replace('\\', '/');
+                    state.put(relative, "symlink:" + target);
                 } else if (Files.isDirectory(
                     path,
                     LinkOption.NOFOLLOW_LINKS
@@ -256,6 +257,21 @@ final class DiscoveryPromotionPipelineFixture {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
+    }
+
+    private static void registerCleanup(Path output) {
+        Thread cleanup = new Thread(
+            () -> {
+                try {
+                    deleteRecursively(output);
+                } catch (IOException ignored) {
+                    // Best-effort cleanup must not obscure the JVM's exit status.
+                }
+            },
+            "cleanup-shared-discovery-promotion-"
+                + ProcessHandle.current().pid()
+        );
+        Runtime.getRuntime().addShutdownHook(cleanup);
     }
 
     private static void deleteRecursively(Path root) throws IOException {

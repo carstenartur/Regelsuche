@@ -11,6 +11,7 @@ import de.regelsuche.discovery.representation.RepresentationDiscoveryRunOutcome.
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -91,12 +92,33 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
             expected,
             RepresentationDiscoveryRunWorkspace.listRetained(directory)
         );
+        RepresentationDiscoveryRunWorkspace.RetainedPage firstPage =
+            RepresentationDiscoveryRunWorkspace.listRetainedPage(
+                directory,
+                0,
+                1
+            );
+        assertEquals(2, firstPage.total());
+        assertEquals(0, firstPage.offset());
+        assertEquals(1, firstPage.limit());
+        assertEquals(expected.subList(0, 1), firstPage.runs());
+        assertEquals(
+            expected.subList(1, 2),
+            RepresentationDiscoveryRunWorkspace.listRetainedPage(
+                directory,
+                1,
+                1
+            ).runs()
+        );
         try (var entries = Files.list(directory)) {
             assertEquals(2L, entries.count());
         }
         for (RepresentationDiscoveryRunWorkspace workspace : expected) {
             Path retained = runFile(directory, workspace.runId());
-            assertTrue(Files.isRegularFile(retained));
+            assertTrue(Files.isRegularFile(
+                retained,
+                LinkOption.NOFOLLOW_LINKS
+            ));
             assertTrue(
                 retained.getFileName().toString().matches(
                     "[0-9a-f]{64}\\.json")
@@ -106,6 +128,28 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
                 Files.readString(retained, StandardCharsets.UTF_8)
             );
         }
+    }
+
+    @Test
+    void immutableByteConflictsUseATypedException(
+        @TempDir Path directory
+    ) throws IOException {
+        RepresentationDiscoveryRunWorkspace workspace = workspace(19);
+        RepresentationDiscoveryRunWorkspace.retain(directory, workspace);
+        Files.writeString(
+            runFile(directory, workspace.runId()),
+            "{}",
+            StandardCharsets.UTF_8
+        );
+
+        assertThrows(
+            RepresentationDiscoveryRunWorkspace
+                .ImmutableRunConflictException.class,
+            () -> RepresentationDiscoveryRunWorkspace.retain(
+                directory,
+                workspace
+            )
+        );
     }
 
     @Test
@@ -232,6 +276,18 @@ class JsonFileRepresentationDiscoveryRunRepositoryTest {
             RepresentationDiscoveryRunWorkspace.listRetained(
                 directory,
                 1,
+                0
+            ));
+        assertThrows(IllegalArgumentException.class, () ->
+            RepresentationDiscoveryRunWorkspace.listRetainedPage(
+                directory,
+                -1,
+                1
+            ));
+        assertThrows(IllegalArgumentException.class, () ->
+            RepresentationDiscoveryRunWorkspace.listRetainedPage(
+                directory,
+                0,
                 0
             ));
         assertThrows(IllegalArgumentException.class, () ->
