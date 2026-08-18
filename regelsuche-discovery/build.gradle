@@ -65,6 +65,9 @@ def domainExportVerificationReportDirectory = layout.buildDirectory.dir(
     'reports/domain-discovery-export-verification')
 def targetFreeRepresentationRunReportDirectory = layout.buildDirectory.dir(
     'reports/representation-discovery/target-free-run')
+def targetFreeRepresentationEvaluationPlanReportDirectory =
+    layout.buildDirectory.dir(
+        'reports/representation-discovery/evaluation-plan')
 def verificationVenvDirectory = rootProject.layout.buildDirectory.dir(
     'verification-venv')
 def verificationPython = verificationVenvDirectory.map { directory ->
@@ -159,13 +162,46 @@ def generateTargetFreeRepresentationDiscoveryRun = tasks.register(
     }
 }
 
+def generateTargetFreeRepresentationEvaluationPlan = tasks.register(
+    'generateTargetFreeRepresentationEvaluationPlan',
+    JavaExec
+) {
+    group = 'verification'
+    description = 'Freezes the complete target-blind representation evaluation matrix without disclosing qualification content.'
+    dependsOn tasks.named('classes')
+    timeout = java.time.Duration.ofMinutes(1)
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlan'
+    argumentProviders.add({
+        [
+            targetFreeRepositoryRevision.get(),
+            targetFreeRepresentationEvaluationPlanReportDirectory.get()
+                .asFile.absolutePath
+        ]
+    } as CommandLineArgumentProvider)
+    inputs.property('repositoryRevision', targetFreeRepositoryRevision)
+    outputs.dir(targetFreeRepresentationEvaluationPlanReportDirectory)
+    doLast {
+        def plan = targetFreeRepresentationEvaluationPlanReportDirectory
+            .get()
+            .file('representation-discovery-plan.json')
+            .asFile
+        if (!plan.isFile()) {
+            throw new GradleException(
+                "Missing target-free evaluation plan: ${plan}")
+        }
+    }
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport'),
         verifyDomainDiscoveryExportEvidence,
-        generateTargetFreeRepresentationDiscoveryRun
+        generateTargetFreeRepresentationDiscoveryRun,
+        generateTargetFreeRepresentationEvaluationPlan
 }
 
 rootProject.tasks.named('check') {
     dependsOn verifyDomainDiscoveryExportEvidence,
-        generateTargetFreeRepresentationDiscoveryRun
+        generateTargetFreeRepresentationDiscoveryRun,
+        generateTargetFreeRepresentationEvaluationPlan
 }
