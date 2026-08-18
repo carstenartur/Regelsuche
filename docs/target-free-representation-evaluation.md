@@ -21,7 +21,24 @@ Die **Formation** enthält nur:
 - R1- oder R2-Informationsspur;
 - endliches Arbeitsbudget;
 - Policy-ID, ausführbare Adapterklasse, Aufrufschnittstelle,
-  Konstruktorvertrag, deterministischen Seed und targetblinde Auswahlgrenze.
+  Konstruktorvertrag, deterministischen Seed und targetblinde Auswahlgrenze;
+- das sichtbare Inventarprofil und die vollständige deterministische
+  Budgetprojektion für die unterschiedlichen Adapterverträge.
+
+Konkret ist vor der Ausführung eingefroren:
+
+- sichtbare Knowledge-Pack-Auswahl `RuleProfile.ALL`;
+- automatische R2-Zurückhaltung aller Rule-Packs, die die erst nach dem Freeze
+  sichtbaren bekannten Strukturen unmittelbar beherrschen;
+- direkte Verwendung aller sechs deklarierten Budgets durch
+  `TargetFreeRepresentationSearch`;
+- für `SearchStrategy`:
+  `maxVisitedExpressions = min(maxExploredStates, maxRetainedStates)`,
+  `maxExpandingSteps = maxDepth`,
+  `beamWidth = min(maxCandidatesPerState, maxRetainedStates)` und
+  `significantImprovementThreshold = 1`;
+- ein global begrenztes, deterministisch nach Regel, Ausdruck,
+  Application-Key und primitiven Regel-IDs sortiertes Transformationspräfix.
 
 Die **Qualifikation** enthält die erst nach dem Kandidaten-Freeze zulässigen
 Referenzausdrücke, Capability-Beziehungen und Negativbedingungen. Der
@@ -32,10 +49,10 @@ Die **Preregistrierung** bindet beide Ressourcen bytegenau und legt die
 vollständige Matrix, den Ausgangsstatus und die Claim-Grenze fest:
 
 ```text
-Formation:      sha256:201f1ffc5dd40678e9f86d593ee45f737c723caa8beceb8d604bcfc33185911f
+Formation:      sha256:2f9ce98cf3989136a0977c72d9ae459051c7809130eb1d3558ae326963863eb8
 Qualifikation:  sha256:a0d45d9ddf49aaa895f4c759bbcb33c646f16c781923b7303df90342e1d03072
 Preregistrierung:
-                sha256:c3001ae01264dbc153878abf55e95aa7635f315c77c5bb7ad362dab60c6ef908
+                sha256:1bd103fbedb176a374bc61bfb851977444eb1918d4d03bb372e7b2abb8fdf51d
 ```
 
 ## 6 × 4-Matrix
