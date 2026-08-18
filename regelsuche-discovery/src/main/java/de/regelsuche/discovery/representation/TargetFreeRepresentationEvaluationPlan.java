@@ -294,15 +294,27 @@ public final class TargetFreeRepresentationEvaluationPlan {
         String caseId,
         String policyId
     ) {
-        return KnownStructureCatalog.sha256(
-            SCHEMA + "/configuration/"
-                + requireSha256(
-                    preregistrationHash,
-                    "preregistrationHash"
-                )
-                + "/" + requireText(caseId, "caseId")
-                + "/" + requireText(policyId, "policyId")
+        StringBuilder descriptor = new StringBuilder();
+        KnownStructureCatalog.appendCanonicalField(
+            descriptor,
+            SCHEMA + "/configuration"
         );
+        KnownStructureCatalog.appendCanonicalField(
+            descriptor,
+            requireSha256(
+                preregistrationHash,
+                "preregistrationHash"
+            )
+        );
+        KnownStructureCatalog.appendCanonicalField(
+            descriptor,
+            requireText(caseId, "caseId")
+        );
+        KnownStructureCatalog.appendCanonicalField(
+            descriptor,
+            requireText(policyId, "policyId")
+        );
+        return KnownStructureCatalog.sha256(descriptor.toString());
     }
 
     private static String requireRepositoryRevision(String value) {
