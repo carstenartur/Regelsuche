@@ -89,7 +89,7 @@
     }
   ],
   "evidenceStatus": "FROZEN_NOT_EXECUTED",
-  "informationBoundary": "Candidate formation receives only the source expression, explicit assumptions, information track, frozen primitive inventory policy and finite work budget. No preferred representation, qualification label, known-structure consequence or post-freeze outcome is available during formation.",
+  "informationBoundary": "Candidate formation receives only the source expression, explicit assumptions, information track, RuleProfile.ALL as the visible Knowledge-Pack selection, track-specific formation withholding, and finite work budgets. R2 withholds every governing known-structure consequence pack during formation. TargetFreeRepresentationSearch consumes the six declared budget fields directly. SearchStrategy adapters use maxVisitedExpressions=min(maxExploredStates,maxRetainedStates), maxExpandingSteps=maxDepth, beamWidth=min(maxCandidatesPerState,maxRetainedStates), significantImprovementThreshold=1, and a deterministic globally capped transformation prefix ordered by rule, expression, application key, and primitive rule IDs. No preferred representation, qualification label, known-structure consequence, reference expression, or post-freeze outcome is available during formation.",
   "policies": [
     {
       "adapter": "de.regelsuche.discovery.representation.TargetFreeRepresentationSearch",
