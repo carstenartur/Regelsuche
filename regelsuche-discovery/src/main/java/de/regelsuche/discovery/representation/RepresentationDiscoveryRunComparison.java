@@ -378,7 +378,12 @@ public record RepresentationDiscoveryRunComparison(
     }
 
     private static String key(Category category, String field) {
-        return "%04d/%s".formatted(category.ordinal(), field);
+        return String.format(
+            java.util.Locale.ROOT,
+            "%04d/%s",
+            category.ordinal(),
+            field
+        );
     }
 
     public record Entry(
