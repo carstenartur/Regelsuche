@@ -11,6 +11,7 @@ import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.PrimaryStatus;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Corpus;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -44,15 +45,54 @@ class HistoricalRediscoveryReportPipelineTest {
                 "-witness-pruning"
             )
         );
+        Path root = directory.toAbsolutePath().getRoot();
         assertThrows(
             IllegalArgumentException.class,
             () -> invoke(
                 "siblingOutput",
                 new Class<?>[] {Path.class, String.class},
-                Path.of("/"),
+                root,
                 "-invalid"
             )
         );
+    }
+
+    @Test
+    @Timeout(240)
+    void writesEveryReportFromOnePrecomputedBoundedAtlas(
+        @TempDir Path directory
+    ) {
+        Corpus corpus = singleCase("difference-of-squares-powers");
+        HistoricalRediscoveryAtlas atlas = new HistoricalRediscoveryAtlas();
+        AtlasReport report = atlas.run(corpus);
+        Path output = directory.resolve("historical-rediscovery");
+
+        HistoricalRediscoveryReportPipeline.Execution execution =
+            HistoricalRediscoveryReportPipeline.execute(
+                output,
+                corpus,
+                atlas,
+                report
+            );
+
+        assertEquals(report, execution.report());
+        assertTrue(Files.isRegularFile(execution.artifacts().json()));
+        assertTrue(Files.isRegularFile(execution.artifacts().markdown()));
+        assertTrue(Files.isRegularFile(
+            execution.verifiedRun().manifestPath()
+        ));
+        assertTrue(Files.isRegularFile(execution.pruningArtifact()));
+        assertTrue(execution.pruningContentHash().matches(
+            "sha256:[0-9a-f]{64}"
+        ));
+        assertTrue(Files.isRegularFile(execution.productionArtifact()));
+        assertTrue(execution.productionReport().contentHash().matches(
+            "sha256:[0-9a-f]{64}"
+        ));
+        assertTrue(Files.isRegularFile(execution.equalWorkArtifact()));
+        assertTrue(execution.equalWorkReport().contentHash().matches(
+            "sha256:[0-9a-f]{64}"
+        ));
     }
 
     @Test
