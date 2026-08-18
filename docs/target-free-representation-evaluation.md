@@ -20,7 +20,8 @@ Die **Formation** enthält nur:
 - Ausgangsausdruck und explizite Annahmen;
 - R1- oder R2-Informationsspur;
 - endliches Arbeitsbudget;
-- Policy-ID, ausführbare Adapterklasse und targetblinde Auswahlgrenze.
+- Policy-ID, ausführbare Adapterklasse, Konstruktorvertrag, deterministischen
+  Seed und targetblinde Auswahlgrenze.
 
 Die **Qualifikation** enthält die erst nach dem Kandidaten-Freeze zulässigen
 Referenzausdrücke, Capability-Beziehungen und Negativbedingungen. Der
@@ -31,10 +32,10 @@ Die **Preregistrierung** bindet beide Ressourcen bytegenau und legt die
 vollständige Matrix, den Ausgangsstatus und die Claim-Grenze fest:
 
 ```text
-Formation:      sha256:057245d5097e737147046502f2e2c20519869f98e3cd741277e9ee7c901c3c8f
+Formation:      sha256:6d7f02cb8c6549d2feaf1e5a9f83689d7ba61a6191b48d1bac867f61ece352a8
 Qualifikation:  sha256:a0d45d9ddf49aaa895f4c759bbcb33c646f16c781923b7303df90342e1d03072
 Preregistrierung:
-                sha256:02b437322ebfd175d482f59e40da169ad5a927c5934b702023b7134d8c364464
+                sha256:d0b2e7cf311bfcacbe634a714698488403da2c1b60ee88bd1ab9b82edffa93b6
 ```
 
 ## 6 × 4-Matrix
@@ -51,12 +52,12 @@ Die Formation enthält sechs unterschiedliche fachliche Fälle:
 Jeder Fall wird mit vier bereits im Checkout vorhandenen Policy-Adaptern
 kombiniert:
 
-| Policy | Produktionsadapter | Zweck |
-|---|---|---|
-| `BOUNDED_ENUMERATION_V1` | `TargetFreeRepresentationSearch` | vollständiger begrenzter Zustandsbestand plus rohe Pareto-Front |
-| `RANDOM_MONTE_CARLO_V1` | `RandomMonteCarloSearchStrategy` | deterministisch seedbarer Zufallskontrolllauf |
-| `SCALAR_BEST_FIRST_V1` | `BestFirstSearchStrategy` | eingefrorene skalare targetblinde Kostensteuerung |
-| `STRUCTURAL_DIVERSITY_V1` | `StructuralDiversitySearchStrategy` | strukturell diverse targetblinde Retention |
+| Policy | Produktionsadapter | Konstruktor | Seed | Zweck |
+|---|---|---|---:|---|
+| `BOUNDED_ENUMERATION_V1` | `TargetFreeRepresentationSearch` | parameterlos | 0 (Sentinel) | vollständiger begrenzter Zustandsbestand plus rohe Pareto-Front |
+| `RANDOM_MONTE_CARLO_V1` | `RandomMonteCarloSearchStrategy` | `long` | 0 | deterministisch wiederholbarer Zufallskontrolllauf |
+| `SCALAR_BEST_FIRST_V1` | `BestFirstSearchStrategy` | parameterlos | 0 (Sentinel) | eingefrorene skalare targetblinde Kostensteuerung |
+| `STRUCTURAL_DIVERSITY_V1` | `StructuralDiversitySearchStrategy` | parameterlos | 0 (Sentinel) | strukturell diverse targetblinde Retention |
 
 Damit entstehen genau 24 Konfigurationen. Vor der tatsächlichen Ausführung muss
 jede Zeile ausdrücklich so ausgewiesen werden:
@@ -69,7 +70,8 @@ terminalReason = NOT_EXECUTED
 `TargetFreeRepresentationEvaluationPlan` erzeugt für jede Kombination eine
 stabile Konfigurations-ID, bindet die exakte Repository-Revision und verwirft
 fehlende, zusätzliche, doppelte oder bereits als ausgeführt dargestellte
-Einträge.
+Einträge. Vor dem Schreiben werden außerdem die gebundenen Adapterklassen und
+die jeweils deklarierten öffentlichen Konstruktoren aufgelöst.
 
 ## Checkout-Evidence
 
@@ -95,7 +97,7 @@ Die Charakterisierung prüft insbesondere:
 
 - exakt sechs Fälle, vier Policies und 24 Konfigurationen;
 - die vollständige kartesische Matrix in stabiler Reihenfolge;
-- vorhandene Adapterklassen;
+- vorhandene Adapterklassen, Konstruktorverträge und Seeds;
 - Byte- und Hashbindung beider getrennten Ressourcen;
 - kanonische, wiederholbar identische Planausgabe;
 - Manipulationserkennung;
