@@ -275,15 +275,19 @@ public final class TargetFreeRepresentationEvaluationPlan {
 
     private static void requireAdapter(PolicyDefinition policy) {
         try {
-            Class.forName(
+            Class<?> adapter = Class.forName(
                 policy.adapter(),
                 false,
                 TargetFreeRepresentationEvaluationPlan.class.getClassLoader()
             );
-        } catch (ClassNotFoundException exception) {
+            switch (policy.adapterConstructor()) {
+                case NO_ARGUMENT -> adapter.getConstructor();
+                case LONG_SEED -> adapter.getConstructor(long.class);
+            }
+        } catch (ReflectiveOperationException exception) {
             throw new IllegalArgumentException(
-                "configured target-blind policy adapter is unavailable: "
-                    + policy.adapter(),
+                "configured target-blind policy adapter contract is "
+                    + "unavailable: " + policy.adapter(),
                 exception
             );
         }
@@ -529,11 +533,22 @@ public final class TargetFreeRepresentationEvaluationPlan {
     public record PolicyDefinition(
         String id,
         String adapter,
+        AdapterConstructor adapterConstructor,
+        long deterministicSeed,
         String selectionBoundary
     ) {
         public PolicyDefinition {
             id = requireText(id, "policy id");
             adapter = requireText(adapter, "adapter");
+            adapterConstructor = Objects.requireNonNull(
+                adapterConstructor,
+                "adapterConstructor"
+            );
+            if (adapterConstructor == AdapterConstructor.NO_ARGUMENT
+                    && deterministicSeed != 0) {
+                throw new IllegalArgumentException(
+                    "no-argument policies must use the zero seed sentinel");
+            }
             selectionBoundary = requireText(
                 selectionBoundary, "selectionBoundary");
         }
@@ -743,5 +758,10 @@ public final class TargetFreeRepresentationEvaluationPlan {
                 );
             }
         }
+    }
+
+    public enum AdapterConstructor {
+        NO_ARGUMENT,
+        LONG_SEED
     }
 }
