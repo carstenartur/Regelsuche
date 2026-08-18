@@ -14,7 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -23,6 +22,20 @@ class TargetFreeRepresentationEvaluationPlanTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String REPOSITORY_REVISION =
         "0123456789abcdef0123456789abcdef01234567";
+    private static final List<String> CASE_IDS = List.of(
+        "assumption-sensitive-cancellation-control",
+        "catalog-blind-trigonometric-bridge",
+        "neutral-element-compression",
+        "occurrence-local-square-bridge",
+        "repeated-term-compression",
+        "telescoping-capability-bridge"
+    );
+    private static final List<String> POLICY_IDS = List.of(
+        "BOUNDED_ENUMERATION_V1",
+        "RANDOM_MONTE_CARLO_V1",
+        "SCALAR_BEST_FIRST_V1",
+        "STRUCTURAL_DIVERSITY_V1"
+    );
 
     @Test
     void freezesTheExactTargetBlindMatrixWithoutQualificationLeakage() {
@@ -61,9 +74,23 @@ class TargetFreeRepresentationEvaluationPlanTest {
                 .count()
         );
 
-        List<String> expectedMatrix = content.cases().stream()
-            .flatMap(benchmarkCase -> content.policies().stream()
-                .map(policy -> benchmarkCase.id() + "/" + policy.id()))
+        assertEquals(
+            CASE_IDS,
+            content.cases().stream()
+                .map(TargetFreeRepresentationEvaluationPlan
+                    .CaseDefinition::id)
+                .toList()
+        );
+        assertEquals(
+            POLICY_IDS,
+            content.policies().stream()
+                .map(TargetFreeRepresentationEvaluationPlan
+                    .PolicyDefinition::id)
+                .toList()
+        );
+        List<String> expectedMatrix = CASE_IDS.stream()
+            .flatMap(caseId -> POLICY_IDS.stream()
+                .map(policyId -> caseId + "/" + policyId))
             .toList();
         assertEquals(
             expectedMatrix,
@@ -88,18 +115,6 @@ class TargetFreeRepresentationEvaluationPlanTest {
         assertFalse(canonical.contains("2 * x"));
         assertFalse(canonical.contains(
             "rule:sympy.trig.pythagorean"));
-        assertEquals(
-            Set.of(
-                "BOUNDED_ENUMERATION_V1",
-                "RANDOM_MONTE_CARLO_V1",
-                "SCALAR_BEST_FIRST_V1",
-                "STRUCTURAL_DIVERSITY_V1"
-            ),
-            content.policies().stream()
-                .map(TargetFreeRepresentationEvaluationPlan
-                    .PolicyDefinition::id)
-                .collect(java.util.stream.Collectors.toSet())
-        );
     }
 
     @Test
@@ -110,6 +125,17 @@ class TargetFreeRepresentationEvaluationPlanTest {
                 TargetFreeRepresentationEvaluationPlan
                     .PREREGISTRATION_RESOURCE
             );
+        assertEquals(
+            TargetFreeRepresentationEvaluationPlan
+                .PREREGISTRATION_BYTE_LENGTH,
+            preregistrationBytes.length
+        );
+        assertEquals(
+            TargetFreeRepresentationEvaluationPlan.PREREGISTRATION_SHA256,
+            TargetFreeRepresentationEvaluationPlan.sha256(
+                preregistrationBytes)
+        );
+
         JsonNode preregistration = JSON.readTree(preregistrationBytes);
         byte[] formation = TargetFreeRepresentationEvaluationPlan
             .readResource(preregistration.path(

@@ -43,6 +43,9 @@ public final class TargetFreeRepresentationEvaluationPlan {
     public static final String PREREGISTRATION_RESOURCE =
         "/de/regelsuche/discovery/representation/"
             + "target-free-representation-preregistration-v1.json";
+    public static final long PREREGISTRATION_BYTE_LENGTH = 1019L;
+    public static final String PREREGISTRATION_SHA256 =
+        "sha256:1bd103fbedb176a374bc61bfb851977444eb1918d4d03bb372e7b2abb8fdf51d";
     public static final String FORMATION_SCHEMA =
         "regelsuche.target-free-representation-formation/v1";
     public static final String PREREGISTRATION_SCHEMA =
@@ -67,6 +70,12 @@ public final class TargetFreeRepresentationEvaluationPlan {
     public static EvaluationPlan create(String repositoryRevision) {
         String revision = requireRepositoryRevision(repositoryRevision);
         byte[] preregistrationBytes = readResource(PREREGISTRATION_RESOURCE);
+        requireResourceBinding(
+            preregistrationBytes,
+            PREREGISTRATION_BYTE_LENGTH,
+            PREREGISTRATION_SHA256,
+            "preregistration"
+        );
         Preregistration preregistration = decode(
             preregistrationBytes,
             Preregistration.class,
