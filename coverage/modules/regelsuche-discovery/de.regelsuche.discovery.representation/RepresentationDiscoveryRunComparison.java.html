@@ -378,7 +378,12 @@ public record RepresentationDiscoveryRunComparison(
     }
 
     private static String key(Category category, String field) {
-<span class="fc" id="L381">        return &quot;%04d/%s&quot;.formatted(category.ordinal(), field);</span>
+<span class="fc" id="L381">        return String.format(</span>
+            java.util.Locale.ROOT,
+            &quot;%04d/%s&quot;,
+<span class="fc" id="L384">            category.ordinal(),</span>
+            field
+        );
     }
 
     public record Entry(
@@ -388,16 +393,16 @@ public record RepresentationDiscoveryRunComparison(
         String rightValue,
         boolean equal
     ) {
-<span class="fc" id="L391">        public Entry {</span>
-<span class="fc" id="L392">            category = Objects.requireNonNull(category, &quot;category&quot;);</span>
-<span class="fc" id="L393">            field = requireText(field, &quot;field&quot;);</span>
-<span class="fc" id="L394">            leftValue = Objects.requireNonNull(leftValue, &quot;leftValue&quot;);</span>
-<span class="fc" id="L395">            rightValue = Objects.requireNonNull(rightValue, &quot;rightValue&quot;);</span>
-<span class="fc bfc" id="L396" title="All 2 branches covered.">            if (equal != leftValue.equals(rightValue)) {</span>
-<span class="fc" id="L397">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L396">        public Entry {</span>
+<span class="fc" id="L397">            category = Objects.requireNonNull(category, &quot;category&quot;);</span>
+<span class="fc" id="L398">            field = requireText(field, &quot;field&quot;);</span>
+<span class="fc" id="L399">            leftValue = Objects.requireNonNull(leftValue, &quot;leftValue&quot;);</span>
+<span class="fc" id="L400">            rightValue = Objects.requireNonNull(rightValue, &quot;rightValue&quot;);</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">            if (equal != leftValue.equals(rightValue)) {</span>
+<span class="fc" id="L402">                throw new IllegalArgumentException(</span>
                     &quot;comparison entry equality flag mismatch: &quot; + field);
             }
-<span class="fc" id="L400">        }</span>
+<span class="fc" id="L405">        }</span>
 
         private static Entry create(
             Category category,
@@ -405,54 +410,54 @@ public record RepresentationDiscoveryRunComparison(
             String leftValue,
             String rightValue
         ) {
-<span class="fc" id="L408">            return new Entry(</span>
+<span class="fc" id="L413">            return new Entry(</span>
                 category,
                 field,
                 leftValue,
                 rightValue,
-<span class="fc" id="L413">                leftValue.equals(rightValue)</span>
+<span class="fc" id="L418">                leftValue.equals(rightValue)</span>
             );
         }
 
         String key() {
-<span class="fc" id="L418">            return RepresentationDiscoveryRunComparison.key(category, field);</span>
+<span class="fc" id="L423">            return RepresentationDiscoveryRunComparison.key(category, field);</span>
         }
 
         void appendTo(StringBuilder descriptor) {
-<span class="fc" id="L422">            append(descriptor, category.name());</span>
-<span class="fc" id="L423">            append(descriptor, field);</span>
-<span class="fc" id="L424">            append(descriptor, leftValue);</span>
-<span class="fc" id="L425">            append(descriptor, rightValue);</span>
-<span class="fc" id="L426">            append(descriptor, Boolean.toString(equal));</span>
-<span class="fc" id="L427">        }</span>
+<span class="fc" id="L427">            append(descriptor, category.name());</span>
+<span class="fc" id="L428">            append(descriptor, field);</span>
+<span class="fc" id="L429">            append(descriptor, leftValue);</span>
+<span class="fc" id="L430">            append(descriptor, rightValue);</span>
+<span class="fc" id="L431">            append(descriptor, Boolean.toString(equal));</span>
+<span class="fc" id="L432">        }</span>
     }
 
-<span class="fc" id="L430">    public enum Category {</span>
-<span class="fc" id="L431">        WORKSPACE,</span>
-<span class="fc" id="L432">        INPUT,</span>
-<span class="fc" id="L433">        LINEAGE,</span>
-<span class="fc" id="L434">        INFORMATION_BOUNDARY,</span>
-<span class="fc" id="L435">        PLAN,</span>
-<span class="fc" id="L436">        OUTCOME,</span>
-<span class="fc" id="L437">        RUNTIME_DIAGNOSTICS,</span>
-<span class="fc" id="L438">        REVISION,</span>
-<span class="fc" id="L439">        ARTIFACT,</span>
-<span class="fc" id="L440">        CLAIM_BOUNDARY</span>
+<span class="fc" id="L435">    public enum Category {</span>
+<span class="fc" id="L436">        WORKSPACE,</span>
+<span class="fc" id="L437">        INPUT,</span>
+<span class="fc" id="L438">        LINEAGE,</span>
+<span class="fc" id="L439">        INFORMATION_BOUNDARY,</span>
+<span class="fc" id="L440">        PLAN,</span>
+<span class="fc" id="L441">        OUTCOME,</span>
+<span class="fc" id="L442">        RUNTIME_DIAGNOSTICS,</span>
+<span class="fc" id="L443">        REVISION,</span>
+<span class="fc" id="L444">        ARTIFACT,</span>
+<span class="fc" id="L445">        CLAIM_BOUNDARY</span>
     }
 
-<span class="fc" id="L443">    public enum Relationship {</span>
-<span class="fc" id="L444">        SAME_RUN {</span>
+<span class="fc" id="L448">    public enum Relationship {</span>
+<span class="fc" id="L449">        SAME_RUN {</span>
             @Override
             boolean accepts(List&lt;Entry&gt; entries) {
-<span class="fc" id="L447">                return entries.stream().allMatch(Entry::equal);</span>
+<span class="fc" id="L452">                return entries.stream().allMatch(Entry::equal);</span>
             }
         },
-<span class="fc" id="L450">        DIRECT_LINEAGE,</span>
-<span class="fc" id="L451">        SIBLING_LINEAGE,</span>
-<span class="fc" id="L452">        UNRELATED;</span>
+<span class="fc" id="L455">        DIRECT_LINEAGE,</span>
+<span class="fc" id="L456">        SIBLING_LINEAGE,</span>
+<span class="fc" id="L457">        UNRELATED;</span>
 
         boolean accepts(List&lt;Entry&gt; entries) {
-<span class="fc" id="L455">            return true;</span>
+<span class="fc" id="L460">            return true;</span>
         }
     }
 }
