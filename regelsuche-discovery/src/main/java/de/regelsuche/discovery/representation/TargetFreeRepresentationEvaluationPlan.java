@@ -48,7 +48,7 @@ public final class TargetFreeRepresentationEvaluationPlan {
             + "target-free-representation-preregistration-v1.json";
     public static final long PREREGISTRATION_BYTE_LENGTH = 1019L;
     public static final String PREREGISTRATION_SHA256 =
-        "sha256:1ce6d02d7d87161de274a88bbc2bcfe92816dbb182287397176805a47e274610";
+        "sha256:6191263a96da7cab36fcc1264d6fac29dff0633b9bae4fb723caa5770c3de17d";
     public static final String FORMATION_SCHEMA =
         "regelsuche.target-free-representation-formation/v1";
     public static final String PREREGISTRATION_SCHEMA =
@@ -579,9 +579,7 @@ public final class TargetFreeRepresentationEvaluationPlan {
         int maxAstSizeIncreasePerStep,
         int significantImprovementThreshold,
         int maxExpandingSteps,
-        int beamWidth,
-        int maxEngineCalls,
-        int maxAdmittedPrimitiveSteps
+        int beamWidth
     ) {
         public WorkBudget {
             if (maxDepth < 0
@@ -594,10 +592,7 @@ public final class TargetFreeRepresentationEvaluationPlan {
                     || maxExpandingSteps < 0
                     || maxExpandingSteps > maxDepth
                     || beamWidth < 1
-                    || beamWidth > maxRetainedStates
-                    || maxEngineCalls < 1
-                    || maxEngineCalls > maxExploredStates
-                    || maxAdmittedPrimitiveSteps < 1) {
+                    || beamWidth > maxRetainedStates) {
                 throw new IllegalArgumentException(
                     "work budget is outside its declared finite range");
             }

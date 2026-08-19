@@ -20,8 +20,7 @@ Die **Formation** enthält ausschließlich:
 - Ausgangsausdruck und explizite Annahmen;
 - R1- oder R2-Informationsspur;
 - `RuleProfile.MINIMAL_KERNEL` und explizit je Fall aktivierte Rule-Packs;
-- sämtliche endlichen Arbeitsbudgets einschließlich Engine-Aufrufen und
-  zugelassenen primitiven Schritten;
+- sämtliche endlichen, von v1 tatsächlich durchgesetzten Suchbudgets;
 - Policy-ID, Produktionsadapter, Aufrufschnittstelle, Konstruktorvertrag,
   deterministischen Seed, initiale Annahmenpolitik und targetblinde
   Auswahlgrenze.
@@ -35,13 +34,13 @@ Die **Preregistrierung** bindet ihre eigenen Bytes sowie Formation und
 Qualifikation fail-closed:
 
 ```text
-Formation:      6640 Bytes
-                sha256:aae56e8ae14b2df8b9929f9e0a554205f7438e7ec8386a8a8520da03342fd223
+Formation:      6205 Bytes
+                sha256:5887eb3f71310a88d6946d1c107f90cf87c350ad1e010f2559e0e1dccb1214ce
 Qualifikation:  2947 Bytes
                 sha256:b87239dcc3a3bed26cee1db87240cb6d7587f0f9a551e5a279f9738cd8866835
 Preregistrierung:
                 1019 Bytes
-                sha256:1ce6d02d7d87161de274a88bbc2bcfe92816dbb182287397176805a47e274610
+                sha256:6191263a96da7cab36fcc1264d6fac29dff0633b9bae4fb723caa5770c3de17d
 ```
 
 Eine Änderung an einer dieser Ressourcen erzeugt nicht stillschweigend eine
@@ -59,8 +58,7 @@ Vor der Ausführung ist festgelegt:
 - direkte Verwendung der sechs ursprünglichen Formation-Budgets durch
   `TargetFreeRepresentationSearch`;
 - zusätzliche, explizite Budgets für `significantImprovementThreshold`,
-  `maxExpandingSteps`, `beamWidth`, Engine-Aufrufe und zugelassene primitive
-  Schritte;
+  `maxExpandingSteps` und `beamWidth`;
 - Vereinigung der deklarierten Fallannahmen mit den Annahmen jedes erhaltenen
   Zustands;
 - deterministische globale Transformationsreihenfolge nach Regel, Ausdruck,
@@ -69,10 +67,10 @@ Vor der Ausführung ist festgelegt:
   kanonische Sortierung vor dem Shuffle sowie Erhalt der Annahmen im Zustand
   und in seiner Identität.
 
-Gleiche konfigurierte Obergrenzen dürfen später nicht als gleiche tatsächlich
-verbrauchte Arbeit ausgegeben werden. Der Ausführungsbericht muss die realen
-Engine-Aufrufe, zugelassenen primitiven Schritte, erzeugten Transitionen,
-explorierten Zustände und erhaltenen Kandidaten je Zeile ausweisen.
+Engine-Aufrufe und primitive Schritte bleiben in v1 beobachtete Arbeitsledger,
+aber keine vorab als durchgesetzt behaupteten Obergrenzen. Der spätere
+Ausführungsbericht muss sie neben erzeugten Transitionen, explorierten
+Zuständen und erhaltenen Kandidaten je Zeile ausweisen.
 
 ## 6 × 4-Matrix
 
