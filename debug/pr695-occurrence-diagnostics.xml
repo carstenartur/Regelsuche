@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanDiagnosticsTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-08-19T02:53:57.428Z" hostname="runnervmp9m8c" time="1.18">
+  <properties/>
+  <testcase name="dumpsOccurrenceLocalBridgeCandidatesAndMatches()" classname="de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanDiagnosticsTest" time="1.16"/>
+  <system-out><![CDATA[SOURCE=y + (sin(x)^2 + (cos(x)^2 + 0))
+FORMATION_RULES=[ast_add_zero_left, ast_add_zero_right, ast_canonical_normalize, ast_divide_one, ast_fold_numeric_arithmetic, ast_multiply_one_left, ast_multiply_one_right, ast_multiply_zero_left, ast_multiply_zero_right, ast_subtract_zero]
+CATALOG_STRUCTURES=[sympy.trig.cosecant-call=[rule:sympy.trig.csc_def], sympy.trig.cosine-sum=[rule:sympy.trig.cos_sum], sympy.trig.cotangent-call=[rule:sympy.trig.cot_def], sympy.trig.pythagorean-pair=[rule:sympy.trig.pythagorean], sympy.trig.secant-call=[rule:sympy.trig.sec_def], sympy.trig.sine-sum=[rule:sympy.trig.sin_sum], sympy.trig.tangent-call=[rule:sympy.trig.tan_def]]
+STATE=2 depth=1 expression=y + cos(x) ^ 2 + sin(x) ^ 2 assumptions=[]
+MATCHES=[]
+DIAGNOSTICS=[]
+STATE=3 depth=1 expression=y + cos(x) ^ 2 + sin(x) ^ 2 + 0 assumptions=[]
+MATCHES=[]
+DIAGNOSTICS=[]
+STATE=4 depth=1 expression=y + sin(x) ^ 2 + cos(x) ^ 2 assumptions=[]
+MATCHES=[]
+DIAGNOSTICS=[]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
