@@ -62,7 +62,7 @@ jobs:
             :regelsuche-discovery:test \
             --tests de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanTest \
             :regelsuche-discovery:generateTargetFreeRepresentationEvaluationPlan \
-            --console=plain
+            --console=plain 2>&1 | tee /tmp/pr695-occurrence-verify.log
 
       - name: Publish the verified fix to PR 695
         shell: bash
@@ -79,3 +79,39 @@ jobs:
             regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlanTest.java
           git commit -m 'Preserve the occurrence-local bridge after normalization'
           git push origin HEAD:agent/pr693-pre-freeze-hardening
+
+      - name: Persist automation outcome
+        if: always()
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          target_head="$(git ls-remote origin refs/heads/agent/pr693-pre-freeze-hardening | cut -f1)"
+          git reset --hard
+          git clean -fd
+          git switch automation/pr695-occurrence-fix
+          mkdir -p debug
+          {
+            echo '{'
+            echo '  "workflowRunId": "${{ github.run_id }}",'
+            echo '  "workflowRunAttempt": "${{ github.run_attempt }}",'
+            echo '  "status": "'"$JOB_STATUS"'",'
+            echo '  "targetHead": "'"$target_head"'",'
+            echo '  "expectedOldHead": "a64d1556fb732b9172105abfd780ad0dbd613cfe"'
+            echo '}'
+          } > debug/pr695-occurrence-fix-status.json
+          if test -f /tmp/pr695-occurrence-verify.log; then
+            tail -n 250 /tmp/pr695-occurrence-verify.log \
+              > debug/pr695-occurrence-fix-verify.log
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add debug/pr695-occurrence-fix-status.json
+          if test -f debug/pr695-occurrence-fix-verify.log; then
+            git add debug/pr695-occurrence-fix-verify.log
+          fi
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record PR 695 occurrence fix automation outcome'
+            git push origin HEAD:automation/pr695-occurrence-fix
+          fi
