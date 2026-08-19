@@ -134,7 +134,7 @@ class TargetFreeRepresentationEvaluationPlanTest {
         assertFalse(canonical.contains("\"requiredCapabilities\""));
         assertFalse(canonical.contains("\"acceptedCandidateTypes\""));
         assertFalse(canonical.contains(
-            "y + (sin(x)^2 + cos(x)^2)"));
+            "y * (sin(x)^2 + cos(x)^2)"));
         assertFalse(canonical.contains(
             "rule:sympy.rational.partial_fraction.telescoping"));
         assertFalse(canonical.contains("2 * x"));
@@ -195,7 +195,7 @@ class TargetFreeRepresentationEvaluationPlanTest {
             "\"referenceExpressions\"",
             "\"requiredCapabilities\"",
             "\"acceptedCandidateTypes\"",
-            "y + (sin(x)^2 + cos(x)^2)",
+            "y * (sin(x)^2 + cos(x)^2)",
             "rule:sympy.rational.partial_fraction.telescoping"
         )) {
             assertTrue(qualificationText.contains(forbidden));

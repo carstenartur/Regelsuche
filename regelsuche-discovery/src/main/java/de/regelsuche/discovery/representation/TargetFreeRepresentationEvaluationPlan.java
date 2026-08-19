@@ -48,7 +48,7 @@ public final class TargetFreeRepresentationEvaluationPlan {
             + "target-free-representation-preregistration-v1.json";
     public static final long PREREGISTRATION_BYTE_LENGTH = 1019L;
     public static final String PREREGISTRATION_SHA256 =
-        "sha256:0097cd62f529bb61b623106eafb05ac9fe86e6186026e2eca1cbe0cd183a84e1";
+        "sha256:1ce6d02d7d87161de274a88bbc2bcfe92816dbb182287397176805a47e274610";
     public static final String FORMATION_SCHEMA =
         "regelsuche.target-free-representation-formation/v1";
     public static final String PREREGISTRATION_SCHEMA =

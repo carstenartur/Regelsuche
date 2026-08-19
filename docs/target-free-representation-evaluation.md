@@ -36,12 +36,12 @@ Qualifikation fail-closed:
 
 ```text
 Formation:      6640 Bytes
-                sha256:74dc8849481a1a9dcff2e5935154a352cbf49fe857dc8eaa56866ceb737d7778
+                sha256:aae56e8ae14b2df8b9929f9e0a554205f7438e7ec8386a8a8520da03342fd223
 Qualifikation:  2947 Bytes
-                sha256:c20d3ae748fca3509927f41da9c607f8a14353467a530b83d4c9fab93804d833
+                sha256:b87239dcc3a3bed26cee1db87240cb6d7587f0f9a551e5a279f9738cd8866835
 Preregistrierung:
                 1019 Bytes
-                sha256:0097cd62f529bb61b623106eafb05ac9fe86e6186026e2eca1cbe0cd183a84e1
+                sha256:1ce6d02d7d87161de274a88bbc2bcfe92816dbb182287397176805a47e274610
 ```
 
 Eine Änderung an einer dieser Ressourcen erzeugt nicht stillschweigend eine
@@ -82,8 +82,9 @@ Die Formation enthält sechs fachlich unterschiedliche Fälle:
    Core-Pack für rationale Cancellation;
 2. katalogblinde trigonometrische Wissensbrücke;
 3. Neutral-Element-Kompression von `x + 0`;
-4. occurrence-lokale trigonometrische Brücke innerhalb eines größeren
-   Ausdrucks;
+4. occurrence-lokale trigonometrische Brücke in einem nichtassoziativen
+   Multiplikationskontext, der die bekannte Summenstruktur als eigenen
+   AST-Teilbaum erhält;
 5. Kompression eines wiederholten Terms mit expliziter Termkollektion;
 6. Teleskopierungsbrücke unter den Annahmen `n != 0` und `n + 1 != 0`.
 
@@ -116,8 +117,10 @@ Aufrufschnittstellen, Konstruktorverträge, Inventar-IDs und Budgets geprüft.
 Die eingefrorenen Fälle verweisen nur auf tatsächlich vorhandene
 Produktionsverträge:
 
-- die occurrence-lokale Brücke qualifiziert die bekannte trigonometrische
-  Struktur und die konkrete Konsequenz `rule:sympy.trig.pythagorean`;
+- die occurrence-lokale Brücke liegt unter einer äußeren Multiplikation; die
+  trigonometrische Summe bleibt daher trotz kanonischer AC-Normalisierung ein
+  echter AST-Teilbaum und qualifiziert die konkrete Konsequenz
+  `rule:sympy.trig.pythagorean`;
 - der Rational-Pack deklariert die bekannte Struktur
   `sympy.rational.telescoping-unit-step` und bindet sie an
   `rule:sympy.rational.partial_fraction.telescoping`;
