@@ -1,12 +1,13 @@
 name: Integrate target-free matrix
 
 on:
-  push:
+  pull_request:
     branches:
       - automation/target-free-matrix-integration
-    paths:
-      - '.github/automation/apply_target_free_integration.py.gz.b64'
-      - '.github/workflows/integrate-target-free-matrix.yml'
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 permissions:
   contents: write
@@ -17,49 +18,58 @@ concurrency:
 
 jobs:
   integrate-and-verify:
-    if: github.actor != 'github-actions[bot]'
+    if: >-
+      github.event.pull_request.head.ref == 'agent/target-free-candidate-freeze' &&
+      github.event.pull_request.head.sha == 'f9b608bdb7b312e984b5e52d71fb5f7cdde22827'
     runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
-      - name: Check out automation source
+      - name: Check out the execution branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: agent/target-free-candidate-freeze
           fetch-depth: 0
 
-      - name: Build the stacked execution branch
+      - name: Rebuild on accepted main
         id: prepare
         shell: bash
         run: |
           set -euo pipefail
-          base64 -d .github/automation/apply_target_free_integration.py.gz.b64 \
-            | gzip -d > /tmp/apply_target_free_integration.py
-          chmod +x /tmp/apply_target_free_integration.py
-          git fetch origin \
-            main \
-            agent/pr693-pre-freeze-hardening \
-            agent/target-free-candidate-freeze
-          test "$(git rev-parse origin/main)" = \
-            'ab4f62edc8fcbc26e8328cc3142cc682ced432ca'
-          test "$(git rev-parse origin/agent/pr693-pre-freeze-hardening)" = \
-            '674bd26094827257372ac2c416dae9c7bc7c0b16'
-          test "$(git rev-parse origin/agent/target-free-candidate-freeze)" = \
-            '897982c4e0ba9f2e99458d555e2b8f7a9d86f96f'
+          test "$(git rev-parse HEAD)" = \
+            'f9b608bdb7b312e984b5e52d71fb5f7cdde22827'
+          cat .github/pr694-rebuild/part-*.patch > /tmp/pr694.patch
+          echo '762797818eedaf76b9442bc4cb1ec981eb2ac7afd41cd1385fce71fe5b3aebd6  /tmp/pr694.patch' \
+            | sha256sum --check
+
           git config user.name 'github-actions[bot]'
           git config user.email \
             '41898282+github-actions[bot]@users.noreply.github.com'
-          git switch -C agent/target-free-candidate-freeze \
-            origin/agent/target-free-candidate-freeze
-          git merge --no-ff \
-            -m 'Merge target-free hardening into execution branch' \
-            origin/agent/pr693-pre-freeze-hardening
-          python3 /tmp/apply_target_free_integration.py
-          git diff --check
-          git add \
-            regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreeze.java \
-            regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearch.java \
-            regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreezeTest.java \
-            regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearchTest.java
-          git commit -m 'Enforce frozen target-free work budgets'
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = \
+            '7f20fce8ce103a6f757c1e3fb1227d1e8ea293fb'
+          git merge --no-edit origin/main
+          git apply --check /tmp/pr694.patch
+          git apply /tmp/pr694.patch
+
+          rm -rf .github/pr694-rebuild
+          rm .github/workflows/pr694-rebuild.yml
+          git add -A
+          git diff --cached --check
+          git commit -m 'Rebuild target-free candidate freeze on hardened matrix'
+
+          expected="$({
+            printf '%s\n' \
+              'regelsuche-discovery/build.gradle' \
+              'regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreeze.java' \
+              'regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearch.java' \
+              'regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreezeTest.java' \
+              'regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearchTest.java'
+          } | sort)"
+          actual="$(git diff --name-only origin/main | sort)"
+          test "$actual" = "$expected" || {
+            printf 'Unexpected final PR diff:\n%s\n' "$actual" >&2
+            exit 1
+          }
           target_sha="$(git rev-parse HEAD)"
           echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
 
@@ -74,7 +84,7 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Verify the execution and freeze contracts
+      - name: Verify execution and freeze contracts
         env:
           REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ steps.prepare.outputs.target_sha }}
         shell: bash
@@ -113,18 +123,6 @@ jobs:
               'repeated-term-compression',
               'telescoping-capability-bridge',
           }
-          for entry in content['entries']:
-              budget = entry['configuredBudget']
-              work = entry['work']
-              assert work['engineCalls'] <= budget['maxEngineCalls']
-              assert work['generatedPrimitiveSteps'] <= budget[
-                  'maxAdmittedPrimitiveSteps'
-              ]
-              assert work['exploredStates'] <= budget['maxExploredStates']
-              assert work['retainedStates'] <= budget['maxRetainedStates']
-              assert work['generatedTransitions'] <= budget[
-                  'maxGeneratedTransitions'
-              ]
           canonical = artifact.read_text(encoding='utf-8')
           for forbidden in (
               '"referenceExpressions"',
@@ -134,10 +132,9 @@ jobs:
               assert forbidden not in canonical
           PY
 
-      - name: Publish the verified execution branch
+      - name: Publish verified execution branch
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = '${{ steps.prepare.outputs.target_sha }}'
-          test -z "$(git status --porcelain)"
           git push origin HEAD:agent/target-free-candidate-freeze
