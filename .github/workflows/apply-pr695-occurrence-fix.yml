@@ -1,0 +1,81 @@
+name: Apply PR 695 occurrence fix
+
+on:
+  push:
+    branches:
+      - automation/pr695-occurrence-fix
+    paths:
+      - '.github/patches/pr695-occurrence-fix.patch'
+      - '.github/workflows/apply-pr695-occurrence-fix.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-pr695-occurrence-fix
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out automation source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Materialize the audited patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/patches/pr695-occurrence-fix.patch /tmp/pr695-occurrence-fix.patch
+          echo 'b6a15a9d3b04765b57879cf64dcd8387f5c4fffbe9f7d7637c3535416c3d5efe  /tmp/pr695-occurrence-fix.patch' \
+            | sha256sum --check --strict
+          git fetch origin agent/pr693-pre-freeze-hardening
+          test "$(git rev-parse origin/agent/pr693-pre-freeze-hardening)" = \
+            'a64d1556fb732b9172105abfd780ad0dbd613cfe'
+          git switch --detach origin/agent/pr693-pre-freeze-hardening
+          git apply --check /tmp/pr695-occurrence-fix.patch
+          git apply /tmp/pr695-occurrence-fix.patch
+          git diff --check
+
+      - name: Set up Java 25
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+
+      - name: Verify the affected contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon \
+            :regelsuche-core:test \
+            --tests de.regelsuche.knowledge.KnowledgePackRegistryTest \
+            :regelsuche-search:test \
+            --tests de.regelsuche.search.strategy.SearchStrategyTest \
+            :regelsuche-discovery:test \
+            --tests de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanTest \
+            :regelsuche-discovery:generateTargetFreeRepresentationEvaluationPlan \
+            --console=plain
+
+      - name: Publish the verified fix to PR 695
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            docs/target-free-representation-evaluation.md \
+            regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlan.java \
+            regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-formation-v1.json \
+            regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-preregistration-v1.json \
+            regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-qualification-v1.json \
+            regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlanTest.java
+          git commit -m 'Preserve the occurrence-local bridge after normalization'
+          git push origin HEAD:agent/pr693-pre-freeze-hardening
