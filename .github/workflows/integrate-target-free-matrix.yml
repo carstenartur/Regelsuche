@@ -48,27 +48,19 @@ jobs:
           test "$(git rev-parse origin/main)" = \
             '7f20fce8ce103a6f757c1e3fb1227d1e8ea293fb'
 
-          git worktree add --detach /tmp/pr694-desired \
-            897982c4e0ba9f2e99458d555e2b8f7a9d86f96f
-          pushd /tmp/pr694-desired
-          git merge --no-edit origin/main
+          candidate='regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreeze.java'
+          candidate_test='regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreezeTest.java'
+          search='regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearch.java'
+          search_test='regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearchTest.java'
+
+          # The hardening patch was generated from the original execution files
+          # over the accepted #695 tree. Restore exactly those four baselines;
+          # keep the already merged build.gradle integration untouched.
+          git checkout 897982c4e0ba9f2e99458d555e2b8f7a9d86f96f -- \
+            "$candidate" "$candidate_test"
+          git checkout origin/main -- "$search" "$search_test"
           git apply --check /tmp/pr694.patch
           git apply /tmp/pr694.patch
-          git diff --check
-          popd
-
-          files=(
-            'regelsuche-discovery/build.gradle'
-            'regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreeze.java'
-            'regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearch.java'
-            'regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreezeTest.java'
-            'regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearchTest.java'
-          )
-          for file in "${files[@]}"; do
-            mkdir -p "$(dirname "$file")"
-            cp "/tmp/pr694-desired/$file" "$file"
-          done
-          git worktree remove --force /tmp/pr694-desired
 
           rm -rf .github/pr694-rebuild
           rm .github/workflows/pr694-rebuild.yml
@@ -76,6 +68,13 @@ jobs:
           git diff --cached --check
           git commit -m 'Rebuild target-free candidate freeze on hardened matrix'
 
+          files=(
+            'regelsuche-discovery/build.gradle'
+            "$candidate"
+            "$search"
+            "$candidate_test"
+            "$search_test"
+          )
           expected="$(printf '%s\n' "${files[@]}" | sort)"
           actual="$(git diff --name-only origin/main | sort)"
           test "$actual" = "$expected" || {
