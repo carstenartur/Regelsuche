@@ -3,6 +3,7 @@ package de.regelsuche.e2e;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.options.ScreenshotAnimations;
 import com.microsoft.playwright.options.ScreenshotType;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -31,6 +32,7 @@ final class ScreenshotDiffUtil {
         Path diff = reportDir().resolve(baselineName + ".diff.png");
         Files.createDirectories(actual.getParent());
         locator.screenshot(new Locator.ScreenshotOptions()
+            .setAnimations(ScreenshotAnimations.DISABLED)
             .setPath(actual)
             .setType(ScreenshotType.PNG));
         if (UPDATE_BASELINES) {
