@@ -6,10 +6,11 @@ on:
       - debug/pr695-occurrence-bridge
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   diagnostics:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
@@ -24,7 +25,21 @@ jobs:
           ./gradlew --no-daemon \
             :regelsuche-discovery:test \
             --tests de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanDiagnosticsTest \
-            --console=plain --info
+            --console=plain
+      - name: Publish diagnostic XML to the branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file='regelsuche-discovery/build/test-results/test/TEST-de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanDiagnosticsTest.xml'
+          test -f "$source_file"
+          mkdir -p debug
+          cp "$source_file" debug/pr695-occurrence-diagnostics.xml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add debug/pr695-occurrence-diagnostics.xml
+          git commit -m 'Record PR 695 occurrence diagnostics'
+          git push
       - name: Retain diagnostic evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
