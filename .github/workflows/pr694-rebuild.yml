@@ -1,0 +1,56 @@
+name: PR 694 one-shot rebuild
+
+on:
+  push:
+    branches:
+      - agent/target-free-candidate-freeze
+    paths:
+      - .github/workflows/pr694-rebuild.yml
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    if: github.event.head_commit.message == 'Arm one-shot PR 694 rebuild'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: agent/target-free-candidate-freeze
+          fetch-depth: 0
+      - name: Rebuild the PR on accepted main
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/pr694-rebuild/part-*.patch > /tmp/pr694.patch
+          echo '762797818eedaf76b9442bc4cb1ec981eb2ac7afd41cd1385fce71fe5b3aebd6  /tmp/pr694.patch' | sha256sum --check
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git merge --no-edit origin/main
+          git apply --check /tmp/pr694.patch
+          git apply /tmp/pr694.patch
+
+          rm -rf .github/pr694-rebuild
+          rm .github/workflows/pr694-rebuild.yml
+          git add -A
+          git diff --cached --check
+
+          expected="$({
+            printf '%s\n' \
+              'regelsuche-discovery/build.gradle' \
+              'regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreeze.java' \
+              'regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearch.java' \
+              'regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreezeTest.java' \
+              'regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearchTest.java'
+          } | sort)"
+          actual="$(git diff --name-only origin/main | sort)"
+          test "$actual" = "$expected" || {
+            printf 'Unexpected final PR diff:\n%s\n' "$actual" >&2
+            exit 1
+          }
+
+          git commit -m 'Rebuild target-free candidate freeze on hardened matrix'
+          git push origin HEAD:agent/target-free-candidate-freeze
