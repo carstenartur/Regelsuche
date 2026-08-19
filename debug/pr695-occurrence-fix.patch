@@ -1,0 +1,73 @@
+diff --git a/regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlan.java b/regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlan.java
+--- a/regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlan.java
++++ b/regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlan.java
+@@ -48,7 +48,7 @@
+             + "target-free-representation-preregistration-v1.json";
+     public static final long PREREGISTRATION_BYTE_LENGTH = 1019L;
+     public static final String PREREGISTRATION_SHA256 =
+-        "sha256:0097cd62f529bb61b623106eafb05ac9fe86e6186026e2eca1cbe0cd183a84e1";
++        "sha256:1ce6d02d7d87161de274a88bbc2bcfe92816dbb182287397176805a47e274610";
+     public static final String FORMATION_SCHEMA =
+         "regelsuche.target-free-representation-formation/v1";
+     public static final String PREREGISTRATION_SCHEMA =
+diff --git a/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-formation-v1.json b/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-formation-v1.json
+--- a/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-formation-v1.json
++++ b/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-formation-v1.json
+@@ -88,7 +88,7 @@
+       "id": "occurrence-local-trigonometric-bridge",
+       "informationTrack": "R2_CATALOG_BLIND_POST_HOC_BRIDGE",
+       "ruleProfile": "MINIMAL_KERNEL",
+-      "sourceExpression": "y + (sin(x)^2 + (cos(x)^2 + 0))"
++      "sourceExpression": "y * (sin(x)^2 + (cos(x)^2 + 0))"
+     },
+     {
+       "assumptions": [],
+diff --git a/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-preregistration-v1.json b/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-preregistration-v1.json
+--- a/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-preregistration-v1.json
++++ b/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-preregistration-v1.json
+@@ -6,10 +6,10 @@
+   "evidenceStatus": "FROZEN_NOT_EXECUTED",
+   "formationByteLength": 6640,
+   "formationResource": "/de/regelsuche/discovery/representation/target-free-representation-formation-v1.json",
+-  "formationSha256": "sha256:74dc8849481a1a9dcff2e5935154a352cbf49fe857dc8eaa56866ceb737d7778",
++  "formationSha256": "sha256:aae56e8ae14b2df8b9929f9e0a554205f7438e7ec8386a8a8520da03342fd223",
+   "qualificationByteLength": 2947,
+   "qualificationResource": "/de/regelsuche/discovery/representation/target-free-representation-qualification-v1.json",
+-  "qualificationSha256": "sha256:c20d3ae748fca3509927f41da9c607f8a14353467a530b83d4c9fab93804d833",
++  "qualificationSha256": "sha256:b87239dcc3a3bed26cee1db87240cb6d7587f0f9a551e5a279f9738cd8866835",
+   "requiredEntryStatus": "REMAINING",
+   "requiredTerminalReason": "NOT_EXECUTED",
+   "schema": "regelsuche.target-free-representation-preregistration/v1"
+diff --git a/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-qualification-v1.json b/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-qualification-v1.json
+--- a/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-qualification-v1.json
++++ b/regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-qualification-v1.json
+@@ -61,7 +61,7 @@
+       "id": "occurrence-local-trigonometric-bridge",
+       "minimumTokenSavings": 0,
+       "referenceExpressions": [
+-        "y + (sin(x)^2 + cos(x)^2)"
++        "y * (sin(x)^2 + cos(x)^2)"
+       ],
+       "requiredAssumptions": [],
+       "requiredCapabilities": [
+diff --git a/regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlanTest.java b/regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlanTest.java
+--- a/regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlanTest.java
++++ b/regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlanTest.java
+@@ -134,7 +134,7 @@
+         assertFalse(canonical.contains("\"requiredCapabilities\""));
+         assertFalse(canonical.contains("\"acceptedCandidateTypes\""));
+         assertFalse(canonical.contains(
+-            "y + (sin(x)^2 + cos(x)^2)"));
++            "y * (sin(x)^2 + cos(x)^2)"));
+         assertFalse(canonical.contains(
+             "rule:sympy.rational.partial_fraction.telescoping"));
+         assertFalse(canonical.contains("2 * x"));
+@@ -195,7 +195,7 @@
+             "\"referenceExpressions\"",
+             "\"requiredCapabilities\"",
+             "\"acceptedCandidateTypes\"",
+-            "y + (sin(x)^2 + cos(x)^2)",
++            "y * (sin(x)^2 + cos(x)^2)",
+             "rule:sympy.rational.partial_fraction.telescoping"
+         )) {
+             assertTrue(qualificationText.contains(forbidden));
