@@ -1,22 +1,47 @@
 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.7.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
 Daemon will be stopped at the end of the build 
 Calculating task graph as no cached configuration is available for tasks: :regelsuche-core:test --tests de.regelsuche.knowledge.KnowledgePackRegistryTest :regelsuche-search:test --tests de.regelsuche.search.strategy.SearchStrategyTest :regelsuche-discovery:test --tests de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanTest :regelsuche-discovery:generateTargetFreeRepresentationEvaluationPlan
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1787109440013.json
+> Task :regelsuche-search:processResources NO-SOURCE
+> Task :regelsuche-egraph:processResources NO-SOURCE
+> Task :regelsuche-search:processTestResources NO-SOURCE
+> Task :regelsuche-core:processResources
+> Task :regelsuche-discovery:processResources
+> Task :regelsuche-core:processTestResources
+> Task :regelsuche-validation:processResources NO-SOURCE
+> Task :regelsuche-discovery:processTestResources NO-SOURCE
+> Task :regelsuche-core:compileJava
+> Task :regelsuche-core:classes
+> Task :regelsuche-core:jar
+> Task :regelsuche-egraph:compileJava
+> Task :regelsuche-egraph:classes
+> Task :regelsuche-egraph:jar
+> Task :regelsuche-validation:compileJava
+> Task :regelsuche-validation:classes
+> Task :regelsuche-validation:jar
+> Task :regelsuche-core:compileTestJava
+> Task :regelsuche-core:testClasses
+> Task :regelsuche-search:compileJava
+> Task :regelsuche-search:classes
+> Task :regelsuche-search:jar
+> Task :regelsuche-search:compileTestJava
+> Task :regelsuche-search:testClasses
+> Task :regelsuche-discovery:compileJava
+> Task :regelsuche-discovery:classes
+> Task :regelsuche-discovery:compileTestJava
+> Task :regelsuche-discovery:testClasses
 
-FAILURE: Build failed with an exception.
+> Task :regelsuche-discovery:generateTargetFreeRepresentationEvaluationPlan
+targetFreeRepresentationEvaluationPlanHash=sha256:b2db3e7dcde7f2772573d3740a7454d742b7455de148100326962a43adc42557
+targetFreeRepresentationEvaluationConfigurations=24
 
-* Where:
-Build file '/home/runner/work/Regelsuche/Regelsuche/regelsuche-discovery/build.gradle' line: 89
+> Task :regelsuche-core:test
+> Task :regelsuche-search:test
+> Task :regelsuche-search:jacocoTestReport
+> Task :regelsuche-core:jacocoTestReport
+> Task :regelsuche-discovery:test
+> Task :regelsuche-discovery:jacocoTestReport
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1787109871794.json
 
-* What went wrong:
-Could not determine the dependencies of task ':regelsuche-discovery:generateTargetFreeRepresentationEvaluationPlan'.
-> Cannot bind representation-discovery evidence to a dirty checkout. Commit, stash or remove local changes, or pass an explicit authoritative repository revision.
-
-* Try:
-> Run with --stacktrace option to get the stack trace.
-> Run with --info or --debug option to get more log output.
-> Run with --scan to get full insights from a Build Scan (powered by Develocity).
-> Get more help at https://help.gradle.org.
-
-BUILD FAILED in 11s
+BUILD SUCCESSFUL in 38s
+22 actionable tasks: 22 executed
 Configuration cache entry stored.
