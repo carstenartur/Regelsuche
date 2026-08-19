@@ -8,7 +8,7 @@ import json
 import re
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path.cwd()
 PACKAGE = (
     ROOT
     / "regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation"
