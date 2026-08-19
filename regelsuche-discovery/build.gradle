@@ -68,6 +68,9 @@ def targetFreeRepresentationRunReportDirectory = layout.buildDirectory.dir(
 def targetFreeRepresentationEvaluationPlanReportDirectory =
     layout.buildDirectory.dir(
         'reports/representation-discovery/evaluation-plan')
+def targetFreeRepresentationCandidateFreezeReportDirectory =
+    layout.buildDirectory.dir(
+        'reports/representation-discovery/candidate-freeze')
 def verificationVenvDirectory = rootProject.layout.buildDirectory.dir(
     'verification-venv')
 def verificationPython = verificationVenvDirectory.map { directory ->
@@ -193,15 +196,49 @@ def generateTargetFreeRepresentationEvaluationPlan = tasks.register(
     }
 }
 
+def generateTargetFreeRepresentationCandidateFreeze = tasks.register(
+    'generateTargetFreeRepresentationCandidateFreeze',
+    JavaExec
+) {
+    group = 'verification'
+    description = 'Executes all target-blind representation rows and freezes candidate batches before qualification.'
+    dependsOn tasks.named('classes'),
+        generateTargetFreeRepresentationEvaluationPlan
+    timeout = java.time.Duration.ofMinutes(5)
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.discovery.representation.TargetFreeRepresentationCandidateFreeze'
+    argumentProviders.add({
+        [
+            targetFreeRepositoryRevision.get(),
+            targetFreeRepresentationCandidateFreezeReportDirectory.get()
+                .asFile.absolutePath
+        ]
+    } as CommandLineArgumentProvider)
+    inputs.property('repositoryRevision', targetFreeRepositoryRevision)
+    outputs.dir(targetFreeRepresentationCandidateFreezeReportDirectory)
+    doLast {
+        def freeze = targetFreeRepresentationCandidateFreezeReportDirectory
+            .get()
+            .file('representation-discovery-candidate-freeze.json')
+            .asFile
+        if (!freeze.isFile()) {
+            throw new GradleException(
+                "Missing target-free candidate freeze: ${freeze}")
+        }
+    }
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport'),
         verifyDomainDiscoveryExportEvidence,
         generateTargetFreeRepresentationDiscoveryRun,
-        generateTargetFreeRepresentationEvaluationPlan
+        generateTargetFreeRepresentationEvaluationPlan,
+        generateTargetFreeRepresentationCandidateFreeze
 }
 
 rootProject.tasks.named('check') {
     dependsOn verifyDomainDiscoveryExportEvidence,
         generateTargetFreeRepresentationDiscoveryRun,
-        generateTargetFreeRepresentationEvaluationPlan
+        generateTargetFreeRepresentationEvaluationPlan,
+        generateTargetFreeRepresentationCandidateFreeze
 }
