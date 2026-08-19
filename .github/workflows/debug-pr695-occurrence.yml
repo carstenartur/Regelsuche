@@ -20,10 +20,20 @@ jobs:
           distribution: temurin
           java-version: '25'
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
-      - name: Run focused diagnostic
+      - name: Apply the focused fix under test
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '713026f19cf3a41b9e862262efc1855c127a53b644a84ff125d9cbcf8eef6559  debug/pr695-occurrence-fix.patch' \
+            | sha256sum --check --strict
+          git apply --check debug/pr695-occurrence-fix.patch
+          git apply debug/pr695-occurrence-fix.patch
+          git diff --check
+      - name: Run the formerly failing contract and diagnostics
         run: |
           ./gradlew --no-daemon \
             :regelsuche-discovery:test \
+            --tests de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanTest.occurrenceLocalBridgeIsActuallyExposedAfterFreeze \
             --tests de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanDiagnosticsTest \
             --console=plain
       - name: Publish diagnostic XML to the branch
@@ -31,14 +41,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source_file='regelsuche-discovery/build/test-results/test/TEST-de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanDiagnosticsTest.xml'
-          test -f "$source_file"
-          mkdir -p debug
-          cp "$source_file" debug/pr695-occurrence-diagnostics.xml
+          mkdir -p debug/results
+          cp regelsuche-discovery/build/test-results/test/TEST-de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanDiagnosticsTest.xml \
+            debug/results/diagnostics.xml
+          cp regelsuche-discovery/build/test-results/test/TEST-de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanTest.xml \
+            debug/results/contract.xml
+          git restore . ':!debug/results'
+          git clean -fd -e debug/results
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add debug/pr695-occurrence-diagnostics.xml
-          git commit -m 'Record PR 695 occurrence diagnostics'
+          git add debug/results
+          git commit -m 'Record fixed PR 695 occurrence verification'
           git push
       - name: Retain diagnostic evidence
         if: always()
