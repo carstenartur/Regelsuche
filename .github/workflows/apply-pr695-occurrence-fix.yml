@@ -97,32 +97,24 @@ jobs:
           )
           if count != 1:
               raise SystemExit('preregistration hash constant not unique')
-          old_signature = '''        int maxExpandingSteps,
-                  int beamWidth,
-                  int maxEngineCalls,
-                  int maxAdmittedPrimitiveSteps
-              ) {'''
-          new_signature = '''        int maxExpandingSteps,
-                  int beamWidth
-              ) {'''
-          if java.count(old_signature) != 1:
-              raise SystemExit('WorkBudget signature not unique')
-          java = java.replace(old_signature, new_signature)
-          old_validation = '''                    || maxExpandingSteps > maxDepth
-                          || beamWidth < 1
-                          || beamWidth > maxRetainedStates
-                          || maxEngineCalls < 1
-                          || maxEngineCalls > maxExploredStates
-                          || maxAdmittedPrimitiveSteps < 1) {'''
-          new_validation = '''                    || maxExpandingSteps > maxDepth
-                          || beamWidth < 1
-                          || beamWidth > maxRetainedStates) {'''
-          if java.count(old_validation) != 1:
-              raise SystemExit('WorkBudget validation not unique')
-          java_path.write_text(
-              java.replace(old_validation, new_validation),
-              encoding='utf-8',
+          java, count = re.subn(
+              r'(\n\s*int maxExpandingSteps,\n\s*int beamWidth),'
+              r'\n\s*int maxEngineCalls,\n\s*int maxAdmittedPrimitiveSteps',
+              r'\1',
+              java,
           )
+          if count != 1:
+              raise SystemExit('WorkBudget signature not unique')
+          java, count = re.subn(
+              r'\n\s*\|\| maxEngineCalls < 1'
+              r'\n\s*\|\| maxEngineCalls > maxExploredStates'
+              r'\n\s*\|\| maxAdmittedPrimitiveSteps < 1',
+              '',
+              java,
+          )
+          if count != 1:
+              raise SystemExit('WorkBudget validation not unique')
+          java_path.write_text(java, encoding='utf-8')
 
           docs = docs_path.read_text(encoding='utf-8')
           replacements = {
