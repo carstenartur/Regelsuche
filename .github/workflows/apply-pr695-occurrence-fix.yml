@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           cp .github/patches/pr695-occurrence-fix.patch /tmp/pr695-occurrence-fix.patch
-          echo 'b6a15a9d3b04765b57879cf64dcd8387f5c4fffbe9f7d7637c3535416c3d5efe  /tmp/pr695-occurrence-fix.patch' \
+          echo 'd9c89899a80117f676bb1e095230b0a6119c6f1c4aad12b6c43a1358a43cd537  /tmp/pr695-occurrence-fix.patch' \
             | sha256sum --check --strict
           git fetch origin agent/pr693-pre-freeze-hardening
           test "$(git rev-parse origin/agent/pr693-pre-freeze-hardening)" = \
