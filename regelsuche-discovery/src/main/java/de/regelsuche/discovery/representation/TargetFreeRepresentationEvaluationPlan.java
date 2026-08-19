@@ -11,6 +11,9 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary.Track;
+import de.regelsuche.knowledge.CoreRuleCatalog;
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.RuleProfile;
 import de.regelsuche.search.strategy.SearchStrategy;
 import de.regelsuche.util.AtomicJsonFile;
 import java.io.IOException;
@@ -45,7 +48,7 @@ public final class TargetFreeRepresentationEvaluationPlan {
             + "target-free-representation-preregistration-v1.json";
     public static final long PREREGISTRATION_BYTE_LENGTH = 1019L;
     public static final String PREREGISTRATION_SHA256 =
-        "sha256:1bd103fbedb176a374bc61bfb851977444eb1918d4d03bb372e7b2abb8fdf51d";
+        "sha256:6191263a96da7cab36fcc1264d6fac29dff0633b9bae4fb723caa5770c3de17d";
     public static final String FORMATION_SCHEMA =
         "regelsuche.target-free-representation-formation/v1";
     public static final String PREREGISTRATION_SCHEMA =
@@ -95,6 +98,7 @@ public final class TargetFreeRepresentationEvaluationPlan {
             "target-free representation formation"
         );
         validateCounts(preregistration, formation);
+        validateRulePacks(formation.cases());
         formation.policies().forEach(
             TargetFreeRepresentationEvaluationPlan::requireAdapter);
 
@@ -260,6 +264,23 @@ public final class TargetFreeRepresentationEvaluationPlan {
         if (matrix != preregistration.configuredEntryCount()) {
             throw new IllegalArgumentException(
                 "formation matrix differs from preregistration");
+        }
+    }
+
+    private static void validateRulePacks(
+        List<CaseDefinition> cases
+    ) {
+        Set<String> available = new HashSet<>(CoreRuleCatalog.packIds());
+        new KnowledgePackRegistry().allPacks().forEach(pack ->
+            available.add(pack.packId()));
+        for (CaseDefinition benchmarkCase : cases) {
+            for (String packId : benchmarkCase.enabledRulePackIds()) {
+                if (!available.contains(packId)) {
+                    throw new IllegalArgumentException(
+                        "unknown enabled rule pack " + packId
+                            + " for case " + benchmarkCase.id());
+                }
+            }
         }
     }
 
@@ -517,6 +538,8 @@ public final class TargetFreeRepresentationEvaluationPlan {
         String sourceExpression,
         List<String> assumptions,
         Track informationTrack,
+        RuleProfile ruleProfile,
+        List<String> enabledRulePackIds,
         WorkBudget budget
     ) {
         public CaseDefinition {
@@ -533,6 +556,16 @@ public final class TargetFreeRepresentationEvaluationPlan {
                 throw new IllegalArgumentException(
                     "evaluation formation supports only R1 and R2");
             }
+            ruleProfile = Objects.requireNonNull(
+                ruleProfile, "ruleProfile");
+            if (ruleProfile != RuleProfile.MINIMAL_KERNEL) {
+                throw new IllegalArgumentException(
+                    "evaluation v1 requires MINIMAL_KERNEL");
+            }
+            enabledRulePackIds = sortedStrings(
+                enabledRulePackIds,
+                "enabledRulePackIds"
+            );
             budget = Objects.requireNonNull(budget, "budget");
         }
     }
@@ -543,7 +576,10 @@ public final class TargetFreeRepresentationEvaluationPlan {
         int maxRetainedStates,
         int maxGeneratedTransitions,
         int maxCandidatesPerState,
-        int maxAstSizeIncreasePerStep
+        int maxAstSizeIncreasePerStep,
+        int significantImprovementThreshold,
+        int maxExpandingSteps,
+        int beamWidth
     ) {
         public WorkBudget {
             if (maxDepth < 0
@@ -551,7 +587,12 @@ public final class TargetFreeRepresentationEvaluationPlan {
                     || maxRetainedStates < 1
                     || maxGeneratedTransitions < 1
                     || maxCandidatesPerState < 1
-                    || maxAstSizeIncreasePerStep < 0) {
+                    || maxAstSizeIncreasePerStep < 0
+                    || significantImprovementThreshold < 1
+                    || maxExpandingSteps < 0
+                    || maxExpandingSteps > maxDepth
+                    || beamWidth < 1
+                    || beamWidth > maxRetainedStates) {
                 throw new IllegalArgumentException(
                     "work budget is outside its declared finite range");
             }
@@ -563,6 +604,7 @@ public final class TargetFreeRepresentationEvaluationPlan {
         String adapter,
         AdapterConstructor adapterConstructor,
         AdapterInterface adapterInterface,
+        InitialAssumptionPolicy initialAssumptionPolicy,
         long deterministicSeed,
         String selectionBoundary
     ) {
@@ -576,6 +618,10 @@ public final class TargetFreeRepresentationEvaluationPlan {
             adapterInterface = Objects.requireNonNull(
                 adapterInterface,
                 "adapterInterface"
+            );
+            initialAssumptionPolicy = Objects.requireNonNull(
+                initialAssumptionPolicy,
+                "initialAssumptionPolicy"
             );
             if (adapterConstructor == AdapterConstructor.NO_ARGUMENT
                     && deterministicSeed != 0) {
@@ -801,5 +847,9 @@ public final class TargetFreeRepresentationEvaluationPlan {
     public enum AdapterInterface {
         TARGET_FREE_REPRESENTATION_SEARCH,
         SEARCH_STRATEGY
+    }
+
+    public enum InitialAssumptionPolicy {
+        UNION_WITH_RETAINED_STATE_ASSUMPTIONS
     }
 }

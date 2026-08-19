@@ -101,3 +101,16 @@ rules:
       examples:
         - from: "div(div(x, y), div(z, w))"
           to: "div(mul(x, w), mul(y, z))"
+knownStructures:
+  - id: sympy.rational.telescoping-unit-step
+    domainId: rational
+    pattern: "1 / (?A * (?A + 1))"
+    recognition: ARITHMETIC_AC
+    consequenceIds:
+      - rule:sympy.rational.partial_fraction.telescoping
+    enabledRulePackIds:
+      - sympy-rational
+    compatibleBackendIds: []
+    minimumEvidence: SYMBOLICALLY_VERIFIED
+    sourceReference: sympy/simplify/radsimp.py at SymPy 1.14; unit-step partial-fraction identity independently reimplemented and validated by the pack rule.
+    translationNotes: Recognizes the rational unit-step form after candidate freeze; the match unlocks the withheld telescoping rewrite but is not itself an equivalence proof.

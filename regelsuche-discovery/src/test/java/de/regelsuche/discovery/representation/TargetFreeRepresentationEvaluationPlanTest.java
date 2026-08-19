@@ -9,11 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.KnowledgePackSelection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -26,7 +29,7 @@ class TargetFreeRepresentationEvaluationPlanTest {
         "assumption-sensitive-cancellation-control",
         "catalog-blind-trigonometric-bridge",
         "neutral-element-compression",
-        "occurrence-local-square-bridge",
+        "occurrence-local-trigonometric-bridge",
         "repeated-term-compression",
         "telescoping-capability-bridge"
     );
@@ -105,13 +108,35 @@ class TargetFreeRepresentationEvaluationPlanTest {
                     .equals(entry.terminalReason())
         ));
         assertPolicyConstructionContracts(content.policies());
+        assertTrue(content.cases().stream().allMatch(benchmarkCase ->
+            benchmarkCase.ruleProfile()
+                == de.regelsuche.knowledge.RuleProfile.MINIMAL_KERNEL));
+        assertEquals(
+            Set.of(
+                "core-polynomial-division",
+                "core-term-collection",
+                "sympy-rational",
+                "sympy-trigonometry"
+            ),
+            content.cases().stream()
+                .flatMap(benchmarkCase -> benchmarkCase
+                    .enabledRulePackIds().stream())
+                .collect(java.util.stream.Collectors.toSet())
+        );
+        assertTrue(content.policies().stream().allMatch(policy ->
+            policy.initialAssumptionPolicy()
+                == TargetFreeRepresentationEvaluationPlan
+                    .InitialAssumptionPolicy
+                    .UNION_WITH_RETAINED_STATE_ASSUMPTIONS));
 
         String canonical = plan.toCanonicalJson();
         assertFalse(canonical.contains("\"referenceExpressions\""));
         assertFalse(canonical.contains("\"requiredCapabilities\""));
         assertFalse(canonical.contains("\"acceptedCandidateTypes\""));
-        assertFalse(canonical.contains("(a + b)^2 + y"));
-        assertFalse(canonical.contains("1 / n - 1 / (n + 1)"));
+        assertFalse(canonical.contains(
+            "y * (sin(x)^2 + cos(x)^2)"));
+        assertFalse(canonical.contains(
+            "rule:sympy.rational.partial_fraction.telescoping"));
         assertFalse(canonical.contains("2 * x"));
         assertFalse(canonical.contains(
             "rule:sympy.trig.pythagorean"));
@@ -170,12 +195,88 @@ class TargetFreeRepresentationEvaluationPlanTest {
             "\"referenceExpressions\"",
             "\"requiredCapabilities\"",
             "\"acceptedCandidateTypes\"",
-            "(a + b)^2 + y",
-            "1 / n - 1 / (n + 1)"
+            "y * (sin(x)^2 + cos(x)^2)",
+            "rule:sympy.rational.partial_fraction.telescoping"
         )) {
             assertTrue(qualificationText.contains(forbidden));
             assertFalse(generated.contains(forbidden));
         }
+    }
+
+    @Test
+    void assumptionSensitiveControlCanFormItsQualifiedCandidate() {
+        var benchmarkCase = TargetFreeRepresentationEvaluationPlan.create(
+            REPOSITORY_REVISION).content().cases().stream()
+            .filter(value -> value.id().equals(
+                "assumption-sensitive-cancellation-control"))
+            .findFirst()
+            .orElseThrow();
+        var boundary = boundary(benchmarkCase);
+        var result = new TargetFreeRepresentationSearch().search(
+            benchmarkCase.sourceExpression(),
+            boundary.candidateFormationRules(),
+            budget(benchmarkCase.budget())
+        );
+
+        var candidate = result.content().candidateStates().stream()
+            .filter(state -> state.expression().equals("1"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(List.of("x != 0"), candidate.assumptions());
+    }
+
+    @Test
+    void occurrenceLocalBridgeIsActuallyExposedAfterFreeze() {
+        var benchmarkCase = TargetFreeRepresentationEvaluationPlan.create(
+            REPOSITORY_REVISION).content().cases().stream()
+            .filter(value -> value.id().equals(
+                "occurrence-local-trigonometric-bridge"))
+            .findFirst()
+            .orElseThrow();
+        var boundary = boundary(benchmarkCase);
+        var result = new TargetFreeRepresentationSearch().search(
+            benchmarkCase.sourceExpression(),
+            boundary.candidateFormationRules(),
+            budget(benchmarkCase.budget())
+        );
+        var disclosure = boundary.disclosePostFreeze(
+            boundary.freezeCandidates(List.of()));
+        KnownStructureMatcher matcher = new KnownStructureMatcher(
+            disclosure.classificationCatalog());
+
+        assertTrue(result.content().candidateStates().stream()
+            .flatMap(state -> matcher.match(state.expression()).stream())
+            .anyMatch(match -> !match.wholeExpression()
+                && match.consequenceIds().contains(
+                    "rule:sympy.trig.pythagorean")));
+    }
+
+    @Test
+    void telescopingKnowledgeIsWithheldUntilCandidateFreeze() {
+        var benchmarkCase = TargetFreeRepresentationEvaluationPlan.create(
+            REPOSITORY_REVISION).content().cases().stream()
+            .filter(value -> value.id().equals(
+                "telescoping-capability-bridge"))
+            .findFirst()
+            .orElseThrow();
+        var boundary = boundary(benchmarkCase);
+
+        assertFalse(boundary.candidateFormationRules().stream()
+            .anyMatch(rule -> rule.id().equals(
+                "sympy.rational.partial_fraction.telescoping")));
+        var result = new TargetFreeRepresentationSearch().search(
+            benchmarkCase.sourceExpression(),
+            boundary.candidateFormationRules(),
+            budget(benchmarkCase.budget())
+        );
+        assertTrue(result.content().candidateStates().stream()
+            .anyMatch(state -> state.expression().equals(
+                "1 / (n * (n + 1))")));
+        var disclosure = boundary.disclosePostFreeze(
+            boundary.freezeCandidates(List.of()));
+        assertTrue(disclosure.classificationCatalog().structures().stream()
+            .anyMatch(structure -> structure.consequenceIds().contains(
+                "rule:sympy.rational.partial_fraction.telescoping")));
     }
 
     @Test
@@ -243,6 +344,35 @@ class TargetFreeRepresentationEvaluationPlanTest {
         );
     }
 
+    private static RepresentationDiscoveryInformationBoundary boundary(
+        TargetFreeRepresentationEvaluationPlan.CaseDefinition benchmarkCase
+    ) {
+        KnowledgePackSelection selection = KnowledgePackSelection.profile(
+            benchmarkCase.ruleProfile());
+        for (String packId : benchmarkCase.enabledRulePackIds()) {
+            selection = selection.enablePack(packId);
+        }
+        return RepresentationDiscoveryInformationBoundary.fromKnowledgePacks(
+            new KnowledgePackRegistry(),
+            benchmarkCase.informationTrack(),
+            selection,
+            Set.of()
+        );
+    }
+
+    private static TargetFreeRepresentationSearch.Budget budget(
+        TargetFreeRepresentationEvaluationPlan.WorkBudget budget
+    ) {
+        return new TargetFreeRepresentationSearch.Budget(
+            budget.maxDepth(),
+            budget.maxExploredStates(),
+            budget.maxRetainedStates(),
+            budget.maxGeneratedTransitions(),
+            budget.maxCandidatesPerState(),
+            budget.maxAstSizeIncreasePerStep()
+        );
+    }
+
     private static void assertPolicyConstructionContracts(
         List<TargetFreeRepresentationEvaluationPlan.PolicyDefinition> policies
     ) {
@@ -267,6 +397,11 @@ class TargetFreeRepresentationEvaluationPlanTest {
             random.adapterConstructor()
         );
         assertEquals(0L, random.deterministicSeed());
+        assertTrue(policies.stream().allMatch(policy ->
+            policy.initialAssumptionPolicy()
+                == TargetFreeRepresentationEvaluationPlan
+                    .InitialAssumptionPolicy
+                    .UNION_WITH_RETAINED_STATE_ASSUMPTIONS));
         assertTrue(byId.entrySet().stream()
             .filter(entry -> !entry.getKey().equals(
                 "BOUNDED_ENUMERATION_V1"))

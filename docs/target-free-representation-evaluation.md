@@ -15,66 +15,86 @@ target-free-representation-qualification-v1.json
 target-free-representation-preregistration-v1.json
 ```
 
-Die **Formation** enthält nur:
+Die **Formation** enthält ausschließlich:
 
 - Ausgangsausdruck und explizite Annahmen;
 - R1- oder R2-Informationsspur;
-- endliches Arbeitsbudget;
-- Policy-ID, ausführbare Adapterklasse, Aufrufschnittstelle,
-  Konstruktorvertrag, deterministischen Seed und targetblinde Auswahlgrenze;
-- das sichtbare Inventarprofil und die vollständige deterministische
-  Budgetprojektion für die unterschiedlichen Adapterverträge.
-
-Konkret ist vor der Ausführung eingefroren:
-
-- sichtbare Knowledge-Pack-Auswahl `RuleProfile.ALL`;
-- automatische R2-Zurückhaltung aller Rule-Packs, die die erst nach dem Freeze
-  sichtbaren bekannten Strukturen unmittelbar beherrschen;
-- direkte Verwendung aller sechs deklarierten Budgets durch
-  `TargetFreeRepresentationSearch`;
-- für `SearchStrategy`:
-  `maxVisitedExpressions = min(maxExploredStates, maxRetainedStates)`,
-  `maxExpandingSteps = maxDepth`,
-  `beamWidth = min(maxCandidatesPerState, maxRetainedStates)` und
-  `significantImprovementThreshold = 1`;
-- ein global begrenztes, deterministisch nach Regel, Ausdruck,
-  Application-Key und primitiven Regel-IDs sortiertes Transformationspräfix.
+- `RuleProfile.MINIMAL_KERNEL` und explizit je Fall aktivierte Rule-Packs;
+- sämtliche endlichen, von v1 tatsächlich durchgesetzten Suchbudgets;
+- Policy-ID, Produktionsadapter, Aufrufschnittstelle, Konstruktorvertrag,
+  deterministischen Seed, initiale Annahmenpolitik und targetblinde
+  Auswahlgrenze.
 
 Die **Qualifikation** enthält die erst nach dem Kandidaten-Freeze zulässigen
 Referenzausdrücke, Capability-Beziehungen und Negativbedingungen. Der
 Plangenerator öffnet diese Datei nicht. Er übernimmt ausschließlich ihren in
 der Preregistrierung gebundenen SHA-256-Wert und die exakte Bytezahl.
 
-Die **Preregistrierung** bindet beide Ressourcen bytegenau und legt die
-vollständige Matrix, den Ausgangsstatus und die Claim-Grenze fest:
+Die **Preregistrierung** bindet ihre eigenen Bytes sowie Formation und
+Qualifikation fail-closed:
 
 ```text
-Formation:      sha256:2f9ce98cf3989136a0977c72d9ae459051c7809130eb1d3558ae326963863eb8
-Qualifikation:  sha256:a0d45d9ddf49aaa895f4c759bbcb33c646f16c781923b7303df90342e1d03072
+Formation:      6205 Bytes
+                sha256:5887eb3f71310a88d6946d1c107f90cf87c350ad1e010f2559e0e1dccb1214ce
+Qualifikation:  2947 Bytes
+                sha256:b87239dcc3a3bed26cee1db87240cb6d7587f0f9a551e5a279f9738cd8866835
 Preregistrierung:
-                sha256:1bd103fbedb176a374bc61bfb851977444eb1918d4d03bb372e7b2abb8fdf51d
+                1019 Bytes
+                sha256:6191263a96da7cab36fcc1264d6fac29dff0633b9bae4fb723caa5770c3de17d
 ```
+
+Eine Änderung an einer dieser Ressourcen erzeugt nicht stillschweigend eine
+neue Studienautorität, sondern muss ausdrücklich als neue Version eingefroren
+werden.
+
+## Eingefrorene Ausführungspolitik
+
+Vor der Ausführung ist festgelegt:
+
+- Basisinventar `RuleProfile.MINIMAL_KERNEL`;
+- explizite fallbezogene Aktivierung von Core- und Knowledge-Pack-IDs;
+- R2-Zurückhaltung jedes aktivierten Packs, das eine erst nach dem Freeze
+  sichtbare bekannte Struktur unmittelbar beherrscht;
+- direkte Verwendung der sechs ursprünglichen Formation-Budgets durch
+  `TargetFreeRepresentationSearch`;
+- zusätzliche, explizite Budgets für `significantImprovementThreshold`,
+  `maxExpandingSteps` und `beamWidth`;
+- Vereinigung der deklarierten Fallannahmen mit den Annahmen jedes erhaltenen
+  Zustands;
+- deterministische globale Transformationsreihenfolge nach Regel, Ausdruck,
+  Application-Key und primitiven Regel-IDs;
+- für den Random-Control ein Neustart vom eingefrorenen Seed bei jedem Lauf,
+  kanonische Sortierung vor dem Shuffle sowie Erhalt der Annahmen im Zustand
+  und in seiner Identität.
+
+Engine-Aufrufe und primitive Schritte bleiben in v1 beobachtete Arbeitsledger,
+aber keine vorab als durchgesetzt behaupteten Obergrenzen. Der spätere
+Ausführungsbericht muss sie neben erzeugten Transitionen, explorierten
+Zuständen und erhaltenen Kandidaten je Zeile ausweisen.
 
 ## 6 × 4-Matrix
 
-Die Formation enthält sechs unterschiedliche fachliche Fälle:
+Die Formation enthält sechs fachlich unterschiedliche Fälle:
 
-1. annahmesensitive Kürzung von `x / x`;
+1. annahmesensitive Kürzung von `(x * 1) / x` über das explizit aktivierte
+   Core-Pack für rationale Cancellation;
 2. katalogblinde trigonometrische Wissensbrücke;
 3. Neutral-Element-Kompression von `x + 0`;
-4. occurrence-lokale Binomstruktur in einem größeren Ausdruck;
-5. Kompression eines wiederholten Terms;
-6. eine mögliche Teleskopierungsbrücke unter expliziten Nennerannahmen.
+4. occurrence-lokale trigonometrische Brücke in einem nichtassoziativen
+   Multiplikationskontext, der die bekannte Summenstruktur als eigenen
+   AST-Teilbaum erhält;
+5. Kompression eines wiederholten Terms mit expliziter Termkollektion;
+6. Teleskopierungsbrücke unter den Annahmen `n != 0` und `n + 1 != 0`.
 
-Jeder Fall wird mit vier bereits im Checkout vorhandenen Policy-Adaptern
+Jeder Fall wird mit vier im Checkout vorhandenen targetblinden Adaptern
 kombiniert:
 
-| Policy | Produktionsadapter | Aufruf | Konstruktor | Seed | Zweck |
-|---|---|---|---|---:|---|
-| `BOUNDED_ENUMERATION_V1` | `TargetFreeRepresentationSearch` | eigener targetfreier Suchvertrag | parameterlos | 0 (Sentinel) | vollständiger begrenzter Zustandsbestand plus rohe Pareto-Front |
-| `RANDOM_MONTE_CARLO_V1` | `RandomMonteCarloSearchStrategy` | `SearchStrategy` | `long` | 0 | deterministisch wiederholbarer Zufallskontrolllauf |
-| `SCALAR_BEST_FIRST_V1` | `BestFirstSearchStrategy` | `SearchStrategy` | parameterlos | 0 (Sentinel) | eingefrorene skalare targetblinde Kostensteuerung |
-| `STRUCTURAL_DIVERSITY_V1` | `StructuralDiversitySearchStrategy` | `SearchStrategy` | parameterlos | 0 (Sentinel) | strukturell diverse targetblinde Retention |
+| Policy | Produktionsadapter | Konstruktor | Zweck |
+|---|---|---|---|
+| `BOUNDED_ENUMERATION_V1` | `TargetFreeRepresentationSearch` | parameterlos | begrenzter Zustandsbestand und rohe Pareto-Front |
+| `RANDOM_MONTE_CARLO_V1` | `RandomMonteCarloSearchStrategy` | `long` | reproduzierbarer Random-Valid-Kontrolllauf |
+| `SCALAR_BEST_FIRST_V1` | `BestFirstSearchStrategy` | parameterlos | eingefrorene skalare targetblinde Auswahl |
+| `STRUCTURAL_DIVERSITY_V1` | `StructuralDiversitySearchStrategy` | parameterlos | strukturell diverse targetblinde Retention |
 
 Damit entstehen genau 24 Konfigurationen. Vor der tatsächlichen Ausführung muss
 jede Zeile ausdrücklich so ausgewiesen werden:
@@ -87,9 +107,29 @@ terminalReason = NOT_EXECUTED
 `TargetFreeRepresentationEvaluationPlan` erzeugt für jede Kombination eine
 stabile Konfigurations-ID, bindet die exakte Repository-Revision und verwirft
 fehlende, zusätzliche, doppelte oder bereits als ausgeführt dargestellte
-Einträge. Vor dem Schreiben werden außerdem die gebundenen Adapterklassen, ihre
-Aufrufschnittstellen und die jeweils deklarierten öffentlichen Konstruktoren
-aufgelöst.
+Einträge. Vor dem Schreiben werden außerdem Adapterklassen,
+Aufrufschnittstellen, Konstruktorverträge, Inventar-IDs und Budgets geprüft.
+
+## Ausführbare Brücken und Kontrollen
+
+Die eingefrorenen Fälle verweisen nur auf tatsächlich vorhandene
+Produktionsverträge:
+
+- die occurrence-lokale Brücke liegt unter einer äußeren Multiplikation; die
+  trigonometrische Summe bleibt daher trotz kanonischer AC-Normalisierung ein
+  echter AST-Teilbaum und qualifiziert die konkrete Konsequenz
+  `rule:sympy.trig.pythagorean`;
+- der Rational-Pack deklariert die bekannte Struktur
+  `sympy.rational.telescoping-unit-step` und bindet sie an
+  `rule:sympy.rational.partial_fraction.telescoping`;
+- die Kürzungskontrolle verwendet eine Form, auf die
+  `ast_cancel_division_factor` tatsächlich anwendbar ist und deren Annahme
+  `x != 0` erhalten bleiben muss;
+- Neutral-Element- und Termkollektionsfälle aktivieren nur die dafür benötigten
+  Inventarteile.
+
+Damit kann ein negatives Resultat später von einem nicht ausführbaren Fixture
+unterschieden werden.
 
 ## Checkout-Evidence
 
@@ -107,19 +147,22 @@ regelsuche-discovery/build/reports/representation-discovery/evaluation-plan/
   representation-discovery-plan.json
 ```
 
-Der Task ist Bestandteil von Modul- und Root-`check`. Die Repository-Revision
-wird wie beim unveränderlichen Discovery-Run fail-closed aus einer expliziten
-Autorität oder einem sauberen Checkout bestimmt.
+Der Task ist Bestandteil von Modul- und Root-`check`. Die
+Repository-Revision wird fail-closed aus einer expliziten Autorität oder einem
+sauberen Checkout bestimmt.
 
 Die Charakterisierung prüft insbesondere:
 
-- exakt sechs Fälle, vier Policies und 24 Konfigurationen;
-- die vollständige kartesische Matrix in stabiler Reihenfolge;
-- vorhandene Adapterklassen, Aufrufschnittstellen, Konstruktorverträge und
-  Seeds;
-- Byte- und Hashbindung beider getrennten Ressourcen;
-- kanonische, wiederholbar identische Planausgabe;
-- Manipulationserkennung;
+- exakt sechs Fall-IDs, vier Policy-IDs und die fest gepinnte 24-Zeilen-Matrix;
+- eindeutige inhaltsadressierte Konfigurations-IDs;
+- die Byte- und Hashbindung aller drei Ressourcen;
+- bekannte Inventar-IDs und vollständige Budgetbereiche;
+- vorhandene Adapterklassen, Schnittstellen, Konstruktorverträge und Seeds;
+- reproduzierbaren Random-Control trotz wiederholter Adapterverwendung und
+  unterschiedlicher Engine-Iteratorreihenfolge;
+- Erhalt von Transformations- und Fallannahmen;
+- occurrence-lokale und Teleskopierungsbrücken erst nach dem Freeze;
+- kanonische, byteidentische Ausgabe und Manipulationserkennung;
 - Abwesenheit aller Referenzausdrücke, Capability-Labels und
   Qualifikationsfelder aus dem generierten Plan.
 
@@ -127,15 +170,26 @@ Die Charakterisierung prüft insbesondere:
 
 ```bash
 ./gradlew --no-daemon \
+  :regelsuche-core:test \
+  --tests de.regelsuche.knowledge.KnowledgePackRegistryTest \
+  :regelsuche-search:test \
+  --tests de.regelsuche.search.strategy.SearchStrategyTest \
   :regelsuche-discovery:test \
   --tests de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanTest \
   :regelsuche-discovery:generateTargetFreeRepresentationEvaluationPlan
 ```
 
+Der vollständige Repository-Vertrag bleibt:
+
+```bash
+./gradlew --no-daemon ciCheck
+mvn --batch-mode --no-transfer-progress -Pfull verify
+```
+
 ## Claim-Grenze
 
-Der erzeugte Plan ist noch **kein Ergebnis der 24 Suchläufe**. Er beweist auch
-keine mathematische Neuheit, Überlegenheit, globale Optimalität oder
-CPU-Zeit-Gleichheit. Er stellt die Voraussetzung dafür her, dass die folgenden
-Ausführungen vollständig bilanziert, reproduzierbar und frei von einer
-unbemerkten Zielformsteuerung verglichen werden können.
+Der erzeugte Plan ist noch **kein Ergebnis der 24 Suchläufe**. Er beweist keine
+mathematische Neuheit, globale Optimalität, CPU-Zeit-Gleichheit oder allgemeine
+Überlegenheit. Er stellt die Voraussetzung dafür her, dass die folgenden
+Ausführungen vollständig bilanziert, reproduzierbar, annahmenerhaltend und frei
+von unbemerkter Zielformsteuerung verglichen werden können.

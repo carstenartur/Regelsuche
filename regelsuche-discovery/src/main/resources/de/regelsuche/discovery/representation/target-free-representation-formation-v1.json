@@ -3,71 +3,104 @@
     {
       "assumptions": [],
       "budget": {
+        "beamWidth": 12,
         "maxAstSizeIncreasePerStep": 6,
         "maxCandidatesPerState": 48,
         "maxDepth": 3,
+        "maxExpandingSteps": 3,
         "maxExploredStates": 96,
         "maxGeneratedTransitions": 384,
-        "maxRetainedStates": 96
+        "maxRetainedStates": 96,
+        "significantImprovementThreshold": 1
       },
+      "enabledRulePackIds": [
+        "core-polynomial-division"
+      ],
       "id": "assumption-sensitive-cancellation-control",
       "informationTrack": "R1_TARGET_FREE_COMPRESSION",
-      "sourceExpression": "x / x"
+      "ruleProfile": "MINIMAL_KERNEL",
+      "sourceExpression": "(x * 1) / x"
     },
     {
       "assumptions": [],
       "budget": {
+        "beamWidth": 12,
         "maxAstSizeIncreasePerStep": 8,
         "maxCandidatesPerState": 64,
         "maxDepth": 4,
+        "maxExpandingSteps": 4,
         "maxExploredStates": 128,
         "maxGeneratedTransitions": 512,
-        "maxRetainedStates": 128
+        "maxRetainedStates": 128,
+        "significantImprovementThreshold": 1
       },
+      "enabledRulePackIds": [
+        "sympy-trigonometry"
+      ],
       "id": "catalog-blind-trigonometric-bridge",
       "informationTrack": "R2_CATALOG_BLIND_POST_HOC_BRIDGE",
+      "ruleProfile": "MINIMAL_KERNEL",
       "sourceExpression": "sin(x)^2 + (cos(x)^2 + 0)"
     },
     {
       "assumptions": [],
       "budget": {
+        "beamWidth": 12,
         "maxAstSizeIncreasePerStep": 2,
         "maxCandidatesPerState": 32,
         "maxDepth": 2,
+        "maxExpandingSteps": 2,
         "maxExploredStates": 32,
         "maxGeneratedTransitions": 128,
-        "maxRetainedStates": 32
+        "maxRetainedStates": 32,
+        "significantImprovementThreshold": 1
       },
+      "enabledRulePackIds": [],
       "id": "neutral-element-compression",
       "informationTrack": "R1_TARGET_FREE_COMPRESSION",
+      "ruleProfile": "MINIMAL_KERNEL",
       "sourceExpression": "x + 0"
     },
     {
       "assumptions": [],
       "budget": {
+        "beamWidth": 12,
         "maxAstSizeIncreasePerStep": 8,
         "maxCandidatesPerState": 64,
         "maxDepth": 5,
+        "maxExpandingSteps": 4,
         "maxExploredStates": 192,
         "maxGeneratedTransitions": 768,
-        "maxRetainedStates": 192
+        "maxRetainedStates": 192,
+        "significantImprovementThreshold": 1
       },
-      "id": "occurrence-local-square-bridge",
+      "enabledRulePackIds": [
+        "sympy-trigonometry"
+      ],
+      "id": "occurrence-local-trigonometric-bridge",
       "informationTrack": "R2_CATALOG_BLIND_POST_HOC_BRIDGE",
-      "sourceExpression": "(a^2 + 2 * a * b + b^2) + y"
+      "ruleProfile": "MINIMAL_KERNEL",
+      "sourceExpression": "y * (sin(x)^2 + (cos(x)^2 + 0))"
     },
     {
       "assumptions": [],
       "budget": {
+        "beamWidth": 12,
         "maxAstSizeIncreasePerStep": 4,
         "maxCandidatesPerState": 48,
         "maxDepth": 3,
+        "maxExpandingSteps": 3,
         "maxExploredStates": 64,
         "maxGeneratedTransitions": 256,
-        "maxRetainedStates": 64
+        "maxRetainedStates": 64,
+        "significantImprovementThreshold": 1
       },
+      "enabledRulePackIds": [
+        "core-term-collection"
+      ],
       "id": "repeated-term-compression",
       "informationTrack": "R1_TARGET_FREE_COMPRESSION",
+      "ruleProfile": "MINIMAL_KERNEL",
       "sourceExpression": "x + x"
     },
     {
@@ -76,20 +109,27 @@
         "n + 1 != 0"
       ],
       "budget": {
+        "beamWidth": 12,
         "maxAstSizeIncreasePerStep": 10,
         "maxCandidatesPerState": 64,
         "maxDepth": 5,
+        "maxExpandingSteps": 4,
         "maxExploredStates": 192,
         "maxGeneratedTransitions": 768,
-        "maxRetainedStates": 192
+        "maxRetainedStates": 192,
+        "significantImprovementThreshold": 1
       },
+      "enabledRulePackIds": [
+        "sympy-rational"
+      ],
       "id": "telescoping-capability-bridge",
       "informationTrack": "R2_CATALOG_BLIND_POST_HOC_BRIDGE",
-      "sourceExpression": "1 / (n * (n + 1))"
+      "ruleProfile": "MINIMAL_KERNEL",
+      "sourceExpression": "1 / (n * (n + 1)) + 0"
     }
   ],
   "evidenceStatus": "FROZEN_NOT_EXECUTED",
-  "informationBoundary": "Candidate formation receives only the source expression, explicit assumptions, information track, RuleProfile.ALL as the visible Knowledge-Pack selection, track-specific formation withholding, and finite work budgets. R2 withholds every governing known-structure consequence pack during formation. TargetFreeRepresentationSearch consumes the six declared budget fields directly. SearchStrategy adapters use maxVisitedExpressions=min(maxExploredStates,maxRetainedStates), maxExpandingSteps=maxDepth, beamWidth=min(maxCandidatesPerState,maxRetainedStates), significantImprovementThreshold=1, and a deterministic globally capped transformation prefix ordered by rule, expression, application key, and primitive rule IDs. No preferred representation, qualification label, known-structure consequence, reference expression, or post-freeze outcome is available during formation.",
+  "informationBoundary": "Candidate formation receives only the source expression, explicit assumptions, information track, RuleProfile.MINIMAL_KERNEL, explicit enabled core or external rule-pack IDs, target-blind policy, deterministic seed and complete finite work budgets. R2 withholds every enabled pack governing a post-freeze known structure before candidate formation. Explicit case assumptions are united with every retained state. No preferred representation, qualification label, known-structure consequence, reference expression or post-freeze outcome is available during formation.",
   "policies": [
     {
       "adapter": "de.regelsuche.discovery.representation.TargetFreeRepresentationSearch",
@@ -97,6 +137,7 @@
       "adapterInterface": "TARGET_FREE_REPRESENTATION_SEARCH",
       "deterministicSeed": 0,
       "id": "BOUNDED_ENUMERATION_V1",
+      "initialAssumptionPolicy": "UNION_WITH_RETAINED_STATE_ASSUMPTIONS",
       "selectionBoundary": "RETAIN_ALL_DISTINCT_REPRESENTATIONS_AND_RAW_PARETO_ARCHIVE"
     },
     {
@@ -105,6 +146,7 @@
       "adapterInterface": "SEARCH_STRATEGY",
       "deterministicSeed": 0,
       "id": "RANDOM_MONTE_CARLO_V1",
+      "initialAssumptionPolicy": "UNION_WITH_RETAINED_STATE_ASSUMPTIONS",
       "selectionBoundary": "TARGET_BLIND_DETERMINISTIC_SEED_RANDOM_VALID_REWRITE_CONTROL"
     },
     {
@@ -113,6 +155,7 @@
       "adapterInterface": "SEARCH_STRATEGY",
       "deterministicSeed": 0,
       "id": "SCALAR_BEST_FIRST_V1",
+      "initialAssumptionPolicy": "UNION_WITH_RETAINED_STATE_ASSUMPTIONS",
       "selectionBoundary": "TARGET_BLIND_FROZEN_SCALAR_DESCRIPTION_COST"
     },
     {
@@ -121,6 +164,7 @@
       "adapterInterface": "SEARCH_STRATEGY",
       "deterministicSeed": 0,
       "id": "STRUCTURAL_DIVERSITY_V1",
+      "initialAssumptionPolicy": "UNION_WITH_RETAINED_STATE_ASSUMPTIONS",
       "selectionBoundary": "TARGET_BLIND_FROZEN_STRUCTURAL_DESCRIPTOR_ARCHIVE"
     }
   ],
