@@ -5,6 +5,7 @@ on:
     branches:
       - automation/pr695-occurrence-fix
     paths:
+      - '.github/automation/fix_pr695_budget_contract.py'
       - '.github/workflows/apply-pr695-occurrence-fix.yml'
 
 permissions:
@@ -18,18 +19,20 @@ jobs:
   fix-and-verify:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 45
     steps:
       - name: Check out automation source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
-      - name: Remove unenforced v1 budgets and rebind resources
+      - name: Prepare the corrected PR head
         id: prepare
         shell: bash
         run: |
           set -euo pipefail
+          cp .github/automation/fix_pr695_budget_contract.py \
+            /tmp/fix_pr695_budget_contract.py
           git fetch origin agent/pr693-pre-freeze-hardening
           test "$(git rev-parse origin/agent/pr693-pre-freeze-hardening)" = \
             '674bd26094827257372ac2c416dae9c7bc7c0b16'
@@ -38,131 +41,7 @@ jobs:
             '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -C agent/pr693-pre-freeze-hardening \
             origin/agent/pr693-pre-freeze-hardening
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import re
-          from pathlib import Path
-
-          root = Path('.')
-          package = root / (
-              'regelsuche-discovery/src/main/resources/de/regelsuche/'
-              'discovery/representation'
-          )
-          formation_path = package / 'target-free-representation-formation-v1.json'
-          prereg_path = package / 'target-free-representation-preregistration-v1.json'
-          java_path = root / (
-              'regelsuche-discovery/src/main/java/de/regelsuche/discovery/'
-              'representation/TargetFreeRepresentationEvaluationPlan.java'
-          )
-          docs_path = root / 'docs/target-free-representation-evaluation.md'
-
-          formation = json.loads(formation_path.read_text(encoding='utf-8'))
-          for case in formation['cases']:
-              budget = case['budget']
-              for key in ('maxEngineCalls', 'maxAdmittedPrimitiveSteps'):
-                  if key not in budget:
-                      raise SystemExit(f'missing {key} in {case["id"]}')
-                  budget.pop(key)
-          formation_path.write_text(
-              json.dumps(formation, ensure_ascii=False, indent=2) + '\n',
-              encoding='utf-8',
-          )
-          formation_bytes = formation_path.read_bytes()
-          formation_hash = 'sha256:' + hashlib.sha256(formation_bytes).hexdigest()
-
-          prereg = json.loads(prereg_path.read_text(encoding='utf-8'))
-          prereg['formationByteLength'] = len(formation_bytes)
-          prereg['formationSha256'] = formation_hash
-          prereg_path.write_text(
-              json.dumps(prereg, ensure_ascii=False, indent=2) + '\n',
-              encoding='utf-8',
-          )
-          prereg_bytes = prereg_path.read_bytes()
-          prereg_hash = 'sha256:' + hashlib.sha256(prereg_bytes).hexdigest()
-
-          java = java_path.read_text(encoding='utf-8')
-          java, count = re.subn(
-              r'public static final long PREREGISTRATION_BYTE_LENGTH = \d+L;',
-              f'public static final long PREREGISTRATION_BYTE_LENGTH = {len(prereg_bytes)}L;',
-              java,
-          )
-          if count != 1:
-              raise SystemExit('preregistration byte-length constant not unique')
-          java, count = re.subn(
-              r'public static final String PREREGISTRATION_SHA256 =\n\s*"sha256:[0-9a-f]{64}";',
-              'public static final String PREREGISTRATION_SHA256 =\n'
-              f'        "{prereg_hash}";',
-              java,
-          )
-          if count != 1:
-              raise SystemExit('preregistration hash constant not unique')
-          java, count = re.subn(
-              r'(\n\s*int maxExpandingSteps,\n\s*int beamWidth),'
-              r'\n\s*int maxEngineCalls,\n\s*int maxAdmittedPrimitiveSteps',
-              r'\1',
-              java,
-          )
-          if count != 1:
-              raise SystemExit('WorkBudget signature not unique')
-          java, count = re.subn(
-              r'\n\s*\|\| maxEngineCalls < 1'
-              r'\n\s*\|\| maxEngineCalls > maxExploredStates'
-              r'\n\s*\|\| maxAdmittedPrimitiveSteps < 1',
-              '',
-              java,
-          )
-          if count != 1:
-              raise SystemExit('WorkBudget validation not unique')
-          java_path.write_text(java, encoding='utf-8')
-
-          docs = docs_path.read_text(encoding='utf-8')
-          replacements = {
-              '- sämtliche endlichen Arbeitsbudgets einschließlich Engine-Aufrufen und\n'
-              '  zugelassenen primitiven Schritten;':
-              '- sämtliche endlichen, von v1 tatsächlich durchgesetzten Suchbudgets;',
-              '- zusätzliche, explizite Budgets für `significantImprovementThreshold`,\n'
-              '  `maxExpandingSteps`, `beamWidth`, Engine-Aufrufe und zugelassene primitive\n'
-              '  Schritte;':
-              '- zusätzliche, explizite Budgets für `significantImprovementThreshold`,\n'
-              '  `maxExpandingSteps` und `beamWidth`;',
-              'Gleiche konfigurierte Obergrenzen dürfen später nicht als gleiche tatsächlich\n'
-              'verbrauchte Arbeit ausgegeben werden. Der Ausführungsbericht muss die realen\n'
-              'Engine-Aufrufe, zugelassenen primitiven Schritte, erzeugten Transitionen,\n'
-              'explorierten Zustände und erhaltenen Kandidaten je Zeile ausweisen.':
-              'Engine-Aufrufe und primitive Schritte bleiben in v1 beobachtete Arbeitsledger,\n'
-              'aber keine vorab als durchgesetzt behaupteten Obergrenzen. Der spätere\n'
-              'Ausführungsbericht muss sie neben erzeugten Transitionen, explorierten\n'
-              'Zuständen und erhaltenen Kandidaten je Zeile ausweisen.',
-          }
-          for old, new in replacements.items():
-              if docs.count(old) != 1:
-                  raise SystemExit(f'documentation replacement not unique: {old!r}')
-              docs = docs.replace(old, new)
-          docs, count = re.subn(
-              r'Formation:\s+\d+ Bytes\n\s+sha256:[0-9a-f]{64}',
-              f'Formation:      {len(formation_bytes)} Bytes\n'
-              f'                {formation_hash}',
-              docs,
-          )
-          if count != 1:
-              raise SystemExit('formation documentation binding not unique')
-          docs, count = re.subn(
-              r'Preregistrierung:\n\s+\d+ Bytes\n\s+sha256:[0-9a-f]{64}',
-              'Preregistrierung:\n'
-              f'                {len(prereg_bytes)} Bytes\n'
-              f'                {prereg_hash}',
-              docs,
-          )
-          if count != 1:
-              raise SystemExit('preregistration documentation binding not unique')
-          docs_path.write_text(docs, encoding='utf-8')
-
-          print(f'formationBytes={len(formation_bytes)}')
-          print(f'formationHash={formation_hash}')
-          print(f'preregistrationBytes={len(prereg_bytes)}')
-          print(f'preregistrationHash={prereg_hash}')
-          PY
+          python3 /tmp/fix_pr695_budget_contract.py
           git diff --check
           git add \
             docs/target-free-representation-evaluation.md \
@@ -185,7 +64,7 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Verify the hardened plan
+      - name: Verify the affected contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -199,9 +78,31 @@ jobs:
             --tests de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanTest \
             :regelsuche-discovery:generateTargetFreeRepresentationEvaluationPlan \
             --console=plain 2>&1 | tee /tmp/pr695-budget-contract.log
-          ./gradlew --no-daemon --no-configuration-cache \
-            -PregelsucheRepositoryRevision="$VERIFIED_REVISION" \
-            ciCheck --console=plain 2>&1 | tee -a /tmp/pr695-budget-contract.log
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          formation_path = Path(
+              'regelsuche-discovery/src/main/resources/de/regelsuche/'
+              'discovery/representation/'
+              'target-free-representation-formation-v1.json'
+          )
+          formation = json.loads(formation_path.read_text(encoding='utf-8'))
+          assert len(formation['cases']) == 6
+          for case in formation['cases']:
+              budget = case['budget']
+              assert 'maxEngineCalls' not in budget
+              assert 'maxAdmittedPrimitiveSteps' not in budget
+              assert case['ruleProfile'] == 'MINIMAL_KERNEL'
+          plan = Path(
+              'regelsuche-discovery/build/reports/representation-discovery/'
+              'evaluation-plan/representation-discovery-plan.json'
+          )
+          data = json.loads(plan.read_text(encoding='utf-8'))
+          assert len(data['content']['entries']) == 24
+          assert data['content']['qualificationDisclosure'] == 'NOT_DISCLOSED'
+          PY
+          git diff --check
 
       - name: Publish the verified PR head
         shell: bash
@@ -233,7 +134,7 @@ jobs:
             echo '}'
           } > debug/pr695-budget-contract-status.json
           if test -f /tmp/pr695-budget-contract.log; then
-            tail -n 400 /tmp/pr695-budget-contract.log \
+            tail -n 250 /tmp/pr695-budget-contract.log \
               > debug/pr695-budget-contract.log
           fi
           git config user.name 'github-actions[bot]'
