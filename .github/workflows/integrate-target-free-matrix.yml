@@ -30,7 +30,7 @@ jobs:
           ref: agent/target-free-candidate-freeze
           fetch-depth: 0
 
-      - name: Rebuild on accepted main
+      - name: Reconstruct the exact desired tree
         id: prepare
         shell: bash
         run: |
@@ -47,9 +47,28 @@ jobs:
           git fetch origin main
           test "$(git rev-parse origin/main)" = \
             '7f20fce8ce103a6f757c1e3fb1227d1e8ea293fb'
+
+          git worktree add --detach /tmp/pr694-desired \
+            897982c4e0ba9f2e99458d555e2b8f7a9d86f96f
+          pushd /tmp/pr694-desired
           git merge --no-edit origin/main
           git apply --check /tmp/pr694.patch
           git apply /tmp/pr694.patch
+          git diff --check
+          popd
+
+          files=(
+            'regelsuche-discovery/build.gradle'
+            'regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreeze.java'
+            'regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearch.java'
+            'regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreezeTest.java'
+            'regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearchTest.java'
+          )
+          for file in "${files[@]}"; do
+            mkdir -p "$(dirname "$file")"
+            cp "/tmp/pr694-desired/$file" "$file"
+          done
+          git worktree remove --force /tmp/pr694-desired
 
           rm -rf .github/pr694-rebuild
           rm .github/workflows/pr694-rebuild.yml
@@ -57,14 +76,7 @@ jobs:
           git diff --cached --check
           git commit -m 'Rebuild target-free candidate freeze on hardened matrix'
 
-          expected="$({
-            printf '%s\n' \
-              'regelsuche-discovery/build.gradle' \
-              'regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreeze.java' \
-              'regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearch.java' \
-              'regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreezeTest.java' \
-              'regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearchTest.java'
-          } | sort)"
+          expected="$(printf '%s\n' "${files[@]}" | sort)"
           actual="$(git diff --name-only origin/main | sort)"
           test "$actual" = "$expected" || {
             printf 'Unexpected final PR diff:\n%s\n' "$actual" >&2
