@@ -1,65 +1,183 @@
-name: Integrate target-free matrix
+name: Fix PR 695 budget contract
 
 on:
   push:
     branches:
       - automation/pr695-occurrence-fix
     paths:
-      - '.github/automation/apply_target_free_integration.py.gz.b64'
       - '.github/workflows/apply-pr695-occurrence-fix.yml'
 
 permissions:
   contents: write
 
 concurrency:
-  group: integrate-target-free-matrix
+  group: fix-pr695-budget-contract
   cancel-in-progress: false
 
 jobs:
-  integrate-and-verify:
+  fix-and-verify:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - name: Check out automation source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
-      - name: Build the stacked execution branch
+      - name: Remove unenforced v1 budgets and rebind resources
         id: prepare
         shell: bash
         run: |
           set -euo pipefail
-          base64 -d .github/automation/apply_target_free_integration.py.gz.b64 \
-            | gzip -d > /tmp/apply_target_free_integration.py
-          chmod +x /tmp/apply_target_free_integration.py
-          git fetch origin \
-            main \
-            agent/pr693-pre-freeze-hardening \
-            agent/target-free-candidate-freeze
-          test "$(git rev-parse origin/main)" = \
-            'ab4f62edc8fcbc26e8328cc3142cc682ced432ca'
+          git fetch origin agent/pr693-pre-freeze-hardening
           test "$(git rev-parse origin/agent/pr693-pre-freeze-hardening)" = \
             '674bd26094827257372ac2c416dae9c7bc7c0b16'
-          test "$(git rev-parse origin/agent/target-free-candidate-freeze)" = \
-            '897982c4e0ba9f2e99458d555e2b8f7a9d86f96f'
           git config user.name 'github-actions[bot]'
           git config user.email \
             '41898282+github-actions[bot]@users.noreply.github.com'
-          git switch -C agent/target-free-candidate-freeze \
-            origin/agent/target-free-candidate-freeze
-          git merge --no-ff \
-            -m 'Merge target-free hardening into execution branch' \
+          git switch -C agent/pr693-pre-freeze-hardening \
             origin/agent/pr693-pre-freeze-hardening
-          python3 /tmp/apply_target_free_integration.py
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import re
+          from pathlib import Path
+
+          root = Path('.')
+          package = root / (
+              'regelsuche-discovery/src/main/resources/de/regelsuche/'
+              'discovery/representation'
+          )
+          formation_path = package / 'target-free-representation-formation-v1.json'
+          prereg_path = package / 'target-free-representation-preregistration-v1.json'
+          java_path = root / (
+              'regelsuche-discovery/src/main/java/de/regelsuche/discovery/'
+              'representation/TargetFreeRepresentationEvaluationPlan.java'
+          )
+          docs_path = root / 'docs/target-free-representation-evaluation.md'
+
+          formation = json.loads(formation_path.read_text(encoding='utf-8'))
+          for case in formation['cases']:
+              budget = case['budget']
+              for key in ('maxEngineCalls', 'maxAdmittedPrimitiveSteps'):
+                  if key not in budget:
+                      raise SystemExit(f'missing {key} in {case["id"]}')
+                  budget.pop(key)
+          formation_path.write_text(
+              json.dumps(formation, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          formation_bytes = formation_path.read_bytes()
+          formation_hash = 'sha256:' + hashlib.sha256(formation_bytes).hexdigest()
+
+          prereg = json.loads(prereg_path.read_text(encoding='utf-8'))
+          prereg['formationByteLength'] = len(formation_bytes)
+          prereg['formationSha256'] = formation_hash
+          prereg_path.write_text(
+              json.dumps(prereg, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          prereg_bytes = prereg_path.read_bytes()
+          prereg_hash = 'sha256:' + hashlib.sha256(prereg_bytes).hexdigest()
+
+          java = java_path.read_text(encoding='utf-8')
+          java, count = re.subn(
+              r'public static final long PREREGISTRATION_BYTE_LENGTH = \d+L;',
+              f'public static final long PREREGISTRATION_BYTE_LENGTH = {len(prereg_bytes)}L;',
+              java,
+          )
+          if count != 1:
+              raise SystemExit('preregistration byte-length constant not unique')
+          java, count = re.subn(
+              r'public static final String PREREGISTRATION_SHA256 =\n\s*"sha256:[0-9a-f]{64}";',
+              'public static final String PREREGISTRATION_SHA256 =\n'
+              f'        "{prereg_hash}";',
+              java,
+          )
+          if count != 1:
+              raise SystemExit('preregistration hash constant not unique')
+          old_signature = '''        int maxExpandingSteps,
+                  int beamWidth,
+                  int maxEngineCalls,
+                  int maxAdmittedPrimitiveSteps
+              ) {'''
+          new_signature = '''        int maxExpandingSteps,
+                  int beamWidth
+              ) {'''
+          if java.count(old_signature) != 1:
+              raise SystemExit('WorkBudget signature not unique')
+          java = java.replace(old_signature, new_signature)
+          old_validation = '''                    || maxExpandingSteps > maxDepth
+                          || beamWidth < 1
+                          || beamWidth > maxRetainedStates
+                          || maxEngineCalls < 1
+                          || maxEngineCalls > maxExploredStates
+                          || maxAdmittedPrimitiveSteps < 1) {'''
+          new_validation = '''                    || maxExpandingSteps > maxDepth
+                          || beamWidth < 1
+                          || beamWidth > maxRetainedStates) {'''
+          if java.count(old_validation) != 1:
+              raise SystemExit('WorkBudget validation not unique')
+          java_path.write_text(
+              java.replace(old_validation, new_validation),
+              encoding='utf-8',
+          )
+
+          docs = docs_path.read_text(encoding='utf-8')
+          replacements = {
+              '- sämtliche endlichen Arbeitsbudgets einschließlich Engine-Aufrufen und\n'
+              '  zugelassenen primitiven Schritten;':
+              '- sämtliche endlichen, von v1 tatsächlich durchgesetzten Suchbudgets;',
+              '- zusätzliche, explizite Budgets für `significantImprovementThreshold`,\n'
+              '  `maxExpandingSteps`, `beamWidth`, Engine-Aufrufe und zugelassene primitive\n'
+              '  Schritte;':
+              '- zusätzliche, explizite Budgets für `significantImprovementThreshold`,\n'
+              '  `maxExpandingSteps` und `beamWidth`;',
+              'Gleiche konfigurierte Obergrenzen dürfen später nicht als gleiche tatsächlich\n'
+              'verbrauchte Arbeit ausgegeben werden. Der Ausführungsbericht muss die realen\n'
+              'Engine-Aufrufe, zugelassenen primitiven Schritte, erzeugten Transitionen,\n'
+              'explorierten Zustände und erhaltenen Kandidaten je Zeile ausweisen.':
+              'Engine-Aufrufe und primitive Schritte bleiben in v1 beobachtete Arbeitsledger,\n'
+              'aber keine vorab als durchgesetzt behaupteten Obergrenzen. Der spätere\n'
+              'Ausführungsbericht muss sie neben erzeugten Transitionen, explorierten\n'
+              'Zuständen und erhaltenen Kandidaten je Zeile ausweisen.',
+          }
+          for old, new in replacements.items():
+              if docs.count(old) != 1:
+                  raise SystemExit(f'documentation replacement not unique: {old!r}')
+              docs = docs.replace(old, new)
+          docs, count = re.subn(
+              r'Formation:\s+\d+ Bytes\n\s+sha256:[0-9a-f]{64}',
+              f'Formation:      {len(formation_bytes)} Bytes\n'
+              f'                {formation_hash}',
+              docs,
+          )
+          if count != 1:
+              raise SystemExit('formation documentation binding not unique')
+          docs, count = re.subn(
+              r'Preregistrierung:\n\s+\d+ Bytes\n\s+sha256:[0-9a-f]{64}',
+              'Preregistrierung:\n'
+              f'                {len(prereg_bytes)} Bytes\n'
+              f'                {prereg_hash}',
+              docs,
+          )
+          if count != 1:
+              raise SystemExit('preregistration documentation binding not unique')
+          docs_path.write_text(docs, encoding='utf-8')
+
+          print(f'formationBytes={len(formation_bytes)}')
+          print(f'formationHash={formation_hash}')
+          print(f'preregistrationBytes={len(prereg_bytes)}')
+          print(f'preregistrationHash={prereg_hash}')
+          PY
           git diff --check
           git add \
-            regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreeze.java \
-            regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearch.java \
-            regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreezeTest.java \
-            regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearchTest.java
-          git commit -m 'Enforce frozen target-free work budgets'
+            docs/target-free-representation-evaluation.md \
+            regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlan.java \
+            regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-formation-v1.json \
+            regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-preregistration-v1.json
+          git commit -m 'Remove unenforced target-free v1 work ceilings'
           target_sha="$(git rev-parse HEAD)"
           echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
           echo "VERIFIED_REVISION=$target_sha" >> "$GITHUB_ENV"
@@ -75,73 +193,31 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Verify the execution and freeze contracts
+      - name: Verify the hardened plan
         shell: bash
         run: |
           set -euo pipefail
           ./gradlew --no-daemon --no-configuration-cache \
             -PregelsucheRepositoryRevision="$VERIFIED_REVISION" \
+            :regelsuche-core:test \
+            --tests de.regelsuche.knowledge.KnowledgePackRegistryTest \
             :regelsuche-search:test \
             --tests de.regelsuche.search.strategy.SearchStrategyTest \
             :regelsuche-discovery:test \
             --tests de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanTest \
-            --tests de.regelsuche.discovery.representation.TargetFreeRepresentationSearchTest \
-            --tests de.regelsuche.discovery.representation.TargetFreeRepresentationCandidateFreezeTest \
-            :regelsuche-discovery:generateTargetFreeRepresentationCandidateFreeze \
-            --console=plain 2>&1 | tee /tmp/target-free-integration.log
+            :regelsuche-discovery:generateTargetFreeRepresentationEvaluationPlan \
+            --console=plain 2>&1 | tee /tmp/pr695-budget-contract.log
           ./gradlew --no-daemon --no-configuration-cache \
             -PregelsucheRepositoryRevision="$VERIFIED_REVISION" \
-            :regelsuche-discovery:check \
-            --console=plain 2>&1 | tee -a /tmp/target-free-integration.log
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
+            ciCheck --console=plain 2>&1 | tee -a /tmp/pr695-budget-contract.log
 
-          artifact = Path(
-              'regelsuche-discovery/build/reports/representation-discovery/'
-              'candidate-freeze/representation-discovery-candidate-freeze.json'
-          )
-          data = json.loads(artifact.read_text(encoding='utf-8'))
-          content = data['content']
-          assert content['qualificationDisclosure'] == 'NOT_DISCLOSED'
-          assert len(content['entries']) == 24
-          assert len({entry['configurationId'] for entry in content['entries']}) == 24
-          assert {entry['caseId'] for entry in content['entries']} == {
-              'assumption-sensitive-cancellation-control',
-              'catalog-blind-trigonometric-bridge',
-              'neutral-element-compression',
-              'occurrence-local-trigonometric-bridge',
-              'repeated-term-compression',
-              'telescoping-capability-bridge',
-          }
-          for entry in content['entries']:
-              budget = entry['configuredBudget']
-              work = entry['work']
-              assert work['engineCalls'] <= budget['maxEngineCalls']
-              assert work['generatedPrimitiveSteps'] <= budget[
-                  'maxAdmittedPrimitiveSteps'
-              ]
-              assert work['exploredStates'] <= budget['maxExploredStates']
-              assert work['retainedStates'] <= budget['maxRetainedStates']
-              assert work['generatedTransitions'] <= budget[
-                  'maxGeneratedTransitions'
-              ]
-          canonical = artifact.read_text(encoding='utf-8')
-          for forbidden in (
-              '"referenceExpressions"',
-              '"requiredCapabilities"',
-              '"acceptedCandidateTypes"',
-          ):
-              assert forbidden not in canonical
-          PY
-
-      - name: Publish the verified execution branch
+      - name: Publish the verified PR head
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$VERIFIED_REVISION"
           test -z "$(git status --porcelain --untracked-files=normal)"
-          git push origin HEAD:agent/target-free-candidate-freeze
+          git push origin HEAD:agent/pr693-pre-freeze-hardening
 
       - name: Persist automation outcome
         if: always()
@@ -150,7 +226,7 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: |
           set -euo pipefail
-          target_head="$(git ls-remote origin refs/heads/agent/target-free-candidate-freeze | cut -f1)"
+          target_head="$(git ls-remote origin refs/heads/agent/pr693-pre-freeze-hardening | cut -f1)"
           git reset --hard
           git clean -fd
           git switch automation/pr695-occurrence-fix
@@ -161,21 +237,21 @@ jobs:
             echo '  "workflowRunAttempt": "${{ github.run_attempt }}",'
             echo '  "status": "'"$JOB_STATUS"'",'
             echo '  "targetHead": "'"$target_head"'",'
-            echo '  "expectedOldHead": "897982c4e0ba9f2e99458d555e2b8f7a9d86f96f"'
+            echo '  "expectedOldHead": "674bd26094827257372ac2c416dae9c7bc7c0b16"'
             echo '}'
-          } > debug/target-free-integration-status.json
-          if test -f /tmp/target-free-integration.log; then
-            tail -n 300 /tmp/target-free-integration.log \
-              > debug/target-free-integration.log
+          } > debug/pr695-budget-contract-status.json
+          if test -f /tmp/pr695-budget-contract.log; then
+            tail -n 400 /tmp/pr695-budget-contract.log \
+              > debug/pr695-budget-contract.log
           fi
           git config user.name 'github-actions[bot]'
           git config user.email \
             '41898282+github-actions[bot]@users.noreply.github.com'
-          git add debug/target-free-integration-status.json
-          if test -f debug/target-free-integration.log; then
-            git add debug/target-free-integration.log
+          git add debug/pr695-budget-contract-status.json
+          if test -f debug/pr695-budget-contract.log; then
+            git add debug/pr695-budget-contract.log
           fi
           if ! git diff --cached --quiet; then
-            git commit -m 'Record target-free integration outcome'
+            git commit -m 'Record PR 695 budget-contract outcome'
             git push origin HEAD:automation/pr695-occurrence-fix
           fi
