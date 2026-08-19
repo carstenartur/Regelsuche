@@ -1,400 +1,41 @@
-solver-ir-backend-outcomes=valid
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.7.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :regelsuche-core:compileJava
+> Task :regelsuche-core:processResources
+> Task :regelsuche-core:classes
+> Task :regelsuche-core:jar
+> Task :regelsuche-core:compileTestJava
+> Task :regelsuche-core:processTestResources
+> Task :regelsuche-core:testClasses
+> Task :regelsuche-core:test
+> Task :regelsuche-egraph:compileJava
+> Task :regelsuche-core:jacocoTestReport
+> Task :regelsuche-search:compileJava
+> Task :regelsuche-search:processResources NO-SOURCE
+> Task :regelsuche-search:classes
+> Task :regelsuche-search:jar
+> Task :regelsuche-egraph:processResources NO-SOURCE
+> Task :regelsuche-egraph:classes
+> Task :regelsuche-egraph:jar
+> Task :regelsuche-search:compileTestJava
+> Task :regelsuche-search:processTestResources NO-SOURCE
+> Task :regelsuche-search:testClasses
+> Task :regelsuche-search:test
+> Task :regelsuche-validation:compileJava
+> Task :regelsuche-search:jacocoTestReport
+> Task :regelsuche-discovery:compileJava
+> Task :regelsuche-discovery:processResources
+> Task :regelsuche-discovery:classes
+> Task :regelsuche-discovery:compileTestJava
+> Task :regelsuche-discovery:processTestResources NO-SOURCE
+> Task :regelsuche-discovery:testClasses
+> Task :regelsuche-validation:processResources NO-SOURCE
+> Task :regelsuche-validation:classes
+> Task :regelsuche-validation:jar
+> Task :regelsuche-discovery:test
+> Task :regelsuche-discovery:jacocoTestReport
+> Task :regelsuche-discovery:generateTargetFreeRepresentationEvaluationPlan
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1787161535822.json
 
-> Task :verifyStaticReferencePage
-> Task :cyclonedxBom
-
-> Task :testSupplyChainEvidenceVerifier
-supply-chain verifier synthetic tests: PASS
-
-> Task :verifySupplyChainInventory
-
-> Task :generateVectorAmortizationFirst
-amortization-report=/home/runner/work/Regelsuche/Regelsuche/build/reports/vector-amortization/first/amortization-report.json
-contentHash=sha256:f533f8bb0158ae2ffda83200bec1dd1e4b8e20d8d454bf6f6a88c465671e0f11
-overallDecision=NOT_ESTABLISHED_INCOMPLETE_LIFECYCLE_COST
-
-> Task :generateVectorAmortizationSecond
-amortization-report=/home/runner/work/Regelsuche/Regelsuche/build/reports/vector-amortization/second/amortization-report.json
-contentHash=sha256:f533f8bb0158ae2ffda83200bec1dd1e4b8e20d8d454bf6f6a88c465671e0f11
-overallDecision=NOT_ESTABLISHED_INCOMPLETE_LIFECYCLE_COST
-
-> Task :verifyVectorAmortizationReport
-vector-amortization-report=VERIFIED
-overall-decision=NOT_ESTABLISHED_INCOMPLETE_LIFECYCLE_COST
-
-> Task :verifyWorkflowSemantics
-
-> Task :regelsuche-autopilot:runProductionCampaign
-sha256:4ad0524718f9f4b35f6f19d28df68cabb3364cffca17ebf322aea91637807dee
-
-> Task :regelsuche-autopilot:verifyAutopilotProductionCampaign
-jsonschema=4.25.1
-autopilot-production-campaign=VERIFIED
-required-artifacts=37
-manifest-artifact-roots=36
-
-> Task :regelsuche-discovery:generateTargetFreeRepresentationDiscoveryRun
-targetFreeRepresentationRunId=sha256:733158ab6a2dfa1a9ab1cb1172d0b10e60bb6cb547d77538b9203fe2e731a4e2
-targetFreeRepresentationSearchHash=sha256:b7e76dfad951db8f23f41d80244b045267956234123cfa545a16837514b50145
-
-> Task :regelsuche-discovery:generateTargetFreeRepresentationEvaluationPlan UP-TO-DATE
-
-> Task :regelsuche-discovery:verifyDomainDiscoveryExportEvidence
-jsonschema=4.25.1
-domain-discovery-export=VERIFIED
-domains=expression-rewrite,integer-sequence-finite-difference
-
-> Task :regelsuche-experiments:generateHistoricalRediscoveryAtlas
-historicalRediscoveryAssessment=USEFUL_DIAGNOSTIC_STEP
-historicalRediscoveryCases=14
-historicalRediscoveryJson=/home/runner/work/Regelsuche/Regelsuche/regelsuche-experiments/build/reports/historical-rediscovery/historical-rediscovery-atlas.json
-historicalRediscoveryMarkdown=/home/runner/work/Regelsuche/Regelsuche/regelsuche-experiments/build/reports/historical-rediscovery/historical-rediscovery-atlas.md
-historicalRediscoveryRun=/home/runner/work/Regelsuche/Regelsuche/regelsuche-experiments/build/reports/historical-rediscovery/historical-rediscovery-run.json
-historicalRediscoveryRunHash=sha256:37bb93860dd20ceccf87e8dc7c322e080d0e78c4611ded0cbf7983bc485fbd1f
-historicalWitnessPruning=/home/runner/work/Regelsuche/Regelsuche/regelsuche-experiments/build/reports/historical-rediscovery-witness-pruning/witness-pruning-diagnostic.json
-historicalWitnessPruningHash=sha256:4853e08ee6f9338d99802dce10ac5ce7a9933bb3a3b9ccb96eaf816a2a45b865
-historicalProductionSearchComparison=/home/runner/work/Regelsuche/Regelsuche/regelsuche-experiments/build/reports/historical-rediscovery-production-search-comparison/production-search-comparison.json
-historicalProductionSearchComparisonHash=sha256:a68a04c7d4a820852c2534dc91289970e4bf0276e6c7d337eaf0389df8a136f7
-historicalEqualWorkSearchComparison=/home/runner/work/Regelsuche/Regelsuche/regelsuche-experiments/build/reports/historical-rediscovery-equal-work-search-comparison/equal-work-search-comparison.json
-historicalEqualWorkSearchComparisonHash=sha256:4af1ef18a933bddb14dc550703dd3d59f931ea69a8c8054bb6df948ac2d25cd0
-
-> Task :regelsuche-experiments:generateHistoricalRewriteArchitectureDecision
-historicalRewriteArchitectureDecision=/home/runner/work/Regelsuche/Regelsuche/regelsuche-experiments/build/reports/historical-rewrite-architecture-decision/rewrite-architecture-decision.json
-historicalRewriteArchitectureDecisionHash=sha256:f84d3b7b8a2eb30a2c78d6a098fbc8eb85e9912a490b0d2539ee99366c14319b
-
-> Task :regelsuche-learning:writeEvolutionStudyPlan
-evolution-study-status=NOT_STARTED
-evolution-split-manifest=/home/runner/work/Regelsuche/Regelsuche/regelsuche-learning/build/reports/evolution-study-plan/evolution-split-manifest.json
-evolution-study-plan=/home/runner/work/Regelsuche/Regelsuche/regelsuche-learning/build/reports/evolution-study-plan/evolution-study-plan.json
-
-> Task :regelsuche-learning:verifyEvolutionStudyContracts
-jsonschema=4.25.1
-evolution-split-manifest=sha256:d96f2100bcd40d0da6563fd57126924a023e8b9c2d876d2509f8a36bc542b3b0
-evolution-study-plan=sha256:e694d74aa76b059cfc4f59486185d49d761ca4765e607b0caa04c9c328d8307c
-evolution-study-status=NOT_STARTED
-
-> Task :regelsuche-learning:verifyIndependentInterestingnessReview
-jsonschema=4.25.1
-independent-interestingness-review=DEVELOPMENT_PROTOCOL_VERIFIED
-study-cases=4
-development-decisions=4
-
-> Task :regelsuche-learning:writeRewriteProgramWorkEvidence
-
-> Task :regelsuche-learning:verifyRewriteProgramWorkEvidence
-OK: rewrite-program work evidence is schema-valid, content-addressed, cross-bound and independently recomputable
-
-> Task :regelsuche-quality:renderJmhHistory
-jmhHistoryStatus=PASSED
-jmhHistorySnapshots=2
-jmhHistoryBenchmarks=29
-jmhHistoryReport=/home/runner/work/Regelsuche/Regelsuche/build/reports/quality/jmh-history/history.json
-
-> Task :regelsuche-release:verifyAutonomousDiscoveryWalkthrough
-sha256:773f323adbee14235774abcd344ea0633031cbaae07a3a7d7ac29719e28f410c
-
-> Task :check
-
-> Task :buildComparativeBenchmarkImage
-#0 building with "default" instance using docker driver
-
-#1 [internal] load build definition from Dockerfile.comparative-benchmarks
-#1 transferring dockerfile: 1.21kB done
-#1 DONE 0.0s
-
-#2 [internal] load metadata for docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
-#2 DONE 0.0s
-
-#3 [internal] load metadata for docker.io/library/eclipse-temurin:25.0.3_9-jdk-noble
-#3 DONE 0.0s
-
-#4 [internal] load .dockerignore
-#4 transferring context: 631B done
-#4 DONE 0.0s
-
-#5 [build 1/4] FROM docker.io/library/eclipse-temurin:25.0.3_9-jdk-noble
-#5 DONE 0.0s
-
-#6 [runtime 1/5] FROM docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
-#6 DONE 0.0s
-
-#7 [build 2/4] WORKDIR /workspace
-#7 DONE 0.0s
-
-#8 [internal] load build context
-#8 transferring context: 16.78MB 0.4s done
-#8 DONE 0.4s
-
-#9 [runtime 2/5] RUN apt-get update     && apt-get install -y --no-install-recommends         python3         python3-venv         z3=4.8.12-3.1build1     && python3 -m venv /opt/regelsuche-sympy     && /opt/regelsuche-sympy/bin/python -m pip install         --disable-pip-version-check         --no-cache-dir         sympy==1.14.0     && rm -rf /var/lib/apt/lists/*     && useradd --create-home --uid 10001 regelsuche     && mkdir -p /output /opt/regelsuche-benchmarks     && chown -R regelsuche:regelsuche /output /opt/regelsuche-benchmarks
-#9 0.371 Get:1 http://archive.ubuntu.com/ubuntu noble InRelease [256 kB]
-#9 0.382 Get:2 http://security.ubuntu.com/ubuntu noble-security InRelease [126 kB]
-#9 0.512 Get:3 http://archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
-#9 0.561 Get:4 http://security.ubuntu.com/ubuntu noble-security/main amd64 Packages [1,174 kB]
-#9 0.614 Get:5 http://security.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1,524 kB]
-#9 0.625 Get:6 http://security.ubuntu.com/ubuntu noble-security/multiverse amd64 Packages [50.0 kB]
-#9 0.633 Get:7 http://security.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1,688 kB]
-#9 0.643 Get:8 http://archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
-#9 0.685 Get:9 http://archive.ubuntu.com/ubuntu noble/main amd64 Packages [1,808 kB]
-#9 0.722 Get:10 http://archive.ubuntu.com/ubuntu noble/multiverse amd64 Packages [331 kB]
-#9 ...
-
-#10 [build 3/4] COPY . .
-#10 DONE 0.5s
-
-#9 [runtime 2/5] RUN apt-get update     && apt-get install -y --no-install-recommends         python3         python3-venv         z3=4.8.12-3.1build1     && python3 -m venv /opt/regelsuche-sympy     && /opt/regelsuche-sympy/bin/python -m pip install         --disable-pip-version-check         --no-cache-dir         sympy==1.14.0     && rm -rf /var/lib/apt/lists/*     && useradd --create-home --uid 10001 regelsuche     && mkdir -p /output /opt/regelsuche-benchmarks     && chown -R regelsuche:regelsuche /output /opt/regelsuche-benchmarks
-#9 0.725 Get:11 http://archive.ubuntu.com/ubuntu noble/restricted amd64 Packages [117 kB]
-#9 0.730 Get:12 http://archive.ubuntu.com/ubuntu noble/universe amd64 Packages [19.3 MB]
-#9 0.834 Get:13 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1,508 kB]
-#9 0.861 Get:14 http://archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1,814 kB]
-#9 0.877 Get:15 http://archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Packages [55.8 kB]
-#9 0.881 Get:16 http://archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [2,142 kB]
-#9 0.897 Get:17 http://archive.ubuntu.com/ubuntu noble-backports/main amd64 Packages [48.9 kB]
-#9 0.898 Get:18 http://archive.ubuntu.com/ubuntu noble-backports/universe amd64 Packages [35.9 kB]
-#9 0.898 Get:19 http://archive.ubuntu.com/ubuntu noble-backports/multiverse amd64 Packages [671 B]
-#9 1.972 Fetched 32.2 MB in 2s (18.7 MB/s)
-#9 1.972 Reading package lists...
-#9 3.114 Reading package lists...
-#9 4.022 Building dependency tree...
-#9 4.301 Reading state information...
-#9 4.629 The following additional packages will be installed:
-#9 4.629   libpython3-stdlib libpython3.12-minimal libpython3.12-stdlib libreadline8t64
-#9 4.630   libsqlite3-0 media-types netbase python3-minimal python3-pip-whl
-#9 4.630   python3-setuptools-whl python3.12 python3.12-minimal python3.12-venv
-#9 4.630   readline-common
-#9 4.631 Suggested packages:
-#9 4.631   python3-doc python3-tk python3.12-doc binutils binfmt-support readline-doc
-#9 4.743 The following NEW packages will be installed:
-#9 4.744   libpython3-stdlib libpython3.12-minimal libpython3.12-stdlib libreadline8t64
-#9 4.744   libsqlite3-0 media-types netbase python3 python3-minimal python3-pip-whl
-#9 4.744   python3-setuptools-whl python3-venv python3.12 python3.12-minimal
-#9 4.745   python3.12-venv readline-common z3
-#9 4.794 0 upgraded, 17 newly installed, 0 to remove and 0 not upgraded.
-#9 4.794 Need to get 15.2 MB of archives.
-#9 4.794 After this operation, 45.3 MB of additional disk space will be used.
-#9 4.794 Get:1 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libpython3.12-minimal amd64 3.12.3-1ubuntu0.15 [839 kB]
-#9 4.832 Get:2 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 python3.12-minimal amd64 3.12.3-1ubuntu0.15 [2,334 kB]
-#9 4.851 Get:3 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 python3-minimal amd64 3.12.3-0ubuntu2.1 [27.4 kB]
-#9 4.856 Get:4 http://archive.ubuntu.com/ubuntu noble/main amd64 media-types all 10.1.0 [27.5 kB]
-#9 4.864 Get:5 http://archive.ubuntu.com/ubuntu noble/main amd64 netbase all 6.4 [13.1 kB]
-#9 4.873 Get:6 http://archive.ubuntu.com/ubuntu noble/main amd64 readline-common all 8.2-4build1 [56.5 kB]
-#9 4.879 Get:7 http://archive.ubuntu.com/ubuntu noble/main amd64 libreadline8t64 amd64 8.2-4build1 [153 kB]
-#9 4.886 Get:8 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libsqlite3-0 amd64 3.45.1-1ubuntu2.7 [701 kB]
-#9 4.896 Get:9 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libpython3.12-stdlib amd64 3.12.3-1ubuntu0.15 [2,071 kB]
-#9 4.913 Get:10 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 python3.12 amd64 3.12.3-1ubuntu0.15 [651 kB]
-#9 4.923 Get:11 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libpython3-stdlib amd64 3.12.3-0ubuntu2.1 [10.1 kB]
-#9 4.929 Get:12 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 python3 amd64 3.12.3-0ubuntu2.1 [23.0 kB]
-#9 4.939 Get:13 http://archive.ubuntu.com/ubuntu noble-updates/universe amd64 python3-pip-whl all 24.0+dfsg-1ubuntu1.3 [1,707 kB]
-#9 4.952 Get:14 http://archive.ubuntu.com/ubuntu noble-updates/universe amd64 python3-setuptools-whl all 68.1.2-2ubuntu1.2 [716 kB]
-#9 4.966 Get:15 http://archive.ubuntu.com/ubuntu noble-updates/universe amd64 python3.12-venv amd64 3.12.3-1ubuntu0.15 [5,674 B]
-#9 4.976 Get:16 http://archive.ubuntu.com/ubuntu noble-updates/universe amd64 python3-venv amd64 3.12.3-0ubuntu2.1 [1,032 B]
-#9 4.988 Get:17 http://archive.ubuntu.com/ubuntu noble/universe amd64 z3 amd64 4.8.12-3.1build1 [5,911 kB]
-#9 5.161 debconf: delaying package configuration, since apt-utils is not installed
-#9 5.205 Fetched 15.2 MB in 0s (56.4 MB/s)
-#9 5.227 Selecting previously unselected package libpython3.12-minimal:amd64.
-#9 5.227 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6267 files and directories currently installed.)
-#9 5.236 Preparing to unpack .../libpython3.12-minimal_3.12.3-1ubuntu0.15_amd64.deb ...
-#9 5.237 Unpacking libpython3.12-minimal:amd64 (3.12.3-1ubuntu0.15) ...
-#9 5.356 Selecting previously unselected package python3.12-minimal.
-#9 5.360 Preparing to unpack .../python3.12-minimal_3.12.3-1ubuntu0.15_amd64.deb ...
-#9 5.368 Unpacking python3.12-minimal (3.12.3-1ubuntu0.15) ...
-#9 5.451 Setting up libpython3.12-minimal:amd64 (3.12.3-1ubuntu0.15) ...
-#9 5.455 Setting up python3.12-minimal (3.12.3-1ubuntu0.15) ...
-#9 6.502 Selecting previously unselected package python3-minimal.
-#9 6.502 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6578 files and directories currently installed.)
-#9 6.507 Preparing to unpack .../0-python3-minimal_3.12.3-0ubuntu2.1_amd64.deb ...
-#9 6.508 Unpacking python3-minimal (3.12.3-0ubuntu2.1) ...
-#9 6.532 Selecting previously unselected package media-types.
-#9 6.533 Preparing to unpack .../1-media-types_10.1.0_all.deb ...
-#9 6.534 Unpacking media-types (10.1.0) ...
-#9 6.557 Selecting previously unselected package netbase.
-#9 6.560 Preparing to unpack .../2-netbase_6.4_all.deb ...
-#9 6.561 Unpacking netbase (6.4) ...
-#9 6.580 Selecting previously unselected package readline-common.
-#9 6.582 Preparing to unpack .../3-readline-common_8.2-4build1_all.deb ...
-#9 6.582 Unpacking readline-common (8.2-4build1) ...
-#9 6.605 Selecting previously unselected package libreadline8t64:amd64.
-#9 6.605 Preparing to unpack .../4-libreadline8t64_8.2-4build1_amd64.deb ...
-#9 6.612 Adding 'diversion of /lib/x86_64-linux-gnu/libhistory.so.8 to /lib/x86_64-linux-gnu/libhistory.so.8.usr-is-merged by libreadline8t64'
-#9 6.616 Adding 'diversion of /lib/x86_64-linux-gnu/libhistory.so.8.2 to /lib/x86_64-linux-gnu/libhistory.so.8.2.usr-is-merged by libreadline8t64'
-#9 6.620 Adding 'diversion of /lib/x86_64-linux-gnu/libreadline.so.8 to /lib/x86_64-linux-gnu/libreadline.so.8.usr-is-merged by libreadline8t64'
-#9 6.624 Adding 'diversion of /lib/x86_64-linux-gnu/libreadline.so.8.2 to /lib/x86_64-linux-gnu/libreadline.so.8.2.usr-is-merged by libreadline8t64'
-#9 6.626 Unpacking libreadline8t64:amd64 (8.2-4build1) ...
-#9 6.645 Selecting previously unselected package libsqlite3-0:amd64.
-#9 6.646 Preparing to unpack .../5-libsqlite3-0_3.45.1-1ubuntu2.7_amd64.deb ...
-#9 6.647 Unpacking libsqlite3-0:amd64 (3.45.1-1ubuntu2.7) ...
-#9 6.681 Selecting previously unselected package libpython3.12-stdlib:amd64.
-#9 6.681 Preparing to unpack .../6-libpython3.12-stdlib_3.12.3-1ubuntu0.15_amd64.deb ...
-#9 6.682 Unpacking libpython3.12-stdlib:amd64 (3.12.3-1ubuntu0.15) ...
-#9 6.856 Selecting previously unselected package python3.12.
-#9 6.860 Preparing to unpack .../7-python3.12_3.12.3-1ubuntu0.15_amd64.deb ...
-#9 6.861 Unpacking python3.12 (3.12.3-1ubuntu0.15) ...
-#9 6.893 Selecting previously unselected package libpython3-stdlib:amd64.
-#9 6.897 Preparing to unpack .../8-libpython3-stdlib_3.12.3-0ubuntu2.1_amd64.deb ...
-#9 6.898 Unpacking libpython3-stdlib:amd64 (3.12.3-0ubuntu2.1) ...
-#9 6.928 Setting up python3-minimal (3.12.3-0ubuntu2.1) ...
-#9 7.139 Selecting previously unselected package python3.
-#9 7.139 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 7055 files and directories currently installed.)
-#9 7.147 Preparing to unpack .../0-python3_3.12.3-0ubuntu2.1_amd64.deb ...
-#9 7.153 Unpacking python3 (3.12.3-0ubuntu2.1) ...
-#9 7.170 Selecting previously unselected package python3-pip-whl.
-#9 7.171 Preparing to unpack .../1-python3-pip-whl_24.0+dfsg-1ubuntu1.3_all.deb ...
-#9 7.172 Unpacking python3-pip-whl (24.0+dfsg-1ubuntu1.3) ...
-#9 7.203 Selecting previously unselected package python3-setuptools-whl.
-#9 7.204 Preparing to unpack .../2-python3-setuptools-whl_68.1.2-2ubuntu1.2_all.deb ...
-#9 7.204 Unpacking python3-setuptools-whl (68.1.2-2ubuntu1.2) ...
-#9 7.226 Selecting previously unselected package python3.12-venv.
-#9 7.228 Preparing to unpack .../3-python3.12-venv_3.12.3-1ubuntu0.15_amd64.deb ...
-#9 7.230 Unpacking python3.12-venv (3.12.3-1ubuntu0.15) ...
-#9 7.256 Selecting previously unselected package python3-venv.
-#9 7.260 Preparing to unpack .../4-python3-venv_3.12.3-0ubuntu2.1_amd64.deb ...
-#9 7.261 Unpacking python3-venv (3.12.3-0ubuntu2.1) ...
-#9 7.284 Selecting previously unselected package z3.
-#9 7.284 Preparing to unpack .../5-z3_4.8.12-3.1build1_amd64.deb ...
-#9 7.287 Unpacking z3 (4.8.12-3.1build1) ...
-#9 7.449 Setting up media-types (10.1.0) ...
-#9 7.452 Setting up python3-setuptools-whl (68.1.2-2ubuntu1.2) ...
-#9 7.460 Setting up python3-pip-whl (24.0+dfsg-1ubuntu1.3) ...
-#9 7.462 Setting up libsqlite3-0:amd64 (3.45.1-1ubuntu2.7) ...
-#9 7.465 Setting up z3 (4.8.12-3.1build1) ...
-#9 7.467 Setting up netbase (6.4) ...
-#9 7.477 Setting up readline-common (8.2-4build1) ...
-#9 7.487 Setting up libreadline8t64:amd64 (8.2-4build1) ...
-#9 7.489 Setting up libpython3.12-stdlib:amd64 (3.12.3-1ubuntu0.15) ...
-#9 7.491 Setting up python3.12 (3.12.3-1ubuntu0.15) ...
-#9 8.652 Setting up libpython3-stdlib:amd64 (3.12.3-0ubuntu2.1) ...
-#9 8.656 Setting up python3.12-venv (3.12.3-1ubuntu0.15) ...
-#9 8.724 Setting up python3 (3.12.3-0ubuntu2.1) ...
-#9 8.732 running python rtupdate hooks for python3.12...
-#9 8.732 running python post-rtupdate hooks for python3.12...
-#9 8.847 Setting up python3-venv (3.12.3-0ubuntu2.1) ...
-#9 8.851 Processing triggers for libc-bin (2.39-0ubuntu8.8) ...
-#9 ...
-
-#11 [build 4/4] RUN chmod +x ./gradlew     && ./gradlew --no-daemon :regelsuche-benchmarks:installDist -x test
-#11 0.253 Fetching distribution (retrying 3 times, with an initial back off of 2000 ms).
-#11 0.253 Downloading https://services.gradle.org/distributions/gradle-9.7.0-bin.zip
-#11 0.979 ..............10%..............20%...............30%..............40%..............50%...............60%..............70%..............80%...............90%..............100%
-#11 3.703 
-#11 3.703 Welcome to Gradle 9.7.0!
-#11 3.704 
-#11 3.704 Here are the highlights of this release:
-#11 3.707  - Isolated Projects graduates to incubating
-#11 3.708  - Broader Configuration Cache compatibility
-#11 3.709  - More source locations in problem reports
-#11 3.710 
-#11 3.710 For more details see https://docs.gradle.org/9.7.0/release-notes.html
-#11 3.711 
-#11 3.809 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.7.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
-#11 5.004 Daemon will be stopped at the end of the build 
-#11 6.802 Calculating task graph as no cached configuration is available for tasks: :regelsuche-benchmarks:installDist
-#11 ...
-
-#9 [runtime 2/5] RUN apt-get update     && apt-get install -y --no-install-recommends         python3         python3-venv         z3=4.8.12-3.1build1     && python3 -m venv /opt/regelsuche-sympy     && /opt/regelsuche-sympy/bin/python -m pip install         --disable-pip-version-check         --no-cache-dir         sympy==1.14.0     && rm -rf /var/lib/apt/lists/*     && useradd --create-home --uid 10001 regelsuche     && mkdir -p /output /opt/regelsuche-benchmarks     && chown -R regelsuche:regelsuche /output /opt/regelsuche-benchmarks
-#9 13.53 Collecting sympy==1.14.0
-#9 13.59   Downloading sympy-1.14.0-py3-none-any.whl.metadata (12 kB)
-#9 13.63 Collecting mpmath<1.4,>=1.1.0 (from sympy==1.14.0)
-#9 13.64   Downloading mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)
-#9 13.68 Downloading sympy-1.14.0-py3-none-any.whl (6.3 MB)
-#9 13.84    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 41.0 MB/s eta 0:00:00
-#9 13.85 Downloading mpmath-1.3.0-py3-none-any.whl (536 kB)
-#9 13.86    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 536.2/536.2 kB 97.4 MB/s eta 0:00:00
-#9 13.91 Installing collected packages: mpmath, sympy
-#9 23.10 Successfully installed mpmath-1.3.0 sympy-1.14.0
-#9 DONE 23.4s
-
-#11 [build 4/4] RUN chmod +x ./gradlew     && ./gradlew --no-daemon :regelsuche-benchmarks:installDist -x test
-#11 ...
-
-#12 [runtime 3/5] WORKDIR /opt/regelsuche-benchmarks
-#12 DONE 0.0s
-
-#11 [build 4/4] RUN chmod +x ./gradlew     && ./gradlew --no-daemon :regelsuche-benchmarks:installDist -x test
-#11 24.51 > Task :regelsuche-egraph:processResources NO-SOURCE
-#11 24.51 > Task :regelsuche-benchmarks:processResources NO-SOURCE
-#11 24.51 > Task :regelsuche-search:processResources NO-SOURCE
-#11 24.51 > Task :regelsuche-math-algorithms:processResources NO-SOURCE
-#11 24.60 > Task :regelsuche-solver-portfolio:processResources NO-SOURCE
-#11 24.60 > Task :regelsuche-validation:processResources NO-SOURCE
-#11 24.60 > Task :regelsuche-solver-ir:processResources NO-SOURCE
-#11 24.60 > Task :regelsuche-core:processResources
-#11 28.20 > Task :regelsuche-core:compileJava
-#11 28.20 > Task :regelsuche-core:classes
-#11 28.40 > Task :regelsuche-core:jar
-#11 28.70 > Task :regelsuche-egraph:compileJava
-#11 28.70 > Task :regelsuche-egraph:classes
-#11 28.70 > Task :regelsuche-egraph:jar
-#11 28.80 > Task :regelsuche-validation:compileJava
-#11 28.80 > Task :regelsuche-validation:classes
-#11 28.91 > Task :regelsuche-validation:jar
-#11 29.80 
-#11 29.80 > Task :regelsuche-math-algorithms:compileJava
-#11 29.80 Note: /workspace/regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/completion/KnuthBendixCompletionService.java uses or overrides a deprecated API.
-#11 29.80 
-#11 29.80 > Task :regelsuche-math-algorithms:classes
-#11 29.80 > Task :regelsuche-math-algorithms:jar
-#11 29.80 Note: Recompile with -Xlint:deprecation for details.
-#11 30.70 > Task :regelsuche-search:compileJava
-#11 30.70 > Task :regelsuche-search:classes
-#11 30.80 > Task :regelsuche-search:jar
-#11 31.10 
-#11 31.10 > Task :regelsuche-solver-ir:compileJava
-#11 31.10 Note: /workspace/regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/SolverIrJsonCodec.java uses or overrides a deprecated API.
-#11 31.10 Note: Recompile with -Xlint:deprecation for details.
-#11 31.10 
-#11 31.10 > Task :regelsuche-solver-ir:classes
-#11 31.11 > Task :regelsuche-solver-ir:jar
-#11 31.50 > Task :regelsuche-solver-portfolio:compileJava
-#11 31.50 > Task :regelsuche-solver-portfolio:classes
-#11 31.50 > Task :regelsuche-solver-portfolio:jar
-#11 31.90 > Task :regelsuche-benchmarks:compileJava
-#11 31.90 > Task :regelsuche-benchmarks:classes
-#11 31.90 > Task :regelsuche-benchmarks:jar
-#11 32.10 > Task :regelsuche-benchmarks:startScripts
-#11 32.20 > Task :regelsuche-benchmarks:installDist
-#11 32.20 
-#11 32.20 [Incubating] Problems report is available at: file:///workspace/build/reports/problems/problems-report.html
-#11 32.20 
-#11 32.20 BUILD SUCCESSFUL in 31s
-#11 32.20 19 actionable tasks: 19 executed
-#11 32.20 Configuration cache entry stored.
-#11 DONE 32.4s
-
-#13 [runtime 4/5] COPY --from=build     /workspace/regelsuche-benchmarks/build/install/regelsuche-benchmarks/ ./
-#13 DONE 0.0s
-
-#14 [runtime 5/5] RUN chown -R regelsuche:regelsuche /opt/regelsuche-benchmarks
-#14 DONE 0.2s
-
-#15 exporting to image
-#15 exporting layers
-#15 exporting layers 1.4s done
-#15 writing image sha256:5245b309e1ecc065f994a560582a033aa2ef4512bfb19212de24188a0745b07c done
-#15 naming to docker.io/library/regelsuche-comparative-benchmarks:verification done
-#15 DONE 1.4s
-
-> Task :runComparativeBenchmarkImage
-> Task :verifyComparativeZ3Toolchain FAILED
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1787159847009.json
-
-[Incubating] Problems report is available at: file:///home/runner/work/Regelsuche/Regelsuche/build/reports/problems/problems-report.html
-
-FAILURE: Build failed with an exception.
-
-* What went wrong:
-Execution failed for task ':verifyComparativeZ3Toolchain' (registered in script 'gradle/ci-verification.gradle').
-> A problem occurred starting process 'command 'z3''
-
-* Try:
-> Run with --stacktrace option to get the stack trace.
-> Run with --info or --debug option to get more log output.
-> Run with --scan to get full insights from a Build Scan (powered by Develocity).
-> Get more help at https://help.gradle.org.
-
-Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
-
-You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
-
-For more on this, please refer to https://docs.gradle.org/9.7.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
-
-BUILD FAILED in 17m 47s
-210 actionable tasks: 194 executed, 16 up-to-date
+BUILD SUCCESSFUL in 37s
+22 actionable tasks: 22 executed
