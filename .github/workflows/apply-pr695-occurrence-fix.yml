@@ -26,12 +26,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Materialize the audited patch
+      - name: Materialize the audited fix
         shell: bash
         run: |
           set -euo pipefail
           cp .github/patches/pr695-occurrence-fix.patch /tmp/pr695-occurrence-fix.patch
-          echo 'd9c89899a80117f676bb1e095230b0a6119c6f1c4aad12b6c43a1358a43cd537  /tmp/pr695-occurrence-fix.patch' \
+          echo '713026f19cf3a41b9e862262efc1855c127a53b644a84ff125d9cbcf8eef6559  /tmp/pr695-occurrence-fix.patch' \
             | sha256sum --check --strict
           git fetch origin agent/pr693-pre-freeze-hardening
           test "$(git rev-parse origin/agent/pr693-pre-freeze-hardening)" = \
@@ -39,6 +39,49 @@ jobs:
           git switch --detach origin/agent/pr693-pre-freeze-hardening
           git apply --check /tmp/pr695-occurrence-fix.patch
           git apply /tmp/pr695-occurrence-fix.patch
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('docs/target-free-representation-evaluation.md')
+          text = path.read_text(encoding='utf-8')
+          replacements = [
+              (
+                  'sha256:74dc8849481a1a9dcff2e5935154a352cbf49fe857dc8eaa56866ceb737d7778',
+                  'sha256:aae56e8ae14b2df8b9929f9e0a554205f7438e7ec8386a8a8520da03342fd223',
+              ),
+              (
+                  'sha256:c20d3ae748fca3509927f41da9c607f8a14353467a530b83d4c9fab93804d833',
+                  'sha256:b87239dcc3a3bed26cee1db87240cb6d7587f0f9a551e5a279f9738cd8866835',
+              ),
+              (
+                  'sha256:0097cd62f529bb61b623106eafb05ac9fe86e6186026e2eca1cbe0cd183a84e1',
+                  'sha256:1ce6d02d7d87161de274a88bbc2bcfe92816dbb182287397176805a47e274610',
+              ),
+              (
+                  '4. occurrence-lokale trigonometrische Brücke innerhalb eines größeren\n'
+                  '   Ausdrucks;',
+                  '4. occurrence-lokale trigonometrische Brücke in einem nichtassoziativen\n'
+                  '   Multiplikationskontext, der die bekannte Summenstruktur als eigenen\n'
+                  '   AST-Teilbaum erhält;',
+              ),
+              (
+                  '- die occurrence-lokale Brücke qualifiziert die bekannte trigonometrische\n'
+                  '  Struktur und die konkrete Konsequenz `rule:sympy.trig.pythagorean`;',
+                  '- die occurrence-lokale Brücke liegt unter einer äußeren Multiplikation; die\n'
+                  '  trigonometrische Summe bleibt daher trotz kanonischer AC-Normalisierung ein\n'
+                  '  echter AST-Teilbaum und qualifiziert die konkrete Konsequenz\n'
+                  '  `rule:sympy.trig.pythagorean`;',
+              ),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(
+                      f'expected exactly one documentation occurrence, found {count}: {old!r}'
+                  )
+              text = text.replace(old, new)
+          path.write_text(text, encoding='utf-8')
+          PY
           git diff --check
 
       - name: Set up Java 25
