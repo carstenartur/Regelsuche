@@ -1,100 +1,68 @@
-name: Apply PR 695 occurrence fix
-# authority-bound verification trigger
+name: Integrate target-free matrix
 
 on:
   push:
     branches:
       - automation/pr695-occurrence-fix
     paths:
-      - '.github/patches/pr695-occurrence-fix.patch'
+      - '.github/automation/apply_target_free_integration.py.gz.b64'
       - '.github/workflows/apply-pr695-occurrence-fix.yml'
 
 permissions:
   contents: write
 
 concurrency:
-  group: apply-pr695-occurrence-fix
+  group: integrate-target-free-matrix
   cancel-in-progress: false
 
 jobs:
-  apply-and-verify:
+  integrate-and-verify:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - name: Check out automation source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
-      - name: Materialize the audited fix
+      - name: Build the stacked execution branch
+        id: prepare
         shell: bash
         run: |
           set -euo pipefail
-          cp .github/patches/pr695-occurrence-fix.patch /tmp/pr695-occurrence-fix.patch
-          echo '713026f19cf3a41b9e862262efc1855c127a53b644a84ff125d9cbcf8eef6559  /tmp/pr695-occurrence-fix.patch' \
-            | sha256sum --check --strict
-          git fetch origin agent/pr693-pre-freeze-hardening
+          base64 -d .github/automation/apply_target_free_integration.py.gz.b64 \
+            | gzip -d > /tmp/apply_target_free_integration.py
+          chmod +x /tmp/apply_target_free_integration.py
+          git fetch origin \
+            main \
+            agent/pr693-pre-freeze-hardening \
+            agent/target-free-candidate-freeze
+          test "$(git rev-parse origin/main)" = \
+            'ab4f62edc8fcbc26e8328cc3142cc682ced432ca'
           test "$(git rev-parse origin/agent/pr693-pre-freeze-hardening)" = \
-            'a64d1556fb732b9172105abfd780ad0dbd613cfe'
-          git switch --detach origin/agent/pr693-pre-freeze-hardening
-          git apply --check /tmp/pr695-occurrence-fix.patch
-          git apply /tmp/pr695-occurrence-fix.patch
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('docs/target-free-representation-evaluation.md')
-          text = path.read_text(encoding='utf-8')
-          replacements = [
-              (
-                  'sha256:74dc8849481a1a9dcff2e5935154a352cbf49fe857dc8eaa56866ceb737d7778',
-                  'sha256:aae56e8ae14b2df8b9929f9e0a554205f7438e7ec8386a8a8520da03342fd223',
-              ),
-              (
-                  'sha256:c20d3ae748fca3509927f41da9c607f8a14353467a530b83d4c9fab93804d833',
-                  'sha256:b87239dcc3a3bed26cee1db87240cb6d7587f0f9a551e5a279f9738cd8866835',
-              ),
-              (
-                  'sha256:0097cd62f529bb61b623106eafb05ac9fe86e6186026e2eca1cbe0cd183a84e1',
-                  'sha256:1ce6d02d7d87161de274a88bbc2bcfe92816dbb182287397176805a47e274610',
-              ),
-              (
-                  '4. occurrence-lokale trigonometrische Brücke innerhalb eines größeren\n'
-                  '   Ausdrucks;',
-                  '4. occurrence-lokale trigonometrische Brücke in einem nichtassoziativen\n'
-                  '   Multiplikationskontext, der die bekannte Summenstruktur als eigenen\n'
-                  '   AST-Teilbaum erhält;',
-              ),
-              (
-                  '- die occurrence-lokale Brücke qualifiziert die bekannte trigonometrische\n'
-                  '  Struktur und die konkrete Konsequenz `rule:sympy.trig.pythagorean`;',
-                  '- die occurrence-lokale Brücke liegt unter einer äußeren Multiplikation; die\n'
-                  '  trigonometrische Summe bleibt daher trotz kanonischer AC-Normalisierung ein\n'
-                  '  echter AST-Teilbaum und qualifiziert die konkrete Konsequenz\n'
-                  '  `rule:sympy.trig.pythagorean`;',
-              ),
-          ]
-          for old, new in replacements:
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(
-                      f'expected exactly one documentation occurrence, found {count}: {old!r}'
-                  )
-              text = text.replace(old, new)
-          path.write_text(text, encoding='utf-8')
-          PY
-          git diff --check
+            '674bd26094827257372ac2c416dae9c7bc7c0b16'
+          test "$(git rev-parse origin/agent/target-free-candidate-freeze)" = \
+            '897982c4e0ba9f2e99458d555e2b8f7a9d86f96f'
           git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.email \
+            '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C agent/target-free-candidate-freeze \
+            origin/agent/target-free-candidate-freeze
+          git merge --no-ff \
+            -m 'Merge target-free hardening into execution branch' \
+            origin/agent/pr693-pre-freeze-hardening
+          python3 /tmp/apply_target_free_integration.py
+          git diff --check
           git add \
-            docs/target-free-representation-evaluation.md \
-            regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlan.java \
-            regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-formation-v1.json \
-            regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-preregistration-v1.json \
-            regelsuche-discovery/src/main/resources/de/regelsuche/discovery/representation/target-free-representation-qualification-v1.json \
-            regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationEvaluationPlanTest.java
-          git commit -m 'Preserve the occurrence-local bridge after normalization'
-          echo "VERIFIED_REVISION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+            regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreeze.java \
+            regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearch.java \
+            regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationCandidateFreezeTest.java \
+            regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeRepresentationSearchTest.java
+          git commit -m 'Enforce frozen target-free work budgets'
+          target_sha="$(git rev-parse HEAD)"
+          echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
+          echo "VERIFIED_REVISION=$target_sha" >> "$GITHUB_ENV"
 
       - name: Set up Java 25
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
@@ -104,29 +72,76 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+        with:
+          cache-read-only: true
 
-      - name: Verify the affected contracts
+      - name: Verify the execution and freeze contracts
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon \
+          ./gradlew --no-daemon --no-configuration-cache \
             -PregelsucheRepositoryRevision="$VERIFIED_REVISION" \
-            :regelsuche-core:test \
-            --tests de.regelsuche.knowledge.KnowledgePackRegistryTest \
             :regelsuche-search:test \
             --tests de.regelsuche.search.strategy.SearchStrategyTest \
             :regelsuche-discovery:test \
             --tests de.regelsuche.discovery.representation.TargetFreeRepresentationEvaluationPlanTest \
-            :regelsuche-discovery:generateTargetFreeRepresentationEvaluationPlan \
-            --console=plain 2>&1 | tee /tmp/pr695-occurrence-verify.log
+            --tests de.regelsuche.discovery.representation.TargetFreeRepresentationSearchTest \
+            --tests de.regelsuche.discovery.representation.TargetFreeRepresentationCandidateFreezeTest \
+            :regelsuche-discovery:generateTargetFreeRepresentationCandidateFreeze \
+            --console=plain 2>&1 | tee /tmp/target-free-integration.log
+          ./gradlew --no-daemon --no-configuration-cache \
+            -PregelsucheRepositoryRevision="$VERIFIED_REVISION" \
+            :regelsuche-discovery:check \
+            --console=plain 2>&1 | tee -a /tmp/target-free-integration.log
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
 
-      - name: Publish the verified fix to PR 695
+          artifact = Path(
+              'regelsuche-discovery/build/reports/representation-discovery/'
+              'candidate-freeze/representation-discovery-candidate-freeze.json'
+          )
+          data = json.loads(artifact.read_text(encoding='utf-8'))
+          content = data['content']
+          assert content['qualificationDisclosure'] == 'NOT_DISCLOSED'
+          assert len(content['entries']) == 24
+          assert len({entry['configurationId'] for entry in content['entries']}) == 24
+          assert {entry['caseId'] for entry in content['entries']} == {
+              'assumption-sensitive-cancellation-control',
+              'catalog-blind-trigonometric-bridge',
+              'neutral-element-compression',
+              'occurrence-local-trigonometric-bridge',
+              'repeated-term-compression',
+              'telescoping-capability-bridge',
+          }
+          for entry in content['entries']:
+              budget = entry['configuredBudget']
+              work = entry['work']
+              assert work['engineCalls'] <= budget['maxEngineCalls']
+              assert work['generatedPrimitiveSteps'] <= budget[
+                  'maxAdmittedPrimitiveSteps'
+              ]
+              assert work['exploredStates'] <= budget['maxExploredStates']
+              assert work['retainedStates'] <= budget['maxRetainedStates']
+              assert work['generatedTransitions'] <= budget[
+                  'maxGeneratedTransitions'
+              ]
+          canonical = artifact.read_text(encoding='utf-8')
+          for forbidden in (
+              '"referenceExpressions"',
+              '"requiredCapabilities"',
+              '"acceptedCandidateTypes"',
+          ):
+              assert forbidden not in canonical
+          PY
+
+      - name: Publish the verified execution branch
         shell: bash
         run: |
           set -euo pipefail
-          test -z "$(git status --porcelain --untracked-files=normal)"
           test "$(git rev-parse HEAD)" = "$VERIFIED_REVISION"
-          git push origin HEAD:agent/pr693-pre-freeze-hardening
+          test -z "$(git status --porcelain --untracked-files=normal)"
+          git push origin HEAD:agent/target-free-candidate-freeze
 
       - name: Persist automation outcome
         if: always()
@@ -135,7 +150,7 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: |
           set -euo pipefail
-          target_head="$(git ls-remote origin refs/heads/agent/pr693-pre-freeze-hardening | cut -f1)"
+          target_head="$(git ls-remote origin refs/heads/agent/target-free-candidate-freeze | cut -f1)"
           git reset --hard
           git clean -fd
           git switch automation/pr695-occurrence-fix
@@ -146,20 +161,21 @@ jobs:
             echo '  "workflowRunAttempt": "${{ github.run_attempt }}",'
             echo '  "status": "'"$JOB_STATUS"'",'
             echo '  "targetHead": "'"$target_head"'",'
-            echo '  "expectedOldHead": "a64d1556fb732b9172105abfd780ad0dbd613cfe"'
+            echo '  "expectedOldHead": "897982c4e0ba9f2e99458d555e2b8f7a9d86f96f"'
             echo '}'
-          } > debug/pr695-occurrence-fix-status.json
-          if test -f /tmp/pr695-occurrence-verify.log; then
-            tail -n 250 /tmp/pr695-occurrence-verify.log \
-              > debug/pr695-occurrence-fix-verify.log
+          } > debug/target-free-integration-status.json
+          if test -f /tmp/target-free-integration.log; then
+            tail -n 300 /tmp/target-free-integration.log \
+              > debug/target-free-integration.log
           fi
           git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add debug/pr695-occurrence-fix-status.json
-          if test -f debug/pr695-occurrence-fix-verify.log; then
-            git add debug/pr695-occurrence-fix-verify.log
+          git config user.email \
+            '41898282+github-actions[bot]@users.noreply.github.com'
+          git add debug/target-free-integration-status.json
+          if test -f debug/target-free-integration.log; then
+            git add debug/target-free-integration.log
           fi
           if ! git diff --cached --quiet; then
-            git commit -m 'Record PR 695 occurrence fix automation outcome'
+            git commit -m 'Record target-free integration outcome'
             git push origin HEAD:automation/pr695-occurrence-fix
           fi
