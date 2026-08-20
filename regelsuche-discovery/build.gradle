@@ -71,6 +71,9 @@ def targetFreeRepresentationEvaluationPlanReportDirectory =
 def targetFreeRepresentationCandidateFreezeReportDirectory =
     layout.buildDirectory.dir(
         'reports/representation-discovery/candidate-freeze')
+def targetFreeRepresentationQualificationReportDirectory =
+    layout.buildDirectory.dir(
+        'reports/representation-discovery/post-freeze-qualification')
 def verificationVenvDirectory = rootProject.layout.buildDirectory.dir(
     'verification-venv')
 def verificationPython = verificationVenvDirectory.map { directory ->
@@ -228,17 +231,59 @@ def generateTargetFreeRepresentationCandidateFreeze = tasks.register(
     }
 }
 
+def generateTargetFreeRepresentationPostFreezeQualification = tasks.register(
+    'generateTargetFreeRepresentationPostFreezeQualification',
+    JavaExec
+) {
+    group = 'verification'
+    description = 'Opens the sealed qualification only after the exact candidate-freeze artifact exists.'
+    dependsOn tasks.named('classes'),
+        generateTargetFreeRepresentationCandidateFreeze
+    timeout = java.time.Duration.ofMinutes(5)
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.discovery.representation.TargetFreeRepresentationPostFreezeQualification'
+    argumentProviders.add({
+        [
+            targetFreeRepositoryRevision.get(),
+            targetFreeRepresentationCandidateFreezeReportDirectory.get()
+                .file('representation-discovery-candidate-freeze.json')
+                .asFile.absolutePath,
+            targetFreeRepresentationQualificationReportDirectory.get()
+                .asFile.absolutePath
+        ]
+    } as CommandLineArgumentProvider)
+    inputs.property('repositoryRevision', targetFreeRepositoryRevision)
+    inputs.file(targetFreeRepresentationCandidateFreezeReportDirectory.map {
+        it.file('representation-discovery-candidate-freeze.json')
+    })
+    outputs.dir(targetFreeRepresentationQualificationReportDirectory)
+    doLast {
+        def qualification =
+            targetFreeRepresentationQualificationReportDirectory.get()
+                .file(
+                    'representation-discovery-post-freeze-qualification.json')
+                .asFile
+        if (!qualification.isFile()) {
+            throw new GradleException(
+                "Missing target-free post-freeze qualification: "
+                    + qualification)
+        }
+    }
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport'),
         verifyDomainDiscoveryExportEvidence,
         generateTargetFreeRepresentationDiscoveryRun,
         generateTargetFreeRepresentationEvaluationPlan,
-        generateTargetFreeRepresentationCandidateFreeze
+        generateTargetFreeRepresentationCandidateFreeze,
+        generateTargetFreeRepresentationPostFreezeQualification
 }
 
 rootProject.tasks.named('check') {
     dependsOn verifyDomainDiscoveryExportEvidence,
         generateTargetFreeRepresentationDiscoveryRun,
         generateTargetFreeRepresentationEvaluationPlan,
-        generateTargetFreeRepresentationCandidateFreeze
+        generateTargetFreeRepresentationCandidateFreeze,
+        generateTargetFreeRepresentationPostFreezeQualification
 }
