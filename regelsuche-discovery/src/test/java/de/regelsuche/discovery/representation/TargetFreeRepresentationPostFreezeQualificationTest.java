@@ -31,6 +31,12 @@ class TargetFreeRepresentationPostFreezeQualificationTest {
             TargetFreeRepresentationPostFreezeQualification.DISCLOSURE,
             content.qualificationDisclosure());
         assertEquals(FREEZE.contentHash(), content.candidateFreezeHash());
+        assertEquals(
+            FREEZE.content().qualificationHash(),
+            content.qualificationHash());
+        assertEquals(
+            FREEZE.content().qualificationByteLength(),
+            content.qualificationByteLength());
         assertEquals(24, content.entries().size());
         assertEquals(
             FREEZE.content().summary().candidateCount(),
