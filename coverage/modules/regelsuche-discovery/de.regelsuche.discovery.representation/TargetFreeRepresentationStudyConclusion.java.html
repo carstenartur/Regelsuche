@@ -1,0 +1,718 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetFreeRepresentationStudyConclusion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">TargetFreeRepresentationStudyConclusion.java</span></div><h1>TargetFreeRepresentationStudyConclusion.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/** Derives the bounded scientific conclusion of the frozen target-free study. */
+final class TargetFreeRepresentationStudyConclusion {
+    static final String SCHEMA =
+        &quot;regelsuche.target-free-representation-study-conclusion/v1&quot;;
+    static final String FILE_NAME =
+        &quot;representation-discovery-study-conclusion.json&quot;;
+    static final String EVIDENCE_STATUS =
+        &quot;POST_FREEZE_STUDY_CONCLUSION_RETAINED&quot;;
+    static final String RESULT_CLASSIFICATION =
+        &quot;INFRASTRUCTURE_AND_KNOWN_BRIDGE_EVIDENCE_ONLY&quot;;
+    static final String POLICY_COMPARISON_STATUS =
+        &quot;NO_POLICY_SUCCESS_DIFFERENTIATION_AND_NO_ALL_POLICY_MATCHED_WORK_CASE&quot;;
+    static final String DIFFICULTY_STATUS =
+        &quot;QUALIFIED_RESULTS_ARE_DEPTH_ONE_ONLY&quot;;
+    static final String NEXT_REQUIRED_STAGE =
+        &quot;PREREGISTER_MULTI_STEP_HELD_OUT_DIFFICULTY_TRANCHE&quot;;
+    static final String CLAIM_BOUNDARY =
+        &quot;This conclusion summarizes the exact frozen formation and post-freeze &quot;
+            + &quot;qualification evidence. It does not establish external novelty, &quot;
+            + &quot;multi-step discovery, matched-work policy superiority, global &quot;
+            + &quot;optimality or usefulness outside the frozen matrix.&quot;;
+
+    private static final String QUALIFIED = &quot;QUALIFIED&quot;;
+    private static final String ALL_POLICIES = &quot;QUALIFIED_BY_ALL_POLICIES&quot;;
+    private static final String SOME_POLICIES = &quot;QUALIFIED_BY_SOME_POLICIES&quot;;
+    private static final String NO_POLICIES = &quot;NO_POLICY_QUALIFIED&quot;;
+<span class="fc" id="L52">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L53">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L54">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L55">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L56">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L57">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L58">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)</span>
+<span class="fc" id="L59">        .build();</span>
+
+    private TargetFreeRepresentationStudyConclusion() {
+    }
+
+    static ConclusionArtifact conclude(
+        Path freezeFile,
+        Path qualificationFile
+    ) throws IOException {
+<span class="nc" id="L68">        return conclude(</span>
+            TargetFreeRepresentationCandidateFreeze.FreezeArtifact
+<span class="nc" id="L70">                .fromCanonicalJson(Files.readString(</span>
+<span class="nc" id="L71">                    Objects.requireNonNull(freezeFile, &quot;freezeFile&quot;),</span>
+                    StandardCharsets.UTF_8
+                )),
+            TargetFreeRepresentationPostFreezeQualification
+<span class="nc" id="L75">                .QualificationArtifact.fromCanonicalJson(Files.readString(</span>
+<span class="nc" id="L76">                    Objects.requireNonNull(</span>
+                        qualificationFile,
+                        &quot;qualificationFile&quot;
+                    ),
+                    StandardCharsets.UTF_8
+                ))
+        );
+    }
+
+    static ConclusionArtifact conclude(
+        TargetFreeRepresentationCandidateFreeze.FreezeArtifact freeze,
+        TargetFreeRepresentationPostFreezeQualification
+            .QualificationArtifact qualification
+    ) {
+<span class="fc" id="L90">        Objects.requireNonNull(freeze, &quot;freeze&quot;);</span>
+<span class="fc" id="L91">        Objects.requireNonNull(qualification, &quot;qualification&quot;);</span>
+<span class="fc" id="L92">        requireAuthority(freeze, qualification);</span>
+
+<span class="fc" id="L94">        List&lt;RowStats&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (int index = 0; index &lt; freeze.content().entries().size(); index++) {</span>
+<span class="fc" id="L96">            rows.add(row(</span>
+<span class="fc" id="L97">                freeze.content().entries().get(index),</span>
+<span class="fc" id="L98">                qualification.content().entries().get(index)</span>
+            ));
+        }
+<span class="fc" id="L101">        List&lt;CaseConclusion&gt; cases = groupCases(rows);</span>
+<span class="fc" id="L102">        List&lt;PolicyConclusion&gt; policies = groupPolicies(rows);</span>
+<span class="fc" id="L103">        Summary summary = Summary.from(cases, policies);</span>
+<span class="fc" id="L104">        Decision decision = new Decision(</span>
+            RESULT_CLASSIFICATION,
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            summary.policyDifferentiatingCaseCount() == 0</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                    &amp;&amp; summary.allPolicyMatchedWorkCaseCount() == 0</span>
+<span class="fc" id="L108">                ? POLICY_COMPARISON_STATUS</span>
+<span class="nc" id="L109">                : &quot;POLICY_DIFFERENCE_REQUIRES_SEPARATE_INTERPRETATION&quot;,</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            summary.qualifiedCandidatesAtDepthAtLeastThree() == 0</span>
+<span class="fc" id="L111">                ? DIFFICULTY_STATUS</span>
+<span class="pc" id="L112">                : &quot;MULTI_STEP_QUALIFIED_RESULT_PRESENT&quot;,</span>
+            NEXT_REQUIRED_STAGE
+        );
+<span class="fc" id="L115">        return ConclusionArtifact.create(new ConclusionContent(</span>
+            SCHEMA,
+            EVIDENCE_STATUS,
+<span class="fc" id="L118">            freeze.content().repositoryRevision(),</span>
+<span class="fc" id="L119">            freeze.contentHash(),</span>
+<span class="fc" id="L120">            qualification.contentHash(),</span>
+            cases,
+            policies,
+            summary,
+            decision,
+            CLAIM_BOUNDARY
+        ));
+    }
+
+    static ConclusionArtifact write(
+        Path outputDirectory,
+        Path freezeFile,
+        Path qualificationFile
+    ) throws IOException {
+<span class="nc" id="L134">        Path directory = Objects.requireNonNull(</span>
+            outputDirectory,
+            &quot;outputDirectory&quot;
+<span class="nc" id="L137">        ).toAbsolutePath().normalize();</span>
+<span class="nc" id="L138">        Files.createDirectories(directory);</span>
+<span class="nc" id="L139">        ConclusionArtifact artifact = conclude(freezeFile, qualificationFile);</span>
+<span class="nc" id="L140">        Path target = directory.resolve(FILE_NAME);</span>
+<span class="nc" id="L141">        String canonical = artifact.toCanonicalJson();</span>
+<span class="nc" id="L142">        AtomicJsonFile.writeUtf8(target, canonical);</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (!canonical.equals(Files.readString(</span>
+                target,
+                StandardCharsets.UTF_8
+            ))
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                || !artifact.equals(</span>
+<span class="nc" id="L148">                    ConclusionArtifact.fromCanonicalJson(canonical))) {</span>
+<span class="nc" id="L149">            throw new IllegalStateException(</span>
+                &quot;target-free study conclusion changed while writing&quot;);
+        }
+<span class="nc" id="L152">        return artifact;</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (args.length != 3) {</span>
+<span class="nc" id="L157">            throw new IllegalArgumentException(</span>
+                &quot;usage: &lt;candidate-freeze-file&gt; &quot;
+                    + &quot;&lt;post-freeze-qualification-file&gt; &quot;
+                    + &quot;&lt;output-directory&gt;&quot;
+            );
+        }
+<span class="nc" id="L163">        ConclusionArtifact artifact = write(</span>
+<span class="nc" id="L164">            Path.of(args[2]),</span>
+<span class="nc" id="L165">            Path.of(args[0]),</span>
+<span class="nc" id="L166">            Path.of(args[1])</span>
+        );
+<span class="nc" id="L168">        Summary summary = artifact.content().summary();</span>
+<span class="nc" id="L169">        System.out.println(</span>
+<span class="nc" id="L170">            &quot;targetFreeStudyConclusionHash=&quot; + artifact.contentHash());</span>
+<span class="nc" id="L171">        System.out.println(</span>
+            &quot;targetFreeStudyQualifiedEntries=&quot;
+<span class="nc" id="L173">                + summary.qualifiedEntries());</span>
+<span class="nc" id="L174">        System.out.println(</span>
+            &quot;targetFreeStudyPolicyDifferentiatingCases=&quot;
+<span class="nc" id="L176">                + summary.policyDifferentiatingCaseCount());</span>
+<span class="nc" id="L177">        System.out.println(</span>
+            &quot;targetFreeStudyQualifiedDepthAtLeastThree=&quot;
+<span class="nc" id="L179">                + summary.qualifiedCandidatesAtDepthAtLeastThree());</span>
+<span class="nc" id="L180">    }</span>
+
+    private static RowStats row(
+        TargetFreeRepresentationCandidateFreeze.ExecutionEntry frozen,
+        TargetFreeRepresentationPostFreezeQualification
+            .QualificationEntry qualification
+    ) {
+<span class="fc" id="L187">        requireEntryBinding(frozen, qualification);</span>
+        Map&lt;String, TargetFreeRepresentationCandidateFreeze.CandidateEvidence&gt;
+<span class="fc" id="L189">            candidates = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L190">        frozen.candidates().forEach(candidate -&gt; {</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if (candidates.put(candidate.candidateHash(), candidate) != null) {</span>
+<span class="nc" id="L192">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate frozen candidate hash&quot;);
+            }
+<span class="fc" id="L195">        });</span>
+
+<span class="fc" id="L197">        int minimumDepth = Integer.MAX_VALUE;</span>
+<span class="fc" id="L198">        int maximumDepth = 0;</span>
+<span class="fc" id="L199">        int depthOne = 0;</span>
+<span class="fc" id="L200">        int depthAtLeastThree = 0;</span>
+<span class="fc" id="L201">        int assumptionViolations = 0;</span>
+<span class="fc" id="L202">        int directRuleLeaks = 0;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (var result : qualification.candidates()) {</span>
+<span class="fc" id="L204">            var candidate = Objects.requireNonNull(</span>
+<span class="fc" id="L205">                candidates.remove(result.candidateHash()),</span>
+<span class="fc" id="L206">                &quot;frozen candidate &quot; + result.candidateHash()</span>
+            );
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (!candidate.expression().equals(result.expression())</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                    || !candidate.assumptions().equals(</span>
+<span class="fc" id="L210">                        result.assumptions())) {</span>
+<span class="nc" id="L211">                throw new IllegalArgumentException(</span>
+                    &quot;qualified candidate differs from frozen candidate&quot;);
+            }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (result.qualified()) {</span>
+<span class="fc" id="L215">                minimumDepth = Math.min(minimumDepth, candidate.depth());</span>
+<span class="fc" id="L216">                maximumDepth = Math.max(maximumDepth, candidate.depth());</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                depthOne += candidate.depth() == 1 ? 1 : 0;</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                depthAtLeastThree += candidate.depth() &gt;= 3 ? 1 : 0;</span>
+            }
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (result.forbiddenOutcomes().contains(&quot;ASSUMPTION_DROPPED&quot;)</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                    || result.disqualificationReasons().contains(</span>
+                        &quot;REQUIRED_ASSUMPTION_MISSING&quot;)) {
+<span class="fc" id="L223">                assumptionViolations++;</span>
+            }
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            if (result.forbiddenOutcomes().contains(</span>
+                    &quot;FORMATION_USED_POST_FREEZE_RULE&quot;)) {
+<span class="nc" id="L227">                directRuleLeaks++;</span>
+            }
+<span class="fc" id="L229">        }</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        if (!candidates.isEmpty()) {</span>
+<span class="nc" id="L231">            throw new IllegalArgumentException(</span>
+                &quot;qualification omitted frozen candidates&quot;);
+        }
+<span class="fc" id="L234">        return new RowStats(</span>
+<span class="fc" id="L235">            frozen.caseId(),</span>
+<span class="fc" id="L236">            frozen.policyId(),</span>
+<span class="fc" id="L237">            qualification.status(),</span>
+<span class="fc" id="L238">            frozen.candidateCount(),</span>
+<span class="fc" id="L239">            qualification.qualifyingCandidateCount(),</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            minimumDepth == Integer.MAX_VALUE ? 0 : minimumDepth,</span>
+            maximumDepth,
+            depthOne,
+            depthAtLeastThree,
+<span class="fc" id="L244">            frozen.work().engineCalls(),</span>
+<span class="fc" id="L245">            frozen.work().generatedPrimitiveSteps(),</span>
+            assumptionViolations,
+            directRuleLeaks
+        );
+    }
+
+    private static void requireAuthority(
+        TargetFreeRepresentationCandidateFreeze.FreezeArtifact freeze,
+        TargetFreeRepresentationPostFreezeQualification
+            .QualificationArtifact qualification
+    ) {
+<span class="fc" id="L256">        var frozen = freeze.content();</span>
+<span class="fc" id="L257">        var classified = qualification.content();</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        if (!classified.repositoryRevision().equals(</span>
+<span class="fc" id="L259">                frozen.repositoryRevision())</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">                || !classified.evaluationPlanHash().equals(</span>
+<span class="fc" id="L261">                    frozen.evaluationPlanHash())</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">                || !classified.candidateFreezeHash().equals(</span>
+<span class="fc" id="L263">                    freeze.contentHash())</span>
+<span class="fc" id="L264">                || classified.summary().configuredEntries()</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                    != frozen.summary().configuredEntryCount()</span>
+<span class="fc" id="L266">                || classified.summary().evaluatedCandidates()</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                    != frozen.summary().candidateCount()</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">                || classified.entries().size() != frozen.entries().size()) {</span>
+<span class="fc" id="L269">            throw new IllegalArgumentException(</span>
+                &quot;qualification is not bound to the supplied freeze&quot;);
+        }
+<span class="fc" id="L272">    }</span>
+
+    private static void requireEntryBinding(
+        TargetFreeRepresentationCandidateFreeze.ExecutionEntry frozen,
+        TargetFreeRepresentationPostFreezeQualification
+            .QualificationEntry qualification
+    ) {
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        if (frozen.sequence() != qualification.sequence()</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">                || !frozen.configurationId().equals(</span>
+<span class="fc" id="L281">                    qualification.configurationId())</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">                || !frozen.caseId().equals(qualification.caseId())</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">                || !frozen.policyId().equals(qualification.policyId())</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">                || !frozen.candidateBatchHash().equals(</span>
+<span class="fc" id="L285">                    qualification.candidateBatchHash())</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">                || !frozen.candidateSetHash().equals(</span>
+<span class="fc" id="L287">                    qualification.candidateSetHash())</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                || !frozen.candidateFreezeReceiptHash().equals(</span>
+<span class="fc" id="L289">                    qualification.candidateFreezeReceiptHash())</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">                || !frozen.work().contentHash().equals(</span>
+<span class="fc" id="L291">                    qualification.workLedgerHash())</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                || !frozen.workAuthorityHash().equals(</span>
+<span class="fc" id="L293">                    qualification.workAuthorityHash())) {</span>
+<span class="nc" id="L294">            throw new IllegalArgumentException(</span>
+                &quot;qualification entry changed frozen evidence&quot;);
+        }
+<span class="fc" id="L297">    }</span>
+
+    private static List&lt;CaseConclusion&gt; groupCases(List&lt;RowStats&gt; rows) {
+<span class="fc" id="L300">        Map&lt;String, List&lt;RowStats&gt;&gt; grouped = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L301">        rows.forEach(row -&gt; grouped.computeIfAbsent(</span>
+<span class="fc" id="L302">            row.caseId(),</span>
+<span class="fc" id="L303">            ignored -&gt; new ArrayList&lt;&gt;()</span>
+<span class="fc" id="L304">        ).add(row));</span>
+<span class="fc" id="L305">        return grouped.entrySet().stream()</span>
+<span class="fc" id="L306">            .map(entry -&gt; CaseConclusion.from(</span>
+<span class="fc" id="L307">                entry.getKey(),</span>
+<span class="fc" id="L308">                entry.getValue()</span>
+            ))
+<span class="fc" id="L310">            .toList();</span>
+    }
+
+    private static List&lt;PolicyConclusion&gt; groupPolicies(List&lt;RowStats&gt; rows) {
+<span class="fc" id="L314">        Map&lt;String, List&lt;RowStats&gt;&gt; grouped = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L315">        rows.forEach(row -&gt; grouped.computeIfAbsent(</span>
+<span class="fc" id="L316">            row.policyId(),</span>
+<span class="fc" id="L317">            ignored -&gt; new ArrayList&lt;&gt;()</span>
+<span class="fc" id="L318">        ).add(row));</span>
+<span class="fc" id="L319">        return grouped.entrySet().stream()</span>
+<span class="fc" id="L320">            .map(entry -&gt; PolicyConclusion.from(</span>
+<span class="fc" id="L321">                entry.getKey(),</span>
+<span class="fc" id="L322">                entry.getValue()</span>
+            ))
+<span class="fc" id="L324">            .toList();</span>
+    }
+
+    private static String json(Object value) {
+        try {
+<span class="fc" id="L329">            return JSON.writeValueAsString(</span>
+<span class="fc" id="L330">                Objects.requireNonNull(value, &quot;value&quot;));</span>
+<span class="nc" id="L331">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L332">            throw new IllegalStateException(</span>
+                &quot;cannot render target-free study conclusion&quot;,
+                exception
+            );
+        }
+    }
+
+    private record RowStats(
+        String caseId,
+        String policyId,
+        String qualificationStatus,
+        int evaluatedCandidates,
+        int qualifiedCandidates,
+        int minimumQualifiedDepth,
+        int maximumQualifiedDepth,
+        int qualifiedCandidatesAtDepthOne,
+        int qualifiedCandidatesAtDepthAtLeastThree,
+        int engineCalls,
+        int generatedPrimitiveSteps,
+        int assumptionViolationCandidates,
+        int directRuleLeakCandidates
+    ) {
+<span class="fc" id="L354">        private RowStats {</span>
+<span class="fc" id="L355">            caseId = requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L356">            policyId = requireText(policyId, &quot;policyId&quot;);</span>
+<span class="fc" id="L357">            qualificationStatus = requireText(</span>
+                qualificationStatus,
+                &quot;qualificationStatus&quot;
+            );
+<span class="pc bpc" id="L361" title="13 of 28 branches missed.">            if (evaluatedCandidates &lt; 0</span>
+                    || qualifiedCandidates &lt; 0
+                    || qualifiedCandidates &gt; evaluatedCandidates
+                    || minimumQualifiedDepth &lt; 0
+                    || maximumQualifiedDepth &lt; minimumQualifiedDepth
+                    || qualifiedCandidatesAtDepthOne &lt; 0
+                    || qualifiedCandidatesAtDepthAtLeastThree &lt; 0
+                    || engineCalls &lt; 0
+                    || generatedPrimitiveSteps &lt; 0
+                    || assumptionViolationCandidates &lt; 0
+                    || directRuleLeakCandidates &lt; 0
+                    || (qualifiedCandidates == 0
+                        &amp;&amp; (minimumQualifiedDepth != 0
+                            || maximumQualifiedDepth != 0))
+<span class="pc bpc" id="L375" title="1 of 4 branches missed.">                    || (QUALIFIED.equals(qualificationStatus)</span>
+                        != (qualifiedCandidates &gt; 0))) {
+<span class="nc" id="L377">                throw new IllegalArgumentException(</span>
+                    &quot;row statistics do not balance&quot;);
+            }
+<span class="fc" id="L380">        }</span>
+
+        boolean qualified() {
+<span class="fc bfc" id="L383" title="All 2 branches covered.">            return qualifiedCandidates &gt; 0;</span>
+        }
+    }
+
+    record CaseConclusion(
+        String caseId,
+        int configuredPolicies,
+        int qualifiedPolicies,
+        int evaluatedCandidates,
+        int qualifiedCandidates,
+        int minimumQualifiedDepth,
+        int maximumQualifiedDepth,
+        int qualifiedCandidatesAtDepthOne,
+        int qualifiedCandidatesAtDepthAtLeastThree,
+        int assumptionViolationCandidates,
+        int directRuleLeakCandidates,
+        boolean allPolicyWorkMatched,
+        String status
+    ) {
+        static CaseConclusion from(String caseId, List&lt;RowStats&gt; rows) {
+<span class="fc" id="L403">            int qualifiedPolicies = Math.toIntExact(rows.stream()</span>
+<span class="fc" id="L404">                .filter(RowStats::qualified).count());</span>
+<span class="fc" id="L405">            Set&lt;String&gt; work = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L406">            rows.forEach(row -&gt; work.add(</span>
+<span class="fc" id="L407">                row.engineCalls() + &quot;:&quot; + row.generatedPrimitiveSteps()));</span>
+<span class="fc" id="L408">            return new CaseConclusion(</span>
+                caseId,
+<span class="fc" id="L410">                rows.size(),</span>
+                qualifiedPolicies,
+<span class="fc" id="L412">                rows.stream().mapToInt(</span>
+<span class="fc" id="L413">                    RowStats::evaluatedCandidates).sum(),</span>
+<span class="fc" id="L414">                rows.stream().mapToInt(</span>
+<span class="fc" id="L415">                    RowStats::qualifiedCandidates).sum(),</span>
+<span class="fc" id="L416">                rows.stream().mapToInt(RowStats::minimumQualifiedDepth)</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">                    .filter(value -&gt; value &gt; 0).min().orElse(0),</span>
+<span class="fc" id="L418">                rows.stream().mapToInt(RowStats::maximumQualifiedDepth)</span>
+<span class="fc" id="L419">                    .max().orElse(0),</span>
+<span class="fc" id="L420">                rows.stream().mapToInt(</span>
+<span class="fc" id="L421">                    RowStats::qualifiedCandidatesAtDepthOne).sum(),</span>
+<span class="fc" id="L422">                rows.stream().mapToInt(</span>
+<span class="fc" id="L423">                    RowStats::qualifiedCandidatesAtDepthAtLeastThree).sum(),</span>
+<span class="fc" id="L424">                rows.stream().mapToInt(</span>
+<span class="fc" id="L425">                    RowStats::assumptionViolationCandidates).sum(),</span>
+<span class="fc" id="L426">                rows.stream().mapToInt(</span>
+<span class="fc" id="L427">                    RowStats::directRuleLeakCandidates).sum(),</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">                work.size() == 1,</span>
+<span class="fc bfc" id="L429" title="All 2 branches covered.">                qualifiedPolicies == rows.size()</span>
+<span class="fc" id="L430">                    ? ALL_POLICIES</span>
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">                    : qualifiedPolicies == 0</span>
+<span class="fc" id="L432">                        ? NO_POLICIES</span>
+<span class="pc" id="L433">                        : SOME_POLICIES</span>
+            );
+        }
+
+<span class="fc" id="L437">        CaseConclusion {</span>
+<span class="fc" id="L438">            caseId = requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L439">            status = requireText(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L440" title="11 of 22 branches missed.">            if (configuredPolicies &lt; 1</span>
+                    || qualifiedPolicies &lt; 0
+                    || qualifiedPolicies &gt; configuredPolicies
+                    || evaluatedCandidates &lt; 0
+                    || qualifiedCandidates &lt; 0
+                    || minimumQualifiedDepth &lt; 0
+                    || maximumQualifiedDepth &lt; minimumQualifiedDepth
+                    || qualifiedCandidatesAtDepthOne &lt; 0
+                    || qualifiedCandidatesAtDepthAtLeastThree &lt; 0
+                    || assumptionViolationCandidates &lt; 0
+                    || directRuleLeakCandidates &lt; 0
+<span class="fc" id="L451">                    || !Set.of(</span>
+                        ALL_POLICIES,
+                        SOME_POLICIES,
+                        NO_POLICIES
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">                    ).contains(status)</span>
+<span class="pc bpc" id="L456" title="1 of 4 branches missed.">                    || (ALL_POLICIES.equals(status)</span>
+                        != (qualifiedPolicies == configuredPolicies))
+<span class="pc bpc" id="L458" title="1 of 4 branches missed.">                    || (NO_POLICIES.equals(status)</span>
+                        != (qualifiedPolicies == 0))) {
+<span class="nc" id="L460">                throw new IllegalArgumentException(</span>
+                    &quot;case conclusion does not balance&quot;);
+            }
+<span class="fc" id="L463">        }</span>
+    }
+
+    record PolicyConclusion(
+        String policyId,
+        int configuredCases,
+        int qualifiedCases,
+        int evaluatedCandidates,
+        int qualifiedCandidates,
+        int engineCalls,
+        int generatedPrimitiveSteps
+    ) {
+        static PolicyConclusion from(String policyId, List&lt;RowStats&gt; rows) {
+<span class="fc" id="L476">            return new PolicyConclusion(</span>
+                policyId,
+<span class="fc" id="L478">                rows.size(),</span>
+<span class="fc" id="L479">                Math.toIntExact(rows.stream()</span>
+<span class="fc" id="L480">                    .filter(RowStats::qualified).count()),</span>
+<span class="fc" id="L481">                rows.stream().mapToInt(</span>
+<span class="fc" id="L482">                    RowStats::evaluatedCandidates).sum(),</span>
+<span class="fc" id="L483">                rows.stream().mapToInt(</span>
+<span class="fc" id="L484">                    RowStats::qualifiedCandidates).sum(),</span>
+<span class="fc" id="L485">                rows.stream().mapToInt(RowStats::engineCalls).sum(),</span>
+<span class="fc" id="L486">                rows.stream().mapToInt(</span>
+<span class="fc" id="L487">                    RowStats::generatedPrimitiveSteps).sum()</span>
+            );
+        }
+
+<span class="fc" id="L491">        PolicyConclusion {</span>
+<span class="fc" id="L492">            policyId = requireText(policyId, &quot;policyId&quot;);</span>
+<span class="pc bpc" id="L493" title="7 of 14 branches missed.">            if (configuredCases &lt; 1</span>
+                    || qualifiedCases &lt; 0
+                    || qualifiedCases &gt; configuredCases
+                    || evaluatedCandidates &lt; 0
+                    || qualifiedCandidates &lt; 0
+                    || engineCalls &lt; 0
+                    || generatedPrimitiveSteps &lt; 0) {
+<span class="nc" id="L500">                throw new IllegalArgumentException(</span>
+                    &quot;policy conclusion does not balance&quot;);
+            }
+<span class="fc" id="L503">        }</span>
+    }
+
+    record Summary(
+        int configuredEntries,
+        int evaluatedCandidates,
+        int qualifiedEntries,
+        int qualifiedCandidates,
+        int configuredCases,
+        int uniformlyQualifiedCaseCount,
+        int uniformlyUnqualifiedCaseCount,
+        int policyDifferentiatingCaseCount,
+        int configuredPolicies,
+        int allPolicyMatchedWorkCaseCount,
+        int qualifiedCandidatesAtDepthOne,
+        int qualifiedCandidatesAtDepthAtLeastThree,
+        int assumptionViolationCandidates,
+        int directRuleLeakCandidates
+    ) {
+        static Summary from(
+            List&lt;CaseConclusion&gt; cases,
+            List&lt;PolicyConclusion&gt; policies
+        ) {
+<span class="fc" id="L526">            Summary summary = new Summary(</span>
+<span class="fc" id="L527">                cases.stream().mapToInt(</span>
+<span class="fc" id="L528">                    CaseConclusion::configuredPolicies).sum(),</span>
+<span class="fc" id="L529">                cases.stream().mapToInt(</span>
+<span class="fc" id="L530">                    CaseConclusion::evaluatedCandidates).sum(),</span>
+<span class="fc" id="L531">                cases.stream().mapToInt(</span>
+<span class="fc" id="L532">                    CaseConclusion::qualifiedPolicies).sum(),</span>
+<span class="fc" id="L533">                cases.stream().mapToInt(</span>
+<span class="fc" id="L534">                    CaseConclusion::qualifiedCandidates).sum(),</span>
+<span class="fc" id="L535">                cases.size(),</span>
+<span class="fc" id="L536">                Math.toIntExact(cases.stream()</span>
+<span class="fc" id="L537">                    .filter(value -&gt; ALL_POLICIES.equals(value.status()))</span>
+<span class="fc" id="L538">                    .count()),</span>
+<span class="fc" id="L539">                Math.toIntExact(cases.stream()</span>
+<span class="fc" id="L540">                    .filter(value -&gt; NO_POLICIES.equals(value.status()))</span>
+<span class="fc" id="L541">                    .count()),</span>
+<span class="fc" id="L542">                Math.toIntExact(cases.stream()</span>
+<span class="fc" id="L543">                    .filter(value -&gt; SOME_POLICIES.equals(value.status()))</span>
+<span class="fc" id="L544">                    .count()),</span>
+<span class="fc" id="L545">                policies.size(),</span>
+<span class="fc" id="L546">                Math.toIntExact(cases.stream()</span>
+<span class="fc" id="L547">                    .filter(CaseConclusion::allPolicyWorkMatched).count()),</span>
+<span class="fc" id="L548">                cases.stream().mapToInt(</span>
+<span class="fc" id="L549">                    CaseConclusion::qualifiedCandidatesAtDepthOne).sum(),</span>
+<span class="fc" id="L550">                cases.stream().mapToInt(</span>
+                    CaseConclusion::qualifiedCandidatesAtDepthAtLeastThree)
+<span class="fc" id="L552">                    .sum(),</span>
+<span class="fc" id="L553">                cases.stream().mapToInt(</span>
+<span class="fc" id="L554">                    CaseConclusion::assumptionViolationCandidates).sum(),</span>
+<span class="fc" id="L555">                cases.stream().mapToInt(</span>
+<span class="fc" id="L556">                    CaseConclusion::directRuleLeakCandidates).sum()</span>
+            );
+<span class="fc" id="L558">            int policyCases = policies.stream().mapToInt(</span>
+<span class="fc" id="L559">                PolicyConclusion::configuredCases).sum();</span>
+<span class="fc" id="L560">            int policyQualified = policies.stream().mapToInt(</span>
+<span class="fc" id="L561">                PolicyConclusion::qualifiedCases).sum();</span>
+<span class="fc" id="L562">            int policyCandidates = policies.stream().mapToInt(</span>
+<span class="fc" id="L563">                PolicyConclusion::evaluatedCandidates).sum();</span>
+<span class="fc" id="L564">            int policyQualifiedCandidates = policies.stream().mapToInt(</span>
+<span class="fc" id="L565">                PolicyConclusion::qualifiedCandidates).sum();</span>
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">            if (policyCases != summary.configuredEntries()</span>
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">                    || policyQualified != summary.qualifiedEntries()</span>
+<span class="pc bpc" id="L568" title="1 of 2 branches missed.">                    || policyCandidates != summary.evaluatedCandidates()</span>
+                    || policyQualifiedCandidates
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">                        != summary.qualifiedCandidates()) {</span>
+<span class="nc" id="L571">                throw new IllegalArgumentException(</span>
+                    &quot;case and policy conclusions disagree&quot;);
+            }
+<span class="fc" id="L574">            return summary;</span>
+        }
+
+<span class="fc" id="L577">        Summary {</span>
+<span class="pc bpc" id="L578" title="17 of 34 branches missed.">            if (configuredEntries &lt; 1</span>
+                    || evaluatedCandidates &lt; 0
+                    || qualifiedEntries &lt; 0
+                    || qualifiedEntries &gt; configuredEntries
+                    || qualifiedCandidates &lt; 0
+                    || configuredCases &lt; 1
+                    || uniformlyQualifiedCaseCount &lt; 0
+                    || uniformlyUnqualifiedCaseCount &lt; 0
+                    || policyDifferentiatingCaseCount &lt; 0
+                    || uniformlyQualifiedCaseCount
+                        + uniformlyUnqualifiedCaseCount
+                        + policyDifferentiatingCaseCount
+                        != configuredCases
+                    || configuredPolicies &lt; 1
+                    || allPolicyMatchedWorkCaseCount &lt; 0
+                    || allPolicyMatchedWorkCaseCount &gt; configuredCases
+                    || qualifiedCandidatesAtDepthOne &lt; 0
+                    || qualifiedCandidatesAtDepthAtLeastThree &lt; 0
+                    || assumptionViolationCandidates &lt; 0
+                    || directRuleLeakCandidates &lt; 0) {
+<span class="nc" id="L598">                throw new IllegalArgumentException(</span>
+                    &quot;study conclusion summary does not balance&quot;);
+            }
+<span class="fc" id="L601">        }</span>
+    }
+
+    record Decision(
+        String evidenceClassification,
+        String policyComparisonStatus,
+        String difficultyStatus,
+        String nextRequiredStage
+    ) {
+<span class="fc" id="L610">        Decision {</span>
+<span class="fc" id="L611">            evidenceClassification = requireText(</span>
+                evidenceClassification,
+                &quot;evidenceClassification&quot;
+            );
+<span class="fc" id="L615">            policyComparisonStatus = requireText(</span>
+                policyComparisonStatus,
+                &quot;policyComparisonStatus&quot;
+            );
+<span class="fc" id="L619">            difficultyStatus = requireText(</span>
+                difficultyStatus,
+                &quot;difficultyStatus&quot;
+            );
+<span class="fc" id="L623">            nextRequiredStage = requireText(</span>
+                nextRequiredStage,
+                &quot;nextRequiredStage&quot;
+            );
+<span class="fc" id="L627">        }</span>
+    }
+
+    record ConclusionContent(
+        String schema,
+        String evidenceStatus,
+        String repositoryRevision,
+        String candidateFreezeHash,
+        String postFreezeQualificationHash,
+        List&lt;CaseConclusion&gt; cases,
+        List&lt;PolicyConclusion&gt; policies,
+        Summary summary,
+        Decision decision,
+        String claimBoundary
+    ) {
+<span class="fc" id="L642">        ConclusionContent {</span>
+<span class="fc" id="L643">            cases = List.copyOf(Objects.requireNonNull(cases, &quot;cases&quot;));</span>
+<span class="fc" id="L644">            policies = List.copyOf(</span>
+<span class="fc" id="L645">                Objects.requireNonNull(policies, &quot;policies&quot;));</span>
+<span class="pc bpc" id="L646" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L647" title="1 of 2 branches missed.">                    || !EVIDENCE_STATUS.equals(evidenceStatus)</span>
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">                    || !repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)</span>
+<span class="pc bpc" id="L649" title="1 of 2 branches missed.">                    || cases.isEmpty()</span>
+<span class="pc bpc" id="L650" title="1 of 2 branches missed.">                    || policies.isEmpty()</span>
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">                    || !Objects.requireNonNull(summary, &quot;summary&quot;).equals(</span>
+<span class="fc" id="L652">                        Summary.from(cases, policies))) {</span>
+<span class="nc" id="L653">                throw new IllegalArgumentException(</span>
+                    &quot;study conclusion content does not balance&quot;);
+            }
+<span class="fc" id="L656">            requireSha256(candidateFreezeHash, &quot;candidateFreezeHash&quot;);</span>
+<span class="fc" id="L657">            requireSha256(</span>
+                postFreezeQualificationHash,
+                &quot;postFreezeQualificationHash&quot;
+            );
+<span class="fc" id="L661">            if (cases.stream().map(CaseConclusion::caseId)</span>
+<span class="pc bpc" id="L662" title="1 of 2 branches missed.">                    .distinct().count() != cases.size()</span>
+<span class="fc" id="L663">                    || policies.stream().map(PolicyConclusion::policyId)</span>
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">                        .distinct().count() != policies.size()) {</span>
+<span class="nc" id="L665">                throw new IllegalArgumentException(</span>
+                    &quot;study conclusion identities are not unique&quot;);
+            }
+<span class="fc" id="L668">            decision = Objects.requireNonNull(decision, &quot;decision&quot;);</span>
+<span class="fc" id="L669">            claimBoundary = requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="fc" id="L670">        }</span>
+    }
+
+    record ConclusionArtifact(
+        ConclusionContent content,
+        String contentHash
+    ) {
+<span class="fc" id="L677">        ConclusionArtifact {</span>
+<span class="fc" id="L678">            content = Objects.requireNonNull(content, &quot;content&quot;);</span>
+<span class="fc" id="L679">            contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L680">            if (!KnownStructureCatalog.sha256(json(content))</span>
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">                    .equals(contentHash)) {</span>
+<span class="nc" id="L682">                throw new IllegalArgumentException(</span>
+                    &quot;study conclusion content hash mismatch&quot;);
+            }
+<span class="fc" id="L685">        }</span>
+
+        static ConclusionArtifact create(ConclusionContent content) {
+<span class="fc" id="L688">            return new ConclusionArtifact(</span>
+                content,
+<span class="fc" id="L690">                KnownStructureCatalog.sha256(json(content))</span>
+            );
+        }
+
+        String toCanonicalJson() {
+<span class="fc" id="L695">            return json(this);</span>
+        }
+
+        static ConclusionArtifact fromCanonicalJson(String source) {
+            try {
+<span class="fc" id="L700">                ConclusionArtifact artifact = JSON.readValue(</span>
+<span class="fc" id="L701">                    Objects.requireNonNull(source, &quot;source&quot;),</span>
+                    ConclusionArtifact.class
+                );
+<span class="fc bfc" id="L704" title="All 2 branches covered.">                if (!artifact.toCanonicalJson().equals(source)) {</span>
+<span class="fc" id="L705">                    throw new IllegalArgumentException(</span>
+                        &quot;study conclusion JSON is not canonical&quot;);
+                }
+<span class="fc" id="L708">                return artifact;</span>
+<span class="nc" id="L709">            } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L710">                throw new IllegalArgumentException(</span>
+                    &quot;invalid target-free study conclusion JSON&quot;,
+                    exception
+                );
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
