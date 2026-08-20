@@ -1,0 +1,159 @@
+{
+  "caseQualifications": [
+    {
+      "expectedOutcome": "QUALIFY_AT_ONE_OR_MORE_MATCHED_WORK_CHECKPOINTS",
+      "forbiddenOutcomes": [
+        "DIRECT_PRIMITIVE_EDGE_TO_REFERENCE",
+        "DIRECT_MACRO_EDGE_TO_REFERENCE",
+        "REQUIRED_ASSUMPTION_MISSING"
+      ],
+      "id": "assumption-chain-cancellation",
+      "maximumQualifiedDepth": 5,
+      "minimumQualifiedDepth": 3,
+      "oracleWitnessRequiredRuleIds": [
+        "ast_cancel_division_factor",
+        "ast_cancel_division_factor",
+        "ast_add_zero_right"
+      ],
+      "referenceExpressions": [
+        "x + y"
+      ],
+      "requireTemporaryComplexityIncrease": false,
+      "requiredAssumptions": [
+        "z != 0"
+      ],
+      "requiredCapabilities": []
+    },
+    {
+      "expectedOutcome": "QUALIFY_AT_ONE_OR_MORE_MATCHED_WORK_CHECKPOINTS",
+      "forbiddenOutcomes": [
+        "DIRECT_PRIMITIVE_EDGE_TO_REFERENCE",
+        "DIRECT_MACRO_EDGE_TO_REFERENCE",
+        "DEPTH_ONE_QUALIFICATION"
+      ],
+      "id": "binomial-expansion-complexity-valley",
+      "maximumQualifiedDepth": 10,
+      "minimumQualifiedDepth": 5,
+      "oracleWitnessRequiredRuleIds": [
+        "ast_distribute_right_add",
+        "ast_distribute_left_add",
+        "ast_distribute_left_add",
+        "ast_product_to_power_two",
+        "ast_multiply_one_right",
+        "ast_multiply_one_left",
+        "ast_multiply_one_left",
+        "ast_double_term"
+      ],
+      "referenceExpressions": [
+        "1 + 2 * x + x^2",
+        "x^2 + 2 * x + 1"
+      ],
+      "requireTemporaryComplexityIncrease": true,
+      "requiredAssumptions": [],
+      "requiredCapabilities": []
+    },
+    {
+      "expectedOutcome": "QUALIFY_AT_ONE_OR_MORE_MATCHED_WORK_CHECKPOINTS",
+      "forbiddenOutcomes": [
+        "DIRECT_PRIMITIVE_EDGE_TO_REFERENCE",
+        "DIRECT_MACRO_EDGE_TO_REFERENCE",
+        "DEPTH_ONE_QUALIFICATION"
+      ],
+      "id": "difference-of-squares-reverse-bridge",
+      "maximumQualifiedDepth": 10,
+      "minimumQualifiedDepth": 5,
+      "oracleWitnessRequiredRuleIds": [
+        "ast_distribute_right_subtract",
+        "ast_distribute_left_add",
+        "ast_distribute_left_add",
+        "ast_product_to_power_two",
+        "ast_multiply_one_right",
+        "ast_multiply_one_left",
+        "ast_multiply_one_left",
+        "ast_canonical_normalize"
+      ],
+      "referenceExpressions": [
+        "-1 + x^2",
+        "x^2 - 1"
+      ],
+      "requireTemporaryComplexityIncrease": true,
+      "requiredAssumptions": [],
+      "requiredCapabilities": []
+    },
+    {
+      "expectedOutcome": "QUALIFY_AT_ONE_OR_MORE_MATCHED_WORK_CHECKPOINTS",
+      "forbiddenOutcomes": [
+        "DIRECT_PRIMITIVE_EDGE_TO_REFERENCE",
+        "DIRECT_MACRO_EDGE_TO_REFERENCE",
+        "WHOLE_EXPRESSION_ONLY_MATCH"
+      ],
+      "id": "occurrence-local-trigonometric-bridge-held-out",
+      "maximumQualifiedDepth": 6,
+      "minimumQualifiedDepth": 3,
+      "oracleWitnessRequiredRuleIds": [
+        "ast_add_zero_right",
+        "ast_multiply_one_left",
+        "ast_add_zero_right"
+      ],
+      "referenceExpressions": [
+        "y * (sin(x)^2 + cos(x)^2)"
+      ],
+      "requireTemporaryComplexityIncrease": false,
+      "requiredAssumptions": [],
+      "requiredCapabilities": [
+        "rule:sympy.trig.pythagorean"
+      ]
+    },
+    {
+      "expectedOutcome": "QUALIFY_AT_ONE_OR_MORE_MATCHED_WORK_CHECKPOINTS",
+      "forbiddenOutcomes": [
+        "DIRECT_PRIMITIVE_EDGE_TO_REFERENCE",
+        "DIRECT_MACRO_EDGE_TO_REFERENCE",
+        "REQUIRED_ASSUMPTION_MISSING",
+        "CAPABILITY_NOT_EXECUTABLE"
+      ],
+      "id": "telescoping-capability-bridge-held-out",
+      "maximumQualifiedDepth": 6,
+      "minimumQualifiedDepth": 3,
+      "oracleWitnessRequiredRuleIds": [
+        "ast_add_zero_right",
+        "ast_multiply_one_left",
+        "ast_add_zero_right",
+        "ast_multiply_one_left"
+      ],
+      "referenceExpressions": [
+        "1 / (n * (n + 1))"
+      ],
+      "requireTemporaryComplexityIncrease": false,
+      "requiredAssumptions": [
+        "n != 0",
+        "n + 1 != 0"
+      ],
+      "requiredCapabilities": [
+        "rule:sympy.rational.partial_fraction.telescoping"
+      ]
+    },
+    {
+      "expectedOutcome": "NO_POLICY_QUALIFIES",
+      "forbiddenOutcomes": [
+        "FALSE_POSITIVE_KNOWN_STRUCTURE_MATCH",
+        "PYTHAGOREAN_MATCH_WITH_DIFFERENT_ARGUMENTS"
+      ],
+      "id": "trigonometric-near-miss-control",
+      "maximumQualifiedDepth": 0,
+      "minimumQualifiedDepth": 0,
+      "oracleWitnessRequiredRuleIds": [],
+      "referenceExpressions": [
+        "y * (sin(x)^2 + cos(y)^2)"
+      ],
+      "requireTemporaryComplexityIncrease": false,
+      "requiredAssumptions": [],
+      "requiredCapabilities": [
+        "rule:sympy.trig.pythagorean"
+      ]
+    }
+  ],
+  "evidenceStatus": "SEALED_POST_FREEZE",
+  "qualificationBoundary": "This resource may be opened only after the exact candidate batches, candidate sets, assumptions, derivation depths, rule traces and actual-work ledgers for all configured case/policy/checkpoint rows have been frozen. Qualification must not alter candidates or work and must reject direct target edges, depth-one positives, missing assumptions, non-executable capabilities and near-miss structure matches.",
+  "schema": "regelsuche.target-free-held-out-qualification/v1"
+}

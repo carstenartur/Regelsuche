@@ -1,0 +1,224 @@
+{
+  "cases": [
+    {
+      "assumptions": [],
+      "budget": {
+        "beamWidth": 32,
+        "maxAstSizeIncreasePerStep": 16,
+        "maxCandidatesPerState": 128,
+        "maxDepth": 10,
+        "maxExpandingSteps": 8,
+        "maxExploredStates": 8192,
+        "maxGeneratedTransitions": 65536,
+        "maxRetainedStates": 4096,
+        "significantImprovementThreshold": 1
+      },
+      "distractorRulePackIds": [
+        "core-power-rules"
+      ],
+      "enabledRulePackIds": [
+        "core-polynomial-division",
+        "core-power-rules"
+      ],
+      "id": "assumption-chain-cancellation",
+      "informationTrack": "R1_TARGET_FREE_COMPRESSION",
+      "ruleProfile": "MINIMAL_KERNEL",
+      "sourceExpression": "(((z * x) / z) + ((z * y) / z)) + 0"
+    },
+    {
+      "assumptions": [],
+      "budget": {
+        "beamWidth": 32,
+        "maxAstSizeIncreasePerStep": 16,
+        "maxCandidatesPerState": 128,
+        "maxDepth": 10,
+        "maxExpandingSteps": 8,
+        "maxExploredStates": 8192,
+        "maxGeneratedTransitions": 65536,
+        "maxRetainedStates": 4096,
+        "significantImprovementThreshold": 1
+      },
+      "distractorRulePackIds": [
+        "core-factorization"
+      ],
+      "enabledRulePackIds": [
+        "core-distribution",
+        "core-factorization",
+        "core-power-rules",
+        "core-term-collection"
+      ],
+      "id": "binomial-expansion-complexity-valley",
+      "informationTrack": "R2_CATALOG_BLIND_POST_HOC_BRIDGE",
+      "ruleProfile": "MINIMAL_KERNEL",
+      "sourceExpression": "(x + 1) * (x + 1)"
+    },
+    {
+      "assumptions": [],
+      "budget": {
+        "beamWidth": 32,
+        "maxAstSizeIncreasePerStep": 16,
+        "maxCandidatesPerState": 128,
+        "maxDepth": 10,
+        "maxExpandingSteps": 8,
+        "maxExploredStates": 8192,
+        "maxGeneratedTransitions": 65536,
+        "maxRetainedStates": 4096,
+        "significantImprovementThreshold": 1
+      },
+      "distractorRulePackIds": [
+        "core-factorization"
+      ],
+      "enabledRulePackIds": [
+        "core-distribution",
+        "core-factorization",
+        "core-power-rules",
+        "core-term-collection"
+      ],
+      "id": "difference-of-squares-reverse-bridge",
+      "informationTrack": "R2_CATALOG_BLIND_POST_HOC_BRIDGE",
+      "ruleProfile": "MINIMAL_KERNEL",
+      "sourceExpression": "(x - 1) * (x + 1)"
+    },
+    {
+      "assumptions": [],
+      "budget": {
+        "beamWidth": 32,
+        "maxAstSizeIncreasePerStep": 16,
+        "maxCandidatesPerState": 128,
+        "maxDepth": 10,
+        "maxExpandingSteps": 8,
+        "maxExploredStates": 8192,
+        "maxGeneratedTransitions": 65536,
+        "maxRetainedStates": 4096,
+        "significantImprovementThreshold": 1
+      },
+      "distractorRulePackIds": [
+        "core-power-rules"
+      ],
+      "enabledRulePackIds": [
+        "core-power-rules",
+        "sympy-trigonometry"
+      ],
+      "id": "occurrence-local-trigonometric-bridge-held-out",
+      "informationTrack": "R2_CATALOG_BLIND_POST_HOC_BRIDGE",
+      "ruleProfile": "MINIMAL_KERNEL",
+      "sourceExpression": "1 * (y * (sin(x)^2 + (cos(x)^2 + 0))) + 0"
+    },
+    {
+      "assumptions": [
+        "n != 0",
+        "n + 1 != 0"
+      ],
+      "budget": {
+        "beamWidth": 32,
+        "maxAstSizeIncreasePerStep": 16,
+        "maxCandidatesPerState": 128,
+        "maxDepth": 10,
+        "maxExpandingSteps": 8,
+        "maxExploredStates": 8192,
+        "maxGeneratedTransitions": 65536,
+        "maxRetainedStates": 4096,
+        "significantImprovementThreshold": 1
+      },
+      "distractorRulePackIds": [
+        "core-power-rules"
+      ],
+      "enabledRulePackIds": [
+        "core-power-rules",
+        "sympy-rational"
+      ],
+      "id": "telescoping-capability-bridge-held-out",
+      "informationTrack": "R2_CATALOG_BLIND_POST_HOC_BRIDGE",
+      "ruleProfile": "MINIMAL_KERNEL",
+      "sourceExpression": "1 * (((1 * 1) / (n * (n + 1))) + 0) + 0"
+    },
+    {
+      "assumptions": [],
+      "budget": {
+        "beamWidth": 32,
+        "maxAstSizeIncreasePerStep": 16,
+        "maxCandidatesPerState": 128,
+        "maxDepth": 10,
+        "maxExpandingSteps": 8,
+        "maxExploredStates": 8192,
+        "maxGeneratedTransitions": 65536,
+        "maxRetainedStates": 4096,
+        "significantImprovementThreshold": 1
+      },
+      "distractorRulePackIds": [
+        "core-power-rules"
+      ],
+      "enabledRulePackIds": [
+        "core-power-rules",
+        "sympy-trigonometry"
+      ],
+      "id": "trigonometric-near-miss-control",
+      "informationTrack": "R2_CATALOG_BLIND_POST_HOC_BRIDGE",
+      "ruleProfile": "MINIMAL_KERNEL",
+      "sourceExpression": "1 * (y * (sin(x)^2 + (cos(y)^2 + 0))) + 0"
+    }
+  ],
+  "evidenceStatus": "FROZEN_NOT_EXECUTED",
+  "informationBoundary": "Candidate formation receives only the source expression, explicit assumptions, information track, RuleProfile.MINIMAL_KERNEL, explicit enabled and distractor rule-pack IDs, a target-blind policy, deterministic seed, finite search limits and an admitted-primitive-step checkpoint. Reference expressions, expected outcomes, oracle witnesses, required capabilities and post-freeze labels are unavailable until every candidate batch at the corresponding checkpoint has been frozen.",
+  "policies": [
+    {
+      "adapter": "de.regelsuche.discovery.representation.TargetFreeRepresentationSearch",
+      "adapterConstructor": "NO_ARGUMENT",
+      "adapterInterface": "TARGET_FREE_REPRESENTATION_SEARCH",
+      "deterministicSeed": 0,
+      "id": "BOUNDED_ENUMERATION_V1",
+      "initialAssumptionPolicy": "UNION_WITH_RETAINED_STATE_ASSUMPTIONS",
+      "selectionBoundary": "RETAIN_ALL_DISTINCT_REPRESENTATIONS_AND_RAW_PARETO_ARCHIVE"
+    },
+    {
+      "adapter": "de.regelsuche.search.strategy.RandomMonteCarloSearchStrategy",
+      "adapterConstructor": "LONG_SEED",
+      "adapterInterface": "SEARCH_STRATEGY",
+      "deterministicSeed": 0,
+      "id": "RANDOM_MONTE_CARLO_V1",
+      "initialAssumptionPolicy": "UNION_WITH_RETAINED_STATE_ASSUMPTIONS",
+      "selectionBoundary": "TARGET_BLIND_DETERMINISTIC_SEED_RANDOM_VALID_REWRITE_CONTROL"
+    },
+    {
+      "adapter": "de.regelsuche.search.strategy.BestFirstSearchStrategy",
+      "adapterConstructor": "NO_ARGUMENT",
+      "adapterInterface": "SEARCH_STRATEGY",
+      "deterministicSeed": 0,
+      "id": "SCALAR_BEST_FIRST_V1",
+      "initialAssumptionPolicy": "UNION_WITH_RETAINED_STATE_ASSUMPTIONS",
+      "selectionBoundary": "TARGET_BLIND_FROZEN_SCALAR_DESCRIPTION_COST"
+    },
+    {
+      "adapter": "de.regelsuche.search.strategy.StructuralDiversitySearchStrategy",
+      "adapterConstructor": "NO_ARGUMENT",
+      "adapterInterface": "SEARCH_STRATEGY",
+      "deterministicSeed": 0,
+      "id": "STRUCTURAL_DIVERSITY_V1",
+      "initialAssumptionPolicy": "UNION_WITH_RETAINED_STATE_ASSUMPTIONS",
+      "selectionBoundary": "TARGET_BLIND_FROZEN_STRUCTURAL_DESCRIPTOR_ARCHIVE"
+    }
+  ],
+  "schema": "regelsuche.target-free-held-out-formation/v1",
+  "workMatching": {
+    "authority": "ADMITTED_PRIMITIVE_STEPS",
+    "checkpoints": [
+      8,
+      16,
+      32,
+      64,
+      128,
+      256
+    ],
+    "comparisonEligibility": "ALL_POLICIES_REACHED_EXACT_CHECKPOINT",
+    "earlyExhaustionStatus": "EXHAUSTED_BEFORE_CHECKPOINT_NOT_COMPARABLE",
+    "engineCalls": "RECORDED_SECONDARY_METRIC",
+    "entryIdentityDimensions": [
+      "CASE_ID",
+      "POLICY_ID",
+      "ADMITTED_PRIMITIVE_STEP_CHECKPOINT"
+    ],
+    "generatedTransitions": "RECORDED_SECONDARY_METRIC",
+    "stopSemantics": "STOP_BEFORE_ADMITTING_A_STEP_BEYOND_THE_CHECKPOINT",
+    "wallClock": "RECORDED_DIAGNOSTIC_ONLY"
+  }
+}
