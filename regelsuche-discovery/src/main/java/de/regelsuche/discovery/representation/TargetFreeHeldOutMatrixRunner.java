@@ -59,7 +59,7 @@ public final class TargetFreeHeldOutMatrixRunner {
             + "target-free-held-out-preregistration-v1.json";
     public static final long PREREGISTRATION_BYTE_LENGTH = 1512L;
     public static final String PREREGISTRATION_SHA256 =
-        "sha256:4c4516862823dc46cbeab1d10d769294b8627ca1243320f68471f6e41a12f045";
+        "sha256:9d79fe60a2a2cf3fda9255cc3b26577b4ac23d61b8359cd22b3a7a0dcdb7bd29";
     public static final String QUALIFICATION_NOT_DISCLOSED = "NOT_DISCLOSED";
     public static final String QUALIFICATION_DISCLOSED =
         "DISCLOSED_AFTER_COMPLETE_CANDIDATE_FREEZE";
