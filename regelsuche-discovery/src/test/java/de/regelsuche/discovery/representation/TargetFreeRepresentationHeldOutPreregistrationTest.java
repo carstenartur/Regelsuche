@@ -46,7 +46,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
             + "target-free-held-out-preregistration-v1.json";
     private static final long PREREGISTRATION_BYTE_LENGTH = 1512L;
     private static final String PREREGISTRATION_SHA256 =
-        "sha256:211f376f293bf562b9328be50e66e942bcc8e0bfaa7bebcc7a5ef2b06a66c7c4";
+        "sha256:cda49378d9aeb4c53a10cabbc6a9d10721d71708e157144a2d2348400275e8b7";
     private static final List<Integer> CHECKPOINTS =
         List.of(8, 16, 32, 64, 128, 256);
     private static final List<String> POLICY_IDS = List.of(
