@@ -120,16 +120,18 @@
       "maximumQualifiedDepth": 6,
       "minimumQualifiedDepth": 3,
       "oracleWitnessRequiredRuleIds": [
-        "ast_add_zero_right",
-        "ast_multiply_one_left",
-        "ast_add_zero_right",
-        "ast_multiply_one_left"
+        "ast_cancel_division_factor",
+        "ast_cancel_division_factor",
+        "ast_cancel_division_factor"
       ],
       "referenceExpressions": [
         "1 / (n * (n + 1))"
       ],
       "requireTemporaryComplexityIncrease": false,
       "requiredAssumptions": [
+        "a != 0",
+        "b != 0",
+        "c != 0",
         "n != 0",
         "n + 1 != 0"
       ],

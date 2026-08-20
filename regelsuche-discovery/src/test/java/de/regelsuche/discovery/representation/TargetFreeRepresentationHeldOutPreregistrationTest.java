@@ -46,7 +46,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
             + "target-free-held-out-preregistration-v1.json";
     private static final long PREREGISTRATION_BYTE_LENGTH = 1512L;
     private static final String PREREGISTRATION_SHA256 =
-        "sha256:3e38d766acee6221aa9c0431d4572a699fc45da6460c774f7e56de7743f16dfd";
+        "sha256:4c4516862823dc46cbeab1d10d769294b8627ca1243320f68471f6e41a12f045";
     private static final List<Integer> CHECKPOINTS =
         List.of(8, 16, 32, 64, 128, 256);
     private static final List<String> POLICY_IDS = List.of(
@@ -66,28 +66,19 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
 
         assertEquals(
             "regelsuche.target-free-held-out-preregistration/v1",
-            preregistration.path("schema").asText()
-        );
+            preregistration.path("schema").asText());
         assertEquals(
             "regelsuche.target-free-held-out-formation/v1",
-            formation.path("schema").asText()
-        );
+            formation.path("schema").asText());
         assertEquals(
             "regelsuche.target-free-held-out-qualification/v1",
-            qualification.path("schema").asText()
-        );
-        assertEquals(
-            "FROZEN_NOT_EXECUTED",
-            preregistration.path("evidenceStatus").asText()
-        );
-        assertEquals(
-            "FROZEN_NOT_EXECUTED",
-            formation.path("evidenceStatus").asText()
-        );
-        assertEquals(
-            "SEALED_POST_FREEZE",
-            qualification.path("evidenceStatus").asText()
-        );
+            qualification.path("schema").asText());
+        assertEquals("FROZEN_NOT_EXECUTED",
+            preregistration.path("evidenceStatus").asText());
+        assertEquals("FROZEN_NOT_EXECUTED",
+            formation.path("evidenceStatus").asText());
+        assertEquals("SEALED_POST_FREEZE",
+            qualification.path("evidenceStatus").asText());
 
         Map<String, JsonNode> cases = byId(formation.path("cases"));
         Map<String, JsonNode> qualifications =
@@ -98,73 +89,57 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
         assertEquals(cases.keySet(), qualifications.keySet());
         assertEquals(POLICY_IDS, List.copyOf(policies.keySet()));
         assertEquals(CHECKPOINTS, integers(
-            formation.path("workMatching").path("checkpoints")
-        ));
-        assertEquals(
-            "ADMITTED_PRIMITIVE_STEPS",
-            formation.path("workMatching").path("authority").asText()
-        );
-        assertEquals(
-            "ALL_POLICIES_REACHED_EXACT_CHECKPOINT",
+            formation.path("workMatching").path("checkpoints")));
+        assertEquals("ADMITTED_PRIMITIVE_STEPS",
+            formation.path("workMatching").path("authority").asText());
+        assertEquals("ALL_POLICIES_REACHED_EXACT_CHECKPOINT",
             formation.path("workMatching")
-                .path("comparisonEligibility").asText()
-        );
-        assertEquals(
-            "EXHAUSTED_BEFORE_CHECKPOINT_NOT_COMPARABLE",
+                .path("comparisonEligibility").asText());
+        assertEquals("EXHAUSTED_BEFORE_CHECKPOINT_NOT_COMPARABLE",
             formation.path("workMatching")
-                .path("earlyExhaustionStatus").asText()
-        );
+                .path("earlyExhaustionStatus").asText());
         assertEquals(
             List.of(
                 "CASE_ID",
                 "POLICY_ID",
-                "ADMITTED_PRIMITIVE_STEP_CHECKPOINT"
-            ),
+                "ADMITTED_PRIMITIVE_STEP_CHECKPOINT"),
             strings(formation.path("workMatching")
-                .path("entryIdentityDimensions"))
-        );
+                .path("entryIdentityDimensions")));
 
-        assertEquals(6, preregistration.path(
-            "configuredCaseCount").asInt());
-        assertEquals(4, preregistration.path(
-            "configuredPolicyCount").asInt());
-        assertEquals(6, preregistration.path(
-            "configuredCheckpointCount").asInt());
-        assertEquals(
-            144,
-            preregistration.path("configuredEntryCount").asInt()
-        );
+        assertEquals(6,
+            preregistration.path("configuredCaseCount").asInt());
+        assertEquals(4,
+            preregistration.path("configuredPolicyCount").asInt());
+        assertEquals(6,
+            preregistration.path("configuredCheckpointCount").asInt());
+        assertEquals(144,
+            preregistration.path("configuredEntryCount").asInt());
         assertEquals(
             cases.size() * policies.size() * CHECKPOINTS.size(),
-            preregistration.path("configuredEntryCount").asInt()
-        );
+            preregistration.path("configuredEntryCount").asInt());
 
         int positiveCases = 0;
         int negativeCases = 0;
         int complexityValleys = 0;
         for (Map.Entry<String, JsonNode> entry : cases.entrySet()) {
             JsonNode benchmarkCase = entry.getValue();
-            JsonNode caseQualification =
-                qualifications.get(entry.getKey());
+            JsonNode caseQualification = qualifications.get(entry.getKey());
             assertEquals("MINIMAL_KERNEL",
                 benchmarkCase.path("ruleProfile").asText());
             assertFalse(strings(
                 benchmarkCase.path("distractorRulePackIds")).isEmpty());
             assertTrue(strings(
                 benchmarkCase.path("enabledRulePackIds")).containsAll(
-                    strings(benchmarkCase.path(
-                        "distractorRulePackIds"))
-                ));
+                    strings(benchmarkCase.path("distractorRulePackIds"))));
             assertAvailablePacks(benchmarkCase);
 
-            String expected = caseQualification.path(
-                "expectedOutcome").asText();
-            if ("NO_POLICY_QUALIFIES".equals(expected)) {
+            if ("NO_POLICY_QUALIFIES".equals(
+                    caseQualification.path("expectedOutcome").asText())) {
                 negativeCases++;
-                assertEquals(0, caseQualification.path(
-                    "minimumQualifiedDepth").asInt());
-                assertEquals(0, caseQualification.path(
-                    "maximumQualifiedDepth").asInt());
+                assertEquals(0,
+                    caseQualification.path("minimumQualifiedDepth").asInt());
+                assertEquals(0,
+                    caseQualification.path("maximumQualifiedDepth").asInt());
                 assertTrue(strings(caseQualification.path(
                     "oracleWitnessRequiredRuleIds")).isEmpty());
             } else {
@@ -194,27 +169,15 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
                 qualification.path("caseQualifications")) {
             assertFalse(formationText.contains(
                 caseQualification.path("expectedOutcome").asText()));
-            for (String reference : strings(
-                    caseQualification.path("referenceExpressions"))) {
-                assertFalse(
-                    formationText.contains(reference),
-                    () -> "reference leaked into formation: " + reference
-                );
-            }
-            for (String capability : strings(
-                    caseQualification.path("requiredCapabilities"))) {
-                assertFalse(
-                    formationText.contains(capability),
-                    () -> "capability leaked into formation: " + capability
-                );
-            }
-            for (String rule : strings(caseQualification.path(
-                    "oracleWitnessRequiredRuleIds"))) {
-                assertFalse(
-                    formationText.contains(rule),
-                    () -> "witness rule leaked into formation: " + rule
-                );
-            }
+            assertNoLeakage(formationText,
+                caseQualification.path("referenceExpressions"),
+                "reference");
+            assertNoLeakage(formationText,
+                caseQualification.path("requiredCapabilities"),
+                "capability");
+            assertNoLeakage(formationText,
+                caseQualification.path("oracleWitnessRequiredRuleIds"),
+                "witness rule");
         }
     }
 
@@ -223,14 +186,11 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
             throws Exception {
         Resources resources = resources();
         Map<String, JsonNode> qualifications = byId(
-            resources.qualification().path("caseQualifications")
-        );
+            resources.qualification().path("caseQualifications"));
 
-        for (JsonNode benchmarkCase :
-                resources.formation().path("cases")) {
+        for (JsonNode benchmarkCase : resources.formation().path("cases")) {
             JsonNode caseQualification = Objects.requireNonNull(
-                qualifications.get(benchmarkCase.path("id").asText())
-            );
+                qualifications.get(benchmarkCase.path("id").asText()));
             BoundaryEngine boundaryEngine = boundaryEngine(benchmarkCase);
             Set<String> availableRuleIds = boundaryEngine.boundary()
                 .candidateFormationRules().stream()
@@ -241,8 +201,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
                     caseQualification.path(
                         "oracleWitnessRequiredRuleIds"))),
                 () -> "witness vocabulary is unavailable for "
-                    + benchmarkCase.path("id").asText()
-            );
+                    + benchmarkCase.path("id").asText());
 
             Set<String> referenceCanonical = strings(
                 caseQualification.path("referenceExpressions")).stream()
@@ -255,8 +214,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
                     referenceCanonical.contains(CANONICALIZER.canonicalize(
                         transformation.transformedExpression()))),
                 () -> "direct primitive edge reaches a held-out reference for "
-                    + benchmarkCase.path("id").asText()
-            );
+                    + benchmarkCase.path("id").asText());
 
             if ("NO_POLICY_QUALIFIES".equals(
                     caseQualification.path("expectedOutcome").asText())) {
@@ -266,13 +224,10 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
                 benchmarkCase,
                 caseQualification,
                 boundaryEngine.engine(),
-                referenceCanonical
-            );
-            assertNotNull(
-                witness,
+                referenceCanonical);
+            assertNotNull(witness,
                 () -> "no bounded witness found for "
-                    + benchmarkCase.path("id").asText()
-            );
+                    + benchmarkCase.path("id").asText());
             int minimum = caseQualification.path(
                 "minimumQualifiedDepth").asInt();
             int maximum = caseQualification.path(
@@ -283,16 +238,13 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
                     + " outside preregistered range "
                     + minimum + ".." + maximum
                     + " for " + benchmarkCase.path("id").asText()
-                    + "; path=" + witness.ruleIds()
-            );
+                    + "; path=" + witness.ruleIds());
             if (caseQualification.path(
                     "requireTemporaryComplexityIncrease").asBoolean()) {
-                assertTrue(
-                    witness.temporaryComplexityIncrease(),
+                assertTrue(witness.temporaryComplexityIncrease(),
                     () -> "required complexity valley missing for "
                         + benchmarkCase.path("id").asText()
-                        + "; path=" + witness.ruleIds()
-                );
+                        + "; path=" + witness.ruleIds());
             }
         }
     }
@@ -300,22 +252,14 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
     @Test
     void matchedWorkComparisonIsFailClosed() throws Exception {
         JsonNode root = resources().formation().path("workMatching");
-        assertEquals(
-            "STOP_BEFORE_ADMITTING_A_STEP_BEYOND_THE_CHECKPOINT",
-            root.path("stopSemantics").asText()
-        );
-        assertEquals(
-            "RECORDED_SECONDARY_METRIC",
-            root.path("engineCalls").asText()
-        );
-        assertEquals(
-            "RECORDED_SECONDARY_METRIC",
-            root.path("generatedTransitions").asText()
-        );
-        assertEquals(
-            "RECORDED_DIAGNOSTIC_ONLY",
-            root.path("wallClock").asText()
-        );
+        assertEquals("STOP_BEFORE_ADMITTING_A_STEP_BEYOND_THE_CHECKPOINT",
+            root.path("stopSemantics").asText());
+        assertEquals("RECORDED_SECONDARY_METRIC",
+            root.path("engineCalls").asText());
+        assertEquals("RECORDED_SECONDARY_METRIC",
+            root.path("generatedTransitions").asText());
+        assertEquals("RECORDED_DIAGNOSTIC_ONLY",
+            root.path("wallClock").asText());
         assertTrue(CHECKPOINTS.stream().allMatch(value -> value > 0));
         assertTrue(java.util.stream.IntStream.range(
             1, CHECKPOINTS.size()).allMatch(index ->
@@ -326,17 +270,12 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
         byte[] preregistrationBytes =
             TargetFreeRepresentationEvaluationPlan.readResource(
                 PREREGISTRATION_RESOURCE);
-        assertEquals(
-            PREREGISTRATION_BYTE_LENGTH,
-            preregistrationBytes.length
-        );
-        assertEquals(
-            PREREGISTRATION_SHA256,
+        assertEquals(PREREGISTRATION_BYTE_LENGTH,
+            preregistrationBytes.length);
+        assertEquals(PREREGISTRATION_SHA256,
             TargetFreeRepresentationEvaluationPlan.sha256(
-                preregistrationBytes)
-        );
-        JsonNode preregistration = JSON.readTree(
-            preregistrationBytes);
+                preregistrationBytes));
+        JsonNode preregistration = JSON.readTree(preregistrationBytes);
         byte[] formationBytes =
             TargetFreeRepresentationEvaluationPlan.readResource(
                 preregistration.path("formationResource").asText());
@@ -346,33 +285,25 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
 
         assertEquals(
             preregistration.path("formationByteLength").asLong(),
-            formationBytes.length
-        );
+            formationBytes.length);
         assertEquals(
             preregistration.path("formationSha256").asText(),
-            TargetFreeRepresentationEvaluationPlan.sha256(
-                formationBytes)
-        );
+            TargetFreeRepresentationEvaluationPlan.sha256(formationBytes));
         assertEquals(
             preregistration.path("qualificationByteLength").asLong(),
-            qualificationBytes.length
-        );
+            qualificationBytes.length);
         assertEquals(
             preregistration.path("qualificationSha256").asText(),
             TargetFreeRepresentationEvaluationPlan.sha256(
-                qualificationBytes)
-        );
+                qualificationBytes));
         return new Resources(
             preregistration,
             JSON.readTree(formationBytes),
             JSON.readTree(qualificationBytes),
-            formationBytes
-        );
+            formationBytes);
     }
 
-    private static BoundaryEngine boundaryEngine(
-        JsonNode benchmarkCase
-    ) {
+    private static BoundaryEngine boundaryEngine(JsonNode benchmarkCase) {
         KnowledgePackSelection selection = KnowledgePackSelection.profile(
             RuleProfile.valueOf(
                 benchmarkCase.path("ruleProfile").asText()));
@@ -381,23 +312,19 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
             selection = selection.enablePack(packId);
         }
         RepresentationDiscoveryInformationBoundary boundary =
-            RepresentationDiscoveryInformationBoundary
-                .fromKnowledgePacks(
-                    new KnowledgePackRegistry(),
-                    Track.valueOf(benchmarkCase.path(
-                        "informationTrack").asText()),
-                    selection,
-                    Set.of()
-                );
+            RepresentationDiscoveryInformationBoundary.fromKnowledgePacks(
+                new KnowledgePackRegistry(),
+                Track.valueOf(benchmarkCase.path(
+                    "informationTrack").asText()),
+                selection,
+                Set.of());
         JsonNode budget = benchmarkCase.path("budget");
         return new BoundaryEngine(
             boundary,
             new AstRewriteTransformationEngine(
                 boundary.candidateFormationRules(),
                 budget.path("maxAstSizeIncreasePerStep").asInt(),
-                budget.path("maxCandidatesPerState").asInt()
-            )
-        );
+                budget.path("maxCandidatesPerState").asInt()));
     }
 
     private static Witness shortestWitness(
@@ -406,8 +333,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
         AstRewriteTransformationEngine engine,
         Set<String> referenceCanonical
     ) {
-        String source = benchmarkCase.path(
-            "sourceExpression").asText();
+        String source = benchmarkCase.path("sourceExpression").asText();
         int sourceSize = CANONICALIZER.astNodeCount(source);
         int maximumDepth = qualification.path(
             "maximumQualifiedDepth").asInt();
@@ -424,8 +350,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
             List.copyOf(initialAssumptions),
             0,
             false,
-            List.of()
-        ));
+            List.of()));
         Set<String> seen = new HashSet<>();
         seen.add(stateKey(source, initialAssumptions, false));
         int explored = 0;
@@ -440,22 +365,18 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
                 engine.transform(state.expression()));
             transformations.sort(Comparator
                 .comparing(Transformation::rule)
-                .thenComparing(
-                    Transformation::transformedExpression)
+                .thenComparing(Transformation::transformedExpression)
                 .thenComparing(value ->
                     String.join("\u0000", value.assumptions())));
             for (Transformation transformation : transformations) {
                 TreeSet<String> assumptions = new TreeSet<>(
                     state.assumptions());
                 assumptions.addAll(transformation.assumptions());
-                String expression =
-                    transformation.transformedExpression();
+                String expression = transformation.transformedExpression();
                 boolean complexityIncrease =
                     state.temporaryComplexityIncrease()
-                        || CANONICALIZER.astNodeCount(expression)
-                            > sourceSize;
-                List<String> path = new ArrayList<>(
-                    state.ruleIds());
+                        || CANONICALIZER.astNodeCount(expression) > sourceSize;
+                List<String> path = new ArrayList<>(state.ruleIds());
                 path.addAll(transformation.primitiveRuleIds());
                 int depth = state.depth()
                     + transformation.primitiveStepCount();
@@ -467,8 +388,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
                     return new Witness(
                         depth,
                         complexityIncrease,
-                        List.copyOf(path)
-                    );
+                        List.copyOf(path));
                 }
                 if (depth >= maximumDepth) {
                     continue;
@@ -481,8 +401,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
                         List.copyOf(assumptions),
                         depth,
                         complexityIncrease,
-                        List.copyOf(path)
-                    ));
+                        List.copyOf(path)));
                 }
             }
         }
@@ -500,17 +419,25 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
     }
 
     private static void assertAvailablePacks(JsonNode benchmarkCase) {
-        Set<String> available = new HashSet<>(
-            CoreRuleCatalog.packIds());
+        Set<String> available = new HashSet<>(CoreRuleCatalog.packIds());
         new KnowledgePackRegistry().allPacks().forEach(pack ->
             available.add(pack.packId()));
         for (String packId : strings(
                 benchmarkCase.path("enabledRulePackIds"))) {
-            assertTrue(
-                available.contains(packId),
+            assertTrue(available.contains(packId),
                 () -> "unknown rule pack " + packId
-                    + " for " + benchmarkCase.path("id").asText()
-            );
+                    + " for " + benchmarkCase.path("id").asText());
+        }
+    }
+
+    private static void assertNoLeakage(
+        String formationText,
+        JsonNode values,
+        String label
+    ) {
+        for (String value : strings(values)) {
+            assertFalse(formationText.contains(value),
+                () -> label + " leaked into formation: " + value);
         }
     }
 
