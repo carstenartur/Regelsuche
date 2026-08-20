@@ -91,15 +91,19 @@
       "maximumQualifiedDepth": 6,
       "minimumQualifiedDepth": 3,
       "oracleWitnessRequiredRuleIds": [
-        "ast_add_zero_right",
-        "ast_multiply_one_left",
-        "ast_add_zero_right"
+        "ast_cancel_division_factor",
+        "ast_cancel_division_factor",
+        "ast_cancel_division_factor"
       ],
       "referenceExpressions": [
-        "y * (sin(x)^2 + cos(x)^2)"
+        "sin(x)^2 + cos(x)^2"
       ],
       "requireTemporaryComplexityIncrease": false,
-      "requiredAssumptions": [],
+      "requiredAssumptions": [
+        "a != 0",
+        "b != 0",
+        "c != 0"
+      ],
       "requiredCapabilities": [
         "rule:sympy.trig.pythagorean"
       ]

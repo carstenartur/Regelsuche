@@ -96,13 +96,14 @@
         "core-power-rules"
       ],
       "enabledRulePackIds": [
+        "core-polynomial-division",
         "core-power-rules",
         "sympy-trigonometry"
       ],
       "id": "occurrence-local-trigonometric-bridge-held-out",
       "informationTrack": "R2_CATALOG_BLIND_POST_HOC_BRIDGE",
       "ruleProfile": "MINIMAL_KERNEL",
-      "sourceExpression": "1 * (y * (sin(x)^2 + (cos(x)^2 + 0))) + 0"
+      "sourceExpression": "((((sin(x) * a) / a) * b) / b)^2 + ((cos(x) * c) / c)^2"
     },
     {
       "assumptions": [
