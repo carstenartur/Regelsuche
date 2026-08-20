@@ -54,6 +54,29 @@ reached exactly that admitted-primitive-step checkpoint for the same case and
 inventory. Early source exhaustion is retained as evidence but is not treated
 as matched work.
 
-The tranche is a preregistration, not a result. It establishes neither
-mathematical novelty nor policy superiority. Execution, candidate freeze,
-post-freeze qualification and interpretation remain separate follow-up steps.
+## Execution and retained evidence
+
+`TargetFreeHeldOutMatrixRunner` executes the complete matrix in canonical row
+order. It writes three separate artifacts:
+
+```text
+target-free-held-out-plan.json
+target-free-held-out-candidate-freeze.json
+target-free-held-out-post-freeze-qualification.json
+```
+
+The plan contains only the preregistration and formation surface. The runner
+then executes every row, records complete candidate lineages and actual-work
+ledgers, writes the candidate-freeze artifact and reads it back byte-for-byte.
+Only after that complete freeze has been verified does it open the sealed
+qualification resource.
+
+The post-freeze artifact binds every qualification row back to its frozen
+configuration, candidate batch, candidate set, freeze receipt, work ledger,
+classification catalog and rule inventory. The generated files are retained
+under the discovery test report tree so CI and independent reproduction can
+inspect the exact evidence rather than relying on console summaries.
+
+The tranche remains bounded evidence. It establishes neither mathematical
+novelty nor general policy superiority, and it does not treat wall-clock time as
+a substitute for matched admitted primitive work.
