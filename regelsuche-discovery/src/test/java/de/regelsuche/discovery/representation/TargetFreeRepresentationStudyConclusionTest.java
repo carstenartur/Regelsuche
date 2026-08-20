@@ -1,6 +1,7 @@
 package de.regelsuche.discovery.representation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -46,8 +47,22 @@ class TargetFreeRepresentationStudyConclusionTest {
         assertEquals(0, summary.allPolicyMatchedWorkCaseCount());
         assertEquals(20, summary.qualifiedCandidatesAtDepthOne());
         assertEquals(0, summary.qualifiedCandidatesAtDepthAtLeastThree());
-        assertEquals(0, summary.assumptionViolationCandidates());
+        assertEquals(4, summary.assumptionViolationCandidates());
         assertEquals(0, summary.directRuleLeakCandidates());
+
+        assertEquals(
+            4L,
+            QUALIFICATION.content().entries().stream()
+                .flatMap(entry -> entry.candidates().stream())
+                .filter(candidate -> candidate.forbiddenOutcomes().contains(
+                    "ASSUMPTION_DROPPED"))
+                .count()
+        );
+        assertFalse(QUALIFICATION.content().entries().stream()
+            .flatMap(entry -> entry.candidates().stream())
+            .anyMatch(candidate -> candidate.qualified()
+                && candidate.forbiddenOutcomes().contains(
+                    "ASSUMPTION_DROPPED")));
 
         assertEquals(
             TargetFreeRepresentationStudyConclusion.RESULT_CLASSIFICATION,
