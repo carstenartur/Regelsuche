@@ -74,12 +74,9 @@ class TargetFreeRepresentationPostFreezeQualificationTest {
             .filter(entry -> entry.caseId().equals(
                 "assumption-sensitive-cancellation-control"))
             .flatMap(entry -> entry.candidates().stream())
-            .filter(candidate -> candidate.expression().equals("1"))
-            .filter(
-                TargetFreeRepresentationPostFreezeQualification
-                    .QualifiedCandidate::qualified)
-            .allMatch(candidate ->
-                candidate.assumptions().contains("x != 0"))
+            .anyMatch(candidate -> candidate.expression().equals("1")
+                && candidate.qualified()
+                && candidate.assumptions().contains("x != 0"))
         );
         assertTrue(content.entries().stream()
             .filter(entry -> entry.caseId().equals(
