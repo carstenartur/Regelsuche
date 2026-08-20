@@ -1,0 +1,799 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetFreeRepresentationPostFreezeQualification.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">TargetFreeRepresentationPostFreezeQualification.java</span></div><h1>TargetFreeRepresentationPostFreezeQualification.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.util.AtomicJsonFile;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.OracleValidator;
+import de.regelsuche.validation.SymPyOracleValidator;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Opens the sealed qualification only after the immutable candidate freeze has
+ * been supplied and its complete content binding has been verified.
+ */
+final class TargetFreeRepresentationPostFreezeQualification {
+    static final String SCHEMA =
+        &quot;regelsuche.target-free-representation-post-freeze-qualification/v1&quot;;
+    static final String FILE_NAME =
+        &quot;representation-discovery-post-freeze-qualification.json&quot;;
+    static final String EVIDENCE_STATUS =
+        &quot;FROZEN_CANDIDATES_QUALIFIED_POST_FREEZE&quot;;
+    static final String DISCLOSURE = &quot;DISCLOSED_AFTER_CANDIDATE_FREEZE&quot;;
+    static final String CLAIM_BOUNDARY =
+        &quot;Classifies the exact immutable candidate batches after opening the &quot;
+            + &quot;sealed qualification resource. Formation, candidates and work &quot;
+            + &quot;ledgers remain unchanged. This is not external novelty, global &quot;
+            + &quot;optimality, CPU-time equality or general superiority evidence.&quot;;
+
+    private static final String QUALIFICATION_SCHEMA =
+        &quot;regelsuche.target-free-representation-qualification/v1&quot;;
+    private static final String SEALED = &quot;SEALED_POST_FREEZE&quot;;
+    private static final String QUALIFIED = &quot;QUALIFIED&quot;;
+    private static final String UNQUALIFIED =
+        &quot;NO_QUALIFYING_CANDIDATE&quot;;
+    private static final String RULE_PREFIX = &quot;rule:&quot;;
+<span class="fc" id="L58">    private static final ExpressionParser QUALIFICATION_PARSER =</span>
+        new ExpressionParser();
+<span class="fc" id="L60">    private static final JsonMapper QUALIFICATION_JSON = JsonMapper.builder()</span>
+<span class="fc" id="L61">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L62">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L63">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L64">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L65">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L66">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)</span>
+<span class="fc" id="L67">        .build();</span>
+
+    private TargetFreeRepresentationPostFreezeQualification() {
+    }
+
+    static QualificationArtifact qualify(
+        Path freezeFile,
+        String repositoryRevision
+    ) throws IOException {
+<span class="nc" id="L76">        String source = Files.readString(</span>
+<span class="nc" id="L77">            Objects.requireNonNull(freezeFile, &quot;freezeFile&quot;)</span>
+<span class="nc" id="L78">                .toAbsolutePath().normalize(),</span>
+            StandardCharsets.UTF_8
+        );
+<span class="nc" id="L81">        return qualify(</span>
+            TargetFreeRepresentationCandidateFreeze.FreezeArtifact
+<span class="nc" id="L83">                .fromCanonicalJson(source),</span>
+            repositoryRevision
+        );
+    }
+
+    static QualificationArtifact qualify(
+        TargetFreeRepresentationCandidateFreeze.FreezeArtifact freeze,
+        String repositoryRevision
+    ) {
+<span class="fc" id="L92">        Objects.requireNonNull(freeze, &quot;freeze&quot;);</span>
+<span class="fc" id="L93">        var plan = TargetFreeRepresentationEvaluationPlan.create(</span>
+            repositoryRevision);
+<span class="fc" id="L95">        requireFrozenAuthority(freeze, plan);</span>
+
+<span class="fc" id="L97">        byte[] sealedBytes =</span>
+<span class="fc" id="L98">            TargetFreeRepresentationEvaluationPlan.readResource(</span>
+<span class="fc" id="L99">                plan.content().qualificationResource());</span>
+<span class="fc" id="L100">        String sealedHash =</span>
+<span class="fc" id="L101">            TargetFreeRepresentationEvaluationPlan.sha256(sealedBytes);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (sealedBytes.length != plan.content().qualificationByteLength()</span>
+                || sealedBytes.length
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                    != freeze.content().qualificationByteLength()</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">                || !sealedHash.equals(plan.content().qualificationHash())</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                || !sealedHash.equals(</span>
+<span class="fc" id="L107">                    freeze.content().qualificationHash())) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(</span>
+                &quot;sealed qualification differs from its frozen commitment&quot;);
+        }
+<span class="fc" id="L111">        Qualification qualification = decode(</span>
+            sealedBytes, Qualification.class);
+<span class="fc" id="L113">        requireQualification(qualification, plan);</span>
+
+        Map&lt;String, TargetFreeRepresentationEvaluationPlan.CaseDefinition&gt;
+<span class="fc" id="L116">            cases = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L117">        plan.content().cases().forEach(value -&gt;</span>
+<span class="fc" id="L118">            cases.put(value.id(), value));</span>
+<span class="fc" id="L119">        Map&lt;String, QualificationRule&gt; rules = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L120">        qualification.cases().forEach(value -&gt;</span>
+<span class="fc" id="L121">            rules.put(value.id(), value));</span>
+
+<span class="fc" id="L123">        SymPyOracleValidator oracle = new SymPyOracleValidator();</span>
+<span class="fc" id="L124">        List&lt;QualificationEntry&gt; entries =</span>
+<span class="fc" id="L125">            freeze.content().entries().stream()</span>
+<span class="fc" id="L126">                .map(entry -&gt; qualifyEntry(</span>
+                    entry,
+<span class="fc" id="L128">                    Objects.requireNonNull(cases.get(entry.caseId())),</span>
+<span class="fc" id="L129">                    Objects.requireNonNull(rules.get(entry.caseId())),</span>
+                    oracle
+                ))
+<span class="fc" id="L132">                .toList();</span>
+<span class="fc" id="L133">        QualificationContent content = new QualificationContent(</span>
+            SCHEMA,
+            EVIDENCE_STATUS,
+<span class="fc" id="L136">            plan.content().repositoryRevision(),</span>
+<span class="fc" id="L137">            plan.contentHash(),</span>
+<span class="fc" id="L138">            freeze.contentHash(),</span>
+<span class="fc" id="L139">            plan.content().qualificationResource(),</span>
+            sealedHash,
+            sealedBytes.length,
+            DISCLOSURE,
+            entries,
+<span class="fc" id="L144">            Summary.from(entries),</span>
+<span class="fc" id="L145">            qualification.claimBoundary(),</span>
+            CLAIM_BOUNDARY
+        );
+<span class="fc" id="L148">        return QualificationArtifact.create(content);</span>
+    }
+
+    static QualificationArtifact write(
+        Path outputDirectory,
+        Path freezeFile,
+        String repositoryRevision
+    ) throws IOException {
+<span class="nc" id="L156">        Path directory = Objects.requireNonNull(</span>
+            outputDirectory, &quot;outputDirectory&quot;)
+<span class="nc" id="L158">            .toAbsolutePath().normalize();</span>
+<span class="nc" id="L159">        Files.createDirectories(directory);</span>
+<span class="nc" id="L160">        QualificationArtifact artifact = qualify(</span>
+            freezeFile, repositoryRevision);
+<span class="nc" id="L162">        Path target = directory.resolve(FILE_NAME);</span>
+<span class="nc" id="L163">        String canonical = artifact.toCanonicalJson();</span>
+<span class="nc" id="L164">        AtomicJsonFile.writeUtf8(target, canonical);</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (!canonical.equals(Files.readString(</span>
+                target, StandardCharsets.UTF_8))
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                || !artifact.equals(</span>
+<span class="nc" id="L168">                    QualificationArtifact.fromCanonicalJson(canonical))) {</span>
+<span class="nc" id="L169">            throw new IllegalStateException(</span>
+                &quot;post-freeze qualification changed while writing&quot;);
+        }
+<span class="nc" id="L172">        return artifact;</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (args.length != 3) {</span>
+<span class="nc" id="L177">            throw new IllegalArgumentException(</span>
+                &quot;usage: &lt;repository-commit&gt; &lt;candidate-freeze-file&gt; &quot;
+                    + &quot;&lt;output-directory&gt;&quot;);
+        }
+<span class="nc" id="L181">        QualificationArtifact artifact = write(</span>
+<span class="nc" id="L182">            Path.of(args[2]), Path.of(args[1]), args[0]);</span>
+<span class="nc" id="L183">        System.out.println(</span>
+            &quot;targetFreeRepresentationPostFreezeQualificationHash=&quot;
+<span class="nc" id="L185">                + artifact.contentHash());</span>
+<span class="nc" id="L186">        System.out.println(</span>
+            &quot;targetFreeRepresentationQualifiedConfigurations=&quot;
+<span class="nc" id="L188">                + artifact.content().summary().qualifiedEntries());</span>
+<span class="nc" id="L189">        System.out.println(</span>
+            &quot;targetFreeRepresentationQualifiedCandidates=&quot;
+<span class="nc" id="L191">                + artifact.content().summary().qualifiedCandidates());</span>
+<span class="nc" id="L192">    }</span>
+
+    private static QualificationEntry qualifyEntry(
+        TargetFreeRepresentationCandidateFreeze.ExecutionEntry frozen,
+        TargetFreeRepresentationEvaluationPlan.CaseDefinition benchmarkCase,
+        QualificationRule rule,
+        SymPyOracleValidator oracle
+    ) {
+<span class="fc" id="L200">        RepresentationDiscoveryInformationBoundary boundary =</span>
+<span class="fc" id="L201">            RepresentationDiscoveryInformationBoundary.fromKnowledgePacks(</span>
+<span class="fc" id="L202">                benchmarkCase.informationTrack(),</span>
+<span class="fc" id="L203">                visibleSelection(benchmarkCase)</span>
+            );
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (!boundary.contentHash().equals(</span>
+<span class="fc" id="L206">                frozen.informationBoundaryHash())</span>
+<span class="fc" id="L207">                || !boundary.candidateFormationSelectionCommitment()</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                    .equals(frozen.formationSelectionCommitment())</span>
+<span class="fc" id="L209">                || !boundary.candidateFormationRuleInventoryHash()</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                    .equals(frozen.formationRuleInventoryHash())</span>
+<span class="fc" id="L211">                || !boundary.postFreezeCatalogCommitment()</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                    .equals(frozen.postFreezeCatalogCommitment())) {</span>
+<span class="nc" id="L213">            throw new IllegalArgumentException(</span>
+                &quot;information-boundary commitment changed before disclosure&quot;);
+        }
+
+<span class="fc" id="L217">        List&lt;RepresentationCandidateProposal&gt; proposals =</span>
+<span class="fc" id="L218">            frozen.candidates().stream()</span>
+<span class="fc" id="L219">                .map(candidate -&gt; RepresentationCandidateProposal.whole(</span>
+<span class="fc" id="L220">                    benchmarkCase.sourceExpression(),</span>
+<span class="fc" id="L221">                    candidate.expression(),</span>
+<span class="fc" id="L222">                    candidate.assumptions(),</span>
+                    CandidateProofStatus.OBSERVED
+                ))
+<span class="fc" id="L225">                .toList();</span>
+<span class="fc" id="L226">        var receipt = boundary.freezeCandidates(proposals);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (receipt.candidateCount() != frozen.candidateCount()</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                || !receipt.candidateSetHash().equals(</span>
+<span class="fc" id="L229">                    frozen.candidateSetHash())</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                || !receipt.contentHash().equals(</span>
+<span class="fc" id="L231">                    frozen.candidateFreezeReceiptHash())) {</span>
+<span class="nc" id="L232">            throw new IllegalArgumentException(</span>
+                &quot;candidate set changed before qualification&quot;);
+        }
+<span class="fc" id="L235">        var disclosure = boundary.disclosePostFreeze(receipt);</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (!disclosure.classificationCatalog().contentHash().equals(</span>
+<span class="fc" id="L237">                frozen.postFreezeCatalogCommitment())</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">                || !disclosure.formationRuleInventoryHash().equals(</span>
+<span class="fc" id="L239">                    frozen.formationRuleInventoryHash())) {</span>
+<span class="nc" id="L240">            throw new IllegalArgumentException(</span>
+                &quot;post-freeze disclosure differs from its commitment&quot;);
+        }
+
+<span class="fc" id="L244">        RepresentationCandidateAssessor assessor =</span>
+            new RepresentationCandidateAssessor(
+<span class="fc" id="L246">                disclosure.classificationCatalog());</span>
+<span class="fc" id="L247">        AstRewriteTransformationEngine engine =</span>
+<span class="fc" id="L248">            AstRewriteTransformationEngine.withKnowledgePacks(</span>
+<span class="fc" id="L249">                disclosure.classificationSelection());</span>
+<span class="fc" id="L250">        List&lt;QualifiedCandidate&gt; candidates = frozen.candidates().stream()</span>
+<span class="fc" id="L251">            .map(candidate -&gt; classify(</span>
+                benchmarkCase,
+                rule,
+                candidate,
+                assessor,
+                engine,
+                oracle
+            ))
+<span class="fc" id="L259">            .sorted(Comparator.comparing(</span>
+                QualifiedCandidate::candidateHash))
+<span class="fc" id="L261">            .toList();</span>
+<span class="fc" id="L262">        int qualified = Math.toIntExact(candidates.stream()</span>
+<span class="fc" id="L263">            .filter(QualifiedCandidate::qualified).count());</span>
+<span class="fc" id="L264">        return new QualificationEntry(</span>
+<span class="fc" id="L265">            frozen.sequence(),</span>
+<span class="fc" id="L266">            frozen.configurationId(),</span>
+<span class="fc" id="L267">            frozen.caseId(),</span>
+<span class="fc" id="L268">            frozen.policyId(),</span>
+<span class="fc" id="L269">            frozen.candidateBatchHash(),</span>
+<span class="fc" id="L270">            frozen.candidateSetHash(),</span>
+<span class="fc" id="L271">            frozen.candidateFreezeReceiptHash(),</span>
+<span class="fc" id="L272">            frozen.work().contentHash(),</span>
+<span class="fc" id="L273">            frozen.workAuthorityHash(),</span>
+<span class="fc" id="L274">            disclosure.contentHash(),</span>
+<span class="fc" id="L275">            disclosure.classificationCatalog().contentHash(),</span>
+<span class="fc" id="L276">            disclosure.classificationRuleInventoryHash(),</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            qualified &gt; 0 ? QUALIFIED : UNQUALIFIED,</span>
+            candidates,
+            qualified
+        );
+    }
+
+    private static QualifiedCandidate classify(
+        TargetFreeRepresentationEvaluationPlan.CaseDefinition benchmarkCase,
+        QualificationRule rule,
+        TargetFreeRepresentationCandidateFreeze.CandidateEvidence candidate,
+        RepresentationCandidateAssessor assessor,
+        AstRewriteTransformationEngine engine,
+        SymPyOracleValidator oracle
+    ) {
+<span class="fc" id="L291">        boolean reference = rule.referenceExpressions().stream()</span>
+<span class="fc" id="L292">            .map(TargetFreeRepresentationPostFreezeQualification::normalize)</span>
+<span class="fc" id="L293">            .anyMatch(normalize(candidate.expression())::equals);</span>
+<span class="fc" id="L294">        Proof proof = proof(</span>
+<span class="fc" id="L295">            benchmarkCase.sourceExpression(), candidate, reference, oracle);</span>
+<span class="fc" id="L296">        RepresentationCandidateAssessment assessment = assessor.assess(</span>
+<span class="fc" id="L297">            RepresentationCandidateProposal.whole(</span>
+<span class="fc" id="L298">                benchmarkCase.sourceExpression(),</span>
+<span class="fc" id="L299">                candidate.expression(),</span>
+<span class="fc" id="L300">                candidate.assumptions(),</span>
+<span class="fc" id="L301">                proof.status()</span>
+            )
+        );
+<span class="fc" id="L304">        int tokenSavings = assessment.wholeSourceMetrics().tokenCount()</span>
+<span class="fc" id="L305">            - assessment.wholeCandidateMetrics().tokenCount();</span>
+<span class="fc" id="L306">        Set&lt;String&gt; types = Set.copyOf(assessment.candidateTypes());</span>
+<span class="fc" id="L307">        boolean assumptions = candidate.assumptions().containsAll(</span>
+<span class="fc" id="L308">            rule.requiredAssumptions());</span>
+<span class="fc" id="L309">        List&lt;String&gt; unlocked =</span>
+<span class="fc" id="L310">            assessment.newlyUnlockedConsequences().stream()</span>
+<span class="fc" id="L311">                .map(KnownStructureConsequenceUnlock::consequenceId)</span>
+<span class="fc" id="L312">                .distinct().sorted().toList();</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        List&lt;String&gt; executable = reference</span>
+<span class="fc" id="L314">            ? executable(engine, candidate.expression(),</span>
+<span class="fc" id="L315">                rule.requiredCapabilities())</span>
+<span class="fc" id="L316">            : List.of();</span>
+<span class="fc" id="L317">        boolean acceptedType = rule.acceptedCandidateTypes().stream()</span>
+<span class="fc" id="L318">            .anyMatch(types::contains);</span>
+<span class="fc" id="L319">        boolean capabilitiesUnlocked =</span>
+<span class="fc" id="L320">            unlocked.containsAll(rule.requiredCapabilities());</span>
+<span class="fc" id="L321">        boolean capabilitiesExecutable =</span>
+<span class="fc" id="L322">            executable.containsAll(rule.requiredCapabilities());</span>
+
+<span class="fc" id="L324">        TreeSet&lt;String&gt; forbidden = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        for (String outcome : rule.forbiddenOutcomes()) {</span>
+<span class="pc bpc" id="L326" title="1 of 7 branches missed.">            boolean present = switch (outcome) {</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">                case &quot;ASSUMPTION_DROPPED&quot; -&gt; !assumptions;</span>
+                case &quot;FORMATION_USED_POST_FREEZE_RULE&quot; -&gt;
+<span class="fc" id="L329">                    usedWithheldRule(</span>
+<span class="fc" id="L330">                        candidate, rule.requiredCapabilities());</span>
+                case &quot;ALIAS_ONLY_COMPRESSION&quot; -&gt;
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">                    !assessment.introducedVariableSymbols().isEmpty()</span>
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">                        || !assessment.introducedFunctionSymbols().isEmpty();</span>
+                case &quot;WRONG_OCCURRENCE_PROVENANCE&quot; -&gt;
+<span class="fc" id="L335">                    assessment.newlyExposedStructureMatches().stream()</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">                        .noneMatch(match -&gt; !match.wholeExpression());</span>
+                case &quot;ALPHA_OR_AC_ONLY_GAIN&quot; -&gt;
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">                    !assessment.materialRepresentationGain();</span>
+                case &quot;LABEL_WITHOUT_EXECUTABLE_CONSEQUENCE&quot; -&gt;
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">                    !capabilitiesExecutable;</span>
+<span class="nc" id="L341">                default -&gt; throw new IllegalArgumentException(</span>
+                    &quot;unknown forbidden qualification outcome &quot; + outcome);
+            };
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            if (present) {</span>
+<span class="fc" id="L345">                forbidden.add(outcome);</span>
+            }
+<span class="fc" id="L347">        }</span>
+
+<span class="fc" id="L349">        TreeSet&lt;String&gt; reasons = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        reject(reasons, !reference, &quot;REFERENCE_NOT_MATCHED&quot;);</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        reject(reasons, !assumptions, &quot;REQUIRED_ASSUMPTION_MISSING&quot;);</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">        reject(reasons, tokenSavings &lt; rule.minimumTokenSavings(),</span>
+            &quot;TOKEN_SAVINGS_BELOW_MINIMUM&quot;);
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        reject(reasons, !acceptedType,</span>
+            &quot;ACCEPTED_CANDIDATE_TYPE_NOT_OBSERVED&quot;);
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        reject(reasons, !capabilitiesUnlocked,</span>
+            &quot;REQUIRED_CAPABILITY_NOT_UNLOCKED&quot;);
+<span class="fc bfc" id="L358" title="All 2 branches covered.">        reject(reasons, !capabilitiesExecutable,</span>
+            &quot;REQUIRED_CAPABILITY_NOT_EXECUTABLE&quot;);
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        reject(reasons, !proof.status().atLeast(</span>
+                CandidateProofStatus.SYMBOLICALLY_VERIFIED),
+            &quot;SYMBOLIC_VALIDATION_NOT_CONFIRMED&quot;);
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        reject(reasons, !forbidden.isEmpty(),</span>
+            &quot;FORBIDDEN_OUTCOME_OBSERVED&quot;);
+
+<span class="fc" id="L366">        List&lt;String&gt; structures =</span>
+<span class="fc" id="L367">            assessment.newlyExposedStructureMatches().stream()</span>
+<span class="fc" id="L368">                .map(match -&gt; match.structureId()</span>
+<span class="fc" id="L369">                    + &quot;@&quot; + match.occurrencePath())</span>
+<span class="fc" id="L370">                .distinct().sorted().toList();</span>
+<span class="fc" id="L371">        return new QualifiedCandidate(</span>
+<span class="fc" id="L372">            candidate.candidateHash(),</span>
+<span class="fc" id="L373">            candidate.expression(),</span>
+<span class="fc" id="L374">            candidate.assumptions(),</span>
+<span class="fc" id="L375">            proof.status().name(),</span>
+<span class="fc" id="L376">            proof.oracleStatus(),</span>
+            reference,
+            tokenSavings,
+<span class="fc" id="L379">            assessment.compressionStatus(),</span>
+<span class="fc" id="L380">            assessment.candidateTypes(),</span>
+            structures,
+            unlocked,
+            executable,
+<span class="fc" id="L384">            List.copyOf(forbidden),</span>
+<span class="fc" id="L385">            List.copyOf(reasons),</span>
+<span class="fc" id="L386">            reasons.isEmpty()</span>
+        );
+    }
+
+    private static Proof proof(
+        String source,
+        TargetFreeRepresentationCandidateFreeze.CandidateEvidence candidate,
+        boolean reference,
+        SymPyOracleValidator oracle
+    ) {
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        if (!reference) {</span>
+<span class="fc" id="L397">            return new Proof(</span>
+                CandidateProofStatus.OBSERVED,
+                &quot;NOT_RUN_REFERENCE_MISS&quot;);
+        }
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">        if (!candidate.equivalencePreserving()) {</span>
+<span class="nc" id="L402">            return new Proof(</span>
+                CandidateProofStatus.OBSERVED,
+                &quot;NOT_EQUIVALENCE_PRESERVING_BY_CONSTRUCTION&quot;);
+        }
+        try {
+<span class="fc" id="L407">            var validation = oracle.validateEquivalence(</span>
+<span class="fc" id="L408">                source, candidate.expression());</span>
+<span class="fc" id="L409">            return new Proof(</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">                validation.status()</span>
+<span class="fc" id="L411">                    == OracleValidator.OracleValidationStatus.AGREE</span>
+<span class="fc" id="L412">                    ? CandidateProofStatus.SYMBOLICALLY_VERIFIED</span>
+<span class="pc" id="L413">                    : CandidateProofStatus.OBSERVED,</span>
+<span class="fc" id="L414">                validation.status().name()</span>
+            );
+<span class="nc" id="L416">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L417">            return new Proof(</span>
+                CandidateProofStatus.OBSERVED,
+                &quot;VALIDATOR_ERROR_&quot;
+<span class="nc" id="L420">                    + exception.getClass().getSimpleName());</span>
+        }
+    }
+
+    private static List&lt;String&gt; executable(
+        AstRewriteTransformationEngine engine,
+        String expression,
+        List&lt;String&gt; capabilities
+    ) {
+<span class="fc bfc" id="L429" title="All 2 branches covered.">        if (capabilities.isEmpty()) {</span>
+<span class="fc" id="L430">            return List.of();</span>
+        }
+<span class="fc" id="L432">        List&lt;Transformation&gt; successors = engine.transform(expression);</span>
+<span class="fc" id="L433">        TreeSet&lt;String&gt; result = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        for (String capability : capabilities) {</span>
+<span class="fc" id="L435">            String rule = ruleId(capability);</span>
+<span class="fc" id="L436">            boolean present = engine.rules().stream()</span>
+<span class="fc" id="L437">                .anyMatch(value -&gt; value.id().equals(rule));</span>
+<span class="fc" id="L438">            boolean executed = successors.stream().anyMatch(value -&gt;</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">                value.rule().equals(rule)</span>
+<span class="fc" id="L440">                    &amp;&amp; !normalize(value.transformedExpression())</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">                        .equals(normalize(expression)));</span>
+<span class="pc bpc" id="L442" title="2 of 4 branches missed.">            if (present &amp;&amp; executed) {</span>
+<span class="fc" id="L443">                result.add(capability);</span>
+            }
+<span class="fc" id="L445">        }</span>
+<span class="fc" id="L446">        return List.copyOf(result);</span>
+    }
+
+    private static boolean usedWithheldRule(
+        TargetFreeRepresentationCandidateFreeze.CandidateEvidence candidate,
+        List&lt;String&gt; capabilities
+    ) {
+<span class="fc" id="L453">        Set&lt;String&gt; rules = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L454">        capabilities.stream().map(</span>
+            TargetFreeRepresentationPostFreezeQualification::ruleId)
+<span class="fc" id="L456">            .forEach(rules::add);</span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">        return candidate.pathRuleIds().stream().anyMatch(rules::contains)</span>
+<span class="fc" id="L458">            || candidate.primitiveRuleIds().stream()</span>
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">                .anyMatch(rules::contains);</span>
+    }
+
+    private static KnowledgePackSelection visibleSelection(
+        TargetFreeRepresentationEvaluationPlan.CaseDefinition benchmarkCase
+    ) {
+<span class="fc" id="L465">        KnowledgePackSelection selection = KnowledgePackSelection.profile(</span>
+<span class="fc" id="L466">            benchmarkCase.ruleProfile());</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        for (String pack : benchmarkCase.enabledRulePackIds()) {</span>
+<span class="fc" id="L468">            selection = selection.enablePack(pack);</span>
+<span class="fc" id="L469">        }</span>
+<span class="fc" id="L470">        return selection;</span>
+    }
+
+    private static void requireFrozenAuthority(
+        TargetFreeRepresentationCandidateFreeze.FreezeArtifact freeze,
+        TargetFreeRepresentationEvaluationPlan.EvaluationPlan plan
+    ) {
+<span class="fc" id="L477">        var content = freeze.content();</span>
+<span class="fc" id="L478">        List&lt;String&gt; expected = plan.content().entries().stream()</span>
+<span class="fc" id="L479">            .map(TargetFreeRepresentationEvaluationPlan.PlanEntry</span>
+                ::configurationId)
+<span class="fc" id="L481">            .toList();</span>
+<span class="fc" id="L482">        List&lt;String&gt; actual = content.entries().stream()</span>
+<span class="fc" id="L483">            .map(TargetFreeRepresentationCandidateFreeze.ExecutionEntry</span>
+                ::configurationId)
+<span class="fc" id="L485">            .toList();</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        if (!content.repositoryRevision().equals(</span>
+<span class="fc" id="L487">                plan.content().repositoryRevision())</span>
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">                || !content.evaluationPlanHash().equals(plan.contentHash())</span>
+<span class="pc bpc" id="L489" title="1 of 2 branches missed.">                || !content.preregistrationHash().equals(</span>
+<span class="fc" id="L490">                    plan.content().preregistrationHash())</span>
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">                || !content.formationHash().equals(</span>
+<span class="fc" id="L492">                    plan.content().formationHash())</span>
+<span class="pc bpc" id="L493" title="1 of 2 branches missed.">                || !content.qualificationHash().equals(</span>
+<span class="fc" id="L494">                    plan.content().qualificationHash())</span>
+                || !TargetFreeRepresentationCandidateFreeze
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">                    .QUALIFICATION_DISCLOSURE.equals(</span>
+<span class="fc" id="L497">                        content.qualificationDisclosure())</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">                || !expected.equals(actual)) {</span>
+<span class="fc" id="L499">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze is not the exact frozen matrix authority&quot;);
+        }
+<span class="fc" id="L502">    }</span>
+
+    private static void requireQualification(
+        Qualification qualification,
+        TargetFreeRepresentationEvaluationPlan.EvaluationPlan plan
+    ) {
+<span class="fc" id="L508">        List&lt;String&gt; expected = plan.content().cases().stream()</span>
+<span class="fc" id="L509">            .map(TargetFreeRepresentationEvaluationPlan.CaseDefinition::id)</span>
+<span class="fc" id="L510">            .toList();</span>
+<span class="fc" id="L511">        List&lt;String&gt; actual = qualification.cases().stream()</span>
+<span class="fc" id="L512">            .map(QualificationRule::id)</span>
+<span class="fc" id="L513">            .toList();</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">        if (!QUALIFICATION_SCHEMA.equals(qualification.schema())</span>
+<span class="pc bpc" id="L515" title="1 of 2 branches missed.">                || !SEALED.equals(qualification.evidenceStatus())</span>
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">                || !expected.equals(actual)) {</span>
+<span class="nc" id="L517">            throw new IllegalArgumentException(</span>
+                &quot;sealed qualification differs from the preregistration&quot;);
+        }
+<span class="fc" id="L520">        qualification.cases().forEach(rule -&gt; {</span>
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">            if (rule.minimumTokenSavings() &lt; 0</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">                    || rule.referenceExpressions().isEmpty()</span>
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">                    || rule.acceptedCandidateTypes().isEmpty()) {</span>
+<span class="nc" id="L524">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L525">                    &quot;qualification rule is incomplete: &quot; + rule.id());</span>
+            }
+<span class="fc" id="L527">            rule.requiredCapabilities().forEach(</span>
+                TargetFreeRepresentationPostFreezeQualification::ruleId);
+<span class="fc" id="L529">        });</span>
+<span class="fc" id="L530">    }</span>
+
+    private static String normalize(String value) {
+<span class="fc" id="L533">        return ExpressionFormatter.format(</span>
+<span class="fc" id="L534">            QUALIFICATION_PARSER.parseTerm(requireText(</span>
+                value, &quot;expression&quot;)));
+    }
+
+    private static String ruleId(String value) {
+<span class="fc" id="L539">        String capability = requireText(value, &quot;capability&quot;);</span>
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">        if (!capability.startsWith(RULE_PREFIX)</span>
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">                || capability.length() == RULE_PREFIX.length()) {</span>
+<span class="nc" id="L542">            throw new IllegalArgumentException(</span>
+                &quot;capability must use rule: identity&quot;);
+        }
+<span class="fc" id="L545">        return capability.substring(RULE_PREFIX.length());</span>
+    }
+
+    private static void reject(
+        Set&lt;String&gt; reasons,
+        boolean condition,
+        String reason
+    ) {
+<span class="fc bfc" id="L553" title="All 2 branches covered.">        if (condition) {</span>
+<span class="fc" id="L554">            reasons.add(reason);</span>
+        }
+<span class="fc" id="L556">    }</span>
+
+    private static &lt;T&gt; T decode(byte[] bytes, Class&lt;T&gt; type) {
+        try {
+<span class="fc" id="L560">            return QUALIFICATION_JSON.readValue(bytes, type);</span>
+<span class="nc" id="L561">        } catch (IOException exception) {</span>
+<span class="nc" id="L562">            throw new IllegalArgumentException(</span>
+                &quot;invalid sealed qualification resource&quot;, exception);
+        }
+    }
+
+    private static String json(Object value) {
+        try {
+<span class="fc" id="L569">            return QUALIFICATION_JSON.writeValueAsString(value);</span>
+<span class="nc" id="L570">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L571">            throw new IllegalStateException(</span>
+                &quot;cannot render post-freeze qualification&quot;, exception);
+        }
+    }
+
+    record Qualification(
+        String schema,
+        String evidenceStatus,
+        List&lt;QualificationRule&gt; cases,
+        String claimBoundary
+    ) {
+<span class="fc" id="L582">        Qualification {</span>
+<span class="fc" id="L583">            cases = List.copyOf(cases);</span>
+<span class="fc" id="L584">            claimBoundary = requireText(</span>
+                claimBoundary, &quot;qualification claimBoundary&quot;);
+<span class="fc" id="L586">        }</span>
+    }
+
+    record QualificationRule(
+        String id,
+        List&lt;String&gt; acceptedCandidateTypes,
+        List&lt;String&gt; forbiddenOutcomes,
+        int minimumTokenSavings,
+        List&lt;String&gt; referenceExpressions,
+        List&lt;String&gt; requiredAssumptions,
+        List&lt;String&gt; requiredCapabilities
+    ) {
+<span class="fc" id="L598">        QualificationRule {</span>
+<span class="fc" id="L599">            id = requireText(id, &quot;qualification id&quot;);</span>
+<span class="fc" id="L600">            acceptedCandidateTypes =</span>
+<span class="fc" id="L601">                List.copyOf(new TreeSet&lt;&gt;(acceptedCandidateTypes));</span>
+<span class="fc" id="L602">            forbiddenOutcomes =</span>
+<span class="fc" id="L603">                List.copyOf(new TreeSet&lt;&gt;(forbiddenOutcomes));</span>
+<span class="fc" id="L604">            referenceExpressions =</span>
+<span class="fc" id="L605">                List.copyOf(new TreeSet&lt;&gt;(referenceExpressions));</span>
+<span class="fc" id="L606">            requiredAssumptions =</span>
+<span class="fc" id="L607">                List.copyOf(new TreeSet&lt;&gt;(requiredAssumptions));</span>
+<span class="fc" id="L608">            requiredCapabilities =</span>
+<span class="fc" id="L609">                List.copyOf(new TreeSet&lt;&gt;(requiredCapabilities));</span>
+<span class="fc" id="L610">        }</span>
+    }
+
+    record QualifiedCandidate(
+        String candidateHash,
+        String expression,
+        List&lt;String&gt; assumptions,
+        String proofStatus,
+        String oracleStatus,
+        boolean referenceMatched,
+        int tokenSavings,
+        String compressionStatus,
+        List&lt;String&gt; candidateTypes,
+        List&lt;String&gt; newlyExposedStructures,
+        List&lt;String&gt; unlockedCapabilities,
+        List&lt;String&gt; executableCapabilities,
+        List&lt;String&gt; forbiddenOutcomes,
+        List&lt;String&gt; disqualificationReasons,
+        boolean qualified
+    ) {
+<span class="fc" id="L630">        QualifiedCandidate {</span>
+<span class="fc" id="L631">            candidateHash = requireSha256(</span>
+                candidateHash, &quot;candidateHash&quot;);
+<span class="fc" id="L633">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L634">            candidateTypes = List.copyOf(candidateTypes);</span>
+<span class="fc" id="L635">            newlyExposedStructures =</span>
+<span class="fc" id="L636">                List.copyOf(newlyExposedStructures);</span>
+<span class="fc" id="L637">            unlockedCapabilities =</span>
+<span class="fc" id="L638">                List.copyOf(unlockedCapabilities);</span>
+<span class="fc" id="L639">            executableCapabilities =</span>
+<span class="fc" id="L640">                List.copyOf(executableCapabilities);</span>
+<span class="fc" id="L641">            forbiddenOutcomes = List.copyOf(forbiddenOutcomes);</span>
+<span class="fc" id="L642">            disqualificationReasons =</span>
+<span class="fc" id="L643">                List.copyOf(disqualificationReasons);</span>
+<span class="pc bpc" id="L644" title="1 of 2 branches missed.">            if (qualified != disqualificationReasons.isEmpty()) {</span>
+<span class="nc" id="L645">                throw new IllegalArgumentException(</span>
+                    &quot;qualified flag differs from reasons&quot;);
+            }
+<span class="fc" id="L648">        }</span>
+    }
+
+    record QualificationEntry(
+        int sequence,
+        String configurationId,
+        String caseId,
+        String policyId,
+        String candidateBatchHash,
+        String candidateSetHash,
+        String candidateFreezeReceiptHash,
+        String workLedgerHash,
+        String workAuthorityHash,
+        String postFreezeDisclosureHash,
+        String classificationCatalogHash,
+        String classificationRuleInventoryHash,
+        String status,
+        List&lt;QualifiedCandidate&gt; candidates,
+        int qualifyingCandidateCount
+    ) {
+<span class="fc" id="L668">        QualificationEntry {</span>
+<span class="fc" id="L669">            candidates = List.copyOf(candidates);</span>
+<span class="fc" id="L670">            int derived = Math.toIntExact(candidates.stream()</span>
+<span class="fc" id="L671">                .filter(QualifiedCandidate::qualified).count());</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">            if (sequence &lt; 1</span>
+<span class="pc bpc" id="L673" title="2 of 4 branches missed.">                    || !Set.of(QUALIFIED, UNQUALIFIED).contains(status)</span>
+                    || qualifyingCandidateCount != derived
+<span class="pc bpc" id="L675" title="1 of 4 branches missed.">                    || (QUALIFIED.equals(status) != (derived &gt; 0))) {</span>
+<span class="nc" id="L676">                throw new IllegalArgumentException(</span>
+                    &quot;qualification entry does not balance&quot;);
+            }
+<span class="fc bfc" id="L679" title="All 2 branches covered.">            for (String hash : List.of(</span>
+                    configurationId,
+                    candidateBatchHash,
+                    candidateSetHash,
+                    candidateFreezeReceiptHash,
+                    workLedgerHash,
+                    workAuthorityHash,
+                    postFreezeDisclosureHash,
+                    classificationCatalogHash,
+                    classificationRuleInventoryHash)) {
+<span class="fc" id="L689">                requireSha256(hash, &quot;qualification hash&quot;);</span>
+<span class="fc" id="L690">            }</span>
+<span class="fc" id="L691">        }</span>
+    }
+
+<span class="fc" id="L694">    record Summary(</span>
+        int configuredEntries,
+        int qualifiedEntries,
+        int evaluatedCandidates,
+        int qualifiedCandidates
+    ) {
+        static Summary from(List&lt;QualificationEntry&gt; entries) {
+<span class="fc" id="L701">            return new Summary(</span>
+<span class="fc" id="L702">                entries.size(),</span>
+<span class="fc" id="L703">                Math.toIntExact(entries.stream()</span>
+<span class="fc" id="L704">                    .filter(value -&gt; QUALIFIED.equals(value.status()))</span>
+<span class="fc" id="L705">                    .count()),</span>
+<span class="fc" id="L706">                entries.stream()</span>
+<span class="fc" id="L707">                    .mapToInt(value -&gt; value.candidates().size()).sum(),</span>
+<span class="fc" id="L708">                entries.stream()</span>
+<span class="fc" id="L709">                    .mapToInt(QualificationEntry</span>
+<span class="fc" id="L710">                        ::qualifyingCandidateCount).sum()</span>
+            );
+        }
+    }
+
+    record QualificationContent(
+        String schema,
+        String evidenceStatus,
+        String repositoryRevision,
+        String evaluationPlanHash,
+        String candidateFreezeHash,
+        String qualificationResource,
+        String qualificationHash,
+        long qualificationByteLength,
+        String qualificationDisclosure,
+        List&lt;QualificationEntry&gt; entries,
+        Summary summary,
+        String qualificationClaimBoundary,
+        String claimBoundary
+    ) {
+<span class="fc" id="L730">        QualificationContent {</span>
+<span class="fc" id="L731">            entries = List.copyOf(entries);</span>
+<span class="pc bpc" id="L732" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L733" title="1 of 2 branches missed.">                    || !EVIDENCE_STATUS.equals(evidenceStatus)</span>
+<span class="pc bpc" id="L734" title="1 of 2 branches missed.">                    || !DISCLOSURE.equals(qualificationDisclosure)</span>
+<span class="pc bpc" id="L735" title="2 of 4 branches missed.">                    || !repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)</span>
+                    || qualificationByteLength &lt; 1
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">                    || !summary.equals(Summary.from(entries))) {</span>
+<span class="nc" id="L738">                throw new IllegalArgumentException(</span>
+                    &quot;post-freeze qualification content does not balance&quot;);
+            }
+<span class="fc" id="L741">            requireSha256(evaluationPlanHash, &quot;evaluationPlanHash&quot;);</span>
+<span class="fc" id="L742">            requireSha256(candidateFreezeHash, &quot;candidateFreezeHash&quot;);</span>
+<span class="fc" id="L743">            requireSha256(qualificationHash, &quot;qualificationHash&quot;);</span>
+<span class="fc" id="L744">        }</span>
+    }
+
+    record QualificationArtifact(
+        QualificationContent content,
+        String contentHash
+    ) {
+<span class="fc" id="L751">        QualificationArtifact {</span>
+<span class="fc" id="L752">            contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L753">            if (!KnownStructureCatalog.sha256(json(content))</span>
+<span class="pc bpc" id="L754" title="1 of 2 branches missed.">                    .equals(contentHash)) {</span>
+<span class="nc" id="L755">                throw new IllegalArgumentException(</span>
+                    &quot;post-freeze qualification hash mismatch&quot;);
+            }
+<span class="fc" id="L758">        }</span>
+
+        static QualificationArtifact create(
+            QualificationContent content
+        ) {
+<span class="fc" id="L763">            return new QualificationArtifact(</span>
+                content,
+<span class="fc" id="L765">                KnownStructureCatalog.sha256(json(content))</span>
+            );
+        }
+
+        String toCanonicalJson() {
+<span class="fc" id="L770">            return json(this);</span>
+        }
+
+        static QualificationArtifact fromCanonicalJson(String source) {
+            try {
+<span class="fc" id="L775">                QualificationArtifact artifact =</span>
+<span class="fc" id="L776">                    QUALIFICATION_JSON.readValue(</span>
+<span class="fc" id="L777">                        Objects.requireNonNull(source, &quot;source&quot;),</span>
+                        QualificationArtifact.class);
+<span class="fc bfc" id="L779" title="All 2 branches covered.">                if (!artifact.toCanonicalJson().equals(source)) {</span>
+<span class="fc" id="L780">                    throw new IllegalArgumentException(</span>
+                        &quot;qualification JSON is not canonical&quot;);
+                }
+<span class="fc" id="L783">                return artifact;</span>
+<span class="nc" id="L784">            } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L785">                throw new IllegalArgumentException(</span>
+                    &quot;invalid post-freeze qualification JSON&quot;,
+                    exception
+                );
+            }
+        }
+    }
+
+<span class="fc" id="L793">    private record Proof(</span>
+        CandidateProofStatus status,
+        String oracleStatus
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

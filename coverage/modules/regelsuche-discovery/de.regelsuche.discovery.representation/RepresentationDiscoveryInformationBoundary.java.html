@@ -420,29 +420,29 @@ public final class RepresentationDiscoveryInformationBoundary {
 <span class="fc" id="L420">        }</span>
 
         public String contentHash() {
-<span class="nc" id="L423">            StringBuilder descriptor = new StringBuilder();</span>
-<span class="nc" id="L424">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L423">            StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L424">            KnownStructureCatalog.appendCanonicalField(</span>
                 descriptor, POST_FREEZE_REVISION);
-<span class="nc" id="L426">            KnownStructureCatalog.appendCanonicalField(</span>
-<span class="nc" id="L427">                descriptor, track.id());</span>
-<span class="nc" id="L428">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L426">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L427">                descriptor, track.id());</span>
+<span class="fc" id="L428">            KnownStructureCatalog.appendCanonicalField(</span>
                 descriptor, boundaryHash);
-<span class="nc" id="L430">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L430">            KnownStructureCatalog.appendCanonicalField(</span>
                 descriptor, freezeReceiptHash);
-<span class="nc" id="L432">            KnownStructureCatalog.appendCanonicalField(</span>
-<span class="nc" id="L433">                descriptor, selectionDescriptor(classificationSelection));</span>
-<span class="nc" id="L434">            KnownStructureCatalog.appendCanonicalField(</span>
-<span class="nc" id="L435">                descriptor, classificationCatalog.contentHash());</span>
-<span class="nc" id="L436">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L432">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L433">                descriptor, selectionDescriptor(classificationSelection));</span>
+<span class="fc" id="L434">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L435">                descriptor, classificationCatalog.contentHash());</span>
+<span class="fc" id="L436">            KnownStructureCatalog.appendCanonicalField(</span>
                 descriptor, formationRuleInventoryHash);
-<span class="nc" id="L438">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L438">            KnownStructureCatalog.appendCanonicalField(</span>
                 descriptor, classificationRuleInventoryHash);
-<span class="nc" id="L440">            appendSet(descriptor, requestedHoldoutStructureIds);</span>
-<span class="nc" id="L441">            appendSet(descriptor, formationExcludedStructureIds);</span>
-<span class="nc" id="L442">            appendSet(descriptor, withheldRulePackIds);</span>
-<span class="nc" id="L443">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L440">            appendSet(descriptor, requestedHoldoutStructureIds);</span>
+<span class="fc" id="L441">            appendSet(descriptor, formationExcludedStructureIds);</span>
+<span class="fc" id="L442">            appendSet(descriptor, withheldRulePackIds);</span>
+<span class="fc" id="L443">            KnownStructureCatalog.appendCanonicalField(</span>
                 descriptor, holdoutCommitmentHash);
-<span class="nc" id="L445">            return KnownStructureCatalog.sha256(descriptor.toString());</span>
+<span class="fc" id="L445">            return KnownStructureCatalog.sha256(descriptor.toString());</span>
         }
     }
 
