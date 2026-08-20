@@ -623,9 +623,9 @@ public final class TargetFreeRepresentationEvaluationPlan {
                 initialAssumptionPolicy,
                 &quot;initialAssumptionPolicy&quot;
             );
-<span class="pc bpc" id="L626" title="1 of 4 branches missed.">            if (adapterConstructor == AdapterConstructor.NO_ARGUMENT</span>
+<span class="fc bfc" id="L626" title="All 4 branches covered.">            if (adapterConstructor == AdapterConstructor.NO_ARGUMENT</span>
                     &amp;&amp; deterministicSeed != 0) {
-<span class="nc" id="L628">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L628">                throw new IllegalArgumentException(</span>
                     &quot;no-argument policies must use the zero seed sentinel&quot;);
             }
 <span class="fc" id="L631">            selectionBoundary = requireText(</span>

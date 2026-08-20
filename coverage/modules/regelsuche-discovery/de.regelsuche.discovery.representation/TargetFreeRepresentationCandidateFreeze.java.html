@@ -1,0 +1,1143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetFreeRepresentationCandidateFreeze.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">TargetFreeRepresentationCandidateFreeze.java</span></div><h1>TargetFreeRepresentationCandidateFreeze.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.search.strategy.SearchStrategy;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.util.AtomicJsonFile;
+import de.regelsuche.validation.CandidateProofStatus;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/** Executes and freezes every target-blind formation row before qualification. */
+public final class TargetFreeRepresentationCandidateFreeze {
+    public static final String SCHEMA =
+        &quot;regelsuche.target-free-representation-candidate-freeze/v1&quot;;
+    public static final String FILE_NAME =
+        &quot;representation-discovery-candidate-freeze.json&quot;;
+    public static final String EVIDENCE_STATUS =
+        &quot;EXECUTED_CANDIDATES_FROZEN_QUALIFICATION_NOT_DISCLOSED&quot;;
+    public static final String QUALIFICATION_DISCLOSURE = &quot;NOT_DISCLOSED&quot;;
+    public static final String VISIBLE_KNOWLEDGE_POLICY =
+        &quot;MINIMAL_KERNEL_WITH_EXPLICIT_PACKS_AND_TRACK_SPECIFIC_WITHHOLDING_V1&quot;;
+    public static final String CLAIM_BOUNDARY =
+        &quot;All configured policies receive only the frozen source, assumptions, &quot;
+            + &quot;track, visible-inventory policy and finite formation budgets. &quot;
+            + &quot;Candidate batches and mechanical work are frozen before any &quot;
+            + &quot;post-freeze qualification resource is opened. This artifact &quot;
+            + &quot;does not classify success, prove equivalence, establish novelty &quot;
+            + &quot;or claim CPU-time or general search superiority.&quot;;
+
+    private static final String EXECUTED = &quot;EXECUTED&quot;;
+    private static final String FRONTIER_EXHAUSTED = &quot;FRONTIER_EXHAUSTED&quot;;
+    private static final String BOUNDED_WITH_TRUNCATION =
+        &quot;BOUNDED_SEARCH_COMPLETED_WITH_TRUNCATION&quot;;
+<span class="fc" id="L61">    private static final Comparator&lt;Transformation&gt; TRANSFORMATION_ORDER =</span>
+<span class="fc" id="L62">        Comparator.comparing(Transformation::rule)</span>
+<span class="fc" id="L63">            .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L64">            .thenComparing(Transformation::applicationKey)</span>
+<span class="pc" id="L65">            .thenComparing(value -&gt; String.join(</span>
+<span class="nc" id="L66">                &quot;\u0001&quot;, value.primitiveRuleIds()));</span>
+<span class="fc" id="L67">    private static final Comparator&lt;CandidateEvidence&gt; CANDIDATE_ORDER =</span>
+<span class="fc" id="L68">        Comparator.comparing(CandidateEvidence::expression)</span>
+<span class="fc" id="L69">            .thenComparing(value -&gt; String.join(</span>
+<span class="fc" id="L70">                &quot;\u0001&quot;, value.assumptions()))</span>
+<span class="fc" id="L71">            .thenComparingInt(CandidateEvidence::depth)</span>
+<span class="fc" id="L72">            .thenComparing(value -&gt; String.join(</span>
+<span class="fc" id="L73">                &quot;\u0001&quot;, value.pathRuleIds()))</span>
+<span class="fc" id="L74">            .thenComparing(CandidateEvidence::candidateHash);</span>
+<span class="fc" id="L75">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L76">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L77">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L78">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L79">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L80">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L81">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)</span>
+<span class="fc" id="L82">        .build();</span>
+
+    private TargetFreeRepresentationCandidateFreeze() {
+    }
+
+    public static FreezeArtifact run(String repositoryRevision) {
+<span class="fc" id="L88">        TargetFreeRepresentationEvaluationPlan.EvaluationPlan plan =</span>
+<span class="fc" id="L89">            TargetFreeRepresentationEvaluationPlan.create(repositoryRevision);</span>
+        Map&lt;String, TargetFreeRepresentationEvaluationPlan.CaseDefinition&gt;
+<span class="fc" id="L91">            cases = indexCases(plan.content().cases());</span>
+        Map&lt;String, TargetFreeRepresentationEvaluationPlan.PolicyDefinition&gt;
+<span class="fc" id="L93">            policies = indexPolicies(plan.content().policies());</span>
+<span class="fc" id="L94">        List&lt;ExecutionEntry&gt; entries = plan.content().entries().stream()</span>
+<span class="fc" id="L95">            .map(entry -&gt; execute(</span>
+                entry,
+<span class="fc" id="L97">                requireCase(cases, entry.caseId()),</span>
+<span class="fc" id="L98">                requirePolicy(policies, entry.policyId())</span>
+            ))
+<span class="fc" id="L100">            .toList();</span>
+<span class="fc" id="L101">        FreezeContent content = new FreezeContent(</span>
+            SCHEMA,
+            EVIDENCE_STATUS,
+<span class="fc" id="L104">            plan.content().repositoryRevision(),</span>
+<span class="fc" id="L105">            plan.contentHash(),</span>
+<span class="fc" id="L106">            plan.content().preregistrationHash(),</span>
+<span class="fc" id="L107">            plan.content().formationHash(),</span>
+<span class="fc" id="L108">            plan.content().qualificationHash(),</span>
+<span class="fc" id="L109">            plan.content().qualificationByteLength(),</span>
+            QUALIFICATION_DISCLOSURE,
+            VISIBLE_KNOWLEDGE_POLICY,
+            entries,
+<span class="fc" id="L113">            Summary.derive(entries),</span>
+            CLAIM_BOUNDARY
+        );
+<span class="fc" id="L116">        return FreezeArtifact.create(content);</span>
+    }
+
+    public static FreezeArtifact write(
+        Path directory,
+        String repositoryRevision
+    ) throws IOException {
+<span class="fc" id="L123">        Path root = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L124">            .toAbsolutePath().normalize();</span>
+<span class="fc" id="L125">        Files.createDirectories(root);</span>
+<span class="fc" id="L126">        FreezeArtifact artifact = run(repositoryRevision);</span>
+<span class="fc" id="L127">        String canonical = artifact.toCanonicalJson();</span>
+<span class="fc" id="L128">        Path target = root.resolve(FILE_NAME);</span>
+<span class="fc" id="L129">        AtomicJsonFile.writeUtf8(target, canonical);</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (!Files.isRegularFile(target)</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                || !canonical.equals(Files.readString(</span>
+                    target, StandardCharsets.UTF_8))) {
+<span class="nc" id="L133">            throw new IllegalStateException(</span>
+                &quot;written candidate-freeze artifact changed: &quot; + target);
+        }
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (!artifact.equals(FreezeArtifact.fromCanonicalJson(canonical))) {</span>
+<span class="nc" id="L137">            throw new IllegalStateException(</span>
+                &quot;candidate-freeze artifact changed during round-trip&quot;);
+        }
+<span class="fc" id="L140">        return artifact;</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (args.length != 2) {</span>
+<span class="nc" id="L145">            throw new IllegalArgumentException(</span>
+                &quot;usage: &lt;repository-commit&gt; &lt;output-directory&gt;&quot;);
+        }
+<span class="nc" id="L148">        FreezeArtifact artifact = write(Path.of(args[1]), args[0]);</span>
+<span class="nc" id="L149">        System.out.println(</span>
+            &quot;targetFreeRepresentationCandidateFreezeHash=&quot;
+<span class="nc" id="L151">                + artifact.contentHash());</span>
+<span class="nc" id="L152">        System.out.println(</span>
+            &quot;targetFreeRepresentationExecutedConfigurations=&quot;
+<span class="nc" id="L154">                + artifact.content().summary().executedEntryCount());</span>
+<span class="nc" id="L155">        System.out.println(</span>
+            &quot;targetFreeRepresentationFrozenCandidates=&quot;
+<span class="nc" id="L157">                + artifact.content().summary().candidateCount());</span>
+<span class="nc" id="L158">    }</span>
+
+    private static ExecutionEntry execute(
+        TargetFreeRepresentationEvaluationPlan.PlanEntry planEntry,
+        TargetFreeRepresentationEvaluationPlan.CaseDefinition benchmarkCase,
+        TargetFreeRepresentationEvaluationPlan.PolicyDefinition policy
+    ) {
+<span class="fc" id="L165">        requireInitialAssumptionPolicy(policy);</span>
+<span class="fc" id="L166">        RepresentationDiscoveryInformationBoundary boundary =</span>
+<span class="fc" id="L167">            RepresentationDiscoveryInformationBoundary.fromKnowledgePacks(</span>
+<span class="fc" id="L168">                benchmarkCase.informationTrack(),</span>
+<span class="fc" id="L169">                visibleSelection(benchmarkCase)</span>
+            );
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        ExecutionResult result = switch (policy.adapterInterface()) {</span>
+            case TARGET_FREE_REPRESENTATION_SEARCH -&gt;
+<span class="fc" id="L173">                executeEnumeration(benchmarkCase, policy, boundary);</span>
+            case SEARCH_STRATEGY -&gt;
+<span class="fc" id="L175">                executeSearchStrategy(benchmarkCase, policy, boundary);</span>
+        };
+<span class="fc" id="L177">        List&lt;RepresentationCandidateProposal&gt; proposals = result.candidates()</span>
+<span class="fc" id="L178">            .stream()</span>
+<span class="fc" id="L179">            .map(candidate -&gt; RepresentationCandidateProposal.whole(</span>
+<span class="fc" id="L180">                benchmarkCase.sourceExpression(),</span>
+<span class="fc" id="L181">                candidate.expression(),</span>
+<span class="fc" id="L182">                candidate.assumptions(),</span>
+                CandidateProofStatus.OBSERVED
+            ))
+<span class="fc" id="L185">            .toList();</span>
+        RepresentationDiscoveryInformationBoundary.CandidateFreezeReceipt
+<span class="fc" id="L187">            receipt = boundary.freezeCandidates(proposals);</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (receipt.candidateCount() != result.candidates().size()) {</span>
+<span class="nc" id="L189">            throw new IllegalStateException(</span>
+                &quot;candidate receipt count differs for &quot;
+<span class="nc" id="L191">                    + planEntry.configurationId());</span>
+        }
+<span class="fc" id="L193">        return ExecutionEntry.create(</span>
+            planEntry,
+            benchmarkCase,
+            policy,
+            boundary,
+            result,
+            receipt
+        );
+    }
+
+    private static KnowledgePackSelection visibleSelection(
+        TargetFreeRepresentationEvaluationPlan.CaseDefinition benchmarkCase
+    ) {
+<span class="fc" id="L206">        KnowledgePackSelection selection = KnowledgePackSelection.profile(</span>
+<span class="fc" id="L207">            benchmarkCase.ruleProfile());</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (String packId : benchmarkCase.enabledRulePackIds()) {</span>
+<span class="fc" id="L209">            selection = selection.enablePack(packId);</span>
+<span class="fc" id="L210">        }</span>
+<span class="fc" id="L211">        return selection;</span>
+    }
+
+    private static ExecutionResult executeEnumeration(
+        TargetFreeRepresentationEvaluationPlan.CaseDefinition benchmarkCase,
+        TargetFreeRepresentationEvaluationPlan.PolicyDefinition policy,
+        RepresentationDiscoveryInformationBoundary boundary
+    ) {
+<span class="fc" id="L219">        requireEnumerationInvocationContract(policy);</span>
+<span class="fc" id="L220">        TargetFreeRepresentationEvaluationPlan.WorkBudget configured =</span>
+<span class="fc" id="L221">            benchmarkCase.budget();</span>
+<span class="fc" id="L222">        TargetFreeRepresentationSearch.Budget budget =</span>
+            new TargetFreeRepresentationSearch.Budget(
+<span class="fc" id="L224">                configured.maxDepth(),</span>
+<span class="fc" id="L225">                configured.maxExploredStates(),</span>
+<span class="fc" id="L226">                configured.maxRetainedStates(),</span>
+<span class="fc" id="L227">                configured.maxGeneratedTransitions(),</span>
+<span class="fc" id="L228">                configured.maxCandidatesPerState(),</span>
+<span class="fc" id="L229">                configured.maxAstSizeIncreasePerStep()</span>
+            );
+<span class="fc" id="L231">        TargetFreeRepresentationSearch.SearchResult search =</span>
+<span class="fc" id="L232">            new TargetFreeRepresentationSearch().search(</span>
+<span class="fc" id="L233">                benchmarkCase.sourceExpression(),</span>
+<span class="fc" id="L234">                boundary.candidateFormationRules(),</span>
+                budget
+            );
+<span class="fc" id="L237">        TargetFreeRepresentationSearch.SearchContent content =</span>
+<span class="fc" id="L238">            search.content();</span>
+<span class="fc" id="L239">        List&lt;CandidateEvidence&gt; candidates = canonicalCandidates(</span>
+<span class="fc" id="L240">            content.candidateStates().stream()</span>
+<span class="fc" id="L241">                .map(state -&gt; CandidateEvidence.create(</span>
+<span class="fc" id="L242">                    state.expression(),</span>
+<span class="fc" id="L243">                    union(benchmarkCase.assumptions(), state.assumptions()),</span>
+<span class="fc" id="L244">                    state.depth(),</span>
+<span class="fc" id="L245">                    state.pathRuleIds(),</span>
+<span class="fc" id="L246">                    state.primitiveRuleIds(),</span>
+                    &quot;EXACT_PRIMITIVE_LINEAGE&quot;,
+<span class="fc" id="L248">                    state.equivalencePreserving()</span>
+                ))
+<span class="fc" id="L250">                .toList()</span>
+        );
+<span class="fc" id="L252">        int engineCalls = (int) content.states().stream()</span>
+<span class="fc" id="L253">            .limit(content.exploredStateCount())</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            .filter(state -&gt; state.depth() &lt; budget.maxDepth())</span>
+<span class="fc" id="L255">            .count();</span>
+<span class="fc" id="L256">        int primitiveSteps = content.transitions().stream()</span>
+<span class="fc" id="L257">            .mapToInt(transition -&gt; transition.primitiveRuleIds().size())</span>
+<span class="fc" id="L258">            .sum();</span>
+<span class="fc" id="L259">        WorkLedger work = WorkLedger.create(</span>
+<span class="fc" id="L260">            policy.id(),</span>
+            engineCalls,
+<span class="fc" id="L262">            content.exploredStateCount(),</span>
+<span class="fc" id="L263">            content.states().size(),</span>
+<span class="fc" id="L264">            content.generatedTransitionCount(),</span>
+            primitiveSteps
+        );
+<span class="fc" id="L267">        List&lt;String&gt; reasons = content.truncationReasons().stream()</span>
+<span class="fc" id="L268">            .map(Enum::name)</span>
+<span class="fc" id="L269">            .sorted()</span>
+<span class="fc" id="L270">            .toList();</span>
+<span class="fc" id="L271">        return new ExecutionResult(</span>
+            candidates,
+            work,
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">            reasons.isEmpty() ? FRONTIER_EXHAUSTED</span>
+<span class="pc" id="L275">                : BOUNDED_WITH_TRUNCATION,</span>
+            reasons,
+<span class="fc" id="L277">            search.contentHash()</span>
+        );
+    }
+
+    private static ExecutionResult executeSearchStrategy(
+        TargetFreeRepresentationEvaluationPlan.CaseDefinition benchmarkCase,
+        TargetFreeRepresentationEvaluationPlan.PolicyDefinition policy,
+        RepresentationDiscoveryInformationBoundary boundary
+    ) {
+<span class="fc" id="L286">        TargetFreeRepresentationEvaluationPlan.WorkBudget configured =</span>
+<span class="fc" id="L287">            benchmarkCase.budget();</span>
+<span class="fc" id="L288">        int retainedLimit = Math.min(</span>
+<span class="fc" id="L289">            configured.maxExploredStates(),</span>
+<span class="fc" id="L290">            configured.maxRetainedStates()</span>
+        );
+<span class="fc" id="L292">        BoundedLedgerEngine engine = new BoundedLedgerEngine(</span>
+            new AstRewriteTransformationEngine(
+<span class="fc" id="L294">                boundary.candidateFormationRules(),</span>
+<span class="fc" id="L295">                configured.maxAstSizeIncreasePerStep(),</span>
+<span class="fc" id="L296">                configured.maxCandidatesPerState()</span>
+            ),
+<span class="fc" id="L298">            configured.maxGeneratedTransitions(),</span>
+<span class="fc" id="L299">            configured.maxCandidatesPerState()</span>
+        );
+<span class="fc" id="L301">        SearchProblem problem = new SearchProblem(</span>
+<span class="fc" id="L302">            benchmarkCase.sourceExpression(),</span>
+            engine,
+            new ExpressionScorer(),
+            new ExpressionCanonicalizer(),
+            new SearchHeuristic(
+<span class="fc" id="L307">                configured.maxDepth(),</span>
+                retainedLimit,
+<span class="fc" id="L309">                configured.significantImprovementThreshold(),</span>
+<span class="fc" id="L310">                configured.maxExpandingSteps(),</span>
+<span class="fc" id="L311">                configured.maxCandidatesPerState(),</span>
+<span class="fc" id="L312">                configured.beamWidth()</span>
+            )
+        );
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (problem.target() != null) {</span>
+<span class="nc" id="L316">            throw new IllegalStateException(</span>
+                &quot;target-free evaluation attached a target&quot;);
+        }
+<span class="fc" id="L319">        SearchStrategy strategy = instantiateSearchStrategy(policy);</span>
+<span class="fc" id="L320">        List&lt;SearchState&gt; states = List.copyOf(strategy.search(problem));</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">        if (states.size() &gt; retainedLimit) {</span>
+<span class="nc" id="L322">            throw new IllegalStateException(</span>
+                &quot;search strategy exceeded retained-state limit&quot;);
+        }
+<span class="fc" id="L325">        List&lt;CandidateEvidence&gt; candidates = canonicalCandidates(</span>
+<span class="fc" id="L326">            states.stream()</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">                .filter(state -&gt; state.depth() &gt; 0)</span>
+<span class="fc" id="L328">                .map(state -&gt; CandidateEvidence.create(</span>
+<span class="fc" id="L329">                    state.expression(),</span>
+<span class="fc" id="L330">                    union(benchmarkCase.assumptions(), state.assumptions()),</span>
+<span class="fc" id="L331">                    state.depth(),</span>
+<span class="fc" id="L332">                    state.appliedRuleIds(),</span>
+<span class="fc" id="L333">                    List.of(),</span>
+                    &quot;PRIMITIVE_IDS_NOT_RETAINED_BY_SEARCH_STATE&quot;,
+<span class="fc" id="L335">                    state.equivalencePreservingFlags().stream()</span>
+<span class="fc" id="L336">                        .allMatch(Boolean.TRUE::equals)</span>
+                ))
+<span class="fc" id="L338">                .toList()</span>
+        );
+<span class="fc" id="L340">        TreeSet&lt;String&gt; reasons = new TreeSet&lt;&gt;();</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        if (states.size() &gt;= retainedLimit) {</span>
+<span class="nc" id="L342">            reasons.add(&quot;MAX_RETAINED_OR_EXPLORED_STATES&quot;);</span>
+        }
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">        if (engine.transitionBudgetReached()) {</span>
+<span class="nc" id="L345">            reasons.add(&quot;MAX_GENERATED_TRANSITIONS&quot;);</span>
+        }
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">        if (engine.candidateLimitObserved()) {</span>
+<span class="nc" id="L348">            reasons.add(&quot;MAX_CANDIDATES_PER_STATE&quot;);</span>
+        }
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">        if (states.stream().anyMatch(</span>
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">                state -&gt; state.depth() &gt;= configured.maxDepth())) {</span>
+<span class="nc" id="L352">            reasons.add(&quot;MAX_DEPTH&quot;);</span>
+        }
+<span class="fc" id="L354">        WorkLedger work = WorkLedger.create(</span>
+<span class="fc" id="L355">            policy.id(),</span>
+<span class="fc" id="L356">            engine.engineCalls(),</span>
+<span class="fc" id="L357">            states.size(),</span>
+<span class="fc" id="L358">            states.size(),</span>
+<span class="fc" id="L359">            engine.generatedTransitions(),</span>
+<span class="fc" id="L360">            engine.generatedPrimitiveSteps()</span>
+        );
+<span class="fc" id="L362">        String workAuthorityHash = KnownStructureCatalog.sha256(</span>
+<span class="fc" id="L363">            canonical(work));</span>
+<span class="fc" id="L364">        return new ExecutionResult(</span>
+            candidates,
+            work,
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">            reasons.isEmpty() ? FRONTIER_EXHAUSTED</span>
+<span class="pc" id="L368">                : BOUNDED_WITH_TRUNCATION,</span>
+<span class="fc" id="L369">            List.copyOf(reasons),</span>
+            workAuthorityHash
+        );
+    }
+
+    static void requireEnumerationInvocationContract(
+        TargetFreeRepresentationEvaluationPlan.PolicyDefinition policy
+    ) {
+<span class="fc" id="L377">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">        if (!TargetFreeRepresentationSearch.class.getName().equals(</span>
+<span class="fc" id="L379">                policy.adapter())</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">                || policy.adapterInterface()</span>
+                    != TargetFreeRepresentationEvaluationPlan
+                        .AdapterInterface.TARGET_FREE_REPRESENTATION_SEARCH
+<span class="fc bfc" id="L383" title="All 2 branches covered.">                || policy.adapterConstructor()</span>
+                    != TargetFreeRepresentationEvaluationPlan
+                        .AdapterConstructor.NO_ARGUMENT
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">                || policy.deterministicSeed() != 0L) {</span>
+<span class="fc" id="L387">            throw new IllegalArgumentException(</span>
+                &quot;native target-free invocation differs from frozen plan&quot;);
+        }
+<span class="fc" id="L390">    }</span>
+
+    private static SearchStrategy instantiateSearchStrategy(
+        TargetFreeRepresentationEvaluationPlan.PolicyDefinition policy
+    ) {
+        try {
+<span class="fc" id="L396">            Class&lt;?&gt; type = Class.forName(policy.adapter());</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">            Object instance = switch (policy.adapterConstructor()) {</span>
+<span class="fc" id="L398">                case NO_ARGUMENT -&gt; type.getConstructor().newInstance();</span>
+<span class="fc" id="L399">                case LONG_SEED -&gt; type.getConstructor(long.class)</span>
+<span class="fc" id="L400">                    .newInstance(policy.deterministicSeed());</span>
+            };
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">            if (!(instance instanceof SearchStrategy strategy)) {</span>
+<span class="nc" id="L403">                throw new IllegalArgumentException(</span>
+                    &quot;configured adapter is not a SearchStrategy: &quot;
+<span class="nc" id="L405">                        + policy.adapter());</span>
+            }
+<span class="fc" id="L407">            return strategy;</span>
+<span class="nc" id="L408">        } catch (ReflectiveOperationException exception) {</span>
+<span class="nc" id="L409">            throw new IllegalArgumentException(</span>
+                &quot;cannot instantiate configured target-free policy: &quot;
+<span class="nc" id="L411">                    + policy.adapter(),</span>
+                exception
+            );
+        }
+    }
+
+    private static void requireInitialAssumptionPolicy(
+        TargetFreeRepresentationEvaluationPlan.PolicyDefinition policy
+    ) {
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">        if (policy.initialAssumptionPolicy()</span>
+                != TargetFreeRepresentationEvaluationPlan
+                    .InitialAssumptionPolicy
+                    .UNION_WITH_RETAINED_STATE_ASSUMPTIONS) {
+<span class="nc" id="L424">            throw new IllegalArgumentException(</span>
+                &quot;unsupported initial assumption policy&quot;);
+        }
+<span class="fc" id="L427">    }</span>
+
+    private static List&lt;CandidateEvidence&gt; canonicalCandidates(
+        List&lt;CandidateEvidence&gt; candidates
+    ) {
+<span class="fc" id="L432">        TreeMap&lt;String, CandidateEvidence&gt; byProposal = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        for (CandidateEvidence candidate : candidates) {</span>
+<span class="fc" id="L434">            byProposal.merge(</span>
+<span class="fc" id="L435">                candidate.proposalKey(),</span>
+                candidate,
+<span class="fc bfc" id="L437" title="All 2 branches covered.">                (left, right) -&gt; CANDIDATE_ORDER.compare(left, right) &lt;= 0</span>
+<span class="fc" id="L438">                    ? left : right</span>
+            );
+<span class="fc" id="L440">        }</span>
+<span class="fc" id="L441">        return byProposal.values().stream()</span>
+<span class="fc" id="L442">            .sorted(CANDIDATE_ORDER)</span>
+<span class="fc" id="L443">            .toList();</span>
+    }
+
+    private static List&lt;String&gt; union(
+        List&lt;String&gt; left,
+        List&lt;String&gt; right
+    ) {
+<span class="fc" id="L450">        TreeSet&lt;String&gt; result = new TreeSet&lt;&gt;(left);</span>
+<span class="fc" id="L451">        result.addAll(right);</span>
+<span class="fc" id="L452">        return List.copyOf(result);</span>
+    }
+
+    private static Map&lt;String,
+            TargetFreeRepresentationEvaluationPlan.CaseDefinition&gt; indexCases(
+        List&lt;TargetFreeRepresentationEvaluationPlan.CaseDefinition&gt; cases
+    ) {
+        Map&lt;String, TargetFreeRepresentationEvaluationPlan.CaseDefinition&gt;
+<span class="fc" id="L460">            result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L461">        cases.forEach(value -&gt; result.put(value.id(), value));</span>
+<span class="fc" id="L462">        return Map.copyOf(result);</span>
+    }
+
+    private static Map&lt;String,
+            TargetFreeRepresentationEvaluationPlan.PolicyDefinition&gt;
+            indexPolicies(
+        List&lt;TargetFreeRepresentationEvaluationPlan.PolicyDefinition&gt; policies
+    ) {
+        Map&lt;String, TargetFreeRepresentationEvaluationPlan.PolicyDefinition&gt;
+<span class="fc" id="L471">            result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L472">        policies.forEach(value -&gt; result.put(value.id(), value));</span>
+<span class="fc" id="L473">        return Map.copyOf(result);</span>
+    }
+
+    private static TargetFreeRepresentationEvaluationPlan.CaseDefinition
+            requireCase(
+        Map&lt;String, TargetFreeRepresentationEvaluationPlan.CaseDefinition&gt;
+            cases,
+        String id
+    ) {
+<span class="fc" id="L482">        return Objects.requireNonNull(cases.get(id), &quot;case &quot; + id);</span>
+    }
+
+    private static TargetFreeRepresentationEvaluationPlan.PolicyDefinition
+            requirePolicy(
+        Map&lt;String, TargetFreeRepresentationEvaluationPlan.PolicyDefinition&gt;
+            policies,
+        String id
+    ) {
+<span class="fc" id="L491">        return Objects.requireNonNull(policies.get(id), &quot;policy &quot; + id);</span>
+    }
+
+    private static String canonical(Object value) {
+        try {
+<span class="fc" id="L496">            return JSON.writeValueAsString(</span>
+<span class="fc" id="L497">                Objects.requireNonNull(value, &quot;value&quot;));</span>
+<span class="nc" id="L498">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L499">            throw new IllegalStateException(</span>
+                &quot;unable to render target-free candidate freeze&quot;,
+                exception
+            );
+        }
+    }
+
+    private static String hashCandidates(List&lt;CandidateEvidence&gt; candidates) {
+<span class="fc" id="L507">        return KnownStructureCatalog.sha256(canonical(candidates));</span>
+    }
+
+    public record CandidateEvidence(
+        String candidateHash,
+        String expression,
+        List&lt;String&gt; assumptions,
+        int depth,
+        List&lt;String&gt; pathRuleIds,
+        List&lt;String&gt; primitiveRuleIds,
+        String primitiveLineageStatus,
+        boolean equivalencePreserving
+    ) {
+<span class="fc" id="L520">        public CandidateEvidence {</span>
+<span class="fc" id="L521">            expression = requireText(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L522">            assumptions = List.copyOf(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L523">                Objects.requireNonNull(assumptions, &quot;assumptions&quot;)));</span>
+<span class="fc" id="L524">            pathRuleIds = List.copyOf(</span>
+<span class="fc" id="L525">                Objects.requireNonNull(pathRuleIds, &quot;pathRuleIds&quot;));</span>
+<span class="fc" id="L526">            primitiveRuleIds = List.copyOf(</span>
+<span class="fc" id="L527">                Objects.requireNonNull(</span>
+                    primitiveRuleIds, &quot;primitiveRuleIds&quot;));
+<span class="fc" id="L529">            primitiveLineageStatus = requireText(</span>
+                primitiveLineageStatus, &quot;primitiveLineageStatus&quot;);
+<span class="pc bpc" id="L531" title="2 of 4 branches missed.">            if (depth &lt; 1 || pathRuleIds.isEmpty()) {</span>
+<span class="nc" id="L532">                throw new IllegalArgumentException(</span>
+                    &quot;candidate evidence requires a non-root lineage&quot;);
+            }
+<span class="fc" id="L535">            candidateHash = requireSha256(</span>
+                candidateHash, &quot;candidateHash&quot;);
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">            if (!candidateHash.equals(hashCandidate(</span>
+                    expression,
+                    assumptions,
+                    depth,
+                    pathRuleIds,
+                    primitiveRuleIds,
+                    primitiveLineageStatus,
+                    equivalencePreserving))) {
+<span class="nc" id="L545">                throw new IllegalArgumentException(</span>
+                    &quot;candidate evidence hash mismatch&quot;);
+            }
+<span class="fc" id="L548">        }</span>
+
+        static CandidateEvidence create(
+            String expression,
+            List&lt;String&gt; assumptions,
+            int depth,
+            List&lt;String&gt; pathRuleIds,
+            List&lt;String&gt; primitiveRuleIds,
+            String primitiveLineageStatus,
+            boolean equivalencePreserving
+        ) {
+<span class="fc" id="L559">            List&lt;String&gt; normalizedAssumptions = List.copyOf(</span>
+                new TreeSet&lt;&gt;(assumptions));
+<span class="fc" id="L561">            return new CandidateEvidence(</span>
+<span class="fc" id="L562">                hashCandidate(</span>
+                    expression,
+                    normalizedAssumptions,
+                    depth,
+                    pathRuleIds,
+                    primitiveRuleIds,
+                    primitiveLineageStatus,
+                    equivalencePreserving
+                ),
+                expression,
+                normalizedAssumptions,
+                depth,
+                pathRuleIds,
+                primitiveRuleIds,
+                primitiveLineageStatus,
+                equivalencePreserving
+            );
+        }
+
+        String proposalKey() {
+<span class="fc" id="L582">            StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L583">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, expression);
+<span class="fc" id="L585">            KnownStructureCatalog.appendCanonicalList(</span>
+                descriptor, assumptions);
+<span class="fc" id="L587">            return descriptor.toString();</span>
+        }
+
+        private static String hashCandidate(
+            String expression,
+            List&lt;String&gt; assumptions,
+            int depth,
+            List&lt;String&gt; pathRuleIds,
+            List&lt;String&gt; primitiveRuleIds,
+            String primitiveLineageStatus,
+            boolean equivalencePreserving
+        ) {
+<span class="fc" id="L599">            StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L600">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, SCHEMA + &quot;/candidate&quot;);
+<span class="fc" id="L602">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L603">                descriptor, requireText(expression, &quot;expression&quot;));</span>
+<span class="fc" id="L604">            KnownStructureCatalog.appendCanonicalList(</span>
+                descriptor, assumptions);
+<span class="fc" id="L606">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L607">                descriptor, Integer.toString(depth));</span>
+<span class="fc" id="L608">            KnownStructureCatalog.appendCanonicalList(</span>
+                descriptor, pathRuleIds);
+<span class="fc" id="L610">            KnownStructureCatalog.appendCanonicalList(</span>
+                descriptor, primitiveRuleIds);
+<span class="fc" id="L612">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor,
+<span class="fc" id="L614">                requireText(</span>
+                    primitiveLineageStatus,
+                    &quot;primitiveLineageStatus&quot;
+                )
+            );
+<span class="fc" id="L619">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L620">                descriptor, Boolean.toString(equivalencePreserving));</span>
+<span class="fc" id="L621">            return KnownStructureCatalog.sha256(descriptor.toString());</span>
+        }
+    }
+
+    public record WorkLedger(
+        String schema,
+        String policyId,
+        int engineCalls,
+        int exploredStates,
+        int retainedStates,
+        int generatedTransitions,
+        int generatedPrimitiveSteps,
+        String contentHash
+    ) {
+<span class="fc" id="L635">        public WorkLedger {</span>
+<span class="fc" id="L636">            schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="pc bpc" id="L637" title="1 of 2 branches missed.">            if (!(SCHEMA + &quot;/work-ledger/v1&quot;).equals(schema)) {</span>
+<span class="nc" id="L638">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported work-ledger schema&quot;);
+            }
+<span class="fc" id="L641">            policyId = requireText(policyId, &quot;policyId&quot;);</span>
+<span class="pc bpc" id="L642" title="5 of 10 branches missed.">            if (engineCalls &lt; 0 || exploredStates &lt; 1</span>
+                    || retainedStates &lt; 1
+                    || generatedTransitions &lt; 0
+                    || generatedPrimitiveSteps &lt; generatedTransitions) {
+<span class="nc" id="L646">                throw new IllegalArgumentException(</span>
+                    &quot;work-ledger counters do not balance&quot;);
+            }
+<span class="fc" id="L649">            contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="pc bpc" id="L650" title="1 of 2 branches missed.">            if (!contentHash.equals(hashWork(</span>
+                    policyId,
+                    engineCalls,
+                    exploredStates,
+                    retainedStates,
+                    generatedTransitions,
+                    generatedPrimitiveSteps))) {
+<span class="nc" id="L657">                throw new IllegalArgumentException(</span>
+                    &quot;work-ledger content hash mismatch&quot;);
+            }
+<span class="fc" id="L660">        }</span>
+
+        static WorkLedger create(
+            String policyId,
+            int engineCalls,
+            int exploredStates,
+            int retainedStates,
+            int generatedTransitions,
+            int generatedPrimitiveSteps
+        ) {
+<span class="fc" id="L670">            return new WorkLedger(</span>
+                SCHEMA + &quot;/work-ledger/v1&quot;,
+                policyId,
+                engineCalls,
+                exploredStates,
+                retainedStates,
+                generatedTransitions,
+                generatedPrimitiveSteps,
+<span class="fc" id="L678">                hashWork(</span>
+                    policyId,
+                    engineCalls,
+                    exploredStates,
+                    retainedStates,
+                    generatedTransitions,
+                    generatedPrimitiveSteps
+                )
+            );
+        }
+
+        private static String hashWork(
+            String policyId,
+            int engineCalls,
+            int exploredStates,
+            int retainedStates,
+            int generatedTransitions,
+            int generatedPrimitiveSteps
+        ) {
+<span class="fc" id="L697">            StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L698">            KnownStructureCatalog.appendCanonicalField(</span>
+                descriptor, SCHEMA + &quot;/work-ledger/v1&quot;);
+<span class="fc" id="L700">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L701">                descriptor, requireText(policyId, &quot;policyId&quot;));</span>
+<span class="fc bfc" id="L702" title="All 2 branches covered.">            for (int value : List.of(</span>
+<span class="fc" id="L703">                    engineCalls,</span>
+<span class="fc" id="L704">                    exploredStates,</span>
+<span class="fc" id="L705">                    retainedStates,</span>
+<span class="fc" id="L706">                    generatedTransitions,</span>
+<span class="fc" id="L707">                    generatedPrimitiveSteps)) {</span>
+<span class="fc" id="L708">                KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L709">                    descriptor, Integer.toString(value));</span>
+<span class="fc" id="L710">            }</span>
+<span class="fc" id="L711">            return KnownStructureCatalog.sha256(descriptor.toString());</span>
+        }
+    }
+
+    public record ExecutionEntry(
+        int sequence,
+        String configurationId,
+        String caseId,
+        String policyId,
+        String status,
+        String terminalReason,
+        List&lt;String&gt; truncationReasons,
+        String informationTrack,
+        String informationBoundaryHash,
+        String formationSelectionCommitment,
+        String formationRuleInventoryHash,
+        String postFreezeCatalogCommitment,
+        long deterministicSeed,
+        TargetFreeRepresentationEvaluationPlan.WorkBudget configuredBudget,
+        BudgetProjection appliedSearchBudget,
+        List&lt;CandidateEvidence&gt; candidates,
+        int candidateCount,
+        String candidateBatchHash,
+        String candidateSetHash,
+        String candidateFreezeReceiptHash,
+        WorkLedger work,
+        String workAuthorityHash
+    ) {
+<span class="fc" id="L739">        public ExecutionEntry {</span>
+<span class="pc bpc" id="L740" title="1 of 2 branches missed.">            if (sequence &lt; 1) {</span>
+<span class="nc" id="L741">                throw new IllegalArgumentException(</span>
+                    &quot;execution sequence must be positive&quot;);
+            }
+<span class="fc" id="L744">            configurationId = requireSha256(</span>
+                configurationId, &quot;configurationId&quot;);
+<span class="fc" id="L746">            caseId = requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L747">            policyId = requireText(policyId, &quot;policyId&quot;);</span>
+<span class="fc" id="L748">            status = requireText(status, &quot;status&quot;);</span>
+<span class="fc bfc" id="L749" title="All 2 branches covered.">            if (!EXECUTED.equals(status)) {</span>
+<span class="fc" id="L750">                throw new IllegalArgumentException(</span>
+                    &quot;candidate freeze currently accepts executed rows only&quot;);
+            }
+<span class="fc" id="L753">            terminalReason = requireText(</span>
+                terminalReason, &quot;terminalReason&quot;);
+<span class="fc" id="L755">            truncationReasons = List.copyOf(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L756">                Objects.requireNonNull(</span>
+                    truncationReasons, &quot;truncationReasons&quot;)));
+<span class="fc" id="L758">            informationTrack = requireText(</span>
+                informationTrack, &quot;informationTrack&quot;);
+<span class="fc" id="L760">            informationBoundaryHash = requireSha256(</span>
+                informationBoundaryHash, &quot;informationBoundaryHash&quot;);
+<span class="fc" id="L762">            formationSelectionCommitment = requireSha256(</span>
+                formationSelectionCommitment,
+                &quot;formationSelectionCommitment&quot;
+            );
+<span class="fc" id="L766">            formationRuleInventoryHash = requireSha256(</span>
+                formationRuleInventoryHash,
+                &quot;formationRuleInventoryHash&quot;
+            );
+<span class="fc" id="L770">            postFreezeCatalogCommitment = requireSha256(</span>
+                postFreezeCatalogCommitment,
+                &quot;postFreezeCatalogCommitment&quot;
+            );
+<span class="fc" id="L774">            configuredBudget = Objects.requireNonNull(</span>
+                configuredBudget, &quot;configuredBudget&quot;);
+<span class="fc" id="L776">            appliedSearchBudget = Objects.requireNonNull(</span>
+                appliedSearchBudget, &quot;appliedSearchBudget&quot;);
+<span class="fc" id="L778">            candidates = Objects.requireNonNull(candidates, &quot;candidates&quot;)</span>
+<span class="fc" id="L779">                .stream().sorted(CANDIDATE_ORDER).toList();</span>
+<span class="pc bpc" id="L780" title="1 of 2 branches missed.">            if (candidateCount != candidates.size()) {</span>
+<span class="nc" id="L781">                throw new IllegalArgumentException(</span>
+                    &quot;candidate count differs from candidate evidence&quot;);
+            }
+<span class="fc" id="L784">            candidateBatchHash = requireSha256(</span>
+                candidateBatchHash, &quot;candidateBatchHash&quot;);
+<span class="pc bpc" id="L786" title="1 of 2 branches missed.">            if (!candidateBatchHash.equals(hashCandidates(candidates))) {</span>
+<span class="nc" id="L787">                throw new IllegalArgumentException(</span>
+                    &quot;candidate batch hash mismatch&quot;);
+            }
+<span class="fc" id="L790">            candidateSetHash = requireSha256(</span>
+                candidateSetHash, &quot;candidateSetHash&quot;);
+<span class="fc" id="L792">            candidateFreezeReceiptHash = requireSha256(</span>
+                candidateFreezeReceiptHash,
+                &quot;candidateFreezeReceiptHash&quot;
+            );
+<span class="fc" id="L796">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L797">            workAuthorityHash = requireSha256(</span>
+                workAuthorityHash, &quot;workAuthorityHash&quot;);
+<span class="fc" id="L799">        }</span>
+
+        static ExecutionEntry create(
+            TargetFreeRepresentationEvaluationPlan.PlanEntry planEntry,
+            TargetFreeRepresentationEvaluationPlan.CaseDefinition benchmarkCase,
+            TargetFreeRepresentationEvaluationPlan.PolicyDefinition policy,
+            RepresentationDiscoveryInformationBoundary boundary,
+            ExecutionResult result,
+            RepresentationDiscoveryInformationBoundary.CandidateFreezeReceipt
+                receipt
+        ) {
+<span class="fc" id="L810">            return new ExecutionEntry(</span>
+<span class="fc" id="L811">                planEntry.sequence(),</span>
+<span class="fc" id="L812">                planEntry.configurationId(),</span>
+<span class="fc" id="L813">                benchmarkCase.id(),</span>
+<span class="fc" id="L814">                policy.id(),</span>
+                EXECUTED,
+<span class="fc" id="L816">                result.terminalReason(),</span>
+<span class="fc" id="L817">                result.truncationReasons(),</span>
+<span class="fc" id="L818">                benchmarkCase.informationTrack().name(),</span>
+<span class="fc" id="L819">                boundary.contentHash(),</span>
+<span class="fc" id="L820">                boundary.candidateFormationSelectionCommitment(),</span>
+<span class="fc" id="L821">                boundary.candidateFormationRuleInventoryHash(),</span>
+<span class="fc" id="L822">                boundary.postFreezeCatalogCommitment(),</span>
+<span class="fc" id="L823">                policy.deterministicSeed(),</span>
+<span class="fc" id="L824">                benchmarkCase.budget(),</span>
+<span class="fc" id="L825">                BudgetProjection.from(benchmarkCase.budget()),</span>
+<span class="fc" id="L826">                result.candidates(),</span>
+<span class="fc" id="L827">                result.candidates().size(),</span>
+<span class="fc" id="L828">                hashCandidates(result.candidates()),</span>
+<span class="fc" id="L829">                receipt.candidateSetHash(),</span>
+<span class="fc" id="L830">                receipt.contentHash(),</span>
+<span class="fc" id="L831">                result.work(),</span>
+<span class="fc" id="L832">                result.workAuthorityHash()</span>
+            );
+        }
+    }
+
+    public record BudgetProjection(
+        int maxDepth,
+        int maxRetainedOrExploredStates,
+        int maxGeneratedTransitions,
+        int maxCandidatesPerState,
+        int maxAstSizeIncreasePerStep,
+        int significantImprovementThreshold,
+        int maxExpandingSteps,
+        int beamWidth
+    ) {
+<span class="fc" id="L847">        public BudgetProjection {</span>
+<span class="pc bpc" id="L848" title="10 of 20 branches missed.">            if (maxDepth &lt; 0 || maxRetainedOrExploredStates &lt; 1</span>
+                    || maxGeneratedTransitions &lt; 1
+                    || maxCandidatesPerState &lt; 1
+                    || maxAstSizeIncreasePerStep &lt; 0
+                    || significantImprovementThreshold &lt; 1
+                    || maxExpandingSteps &lt; 0
+                    || maxExpandingSteps &gt; maxDepth
+                    || beamWidth &lt; 1
+                    || beamWidth &gt; maxRetainedOrExploredStates) {
+<span class="nc" id="L857">                throw new IllegalArgumentException(</span>
+                    &quot;applied search budget is invalid&quot;);
+            }
+<span class="fc" id="L860">        }</span>
+
+        static BudgetProjection from(
+            TargetFreeRepresentationEvaluationPlan.WorkBudget value
+        ) {
+<span class="fc" id="L865">            int retainedOrExplored = Math.min(</span>
+<span class="fc" id="L866">                value.maxExploredStates(),</span>
+<span class="fc" id="L867">                value.maxRetainedStates()</span>
+            );
+<span class="fc" id="L869">            return new BudgetProjection(</span>
+<span class="fc" id="L870">                value.maxDepth(),</span>
+                retainedOrExplored,
+<span class="fc" id="L872">                value.maxGeneratedTransitions(),</span>
+<span class="fc" id="L873">                value.maxCandidatesPerState(),</span>
+<span class="fc" id="L874">                value.maxAstSizeIncreasePerStep(),</span>
+<span class="fc" id="L875">                value.significantImprovementThreshold(),</span>
+<span class="fc" id="L876">                value.maxExpandingSteps(),</span>
+<span class="fc" id="L877">                value.beamWidth()</span>
+            );
+        }
+    }
+
+    public record Summary(
+        int configuredEntryCount,
+        int executedEntryCount,
+        int zeroCandidateEntryCount,
+        int truncatedEntryCount,
+        int candidateCount,
+        int engineCalls,
+        int exploredStates,
+        int generatedTransitions,
+        int generatedPrimitiveSteps
+    ) {
+<span class="fc" id="L893">        public Summary {</span>
+<span class="pc bpc" id="L894" title="9 of 18 branches missed.">            if (configuredEntryCount &lt; 1</span>
+                    || executedEntryCount != configuredEntryCount
+                    || zeroCandidateEntryCount &lt; 0
+                    || truncatedEntryCount &lt; 0
+                    || candidateCount &lt; 0
+                    || engineCalls &lt; 0
+                    || exploredStates &lt; configuredEntryCount
+                    || generatedTransitions &lt; 0
+                    || generatedPrimitiveSteps &lt; generatedTransitions) {
+<span class="nc" id="L903">                throw new IllegalArgumentException(</span>
+                    &quot;candidate-freeze summary does not balance&quot;);
+            }
+<span class="fc" id="L906">        }</span>
+
+        static Summary derive(List&lt;ExecutionEntry&gt; entries) {
+<span class="fc" id="L909">            return new Summary(</span>
+<span class="fc" id="L910">                entries.size(),</span>
+<span class="fc" id="L911">                (int) entries.stream()</span>
+<span class="fc" id="L912">                    .filter(value -&gt; EXECUTED.equals(value.status())).count(),</span>
+<span class="fc" id="L913">                (int) entries.stream()</span>
+<span class="pc bpc" id="L914" title="1 of 2 branches missed.">                    .filter(value -&gt; value.candidateCount() == 0).count(),</span>
+<span class="fc" id="L915">                (int) entries.stream()</span>
+<span class="pc bpc" id="L916" title="1 of 2 branches missed.">                    .filter(value -&gt; !value.truncationReasons().isEmpty())</span>
+<span class="fc" id="L917">                    .count(),</span>
+<span class="fc" id="L918">                entries.stream().mapToInt(ExecutionEntry::candidateCount).sum(),</span>
+<span class="fc" id="L919">                entries.stream().mapToInt(value -&gt;</span>
+<span class="fc" id="L920">                    value.work().engineCalls()).sum(),</span>
+<span class="fc" id="L921">                entries.stream().mapToInt(value -&gt;</span>
+<span class="fc" id="L922">                    value.work().exploredStates()).sum(),</span>
+<span class="fc" id="L923">                entries.stream().mapToInt(value -&gt;</span>
+<span class="fc" id="L924">                    value.work().generatedTransitions()).sum(),</span>
+<span class="fc" id="L925">                entries.stream().mapToInt(value -&gt;</span>
+<span class="fc" id="L926">                    value.work().generatedPrimitiveSteps()).sum()</span>
+            );
+        }
+    }
+
+    public record FreezeContent(
+        String schema,
+        String evidenceStatus,
+        String repositoryRevision,
+        String evaluationPlanHash,
+        String preregistrationHash,
+        String formationHash,
+        String qualificationHash,
+        long qualificationByteLength,
+        String qualificationDisclosure,
+        String visibleKnowledgePolicy,
+        List&lt;ExecutionEntry&gt; entries,
+        Summary summary,
+        String claimBoundary
+    ) {
+<span class="fc" id="L946">        public FreezeContent {</span>
+<span class="fc" id="L947">            schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="pc bpc" id="L948" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L949">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported candidate-freeze schema&quot;);
+            }
+<span class="fc" id="L952">            evidenceStatus = requireText(</span>
+                evidenceStatus, &quot;evidenceStatus&quot;);
+<span class="pc bpc" id="L954" title="1 of 2 branches missed.">            if (!EVIDENCE_STATUS.equals(evidenceStatus)) {</span>
+<span class="nc" id="L955">                throw new IllegalArgumentException(</span>
+                    &quot;candidate-freeze evidence status differs&quot;);
+            }
+<span class="fc" id="L958">            repositoryRevision = requireText(</span>
+                repositoryRevision, &quot;repositoryRevision&quot;);
+<span class="pc bpc" id="L960" title="1 of 2 branches missed.">            if (!repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L961">                throw new IllegalArgumentException(</span>
+                    &quot;repositoryRevision must be a commit SHA&quot;);
+            }
+<span class="fc" id="L964">            evaluationPlanHash = requireSha256(</span>
+                evaluationPlanHash, &quot;evaluationPlanHash&quot;);
+<span class="fc" id="L966">            preregistrationHash = requireSha256(</span>
+                preregistrationHash, &quot;preregistrationHash&quot;);
+<span class="fc" id="L968">            formationHash = requireSha256(</span>
+                formationHash, &quot;formationHash&quot;);
+<span class="fc" id="L970">            qualificationHash = requireSha256(</span>
+                qualificationHash, &quot;qualificationHash&quot;);
+<span class="pc bpc" id="L972" title="1 of 2 branches missed.">            if (qualificationByteLength &lt; 1) {</span>
+<span class="nc" id="L973">                throw new IllegalArgumentException(</span>
+                    &quot;qualification byte length must be positive&quot;);
+            }
+<span class="fc" id="L976">            qualificationDisclosure = requireText(</span>
+                qualificationDisclosure, &quot;qualificationDisclosure&quot;);
+<span class="pc bpc" id="L978" title="1 of 2 branches missed.">            if (!QUALIFICATION_DISCLOSURE.equals(</span>
+                    qualificationDisclosure)) {
+<span class="nc" id="L980">                throw new IllegalArgumentException(</span>
+                    &quot;qualification must remain undisclosed&quot;);
+            }
+<span class="fc" id="L983">            visibleKnowledgePolicy = requireText(</span>
+                visibleKnowledgePolicy, &quot;visibleKnowledgePolicy&quot;);
+<span class="fc" id="L985">            entries = List.copyOf(</span>
+<span class="fc" id="L986">                Objects.requireNonNull(entries, &quot;entries&quot;));</span>
+<span class="pc bpc" id="L987" title="1 of 2 branches missed.">            if (entries.isEmpty()) {</span>
+<span class="nc" id="L988">                throw new IllegalArgumentException(</span>
+                    &quot;candidate-freeze entries must not be empty&quot;);
+            }
+<span class="fc bfc" id="L991" title="All 2 branches covered.">            for (int index = 0; index &lt; entries.size(); index++) {</span>
+<span class="pc bpc" id="L992" title="1 of 2 branches missed.">                if (entries.get(index).sequence() != index + 1) {</span>
+<span class="nc" id="L993">                    throw new IllegalArgumentException(</span>
+                        &quot;candidate-freeze sequence is not canonical&quot;);
+                }
+            }
+<span class="fc" id="L997">            if (entries.stream().map(ExecutionEntry::configurationId)</span>
+<span class="pc bpc" id="L998" title="1 of 2 branches missed.">                    .distinct().count() != entries.size()) {</span>
+<span class="nc" id="L999">                throw new IllegalArgumentException(</span>
+                    &quot;candidate-freeze configuration IDs are not unique&quot;);
+            }
+<span class="fc" id="L1002">            summary = Objects.requireNonNull(summary, &quot;summary&quot;);</span>
+<span class="pc bpc" id="L1003" title="1 of 2 branches missed.">            if (!summary.equals(Summary.derive(entries))) {</span>
+<span class="nc" id="L1004">                throw new IllegalArgumentException(</span>
+                    &quot;candidate-freeze summary differs from entries&quot;);
+            }
+<span class="fc" id="L1007">            claimBoundary = requireText(</span>
+                claimBoundary, &quot;claimBoundary&quot;);
+<span class="fc" id="L1009">        }</span>
+    }
+
+    public record FreezeArtifact(
+        FreezeContent content,
+        String contentHash
+    ) {
+<span class="fc" id="L1016">        public FreezeArtifact {</span>
+<span class="fc" id="L1017">            content = Objects.requireNonNull(content, &quot;content&quot;);</span>
+<span class="fc" id="L1018">            contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L1019">            String expected = KnownStructureCatalog.sha256(</span>
+<span class="fc" id="L1020">                canonical(content));</span>
+<span class="pc bpc" id="L1021" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L1022">                throw new IllegalArgumentException(</span>
+                    &quot;candidate-freeze content hash mismatch&quot;);
+            }
+<span class="fc" id="L1025">        }</span>
+
+        static FreezeArtifact create(FreezeContent content) {
+<span class="fc" id="L1028">            return new FreezeArtifact(</span>
+                content,
+<span class="fc" id="L1030">                KnownStructureCatalog.sha256(canonical(content))</span>
+            );
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L1035">            return canonical(this);</span>
+        }
+
+        public static FreezeArtifact fromCanonicalJson(String source) {
+<span class="fc" id="L1039">            String json = Objects.requireNonNull(source, &quot;source&quot;);</span>
+            try {
+<span class="fc" id="L1041">                FreezeArtifact artifact = JSON.readValue(</span>
+                    json, FreezeArtifact.class);
+<span class="fc bfc" id="L1043" title="All 2 branches covered.">                if (!artifact.toCanonicalJson().equals(json)) {</span>
+<span class="fc" id="L1044">                    throw new IllegalArgumentException(</span>
+                        &quot;candidate-freeze JSON is not canonical&quot;);
+                }
+<span class="fc" id="L1047">                return artifact;</span>
+<span class="fc" id="L1048">            } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L1049">                throw new IllegalArgumentException(</span>
+                    &quot;invalid target-free candidate-freeze JSON&quot;,
+                    exception
+                );
+            }
+        }
+    }
+
+    private record ExecutionResult(
+        List&lt;CandidateEvidence&gt; candidates,
+        WorkLedger work,
+        String terminalReason,
+        List&lt;String&gt; truncationReasons,
+        String workAuthorityHash
+    ) {
+<span class="fc" id="L1064">        private ExecutionResult {</span>
+<span class="fc" id="L1065">            candidates = List.copyOf(candidates);</span>
+<span class="fc" id="L1066">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L1067">            terminalReason = requireText(</span>
+                terminalReason, &quot;terminalReason&quot;);
+<span class="fc" id="L1069">            truncationReasons = List.copyOf(new TreeSet&lt;&gt;(</span>
+                truncationReasons));
+<span class="fc" id="L1071">            workAuthorityHash = requireSha256(</span>
+                workAuthorityHash, &quot;workAuthorityHash&quot;);
+<span class="fc" id="L1073">        }</span>
+    }
+
+    private static final class BoundedLedgerEngine
+            implements TransformationEngine {
+        private final TransformationEngine delegate;
+        private final int maxGeneratedTransitions;
+        private final int maxCandidatesPerState;
+        private int engineCalls;
+        private int generatedTransitions;
+        private int generatedPrimitiveSteps;
+        private boolean candidateLimitObserved;
+
+        private BoundedLedgerEngine(
+            TransformationEngine delegate,
+            int maxGeneratedTransitions,
+            int maxCandidatesPerState
+<span class="fc" id="L1090">        ) {</span>
+<span class="fc" id="L1091">            this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="pc bpc" id="L1092" title="2 of 4 branches missed.">            if (maxGeneratedTransitions &lt; 1 || maxCandidatesPerState &lt; 1) {</span>
+<span class="nc" id="L1093">                throw new IllegalArgumentException(</span>
+                    &quot;ledger-engine budgets must be positive&quot;);
+            }
+<span class="fc" id="L1096">            this.maxGeneratedTransitions = maxGeneratedTransitions;</span>
+<span class="fc" id="L1097">            this.maxCandidatesPerState = maxCandidatesPerState;</span>
+<span class="fc" id="L1098">        }</span>
+
+        @Override
+        public List&lt;Transformation&gt; transform(String expression) {
+<span class="pc bpc" id="L1102" title="1 of 2 branches missed.">            if (transitionBudgetReached()) {</span>
+<span class="nc" id="L1103">                return List.of();</span>
+            }
+<span class="fc" id="L1105">            engineCalls++;</span>
+<span class="fc" id="L1106">            List&lt;Transformation&gt; generated = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L1107">                delegate.transform(expression));</span>
+<span class="fc" id="L1108">            generated.sort(TRANSFORMATION_ORDER);</span>
+<span class="fc" id="L1109">            candidateLimitObserved |=</span>
+<span class="pc bpc" id="L1110" title="1 of 2 branches missed.">                generated.size() &gt;= maxCandidatesPerState;</span>
+<span class="fc" id="L1111">            int remaining = maxGeneratedTransitions - generatedTransitions;</span>
+<span class="fc" id="L1112">            List&lt;Transformation&gt; admitted = generated.stream()</span>
+<span class="fc" id="L1113">                .limit(remaining)</span>
+<span class="fc" id="L1114">                .toList();</span>
+<span class="fc" id="L1115">            generatedTransitions += admitted.size();</span>
+<span class="fc" id="L1116">            generatedPrimitiveSteps += admitted.stream()</span>
+<span class="fc" id="L1117">                .mapToInt(Transformation::primitiveStepCount)</span>
+<span class="fc" id="L1118">                .sum();</span>
+<span class="fc" id="L1119">            return admitted;</span>
+        }
+
+        int engineCalls() {
+<span class="fc" id="L1123">            return engineCalls;</span>
+        }
+
+        int generatedTransitions() {
+<span class="fc" id="L1127">            return generatedTransitions;</span>
+        }
+
+        int generatedPrimitiveSteps() {
+<span class="fc" id="L1131">            return generatedPrimitiveSteps;</span>
+        }
+
+        boolean transitionBudgetReached() {
+<span class="pc bpc" id="L1135" title="1 of 2 branches missed.">            return generatedTransitions &gt;= maxGeneratedTransitions;</span>
+        }
+
+        boolean candidateLimitObserved() {
+<span class="fc" id="L1139">            return candidateLimitObserved;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
