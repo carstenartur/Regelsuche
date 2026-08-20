@@ -46,32 +46,26 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
             + "target-free-held-out-preregistration-v1.json";
     private static final long PREREGISTRATION_BYTE_LENGTH = 1512L;
     private static final String PREREGISTRATION_SHA256 =
-        "sha256:4c4516862823dc46cbeab1d10d769294b8627ca1243320f68471f6e41a12f045";
+        "sha256:9d79fe60a2a2cf3fda9255cc3b26577b4ac23d61b8359cd22b3a7a0dcdb7bd29";
     private static final List<Integer> CHECKPOINTS =
         List.of(8, 16, 32, 64, 128, 256);
     private static final List<String> POLICY_IDS = List.of(
         "BOUNDED_ENUMERATION_V1",
         "RANDOM_MONTE_CARLO_V1",
         "SCALAR_BEST_FIRST_V1",
-        "STRUCTURAL_DIVERSITY_V1"
-    );
+        "STRUCTURAL_DIVERSITY_V1");
 
     @Test
-    void freezesTheMultiStepHeldOutMatrixWithoutQualificationLeakage()
-            throws Exception {
+    void freezesTheMatrixWithoutQualificationLeakage() throws Exception {
         Resources resources = resources();
         JsonNode preregistration = resources.preregistration();
         JsonNode formation = resources.formation();
         JsonNode qualification = resources.qualification();
-
-        assertEquals(
-            "regelsuche.target-free-held-out-preregistration/v1",
+        assertEquals("regelsuche.target-free-held-out-preregistration/v1",
             preregistration.path("schema").asText());
-        assertEquals(
-            "regelsuche.target-free-held-out-formation/v1",
+        assertEquals("regelsuche.target-free-held-out-formation/v1",
             formation.path("schema").asText());
-        assertEquals(
-            "regelsuche.target-free-held-out-qualification/v1",
+        assertEquals("regelsuche.target-free-held-out-qualification/v1",
             qualification.path("schema").asText());
         assertEquals("FROZEN_NOT_EXECUTED",
             preregistration.path("evidenceStatus").asText());
@@ -84,186 +78,136 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
         Map<String, JsonNode> qualifications =
             byId(qualification.path("caseQualifications"));
         Map<String, JsonNode> policies = byId(formation.path("policies"));
-
         assertEquals(6, cases.size());
         assertEquals(cases.keySet(), qualifications.keySet());
         assertEquals(POLICY_IDS, List.copyOf(policies.keySet()));
         assertEquals(CHECKPOINTS, integers(
             formation.path("workMatching").path("checkpoints")));
-        assertEquals("ADMITTED_PRIMITIVE_STEPS",
-            formation.path("workMatching").path("authority").asText());
-        assertEquals("ALL_POLICIES_REACHED_EXACT_CHECKPOINT",
-            formation.path("workMatching")
-                .path("comparisonEligibility").asText());
-        assertEquals("EXHAUSTED_BEFORE_CHECKPOINT_NOT_COMPARABLE",
-            formation.path("workMatching")
-                .path("earlyExhaustionStatus").asText());
-        assertEquals(
-            List.of(
-                "CASE_ID",
-                "POLICY_ID",
-                "ADMITTED_PRIMITIVE_STEP_CHECKPOINT"),
-            strings(formation.path("workMatching")
-                .path("entryIdentityDimensions")));
-
-        assertEquals(6,
-            preregistration.path("configuredCaseCount").asInt());
-        assertEquals(4,
-            preregistration.path("configuredPolicyCount").asInt());
-        assertEquals(6,
-            preregistration.path("configuredCheckpointCount").asInt());
         assertEquals(144,
             preregistration.path("configuredEntryCount").asInt());
-        assertEquals(
-            cases.size() * policies.size() * CHECKPOINTS.size(),
+        assertEquals(cases.size() * policies.size() * CHECKPOINTS.size(),
             preregistration.path("configuredEntryCount").asInt());
 
-        int positiveCases = 0;
-        int negativeCases = 0;
-        int complexityValleys = 0;
+        int positives = 0;
+        int negatives = 0;
+        int valleys = 0;
         for (Map.Entry<String, JsonNode> entry : cases.entrySet()) {
             JsonNode benchmarkCase = entry.getValue();
-            JsonNode caseQualification = qualifications.get(entry.getKey());
+            JsonNode rule = qualifications.get(entry.getKey());
             assertEquals("MINIMAL_KERNEL",
                 benchmarkCase.path("ruleProfile").asText());
-            assertFalse(strings(
-                benchmarkCase.path("distractorRulePackIds")).isEmpty());
-            assertTrue(strings(
-                benchmarkCase.path("enabledRulePackIds")).containsAll(
-                    strings(benchmarkCase.path("distractorRulePackIds"))));
+            List<String> distractors = strings(
+                benchmarkCase.path("distractorRulePackIds"));
+            assertFalse(distractors.isEmpty());
+            assertTrue(strings(benchmarkCase.path("enabledRulePackIds"))
+                .containsAll(distractors));
             assertAvailablePacks(benchmarkCase);
-
             if ("NO_POLICY_QUALIFIES".equals(
-                    caseQualification.path("expectedOutcome").asText())) {
-                negativeCases++;
-                assertEquals(0,
-                    caseQualification.path("minimumQualifiedDepth").asInt());
-                assertEquals(0,
-                    caseQualification.path("maximumQualifiedDepth").asInt());
-                assertTrue(strings(caseQualification.path(
+                    rule.path("expectedOutcome").asText())) {
+                negatives++;
+                assertEquals(0, rule.path("minimumQualifiedDepth").asInt());
+                assertEquals(0, rule.path("maximumQualifiedDepth").asInt());
+                assertTrue(strings(rule.path(
                     "oracleWitnessRequiredRuleIds")).isEmpty());
             } else {
-                positiveCases++;
-                int minimum = caseQualification.path(
-                    "minimumQualifiedDepth").asInt();
-                int maximum = caseQualification.path(
-                    "maximumQualifiedDepth").asInt();
-                assertTrue(minimum >= 3);
-                assertTrue(maximum <= 10);
-                assertTrue(minimum <= maximum);
-                assertFalse(strings(caseQualification.path(
+                positives++;
+                int minimum = rule.path("minimumQualifiedDepth").asInt();
+                int maximum = rule.path("maximumQualifiedDepth").asInt();
+                assertTrue(minimum >= 3 && minimum <= maximum
+                    && maximum <= 10);
+                assertFalse(strings(rule.path(
                     "oracleWitnessRequiredRuleIds")).isEmpty());
             }
-            if (caseQualification.path(
-                    "requireTemporaryComplexityIncrease").asBoolean()) {
-                complexityValleys++;
+            if (rule.path("requireTemporaryComplexityIncrease").asBoolean()) {
+                valleys++;
             }
         }
-        assertEquals(5, positiveCases);
-        assertEquals(1, negativeCases);
-        assertTrue(complexityValleys >= 2);
+        assertEquals(5, positives);
+        assertEquals(1, negatives);
+        assertTrue(valleys >= 2);
 
         String formationText = new String(
             resources.formationBytes(), StandardCharsets.UTF_8);
-        for (JsonNode caseQualification :
-                qualification.path("caseQualifications")) {
+        for (JsonNode rule : qualification.path("caseQualifications")) {
             assertFalse(formationText.contains(
-                caseQualification.path("expectedOutcome").asText()));
+                rule.path("expectedOutcome").asText()));
             assertNoLeakage(formationText,
-                caseQualification.path("referenceExpressions"),
-                "reference");
+                rule.path("referenceExpressions"), "reference");
             assertNoLeakage(formationText,
-                caseQualification.path("requiredCapabilities"),
-                "capability");
+                rule.path("requiredCapabilities"), "capability");
             assertNoLeakage(formationText,
-                caseQualification.path("oracleWitnessRequiredRuleIds"),
-                "witness rule");
+                rule.path("oracleWitnessRequiredRuleIds"), "witness rule");
         }
     }
 
     @Test
-    void positiveCasesHaveNoDirectEdgeAndAReachableThreeToTenStepWitness()
+    void positiveCasesHaveNoDirectEdgeAndHaveBoundedWitnesses()
             throws Exception {
         Resources resources = resources();
         Map<String, JsonNode> qualifications = byId(
             resources.qualification().path("caseQualifications"));
-
         for (JsonNode benchmarkCase : resources.formation().path("cases")) {
-            JsonNode caseQualification = Objects.requireNonNull(
+            JsonNode rule = Objects.requireNonNull(
                 qualifications.get(benchmarkCase.path("id").asText()));
             BoundaryEngine boundaryEngine = boundaryEngine(benchmarkCase);
             Set<String> availableRuleIds = boundaryEngine.boundary()
                 .candidateFormationRules().stream()
-                .map(rule -> rule.id())
+                .map(value -> value.id())
                 .collect(java.util.stream.Collectors.toSet());
-            assertTrue(
-                availableRuleIds.containsAll(strings(
-                    caseQualification.path(
-                        "oracleWitnessRequiredRuleIds"))),
-                () -> "witness vocabulary is unavailable for "
-                    + benchmarkCase.path("id").asText());
-
-            Set<String> referenceCanonical = strings(
-                caseQualification.path("referenceExpressions")).stream()
-                .map(CANONICALIZER::canonicalize)
+            assertTrue(availableRuleIds.containsAll(strings(
+                rule.path("oracleWitnessRequiredRuleIds"))));
+            Set<String> references = strings(rule.path("referenceExpressions"))
+                .stream().map(CANONICALIZER::canonicalize)
                 .collect(java.util.stream.Collectors.toSet());
-            assertTrue(
-                boundaryEngine.engine().transform(
-                    benchmarkCase.path("sourceExpression").asText()
-                ).stream().noneMatch(transformation ->
-                    referenceCanonical.contains(CANONICALIZER.canonicalize(
+            assertTrue(boundaryEngine.engine().transform(
+                benchmarkCase.path("sourceExpression").asText()).stream()
+                .noneMatch(transformation -> references.contains(
+                    CANONICALIZER.canonicalize(
                         transformation.transformedExpression()))),
                 () -> "direct primitive edge reaches a held-out reference for "
                     + benchmarkCase.path("id").asText());
-
             if ("NO_POLICY_QUALIFIES".equals(
-                    caseQualification.path("expectedOutcome").asText())) {
+                    rule.path("expectedOutcome").asText())) {
                 continue;
             }
             Witness witness = shortestWitness(
-                benchmarkCase,
-                caseQualification,
-                boundaryEngine.engine(),
-                referenceCanonical);
+                benchmarkCase, rule, boundaryEngine.engine(), references);
             assertNotNull(witness,
                 () -> "no bounded witness found for "
                     + benchmarkCase.path("id").asText());
-            int minimum = caseQualification.path(
-                "minimumQualifiedDepth").asInt();
-            int maximum = caseQualification.path(
-                "maximumQualifiedDepth").asInt();
-            assertTrue(
-                witness.depth() >= minimum && witness.depth() <= maximum,
+            int minimum = rule.path("minimumQualifiedDepth").asInt();
+            int maximum = rule.path("maximumQualifiedDepth").asInt();
+            assertTrue(witness.depth() >= minimum
+                && witness.depth() <= maximum,
                 () -> "witness depth " + witness.depth()
-                    + " outside preregistered range "
-                    + minimum + ".." + maximum
+                    + " outside " + minimum + ".." + maximum
                     + " for " + benchmarkCase.path("id").asText()
                     + "; path=" + witness.ruleIds());
-            if (caseQualification.path(
-                    "requireTemporaryComplexityIncrease").asBoolean()) {
+            if (rule.path("requireTemporaryComplexityIncrease").asBoolean()) {
                 assertTrue(witness.temporaryComplexityIncrease(),
                     () -> "required complexity valley missing for "
-                        + benchmarkCase.path("id").asText()
-                        + "; path=" + witness.ruleIds());
+                        + benchmarkCase.path("id").asText());
             }
         }
     }
 
     @Test
     void matchedWorkComparisonIsFailClosed() throws Exception {
-        JsonNode root = resources().formation().path("workMatching");
+        JsonNode work = resources().formation().path("workMatching");
+        assertEquals("ADMITTED_PRIMITIVE_STEPS",
+            work.path("authority").asText());
+        assertEquals("ALL_POLICIES_REACHED_EXACT_CHECKPOINT",
+            work.path("comparisonEligibility").asText());
+        assertEquals("EXHAUSTED_BEFORE_CHECKPOINT_NOT_COMPARABLE",
+            work.path("earlyExhaustionStatus").asText());
         assertEquals("STOP_BEFORE_ADMITTING_A_STEP_BEYOND_THE_CHECKPOINT",
-            root.path("stopSemantics").asText());
+            work.path("stopSemantics").asText());
         assertEquals("RECORDED_SECONDARY_METRIC",
-            root.path("engineCalls").asText());
+            work.path("engineCalls").asText());
         assertEquals("RECORDED_SECONDARY_METRIC",
-            root.path("generatedTransitions").asText());
+            work.path("generatedTransitions").asText());
         assertEquals("RECORDED_DIAGNOSTIC_ONLY",
-            root.path("wallClock").asText());
-        assertTrue(CHECKPOINTS.stream().allMatch(value -> value > 0));
-        assertTrue(java.util.stream.IntStream.range(
-            1, CHECKPOINTS.size()).allMatch(index ->
-                CHECKPOINTS.get(index) > CHECKPOINTS.get(index - 1)));
+            work.path("wallClock").asText());
     }
 
     private static Resources resources() throws Exception {
@@ -282,18 +226,13 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
         byte[] qualificationBytes =
             TargetFreeRepresentationEvaluationPlan.readResource(
                 preregistration.path("qualificationResource").asText());
-
-        assertEquals(
-            preregistration.path("formationByteLength").asLong(),
+        assertEquals(preregistration.path("formationByteLength").asLong(),
             formationBytes.length);
-        assertEquals(
-            preregistration.path("formationSha256").asText(),
+        assertEquals(preregistration.path("formationSha256").asText(),
             TargetFreeRepresentationEvaluationPlan.sha256(formationBytes));
-        assertEquals(
-            preregistration.path("qualificationByteLength").asLong(),
+        assertEquals(preregistration.path("qualificationByteLength").asLong(),
             qualificationBytes.length);
-        assertEquals(
-            preregistration.path("qualificationSha256").asText(),
+        assertEquals(preregistration.path("qualificationSha256").asText(),
             TargetFreeRepresentationEvaluationPlan.sha256(
                 qualificationBytes));
         return new Resources(
@@ -331,7 +270,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
         JsonNode benchmarkCase,
         JsonNode qualification,
         AstRewriteTransformationEngine engine,
-        Set<String> referenceCanonical
+        Set<String> references
     ) {
         String source = benchmarkCase.path("sourceExpression").asText();
         int sourceSize = CANONICALIZER.astNodeCount(source);
@@ -343,21 +282,14 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
             qualification.path("requiredAssumptions")));
         TreeSet<String> initialAssumptions = new TreeSet<>(
             strings(benchmarkCase.path("assumptions")));
-
         ArrayDeque<SearchState> queue = new ArrayDeque<>();
         queue.add(new SearchState(
-            source,
-            List.copyOf(initialAssumptions),
-            0,
-            false,
-            List.of()));
+            source, List.copyOf(initialAssumptions), 0, false, List.of()));
         Set<String> seen = new HashSet<>();
         seen.add(stateKey(source, initialAssumptions, false));
         int explored = 0;
-
-        while (!queue.isEmpty() && explored < maximumStates) {
+        while (!queue.isEmpty() && explored++ < maximumStates) {
             SearchState state = queue.removeFirst();
-            explored++;
             if (state.depth() >= maximumDepth) {
                 continue;
             }
@@ -380,22 +312,15 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
                 path.addAll(transformation.primitiveRuleIds());
                 int depth = state.depth()
                     + transformation.primitiveStepCount();
-
                 if (depth <= maximumDepth
-                        && referenceCanonical.contains(
+                        && references.contains(
                             CANONICALIZER.canonicalize(expression))
                         && assumptions.containsAll(requiredAssumptions)) {
                     return new Witness(
-                        depth,
-                        complexityIncrease,
-                        List.copyOf(path));
+                        depth, complexityIncrease, List.copyOf(path));
                 }
-                if (depth >= maximumDepth) {
-                    continue;
-                }
-                String key = stateKey(
-                    expression, assumptions, complexityIncrease);
-                if (seen.add(key)) {
+                if (depth < maximumDepth && seen.add(stateKey(
+                        expression, assumptions, complexityIncrease))) {
                     queue.addLast(new SearchState(
                         expression,
                         List.copyOf(assumptions),

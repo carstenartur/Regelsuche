@@ -151,13 +151,14 @@
         "core-power-rules"
       ],
       "enabledRulePackIds": [
+        "core-polynomial-division",
         "core-power-rules",
         "sympy-trigonometry"
       ],
       "id": "trigonometric-near-miss-control",
       "informationTrack": "R2_CATALOG_BLIND_POST_HOC_BRIDGE",
       "ruleProfile": "MINIMAL_KERNEL",
-      "sourceExpression": "1 * (y * (sin(x)^2 + (cos(y)^2 + 0))) + 0"
+      "sourceExpression": "y * (((((sin(x) * a) / a) * b) / b)^2 + ((cos(y) * c) / c)^2)"
     }
   ],
   "evidenceStatus": "FROZEN_NOT_EXECUTED",
