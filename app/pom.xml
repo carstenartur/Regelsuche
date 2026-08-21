@@ -14,6 +14,10 @@
   <artifactId>regelsuche-app</artifactId>
   <name>Regelsuche Application</name>
 
+  <properties>
+    <cytoscape.version>3.34.1</cytoscape.version>
+  </properties>
+
   <dependencies>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-core</artifactId></dependency>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-egraph</artifactId></dependency>
@@ -89,6 +93,25 @@
             </configuration>
           </execution>
           <execution>
+            <id>unpack-cytoscape-assets</id>
+            <phase>generate-resources</phase>
+            <goals><goal>unpack</goal></goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.webjars.npm</groupId>
+                  <artifactId>cytoscape</artifactId>
+                  <version>${cytoscape.version}</version>
+                  <type>jar</type>
+                  <outputDirectory>${project.build.directory}/generated-resources/cytoscape-webjar</outputDirectory>
+                  <includes>META-INF/resources/webjars/cytoscape/${cytoscape.version}/dist/cytoscape.min.js,META-INF/resources/webjars/cytoscape/${cytoscape.version}/LICENSE,META-INF/resources/webjars/cytoscape/${cytoscape.version}/README.md</includes>
+                </artifactItem>
+              </artifactItems>
+              <overWriteReleases>false</overWriteReleases>
+              <overWriteSnapshots>true</overWriteSnapshots>
+            </configuration>
+          </execution>
+          <execution>
             <id>copy-runtime-dependencies</id>
             <phase>prepare-package</phase>
             <goals><goal>copy-dependencies</goal></goals>
@@ -121,6 +144,32 @@
                     <include>swagger-ui.css</include>
                     <include>swagger-ui-bundle.js</include>
                     <include>swagger-ui-standalone-preset.js</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy-cytoscape-assets</id>
+            <phase>process-resources</phase>
+            <goals><goal>copy-resources</goal></goals>
+            <configuration>
+              <overwrite>true</overwrite>
+              <outputDirectory>${project.build.outputDirectory}/web/vendor/cytoscape</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.build.directory}/generated-resources/cytoscape-webjar/META-INF/resources/webjars/cytoscape/${cytoscape.version}/dist</directory>
+                  <filtering>false</filtering>
+                  <includes>
+                    <include>cytoscape.min.js</include>
+                  </includes>
+                </resource>
+                <resource>
+                  <directory>${project.build.directory}/generated-resources/cytoscape-webjar/META-INF/resources/webjars/cytoscape/${cytoscape.version}</directory>
+                  <filtering>false</filtering>
+                  <includes>
+                    <include>LICENSE</include>
+                    <include>README.md</include>
                   </includes>
                 </resource>
               </resources>
