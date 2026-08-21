@@ -1,0 +1,44 @@
+name: Patch held-out reproduction verifier main class
+
+on:
+  push:
+    branches:
+      - agent/target-free-held-out-container-reproduction
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: agent/target-free-held-out-container-reproduction
+          fetch-depth: 0
+      - name: Use one Groovy string literal for the Java main class
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("gradle/target-free-held-out-container-reproduction.gradle")
+          old = """    mainClass = 'de.regelsuche.discovery.representation.'
+        + 'TargetFreeHeldOutContainerReproductionVerifier'
+"""
+          new = """    mainClass = 'de.regelsuche.discovery.representation.TargetFreeHeldOutContainerReproductionVerifier'
+"""
+          source = path.read_text(encoding="utf-8")
+          if source.count(old) != 1:
+              raise SystemExit("expected exactly one split mainClass assignment")
+          path.write_text(source.replace(old, new), encoding="utf-8")
+          Path(".github/workflows/patch-held-out-reproduction-mainclass.yml").unlink()
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            gradle/target-free-held-out-container-reproduction.gradle \
+            .github/workflows/patch-held-out-reproduction-mainclass.yml
+          git commit -m 'Fix the held-out verifier main-class assignment'
+          git push origin HEAD:agent/target-free-held-out-container-reproduction
