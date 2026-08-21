@@ -238,8 +238,7 @@ public final class AcNormalizationPreparationTransformationEngine
     private Transformation replayPrincipal(
         AcNormalizationPreparationSolver.PreparedApplication application
     ) {
-        String prepared = ExpressionFormatter.format(
-            application.preparedSubtree());
+        String prepared = principalReplayExpression(application);
         String expected = outputKey(
             ExpressionFormatter.format(application.resultSubtree()),
             application.assumptions());
@@ -251,6 +250,27 @@ public final class AcNormalizationPreparationTransformationEngine
                 transformation.assumptions())))
             .findFirst()
             .orElse(null);
+    }
+
+    /**
+     * Serializes the prepared subtree with explicit grouping at the principal
+     * rule boundary. The general formatter intentionally omits associative
+     * multiplication parentheses; reparsing that text would otherwise change
+     * which factor is an immediate child of the numerator product.
+     */
+    private static String principalReplayExpression(
+        AcNormalizationPreparationSolver.PreparedApplication application
+    ) {
+        Expr divisor = Objects.requireNonNull(
+            application.bindings().get("A"),
+            "prepared divisor binding");
+        Expr remainder = Objects.requireNonNull(
+            application.bindings().get("B"),
+            "prepared remainder binding");
+        String divisorText = ExpressionFormatter.format(divisor);
+        String remainderText = ExpressionFormatter.format(remainder);
+        return "((" + divisorText + ") * (" + remainderText + ")) / ("
+            + divisorText + ")";
     }
 
     private String outputKey(
