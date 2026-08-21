@@ -631,7 +631,7 @@ public final class TargetFreeHeldOutContainerReproductionVerifier {
                         CONTAINER_ENVIRONMENT).equals(runs.stream()
                             .map(RunIdentity::environment).toList())
                     || runs.stream().anyMatch(run ->
-                        !artifactSetHash.equals(run.artifactSetHash()))
+                        !derivedArtifactSet.equals(run.artifactSetHash()))
                     || !EXPECTED_FILES.equals(artifactPaths)
                     || !artifactSetHash.equals(derivedArtifactSet)) {
                 throw new IllegalArgumentException(
