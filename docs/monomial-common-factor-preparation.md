@@ -1,27 +1,13 @@
 # Monomial common-factor preparation
 
-Issue #708 adds bounded preparation solvers between direct AST matching and the
-global search frontier. This slice handles a case that associative/commutative
-reordering alone cannot solve: a common factor is present mathematically, but
-is encoded with different powers or integer coefficients in the two terms.
+Issue #708 places bounded, certificate-carrying preparation between direct AST
+matching and the global frontier. This slice handles common factors hidden by
+different coefficients or powers, which AC reordering alone cannot expose.
 
 ## Example
 
-The direct rule
-
-```text
-A * B + A * C -> A * (B + C)
-```
-
-does not match
-
-```text
-x^2 * y + x * z
-```
-
-because the left term does not contain an outer factor that is structurally
-identical to the `x` in the right term. The monomial solver parses both terms in
-a bounded exact fragment and computes their greatest common monomial:
+The direct rule `A * B + A * C -> A * (B + C)` does not match
+`x^2 * y + x * z`. In the supported exact monomial fragment the solver derives:
 
 ```text
 left  = x^2 * y
@@ -29,18 +15,8 @@ right = x * z
 GCD   = x
 ```
 
-It then constructs the certified preparation
-
-```text
-x * (x * y) + x * z
-```
-
-and replays the unchanged `ast_factor_common_left` rule to obtain
-
-```text
-x * (x * y + z)
-```
-
+It prepares `x * (x * y) + x * z` and then replays the unchanged
+`ast_factor_common_left` implementation to obtain `x * (x * y + z)`.
 The retained primitive lineage is:
 
 ```text
@@ -48,86 +24,39 @@ prepare_monomial_common_factor
 ast_factor_common_left
 ```
 
-## Supported fragment
+The same mechanism yields
+`6 * x^2 * y + 9 * x * z -> (3 * x) * (2 * x * y + 3 * z)`.
+It may introduce an exact quotient of one, as in
+`x^2 + x -> x * x + x * 1 -> x * (x + 1)`; this unit is certified by exact
+monomial division rather than guessed.
 
-Each of the two additive terms may contain only:
+## Fragment, limits and evidence
 
-- positive exact integer coefficients;
-- variables;
-- positive integer powers of variables;
-- multiplication.
+Each of the two additive terms may contain positive exact integer coefficients,
+variables, positive integer powers and multiplication. Factor count, exponent
+and intermediate coefficient are bounded. A reached limit is
+`BUDGET_INCONCLUSIVE`; subtraction, fractions, symbolic exponents, functions or
+non-monomial terms are `UNSUPPORTED`.
 
-The default limits bind the total number of inspected atomic factors, the
-largest exponent and the largest intermediate coefficient. Reaching a declared
-limit produces `BUDGET_INCONCLUSIVE`, not a mathematical non-match.
+A prepared application retains the original/prepared/result ASTs, GCD and both
+quotients, `A/B/C` bindings, residual equations, balanced work, exact monomial
+descriptors, a content hash and both primitive IDs. Verification reparses the
+source under the retained budget, recomputes the GCD and quotients, reconstructs
+both terms and requires successful replay through the real principal rule.
 
-Subtraction, negative or fractional coefficients, symbolic exponents,
-functions and non-monomial sums inside either term are outside this first
-fragment and produce `UNSUPPORTED`.
+Outcomes are `PREPARED`, `DIRECT_MATCH_AVAILABLE`, `NOT_APPLICABLE`,
+`UNSUPPORTED`, `BUDGET_INCONCLUSIVE` and `INVALID_CERTIFICATE`. Hidden rules,
+invalid evidence or failed replay emit no candidate.
 
-## Exact unit remainder
-
-The solver may introduce a unit only when exact monomial division requires it.
-For example:
-
-```text
-x^2 + x
-  -> x * x + x * 1
-  -> x * (x + 1)
-```
-
-This is not arbitrary term invention. The certificate proves that the original
-term is the exact product of the GCD and the retained quotient; factoring itself
-introduces no non-zero side condition.
-
-## Retained evidence
-
-Each prepared application retains:
-
-- the original, prepared and result subtrees;
-- the exact greatest common monomial;
-- both exact quotient monomials;
-- placeholder bindings `A`, `B` and `C`;
-- the residual equations `left = A * B` and `right = A * C`;
-- the configured, consumed and remaining factor budget;
-- canonical monomial descriptors for both source terms and the GCD;
-- a content-addressed certificate;
-- both primitive rule IDs.
-
-Verification reparses both original terms under the retained budget, recomputes
-the GCD, divides both terms exactly, reconstructs the products, checks every
-retained field and finally requires a successful replay through the real
-principal rule implementation.
-
-## Fail-closed outcomes
-
-The solver distinguishes:
-
-- `PREPARED`;
-- `DIRECT_MATCH_AVAILABLE`;
-- `NOT_APPLICABLE`;
-- `UNSUPPORTED`;
-- `BUDGET_INCONCLUSIVE`;
-- `INVALID_CERTIFICATE`.
-
-If the principal rule is hidden, the certificate is invalid, replay fails, or
-the fragment cannot decide the case within budget, no prepared transformation
-is emitted.
-
-## Opt-in engine
+## Opt-in and claim boundary
 
 ```java
 TransformationEngine engine =
     new MonomialCommonFactorPreparationTransformationEngine();
 ```
 
-This engine composes the existing direct, exact-polynomial and AC-normalization
-preparation paths and then adds monomial common-factor synthesis. Existing
-engines and historical benchmark identities remain unchanged.
-
-## Claim boundary
-
-This slice establishes bounded exact common-factor synthesis for two positive
-integer monomials. It does not establish general polynomial factorization,
-multiterm GCD extraction, subtraction handling, rational coefficients, general
-AC unification, global reachability or search superiority.
+The engine composes the existing direct, exact-polynomial and AC-preparation
+paths; historical engines and benchmark identities remain unchanged. The claim
+is limited to exact GCD extraction for two positive integer monomials. It does
+not cover general polynomial factorization, subtraction, rational coefficients,
+multiterm GCDs, global reachability or search superiority.
