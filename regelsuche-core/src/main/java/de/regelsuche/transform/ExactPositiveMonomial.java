@@ -18,7 +18,7 @@ record ExactPositiveMonomial(
     long coefficient,
     SortedMap<String, Integer> powers
 ) {
-    static final long MAX_EXACT_DOUBLE_INTEGER = 1L << 53;
+    static final long MAX_EXACT_DOUBLE_INTEGER = (1L << 53) - 1;
 
     ExactPositiveMonomial(long coefficient, Map<String, Integer> powers) {
         this(coefficient, new TreeMap<>(Objects.requireNonNull(powers, "powers")));
@@ -34,7 +34,7 @@ record ExactPositiveMonomial(
                         || entry.getValue() == null
                         || entry.getValue() < 1)) {
             throw new IllegalArgumentException(
-                "monomials require an exactly representable positive coefficient and powers");
+                "monomials require a safely representable positive coefficient and powers");
         }
         powers = Collections.unmodifiableSortedMap(new TreeMap<>(powers));
     }
@@ -141,7 +141,7 @@ record ExactPositiveMonomial(
                     || maxCoefficient < 1
                     || maxCoefficient > MAX_EXACT_DOUBLE_INTEGER) {
                 throw new IllegalArgumentException(
-                    "limits must remain inside the exact positive double-integer fragment");
+                    "limits must remain inside the safe positive double-integer fragment");
             }
         }
     }
@@ -221,7 +221,7 @@ record ExactPositiveMonomial(
             long value = exactPositiveInteger(number.value());
             if (value < 1) {
                 return ParseResult.unsupported(
-                    "coefficient-is-not-an-exactly-representable-positive-integer");
+                    "coefficient-is-not-a-safely-representable-positive-integer");
             }
             return value > limits.maxCoefficient()
                 ? ParseResult.inconclusive("monomial-coefficient-limit-exhausted")
