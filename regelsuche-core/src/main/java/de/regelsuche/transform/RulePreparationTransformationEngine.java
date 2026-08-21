@@ -20,6 +20,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -196,7 +197,7 @@ public final class RulePreparationTransformationEngine
             if (prepared.size() >= maxPreparedCandidates) {
                 break;
             }
-            CacheKey cacheKey = cacheKey(positioned.expression());
+            CacheKey cacheKey = cacheKey(positioned.subtreeHash());
             RulePreparationPlanner.PlanAttempt attempt =
                 memoizer.find(cacheKey);
             if (attempt == null) {
@@ -272,54 +273,14 @@ public final class RulePreparationTransformationEngine
         }
     }
 
-    private CacheKey cacheKey(Expr expression) {
+    private CacheKey cacheKey(String subtreeHash) {
         return new CacheKey(
             plannerId(),
             RulePreparationPlanner.PRINCIPAL_RULE_ID,
-            exactSubtreeHash(expression),
+            subtreeHash,
             assumptionSignature.fingerprint(),
             ruleInventoryHash,
             "maxSolverAttempts=" + planner.budget().maxSolverAttempts());
-    }
-
-    private static String exactSubtreeHash(Expr expression) {
-        StringBuilder descriptor = new StringBuilder();
-        appendAst(descriptor, Objects.requireNonNull(expression, "expression"));
-        return sha256(descriptor.toString());
-    }
-
-    private static void appendAst(StringBuilder target, Expr expression) {
-        if (expression instanceof NumberExpr number) {
-            appendToken(target, "number");
-            appendToken(target, Long.toHexString(
-                Double.doubleToLongBits(number.value())));
-            return;
-        }
-        if (expression instanceof VariableExpr variable) {
-            appendToken(target, "variable");
-            appendToken(target, variable.name());
-            return;
-        }
-        if (expression instanceof BinaryExpr binary) {
-            appendToken(target, "binary");
-            appendToken(target, binary.operator().name());
-            appendAst(target, binary.left());
-            appendAst(target, binary.right());
-            return;
-        }
-        if (expression instanceof FunctionExpr function) {
-            appendToken(target, "function");
-            appendToken(target, function.name());
-            appendToken(target, Integer.toString(function.arguments().size()));
-            function.arguments().forEach(argument -> appendAst(target, argument));
-            return;
-        }
-        throw new IllegalArgumentException(
-            "unsupported expression type: " + expression.getClass().getName());
-    }
-
-    private static void appendToken(StringBuilder target, String value) {
-        target.append(value.length()).append(':').append(value);
     }
 
     private Transformation replayPrincipal(
@@ -354,20 +315,70 @@ public final class RulePreparationTransformationEngine
     }
 
     private static List<PositionedNode> positionedNodes(Expr root) {
+        IdentityHashMap<Expr, String> subtreeHashes = new IdentityHashMap<>();
+        fingerprint(root, subtreeHashes);
         List<PositionedNode> result = new ArrayList<>();
-        collect(root, List.of(), result);
+        collect(root, List.of(), subtreeHashes, result);
         return List.copyOf(result);
+    }
+
+    private static String fingerprint(
+        Expr expression,
+        IdentityHashMap<Expr, String> retained
+    ) {
+        String existing = retained.get(expression);
+        if (existing != null) {
+            return existing;
+        }
+        StringBuilder descriptor = new StringBuilder();
+        if (expression instanceof NumberExpr number) {
+            appendToken(descriptor, "number");
+            appendToken(descriptor, Long.toHexString(
+                Double.doubleToLongBits(number.value())));
+        } else if (expression instanceof VariableExpr variable) {
+            appendToken(descriptor, "variable");
+            appendToken(descriptor, variable.name());
+        } else if (expression instanceof BinaryExpr binary) {
+            appendToken(descriptor, "binary");
+            appendToken(descriptor, binary.operator().name());
+            appendToken(descriptor, fingerprint(binary.left(), retained));
+            appendToken(descriptor, fingerprint(binary.right(), retained));
+        } else if (expression instanceof FunctionExpr function) {
+            appendToken(descriptor, "function");
+            appendToken(descriptor, function.name());
+            appendToken(descriptor, Integer.toString(
+                function.arguments().size()));
+            function.arguments().forEach(argument ->
+                appendToken(descriptor, fingerprint(argument, retained)));
+        } else {
+            throw new IllegalArgumentException(
+                "unsupported expression type: "
+                    + expression.getClass().getName());
+        }
+        String fingerprint = sha256(descriptor.toString());
+        retained.put(expression, fingerprint);
+        return fingerprint;
+    }
+
+    private static void appendToken(StringBuilder target, String value) {
+        target.append(value.length()).append(':').append(value);
     }
 
     private static void collect(
         Expr expression,
         List<Integer> path,
+        IdentityHashMap<Expr, String> subtreeHashes,
         List<PositionedNode> result
     ) {
-        result.add(new PositionedNode(expression, path));
+        result.add(new PositionedNode(
+            expression,
+            path,
+            Objects.requireNonNull(
+                subtreeHashes.get(expression),
+                "subtree fingerprint")));
         if (expression instanceof BinaryExpr binary) {
-            collect(binary.left(), append(path, 0), result);
-            collect(binary.right(), append(path, 1), result);
+            collect(binary.left(), append(path, 0), subtreeHashes, result);
+            collect(binary.right(), append(path, 1), subtreeHashes, result);
         } else if (expression instanceof FunctionExpr function) {
             for (int index = 0;
                     index < function.arguments().size();
@@ -375,6 +386,7 @@ public final class RulePreparationTransformationEngine
                 collect(
                     function.arguments().get(index),
                     append(path, index),
+                    subtreeHashes,
                     result);
             }
         }
@@ -602,11 +614,16 @@ public final class RulePreparationTransformationEngine
 
     private record PositionedNode(
         Expr expression,
-        List<Integer> path
+        List<Integer> path,
+        String subtreeHash
     ) {
         private PositionedNode {
             Objects.requireNonNull(expression, "expression");
             path = List.copyOf(Objects.requireNonNull(path, "path"));
+            if (subtreeHash == null || subtreeHash.isBlank()) {
+                throw new IllegalArgumentException(
+                    "subtreeHash must not be blank");
+            }
         }
     }
 }
