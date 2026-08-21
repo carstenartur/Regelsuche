@@ -53,6 +53,42 @@ class RulePreparationPlannerTest {
     }
 
     @Test
+    void nonDivisionIsNotApplicableWithoutSolverWork() {
+        RulePreparationPlanner.PlanAttempt attempt =
+            new RulePreparationPlanner().plan(parser.parseTerm("x^3 - 1"));
+
+        assertEquals(
+            RulePreparationPlanner.Status.NOT_APPLICABLE,
+            attempt.status());
+        assertTrue(attempt.residualObligation().isEmpty());
+        assertEquals(0, attempt.work().consumedSolverAttempts());
+    }
+
+    @Test
+    void explicitZeroDivisorIsUnsupportedWithoutSolverWork() {
+        RulePreparationPlanner.PlanAttempt attempt =
+            new RulePreparationPlanner().plan(parser.parseTerm("x / 0"));
+
+        assertEquals(
+            RulePreparationPlanner.Status.UNSUPPORTED,
+            attempt.status());
+        assertTrue(attempt.residualObligation().isEmpty());
+        assertEquals(0, attempt.work().consumedSolverAttempts());
+    }
+
+    @Test
+    void constantDivisorIsOutsideThePreparationFragment() {
+        RulePreparationPlanner.PlanAttempt attempt =
+            new RulePreparationPlanner().plan(parser.parseTerm("(x + 1) / 2"));
+
+        assertEquals(
+            RulePreparationPlanner.Status.UNSUPPORTED,
+            attempt.status());
+        assertTrue(attempt.residualObligation().isPresent());
+        assertEquals(1, attempt.work().consumedSolverAttempts());
+    }
+
+    @Test
     void rejectsANonExactPolynomialQuotient() {
         RulePreparationPlanner.PlanAttempt attempt =
             new RulePreparationPlanner().plan(
@@ -112,6 +148,7 @@ class RulePreparationPlannerTest {
     @Test
     void corruptedCertificateIsRejected() {
         RulePreparationPlanner planner = new RulePreparationPlanner();
+        assertFalse(planner.verify(null));
         RulePreparationPlanner.PreparedRuleApplication application =
             planner.plan(parser.parseTerm("(x^3 - 1) / (x - 1)"))
                 .application()

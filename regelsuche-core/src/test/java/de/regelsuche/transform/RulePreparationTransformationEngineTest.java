@@ -60,6 +60,24 @@ class RulePreparationTransformationEngineTest {
     }
 
     @Test
+    void preparesAFunctionArgumentAtItsExactAstPosition() {
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine();
+
+        boolean reached = engine.transform(
+                "sin((x^3 - 1) / (x - 1))")
+            .stream()
+            .filter(transformation -> transformation.primitiveRuleIds()
+                .contains(RulePreparationPlanner.PREPARATION_RULE_ID))
+            .anyMatch(transformation -> canonicalizer.stableHash(
+                    transformation.transformedExpression())
+                .equals(canonicalizer.stableHash(
+                    "sin(x^2 + x + 1)")));
+
+        assertTrue(reached);
+    }
+
+    @Test
     void disabledPlanningReturnsTheDirectEngineResultsByteForByte() {
         AstRewriteTransformationEngine direct =
             new AstRewriteTransformationEngine();
@@ -91,6 +109,19 @@ class RulePreparationTransformationEngineTest {
         assertEquals(
             direct.transform("(x^3 - 1) / (x - 1)"),
             engine.transform("(x^3 - 1) / (x - 1)"));
+    }
+
+    @Test
+    void preparedCandidateRequiresReplayThroughThePrincipalRule() {
+        TransformationEngine emptyDirectEngine = expression -> List.of();
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine(
+                emptyDirectEngine,
+                Set.of(RulePreparationPlanner.PRINCIPAL_RULE_ID),
+                new RulePreparationPlanner(),
+                16);
+
+        assertTrue(engine.transform("(x^3 - 1) / (x - 1)").isEmpty());
     }
 
     @Test
