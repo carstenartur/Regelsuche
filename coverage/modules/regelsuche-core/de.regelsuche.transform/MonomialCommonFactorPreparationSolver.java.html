@@ -1,0 +1,741 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MonomialCommonFactorPreparationSolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">MonomialCommonFactorPreparationSolver.java</span></div><h1>MonomialCommonFactorPreparationSolver.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.parse.ExpressionFormatter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Bounded preparation solver that synthesizes the greatest common monomial of
+ * two additive terms and exposes it to the ordinary common-left-factor rule.
+ *
+ * &lt;p&gt;The supported fragment contains positive exact integer coefficients,
+ * variables, positive integer powers of variables, and multiplication. The
+ * solver never distributes, guesses a factor, or treats an unsupported term as
+ * a negative result. It may introduce an explicit unit remainder, for example
+ * {@code x^2 + x -&gt; x*x + x*1}, because that unit is certified by exact
+ * monomial division.&lt;/p&gt;
+ */
+public final class MonomialCommonFactorPreparationSolver {
+    public static final String SOLVER_ID =
+        &quot;monomial-common-factor/exact-positive-integer/v1&quot;;
+    public static final String CERTIFICATE_SCHEMA =
+        &quot;regelsuche.monomial-common-factor-certificate/v1&quot;;
+    public static final String APPLICATION_SCHEMA =
+        &quot;regelsuche.monomial-common-factor-application/v1&quot;;
+    public static final String PREPARATION_RULE_ID =
+        &quot;prepare_monomial_common_factor&quot;;
+    public static final String PRINCIPAL_RULE_ID =
+        &quot;ast_factor_common_left&quot;;
+
+    private final Budget budget;
+
+    public MonomialCommonFactorPreparationSolver() {
+<span class="fc" id="L43">        this(Budget.DEFAULT);</span>
+<span class="fc" id="L44">    }</span>
+
+<span class="fc" id="L46">    public MonomialCommonFactorPreparationSolver(Budget budget) {</span>
+<span class="fc" id="L47">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L48">        budget.limits();</span>
+<span class="fc" id="L49">    }</span>
+
+    public Budget budget() {
+<span class="nc" id="L52">        return budget;</span>
+    }
+
+    /** Attempts one exact two-term common-monomial preparation. */
+    public PlanAttempt plan(Expr subtree) {
+<span class="fc" id="L57">        Objects.requireNonNull(subtree, &quot;subtree&quot;);</span>
+<span class="fc" id="L58">        WorkLedger untouched = WorkLedger.untouched(budget.maxFactors());</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (!(subtree instanceof BinaryExpr addition)</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">                || addition.operator() != BinaryOperator.ADD) {</span>
+<span class="nc" id="L61">            return PlanAttempt.withoutApplication(</span>
+                Status.NOT_APPLICABLE,
+                untouched,
+                &quot;root-is-not-two-term-addition&quot;);
+        }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (hasDirectFactorization(addition)</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                || addition.left().equals(addition.right())) {</span>
+<span class="fc" id="L68">            return PlanAttempt.withoutApplication(</span>
+                Status.DIRECT_MATCH_AVAILABLE,
+                untouched,
+                &quot;existing-direct-rule-already-applies&quot;);
+        }
+
+<span class="fc" id="L74">        ResidualObligation obligation = residualObligation(addition);</span>
+<span class="fc" id="L75">        ExactPositiveMonomial.Parser parser = new ExactPositiveMonomial.Parser(</span>
+<span class="fc" id="L76">            budget.limits());</span>
+<span class="fc" id="L77">        ExactPositiveMonomial.ParseResult left = parser.parse(addition.left());</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (!left.supported()) {</span>
+<span class="fc" id="L79">            return failedParseAttempt(left, obligation, parser);</span>
+        }
+<span class="fc" id="L81">        ExactPositiveMonomial.ParseResult right = parser.parse(addition.right());</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (!right.supported()) {</span>
+<span class="fc" id="L83">            return failedParseAttempt(right, obligation, parser);</span>
+        }
+
+<span class="fc" id="L86">        WorkLedger work = work(parser);</span>
+<span class="fc" id="L87">        ExactPositiveMonomial common = left.monomial().gcd(right.monomial());</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (common.isOne()) {</span>
+<span class="fc" id="L89">            return PlanAttempt.withoutApplication(</span>
+                Status.NOT_APPLICABLE,
+<span class="fc" id="L91">                Optional.of(obligation),</span>
+                work,
+                &quot;terms-have-no-nontrivial-supported-common-monomial&quot;);
+        }
+
+<span class="fc" id="L96">        ExactPositiveMonomial leftRemainder =</span>
+<span class="fc" id="L97">            left.monomial().divideExactly(common);</span>
+<span class="fc" id="L98">        ExactPositiveMonomial rightRemainder =</span>
+<span class="fc" id="L99">            right.monomial().divideExactly(common);</span>
+<span class="pc bpc" id="L100" title="2 of 4 branches missed.">        if (leftRemainder == null || rightRemainder == null) {</span>
+<span class="nc" id="L101">            return PlanAttempt.withoutApplication(</span>
+                Status.INVALID_CERTIFICATE,
+<span class="nc" id="L103">                Optional.of(obligation),</span>
+                work,
+                &quot;computed-gcd-does-not-divide-both-terms&quot;);
+        }
+
+<span class="fc" id="L108">        ExpectedApplication expected = expectedApplication(</span>
+            common,
+            leftRemainder,
+            rightRemainder);
+<span class="fc" id="L112">        Certificate certificate = certificate(</span>
+            addition,
+<span class="fc" id="L114">            expected.common(),</span>
+<span class="fc" id="L115">            expected.leftRemainder(),</span>
+<span class="fc" id="L116">            expected.rightRemainder(),</span>
+<span class="fc" id="L117">            expected.prepared(),</span>
+<span class="fc" id="L118">            expected.result(),</span>
+<span class="fc" id="L119">            left.monomial(),</span>
+<span class="fc" id="L120">            right.monomial(),</span>
+            common);
+<span class="fc" id="L122">        PreparedApplication application = new PreparedApplication(</span>
+            APPLICATION_SCHEMA,
+            SOLVER_ID,
+            PRINCIPAL_RULE_ID,
+            subtree,
+<span class="fc" id="L127">            expected.prepared(),</span>
+<span class="fc" id="L128">            expected.result(),</span>
+<span class="fc" id="L129">            expected.common(),</span>
+<span class="fc" id="L130">            expected.leftRemainder(),</span>
+<span class="fc" id="L131">            expected.rightRemainder(),</span>
+<span class="fc" id="L132">            Map.of(</span>
+<span class="fc" id="L133">                &quot;A&quot;, expected.common(),</span>
+<span class="fc" id="L134">                &quot;B&quot;, expected.leftRemainder(),</span>
+<span class="fc" id="L135">                &quot;C&quot;, expected.rightRemainder()),</span>
+            obligation,
+<span class="fc" id="L137">            List.of(),</span>
+<span class="fc" id="L138">            List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID),</span>
+            budget,
+            certificate,
+            work);
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (!verify(application)) {</span>
+<span class="nc" id="L143">            return PlanAttempt.withoutApplication(</span>
+                Status.INVALID_CERTIFICATE,
+<span class="nc" id="L145">                Optional.of(obligation),</span>
+                work,
+                &quot;generated-monomial-certificate-rejected&quot;);
+        }
+<span class="fc" id="L149">        return PlanAttempt.prepared(application);</span>
+    }
+
+    /** Independently checks the retained gcd, exact quotients and replay form. */
+    public boolean verify(PreparedApplication application) {
+<span class="fc" id="L154">        BinaryExpr addition = verificationSource(application);</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (addition == null) {</span>
+<span class="nc" id="L156">            return false;</span>
+        }
+<span class="fc" id="L158">        ParsedTerms parsed = parseForVerification(addition, application);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (parsed == null) {</span>
+<span class="nc" id="L160">            return false;</span>
+        }
+<span class="fc" id="L162">        ExactFactorization factorization = exactFactorization(parsed);</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (factorization == null) {</span>
+<span class="nc" id="L164">            return false;</span>
+        }
+<span class="fc" id="L166">        ExpectedApplication expected = expectedApplication(</span>
+<span class="fc" id="L167">            factorization.common(),</span>
+<span class="fc" id="L168">            factorization.leftRemainder(),</span>
+<span class="fc" id="L169">            factorization.rightRemainder());</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (!expressionsMatch(application, expected)</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                || !bindingsMatch(application, expected)</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                || !contextMatches(application, addition)) {</span>
+<span class="nc" id="L173">            return false;</span>
+        }
+<span class="fc" id="L175">        Certificate expectedCertificate = certificate(</span>
+            addition,
+<span class="fc" id="L177">            expected.common(),</span>
+<span class="fc" id="L178">            expected.leftRemainder(),</span>
+<span class="fc" id="L179">            expected.rightRemainder(),</span>
+<span class="fc" id="L180">            expected.prepared(),</span>
+<span class="fc" id="L181">            expected.result(),</span>
+<span class="fc" id="L182">            parsed.left(),</span>
+<span class="fc" id="L183">            parsed.right(),</span>
+<span class="fc" id="L184">            factorization.common());</span>
+<span class="fc" id="L185">        return expectedCertificate.equals(application.certificate());</span>
+    }
+
+    private BinaryExpr verificationSource(PreparedApplication application) {
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (!hasExpectedMetadata(application)</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                || !budget.equals(application.budget())</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                || !(application.originalSubtree()</span>
+<span class="fc" id="L192">                    instanceof BinaryExpr addition)) {</span>
+<span class="nc" id="L193">            return null;</span>
+        }
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        return eligibleForPreparation(addition) ? addition : null;</span>
+    }
+
+    private static boolean eligibleForPreparation(BinaryExpr addition) {
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        return addition.operator() == BinaryOperator.ADD</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            &amp;&amp; !hasDirectFactorization(addition)</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            &amp;&amp; !addition.left().equals(addition.right());</span>
+    }
+
+    private ParsedTerms parseForVerification(
+        BinaryExpr addition,
+        PreparedApplication application
+    ) {
+<span class="fc" id="L208">        ExactPositiveMonomial.Parser parser =</span>
+<span class="fc" id="L209">            new ExactPositiveMonomial.Parser(application.budget().limits());</span>
+<span class="fc" id="L210">        ExactPositiveMonomial.ParseResult left = parser.parse(addition.left());</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (!left.supported()) {</span>
+<span class="nc" id="L212">            return null;</span>
+        }
+<span class="fc" id="L214">        ExactPositiveMonomial.ParseResult right = parser.parse(addition.right());</span>
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        if (!right.supported() || !work(parser).equals(application.work())) {</span>
+<span class="nc" id="L216">            return null;</span>
+        }
+<span class="fc" id="L218">        return new ParsedTerms(left.monomial(), right.monomial());</span>
+    }
+
+    private static ExactFactorization exactFactorization(ParsedTerms parsed) {
+<span class="fc" id="L222">        ExactPositiveMonomial common = parsed.left().gcd(parsed.right());</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        if (common.isOne()) {</span>
+<span class="nc" id="L224">            return null;</span>
+        }
+<span class="fc" id="L226">        ExactPositiveMonomial leftRemainder =</span>
+<span class="fc" id="L227">            parsed.left().divideExactly(common);</span>
+<span class="fc" id="L228">        ExactPositiveMonomial rightRemainder =</span>
+<span class="fc" id="L229">            parsed.right().divideExactly(common);</span>
+<span class="pc bpc" id="L230" title="2 of 4 branches missed.">        if (leftRemainder == null || rightRemainder == null) {</span>
+<span class="nc" id="L231">            return null;</span>
+        }
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        if (!reconstructs(parsed.left(), common, leftRemainder)</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">                || !reconstructs(parsed.right(), common, rightRemainder)) {</span>
+<span class="nc" id="L235">            return null;</span>
+        }
+<span class="fc" id="L237">        return new ExactFactorization(</span>
+            common,
+            leftRemainder,
+            rightRemainder);
+    }
+
+    private static boolean reconstructs(
+        ExactPositiveMonomial original,
+        ExactPositiveMonomial common,
+        ExactPositiveMonomial remainder
+    ) {
+<span class="fc" id="L248">        ExactPositiveMonomial reconstructed = common.multiply(remainder);</span>
+<span class="fc" id="L249">        return original.equals(reconstructed);</span>
+    }
+
+    private static ExpectedApplication expectedApplication(
+        ExactPositiveMonomial common,
+        ExactPositiveMonomial leftRemainder,
+        ExactPositiveMonomial rightRemainder
+    ) {
+<span class="fc" id="L257">        Expr commonExpression = common.toExpression();</span>
+<span class="fc" id="L258">        Expr leftExpression = leftRemainder.toExpression();</span>
+<span class="fc" id="L259">        Expr rightExpression = rightRemainder.toExpression();</span>
+<span class="fc" id="L260">        Expr prepared = new BinaryExpr(</span>
+            new BinaryExpr(
+                commonExpression,
+                BinaryOperator.MUL,
+                leftExpression),
+            BinaryOperator.ADD,
+            new BinaryExpr(
+                commonExpression,
+                BinaryOperator.MUL,
+                rightExpression));
+<span class="fc" id="L270">        Expr result = new BinaryExpr(</span>
+            commonExpression,
+            BinaryOperator.MUL,
+            new BinaryExpr(
+                leftExpression,
+                BinaryOperator.ADD,
+                rightExpression));
+<span class="fc" id="L277">        return new ExpectedApplication(</span>
+            commonExpression,
+            leftExpression,
+            rightExpression,
+            prepared,
+            result);
+    }
+
+    private static boolean expressionsMatch(
+        PreparedApplication application,
+        ExpectedApplication expected
+    ) {
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        return expected.common().equals(application.commonFactor())</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            &amp;&amp; expected.leftRemainder().equals(application.leftRemainder())</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            &amp;&amp; expected.rightRemainder().equals(application.rightRemainder())</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            &amp;&amp; expected.prepared().equals(application.preparedSubtree())</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            &amp;&amp; expected.result().equals(application.resultSubtree());</span>
+    }
+
+    private static boolean bindingsMatch(
+        PreparedApplication application,
+        ExpectedApplication expected
+    ) {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        return application.bindings().size() == 3</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            &amp;&amp; expected.common().equals(application.bindings().get(&quot;A&quot;))</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            &amp;&amp; expected.leftRemainder().equals(application.bindings().get(&quot;B&quot;))</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            &amp;&amp; expected.rightRemainder().equals(application.bindings().get(&quot;C&quot;));</span>
+    }
+
+    private static boolean contextMatches(
+        PreparedApplication application,
+        BinaryExpr addition
+    ) {
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        return application.assumptions().isEmpty()</span>
+<span class="fc" id="L311">            &amp;&amp; residualObligation(addition)</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">                .equals(application.residualObligation());</span>
+    }
+
+    private static boolean hasExpectedMetadata(
+        PreparedApplication application
+    ) {
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        return application != null</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">            &amp;&amp; APPLICATION_SCHEMA.equals(application.schema())</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            &amp;&amp; SOLVER_ID.equals(application.solverId())</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">            &amp;&amp; PRINCIPAL_RULE_ID.equals(application.principalRuleId())</span>
+<span class="fc" id="L322">            &amp;&amp; List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID)</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">                .equals(application.primitiveRuleIds());</span>
+    }
+
+    private PlanAttempt failedParseAttempt(
+        ExactPositiveMonomial.ParseResult result,
+        ResidualObligation obligation,
+        ExactPositiveMonomial.Parser parser
+    ) {
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        Status status = result.status()</span>
+<span class="fc" id="L332">                == ExactPositiveMonomial.ParseStatus.INCONCLUSIVE</span>
+<span class="fc" id="L333">            ? Status.BUDGET_INCONCLUSIVE</span>
+<span class="fc" id="L334">            : Status.UNSUPPORTED;</span>
+<span class="fc" id="L335">        return PlanAttempt.withoutApplication(</span>
+            status,
+<span class="fc" id="L337">            Optional.of(obligation),</span>
+<span class="fc" id="L338">            work(parser),</span>
+<span class="fc" id="L339">            result.detail());</span>
+    }
+
+    private WorkLedger work(ExactPositiveMonomial.Parser parser) {
+<span class="fc" id="L343">        return new WorkLedger(</span>
+<span class="fc" id="L344">            budget.maxFactors(),</span>
+<span class="fc" id="L345">            parser.inspectedFactors(),</span>
+<span class="fc" id="L346">            parser.remainingFactors());</span>
+    }
+
+    private static boolean hasDirectFactorization(BinaryExpr addition) {
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        if (!(addition.left() instanceof BinaryExpr leftProduct)</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">                || leftProduct.operator() != BinaryOperator.MUL</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">                || !(addition.right() instanceof BinaryExpr rightProduct)</span>
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">                || rightProduct.operator() != BinaryOperator.MUL) {</span>
+<span class="fc" id="L354">            return false;</span>
+        }
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        return leftProduct.left().equals(rightProduct.left())</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">            || leftProduct.right().equals(rightProduct.right());</span>
+    }
+
+    private static ResidualObligation residualObligation(
+        BinaryExpr addition
+    ) {
+<span class="fc" id="L363">        String left = ExpressionFormatter.format(addition.left());</span>
+<span class="fc" id="L364">        String right = ExpressionFormatter.format(addition.right());</span>
+<span class="fc" id="L365">        return new ResidualObligation(</span>
+            &quot;MONOMIAL_COMMON_FACTOR&quot;,
+            left,
+            right,
+            &quot;A&quot;,
+            left + &quot; = A * B; &quot; + right + &quot; = A * C&quot;);
+    }
+
+    private static Certificate certificate(
+        BinaryExpr original,
+        Expr common,
+        Expr leftRemainder,
+        Expr rightRemainder,
+        Expr prepared,
+        Expr result,
+        ExactPositiveMonomial leftMonomial,
+        ExactPositiveMonomial rightMonomial,
+        ExactPositiveMonomial commonMonomial
+    ) {
+<span class="fc" id="L384">        String leftText = ExpressionFormatter.format(original.left());</span>
+<span class="fc" id="L385">        String rightText = ExpressionFormatter.format(original.right());</span>
+<span class="fc" id="L386">        String commonText = ExpressionFormatter.format(common);</span>
+<span class="fc" id="L387">        String leftRemainderText = ExpressionFormatter.format(leftRemainder);</span>
+<span class="fc" id="L388">        String rightRemainderText = ExpressionFormatter.format(rightRemainder);</span>
+<span class="fc" id="L389">        String preparedText = ExpressionFormatter.format(prepared);</span>
+<span class="fc" id="L390">        String resultText = ExpressionFormatter.format(result);</span>
+<span class="fc" id="L391">        String payload = String.join(&quot;\n&quot;,</span>
+            &quot;schema=&quot; + CERTIFICATE_SCHEMA,
+            &quot;solver=&quot; + SOLVER_ID,
+            &quot;principalRule=&quot; + PRINCIPAL_RULE_ID,
+            &quot;left=&quot; + leftText,
+            &quot;right=&quot; + rightText,
+<span class="fc" id="L397">            &quot;leftMonomial=&quot; + leftMonomial.descriptor(),</span>
+<span class="fc" id="L398">            &quot;rightMonomial=&quot; + rightMonomial.descriptor(),</span>
+            &quot;common=&quot; + commonText,
+<span class="fc" id="L400">            &quot;commonMonomial=&quot; + commonMonomial.descriptor(),</span>
+            &quot;leftRemainder=&quot; + leftRemainderText,
+            &quot;rightRemainder=&quot; + rightRemainderText,
+            &quot;prepared=&quot; + preparedText,
+            &quot;result=&quot; + resultText);
+<span class="fc" id="L405">        return new Certificate(</span>
+            CERTIFICATE_SCHEMA,
+            SOLVER_ID,
+            leftText,
+            rightText,
+            commonText,
+            leftRemainderText,
+            rightRemainderText,
+            preparedText,
+            resultText,
+<span class="fc" id="L415">            leftMonomial.descriptor(),</span>
+<span class="fc" id="L416">            rightMonomial.descriptor(),</span>
+<span class="fc" id="L417">            commonMonomial.descriptor(),</span>
+<span class="fc" id="L418">            sha256(payload));</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L423">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L424">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L425">            return java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L426">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L427">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L431">    public enum Status {</span>
+<span class="fc" id="L432">        PREPARED,</span>
+<span class="fc" id="L433">        DIRECT_MATCH_AVAILABLE,</span>
+<span class="fc" id="L434">        NOT_APPLICABLE,</span>
+<span class="fc" id="L435">        UNSUPPORTED,</span>
+<span class="fc" id="L436">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L437">        INVALID_CERTIFICATE</span>
+    }
+
+    public record Budget(
+        int maxFactors,
+        int maxExponent,
+        long maxCoefficient
+    ) {
+<span class="fc" id="L445">        public static final Budget DEFAULT = new Budget(32, 16, 1_000_000L);</span>
+
+<span class="fc" id="L447">        public Budget {</span>
+<span class="fc bfc" id="L448" title="All 6 branches covered.">            if (maxFactors &lt; 0 || maxExponent &lt; 1 || maxCoefficient &lt; 1) {</span>
+<span class="fc" id="L449">                throw new IllegalArgumentException(</span>
+                    &quot;factor limit must be non-negative and algebra limits positive&quot;);
+            }
+<span class="fc" id="L452">        }</span>
+
+        private ExactPositiveMonomial.Limits limits() {
+<span class="fc" id="L455">            return new ExactPositiveMonomial.Limits(</span>
+                maxFactors,
+                maxExponent,
+                maxCoefficient);
+        }
+    }
+
+    public record WorkLedger(
+        int configuredFactorLimit,
+        int inspectedFactors,
+        int remainingFactorBudget
+    ) {
+<span class="fc" id="L467">        public WorkLedger {</span>
+<span class="pc bpc" id="L468" title="4 of 8 branches missed.">            if (configuredFactorLimit &lt; 0</span>
+                    || inspectedFactors &lt; 0
+                    || remainingFactorBudget &lt; 0
+                    || configuredFactorLimit
+                        != inspectedFactors + remainingFactorBudget) {
+<span class="nc" id="L473">                throw new IllegalArgumentException(</span>
+                    &quot;factor work must be non-negative and balanced&quot;);
+            }
+<span class="fc" id="L476">        }</span>
+
+        private static WorkLedger untouched(int configured) {
+<span class="fc" id="L479">            return new WorkLedger(configured, 0, configured);</span>
+        }
+    }
+
+    public record ResidualObligation(
+        String kind,
+        String leftTermExpression,
+        String rightTermExpression,
+        String commonPlaceholder,
+        String equationTemplate
+    ) {
+<span class="fc" id="L490">        public ResidualObligation {</span>
+<span class="fc" id="L491">            kind = requireText(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L492">            leftTermExpression = requireText(</span>
+                leftTermExpression,
+                &quot;leftTermExpression&quot;);
+<span class="fc" id="L495">            rightTermExpression = requireText(</span>
+                rightTermExpression,
+                &quot;rightTermExpression&quot;);
+<span class="fc" id="L498">            commonPlaceholder = requireText(</span>
+                commonPlaceholder,
+                &quot;commonPlaceholder&quot;);
+<span class="fc" id="L501">            equationTemplate = requireText(</span>
+                equationTemplate,
+                &quot;equationTemplate&quot;);
+<span class="fc" id="L504">        }</span>
+    }
+
+    public record Certificate(
+        String schema,
+        String solverId,
+        String leftTermExpression,
+        String rightTermExpression,
+        String commonFactorExpression,
+        String leftRemainderExpression,
+        String rightRemainderExpression,
+        String preparedExpression,
+        String resultExpression,
+        String leftMonomialDescriptor,
+        String rightMonomialDescriptor,
+        String commonMonomialDescriptor,
+        String contentHash
+    ) {
+<span class="fc" id="L522">        public Certificate {</span>
+<span class="fc" id="L523">            schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L524">            solverId = requireText(solverId, &quot;solverId&quot;);</span>
+<span class="fc" id="L525">            leftTermExpression = requireText(</span>
+                leftTermExpression,
+                &quot;leftTermExpression&quot;);
+<span class="fc" id="L528">            rightTermExpression = requireText(</span>
+                rightTermExpression,
+                &quot;rightTermExpression&quot;);
+<span class="fc" id="L531">            commonFactorExpression = requireText(</span>
+                commonFactorExpression,
+                &quot;commonFactorExpression&quot;);
+<span class="fc" id="L534">            leftRemainderExpression = requireText(</span>
+                leftRemainderExpression,
+                &quot;leftRemainderExpression&quot;);
+<span class="fc" id="L537">            rightRemainderExpression = requireText(</span>
+                rightRemainderExpression,
+                &quot;rightRemainderExpression&quot;);
+<span class="fc" id="L540">            preparedExpression = requireText(</span>
+                preparedExpression,
+                &quot;preparedExpression&quot;);
+<span class="fc" id="L543">            resultExpression = requireText(</span>
+                resultExpression,
+                &quot;resultExpression&quot;);
+<span class="fc" id="L546">            leftMonomialDescriptor = requireText(</span>
+                leftMonomialDescriptor,
+                &quot;leftMonomialDescriptor&quot;);
+<span class="fc" id="L549">            rightMonomialDescriptor = requireText(</span>
+                rightMonomialDescriptor,
+                &quot;rightMonomialDescriptor&quot;);
+<span class="fc" id="L552">            commonMonomialDescriptor = requireText(</span>
+                commonMonomialDescriptor,
+                &quot;commonMonomialDescriptor&quot;);
+<span class="fc" id="L555">            contentHash = requireText(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L556">        }</span>
+    }
+
+    public record PreparedApplication(
+        String schema,
+        String solverId,
+        String principalRuleId,
+        Expr originalSubtree,
+        Expr preparedSubtree,
+        Expr resultSubtree,
+        Expr commonFactor,
+        Expr leftRemainder,
+        Expr rightRemainder,
+        Map&lt;String, Expr&gt; bindings,
+        ResidualObligation residualObligation,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; primitiveRuleIds,
+        Budget budget,
+        Certificate certificate,
+        WorkLedger work
+    ) {
+<span class="fc" id="L577">        public PreparedApplication {</span>
+<span class="fc" id="L578">            schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L579">            solverId = requireText(solverId, &quot;solverId&quot;);</span>
+<span class="fc" id="L580">            principalRuleId = requireText(</span>
+                principalRuleId,
+                &quot;principalRuleId&quot;);
+<span class="fc" id="L583">            originalSubtree = Objects.requireNonNull(</span>
+                originalSubtree,
+                &quot;originalSubtree&quot;);
+<span class="fc" id="L586">            preparedSubtree = Objects.requireNonNull(</span>
+                preparedSubtree,
+                &quot;preparedSubtree&quot;);
+<span class="fc" id="L589">            resultSubtree = Objects.requireNonNull(</span>
+                resultSubtree,
+                &quot;resultSubtree&quot;);
+<span class="fc" id="L592">            commonFactor = Objects.requireNonNull(</span>
+                commonFactor,
+                &quot;commonFactor&quot;);
+<span class="fc" id="L595">            leftRemainder = Objects.requireNonNull(</span>
+                leftRemainder,
+                &quot;leftRemainder&quot;);
+<span class="fc" id="L598">            rightRemainder = Objects.requireNonNull(</span>
+                rightRemainder,
+                &quot;rightRemainder&quot;);
+<span class="fc" id="L601">            bindings = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(</span>
+<span class="fc" id="L602">                Objects.requireNonNull(bindings, &quot;bindings&quot;)));</span>
+<span class="fc" id="L603">            residualObligation = Objects.requireNonNull(</span>
+                residualObligation,
+                &quot;residualObligation&quot;);
+<span class="fc" id="L606">            assumptions = List.copyOf(</span>
+<span class="fc" id="L607">                Objects.requireNonNull(assumptions, &quot;assumptions&quot;));</span>
+<span class="fc" id="L608">            primitiveRuleIds = List.copyOf(</span>
+<span class="fc" id="L609">                Objects.requireNonNull(</span>
+                    primitiveRuleIds,
+                    &quot;primitiveRuleIds&quot;));
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">            if (primitiveRuleIds.isEmpty()) {</span>
+<span class="nc" id="L613">                throw new IllegalArgumentException(</span>
+                    &quot;primitiveRuleIds must not be empty&quot;);
+            }
+<span class="fc" id="L616">            budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L617">            certificate = Objects.requireNonNull(certificate, &quot;certificate&quot;);</span>
+<span class="fc" id="L618">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L619">        }</span>
+    }
+
+    public record PlanAttempt(
+        Status status,
+        Optional&lt;PreparedApplication&gt; application,
+        Optional&lt;ResidualObligation&gt; residualObligation,
+        WorkLedger work,
+        String detail
+    ) {
+<span class="fc" id="L629">        public PlanAttempt {</span>
+<span class="fc" id="L630">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L631">            application = Objects.requireNonNull(</span>
+                application,
+                &quot;application&quot;);
+<span class="fc" id="L634">            residualObligation = Objects.requireNonNull(</span>
+                residualObligation,
+                &quot;residualObligation&quot;);
+<span class="fc" id="L637">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="pc bpc" id="L639" title="1 of 4 branches missed.">            if ((status == Status.PREPARED) != application.isPresent()) {</span>
+<span class="nc" id="L640">                throw new IllegalArgumentException(</span>
+                    &quot;only PREPARED attempts may retain an application&quot;);
+            }
+<span class="fc bfc" id="L643" title="All 2 branches covered.">            if (application.isPresent()</span>
+<span class="pc bpc" id="L644" title="1 of 2 branches missed.">                    &amp;&amp; (!application.get().work().equals(work)</span>
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">                        || !residualObligation.equals(Optional.of(</span>
+<span class="fc" id="L646">                            application.get().residualObligation())))) {</span>
+<span class="nc" id="L647">                throw new IllegalArgumentException(</span>
+                    &quot;attempt and application evidence must agree&quot;);
+            }
+<span class="fc" id="L650">        }</span>
+
+        private static PlanAttempt prepared(PreparedApplication application) {
+<span class="fc" id="L653">            return new PlanAttempt(</span>
+                Status.PREPARED,
+<span class="fc" id="L655">                Optional.of(application),</span>
+<span class="fc" id="L656">                Optional.of(application.residualObligation()),</span>
+<span class="fc" id="L657">                application.work(),</span>
+                &quot;greatest-common-monomial-prepared&quot;);
+        }
+
+        private static PlanAttempt withoutApplication(
+            Status status,
+            WorkLedger work,
+            String detail
+        ) {
+<span class="fc" id="L666">            return withoutApplication(</span>
+                status,
+<span class="fc" id="L668">                Optional.empty(),</span>
+                work,
+                detail);
+        }
+
+        private static PlanAttempt withoutApplication(
+            Status status,
+            Optional&lt;ResidualObligation&gt; residualObligation,
+            WorkLedger work,
+            String detail
+        ) {
+<span class="fc" id="L679">            return new PlanAttempt(</span>
+                status,
+<span class="fc" id="L681">                Optional.empty(),</span>
+                residualObligation,
+                work,
+                detail);
+        }
+    }
+
+    private record ParsedTerms(
+        ExactPositiveMonomial left,
+        ExactPositiveMonomial right
+    ) {
+<span class="fc" id="L692">        private ParsedTerms {</span>
+<span class="fc" id="L693">            left = Objects.requireNonNull(left, &quot;left&quot;);</span>
+<span class="fc" id="L694">            right = Objects.requireNonNull(right, &quot;right&quot;);</span>
+<span class="fc" id="L695">        }</span>
+    }
+
+    private record ExactFactorization(
+        ExactPositiveMonomial common,
+        ExactPositiveMonomial leftRemainder,
+        ExactPositiveMonomial rightRemainder
+    ) {
+<span class="fc" id="L703">        private ExactFactorization {</span>
+<span class="fc" id="L704">            common = Objects.requireNonNull(common, &quot;common&quot;);</span>
+<span class="fc" id="L705">            leftRemainder = Objects.requireNonNull(</span>
+                leftRemainder,
+                &quot;leftRemainder&quot;);
+<span class="fc" id="L708">            rightRemainder = Objects.requireNonNull(</span>
+                rightRemainder,
+                &quot;rightRemainder&quot;);
+<span class="fc" id="L711">        }</span>
+    }
+
+    private record ExpectedApplication(
+        Expr common,
+        Expr leftRemainder,
+        Expr rightRemainder,
+        Expr prepared,
+        Expr result
+    ) {
+<span class="fc" id="L721">        private ExpectedApplication {</span>
+<span class="fc" id="L722">            common = Objects.requireNonNull(common, &quot;common&quot;);</span>
+<span class="fc" id="L723">            leftRemainder = Objects.requireNonNull(</span>
+                leftRemainder,
+                &quot;leftRemainder&quot;);
+<span class="fc" id="L726">            rightRemainder = Objects.requireNonNull(</span>
+                rightRemainder,
+                &quot;rightRemainder&quot;);
+<span class="fc" id="L729">            prepared = Objects.requireNonNull(prepared, &quot;prepared&quot;);</span>
+<span class="fc" id="L730">            result = Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L731">        }</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L735" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L736">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L738">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

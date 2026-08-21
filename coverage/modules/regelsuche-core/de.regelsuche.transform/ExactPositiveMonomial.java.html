@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactPositiveMonomial.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">ExactPositiveMonomial.java</span></div><h1>ExactPositiveMonomial.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.SortedMap;
+import java.util.TreeMap;
+
+/** Exact positive-integer monomial used by bounded preparation solvers. */
+record ExactPositiveMonomial(
+    long coefficient,
+    SortedMap&lt;String, Integer&gt; powers
+) {
+    static final long MAX_EXACT_DOUBLE_INTEGER = (1L &lt;&lt; 53) - 1;
+
+    ExactPositiveMonomial(long coefficient, Map&lt;String, Integer&gt; powers) {
+<span class="fc" id="L24">        this(coefficient, new TreeMap&lt;&gt;(Objects.requireNonNull(powers, &quot;powers&quot;)));</span>
+<span class="fc" id="L25">    }</span>
+
+<span class="fc" id="L27">    ExactPositiveMonomial {</span>
+<span class="pc bpc" id="L28" title="3 of 6 branches missed.">        if (coefficient &lt; 1</span>
+                || coefficient &gt; MAX_EXACT_DOUBLE_INTEGER
+                || powers == null
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">                || powers.entrySet().stream().anyMatch(entry -&gt;</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">                    entry.getKey() == null</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">                        || entry.getKey().isBlank()</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                        || entry.getValue() == null</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                        || entry.getValue() &lt; 1)) {</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(</span>
+                &quot;monomials require a safely representable positive coefficient and powers&quot;);
+        }
+<span class="fc" id="L39">        powers = Collections.unmodifiableSortedMap(new TreeMap&lt;&gt;(powers));</span>
+<span class="fc" id="L40">    }</span>
+
+    boolean isOne() {
+<span class="fc bfc" id="L43" title="All 4 branches covered.">        return coefficient == 1 &amp;&amp; powers.isEmpty();</span>
+    }
+
+    ExactPositiveMonomial gcd(ExactPositiveMonomial other) {
+<span class="fc" id="L47">        TreeMap&lt;String, Integer&gt; common = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L48">        powers.forEach((name, exponent) -&gt; {</span>
+<span class="fc" id="L49">            Integer candidate = other.powers.get(name);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (candidate != null) {</span>
+<span class="fc" id="L51">                common.put(name, Math.min(exponent, candidate));</span>
+            }
+<span class="fc" id="L53">        });</span>
+<span class="fc" id="L54">        return new ExactPositiveMonomial(</span>
+<span class="fc" id="L55">            greatestCommonDivisor(coefficient, other.coefficient), common);</span>
+    }
+
+    ExactPositiveMonomial divideExactly(ExactPositiveMonomial divisor) {
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (coefficient % divisor.coefficient != 0) {</span>
+<span class="nc" id="L60">            return null;</span>
+        }
+<span class="fc" id="L62">        TreeMap&lt;String, Integer&gt; remainder = new TreeMap&lt;&gt;(powers);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (Map.Entry&lt;String, Integer&gt; factor : divisor.powers.entrySet()) {</span>
+<span class="fc" id="L64">            Integer exponent = remainder.get(factor.getKey());</span>
+<span class="pc bpc" id="L65" title="2 of 4 branches missed.">            if (exponent == null || exponent &lt; factor.getValue()) {</span>
+<span class="nc" id="L66">                return null;</span>
+            }
+<span class="fc" id="L68">            int value = exponent - factor.getValue();</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (value == 0) {</span>
+<span class="fc" id="L70">                remainder.remove(factor.getKey());</span>
+            } else {
+<span class="fc" id="L72">                remainder.put(factor.getKey(), value);</span>
+            }
+<span class="fc" id="L74">        }</span>
+<span class="fc" id="L75">        return new ExactPositiveMonomial(</span>
+            coefficient / divisor.coefficient, remainder);
+    }
+
+    ExactPositiveMonomial multiply(ExactPositiveMonomial other) {
+        long product;
+        try {
+<span class="fc" id="L82">            product = Math.multiplyExact(coefficient, other.coefficient);</span>
+<span class="nc" id="L83">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L84">            return null;</span>
+<span class="fc" id="L85">        }</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (product &gt; MAX_EXACT_DOUBLE_INTEGER) {</span>
+<span class="nc" id="L87">            return null;</span>
+        }
+<span class="fc" id="L89">        TreeMap&lt;String, Integer&gt; combined = new TreeMap&lt;&gt;(powers);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (Map.Entry&lt;String, Integer&gt; factor : other.powers.entrySet()) {</span>
+            try {
+<span class="fc" id="L92">                combined.merge(factor.getKey(), factor.getValue(), Math::addExact);</span>
+<span class="nc" id="L93">            } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L94">                return null;</span>
+<span class="fc" id="L95">            }</span>
+<span class="fc" id="L96">        }</span>
+<span class="fc" id="L97">        return new ExactPositiveMonomial(product, combined);</span>
+    }
+
+    Expr toExpression() {
+<span class="fc" id="L101">        List&lt;Expr&gt; factors = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L102" title="All 4 branches covered.">        if (coefficient != 1 || powers.isEmpty()) {</span>
+<span class="fc" id="L103">            factors.add(new NumberExpr(coefficient));</span>
+        }
+<span class="fc" id="L105">        powers.forEach((name, exponent) -&gt; {</span>
+<span class="fc" id="L106">            Expr variable = new VariableExpr(name);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            factors.add(exponent == 1 ? variable : new BinaryExpr(</span>
+<span class="nc" id="L108">                variable, BinaryOperator.POW, new NumberExpr(exponent)));</span>
+<span class="fc" id="L109">        });</span>
+<span class="fc" id="L110">        Expr result = factors.getFirst();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (int index = 1; index &lt; factors.size(); index++) {</span>
+<span class="fc" id="L112">            result = new BinaryExpr(</span>
+<span class="fc" id="L113">                result, BinaryOperator.MUL, factors.get(index));</span>
+        }
+<span class="fc" id="L115">        return result;</span>
+    }
+
+    String descriptor() {
+<span class="fc" id="L119">        StringBuilder result = new StringBuilder().append(coefficient);</span>
+<span class="fc" id="L120">        powers.forEach((name, exponent) -&gt; result.append('|')</span>
+<span class="fc" id="L121">            .append(name.length()).append(':').append(name)</span>
+<span class="fc" id="L122">            .append('^').append(exponent));</span>
+<span class="fc" id="L123">        return result.toString();</span>
+    }
+
+    private static long greatestCommonDivisor(long left, long right) {
+<span class="fc" id="L127">        long a = left;</span>
+<span class="fc" id="L128">        long b = right;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        while (b != 0) {</span>
+<span class="fc" id="L130">            long remainder = a % b;</span>
+<span class="fc" id="L131">            a = b;</span>
+<span class="fc" id="L132">            b = remainder;</span>
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">        return a;</span>
+    }
+
+    record Limits(int maxFactors, int maxExponent, long maxCoefficient) {
+<span class="fc" id="L138">        Limits {</span>
+<span class="pc bpc" id="L139" title="3 of 8 branches missed.">            if (maxFactors &lt; 0</span>
+                    || maxExponent &lt; 1
+                    || maxCoefficient &lt; 1
+                    || maxCoefficient &gt; MAX_EXACT_DOUBLE_INTEGER) {
+<span class="fc" id="L143">                throw new IllegalArgumentException(</span>
+                    &quot;limits must remain inside the safe positive double-integer fragment&quot;);
+            }
+<span class="fc" id="L146">        }</span>
+    }
+
+<span class="fc" id="L149">    enum ParseStatus { SUPPORTED, UNSUPPORTED, INCONCLUSIVE }</span>
+
+    record ParseResult(
+        ParseStatus status,
+        ExactPositiveMonomial monomial,
+        String detail
+    ) {
+<span class="fc" id="L156">        ParseResult {</span>
+<span class="fc" id="L157">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="pc bpc" id="L159" title="1 of 6 branches missed.">            if ((status == ParseStatus.SUPPORTED) != (monomial != null)) {</span>
+<span class="nc" id="L160">                throw new IllegalArgumentException(</span>
+                    &quot;only supported results retain a monomial&quot;);
+            }
+<span class="fc" id="L163">        }</span>
+
+        static ParseResult supported(ExactPositiveMonomial value) {
+<span class="fc" id="L166">            return new ParseResult(</span>
+                ParseStatus.SUPPORTED,
+<span class="fc" id="L168">                Objects.requireNonNull(value, &quot;value&quot;),</span>
+                &quot;&quot;);
+        }
+
+        static ParseResult unsupported(String detail) {
+<span class="fc" id="L173">            return new ParseResult(ParseStatus.UNSUPPORTED, null, detail);</span>
+        }
+
+        static ParseResult inconclusive(String detail) {
+<span class="fc" id="L177">            return new ParseResult(ParseStatus.INCONCLUSIVE, null, detail);</span>
+        }
+
+        boolean supported() {
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            return status == ParseStatus.SUPPORTED;</span>
+        }
+    }
+
+    static final class Parser {
+        private final Limits limits;
+        private int inspectedFactors;
+
+<span class="fc" id="L189">        Parser(Limits limits) {</span>
+<span class="fc" id="L190">            this.limits = Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="fc" id="L191">        }</span>
+
+        ParseResult parse(Expr expression) {
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L195">                return parseNumber(number);</span>
+            }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L198">                return atomic(1, Map.of(variable.name(), 1));</span>
+            }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc" id="L202">                    return parsePower(binary);</span>
+                }
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                if (binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L205">                    return parseProduct(binary);</span>
+                }
+            }
+<span class="fc" id="L208">            return ParseResult.unsupported(</span>
+                &quot;term-is-outside-positive-integer-monomial-fragment&quot;);
+        }
+
+        int inspectedFactors() {
+<span class="fc" id="L213">            return inspectedFactors;</span>
+        }
+
+        int remainingFactors() {
+<span class="fc" id="L217">            return limits.maxFactors() - inspectedFactors;</span>
+        }
+
+        private ParseResult parseNumber(NumberExpr number) {
+<span class="fc" id="L221">            long value = exactPositiveInteger(number.value());</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (value &lt; 1) {</span>
+<span class="fc" id="L223">                return ParseResult.unsupported(</span>
+                    &quot;coefficient-is-not-a-safely-representable-positive-integer&quot;);
+            }
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">            return value &gt; limits.maxCoefficient()</span>
+<span class="nc" id="L227">                ? ParseResult.inconclusive(&quot;monomial-coefficient-limit-exhausted&quot;)</span>
+<span class="fc" id="L228">                : atomic(value, Map.of());</span>
+        }
+
+        private ParseResult parsePower(BinaryExpr power) {
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">            if (!(power.left() instanceof VariableExpr variable)</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                    || !(power.right() instanceof NumberExpr exponentValue)) {</span>
+<span class="nc" id="L234">                return ParseResult.unsupported(</span>
+                    &quot;power-is-not-a-positive-integer-variable-power&quot;);
+            }
+<span class="fc" id="L237">            long exponent = exactPositiveInteger(exponentValue.value());</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">            if (exponent &lt; 1) {</span>
+<span class="nc" id="L239">                return ParseResult.unsupported(</span>
+                    &quot;variable-power-exponent-is-not-a-positive-exact-integer&quot;);
+            }
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            return exponent &gt; limits.maxExponent()</span>
+<span class="nc" id="L243">                ? ParseResult.inconclusive(&quot;monomial-exponent-limit-exhausted&quot;)</span>
+<span class="fc" id="L244">                : atomic(1, Map.of(variable.name(), Math.toIntExact(exponent)));</span>
+        }
+
+        private ParseResult atomic(long coefficient, Map&lt;String, Integer&gt; powers) {
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            if (inspectedFactors &gt;= limits.maxFactors()) {</span>
+<span class="fc" id="L249">                return ParseResult.inconclusive(&quot;monomial-factor-limit-exhausted&quot;);</span>
+            }
+<span class="fc" id="L251">            inspectedFactors++;</span>
+<span class="fc" id="L252">            return ParseResult.supported(</span>
+                new ExactPositiveMonomial(coefficient, powers));
+        }
+
+        private ParseResult parseProduct(BinaryExpr product) {
+<span class="fc" id="L257">            ParseResult left = parse(product.left());</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (!left.supported()) {</span>
+<span class="nc" id="L259">                return left;</span>
+            }
+<span class="fc" id="L261">            ParseResult right = parse(product.right());</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            if (!right.supported()) {</span>
+<span class="fc" id="L263">                return right;</span>
+            }
+<span class="fc" id="L265">            ExactPositiveMonomial combined =</span>
+<span class="fc" id="L266">                left.monomial().multiply(right.monomial());</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            if (combined == null</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">                    || combined.coefficient() &gt; limits.maxCoefficient()) {</span>
+<span class="nc" id="L269">                return ParseResult.inconclusive(</span>
+                    &quot;monomial-coefficient-limit-exhausted&quot;);
+            }
+<span class="fc" id="L272">            return combined.powers().values().stream()</span>
+<span class="pc bpc" id="L273" title="2 of 4 branches missed.">                    .anyMatch(exponent -&gt; exponent &gt; limits.maxExponent())</span>
+<span class="nc" id="L274">                ? ParseResult.inconclusive(&quot;monomial-exponent-limit-exhausted&quot;)</span>
+<span class="fc" id="L275">                : ParseResult.supported(combined);</span>
+        }
+
+        private static long exactPositiveInteger(double value) {
+<span class="pc bpc" id="L279" title="2 of 4 branches missed.">            return Double.isFinite(value)</span>
+                    &amp;&amp; value &gt;= 1
+<span class="pc bpc" id="L281" title="1 of 4 branches missed.">                    &amp;&amp; value == Math.rint(value)</span>
+<span class="fc" id="L282">                    &amp;&amp; value &lt;= MAX_EXACT_DOUBLE_INTEGER</span>
+<span class="fc" id="L283">                ? (long) value</span>
+<span class="fc" id="L284">                : -1;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

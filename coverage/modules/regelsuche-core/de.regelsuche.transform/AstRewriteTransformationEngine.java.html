@@ -318,7 +318,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             }
 <span class="fc" id="L319">            Power left = asPower(multiplication.left());</span>
 <span class="fc" id="L320">            Power right = asPower(multiplication.right());</span>
-<span class="pc bpc" id="L321" title="2 of 6 branches missed.">            if (left != null &amp;&amp; right != null &amp;&amp; left.base().equals(right.base())) {</span>
+<span class="pc bpc" id="L321" title="1 of 6 branches missed.">            if (left != null &amp;&amp; right != null &amp;&amp; left.base().equals(right.base())) {</span>
 <span class="fc" id="L322">                return new PowerPair(left.base(), left.exponent(), right.exponent());</span>
             }
 <span class="fc" id="L324">            return null;</span>
