@@ -20,11 +20,11 @@ import java.util.Set;
 
 /**
  * Opt-in engine that adds exact common-monomial synthesis to the existing
- * direct, polynomial-preparation, and AC-normalization paths.
+ * direct, polynomial-preparation and AC-normalization paths.
  *
  * <p>A candidate is emitted only after the monomial certificate verifies and
  * the unchanged visible {@code ast_factor_common_left} implementation replays
- * on the prepared subtree.</p>
+ * on the retained prepared AST.</p>
  */
 public final class MonomialCommonFactorPreparationTransformationEngine
         implements TransformationEngine {
@@ -34,6 +34,7 @@ public final class MonomialCommonFactorPreparationTransformationEngine
 
     private final TransformationEngine baseEngine;
     private final TransformationEngine principalEngine;
+    private final RewriteRule principalRule;
     private final Set<String> visibleRuleIds;
     private final MonomialCommonFactorPreparationSolver solver;
     private final int maxPreparedCandidates;
@@ -51,6 +52,7 @@ public final class MonomialCommonFactorPreparationTransformationEngine
         this(
             new AcNormalizationPreparationTransformationEngine(copyRules(rules)),
             new AstRewriteTransformationEngine(copyRules(rules)),
+            findPrincipalRule(rules),
             ruleIds(rules),
             new MonomialCommonFactorPreparationSolver(),
             DEFAULT_MAX_PREPARED_CANDIDATES);
@@ -63,10 +65,28 @@ public final class MonomialCommonFactorPreparationTransformationEngine
         MonomialCommonFactorPreparationSolver solver,
         int maxPreparedCandidates
     ) {
+        this(
+            baseEngine,
+            principalEngine,
+            null,
+            visibleRuleIds,
+            solver,
+            maxPreparedCandidates);
+    }
+
+    private MonomialCommonFactorPreparationTransformationEngine(
+        TransformationEngine baseEngine,
+        TransformationEngine principalEngine,
+        RewriteRule principalRule,
+        Set<String> visibleRuleIds,
+        MonomialCommonFactorPreparationSolver solver,
+        int maxPreparedCandidates
+    ) {
         this.baseEngine = Objects.requireNonNull(baseEngine, "baseEngine");
         this.principalEngine = Objects.requireNonNull(
             principalEngine,
             "principalEngine");
+        this.principalRule = principalRule;
         this.visibleRuleIds = Set.copyOf(
             Objects.requireNonNull(visibleRuleIds, "visibleRuleIds"));
         this.solver = Objects.requireNonNull(solver, "solver");
@@ -234,6 +254,49 @@ public final class MonomialCommonFactorPreparationTransformationEngine
     private Transformation replayPrincipal(
         MonomialCommonFactorPreparationSolver.PreparedApplication application
     ) {
+        return principalRule == null
+            ? replayPrincipalThroughEngine(application)
+            : replayPrincipalOnAst(application);
+    }
+
+    private Transformation replayPrincipalOnAst(
+        MonomialCommonFactorPreparationSolver.PreparedApplication application
+    ) {
+        Expr prepared = application.preparedSubtree();
+        if (!principalRule.id().equals(application.principalRuleId())
+                || !principalRule.matches(prepared)) {
+            return null;
+        }
+        try {
+            Expr actual = principalRule.apply(prepared);
+            if (!actual.equals(application.resultSubtree())) {
+                return null;
+            }
+            Transformation replay = new Transformation(
+                principalRule.id(),
+                ExpressionFormatter.format(actual),
+                principalRule.kind(),
+                principalRule.mayIncreaseComplexity(),
+                principalRule.estimatedCostDelta(),
+                principalRule.isEquivalencePreservingByConstruction(),
+                "principal-ast-replay:"
+                    + application.certificate().contentHash(),
+                principalRule.assumptions(prepared).stream()
+                    .map(de.regelsuche.assumption.Assumption::expression)
+                    .toList(),
+                principalRule.descriptor().packId(),
+                principalRule.descriptor().license());
+            return replay.assumptions().equals(application.assumptions())
+                ? replay
+                : null;
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    private Transformation replayPrincipalThroughEngine(
+        MonomialCommonFactorPreparationSolver.PreparedApplication application
+    ) {
         String prepared = ExpressionFormatter.format(
             application.preparedSubtree());
         String expectedExpression = canonicalExpressionKey(
@@ -360,6 +423,14 @@ public final class MonomialCommonFactorPreparationTransformationEngine
         return path.stream()
             .map(String::valueOf)
             .collect(java.util.stream.Collectors.joining("."));
+    }
+
+    private static RewriteRule findPrincipalRule(List<RewriteRule> rules) {
+        return copyRules(rules).stream()
+            .filter(rule -> rule.id().equals(
+                MonomialCommonFactorPreparationSolver.PRINCIPAL_RULE_ID))
+            .findFirst()
+            .orElse(null);
     }
 
     private static List<RewriteRule> copyRules(List<RewriteRule> rules) {
