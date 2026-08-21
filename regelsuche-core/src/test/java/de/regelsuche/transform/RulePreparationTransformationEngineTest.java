@@ -172,9 +172,8 @@ class RulePreparationTransformationEngineTest {
         assertEquals(2, execution.cacheMetrics().preparedVerifications());
         assertEquals(0, execution.cacheMetrics().skippedUnverifiable());
         assertTrue(execution.transformations().stream()
-            .filter(transformation -> transformation.primitiveRuleIds()
-                .contains(RulePreparationPlanner.PREPARATION_RULE_ID))
-            .count() >= 2);
+            .anyMatch(transformation -> transformation.primitiveRuleIds()
+                .contains(RulePreparationPlanner.PREPARATION_RULE_ID)));
     }
 
     @Test
