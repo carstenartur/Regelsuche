@@ -159,6 +159,23 @@ class RulePreparationTransformationEngineTest {
     }
 
     @Test
+    void distinctAstStructuresDoNotReuseOccurrenceSpecificEvidence() {
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine();
+
+        RulePreparationTransformationEngine.Execution execution =
+            engine.transformWithEvidence(
+                "(x^3 - 1) / (x - 1) + ((x^3 + 0) - 1) / (x - 1)");
+
+        assertEquals(2, execution.cacheMetrics().preparedVerifications());
+        assertEquals(0, execution.cacheMetrics().skippedUnverifiable());
+        assertTrue(execution.transformations().stream()
+            .filter(transformation -> transformation.primitiveRuleIds()
+                .contains(RulePreparationPlanner.PREPARATION_RULE_ID))
+            .count() >= 2);
+    }
+
+    @Test
     void zeroCacheCapacityPreservesResultsWithoutMemoization() {
         AstRewriteTransformationEngine direct =
             new AstRewriteTransformationEngine();
