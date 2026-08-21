@@ -13,39 +13,25 @@ import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-/** Exact positive-integer monomial representation used by preparation solvers. */
-final class ExactPositiveMonomial {
-    private final long coefficient;
-    private final SortedMap<String, Integer> powers;
+/** Exact positive-integer monomial used by bounded preparation solvers. */
+record ExactPositiveMonomial(
+    long coefficient,
+    SortedMap<String, Integer> powers
+) {
+    ExactPositiveMonomial(long coefficient, Map<String, Integer> powers) {
+        this(coefficient, new TreeMap<>(Objects.requireNonNull(powers, "powers")));
+    }
 
-    private ExactPositiveMonomial(
-        long coefficient,
-        Map<String, Integer> powers
-    ) {
-        if (coefficient < 1) {
-            throw new IllegalArgumentException(
-                "monomial coefficient must be positive");
-        }
-        TreeMap<String, Integer> copy = new TreeMap<>(
-            Objects.requireNonNull(powers, "powers"));
-        if (copy.entrySet().stream().anyMatch(entry ->
-                entry.getKey() == null
+    ExactPositiveMonomial {
+        if (coefficient < 1 || powers == null || powers.entrySet().stream()
+                .anyMatch(entry -> entry.getKey() == null
                     || entry.getKey().isBlank()
                     || entry.getValue() == null
                     || entry.getValue() < 1)) {
             throw new IllegalArgumentException(
-                "monomial powers require names and positive exponents");
+                "monomials require a positive coefficient and powers");
         }
-        this.coefficient = coefficient;
-        this.powers = Collections.unmodifiableSortedMap(copy);
-    }
-
-    long coefficient() {
-        return coefficient;
-    }
-
-    SortedMap<String, Integer> powers() {
-        return powers;
+        powers = Collections.unmodifiableSortedMap(new TreeMap<>(powers));
     }
 
     boolean isOne() {
@@ -53,63 +39,54 @@ final class ExactPositiveMonomial {
     }
 
     ExactPositiveMonomial gcd(ExactPositiveMonomial other) {
-        TreeMap<String, Integer> commonPowers = new TreeMap<>();
-        for (Map.Entry<String, Integer> entry : powers.entrySet()) {
-            Integer otherExponent = other.powers.get(entry.getKey());
-            if (otherExponent != null) {
-                commonPowers.put(
-                    entry.getKey(),
-                    Math.min(entry.getValue(), otherExponent));
+        TreeMap<String, Integer> common = new TreeMap<>();
+        powers.forEach((name, exponent) -> {
+            Integer candidate = other.powers.get(name);
+            if (candidate != null) {
+                common.put(name, Math.min(exponent, candidate));
             }
-        }
+        });
         return new ExactPositiveMonomial(
-            greatestCommonDivisor(coefficient, other.coefficient),
-            commonPowers);
+            greatestCommonDivisor(coefficient, other.coefficient), common);
     }
 
     ExactPositiveMonomial divideExactly(ExactPositiveMonomial divisor) {
         if (coefficient % divisor.coefficient != 0) {
             return null;
         }
-        TreeMap<String, Integer> remainderPowers = new TreeMap<>(powers);
-        for (Map.Entry<String, Integer> entry : divisor.powers.entrySet()) {
-            Integer exponent = remainderPowers.get(entry.getKey());
-            if (exponent == null || exponent < entry.getValue()) {
+        TreeMap<String, Integer> remainder = new TreeMap<>(powers);
+        for (Map.Entry<String, Integer> factor : divisor.powers.entrySet()) {
+            Integer exponent = remainder.get(factor.getKey());
+            if (exponent == null || exponent < factor.getValue()) {
                 return null;
             }
-            int remaining = exponent - entry.getValue();
-            if (remaining == 0) {
-                remainderPowers.remove(entry.getKey());
+            int value = exponent - factor.getValue();
+            if (value == 0) {
+                remainder.remove(factor.getKey());
             } else {
-                remainderPowers.put(entry.getKey(), remaining);
+                remainder.put(factor.getKey(), value);
             }
         }
         return new ExactPositiveMonomial(
-            coefficient / divisor.coefficient,
-            remainderPowers);
+            coefficient / divisor.coefficient, remainder);
     }
 
     ExactPositiveMonomial multiply(ExactPositiveMonomial other) {
-        long productCoefficient;
+        long product;
         try {
-            productCoefficient = Math.multiplyExact(
-                coefficient,
-                other.coefficient);
+            product = Math.multiplyExact(coefficient, other.coefficient);
         } catch (ArithmeticException exception) {
             return null;
         }
-        TreeMap<String, Integer> productPowers = new TreeMap<>(powers);
-        for (Map.Entry<String, Integer> entry : other.powers.entrySet()) {
-            int current = productPowers.getOrDefault(entry.getKey(), 0);
-            int productExponent;
+        TreeMap<String, Integer> combined = new TreeMap<>(powers);
+        for (Map.Entry<String, Integer> factor : other.powers.entrySet()) {
             try {
-                productExponent = Math.addExact(current, entry.getValue());
+                combined.merge(factor.getKey(), factor.getValue(), Math::addExact);
             } catch (ArithmeticException exception) {
                 return null;
             }
-            productPowers.put(entry.getKey(), productExponent);
         }
-        return new ExactPositiveMonomial(productCoefficient, productPowers);
+        return new ExactPositiveMonomial(product, combined);
     }
 
     Expr toExpression() {
@@ -117,49 +94,25 @@ final class ExactPositiveMonomial {
         if (coefficient != 1 || powers.isEmpty()) {
             factors.add(new NumberExpr(coefficient));
         }
-        for (Map.Entry<String, Integer> entry : powers.entrySet()) {
-            Expr variable = new VariableExpr(entry.getKey());
-            factors.add(entry.getValue() == 1
-                ? variable
-                : new BinaryExpr(
-                    variable,
-                    BinaryOperator.POW,
-                    new NumberExpr(entry.getValue())));
-        }
+        powers.forEach((name, exponent) -> {
+            Expr variable = new VariableExpr(name);
+            factors.add(exponent == 1 ? variable : new BinaryExpr(
+                variable, BinaryOperator.POW, new NumberExpr(exponent)));
+        });
         Expr result = factors.getFirst();
         for (int index = 1; index < factors.size(); index++) {
             result = new BinaryExpr(
-                result,
-                BinaryOperator.MUL,
-                factors.get(index));
+                result, BinaryOperator.MUL, factors.get(index));
         }
         return result;
     }
 
     String descriptor() {
-        StringBuilder descriptor = new StringBuilder();
-        descriptor.append(coefficient);
-        for (Map.Entry<String, Integer> entry : powers.entrySet()) {
-            descriptor.append('|')
-                .append(entry.getKey().length())
-                .append(':')
-                .append(entry.getKey())
-                .append('^')
-                .append(entry.getValue());
-        }
-        return descriptor.toString();
-    }
-
-    @Override
-    public boolean equals(Object other) {
-        return other instanceof ExactPositiveMonomial monomial
-            && coefficient == monomial.coefficient
-            && powers.equals(monomial.powers);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(coefficient, powers);
+        StringBuilder result = new StringBuilder().append(coefficient);
+        powers.forEach((name, exponent) -> result.append('|')
+            .append(name.length()).append(':').append(name)
+            .append('^').append(exponent));
+        return result.toString();
     }
 
     private static long greatestCommonDivisor(long left, long right) {
@@ -173,11 +126,7 @@ final class ExactPositiveMonomial {
         return a;
     }
 
-    record Limits(
-        int maxFactors,
-        int maxExponent,
-        long maxCoefficient
-    ) {
+    record Limits(int maxFactors, int maxExponent, long maxCoefficient) {
         Limits {
             if (maxFactors < 0 || maxExponent < 1 || maxCoefficient < 1) {
                 throw new IllegalArgumentException(
@@ -186,11 +135,7 @@ final class ExactPositiveMonomial {
         }
     }
 
-    enum ParseStatus {
-        SUPPORTED,
-        UNSUPPORTED,
-        INCONCLUSIVE
-    }
+    enum ParseStatus { SUPPORTED, UNSUPPORTED, INCONCLUSIVE }
 
     record ParseResult(
         ParseStatus status,
@@ -202,14 +147,14 @@ final class ExactPositiveMonomial {
             detail = detail == null ? "" : detail;
             if ((status == ParseStatus.SUPPORTED) != (monomial != null)) {
                 throw new IllegalArgumentException(
-                    "only supported parse results retain a monomial");
+                    "only supported results retain a monomial");
             }
         }
 
-        static ParseResult supported(ExactPositiveMonomial monomial) {
+        static ParseResult supported(ExactPositiveMonomial value) {
             return new ParseResult(
                 ParseStatus.SUPPORTED,
-                Objects.requireNonNull(monomial, "monomial"),
+                Objects.requireNonNull(value, "value"),
                 "");
         }
 
@@ -239,15 +184,15 @@ final class ExactPositiveMonomial {
                 return parseNumber(number);
             }
             if (expression instanceof VariableExpr variable) {
-                return parseVariable(variable);
+                return atomic(1, Map.of(variable.name(), 1));
             }
-            if (expression instanceof BinaryExpr binary
-                    && binary.operator() == BinaryOperator.POW) {
-                return parsePower(binary);
-            }
-            if (expression instanceof BinaryExpr binary
-                    && binary.operator() == BinaryOperator.MUL) {
-                return parseProduct(binary);
+            if (expression instanceof BinaryExpr binary) {
+                if (binary.operator() == BinaryOperator.POW) {
+                    return parsePower(binary);
+                }
+                if (binary.operator() == BinaryOperator.MUL) {
+                    return parseProduct(binary);
+                }
             }
             return ParseResult.unsupported(
                 "term-is-outside-positive-integer-monomial-fragment");
@@ -262,30 +207,14 @@ final class ExactPositiveMonomial {
         }
 
         private ParseResult parseNumber(NumberExpr number) {
-            if (!consumeFactor()) {
-                return factorLimit();
-            }
             long value = exactPositiveInteger(number.value());
             if (value < 1) {
                 return ParseResult.unsupported(
                     "coefficient-is-not-a-positive-exact-integer");
             }
-            if (value > limits.maxCoefficient()) {
-                return ParseResult.inconclusive(
-                    "monomial-coefficient-limit-exhausted");
-            }
-            return ParseResult.supported(new ExactPositiveMonomial(
-                value,
-                Map.of()));
-        }
-
-        private ParseResult parseVariable(VariableExpr variable) {
-            if (!consumeFactor()) {
-                return factorLimit();
-            }
-            return ParseResult.supported(new ExactPositiveMonomial(
-                1,
-                Map.of(variable.name(), 1)));
+            return value > limits.maxCoefficient()
+                ? ParseResult.inconclusive("monomial-coefficient-limit-exhausted")
+                : atomic(value, Map.of());
         }
 
         private ParseResult parsePower(BinaryExpr power) {
@@ -294,21 +223,23 @@ final class ExactPositiveMonomial {
                 return ParseResult.unsupported(
                     "power-is-not-a-positive-integer-variable-power");
             }
-            if (!consumeFactor()) {
-                return factorLimit();
-            }
             long exponent = exactPositiveInteger(exponentValue.value());
             if (exponent < 1) {
                 return ParseResult.unsupported(
                     "variable-power-exponent-is-not-a-positive-exact-integer");
             }
-            if (exponent > limits.maxExponent()) {
-                return ParseResult.inconclusive(
-                    "monomial-exponent-limit-exhausted");
+            return exponent > limits.maxExponent()
+                ? ParseResult.inconclusive("monomial-exponent-limit-exhausted")
+                : atomic(1, Map.of(variable.name(), Math.toIntExact(exponent)));
+        }
+
+        private ParseResult atomic(long coefficient, Map<String, Integer> powers) {
+            if (inspectedFactors >= limits.maxFactors()) {
+                return ParseResult.inconclusive("monomial-factor-limit-exhausted");
             }
-            return ParseResult.supported(new ExactPositiveMonomial(
-                1,
-                Map.of(variable.name(), Math.toIntExact(exponent))));
+            inspectedFactors++;
+            return ParseResult.supported(
+                new ExactPositiveMonomial(coefficient, powers));
         }
 
         private ParseResult parseProduct(BinaryExpr product) {
@@ -327,35 +258,19 @@ final class ExactPositiveMonomial {
                 return ParseResult.inconclusive(
                     "monomial-coefficient-limit-exhausted");
             }
-            if (combined.powers().values().stream().anyMatch(exponent ->
-                    exponent > limits.maxExponent())) {
-                return ParseResult.inconclusive(
-                    "monomial-exponent-limit-exhausted");
-            }
-            return ParseResult.supported(combined);
-        }
-
-        private boolean consumeFactor() {
-            if (inspectedFactors >= limits.maxFactors()) {
-                return false;
-            }
-            inspectedFactors++;
-            return true;
-        }
-
-        private static ParseResult factorLimit() {
-            return ParseResult.inconclusive(
-                "monomial-factor-limit-exhausted");
+            return combined.powers().values().stream()
+                    .anyMatch(exponent -> exponent > limits.maxExponent())
+                ? ParseResult.inconclusive("monomial-exponent-limit-exhausted")
+                : ParseResult.supported(combined);
         }
 
         private static long exactPositiveInteger(double value) {
-            if (!Double.isFinite(value)
-                    || value < 1
-                    || value != Math.rint(value)
-                    || value > Long.MAX_VALUE) {
-                return -1;
-            }
-            return (long) value;
+            return Double.isFinite(value)
+                    && value >= 1
+                    && value == Math.rint(value)
+                    && value <= Long.MAX_VALUE
+                ? (long) value
+                : -1;
         }
     }
 }
