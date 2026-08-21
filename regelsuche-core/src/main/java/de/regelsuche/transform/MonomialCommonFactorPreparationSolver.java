@@ -92,8 +92,10 @@ public final class MonomialCommonFactorPreparationSolver {
                 "terms-have-no-nontrivial-supported-common-monomial");
         }
 
-        ExactPositiveMonomial leftRemainder = left.monomial().divideExactly(common);
-        ExactPositiveMonomial rightRemainder = right.monomial().divideExactly(common);
+        ExactPositiveMonomial leftRemainder =
+            left.monomial().divideExactly(common);
+        ExactPositiveMonomial rightRemainder =
+            right.monomial().divideExactly(common);
         if (leftRemainder == null || rightRemainder == null) {
             return PlanAttempt.withoutApplication(
                 Status.INVALID_CERTIFICATE,
@@ -102,33 +104,17 @@ public final class MonomialCommonFactorPreparationSolver {
                 "computed-gcd-does-not-divide-both-terms");
         }
 
-        Expr commonExpression = common.toExpression();
-        Expr leftRemainderExpression = leftRemainder.toExpression();
-        Expr rightRemainderExpression = rightRemainder.toExpression();
-        Expr preparedSubtree = new BinaryExpr(
-            new BinaryExpr(
-                commonExpression,
-                BinaryOperator.MUL,
-                leftRemainderExpression),
-            BinaryOperator.ADD,
-            new BinaryExpr(
-                commonExpression,
-                BinaryOperator.MUL,
-                rightRemainderExpression));
-        Expr resultSubtree = new BinaryExpr(
-            commonExpression,
-            BinaryOperator.MUL,
-            new BinaryExpr(
-                leftRemainderExpression,
-                BinaryOperator.ADD,
-                rightRemainderExpression));
+        ExpectedApplication expected = expectedApplication(
+            common,
+            leftRemainder,
+            rightRemainder);
         Certificate certificate = certificate(
             addition,
-            commonExpression,
-            leftRemainderExpression,
-            rightRemainderExpression,
-            preparedSubtree,
-            resultSubtree,
+            expected.common(),
+            expected.leftRemainder(),
+            expected.rightRemainder(),
+            expected.prepared(),
+            expected.result(),
             left.monomial(),
             right.monomial(),
             common);
@@ -137,15 +123,15 @@ public final class MonomialCommonFactorPreparationSolver {
             SOLVER_ID,
             PRINCIPAL_RULE_ID,
             subtree,
-            preparedSubtree,
-            resultSubtree,
-            commonExpression,
-            leftRemainderExpression,
-            rightRemainderExpression,
+            expected.prepared(),
+            expected.result(),
+            expected.common(),
+            expected.leftRemainder(),
+            expected.rightRemainder(),
             Map.of(
-                "A", commonExpression,
-                "B", leftRemainderExpression,
-                "C", rightRemainderExpression),
+                "A", expected.common(),
+                "B", expected.leftRemainder(),
+                "C", expected.rightRemainder()),
             obligation,
             List.of(),
             List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID),
@@ -164,90 +150,165 @@ public final class MonomialCommonFactorPreparationSolver {
 
     /** Independently checks the retained gcd, exact quotients and replay form. */
     public boolean verify(PreparedApplication application) {
-        if (!hasExpectedMetadata(application)
-                || !budget.equals(application.budget())
-                || !(application.originalSubtree()
-                    instanceof BinaryExpr addition)
-                || addition.operator() != BinaryOperator.ADD
-                || hasDirectFactorization(addition)
-                || addition.left().equals(addition.right())) {
+        BinaryExpr addition = verificationSource(application);
+        if (addition == null) {
             return false;
         }
-
-        ExactPositiveMonomial.Parser parser =
-            new ExactPositiveMonomial.Parser(application.budget().limits());
-        ExactPositiveMonomial.ParseResult left = parser.parse(addition.left());
-        ExactPositiveMonomial.ParseResult right = parser.parse(addition.right());
-        if (!left.supported() || !right.supported()
-                || !work(parser).equals(application.work())) {
+        ParsedTerms parsed = parseForVerification(addition, application);
+        if (parsed == null) {
             return false;
         }
-        ExactPositiveMonomial common = left.monomial().gcd(right.monomial());
-        if (common.isOne()) {
+        ExactFactorization factorization = exactFactorization(parsed);
+        if (factorization == null) {
             return false;
         }
-        ExactPositiveMonomial leftRemainder = left.monomial().divideExactly(common);
-        ExactPositiveMonomial rightRemainder = right.monomial().divideExactly(common);
-        ExactPositiveMonomial reconstructedLeft = leftRemainder == null
-            ? null
-            : common.multiply(leftRemainder);
-        ExactPositiveMonomial reconstructedRight = rightRemainder == null
-            ? null
-            : common.multiply(rightRemainder);
-        if (leftRemainder == null || rightRemainder == null
-                || reconstructedLeft == null || reconstructedRight == null
-                || !reconstructedLeft.equals(left.monomial())
-                || !reconstructedRight.equals(right.monomial())) {
-            return false;
-        }
-
-        Expr expectedCommon = common.toExpression();
-        Expr expectedLeftRemainder = leftRemainder.toExpression();
-        Expr expectedRightRemainder = rightRemainder.toExpression();
-        Expr expectedPrepared = new BinaryExpr(
-            new BinaryExpr(
-                expectedCommon,
-                BinaryOperator.MUL,
-                expectedLeftRemainder),
-            BinaryOperator.ADD,
-            new BinaryExpr(
-                expectedCommon,
-                BinaryOperator.MUL,
-                expectedRightRemainder));
-        Expr expectedResult = new BinaryExpr(
-            expectedCommon,
-            BinaryOperator.MUL,
-            new BinaryExpr(
-                expectedLeftRemainder,
-                BinaryOperator.ADD,
-                expectedRightRemainder));
-        if (!expectedCommon.equals(application.commonFactor())
-                || !expectedLeftRemainder.equals(application.leftRemainder())
-                || !expectedRightRemainder.equals(application.rightRemainder())
-                || !expectedPrepared.equals(application.preparedSubtree())
-                || !expectedResult.equals(application.resultSubtree())
-                || application.bindings().size() != 3
-                || !expectedCommon.equals(application.bindings().get("A"))
-                || !expectedLeftRemainder.equals(
-                    application.bindings().get("B"))
-                || !expectedRightRemainder.equals(
-                    application.bindings().get("C"))
-                || !application.assumptions().isEmpty()
-                || !residualObligation(addition)
-                    .equals(application.residualObligation())) {
+        ExpectedApplication expected = expectedApplication(
+            factorization.common(),
+            factorization.leftRemainder(),
+            factorization.rightRemainder());
+        if (!expressionsMatch(application, expected)
+                || !bindingsMatch(application, expected)
+                || !contextMatches(application, addition)) {
             return false;
         }
         Certificate expectedCertificate = certificate(
             addition,
-            expectedCommon,
-            expectedLeftRemainder,
-            expectedRightRemainder,
-            expectedPrepared,
-            expectedResult,
-            left.monomial(),
-            right.monomial(),
-            common);
+            expected.common(),
+            expected.leftRemainder(),
+            expected.rightRemainder(),
+            expected.prepared(),
+            expected.result(),
+            parsed.left(),
+            parsed.right(),
+            factorization.common());
         return expectedCertificate.equals(application.certificate());
+    }
+
+    private BinaryExpr verificationSource(PreparedApplication application) {
+        if (!hasExpectedMetadata(application)
+                || !budget.equals(application.budget())
+                || !(application.originalSubtree()
+                    instanceof BinaryExpr addition)) {
+            return null;
+        }
+        return eligibleForPreparation(addition) ? addition : null;
+    }
+
+    private static boolean eligibleForPreparation(BinaryExpr addition) {
+        return addition.operator() == BinaryOperator.ADD
+            && !hasDirectFactorization(addition)
+            && !addition.left().equals(addition.right());
+    }
+
+    private ParsedTerms parseForVerification(
+        BinaryExpr addition,
+        PreparedApplication application
+    ) {
+        ExactPositiveMonomial.Parser parser =
+            new ExactPositiveMonomial.Parser(application.budget().limits());
+        ExactPositiveMonomial.ParseResult left = parser.parse(addition.left());
+        if (!left.supported()) {
+            return null;
+        }
+        ExactPositiveMonomial.ParseResult right = parser.parse(addition.right());
+        if (!right.supported() || !work(parser).equals(application.work())) {
+            return null;
+        }
+        return new ParsedTerms(left.monomial(), right.monomial());
+    }
+
+    private static ExactFactorization exactFactorization(ParsedTerms parsed) {
+        ExactPositiveMonomial common = parsed.left().gcd(parsed.right());
+        if (common.isOne()) {
+            return null;
+        }
+        ExactPositiveMonomial leftRemainder =
+            parsed.left().divideExactly(common);
+        ExactPositiveMonomial rightRemainder =
+            parsed.right().divideExactly(common);
+        if (leftRemainder == null || rightRemainder == null) {
+            return null;
+        }
+        if (!reconstructs(parsed.left(), common, leftRemainder)
+                || !reconstructs(parsed.right(), common, rightRemainder)) {
+            return null;
+        }
+        return new ExactFactorization(
+            common,
+            leftRemainder,
+            rightRemainder);
+    }
+
+    private static boolean reconstructs(
+        ExactPositiveMonomial original,
+        ExactPositiveMonomial common,
+        ExactPositiveMonomial remainder
+    ) {
+        ExactPositiveMonomial reconstructed = common.multiply(remainder);
+        return original.equals(reconstructed);
+    }
+
+    private static ExpectedApplication expectedApplication(
+        ExactPositiveMonomial common,
+        ExactPositiveMonomial leftRemainder,
+        ExactPositiveMonomial rightRemainder
+    ) {
+        Expr commonExpression = common.toExpression();
+        Expr leftExpression = leftRemainder.toExpression();
+        Expr rightExpression = rightRemainder.toExpression();
+        Expr prepared = new BinaryExpr(
+            new BinaryExpr(
+                commonExpression,
+                BinaryOperator.MUL,
+                leftExpression),
+            BinaryOperator.ADD,
+            new BinaryExpr(
+                commonExpression,
+                BinaryOperator.MUL,
+                rightExpression));
+        Expr result = new BinaryExpr(
+            commonExpression,
+            BinaryOperator.MUL,
+            new BinaryExpr(
+                leftExpression,
+                BinaryOperator.ADD,
+                rightExpression));
+        return new ExpectedApplication(
+            commonExpression,
+            leftExpression,
+            rightExpression,
+            prepared,
+            result);
+    }
+
+    private static boolean expressionsMatch(
+        PreparedApplication application,
+        ExpectedApplication expected
+    ) {
+        return expected.common().equals(application.commonFactor())
+            && expected.leftRemainder().equals(application.leftRemainder())
+            && expected.rightRemainder().equals(application.rightRemainder())
+            && expected.prepared().equals(application.preparedSubtree())
+            && expected.result().equals(application.resultSubtree());
+    }
+
+    private static boolean bindingsMatch(
+        PreparedApplication application,
+        ExpectedApplication expected
+    ) {
+        return application.bindings().size() == 3
+            && expected.common().equals(application.bindings().get("A"))
+            && expected.leftRemainder().equals(application.bindings().get("B"))
+            && expected.rightRemainder().equals(application.bindings().get("C"));
+    }
+
+    private static boolean contextMatches(
+        PreparedApplication application,
+        BinaryExpr addition
+    ) {
+        return application.assumptions().isEmpty()
+            && residualObligation(addition)
+                .equals(application.residualObligation());
     }
 
     private static boolean hasExpectedMetadata(
@@ -620,6 +681,52 @@ public final class MonomialCommonFactorPreparationSolver {
                 residualObligation,
                 work,
                 detail);
+        }
+    }
+
+    private record ParsedTerms(
+        ExactPositiveMonomial left,
+        ExactPositiveMonomial right
+    ) {
+        private ParsedTerms {
+            left = Objects.requireNonNull(left, "left");
+            right = Objects.requireNonNull(right, "right");
+        }
+    }
+
+    private record ExactFactorization(
+        ExactPositiveMonomial common,
+        ExactPositiveMonomial leftRemainder,
+        ExactPositiveMonomial rightRemainder
+    ) {
+        private ExactFactorization {
+            common = Objects.requireNonNull(common, "common");
+            leftRemainder = Objects.requireNonNull(
+                leftRemainder,
+                "leftRemainder");
+            rightRemainder = Objects.requireNonNull(
+                rightRemainder,
+                "rightRemainder");
+        }
+    }
+
+    private record ExpectedApplication(
+        Expr common,
+        Expr leftRemainder,
+        Expr rightRemainder,
+        Expr prepared,
+        Expr result
+    ) {
+        private ExpectedApplication {
+            common = Objects.requireNonNull(common, "common");
+            leftRemainder = Objects.requireNonNull(
+                leftRemainder,
+                "leftRemainder");
+            rightRemainder = Objects.requireNonNull(
+                rightRemainder,
+                "rightRemainder");
+            prepared = Objects.requireNonNull(prepared, "prepared");
+            result = Objects.requireNonNull(result, "result");
         }
     }
 
