@@ -77,6 +77,17 @@ classification catalog and rule inventory. The generated files are retained
 under the discovery test report tree so CI and independent reproduction can
 inspect the exact evidence rather than relying on console summaries.
 
+## Host and pinned-container reproduction
+
+The complete matrix is additionally executed twice in separate checkout JVM
+runs and once in a digest-pinned, offline `linux/amd64` container. The gate
+requires all three canonical artifact sets to be byte-identical and retains the
+Dockerfile hash, pinned base-image digest and built-image ID in a schema-checked
+receipt.
+
+See [Target-free held-out container reproduction](target-free-held-out-container-reproduction.md)
+for the exact command, isolation policy, generated paths and claim boundary.
+
 The tranche remains bounded evidence. It establishes neither mathematical
 novelty nor general policy superiority, and it does not treat wall-clock time as
 a substitute for matched admitted primitive work.

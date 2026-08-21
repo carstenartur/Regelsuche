@@ -1,0 +1,22 @@
+/*
+ * Keep container-reproduction orchestration out of the production discovery
+ * source set. The implementation script registers the tasks; this adapter
+ * then runs the independent verifier from the module's test/verification
+ * runtime, where its file-system and container-definition checks belong.
+ */
+
+apply from: rootProject.file(
+    'gradle/target-free-held-out-container-reproduction-base.gradle')
+
+project(':regelsuche-discovery') { discovery ->
+    discovery.plugins.withId('java-library') {
+        rootProject.tasks.named(
+            'verifyTargetFreeHeldOutContainerReproduction',
+            JavaExec
+        ).configure {
+            dependsOn discovery.tasks.named('testClasses')
+            classpath = discovery.extensions.getByName('sourceSets')
+                .getByName('test').runtimeClasspath
+        }
+    }
+}
