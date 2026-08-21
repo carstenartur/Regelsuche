@@ -7,30 +7,73 @@ registries:
     username: dummy # Required by Dependabot for a declared Maven registry.
     password: dummy # The public plugin portal does not authenticate this value.
 
+# Dependencies declared in both build systems must be changed in one PR. The
+# group schedule is authoritative; every participating ecosystem below has an
+# explicit pattern set as required by Dependabot's multi-ecosystem contract.
+multi-ecosystem-groups:
+  java-runtime-maintenance:
+    schedule:
+      interval: weekly
+  graalvm-runtime:
+    schedule:
+      interval: weekly
+  web-assets:
+    schedule:
+      interval: weekly
+
 updates:
-  # The root Gradle build includes every subproject through settings.gradle.
-  # Bundle only routine minor/patch maintenance with similar risk. Dependencies
-  # not matched by these groups remain eligible for their own reviewable PRs,
-  # including major, UI-sensitive, GraalVM and Playwright updates.
+  # Keep Gradle-only dependencies and build tooling reviewable. Minor/patch
+  # updates assigned to a cross-ecosystem group are ignored here so Dependabot
+  # cannot create a second Gradle-only PR for the same update. Major updates of
+  # routine libraries remain individual and must satisfy the checkout parity
+  # contract before merge.
   - package-ecosystem: gradle
     directory: /
     registries:
       - gradle-plugin-portal
     schedule:
       interval: weekly
-    groups:
-      runtime-maintenance:
-        patterns:
-          - "com.fasterxml.jackson.*:*"
-          - "org.neo4j.driver:*"
-          - "com.google.guava:*"
-          - "org.junit.jupiter:*"
-          - "org.postgresql:*"
-          - "org.hibernate.*:*"
-          - "org.eclipse:yasson"
+    ignore:
+      - dependency-name: "com.fasterxml.jackson.*:*"
         update-types:
-          - "minor"
-          - "patch"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      - dependency-name: "org.neo4j.driver:*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      - dependency-name: "org.junit.jupiter:*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      - dependency-name: "org.testcontainers:*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      - dependency-name: "org.postgresql:*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      - dependency-name: "org.hibernate.*:*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      - dependency-name: "org.eclipse:yasson"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      - dependency-name: "org.glassfish:jakarta.el"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      - dependency-name: "jakarta.persistence:jakarta.persistence-api"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      - dependency-name: "org.graalvm.polyglot:*"
+      - dependency-name: "org.webjars:swagger-ui"
+      - dependency-name: "org.webjars.npm:cytoscape"
+    groups:
       build-tooling-maintenance:
         patterns:
           - "gradle-wrapper"
@@ -38,10 +81,83 @@ updates:
           - "minor"
           - "patch"
 
+  - package-ecosystem: gradle
+    directory: /
+    registries:
+      - gradle-plugin-portal
+    patterns:
+      - "com.fasterxml.jackson.*:*"
+      - "org.neo4j.driver:*"
+      - "org.junit.jupiter:*"
+      - "org.testcontainers:*"
+      - "org.postgresql:*"
+      - "org.hibernate.*:*"
+      - "org.eclipse:yasson"
+      - "org.glassfish:jakarta.el"
+      - "jakarta.persistence:jakarta.persistence-api"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+    multi-ecosystem-group: java-runtime-maintenance
+
+  - package-ecosystem: maven
+    directory: /
+    patterns:
+      - "com.fasterxml.jackson.*:*"
+      - "org.neo4j.driver:*"
+      - "org.junit:*"
+      - "org.junit.jupiter:*"
+      - "org.testcontainers:*"
+      - "org.postgresql:*"
+      - "org.hibernate.*:*"
+      - "org.eclipse:yasson"
+      - "org.glassfish:jakarta.el"
+      - "jakarta.persistence:jakarta.persistence-api"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+    multi-ecosystem-group: java-runtime-maintenance
+
+  # GraalVM is intentionally isolated because it can change polyglot runtime
+  # behavior and needs the complete application/container contract.
+  - package-ecosystem: gradle
+    directory: /
+    registries:
+      - gradle-plugin-portal
+    patterns:
+      - "org.graalvm.polyglot:*"
+    multi-ecosystem-group: graalvm-runtime
+
+  - package-ecosystem: maven
+    directory: /
+    patterns:
+      - "org.graalvm.polyglot:*"
+    multi-ecosystem-group: graalvm-runtime
+
+  # Browser libraries shipped in the offline product must be updated through
+  # both packaging paths together. Playwright remains separate because its Java
+  # library, browser binary and pinned container form a stronger contract.
+  - package-ecosystem: gradle
+    directory: /
+    registries:
+      - gradle-plugin-portal
+    patterns:
+      - "org.webjars:swagger-ui"
+      - "org.webjars.npm:cytoscape"
+    multi-ecosystem-group: web-assets
+
+  - package-ecosystem: maven
+    directory: /
+    patterns:
+      - "org.webjars:swagger-ui"
+      - "org.webjars.npm:cytoscape"
+    multi-ecosystem-group: web-assets
+
   # Keep all action families used by the ordinary CI and release workflows in
-  # scope, including actions/*, gradle/actions, peaceiris/actions-gh-pages and
-  # peter-evans/create-pull-request. Immutable SHA pins remain visible and are
-  # updated together with their readable version comments.
+  # scope. Immutable SHA pins remain visible and are updated together with their
+  # readable version comments.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -54,9 +170,7 @@ updates:
   # Keep the declared Java major explicit. Java-25 image patch/minor updates are
   # grouped; a Java-major migration remains intentionally blocked until the
   # project itself changes its Java contract. Other Docker images, especially
-  # Playwright, remain eligible for separate PRs. The visual-regression contract
-  # then fails closed until a Playwright image update is synchronized with the
-  # matching Java dependency update.
+  # Playwright, remain eligible for separate PRs.
   - package-ecosystem: docker
     directory: /
     schedule:
