@@ -199,6 +199,16 @@ public final class RulePreparationTransformationEngine
                 memoizer.find(cacheKey);
             if (attempt == null) {
                 attempt = planner.plan(positioned.expression());
+                if (attempt.status()
+                        == RulePreparationPlanner.Status.PREPARED) {
+                    memoizer.recordPreparedVerification();
+                    PreparedRuleApplication proposed =
+                        attempt.application().orElseThrow();
+                    if (!verifyPreparedApplication(proposed)) {
+                        memoizer.recordUnverifiable();
+                        continue;
+                    }
+                }
                 memoizer.retain(cacheKey, attempt);
             }
             if (attempt.status()
@@ -207,12 +217,6 @@ public final class RulePreparationTransformationEngine
             }
             PreparedRuleApplication application =
                 attempt.application().orElseThrow();
-            if (!planner.verify(application)) {
-                // A malformed or stale preparation is not a reason to fail the
-                // complete transformation request. Preserve the direct results
-                // and continue scanning other AST positions fail-closed.
-                continue;
-            }
             Transformation principal = replayPrincipal(application);
             if (principal == null) {
                 continue;
@@ -252,6 +256,18 @@ public final class RulePreparationTransformationEngine
         List<Transformation> result = new ArrayList<>(direct);
         result.addAll(prepared);
         return new Execution(result, memoizer.metrics());
+    }
+
+    private boolean verifyPreparedApplication(
+        PreparedRuleApplication application
+    ) {
+        try {
+            return planner.verify(application);
+        } catch (RuntimeException exception) {
+            // Preparation is an optional candidate source. Invalid or stale
+            // evidence must fail closed without failing the direct request.
+            return false;
+        }
     }
 
     private CacheKey cacheKey(Expr expression) {
@@ -434,12 +450,16 @@ public final class RulePreparationTransformationEngine
         int misses,
         int retainedEntries,
         int evictions,
-        int skippedInconclusive
+        int skippedInconclusive,
+        int preparedVerifications,
+        int skippedUnverifiable
     ) {
         public CacheMetrics {
             if (lookups < 0 || hits < 0 || misses < 0
                     || retainedEntries < 0 || evictions < 0
                     || skippedInconclusive < 0
+                    || preparedVerifications < 0
+                    || skippedUnverifiable < 0
                     || lookups != hits + misses) {
                 throw new IllegalArgumentException(
                     "cache metrics must be non-negative and balanced");
@@ -476,6 +496,8 @@ public final class RulePreparationTransformationEngine
         private int misses;
         private int evictions;
         private int skippedInconclusive;
+        private int preparedVerifications;
+        private int skippedUnverifiable;
 
         private PreparationMemoizer(int maxEntries) {
             this.maxEntries = maxEntries;
@@ -512,6 +534,14 @@ public final class RulePreparationTransformationEngine
             entries.put(key, attempt);
         }
 
+        private void recordPreparedVerification() {
+            preparedVerifications++;
+        }
+
+        private void recordUnverifiable() {
+            skippedUnverifiable++;
+        }
+
         private CacheMetrics metrics() {
             return new CacheMetrics(
                 lookups,
@@ -519,7 +549,9 @@ public final class RulePreparationTransformationEngine
                 misses,
                 entries.size(),
                 evictions,
-                skippedInconclusive);
+                skippedInconclusive,
+                preparedVerifications,
+                skippedUnverifiable);
         }
     }
 
