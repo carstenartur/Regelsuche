@@ -73,11 +73,18 @@ public final class PatternMatchAnalyzer {
         ExprMatcher.MatchOutcome outcome
     ) {
         ExprMatcher.MatchResult preferred = preferred(outcome.matches());
-        boolean exact = outcome.matches().stream().anyMatch(result ->
-            result.recognitionStrength()
-                == ExprMatcher.RecognitionStrength.EXACT);
+        ExprMatcher.RecognitionStrength strength =
+            preferred.recognitionStrength();
+        String detailCode = switch (strength) {
+            case EXACT -> "EXACT_PATTERN_MATCH";
+            case EQUIVALENCE_AWARE -> "EQUIVALENCE_AWARE_PATTERN_MATCH";
+            case BOUNDED_REPRESENTATIVE ->
+                "BOUNDED_REPRESENTATIVE_PATTERN_MATCH";
+        };
         return new Analysis(
-            exact ? Status.EXACT_MATCH : Status.MATCH_MODULO_THEORY,
+            strength == ExprMatcher.RecognitionStrength.EXACT
+                ? Status.EXACT_MATCH
+                : Status.MATCH_MODULO_THEORY,
             outcome.matches(),
             preferred.bindings(),
             List.of(),
@@ -87,9 +94,7 @@ public final class PatternMatchAnalyzer {
             0,
             0,
             patternNodeCount(pattern),
-            exact
-                ? "EXACT_PATTERN_MATCH"
-                : "EQUIVALENCE_AWARE_PATTERN_MATCH");
+            detailCode);
     }
 
     private static Analysis inconclusive(
