@@ -132,8 +132,10 @@ public final class RulePreparationTransformationEngine
             PreparedRuleApplication application =
                 attempt.application().orElseThrow();
             if (!planner.verify(application)) {
-                throw new IllegalStateException(
-                    "prepared application failed independent verification");
+                // A malformed or stale preparation is not a reason to fail the
+                // complete transformation request. Preserve the direct results
+                // and continue scanning other AST positions fail-closed.
+                continue;
             }
             Transformation principal = replayPrincipal(application);
             if (principal == null) {
