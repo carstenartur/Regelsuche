@@ -1,6 +1,6 @@
 # Discovery- und Forschungsstand
 
-**Stand: 2. August 2026**
+**Stand: 21. August 2026**
 
 Diese Seite fasst den gegenwärtigen Forschungsstand zusammen. Sie trennt
 implementierte Softwarefähigkeiten, reproduzierte Projektergebnisse,
@@ -27,7 +27,7 @@ anschließenden TRAIN-/VALIDATION-/FINAL-TEST-Ergebnisse fehlen noch.
 | Produkt und Build | Web-Workbench, CLI, Docker, Full Mode, Proof-Image und checkout-eigener `ciCheck` sind vorhanden | Kein Produktions- oder Sicherheitszertifikat |
 | Autonome Referenz-Campaign | Für den eng definierten internen Claim qualifiziert und reproduzierbar gebunden | Keine externe mathematische Neuheit |
 | Mehrdomänen-Discovery | Expression Rewrite und endliche Differenzen sind getrennt qualifiziert | Kein universeller domänenunabhängiger Discovery-Nachweis |
-| Targetfreie Simplification | Regelsuche erreicht 6/7, SymPy 7/7 eingefrorene Referenzformen | Negatives Track-Ergebnis; keine allgemeine Rangfolge |
+| Targetfreie Simplification | Acht getrennte Konfigurationen; primär Regelsuche 6/7 gegenüber SymPy `simplify` 7/7 | Negatives Portfolio-Ergebnis; keine allgemeine Rangfolge oder nachträgliche Best-of-Auswahl |
 | Flagship-Präregistrierung | Work Accounting, Corpus-/Reveal-/Split-/Freeze-Werkzeuge und Baseline-Verträge sind implementiert | Reales Experiment noch nicht freigegeben |
 | TRAIN | Kein Flagship-Populationsresultat | Keine Aussage über erlernte Verbesserung |
 | VALIDATION | Nicht geöffnet und nicht zur Auswahl verwendet | Keine ausgewählte Flagship-Konfiguration |
@@ -107,9 +107,17 @@ algebraischen Autonomie-Claim nicht automatisch.
 
 ## Aktueller vergleichender Benchmark
 
-Der Track `target-free-simplification-head-to-head` vergleicht tatsächliche
-Simplifier. Weder Regelsuche noch SymPy erhält die gepinnte Referenzform als
-Suchziel.
+Der Track `target-free-simplification-operation-portfolio` führt acht getrennte,
+targetfreie Konfigurationen aus: Regelsuche mit untargeted Best-First, einen
+deterministischen randomized-valid Kontrolllauf sowie die sechs einzeln
+gebundenen SymPy-Operationen `simplify`, `factor`, `cancel`, `together`, `apart`
+und `trigsimp`. Keine Konfiguration erhält die gepinnte Referenzform als Suchziel
+oder verborgene Auswahlhilfe.
+
+Der primäre historische Vergleich bleibt Regelsuche gegenüber SymPy
+`simplify`; die weiteren Operationen sind diagnostische Einzel-Baselines und
+werden weder zu einer verdeckten Pipeline kombiniert noch nach Kenntnis der
+Referenzform als günstigstes Ergebnis ausgewählt.
 
 | Fall | Familie | Regelsuche | SymPy `simplify` |
 | --- | --- | --- | --- |
@@ -121,10 +129,14 @@ Suchziel.
 | `(x^2 - 1) / (x - 1) → x + 1` | rationale Kürzung | erreicht | erreicht |
 | `(x^3 - 1) / (x - 1) → x^2 + x + 1` | Polynomdivision | **nicht erreicht** | erreicht |
 
-Regelsuche erreicht sechs von sieben Referenzformen. Der Track bleibt deshalb
-mit Status `NEGATIVE` retained. Die exakte Polynomdivision ist als
-standardmäßig deaktiviertes Pack verfügbar; sie wird nicht nachträglich in das
-gemessene Default-Inventar hineindefiniert.
+Regelsuche erreicht in diesem Primärvergleich sechs von sieben
+Referenzformen, SymPy `simplify` sieben von sieben. Das vollständige Portfolio
+bleibt mit Status `NEGATIVE` retained, weil mindestens eine konfigurierte
+Strategie oder native Operation eine gepinnte Referenzform nicht erreicht.
+Unveränderte, nicht anwendbare und abweichende Ausgaben bleiben dabei als
+Evidence erhalten. Die exakte Polynomdivision ist als standardmäßig
+deaktiviertes Pack verfügbar; sie wird nicht nachträglich in das gemessene
+Default-Inventar hineindefiniert.
 
 Vollständiger Vertrag, Coverage Gaps und Reproduktion:
 [Comparative Discovery Benchmarks](discovery-benchmarks.md).

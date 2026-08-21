@@ -91,8 +91,8 @@ class SymPyNativeOperationPortfolioTest {
             "apart-multivariate-not-applicable",
             Track.SIMPLIFICATION_COMPETITION,
             "multivariate-rational",
-            "(a + b) * (a + b)",
-            "(a + b) ^ 2",
+            "1 / ((a + b) * (a + c))",
+            "1 / ((a + b) * (a + c))",
             List.of(),
             ExpectedVerdict.TARGET_REACHED);
 

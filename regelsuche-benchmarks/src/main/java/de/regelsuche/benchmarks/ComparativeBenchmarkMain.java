@@ -8,6 +8,7 @@ import de.regelsuche.benchmarks.ComparativeBenchmark.Report;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Result;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
 import java.nio.file.Path;
+import java.util.EnumSet;
 import java.util.List;
 
 /**
@@ -33,11 +34,17 @@ public final class ComparativeBenchmarkMain {
     }
 
     static void verify(Report report) {
-        List<Track> measuredTracks = report.configurations().stream()
+        EnumSet<Track> measuredTracks = EnumSet.noneOf(Track.class);
+        report.configurations().stream()
             .map(Configuration::track)
-            .distinct()
-            .sorted()
-            .toList();
+            .forEach(measuredTracks::add);
+        report.cases().forEach(benchmarkCase ->
+            measuredTracks.add(benchmarkCase.track()));
+        if (measuredTracks.isEmpty()) {
+            throw new IllegalStateException(
+                "comparative benchmark contains no measured track");
+        }
+
         for (Track track : measuredTracks) {
             long configurations = report.configurations().stream()
                 .filter(configuration -> configuration.track() == track)
@@ -45,6 +52,12 @@ public final class ComparativeBenchmarkMain {
             long cases = report.cases().stream()
                 .filter(benchmarkCase -> benchmarkCase.track() == track)
                 .count();
+            if (configurations == 0L || cases == 0L) {
+                throw new IllegalStateException(
+                    "incomplete comparative track definition for " + track
+                        + ": configurations=" + configurations
+                        + ", cases=" + cases);
+            }
             long expected = Math.multiplyExact(configurations, cases);
             long actual = report.results().stream()
                 .filter(result -> result.track() == track)
