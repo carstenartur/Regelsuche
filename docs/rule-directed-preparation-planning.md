@@ -108,10 +108,15 @@ Each key binds:
 
 - planner revision;
 - principal rule ID;
-- canonical subtree hash;
+- exact formatted AST-subtree hash;
 - normalized assumption fingerprint;
 - deterministic rule-inventory fingerprint;
 - preparation-budget identity.
+
+The subtree key deliberately preserves AST structure rather than using a
+broader algebraic canonical hash. Algebraically equivalent but syntactically
+different occurrences may require different bindings and retained evidence;
+they are therefore analyzed independently.
 
 The standard rule-list constructor uses `RuleInventoryFingerprint`, so changes
 to rule implementations, patterns, recognition profiles, descriptors or pack
