@@ -73,6 +73,19 @@ A fourth solver exposes exact square structure. For example:
 Both monomial roots must be exact under the configured bounds. The existing
 difference-of-squares rule remains the principal transformation.
 
+A fifth solver prepares two rational terms with different denominators. For
+example:
+
+```text
+a / b + c / d
+  -> prepared as (a * d) / (b * d) + (c * b) / (b * d)
+  -> (a * d + c * b) / (b * d)
+```
+
+The solver preserves addition or subtraction order, retains the common
+denominator and cross-multiplied numerators, and requires the existing rational
+normalization operator to replay with the exact retained side condition.
+
 ## Information boundary
 
 A preparation solver consumes only:
@@ -117,6 +130,13 @@ TransformationEngine engine =
     new PerfectSquareStructurePreparationTransformationEngine();
 ```
 
+Bounded cross-multiplication for two rational terms is available through:
+
+```java
+TransformationEngine engine =
+    new RationalCommonDenominatorPreparationTransformationEngine();
+```
+
 The engines also support explicit rule selection through their
 `withKnowledgePacks(selection)` factories.
 
@@ -157,6 +177,16 @@ configurations therefore retain their previous rule inventory and output.
 - both exact monomial square roots and bindings `A` and `B`;
 - residual square equations, source/root descriptors and a content hash;
 - balanced work and the preparation/principal primitive lineage.
+
+`RationalCommonDenominatorPreparationSolver.PreparedApplication` records:
+
+- original, prepared and result ASTs;
+- original numerators and denominators as bindings `A`, `B`, `C` and `D`;
+- both scaled numerators and the common denominator binding `Q`;
+- the residual denominator obligation and exact non-zero assumption;
+- input/constructed-node work, structure hashes and a content-addressed
+  certificate;
+- preparation and rational-normalization primitive IDs.
 
 The transformation edge keeps every primitive ID, so treating a composed
 operation as one frontier move does not hide its mathematical work.
@@ -240,6 +270,29 @@ produce the exact expected result. See
 [`perfect-square-structure-preparation.md`](perfect-square-structure-preparation.md)
 for the complete evidence and claim boundary.
 
+## Rational common-denominator preparation
+
+The rational solver accepts addition or subtraction with one division on each
+side. It constructs `B * D` as the common denominator and scales the two
+numerators to `A * D` and `C * B`. Explicit zero denominators are rejected.
+Already equal denominators remain on the cheap direct path.
+
+The prepared expression is independently reconstructed and hashed before the
+existing `hypothesis_rational_normalization` operator is invoked. The candidate
+is emitted only when that operator returns the expected canonical expression
+and exact assumption:
+
+```text
+B * D != 0
+```
+
+This single condition is sufficient for both denominator extensions and the
+final fraction in the declared scalar domain. The solver does not minimize the
+denominator, cancel factors or infer polynomial GCD/LCM information. Input and
+constructed AST work are separately bounded. See
+[`rational-common-denominator-preparation.md`](rational-common-denominator-preparation.md)
+for the complete contract.
+
 ## Fail-closed outcomes
 
 The exact-polynomial planner distinguishes:
@@ -251,7 +304,8 @@ The exact-polynomial planner distinguishes:
 - `NO_EXACT_QUOTIENT`;
 - `BUDGET_INCONCLUSIVE`.
 
-The AC, common-monomial and perfect-square solvers distinguish:
+The AC, common-monomial, perfect-square and rational common-denominator solvers
+distinguish:
 
 - `PREPARED`;
 - `DIRECT_MATCH_AVAILABLE`;
@@ -349,12 +403,15 @@ from configurations that did not declare these execution policies.
 
 The implemented solvers now cover exact univariate integer-polynomial quotient
 synthesis, existing-factor exposure modulo scalar multiplication AC, exact
-common-factor synthesis for two positive integer monomials and exact
-perfect-square exposure for two such monomials.
+common-factor synthesis for two positive integer monomials, exact
+perfect-square exposure for two such monomials and bounded cross-multiplication
+for two scalar rational terms.
 
 They do not yet provide general partial-pattern obligations, e-class
-representative planning, rational common-denominator preparation or bounded
-local pattern-targeted BFS. The exact monomial solvers also do not establish
-general polynomial factorization, subtraction-aware or rational-coefficient
-GCD extraction, multiterm common-factor synthesis or arbitrary algebraic root
-extraction. Those remaining capabilities stay in #708.
+representative planning or bounded local pattern-targeted BFS. The exact
+monomial solvers do not establish general polynomial factorization,
+subtraction-aware or rational-coefficient GCD extraction, multiterm
+common-factor synthesis or arbitrary algebraic root extraction. The rational
+solver does not establish denominator minimization, polynomial GCD/LCM
+computation, cancellation or complete rational simplification. Those remaining
+capabilities stay in #708.
