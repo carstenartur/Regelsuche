@@ -155,6 +155,7 @@ class RulePreparationTransformationEngineTest {
         assertEquals(metrics.lookups(), metrics.hits() + metrics.misses());
         assertEquals(1, metrics.preparedVerifications());
         assertEquals(0, metrics.skippedUnverifiable());
+        assertTrue(metrics.skippedZeroSolverWork() > 0);
         assertTrue(engine.ruleInventoryHash().startsWith("sha256:"));
     }
 
@@ -237,7 +238,7 @@ class RulePreparationTransformationEngineTest {
     }
 
     @Test
-    void boundedCacheEvictsTheOldestDeterministically() {
+    void boundedCacheEvictsTheOldestExpensiveAnalysisDeterministically() {
         AstRewriteTransformationEngine direct =
             new AstRewriteTransformationEngine();
         Set<String> visibleRuleIds = direct.rules().stream()
@@ -255,11 +256,13 @@ class RulePreparationTransformationEngineTest {
 
         RulePreparationTransformationEngine.Execution execution =
             engine.transformWithEvidence(
-                "(x^3 - 1) / (x - 1) + (x^3 - 1) / (x - 1)");
+                "(x^3 - 1) / (x - 1)"
+                    + " + (x^4 - 1) / (x - 1)"
+                    + " + (x^3 - 1) / (x - 1)");
 
         assertEquals(1, execution.cacheMetrics().retainedEntries());
-        assertTrue(execution.cacheMetrics().evictions() > 0);
-        assertTrue(execution.cacheMetrics().preparedVerifications() >= 2);
+        assertTrue(execution.cacheMetrics().evictions() >= 2);
+        assertEquals(3, execution.cacheMetrics().preparedVerifications());
     }
 
     @Test
@@ -313,6 +316,7 @@ class RulePreparationTransformationEngineTest {
             IllegalArgumentException.class,
             () -> new RulePreparationTransformationEngine.CacheMetrics(
                 1,
+                0,
                 0,
                 0,
                 0,
