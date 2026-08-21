@@ -45,6 +45,7 @@ public final class MonomialCommonFactorPreparationSolver {
 
     public MonomialCommonFactorPreparationSolver(Budget budget) {
         this.budget = Objects.requireNonNull(budget, "budget");
+        budget.limits();
     }
 
     public Budget budget() {
