@@ -131,6 +131,91 @@ class PatternMatchAnalyzerTest {
     }
 
     @Test
+    void retainsALiteralMismatchInsideAMatchedParent() {
+        PatternExpr pattern = PatternExpr.op(
+            BinaryOperator.ADD,
+            PatternExpr.var("A"),
+            PatternExpr.num(0));
+
+        PatternMatchAnalyzer.Analysis analysis = analyzer.analyze(
+            pattern,
+            parser.parseTerm("x + 1"),
+            RecognitionProfile.exact());
+
+        assertEquals(
+            PatternMatchAnalyzer.Status.RESIDUAL,
+            analysis.status());
+        assertEquals(
+            "x",
+            ExpressionFormatter.format(analysis.bindings().get("A")));
+        PatternMatchAnalyzer.ResidualObligation obligation =
+            analysis.residualObligations().getFirst();
+        assertEquals(
+            PatternMatchAnalyzer.ResidualKind.LITERAL_MISMATCH,
+            obligation.kind());
+        assertEquals("1", obligation.path());
+        assertEquals("1", ExpressionFormatter.format(
+            obligation.actualExpression()));
+        assertTrue(obligation.unboundPlaceholders().isEmpty());
+    }
+
+    @Test
+    void retainsANestedFunctionShapeMismatch() {
+        PatternExpr pattern = PatternExpr.fn(
+            "sin",
+            PatternExpr.fn("cos", PatternExpr.var("A")));
+
+        PatternMatchAnalyzer.Analysis analysis = analyzer.analyze(
+            pattern,
+            parser.parseTerm("sin(tan(x))"),
+            RecognitionProfile.exact());
+
+        assertEquals(
+            PatternMatchAnalyzer.Status.RESIDUAL,
+            analysis.status());
+        assertTrue(analysis.bindings().isEmpty());
+        PatternMatchAnalyzer.ResidualObligation obligation =
+            analysis.residualObligations().getFirst();
+        assertEquals(
+            PatternMatchAnalyzer.ResidualKind.FUNCTION_SHAPE_MISMATCH,
+            obligation.kind());
+        assertEquals("0", obligation.path());
+        assertEquals(Set.of("A"), obligation.unboundPlaceholders());
+        assertEquals(
+            "tan(x)",
+            ExpressionFormatter.format(obligation.actualExpression()));
+    }
+
+    @Test
+    void retainsAConsistentRepeatedBindingBeforeAnotherResidual() {
+        PatternExpr pattern = PatternExpr.op(
+            BinaryOperator.ADD,
+            PatternExpr.op(
+                BinaryOperator.ADD,
+                PatternExpr.var("A"),
+                PatternExpr.var("A")),
+            PatternExpr.num(0));
+
+        PatternMatchAnalyzer.Analysis analysis = analyzer.analyze(
+            pattern,
+            parser.parseTerm("(x + x) + 1"),
+            RecognitionProfile.exact());
+
+        assertEquals(
+            PatternMatchAnalyzer.Status.RESIDUAL,
+            analysis.status());
+        assertEquals(
+            "x",
+            ExpressionFormatter.format(analysis.bindings().get("A")));
+        assertEquals(1, analysis.residualObligations().size());
+        assertEquals(
+            PatternMatchAnalyzer.ResidualKind.LITERAL_MISMATCH,
+            analysis.residualObligations().getFirst().kind());
+        assertEquals(4, analysis.matchedPatternNodes());
+        assertEquals(5, analysis.totalPatternNodes());
+    }
+
+    @Test
     void unrelatedRootShapesRemainAConclusiveNonMatch() {
         PatternExpr pattern = PatternExpr.fn(
             "sin",
