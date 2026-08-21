@@ -87,6 +87,13 @@ class MonomialCommonFactorPreparationSolverTest {
                 1,
                 1,
                 ExactPositiveMonomial.MAX_EXACT_DOUBLE_INTEGER + 1));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new MonomialCommonFactorPreparationSolver(
+                new MonomialCommonFactorPreparationSolver.Budget(
+                    1,
+                    1,
+                    ExactPositiveMonomial.MAX_EXACT_DOUBLE_INTEGER + 1)));
     }
 
     @Test
