@@ -50,7 +50,7 @@
     <jakarta.el.version>5.0.0-M1</jakarta.el.version>
     <jakarta.persistence.version>3.2.0</jakarta.persistence.version>
     <neo4j.driver.version>6.2.1</neo4j.driver.version>
-    <graalvm.polyglot.version>24.2.1</graalvm.polyglot.version>
+    <graalvm.polyglot.version>25.1.3</graalvm.polyglot.version>
     <swagger.ui.version>5.32.8</swagger.ui.version>
 
     <maven.clean.plugin.version>3.5.0</maven.clean.plugin.version>
@@ -153,7 +153,7 @@
           <requireJavaVersion><version>[25,26)</version><message>Regelsuche requires a Java 25 JDK.</message></requireJavaVersion>
           <requireNoRepositories><message>The Maven reactor must use the standard Central resolution path and must not declare checkout-specific repositories or plugin repositories.</message></requireNoRepositories>
           <requirePluginVersions><phases>clean,deploy,site</phases></requirePluginVersions>
-          <bannedPlugins><excludes><exclude>org.codehaus.mojo:exec-maven-plugin</exclude><exclude>com.github.eirslett:frontend-maven-plugin</exclude></excludes><message>Host scripting and frontend runtimes are not part of the Maven build contract.</message></bannedPlugins>
+          <bannedPlugins><excludes><exclude>org.codehaus.mojo:exec-maven-plugin</exclude><exclude>com.github.eirslett:frontend-maven-plugin</exclude></bannedPlugins><message>Host scripting and frontend runtimes are not part of the Maven build contract.</message></bannedPlugins>
         </rules></configuration></execution></executions>
       </plugin>
       <plugin>
