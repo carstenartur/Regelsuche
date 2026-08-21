@@ -32,6 +32,9 @@ class PatternMatchAnalyzerRepresentativeTest {
         assertEquals(
             PatternMatchAnalyzer.Status.MATCH_MODULO_THEORY,
             analysis.status());
+        assertEquals(
+            "BOUNDED_REPRESENTATIVE_PATTERN_MATCH",
+            analysis.detailCode());
         assertTrue(analysis.matches().stream().anyMatch(match ->
             match.recognitionStrength()
                 == ExprMatcher.RecognitionStrength.BOUNDED_REPRESENTATIVE));
