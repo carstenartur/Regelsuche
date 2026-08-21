@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetFreeHeldOutFreezeModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">TargetFreeHeldOutFreezeModel.java</span></div><h1>TargetFreeHeldOutFreezeModel.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.CANDIDATE_ORDER;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.EXACT_CHECKPOINT;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.FREEZE_SCHEMA;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.FREEZE_STATUS;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.JSON;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.NOT_COMPARABLE;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.QUALIFICATION_NOT_DISCLOSED;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.canonical;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary.CandidateFreezeReceipt;
+import java.util.List;
+import java.util.Objects;
+import java.util.TreeSet;
+
+record CandidateEvidence(
+    String candidateHash,
+    String expression,
+    List&lt;String&gt; assumptions,
+    int depth,
+    List&lt;String&gt; pathExpressions,
+    List&lt;String&gt; pathRuleIds,
+    List&lt;String&gt; primitiveRuleIds,
+    boolean equivalencePreserving,
+    boolean temporaryComplexityIncrease
+) {
+<span class="fc" id="L31">    public CandidateEvidence {</span>
+<span class="fc" id="L32">        expression = requireText(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L33">        assumptions = List.copyOf(new TreeSet&lt;&gt;(assumptions));</span>
+<span class="fc" id="L34">        pathExpressions = List.copyOf(pathExpressions);</span>
+<span class="fc" id="L35">        pathRuleIds = List.copyOf(pathRuleIds);</span>
+<span class="fc" id="L36">        primitiveRuleIds = List.copyOf(primitiveRuleIds);</span>
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">        if (depth &lt; 1 || pathExpressions.size() &lt; 2</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                || pathRuleIds.isEmpty()</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                || primitiveRuleIds.isEmpty()) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(</span>
+                &quot;candidate lineage is incomplete&quot;);
+        }
+<span class="fc" id="L43">        candidateHash = requireSha256(</span>
+            candidateHash, &quot;candidateHash&quot;);
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (!candidateHash.equals(hashCandidate(</span>
+                expression,
+                assumptions,
+                depth,
+                pathExpressions,
+                pathRuleIds,
+                primitiveRuleIds,
+                equivalencePreserving,
+                temporaryComplexityIncrease))) {
+<span class="nc" id="L54">            throw new IllegalArgumentException(</span>
+                &quot;candidate hash mismatch&quot;);
+        }
+<span class="fc" id="L57">    }</span>
+
+    static CandidateEvidence create(
+        String expression,
+        List&lt;String&gt; assumptions,
+        int depth,
+        List&lt;String&gt; pathExpressions,
+        List&lt;String&gt; pathRuleIds,
+        List&lt;String&gt; primitiveRuleIds,
+        boolean equivalencePreserving,
+        boolean temporaryComplexityIncrease
+    ) {
+<span class="fc" id="L69">        List&lt;String&gt; normalizedAssumptions = List.copyOf(</span>
+            new TreeSet&lt;&gt;(assumptions));
+<span class="fc" id="L71">        return new CandidateEvidence(</span>
+<span class="fc" id="L72">            hashCandidate(</span>
+                expression,
+                normalizedAssumptions,
+                depth,
+                pathExpressions,
+                pathRuleIds,
+                primitiveRuleIds,
+                equivalencePreserving,
+                temporaryComplexityIncrease),
+            expression,
+            normalizedAssumptions,
+            depth,
+            pathExpressions,
+            pathRuleIds,
+            primitiveRuleIds,
+            equivalencePreserving,
+            temporaryComplexityIncrease);
+    }
+
+    String proposalKey() {
+<span class="fc" id="L92">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L93">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor, expression);
+<span class="fc" id="L95">        KnownStructureCatalog.appendCanonicalList(</span>
+            descriptor, assumptions);
+<span class="fc" id="L97">        return descriptor.toString();</span>
+    }
+
+    private static String hashCandidate(
+        String expression,
+        List&lt;String&gt; assumptions,
+        int depth,
+        List&lt;String&gt; pathExpressions,
+        List&lt;String&gt; pathRuleIds,
+        List&lt;String&gt; primitiveRuleIds,
+        boolean equivalencePreserving,
+        boolean temporaryComplexityIncrease
+    ) {
+<span class="fc" id="L110">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L111">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor, FREEZE_SCHEMA + &quot;/candidate&quot;);
+<span class="fc" id="L113">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L114">            descriptor, requireText(expression, &quot;expression&quot;));</span>
+<span class="fc" id="L115">        KnownStructureCatalog.appendCanonicalList(</span>
+            descriptor, assumptions);
+<span class="fc" id="L117">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L118">            descriptor, Integer.toString(depth));</span>
+<span class="fc" id="L119">        KnownStructureCatalog.appendCanonicalList(</span>
+            descriptor, pathExpressions);
+<span class="fc" id="L121">        KnownStructureCatalog.appendCanonicalList(</span>
+            descriptor, pathRuleIds);
+<span class="fc" id="L123">        KnownStructureCatalog.appendCanonicalList(</span>
+            descriptor, primitiveRuleIds);
+<span class="fc" id="L125">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L126">            descriptor, Boolean.toString(equivalencePreserving));</span>
+<span class="fc" id="L127">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor,
+<span class="fc" id="L129">            Boolean.toString(temporaryComplexityIncrease));</span>
+<span class="fc" id="L130">        return KnownStructureCatalog.sha256(descriptor.toString());</span>
+    }
+}
+
+record WorkLedger(
+    String schema,
+    int checkpoint,
+    int engineCalls,
+    int materializedTransitions,
+    int admittedTransitions,
+    int admittedPrimitiveSteps,
+    int exploredStates,
+    int retainedStates,
+    boolean exactCheckpointReached,
+    String contentHash
+) {
+<span class="fc" id="L146">    public WorkLedger {</span>
+<span class="pc bpc" id="L147" title="10 of 22 branches missed.">        if (!(FREEZE_SCHEMA + &quot;/work-ledger/v1&quot;).equals(schema)</span>
+                || checkpoint &lt; 1
+                || engineCalls &lt; 0
+                || materializedTransitions &lt; admittedTransitions
+                || admittedTransitions &lt; 0
+                || admittedPrimitiveSteps &lt; admittedTransitions
+                || admittedPrimitiveSteps &gt; checkpoint
+                || exploredStates &lt; 0
+                || retainedStates &lt; 1
+                || exactCheckpointReached
+                    != (admittedPrimitiveSteps == checkpoint)) {
+<span class="nc" id="L158">            throw new IllegalArgumentException(</span>
+                &quot;work ledger does not balance&quot;);
+        }
+<span class="fc" id="L161">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (!contentHash.equals(hashWork(</span>
+                checkpoint,
+                engineCalls,
+                materializedTransitions,
+                admittedTransitions,
+                admittedPrimitiveSteps,
+                exploredStates,
+                retainedStates,
+                exactCheckpointReached))) {
+<span class="nc" id="L171">            throw new IllegalArgumentException(</span>
+                &quot;work-ledger hash mismatch&quot;);
+        }
+<span class="fc" id="L174">    }</span>
+
+    static WorkLedger create(
+        int checkpoint,
+        int engineCalls,
+        int materializedTransitions,
+        int admittedTransitions,
+        int admittedPrimitiveSteps,
+        int exploredStates,
+        int retainedStates
+    ) {
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        boolean exact = admittedPrimitiveSteps == checkpoint;</span>
+<span class="fc" id="L186">        return new WorkLedger(</span>
+            FREEZE_SCHEMA + &quot;/work-ledger/v1&quot;,
+            checkpoint,
+            engineCalls,
+            materializedTransitions,
+            admittedTransitions,
+            admittedPrimitiveSteps,
+            exploredStates,
+            retainedStates,
+            exact,
+<span class="fc" id="L196">            hashWork(</span>
+                checkpoint,
+                engineCalls,
+                materializedTransitions,
+                admittedTransitions,
+                admittedPrimitiveSteps,
+                exploredStates,
+                retainedStates,
+                exact));
+    }
+
+    private static String hashWork(
+        int checkpoint,
+        int engineCalls,
+        int materializedTransitions,
+        int admittedTransitions,
+        int admittedPrimitiveSteps,
+        int exploredStates,
+        int retainedStates,
+        boolean exact
+    ) {
+<span class="fc" id="L217">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L218">        KnownStructureCatalog.appendCanonicalField(</span>
+            descriptor, FREEZE_SCHEMA + &quot;/work-ledger/v1&quot;);
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        for (int value : List.of(</span>
+<span class="fc" id="L221">                checkpoint,</span>
+<span class="fc" id="L222">                engineCalls,</span>
+<span class="fc" id="L223">                materializedTransitions,</span>
+<span class="fc" id="L224">                admittedTransitions,</span>
+<span class="fc" id="L225">                admittedPrimitiveSteps,</span>
+<span class="fc" id="L226">                exploredStates,</span>
+<span class="fc" id="L227">                retainedStates)) {</span>
+<span class="fc" id="L228">            KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L229">                descriptor, Integer.toString(value));</span>
+<span class="fc" id="L230">        }</span>
+<span class="fc" id="L231">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L232">            descriptor, Boolean.toString(exact));</span>
+<span class="fc" id="L233">        return KnownStructureCatalog.sha256(descriptor.toString());</span>
+    }
+}
+
+record FreezeRow(
+    int sequence,
+    String configurationId,
+    String caseId,
+    String policyId,
+    int checkpoint,
+    String status,
+    String terminalReason,
+    List&lt;String&gt; limitReasons,
+    long deterministicSeed,
+    WorkBudget configuredBudget,
+    String informationBoundaryHash,
+    String formationSelectionCommitment,
+    String formationRuleInventoryHash,
+    String postFreezeCatalogCommitment,
+    List&lt;CandidateEvidence&gt; candidates,
+    int candidateLineageCount,
+    int candidateSetCount,
+    String candidateBatchHash,
+    String candidateSetHash,
+    String candidateFreezeReceiptHash,
+    WorkLedger work
+) {
+<span class="fc" id="L260">    public FreezeRow {</span>
+<span class="pc bpc" id="L261" title="2 of 4 branches missed.">        if (sequence &lt; 1 || checkpoint &lt; 1) {</span>
+<span class="nc" id="L262">            throw new IllegalArgumentException(</span>
+                &quot;invalid freeze row identity&quot;);
+        }
+<span class="fc" id="L265">        configurationId = requireSha256(</span>
+            configurationId, &quot;configurationId&quot;);
+<span class="fc" id="L267">        caseId = requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L268">        policyId = requireText(policyId, &quot;policyId&quot;);</span>
+<span class="fc" id="L269">        status = requireText(status, &quot;status&quot;);</span>
+<span class="fc" id="L270">        terminalReason = requireText(</span>
+            terminalReason, &quot;terminalReason&quot;);
+<span class="fc" id="L272">        limitReasons = List.copyOf(new TreeSet&lt;&gt;(limitReasons));</span>
+<span class="fc" id="L273">        candidates = candidates.stream()</span>
+<span class="fc" id="L274">            .sorted(CANDIDATE_ORDER).toList();</span>
+<span class="pc bpc" id="L275" title="3 of 6 branches missed.">        if (candidateLineageCount != candidates.size()</span>
+                || candidateSetCount &lt; 0
+                || candidateSetCount &gt; candidateLineageCount) {
+<span class="nc" id="L278">            throw new IllegalArgumentException(</span>
+                &quot;candidate counts do not balance&quot;);
+        }
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        for (String hash : List.of(</span>
+                informationBoundaryHash,
+                formationSelectionCommitment,
+                formationRuleInventoryHash,
+                postFreezeCatalogCommitment,
+                candidateBatchHash,
+                candidateSetHash,
+                candidateFreezeReceiptHash)) {
+<span class="fc" id="L289">            requireSha256(hash, &quot;freeze-row hash&quot;);</span>
+<span class="fc" id="L290">        }</span>
+<span class="fc" id="L291">        Objects.requireNonNull(configuredBudget, &quot;configuredBudget&quot;);</span>
+<span class="fc" id="L292">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        if (work.checkpoint() != checkpoint</span>
+<span class="fc" id="L294">                || EXACT_CHECKPOINT.equals(status)</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">                    != work.exactCheckpointReached()</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                || !candidateBatchHash.equals(</span>
+<span class="fc" id="L297">                    KnownStructureCatalog.sha256(</span>
+<span class="fc" id="L298">                        canonical(candidates)))) {</span>
+<span class="nc" id="L299">            throw new IllegalArgumentException(</span>
+                &quot;freeze row differs from its evidence&quot;);
+        }
+<span class="fc" id="L302">    }</span>
+
+    static FreezeRow create(
+        PlanRow row,
+        CaseSpec benchmarkCase,
+        PolicySpec policy,
+        RepresentationDiscoveryInformationBoundary boundary,
+        ExecutionResult result,
+        CandidateFreezeReceipt receipt,
+        int candidateSetCount
+    ) {
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        String status = result.work().exactCheckpointReached()</span>
+<span class="fc" id="L314">            ? EXACT_CHECKPOINT : NOT_COMPARABLE;</span>
+<span class="fc" id="L315">        return new FreezeRow(</span>
+<span class="fc" id="L316">            row.sequence(),</span>
+<span class="fc" id="L317">            row.configurationId(),</span>
+<span class="fc" id="L318">            benchmarkCase.id(),</span>
+<span class="fc" id="L319">            policy.id(),</span>
+<span class="fc" id="L320">            row.checkpoint(),</span>
+            status,
+<span class="fc" id="L322">            result.terminalReason(),</span>
+<span class="fc" id="L323">            result.limitReasons(),</span>
+<span class="fc" id="L324">            policy.deterministicSeed(),</span>
+<span class="fc" id="L325">            benchmarkCase.budget(),</span>
+<span class="fc" id="L326">            boundary.contentHash(),</span>
+<span class="fc" id="L327">            boundary.candidateFormationSelectionCommitment(),</span>
+<span class="fc" id="L328">            boundary.candidateFormationRuleInventoryHash(),</span>
+<span class="fc" id="L329">            boundary.postFreezeCatalogCommitment(),</span>
+<span class="fc" id="L330">            result.candidates(),</span>
+<span class="fc" id="L331">            result.candidates().size(),</span>
+            candidateSetCount,
+<span class="fc" id="L333">            KnownStructureCatalog.sha256(</span>
+<span class="fc" id="L334">                canonical(result.candidates())),</span>
+<span class="fc" id="L335">            receipt.candidateSetHash(),</span>
+<span class="fc" id="L336">            receipt.contentHash(),</span>
+<span class="fc" id="L337">            result.work());</span>
+    }
+}
+
+record MatchedWorkGroup(
+    String caseId,
+    int checkpoint,
+    boolean eligible,
+    List&lt;String&gt; policyIds,
+    List&lt;String&gt; workLedgerHashes
+) {
+<span class="fc" id="L348">    public MatchedWorkGroup {</span>
+<span class="fc" id="L349">        caseId = requireText(caseId, &quot;caseId&quot;);</span>
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">        if (checkpoint &lt; 1) {</span>
+<span class="nc" id="L351">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint must be positive&quot;);
+        }
+<span class="fc" id="L354">        policyIds = List.copyOf(policyIds);</span>
+<span class="fc" id="L355">        workLedgerHashes = List.copyOf(workLedgerHashes);</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">        if (policyIds.size() != 4</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                || workLedgerHashes.size() != 4) {</span>
+<span class="nc" id="L358">            throw new IllegalArgumentException(</span>
+                &quot;matched-work group requires four policies&quot;);
+        }
+<span class="fc" id="L361">        workLedgerHashes.forEach(hash -&gt;</span>
+<span class="fc" id="L362">            requireSha256(hash, &quot;workLedgerHash&quot;));</span>
+<span class="fc" id="L363">    }</span>
+}
+
+<span class="fc" id="L366">record FreezeSummary(</span>
+    int configuredRows,
+    int exactCheckpointRows,
+    int nonComparableRows,
+    int candidateLineages,
+    int candidateSets,
+    int matchedWorkGroups,
+    int eligibleMatchedWorkGroups,
+    int admittedPrimitiveSteps
+) {
+    static FreezeSummary derive(
+        List&lt;FreezeRow&gt; rows,
+        List&lt;MatchedWorkGroup&gt; groups
+    ) {
+<span class="fc" id="L380">        int exact = Math.toIntExact(rows.stream()</span>
+<span class="fc" id="L381">            .filter(row -&gt; row.work().exactCheckpointReached()).count());</span>
+<span class="fc" id="L382">        return new FreezeSummary(</span>
+<span class="fc" id="L383">            rows.size(),</span>
+            exact,
+<span class="fc" id="L385">            rows.size() - exact,</span>
+<span class="fc" id="L386">            rows.stream().mapToInt(</span>
+<span class="fc" id="L387">                FreezeRow::candidateLineageCount).sum(),</span>
+<span class="fc" id="L388">            rows.stream().mapToInt(</span>
+<span class="fc" id="L389">                FreezeRow::candidateSetCount).sum(),</span>
+<span class="fc" id="L390">            groups.size(),</span>
+<span class="fc" id="L391">            Math.toIntExact(groups.stream()</span>
+<span class="fc" id="L392">                .filter(MatchedWorkGroup::eligible).count()),</span>
+<span class="fc" id="L393">            rows.stream().mapToInt(row -&gt;</span>
+<span class="fc" id="L394">                row.work().admittedPrimitiveSteps()).sum());</span>
+    }
+}
+
+record FreezeContent(
+    String schema,
+    String evidenceStatus,
+    String repositoryRevision,
+    String planHash,
+    String preregistrationHash,
+    String formationHash,
+    String qualificationHash,
+    long qualificationByteLength,
+    String qualificationDisclosure,
+    List&lt;FreezeRow&gt; rows,
+    List&lt;MatchedWorkGroup&gt; matchedWorkGroups,
+    FreezeSummary summary,
+    String claimBoundary
+) {
+<span class="fc" id="L413">    public FreezeContent {</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">        if (!FREEZE_SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">                || !FREEZE_STATUS.equals(evidenceStatus)</span>
+<span class="pc bpc" id="L416" title="2 of 4 branches missed.">                || !repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)</span>
+                || qualificationByteLength &lt; 1
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">                || !QUALIFICATION_NOT_DISCLOSED.equals(</span>
+                    qualificationDisclosure)) {
+<span class="nc" id="L420">            throw new IllegalArgumentException(</span>
+                &quot;candidate-freeze content is invalid&quot;);
+        }
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        for (String hash : List.of(</span>
+                planHash,
+                preregistrationHash,
+                formationHash,
+                qualificationHash)) {
+<span class="fc" id="L428">            requireSha256(hash, &quot;freeze content hash&quot;);</span>
+<span class="fc" id="L429">        }</span>
+<span class="fc" id="L430">        rows = List.copyOf(rows);</span>
+<span class="fc" id="L431">        matchedWorkGroups = List.copyOf(matchedWorkGroups);</span>
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">        if (rows.size() != 144</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">                || matchedWorkGroups.size() != 36</span>
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">                || !summary.equals(FreezeSummary.derive(</span>
+                    rows, matchedWorkGroups))) {
+<span class="nc" id="L436">            throw new IllegalArgumentException(</span>
+                &quot;candidate-freeze matrix does not balance&quot;);
+        }
+<span class="fc bfc" id="L439" title="All 2 branches covered.">        for (int index = 0; index &lt; rows.size(); index++) {</span>
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">            if (rows.get(index).sequence() != index + 1) {</span>
+<span class="nc" id="L441">                throw new IllegalArgumentException(</span>
+                    &quot;freeze row sequence is not canonical&quot;);
+            }
+        }
+<span class="fc" id="L445">        claimBoundary = requireText(</span>
+            claimBoundary, &quot;claimBoundary&quot;);
+<span class="fc" id="L447">    }</span>
+}
+
+record FreezeArtifact(
+    FreezeContent content,
+    String contentHash
+) {
+<span class="fc" id="L454">    public FreezeArtifact {</span>
+<span class="fc" id="L455">        Objects.requireNonNull(content, &quot;content&quot;);</span>
+<span class="fc" id="L456">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L457">        if (!KnownStructureCatalog.sha256(canonical(content))</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">                .equals(contentHash)) {</span>
+<span class="nc" id="L459">            throw new IllegalArgumentException(</span>
+                &quot;candidate-freeze content hash mismatch&quot;);
+        }
+<span class="fc" id="L462">    }</span>
+
+    static FreezeArtifact create(FreezeContent content) {
+<span class="fc" id="L465">        return new FreezeArtifact(</span>
+            content,
+<span class="fc" id="L467">            KnownStructureCatalog.sha256(canonical(content)));</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L471">        return canonical(this);</span>
+    }
+
+    public static FreezeArtifact fromCanonicalJson(String source) {
+        try {
+<span class="fc" id="L476">            FreezeArtifact artifact = JSON.readValue(</span>
+<span class="fc" id="L477">                Objects.requireNonNull(source, &quot;source&quot;),</span>
+                FreezeArtifact.class);
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">            if (!artifact.toCanonicalJson().equals(source)) {</span>
+<span class="nc" id="L480">                throw new IllegalArgumentException(</span>
+                    &quot;candidate-freeze JSON is not canonical&quot;);
+            }
+<span class="fc" id="L483">            return artifact;</span>
+<span class="nc" id="L484">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L485">            throw new IllegalArgumentException(</span>
+                &quot;invalid candidate-freeze JSON&quot;, exception);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

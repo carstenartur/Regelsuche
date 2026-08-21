@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetFreeHeldOutExecutionSupport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">TargetFreeHeldOutExecutionSupport.java</span></div><h1>TargetFreeHeldOutExecutionSupport.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.CANONICALIZER;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.TRANSFORMATION_ORDER;
+
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.validation.CandidateProofStatus;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.TreeSet;
+
+record ExecutionResult(
+    List&lt;CandidateEvidence&gt; candidates,
+    WorkLedger work,
+    String terminalReason,
+    List&lt;String&gt; limitReasons
+) {
+<span class="fc" id="L21">    ExecutionResult {</span>
+<span class="fc" id="L22">        candidates = List.copyOf(candidates);</span>
+<span class="fc" id="L23">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L24">        terminalReason = requireText(</span>
+            terminalReason, &quot;terminalReason&quot;);
+<span class="fc" id="L26">        limitReasons = List.copyOf(new TreeSet&lt;&gt;(limitReasons));</span>
+<span class="fc" id="L27">    }</span>
+}
+
+record EnumState(
+    String expression,
+    List&lt;String&gt; assumptions,
+    int depth,
+    List&lt;String&gt; pathExpressions,
+    List&lt;String&gt; pathRuleIds,
+    List&lt;String&gt; primitiveRuleIds,
+    boolean equivalencePreserving,
+    boolean temporaryComplexityIncrease
+) {
+<span class="fc" id="L40">    EnumState {</span>
+<span class="fc" id="L41">        assumptions = List.copyOf(new TreeSet&lt;&gt;(assumptions));</span>
+<span class="fc" id="L42">        pathExpressions = List.copyOf(pathExpressions);</span>
+<span class="fc" id="L43">        pathRuleIds = List.copyOf(pathRuleIds);</span>
+<span class="fc" id="L44">        primitiveRuleIds = List.copyOf(primitiveRuleIds);</span>
+<span class="fc" id="L45">    }</span>
+
+    static EnumState root(
+        String expression,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L51">        return new EnumState(</span>
+            expression,
+            assumptions,
+            0,
+<span class="fc" id="L55">            List.of(expression),</span>
+<span class="fc" id="L56">            List.of(),</span>
+<span class="fc" id="L57">            List.of(),</span>
+            true,
+            false);
+    }
+
+    EnumState successor(
+        String nextExpression,
+        List&lt;String&gt; nextAssumptions,
+        Transformation transformation,
+        int nextDepth,
+        boolean complexityIncrease
+    ) {
+<span class="fc" id="L69">        List&lt;String&gt; expressions = new ArrayList&lt;&gt;(pathExpressions);</span>
+<span class="fc" id="L70">        expressions.add(nextExpression);</span>
+<span class="fc" id="L71">        List&lt;String&gt; rules = new ArrayList&lt;&gt;(pathRuleIds);</span>
+<span class="fc" id="L72">        rules.add(transformation.rule());</span>
+<span class="fc" id="L73">        List&lt;String&gt; primitives = new ArrayList&lt;&gt;(primitiveRuleIds);</span>
+<span class="fc" id="L74">        primitives.addAll(transformation.primitiveRuleIds());</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        return new EnumState(</span>
+            nextExpression,
+            nextAssumptions,
+            nextDepth,
+            expressions,
+            rules,
+            primitives,
+            equivalencePreserving
+                &amp;&amp; transformation
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                    .equivalencePreservingByConstruction(),</span>
+            complexityIncrease);
+    }
+
+    CandidateEvidence toCandidate() {
+<span class="fc" id="L89">        return CandidateEvidence.create(</span>
+            expression,
+            assumptions,
+            depth,
+            pathExpressions,
+            pathRuleIds,
+            primitiveRuleIds,
+            equivalencePreserving,
+            temporaryComplexityIncrease);
+    }
+}
+
+<span class="fc" id="L101">record Proof(</span>
+    CandidateProofStatus status,
+    String oracleStatus
+) {
+}
+
+final class CheckpointEngine
+        implements TransformationEngine {
+    private final TransformationEngine delegate;
+    private final int checkpoint;
+    private final int maxMaterializedTransitions;
+    private final int maxCandidatesPerState;
+    private int engineCalls;
+    private int materializedTransitions;
+    private int admittedTransitions;
+    private int admittedPrimitiveSteps;
+    private boolean candidateLimitObserved;
+    private boolean materializedLimitReached;
+
+    CheckpointEngine(
+        TransformationEngine delegate,
+        int checkpoint,
+        int maxMaterializedTransitions,
+        int maxCandidatesPerState
+<span class="fc" id="L125">    ) {</span>
+<span class="fc" id="L126">        this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="pc bpc" id="L127" title="3 of 6 branches missed.">        if (checkpoint &lt; 1 || maxMaterializedTransitions &lt; 1</span>
+                || maxCandidatesPerState &lt; 1) {
+<span class="nc" id="L129">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint-engine budgets must be positive&quot;);
+        }
+<span class="fc" id="L132">        this.checkpoint = checkpoint;</span>
+<span class="fc" id="L133">        this.maxMaterializedTransitions = maxMaterializedTransitions;</span>
+<span class="fc" id="L134">        this.maxCandidatesPerState = maxCandidatesPerState;</span>
+<span class="fc" id="L135">    }</span>
+
+    @Override
+    public List&lt;Transformation&gt; transform(String expression) {
+<span class="pc bpc" id="L139" title="1 of 4 branches missed.">        if (checkpointReached() || materializedLimitReached) {</span>
+<span class="fc" id="L140">            return List.of();</span>
+        }
+<span class="fc" id="L142">        engineCalls++;</span>
+<span class="fc" id="L143">        List&lt;Transformation&gt; generated = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L144">            delegate.transform(expression));</span>
+<span class="fc" id="L145">        generated.sort(TRANSFORMATION_ORDER);</span>
+<span class="fc" id="L146">        candidateLimitObserved |=</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            generated.size() &gt;= maxCandidatesPerState;</span>
+<span class="fc" id="L148">        int remainingMaterialized = maxMaterializedTransitions</span>
+            - materializedTransitions;
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (generated.size() &gt; remainingMaterialized) {</span>
+<span class="nc" id="L151">            generated = generated.stream()</span>
+<span class="nc" id="L152">                .limit(remainingMaterialized).toList();</span>
+<span class="nc" id="L153">            materializedLimitReached = true;</span>
+        }
+<span class="fc" id="L155">        materializedTransitions += generated.size();</span>
+<span class="fc" id="L156">        List&lt;Transformation&gt; admitted = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        for (Transformation candidate : generated) {</span>
+<span class="fc" id="L158">            int cost = candidate.primitiveStepCount();</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            if (cost &lt; 1) {</span>
+<span class="nc" id="L160">                throw new IllegalStateException(</span>
+                    &quot;primitive work cost must be positive&quot;);
+            }
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (admittedPrimitiveSteps + cost &gt; checkpoint) {</span>
+<span class="nc" id="L164">                break;</span>
+            }
+<span class="fc" id="L166">            admitted.add(candidate);</span>
+<span class="fc" id="L167">            admittedTransitions++;</span>
+<span class="fc" id="L168">            admittedPrimitiveSteps += cost;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (checkpointReached()) {</span>
+<span class="fc" id="L170">                break;</span>
+            }
+<span class="fc" id="L172">        }</span>
+<span class="fc" id="L173">        return List.copyOf(admitted);</span>
+    }
+
+    int engineCalls() {
+<span class="fc" id="L177">        return engineCalls;</span>
+    }
+
+    int materializedTransitions() {
+<span class="fc" id="L181">        return materializedTransitions;</span>
+    }
+
+    int admittedTransitions() {
+<span class="fc" id="L185">        return admittedTransitions;</span>
+    }
+
+    int admittedPrimitiveSteps() {
+<span class="fc" id="L189">        return admittedPrimitiveSteps;</span>
+    }
+
+    boolean checkpointReached() {
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        return admittedPrimitiveSteps == checkpoint;</span>
+    }
+
+    List&lt;String&gt; limitReasons() {
+<span class="fc" id="L197">        TreeSet&lt;String&gt; result = new TreeSet&lt;&gt;();</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (candidateLimitObserved) {</span>
+<span class="nc" id="L199">            result.add(&quot;MAX_CANDIDATES_PER_STATE_OBSERVED&quot;);</span>
+        }
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (materializedLimitReached) {</span>
+<span class="nc" id="L202">            result.add(&quot;MAX_GENERATED_TRANSITIONS&quot;);</span>
+        }
+<span class="fc" id="L204">        return List.copyOf(result);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
