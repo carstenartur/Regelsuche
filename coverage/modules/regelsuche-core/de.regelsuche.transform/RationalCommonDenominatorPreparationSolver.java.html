@@ -1,0 +1,897 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RationalCommonDenominatorPreparationSolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">RationalCommonDenominatorPreparationSolver.java</span></div><h1>RationalCommonDenominatorPreparationSolver.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.parse.ExpressionFormatter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Bounded, certificate-carrying preparation for two rational terms with
+ * different denominators.
+ *
+ * &lt;p&gt;For {@code A/B op C/D}, where {@code op} is addition or subtraction, the
+ * solver constructs two fractions with the identical retained denominator
+ * {@code B*D}. The ordinary {@link RationalNormalizationHypothesisOperator}
+ * must then replay on that prepared AST. The solver does not cancel factors,
+ * simplify products, or infer that a symbolic denominator is non-zero.&lt;/p&gt;
+ */
+public final class RationalCommonDenominatorPreparationSolver {
+    public static final String SOLVER_ID =
+        &quot;rational-common-denominator/bounded-ast/v1&quot;;
+    public static final String CERTIFICATE_SCHEMA =
+        &quot;regelsuche.rational-common-denominator-certificate/v1&quot;;
+    public static final String APPLICATION_SCHEMA =
+        &quot;regelsuche.rational-common-denominator-application/v1&quot;;
+    public static final String PREPARATION_RULE_ID =
+        &quot;prepare_rational_common_denominator&quot;;
+    public static final String PRINCIPAL_RULE_ID =
+        RationalNormalizationHypothesisOperator.RULE_ID;
+
+    private final Budget budget;
+<span class="fc" id="L44">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+
+    public RationalCommonDenominatorPreparationSolver() {
+<span class="fc" id="L48">        this(Budget.DEFAULT);</span>
+<span class="fc" id="L49">    }</span>
+
+<span class="fc" id="L51">    public RationalCommonDenominatorPreparationSolver(Budget budget) {</span>
+<span class="fc" id="L52">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L53">    }</span>
+
+    public Budget budget() {
+<span class="nc" id="L56">        return budget;</span>
+    }
+
+    public PlanAttempt plan(Expr subtree) {
+<span class="fc" id="L60">        Objects.requireNonNull(subtree, &quot;subtree&quot;);</span>
+<span class="fc" id="L61">        WorkLedger untouched = WorkLedger.untouched(budget);</span>
+<span class="fc" id="L62">        BinaryExpr operation = rationalOperation(subtree);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (operation == null) {</span>
+<span class="fc" id="L64">            return PlanAttempt.withoutApplication(</span>
+                Status.NOT_APPLICABLE,
+                untouched,
+                &quot;root-is-not-a-two-fraction-sum-or-difference&quot;);
+        }
+
+<span class="fc" id="L70">        int inputNodes = boundedNodeCount(</span>
+            subtree,
+<span class="fc" id="L72">            budget.maxInputNodes());</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (inputNodes &gt; budget.maxInputNodes()) {</span>
+<span class="fc" id="L74">            return PlanAttempt.withoutApplication(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L76">                WorkLedger.inputExhausted(budget),</span>
+                &quot;input-node-limit-exhausted&quot;);
+        }
+
+<span class="fc" id="L80">        DivisionParts left = division(operation.left());</span>
+<span class="fc" id="L81">        DivisionParts right = division(operation.right());</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">        if (left == null || right == null) {</span>
+<span class="fc" id="L83">            return PlanAttempt.withoutApplication(</span>
+                Status.NOT_APPLICABLE,
+<span class="fc" id="L85">                WorkLedger.withInput(budget, inputNodes),</span>
+                &quot;both-operands-must-be-fractions&quot;);
+        }
+
+<span class="fc" id="L89">        ResidualObligation obligation = residualObligation(operation, left, right);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (isExplicitZero(left.denominator())</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                || isExplicitZero(right.denominator())) {</span>
+<span class="fc" id="L92">            return PlanAttempt.withoutApplication(</span>
+                Status.UNSUPPORTED,
+<span class="fc" id="L94">                Optional.of(obligation),</span>
+<span class="fc" id="L95">                WorkLedger.withInput(budget, inputNodes),</span>
+                &quot;explicit-zero-denominator&quot;);
+        }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (sameValue(left.denominator(), right.denominator())) {</span>
+<span class="fc" id="L99">            return PlanAttempt.withoutApplication(</span>
+                Status.DIRECT_MATCH_AVAILABLE,
+<span class="fc" id="L101">                WorkLedger.withInput(budget, inputNodes),</span>
+                &quot;principal-operator-already-matches&quot;);
+        }
+
+<span class="fc" id="L105">        ExpectedApplication expected =</span>
+<span class="fc" id="L106">            expectedApplication(operation.operator(), left, right);</span>
+<span class="fc" id="L107">        int constructedNodes = boundedNodeCount(</span>
+<span class="fc" id="L108">            expected.prepared(),</span>
+<span class="fc" id="L109">            budget.maxConstructedNodes());</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (constructedNodes &lt;= budget.maxConstructedNodes()) {</span>
+<span class="fc" id="L111">            int remaining = budget.maxConstructedNodes() - constructedNodes;</span>
+<span class="fc" id="L112">            int resultNodes = boundedNodeCount(expected.result(), remaining);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            constructedNodes = resultNodes &gt; remaining</span>
+<span class="nc" id="L114">                ? budget.maxConstructedNodes() + 1</span>
+<span class="fc" id="L115">                : constructedNodes + resultNodes;</span>
+        }
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (constructedNodes &gt; budget.maxConstructedNodes()) {</span>
+<span class="fc" id="L118">            return PlanAttempt.withoutApplication(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L120">                Optional.of(obligation),</span>
+<span class="fc" id="L121">                WorkLedger.constructedExhausted(budget, inputNodes),</span>
+                &quot;constructed-node-limit-exhausted&quot;);
+        }
+
+<span class="fc" id="L125">        WorkLedger work = new WorkLedger(</span>
+<span class="fc" id="L126">            budget.maxInputNodes(),</span>
+            inputNodes,
+<span class="fc" id="L128">            budget.maxInputNodes() - inputNodes,</span>
+<span class="fc" id="L129">            budget.maxConstructedNodes(),</span>
+            constructedNodes,
+<span class="fc" id="L131">            budget.maxConstructedNodes() - constructedNodes);</span>
+<span class="fc" id="L132">        List&lt;String&gt; assumptions = denominatorAssumptions(</span>
+<span class="fc" id="L133">            expected.commonDenominator());</span>
+<span class="fc" id="L134">        Certificate certificate = certificate(</span>
+            operation,
+            left,
+            right,
+            expected);
+<span class="fc" id="L139">        PreparedApplication application = new PreparedApplication(</span>
+            APPLICATION_SCHEMA,
+            SOLVER_ID,
+            PRINCIPAL_RULE_ID,
+            subtree,
+<span class="fc" id="L144">            expected.prepared(),</span>
+<span class="fc" id="L145">            expected.result(),</span>
+<span class="fc" id="L146">            expected.leftScaledNumerator(),</span>
+<span class="fc" id="L147">            expected.rightScaledNumerator(),</span>
+<span class="fc" id="L148">            expected.commonDenominator(),</span>
+<span class="fc" id="L149">            Map.of(</span>
+<span class="fc" id="L150">                &quot;A&quot;, left.numerator(),</span>
+<span class="fc" id="L151">                &quot;B&quot;, left.denominator(),</span>
+<span class="fc" id="L152">                &quot;C&quot;, right.numerator(),</span>
+<span class="fc" id="L153">                &quot;D&quot;, right.denominator(),</span>
+<span class="fc" id="L154">                &quot;Q&quot;, expected.commonDenominator()),</span>
+            obligation,
+            assumptions,
+<span class="fc" id="L157">            List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID),</span>
+            budget,
+            certificate,
+            work);
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (!verify(application)) {</span>
+<span class="nc" id="L162">            return PlanAttempt.withoutApplication(</span>
+                Status.INVALID_CERTIFICATE,
+<span class="nc" id="L164">                Optional.of(obligation),</span>
+                work,
+                &quot;generated-common-denominator-certificate-rejected&quot;);
+        }
+<span class="fc" id="L168">        return PlanAttempt.prepared(application);</span>
+    }
+
+    public boolean verify(PreparedApplication application) {
+<span class="fc" id="L172">        VerificationInput input = verificationInput(application);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (input == null) {</span>
+<span class="fc" id="L174">            return false;</span>
+        }
+<span class="fc" id="L176">        ExpectedApplication expected = expectedApplication(</span>
+<span class="fc" id="L177">            input.operation().operator(),</span>
+<span class="fc" id="L178">            input.left(),</span>
+<span class="fc" id="L179">            input.right());</span>
+<span class="fc" id="L180">        int constructedNodes = nodeCount(expected.prepared())</span>
+<span class="fc" id="L181">            + nodeCount(expected.result());</span>
+<span class="fc" id="L182">        WorkLedger expectedWork = new WorkLedger(</span>
+<span class="fc" id="L183">            budget.maxInputNodes(),</span>
+<span class="fc" id="L184">            input.inputNodes(),</span>
+<span class="fc" id="L185">            budget.maxInputNodes() - input.inputNodes(),</span>
+<span class="fc" id="L186">            budget.maxConstructedNodes(),</span>
+            constructedNodes,
+<span class="fc" id="L188">            budget.maxConstructedNodes() - constructedNodes);</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (!expectedWork.equals(application.work())</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                || !expressionsMatch(application, expected)</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                || !bindingsMatch(application, input, expected)</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                || !contextMatches(application, input, expected)) {</span>
+<span class="fc" id="L193">            return false;</span>
+        }
+<span class="fc" id="L195">        return certificate(</span>
+<span class="fc" id="L196">            input.operation(),</span>
+<span class="fc" id="L197">            input.left(),</span>
+<span class="fc" id="L198">            input.right(),</span>
+<span class="fc" id="L199">            expected).equals(application.certificate());</span>
+    }
+
+    private VerificationInput verificationInput(
+        PreparedApplication application
+    ) {
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (!hasExpectedMetadata(application)</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                || !budget.equals(application.budget())</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                || !(application.originalSubtree()</span>
+<span class="fc" id="L208">                    instanceof BinaryExpr operation)</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                || (operation.operator() != BinaryOperator.ADD</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                    &amp;&amp; operation.operator() != BinaryOperator.SUB)) {</span>
+<span class="fc" id="L211">            return null;</span>
+        }
+<span class="fc" id="L213">        DivisionParts left = division(operation.left());</span>
+<span class="fc" id="L214">        DivisionParts right = division(operation.right());</span>
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        if (left == null || right == null</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                || isExplicitZero(left.denominator())</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                || isExplicitZero(right.denominator())</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                || sameValue(left.denominator(), right.denominator())) {</span>
+<span class="nc" id="L219">            return null;</span>
+        }
+<span class="fc" id="L221">        int inputNodes = nodeCount(operation);</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (inputNodes &gt; budget.maxInputNodes()) {</span>
+<span class="nc" id="L223">            return null;</span>
+        }
+<span class="fc" id="L225">        ExpectedApplication expected = expectedApplication(</span>
+<span class="fc" id="L226">            operation.operator(),</span>
+            left,
+            right);
+<span class="fc" id="L229">        if (nodeCount(expected.prepared()) + nodeCount(expected.result())</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                &gt; budget.maxConstructedNodes()) {</span>
+<span class="nc" id="L231">            return null;</span>
+        }
+<span class="fc" id="L233">        return new VerificationInput(operation, left, right, inputNodes);</span>
+    }
+
+    private static ExpectedApplication expectedApplication(
+        BinaryOperator operator,
+        DivisionParts left,
+        DivisionParts right
+    ) {
+<span class="fc" id="L241">        Expr commonDenominator = multiply(</span>
+<span class="fc" id="L242">            left.denominator(),</span>
+<span class="fc" id="L243">            right.denominator());</span>
+<span class="fc" id="L244">        Expr leftScaledNumerator = multiply(</span>
+<span class="fc" id="L245">            left.numerator(),</span>
+<span class="fc" id="L246">            right.denominator());</span>
+<span class="fc" id="L247">        Expr rightScaledNumerator = multiply(</span>
+<span class="fc" id="L248">            right.numerator(),</span>
+<span class="fc" id="L249">            left.denominator());</span>
+<span class="fc" id="L250">        Expr prepared = new BinaryExpr(</span>
+<span class="fc" id="L251">            divide(leftScaledNumerator, commonDenominator),</span>
+            operator,
+<span class="fc" id="L253">            divide(rightScaledNumerator, commonDenominator));</span>
+<span class="fc" id="L254">        Expr result = divide(</span>
+            new BinaryExpr(
+                leftScaledNumerator,
+                operator,
+                rightScaledNumerator),
+            commonDenominator);
+<span class="fc" id="L260">        return new ExpectedApplication(</span>
+            leftScaledNumerator,
+            rightScaledNumerator,
+            commonDenominator,
+            prepared,
+            result);
+    }
+
+    private static Expr multiply(Expr left, Expr right) {
+<span class="fc" id="L269">        return new BinaryExpr(left, BinaryOperator.MUL, right);</span>
+    }
+
+    private static Expr divide(Expr numerator, Expr denominator) {
+<span class="fc" id="L273">        return new BinaryExpr(numerator, BinaryOperator.DIV, denominator);</span>
+    }
+
+    private static DivisionParts division(Expr expression) {
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                &amp;&amp; binary.operator() == BinaryOperator.DIV) {</span>
+<span class="fc" id="L279">            return new DivisionParts(binary.left(), binary.right());</span>
+        }
+<span class="fc" id="L281">        return null;</span>
+    }
+
+    private static BinaryExpr rationalOperation(Expr expression) {
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">                &amp;&amp; (binary.operator() == BinaryOperator.ADD</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                    || binary.operator() == BinaryOperator.SUB)) {</span>
+<span class="fc" id="L288">            return binary;</span>
+        }
+<span class="fc" id="L290">        return null;</span>
+    }
+
+    private boolean sameValue(Expr left, Expr right) {
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (left.equals(right)) {</span>
+<span class="fc" id="L295">            return true;</span>
+        }
+        try {
+<span class="fc" id="L298">            return canonicalizer.stableHash(ExpressionFormatter.format(left))</span>
+<span class="fc" id="L299">                .equals(canonicalizer.stableHash(</span>
+<span class="fc" id="L300">                    ExpressionFormatter.format(right)));</span>
+<span class="nc" id="L301">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L302">            return false;</span>
+        }
+    }
+
+    private static boolean isExplicitZero(Expr expression) {
+<span class="fc" id="L307">        return expression instanceof NumberExpr number</span>
+<span class="fc bfc" id="L308" title="All 4 branches covered.">            &amp;&amp; number.value() == 0;</span>
+    }
+
+    private static List&lt;String&gt; denominatorAssumptions(Expr denominator) {
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        if (denominator instanceof NumberExpr number) {</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">            return number.value() == 0</span>
+<span class="nc" id="L314">                ? List.of(&quot;0 != 0&quot;)</span>
+<span class="nc" id="L315">                : List.of();</span>
+        }
+<span class="fc" id="L317">        return List.of(ExpressionFormatter.format(denominator) + &quot; != 0&quot;);</span>
+    }
+
+    private static boolean expressionsMatch(
+        PreparedApplication application,
+        ExpectedApplication expected
+    ) {
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        return expected.leftScaledNumerator().equals(</span>
+<span class="fc" id="L325">                application.leftScaledNumerator())</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            &amp;&amp; expected.rightScaledNumerator().equals(</span>
+<span class="fc" id="L327">                application.rightScaledNumerator())</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            &amp;&amp; expected.commonDenominator().equals(</span>
+<span class="fc" id="L329">                application.commonDenominator())</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            &amp;&amp; expected.prepared().equals(application.preparedSubtree())</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            &amp;&amp; expected.result().equals(application.resultSubtree());</span>
+    }
+
+    private static boolean bindingsMatch(
+        PreparedApplication application,
+        VerificationInput input,
+        ExpectedApplication expected
+    ) {
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        return application.bindings().size() == 5</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">            &amp;&amp; input.left().numerator().equals(</span>
+<span class="fc" id="L341">                application.bindings().get(&quot;A&quot;))</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">            &amp;&amp; input.left().denominator().equals(</span>
+<span class="fc" id="L343">                application.bindings().get(&quot;B&quot;))</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">            &amp;&amp; input.right().numerator().equals(</span>
+<span class="fc" id="L345">                application.bindings().get(&quot;C&quot;))</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">            &amp;&amp; input.right().denominator().equals(</span>
+<span class="fc" id="L347">                application.bindings().get(&quot;D&quot;))</span>
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">            &amp;&amp; expected.commonDenominator().equals(</span>
+<span class="fc" id="L349">                application.bindings().get(&quot;Q&quot;));</span>
+    }
+
+    private static boolean contextMatches(
+        PreparedApplication application,
+        VerificationInput input,
+        ExpectedApplication expected
+    ) {
+<span class="fc" id="L357">        return residualObligation(</span>
+<span class="fc" id="L358">                input.operation(),</span>
+<span class="fc" id="L359">                input.left(),</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">                input.right()).equals(application.residualObligation())</span>
+<span class="fc" id="L361">            &amp;&amp; denominatorAssumptions(expected.commonDenominator())</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">                .equals(application.assumptions());</span>
+    }
+
+    private static boolean hasExpectedMetadata(
+        PreparedApplication application
+    ) {
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        return application != null</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            &amp;&amp; APPLICATION_SCHEMA.equals(application.schema())</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">            &amp;&amp; SOLVER_ID.equals(application.solverId())</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">            &amp;&amp; PRINCIPAL_RULE_ID.equals(application.principalRuleId())</span>
+<span class="fc" id="L372">            &amp;&amp; List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID)</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">                .equals(application.primitiveRuleIds());</span>
+    }
+
+    private static ResidualObligation residualObligation(
+        BinaryExpr operation,
+        DivisionParts left,
+        DivisionParts right
+    ) {
+<span class="fc" id="L381">        return new ResidualObligation(</span>
+            &quot;RATIONAL_COMMON_DENOMINATOR&quot;,
+<span class="fc" id="L383">            operation.operator().name(),</span>
+<span class="fc" id="L384">            ExpressionFormatter.format(left.numerator()),</span>
+<span class="fc" id="L385">            ExpressionFormatter.format(left.denominator()),</span>
+<span class="fc" id="L386">            ExpressionFormatter.format(right.numerator()),</span>
+<span class="fc" id="L387">            ExpressionFormatter.format(right.denominator()),</span>
+            &quot;Q&quot;,
+            &quot;A/B &quot;
+<span class="fc" id="L390">                + operatorToken(operation.operator())</span>
+                + &quot; C/D -&gt; N/Q&quot;);
+    }
+
+    private static String operatorToken(BinaryOperator operator) {
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        return operator == BinaryOperator.ADD ? &quot;+&quot; : &quot;-&quot;;</span>
+    }
+
+    private static Certificate certificate(
+        BinaryExpr operation,
+        DivisionParts left,
+        DivisionParts right,
+        ExpectedApplication expected
+    ) {
+<span class="fc" id="L404">        String originalText = ExpressionFormatter.format(operation);</span>
+<span class="fc" id="L405">        String preparedText = ExpressionFormatter.format(expected.prepared());</span>
+<span class="fc" id="L406">        String resultText = ExpressionFormatter.format(expected.result());</span>
+<span class="fc" id="L407">        String commonText = ExpressionFormatter.format(</span>
+<span class="fc" id="L408">            expected.commonDenominator());</span>
+<span class="fc" id="L409">        String originalHash = structureHash(operation);</span>
+<span class="fc" id="L410">        String preparedHash = structureHash(expected.prepared());</span>
+<span class="fc" id="L411">        String resultHash = structureHash(expected.result());</span>
+<span class="fc" id="L412">        String commonHash = structureHash(expected.commonDenominator());</span>
+<span class="fc" id="L413">        String payload = String.join(&quot;\n&quot;,</span>
+            &quot;schema=&quot; + CERTIFICATE_SCHEMA,
+            &quot;solver=&quot; + SOLVER_ID,
+            &quot;principalRule=&quot; + PRINCIPAL_RULE_ID,
+<span class="fc" id="L417">            &quot;operator=&quot; + operation.operator().name(),</span>
+<span class="fc" id="L418">            &quot;leftNumerator=&quot; + ExpressionFormatter.format(left.numerator()),</span>
+<span class="fc" id="L419">            &quot;leftDenominator=&quot; + ExpressionFormatter.format(left.denominator()),</span>
+<span class="fc" id="L420">            &quot;rightNumerator=&quot; + ExpressionFormatter.format(right.numerator()),</span>
+<span class="fc" id="L421">            &quot;rightDenominator=&quot; + ExpressionFormatter.format(right.denominator()),</span>
+            &quot;original=&quot; + originalText,
+            &quot;originalStructure=&quot; + originalHash,
+            &quot;commonDenominator=&quot; + commonText,
+            &quot;commonStructure=&quot; + commonHash,
+            &quot;prepared=&quot; + preparedText,
+            &quot;preparedStructure=&quot; + preparedHash,
+            &quot;result=&quot; + resultText,
+            &quot;resultStructure=&quot; + resultHash);
+<span class="fc" id="L430">        return new Certificate(</span>
+            CERTIFICATE_SCHEMA,
+            SOLVER_ID,
+<span class="fc" id="L433">            operation.operator().name(),</span>
+            originalText,
+            preparedText,
+            resultText,
+            commonText,
+            originalHash,
+            preparedHash,
+            resultHash,
+            commonHash,
+<span class="fc" id="L442">            sha256(payload));</span>
+    }
+
+    private static String structureHash(Expr expression) {
+<span class="fc" id="L446">        return sha256(structureDescriptor(expression));</span>
+    }
+
+    private static String structureDescriptor(Expr expression) {
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L451">            return &quot;N&quot; + Long.toUnsignedString(</span>
+<span class="fc" id="L452">                Double.doubleToRawLongBits(number.value()),</span>
+                16);
+        }
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L456">            return token(&quot;V&quot;, variable.name());</span>
+        }
+<span class="fc bfc" id="L458" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L459">            return token(&quot;B&quot;, binary.operator().name())</span>
+<span class="fc" id="L460">                + &quot;(&quot; + structureDescriptor(binary.left()) + &quot;)&quot;</span>
+<span class="fc" id="L461">                + &quot;(&quot; + structureDescriptor(binary.right()) + &quot;)&quot;;</span>
+        }
+<span class="fc" id="L463">        FunctionExpr function = (FunctionExpr) expression;</span>
+<span class="fc" id="L464">        StringBuilder result = new StringBuilder(</span>
+<span class="fc" id="L465">            token(&quot;F&quot;, function.name()))</span>
+<span class="fc" id="L466">            .append('#')</span>
+<span class="fc" id="L467">            .append(function.arguments().size());</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">        for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L469">            result.append('(')</span>
+<span class="fc" id="L470">                .append(structureDescriptor(argument))</span>
+<span class="fc" id="L471">                .append(')');</span>
+<span class="fc" id="L472">        }</span>
+<span class="fc" id="L473">        return result.toString();</span>
+    }
+
+    private static String token(String kind, String value) {
+<span class="fc" id="L477">        return kind + value.length() + &quot;:&quot; + value;</span>
+    }
+
+    private static int boundedNodeCount(Expr expression, int limit) {
+<span class="fc" id="L481">        NodeCounter counter = new NodeCounter(limit);</span>
+<span class="fc" id="L482">        counter.visit(expression);</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        return counter.exhausted() ? limit + 1 : counter.count();</span>
+    }
+
+    private static int nodeCount(Expr expression) {
+<span class="fc bfc" id="L487" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L488">            return 1 + nodeCount(binary.left()) + nodeCount(binary.right());</span>
+        }
+<span class="fc bfc" id="L490" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L491">            return 1 + function.arguments().stream()</span>
+<span class="fc" id="L492">                .mapToInt(RationalCommonDenominatorPreparationSolver::nodeCount)</span>
+<span class="fc" id="L493">                .sum();</span>
+        }
+<span class="fc" id="L495">        return 1;</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L500">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L501">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L502">            return java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L503">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L504">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L508">    public enum Status {</span>
+<span class="fc" id="L509">        PREPARED,</span>
+<span class="fc" id="L510">        DIRECT_MATCH_AVAILABLE,</span>
+<span class="fc" id="L511">        NOT_APPLICABLE,</span>
+<span class="fc" id="L512">        UNSUPPORTED,</span>
+<span class="fc" id="L513">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L514">        INVALID_CERTIFICATE</span>
+    }
+
+    public record Budget(
+        int maxInputNodes,
+        int maxConstructedNodes
+    ) {
+<span class="fc" id="L521">        public static final Budget DEFAULT = new Budget(96, 384);</span>
+
+<span class="fc" id="L523">        public Budget {</span>
+<span class="fc bfc" id="L524" title="All 4 branches covered.">            if (maxInputNodes &lt; 1 || maxConstructedNodes &lt; 1) {</span>
+<span class="fc" id="L525">                throw new IllegalArgumentException(</span>
+                    &quot;node limits must be positive&quot;);
+            }
+<span class="fc" id="L528">        }</span>
+    }
+
+    public record WorkLedger(
+        int configuredInputNodeLimit,
+        int inspectedInputNodes,
+        int remainingInputNodeBudget,
+        int configuredConstructedNodeLimit,
+        int constructedNodes,
+        int remainingConstructedNodeBudget
+    ) {
+<span class="fc" id="L539">        public WorkLedger {</span>
+<span class="pc bpc" id="L540" title="8 of 16 branches missed.">            if (configuredInputNodeLimit &lt; 1</span>
+                    || inspectedInputNodes &lt; 0
+                    || remainingInputNodeBudget &lt; 0
+                    || configuredInputNodeLimit
+                        != inspectedInputNodes + remainingInputNodeBudget
+                    || configuredConstructedNodeLimit &lt; 1
+                    || constructedNodes &lt; 0
+                    || remainingConstructedNodeBudget &lt; 0
+                    || configuredConstructedNodeLimit
+                        != constructedNodes
+                            + remainingConstructedNodeBudget) {
+<span class="nc" id="L551">                throw new IllegalArgumentException(</span>
+                    &quot;node work must be non-negative and balanced&quot;);
+            }
+<span class="fc" id="L554">        }</span>
+
+        private static WorkLedger untouched(Budget budget) {
+<span class="fc" id="L557">            return new WorkLedger(</span>
+<span class="fc" id="L558">                budget.maxInputNodes(),</span>
+                0,
+<span class="fc" id="L560">                budget.maxInputNodes(),</span>
+<span class="fc" id="L561">                budget.maxConstructedNodes(),</span>
+                0,
+<span class="fc" id="L563">                budget.maxConstructedNodes());</span>
+        }
+
+        private static WorkLedger withInput(Budget budget, int inputNodes) {
+<span class="fc" id="L567">            return new WorkLedger(</span>
+<span class="fc" id="L568">                budget.maxInputNodes(),</span>
+                inputNodes,
+<span class="fc" id="L570">                budget.maxInputNodes() - inputNodes,</span>
+<span class="fc" id="L571">                budget.maxConstructedNodes(),</span>
+                0,
+<span class="fc" id="L573">                budget.maxConstructedNodes());</span>
+        }
+
+        private static WorkLedger inputExhausted(Budget budget) {
+<span class="fc" id="L577">            return new WorkLedger(</span>
+<span class="fc" id="L578">                budget.maxInputNodes(),</span>
+<span class="fc" id="L579">                budget.maxInputNodes(),</span>
+                0,
+<span class="fc" id="L581">                budget.maxConstructedNodes(),</span>
+                0,
+<span class="fc" id="L583">                budget.maxConstructedNodes());</span>
+        }
+
+        private static WorkLedger constructedExhausted(
+            Budget budget,
+            int inputNodes
+        ) {
+<span class="fc" id="L590">            return new WorkLedger(</span>
+<span class="fc" id="L591">                budget.maxInputNodes(),</span>
+                inputNodes,
+<span class="fc" id="L593">                budget.maxInputNodes() - inputNodes,</span>
+<span class="fc" id="L594">                budget.maxConstructedNodes(),</span>
+<span class="fc" id="L595">                budget.maxConstructedNodes(),</span>
+                0);
+        }
+    }
+
+    public record ResidualObligation(
+        String kind,
+        String operator,
+        String leftNumeratorExpression,
+        String leftDenominatorExpression,
+        String rightNumeratorExpression,
+        String rightDenominatorExpression,
+        String commonDenominatorPlaceholder,
+        String equationTemplate
+    ) {
+<span class="fc" id="L610">        public ResidualObligation {</span>
+<span class="fc" id="L611">            kind = requireText(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L612">            operator = requireText(operator, &quot;operator&quot;);</span>
+<span class="fc" id="L613">            leftNumeratorExpression = requireText(</span>
+                leftNumeratorExpression,
+                &quot;leftNumeratorExpression&quot;);
+<span class="fc" id="L616">            leftDenominatorExpression = requireText(</span>
+                leftDenominatorExpression,
+                &quot;leftDenominatorExpression&quot;);
+<span class="fc" id="L619">            rightNumeratorExpression = requireText(</span>
+                rightNumeratorExpression,
+                &quot;rightNumeratorExpression&quot;);
+<span class="fc" id="L622">            rightDenominatorExpression = requireText(</span>
+                rightDenominatorExpression,
+                &quot;rightDenominatorExpression&quot;);
+<span class="fc" id="L625">            commonDenominatorPlaceholder = requireText(</span>
+                commonDenominatorPlaceholder,
+                &quot;commonDenominatorPlaceholder&quot;);
+<span class="fc" id="L628">            equationTemplate = requireText(</span>
+                equationTemplate,
+                &quot;equationTemplate&quot;);
+<span class="fc" id="L631">        }</span>
+    }
+
+    public record Certificate(
+        String schema,
+        String solverId,
+        String operator,
+        String originalExpression,
+        String preparedExpression,
+        String resultExpression,
+        String commonDenominatorExpression,
+        String originalStructureHash,
+        String preparedStructureHash,
+        String resultStructureHash,
+        String commonDenominatorStructureHash,
+        String contentHash
+    ) {
+<span class="fc" id="L648">        public Certificate {</span>
+<span class="fc" id="L649">            schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L650">            solverId = requireText(solverId, &quot;solverId&quot;);</span>
+<span class="fc" id="L651">            operator = requireText(operator, &quot;operator&quot;);</span>
+<span class="fc" id="L652">            originalExpression = requireText(</span>
+                originalExpression,
+                &quot;originalExpression&quot;);
+<span class="fc" id="L655">            preparedExpression = requireText(</span>
+                preparedExpression,
+                &quot;preparedExpression&quot;);
+<span class="fc" id="L658">            resultExpression = requireText(</span>
+                resultExpression,
+                &quot;resultExpression&quot;);
+<span class="fc" id="L661">            commonDenominatorExpression = requireText(</span>
+                commonDenominatorExpression,
+                &quot;commonDenominatorExpression&quot;);
+<span class="fc" id="L664">            originalStructureHash = requireText(</span>
+                originalStructureHash,
+                &quot;originalStructureHash&quot;);
+<span class="fc" id="L667">            preparedStructureHash = requireText(</span>
+                preparedStructureHash,
+                &quot;preparedStructureHash&quot;);
+<span class="fc" id="L670">            resultStructureHash = requireText(</span>
+                resultStructureHash,
+                &quot;resultStructureHash&quot;);
+<span class="fc" id="L673">            commonDenominatorStructureHash = requireText(</span>
+                commonDenominatorStructureHash,
+                &quot;commonDenominatorStructureHash&quot;);
+<span class="fc" id="L676">            contentHash = requireText(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L677">        }</span>
+    }
+
+    public record PreparedApplication(
+        String schema,
+        String solverId,
+        String principalRuleId,
+        Expr originalSubtree,
+        Expr preparedSubtree,
+        Expr resultSubtree,
+        Expr leftScaledNumerator,
+        Expr rightScaledNumerator,
+        Expr commonDenominator,
+        Map&lt;String, Expr&gt; bindings,
+        ResidualObligation residualObligation,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; primitiveRuleIds,
+        Budget budget,
+        Certificate certificate,
+        WorkLedger work
+    ) {
+<span class="fc" id="L698">        public PreparedApplication {</span>
+<span class="fc" id="L699">            schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L700">            solverId = requireText(solverId, &quot;solverId&quot;);</span>
+<span class="fc" id="L701">            principalRuleId = requireText(</span>
+                principalRuleId,
+                &quot;principalRuleId&quot;);
+<span class="fc" id="L704">            originalSubtree = Objects.requireNonNull(</span>
+                originalSubtree,
+                &quot;originalSubtree&quot;);
+<span class="fc" id="L707">            preparedSubtree = Objects.requireNonNull(</span>
+                preparedSubtree,
+                &quot;preparedSubtree&quot;);
+<span class="fc" id="L710">            resultSubtree = Objects.requireNonNull(</span>
+                resultSubtree,
+                &quot;resultSubtree&quot;);
+<span class="fc" id="L713">            leftScaledNumerator = Objects.requireNonNull(</span>
+                leftScaledNumerator,
+                &quot;leftScaledNumerator&quot;);
+<span class="fc" id="L716">            rightScaledNumerator = Objects.requireNonNull(</span>
+                rightScaledNumerator,
+                &quot;rightScaledNumerator&quot;);
+<span class="fc" id="L719">            commonDenominator = Objects.requireNonNull(</span>
+                commonDenominator,
+                &quot;commonDenominator&quot;);
+<span class="fc" id="L722">            bindings = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(</span>
+<span class="fc" id="L723">                Objects.requireNonNull(bindings, &quot;bindings&quot;)));</span>
+<span class="fc" id="L724">            residualObligation = Objects.requireNonNull(</span>
+                residualObligation,
+                &quot;residualObligation&quot;);
+<span class="fc" id="L727">            assumptions = List.copyOf(</span>
+<span class="fc" id="L728">                Objects.requireNonNull(assumptions, &quot;assumptions&quot;));</span>
+<span class="fc" id="L729">            primitiveRuleIds = List.copyOf(</span>
+<span class="fc" id="L730">                Objects.requireNonNull(</span>
+                    primitiveRuleIds,
+                    &quot;primitiveRuleIds&quot;));
+<span class="pc bpc" id="L733" title="1 of 2 branches missed.">            if (primitiveRuleIds.isEmpty()) {</span>
+<span class="nc" id="L734">                throw new IllegalArgumentException(</span>
+                    &quot;primitiveRuleIds must not be empty&quot;);
+            }
+<span class="fc" id="L737">            budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L738">            certificate = Objects.requireNonNull(</span>
+                certificate,
+                &quot;certificate&quot;);
+<span class="fc" id="L741">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L742">        }</span>
+    }
+
+    public record PlanAttempt(
+        Status status,
+        Optional&lt;PreparedApplication&gt; application,
+        Optional&lt;ResidualObligation&gt; residualObligation,
+        WorkLedger work,
+        String detail
+    ) {
+<span class="fc" id="L752">        public PlanAttempt {</span>
+<span class="fc" id="L753">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L754">            application = Objects.requireNonNull(</span>
+                application,
+                &quot;application&quot;);
+<span class="fc" id="L757">            residualObligation = Objects.requireNonNull(</span>
+                residualObligation,
+                &quot;residualObligation&quot;);
+<span class="fc" id="L760">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L761" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="pc bpc" id="L762" title="1 of 4 branches missed.">            if ((status == Status.PREPARED) != application.isPresent()) {</span>
+<span class="nc" id="L763">                throw new IllegalArgumentException(</span>
+                    &quot;only PREPARED attempts may retain an application&quot;);
+            }
+<span class="fc bfc" id="L766" title="All 2 branches covered.">            if (application.isPresent()</span>
+<span class="pc bpc" id="L767" title="1 of 2 branches missed.">                    &amp;&amp; (!application.get().work().equals(work)</span>
+<span class="pc bpc" id="L768" title="1 of 2 branches missed.">                        || !residualObligation.equals(Optional.of(</span>
+<span class="fc" id="L769">                            application.get().residualObligation())))) {</span>
+<span class="nc" id="L770">                throw new IllegalArgumentException(</span>
+                    &quot;attempt and application evidence must agree&quot;);
+            }
+<span class="fc" id="L773">        }</span>
+
+        private static PlanAttempt prepared(
+            PreparedApplication application
+        ) {
+<span class="fc" id="L778">            return new PlanAttempt(</span>
+                Status.PREPARED,
+<span class="fc" id="L780">                Optional.of(application),</span>
+<span class="fc" id="L781">                Optional.of(application.residualObligation()),</span>
+<span class="fc" id="L782">                application.work(),</span>
+                &quot;rational-common-denominator-prepared&quot;);
+        }
+
+        private static PlanAttempt withoutApplication(
+            Status status,
+            WorkLedger work,
+            String detail
+        ) {
+<span class="fc" id="L791">            return withoutApplication(</span>
+                status,
+<span class="fc" id="L793">                Optional.empty(),</span>
+                work,
+                detail);
+        }
+
+        private static PlanAttempt withoutApplication(
+            Status status,
+            Optional&lt;ResidualObligation&gt; obligation,
+            WorkLedger work,
+            String detail
+        ) {
+<span class="fc" id="L804">            return new PlanAttempt(</span>
+                status,
+<span class="fc" id="L806">                Optional.empty(),</span>
+                obligation,
+                work,
+                detail);
+        }
+    }
+
+    private record DivisionParts(Expr numerator, Expr denominator) {
+<span class="fc" id="L814">        private DivisionParts {</span>
+<span class="fc" id="L815">            numerator = Objects.requireNonNull(numerator, &quot;numerator&quot;);</span>
+<span class="fc" id="L816">            denominator = Objects.requireNonNull(</span>
+                denominator,
+                &quot;denominator&quot;);
+<span class="fc" id="L819">        }</span>
+    }
+
+    private record ExpectedApplication(
+        Expr leftScaledNumerator,
+        Expr rightScaledNumerator,
+        Expr commonDenominator,
+        Expr prepared,
+        Expr result
+    ) {
+<span class="fc" id="L829">        private ExpectedApplication {</span>
+<span class="fc" id="L830">            leftScaledNumerator = Objects.requireNonNull(</span>
+                leftScaledNumerator,
+                &quot;leftScaledNumerator&quot;);
+<span class="fc" id="L833">            rightScaledNumerator = Objects.requireNonNull(</span>
+                rightScaledNumerator,
+                &quot;rightScaledNumerator&quot;);
+<span class="fc" id="L836">            commonDenominator = Objects.requireNonNull(</span>
+                commonDenominator,
+                &quot;commonDenominator&quot;);
+<span class="fc" id="L839">            prepared = Objects.requireNonNull(prepared, &quot;prepared&quot;);</span>
+<span class="fc" id="L840">            result = Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L841">        }</span>
+    }
+
+<span class="fc" id="L844">    private record VerificationInput(</span>
+        BinaryExpr operation,
+        DivisionParts left,
+        DivisionParts right,
+        int inputNodes
+    ) {
+    }
+
+    private static final class NodeCounter {
+        private final int limit;
+        private int count;
+        private boolean exhausted;
+
+<span class="fc" id="L857">        private NodeCounter(int limit) {</span>
+<span class="fc" id="L858">            this.limit = limit;</span>
+<span class="fc" id="L859">        }</span>
+
+        private void visit(Expr expression) {
+<span class="fc bfc" id="L862" title="All 2 branches covered.">            if (exhausted) {</span>
+<span class="fc" id="L863">                return;</span>
+            }
+<span class="fc" id="L865">            count++;</span>
+<span class="fc bfc" id="L866" title="All 2 branches covered.">            if (count &gt; limit) {</span>
+<span class="fc" id="L867">                exhausted = true;</span>
+<span class="fc" id="L868">                return;</span>
+            }
+<span class="fc bfc" id="L870" title="All 2 branches covered.">            if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L871">                visit(binary.left());</span>
+<span class="fc" id="L872">                visit(binary.right());</span>
+<span class="fc bfc" id="L873" title="All 2 branches covered.">            } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L874" title="All 2 branches covered.">                for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L875">                    visit(argument);</span>
+<span class="fc" id="L876">                }</span>
+            }
+<span class="fc" id="L878">        }</span>
+
+        private int count() {
+<span class="fc" id="L881">            return count;</span>
+        }
+
+        private boolean exhausted() {
+<span class="fc" id="L885">            return exhausted;</span>
+        }
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L890" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L891">            throw new IllegalArgumentException(</span>
+                name + &quot; must not be blank&quot;);
+        }
+<span class="fc" id="L894">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -42,14 +42,14 @@ import java.util.Map;
         Expr root,
         Map&lt;String, Transformation&gt; candidates
     ) {
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (!(root instanceof BinaryExpr binary)</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (!(root instanceof BinaryExpr binary)</span>
 <span class="fc bfc" id="L46" title="All 2 branches covered.">            || (binary.operator() != BinaryOperator.ADD</span>
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                &amp;&amp; binary.operator() != BinaryOperator.SUB)) {</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                &amp;&amp; binary.operator() != BinaryOperator.SUB)) {</span>
 <span class="fc" id="L48">            return;</span>
         }
 <span class="fc" id="L50">        DivisionParts left = division(binary.left());</span>
 <span class="fc" id="L51">        DivisionParts right = division(binary.right());</span>
-<span class="pc bpc" id="L52" title="2 of 4 branches missed.">        if (left == null || right == null</span>
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">        if (left == null || right == null</span>
 <span class="fc bfc" id="L53" title="All 2 branches covered.">                || !same(left.denominator(), right.denominator())</span>
 <span class="fc bfc" id="L54" title="All 2 branches covered.">                || isExplicitZero(left.denominator())) {</span>
 <span class="fc" id="L55">            return;</span>
@@ -69,7 +69,7 @@ import java.util.Map;
         Expr root,
         Map&lt;String, Transformation&gt; candidates
     ) {
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (!(root instanceof BinaryExpr binary)</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (!(root instanceof BinaryExpr binary)</span>
 <span class="fc bfc" id="L73" title="All 2 branches covered.">                || binary.operator() != BinaryOperator.DIV) {</span>
 <span class="fc" id="L74">            return;</span>
         }
@@ -98,11 +98,11 @@ import java.util.Map;
 <span class="fc" id="L98">    }</span>
 
     private DivisionParts division(Expr expression) {
-<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary</span>
-<span class="pc bpc" id="L102" title="1 of 2 branches missed.">                &amp;&amp; binary.operator() == BinaryOperator.DIV) {</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                &amp;&amp; binary.operator() == BinaryOperator.DIV) {</span>
 <span class="fc" id="L103">            return new DivisionParts(binary.left(), binary.right());</span>
         }
-<span class="nc" id="L105">        return null;</span>
+<span class="fc" id="L105">        return null;</span>
     }
 
     private Expr firstCommonNonNumericFactor(List&lt;Expr&gt; left, List&lt;Expr&gt; right) {
@@ -179,7 +179,7 @@ import java.util.Map;
 <span class="fc" id="L179">        boolean removed = false;</span>
 <span class="fc" id="L180">        String targetHash = hash(target);</span>
 <span class="fc bfc" id="L181" title="All 2 branches covered.">        for (Expr factor : factors) {</span>
-<span class="pc bpc" id="L182" title="1 of 4 branches missed.">            if (!removed &amp;&amp; hash(factor).equals(targetHash)) {</span>
+<span class="fc bfc" id="L182" title="All 4 branches covered.">            if (!removed &amp;&amp; hash(factor).equals(targetHash)) {</span>
 <span class="fc" id="L183">                removed = true;</span>
 <span class="fc" id="L184">                continue;</span>
             }
@@ -193,9 +193,9 @@ import java.util.Map;
 <span class="fc" id="L193">            return new NumberExpr(1);</span>
         }
 <span class="fc" id="L195">        Expr result = factors.getFirst();</span>
-<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        for (int index = 1; index &lt; factors.size(); index++) {</span>
-<span class="nc" id="L197">            result = new BinaryExpr(</span>
-<span class="nc" id="L198">                result, BinaryOperator.MUL, factors.get(index));</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        for (int index = 1; index &lt; factors.size(); index++) {</span>
+<span class="fc" id="L197">            result = new BinaryExpr(</span>
+<span class="fc" id="L198">                result, BinaryOperator.MUL, factors.get(index));</span>
         }
 <span class="fc" id="L200">        return result;</span>
     }

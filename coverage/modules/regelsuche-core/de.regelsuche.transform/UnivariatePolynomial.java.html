@@ -107,7 +107,7 @@ final class UnivariatePolynomial {
      */
     UnivariatePolynomial divideExactly(UnivariatePolynomial divisor) {
 <span class="fc" id="L109">        Objects.requireNonNull(divisor, &quot;divisor&quot;);</span>
-<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        if (divisor.isZero() || !sameVariable(divisor)</span>
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">        if (divisor.isZero() || !sameVariable(divisor)</span>
 <span class="fc bfc" id="L111" title="All 2 branches covered.">                || divisor.degree() &gt; degree()) {</span>
 <span class="fc" id="L112">            return null;</span>
         }
