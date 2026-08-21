@@ -165,7 +165,8 @@ class RulePreparationTransformationEngineTest {
 
         RulePreparationTransformationEngine.Execution execution =
             engine.transformWithEvidence(
-                "(x^3 - 1) / (x - 1) + ((x^3 + 0) - 1) / (x - 1)");
+                "(x^3 + x^2 + x + 1) / (x + 1)"
+                    + " + (x^3 + (x^2 + (x + 1))) / (x + 1)");
 
         assertEquals(2, execution.cacheMetrics().preparedVerifications());
         assertEquals(0, execution.cacheMetrics().skippedUnverifiable());
