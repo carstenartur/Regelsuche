@@ -2,14 +2,14 @@ package de.regelsuche.benchmarks;
 
 import de.regelsuche.benchmarks.ComparativeBenchmark.CapabilityClaim;
 import de.regelsuche.benchmarks.ComparativeBenchmark.ClaimStatus;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Configuration;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Disposition;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Report;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Result;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
 import java.nio.file.Path;
-import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Writes the real #235 bundle and fails closed on overclaiming.
@@ -21,12 +21,6 @@ import java.util.Map;
  * or a claim that is stronger than its own track's retained results.</p>
  */
 public final class ComparativeBenchmarkMain {
-    private static final Map<Track, Long> EXPECTED_RESULTS =
-        new EnumMap<>(Map.of(
-            Track.TARGET_DIRECTED_SEARCH, 9L,
-            Track.EQUALITY_VALIDATION, 6L,
-            Track.SIMPLIFICATION_COMPETITION, 21L));
-
     private ComparativeBenchmarkMain() {
     }
 
@@ -40,15 +34,38 @@ public final class ComparativeBenchmarkMain {
     }
 
     static void verify(Report report) {
-        for (Map.Entry<Track, Long> expected : EXPECTED_RESULTS.entrySet()) {
-            long actual = report.results().stream()
-                .filter(result -> result.track() == expected.getKey())
+        EnumSet<Track> measuredTracks = EnumSet.noneOf(Track.class);
+        report.configurations().stream()
+            .map(Configuration::track)
+            .forEach(measuredTracks::add);
+        report.cases().forEach(benchmarkCase ->
+            measuredTracks.add(benchmarkCase.track()));
+        if (measuredTracks.isEmpty()) {
+            throw new IllegalStateException(
+                "comparative benchmark contains no measured track");
+        }
+
+        for (Track track : measuredTracks) {
+            long configurations = report.configurations().stream()
+                .filter(configuration -> configuration.track() == track)
                 .count();
-            if (actual != expected.getValue()) {
+            long cases = report.cases().stream()
+                .filter(benchmarkCase -> benchmarkCase.track() == track)
+                .count();
+            if (configurations == 0L || cases == 0L) {
                 throw new IllegalStateException(
-                    "unexpected comparative result count for "
-                        + expected.getKey() + ": expected "
-                        + expected.getValue() + ", found " + actual);
+                    "incomplete comparative track definition for " + track
+                        + ": configurations=" + configurations
+                        + ", cases=" + cases);
+            }
+            long expected = Math.multiplyExact(configurations, cases);
+            long actual = report.results().stream()
+                .filter(result -> result.track() == track)
+                .count();
+            if (actual != expected) {
+                throw new IllegalStateException(
+                    "incomplete comparative result matrix for " + track
+                        + ": expected " + expected + ", found " + actual);
             }
         }
 
@@ -84,7 +101,7 @@ public final class ComparativeBenchmarkMain {
             }
         }
 
-        for (Track track : EXPECTED_RESULTS.keySet()) {
+        for (Track track : measuredTracks) {
             if (report.claims().stream()
                     .noneMatch(claim -> claim.track() == track)) {
                 throw new IllegalStateException(

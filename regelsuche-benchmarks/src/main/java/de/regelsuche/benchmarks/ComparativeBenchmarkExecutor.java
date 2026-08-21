@@ -108,8 +108,9 @@ final class ComparativeBenchmarkExecutor {
      * <p>Every competitor emits exactly one expression. The internal search
      * explores a state set, but selects its output without access to the pinned
      * reference: minimum {@link ExpressionScorer} total, then normalized
-     * expression text, then depth. SymPy returns its native single
-     * {@code simplify} output. The shared judge is applied only afterwards.</p>
+     * expression text, then depth. Each external SymPy configuration applies
+     * exactly its one declared native operation and returns that single output.
+     * The shared judge is applied only afterwards.</p>
      */
     Result runSimplification(
         SimplificationSystem system,
