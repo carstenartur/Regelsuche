@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
@@ -67,6 +68,25 @@ class MonomialCommonFactorPreparationSolverTest {
         assertEquals(status("BUDGET_INCONCLUSIVE"), limited.status());
         assertEquals(1, limited.work().inspectedFactors());
         assertEquals(0, limited.work().remainingFactorBudget());
+    }
+
+    @Test
+    void rejectsAmbiguousAndOutOfRangeDoubleIntegerCoefficients() {
+        var limits = new ExactPositiveMonomial.Limits(
+            1,
+            1,
+            ExactPositiveMonomial.MAX_EXACT_DOUBLE_INTEGER);
+        var unsafe = new ExactPositiveMonomial.Parser(limits).parse(
+            new NumberExpr((double) (1L << 53)));
+        assertEquals(
+            ExactPositiveMonomial.ParseStatus.UNSUPPORTED,
+            unsafe.status());
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new ExactPositiveMonomial.Limits(
+                1,
+                1,
+                ExactPositiveMonomial.MAX_EXACT_DOUBLE_INTEGER + 1));
     }
 
     @Test
