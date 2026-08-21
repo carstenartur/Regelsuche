@@ -98,6 +98,22 @@ final class UnivariatePolynomial {
         return isConstant() && coefficients[0].signum() == 0;
     }
 
+    /** Exact value comparison for independently checking retained witnesses. */
+    boolean sameValue(UnivariatePolynomial other) {
+        return other != null
+            && sameVariable(other)
+            && Arrays.equals(coefficients, other.coefficients);
+    }
+
+    /**
+     * Exact multiplication exposed package-locally for certificate checking.
+     * Proposal code uses long division; certificate verification uses this
+     * independent multiplication path.
+     */
+    UnivariatePolynomial multiplyExact(UnivariatePolynomial other) {
+        return other == null ? null : multiply(other);
+    }
+
     /**
      * Exact division without remainder.
      *
