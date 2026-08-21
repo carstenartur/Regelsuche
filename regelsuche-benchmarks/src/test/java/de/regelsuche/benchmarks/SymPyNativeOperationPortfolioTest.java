@@ -1,11 +1,16 @@
 package de.regelsuche.benchmarks;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.benchmarks.ComparativeBenchmark.Case;
+import de.regelsuche.benchmarks.ComparativeBenchmark.ExpectedVerdict;
 import de.regelsuche.benchmarks.ComparativeBenchmark.SystemKind;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SimplificationSystem;
 import java.util.List;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 class SymPyNativeOperationPortfolioTest {
@@ -70,5 +75,37 @@ class SymPyNativeOperationPortfolioTest {
                 .backendId());
         assertTrue(ExternalSymPySimplificationBaseline.SIMPLIFY_SCRIPT
             .contains("sympy.simplify(a)"));
+        assertTrue(ExternalSymPySimplificationBaseline.SIMPLIFY_SCRIPT
+            .contains("except NotImplementedError"));
+    }
+
+    @Test
+    void multivariateApartNotApplicableRemainsAnExecutedOutput() {
+        ExternalSymPySimplificationBaseline apart =
+            ExternalSymPySimplificationBaseline.detectSystemSymPy(
+                ExternalSymPySimplificationBaseline.Operation.APART);
+        Assumptions.assumeTrue(
+            apart.available(),
+            "SymPy is required for native-operation characterization");
+        Case benchmarkCase = Case.create(
+            "apart-multivariate-not-applicable",
+            Track.SIMPLIFICATION_COMPETITION,
+            "multivariate-rational",
+            "(a + b) * (a + b)",
+            "(a + b) ^ 2",
+            List.of(),
+            ExpectedVerdict.TARGET_REACHED);
+
+        ExternalSymPySimplificationBaseline.Simplification result =
+            apart.simplify(
+                benchmarkCase.inputExpression(),
+                SimplificationAssumptionContract.forCase(benchmarkCase));
+
+        assertEquals(
+            ExternalSymPySimplificationBaseline.Outcome.PRODUCED,
+            result.outcome());
+        assertFalse(result.producedExpression().isBlank());
+        assertTrue(result.issues().contains(
+            "NATIVE_OPERATION_NOT_APPLICABLE_RETURNS_INPUT"));
     }
 }
