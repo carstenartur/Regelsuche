@@ -24,7 +24,7 @@ EXPECTED_SCORE_POLICY = "NO_UNIVERSAL_SCORE_TRACK_SCOPED_CLAIMS_ONLY"
 EXPECTED_CONFIGURATION_COUNTS = {
     "TARGET_DIRECTED_SEARCH": 3,
     "EQUALITY_VALIDATION": 3,
-    "SIMPLIFICATION_COMPETITION": 3,
+    "SIMPLIFICATION_COMPETITION": 8,
 }
 EXPECTED_CASE_COUNTS = {
     "TARGET_DIRECTED_SEARCH": 3,
@@ -52,6 +52,11 @@ EXPECTED_SIMPLIFICATION_BACKENDS = {
     "regelsuche-untargeted-best-first",
     "randomized-valid-rewrite-control",
     "sympy-cas-simplifier",
+    "sympy-cas-factor",
+    "sympy-cas-cancel",
+    "sympy-cas-together",
+    "sympy-cas-apart",
+    "sympy-cas-trigsimp",
 }
 EXPECTED_COVERAGE_GAPS = {
     "SIMPLIFICATION_COMPETITION",
