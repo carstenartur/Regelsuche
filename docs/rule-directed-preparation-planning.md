@@ -92,7 +92,49 @@ The planner distinguishes:
 - `BUDGET_INCONCLUSIVE`.
 
 Unsupported multivariate input, a non-exact quotient, an explicit zero divisor
-or exhausted solver work never produces a guessed candidate.
+or exhausted solver work never produces a guessed candidate. A prepared
+application that fails independent verification is skipped while direct
+results and other AST positions remain available.
+
+## Invocation-local memoization
+
+One transformation invocation may contain the same subtree at several AST
+positions. Repeating the same residual solver call at each occurrence adds no
+mathematical information. `RulePreparationTransformationEngine` therefore
+maintains a bounded deterministic cache for the duration of one
+`transformWithEvidence` call.
+
+Each key binds:
+
+- planner revision;
+- principal rule ID;
+- canonical subtree hash;
+- normalized assumption fingerprint;
+- deterministic rule-inventory fingerprint;
+- preparation-budget identity.
+
+The standard rule-list constructor uses `RuleInventoryFingerprint`, so changes
+to rule implementations, patterns, recognition profiles, descriptors or pack
+metadata invalidate the cache identity. Callers that inject a custom direct
+engine must provide or accept an explicit ID-only inventory hash.
+
+Insertion order and oldest-entry eviction are deterministic. Cache capacity is
+configurable and may be set to zero for an exact no-cache ablation.
+`BUDGET_INCONCLUSIVE` results are never retained: a budget-limited non-result
+must not become a semantic negative fact.
+
+`transformWithEvidence` returns balanced cache metrics:
+
+```text
+lookups = hits + misses
+retained entries
+oldest-entry evictions
+skipped budget-inconclusive results
+```
+
+The cache is intentionally invocation-local. It cannot leak candidates between
+experiments with different assumptions, inventories or configuration
+identities, and it requires no invalidation protocol beyond the retained key.
 
 ## Current limits
 
