@@ -1,0 +1,701 @@
+name: Patch native SymPy operation baselines
+
+on:
+  push:
+    branches:
+      - agent/sympy-native-operation-baselines
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: agent/sympy-native-operation-baselines
+          fetch-depth: 0
+      - name: Split native SymPy operations into separate configurations
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              source = path.read_text(encoding="utf-8")
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one replacement, found {count}")
+              path.write_text(source.replace(old, new), encoding="utf-8")
+
+          baseline = Path("regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ExternalSymPySimplificationBaseline.java")
+          baseline.write_text(r'''package de.regelsuche.benchmarks;
+
+import de.regelsuche.solver.ir.SolverIr;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * External SymPy baseline in the competing-simplifier role.
+ *
+ * <p>This adapter is deliberately different from
+ * {@link ExternalSymPySolverBackend}. The solver backend is a validator: it
+ * receives both sides of a statement and decides equality. This adapter
+ * receives the input expression only and applies exactly one declared native
+ * SymPy operation, like the untargeted Regelsuche search it is compared
+ * against. Neither competitor sees the reference form.</p>
+ *
+ * <p>Each native operation is a separate configuration with its own backend
+ * identity and content hash. This prevents an opaque CAS pipeline from choosing
+ * among simplify, factor, cancel, together, apart or trigsimp after seeing a
+ * case result.</p>
+ *
+ * <p>The produced expression is rendered in Regelsuche surface syntax so that a
+ * single shared judge can canonicalize all competitors' outputs. Rendering is
+ * a printing concern only; it never changes the native operation result.</p>
+ *
+ * <p>The declared case assumptions travel through the same
+ * {@link SimplificationAssumptionContract} as for every other competitor.
+ * Symbol-scoped declarations are bound as SymPy symbol assumptions before
+ * parsing, which is the mechanism SymPy's own operations consult. A declaration
+ * whose subject is a composite expression has no symbol to bind to and is
+ * therefore passed but unused; that residue remains an explicit limitation.</p>
+ */
+final class ExternalSymPySimplificationBaseline {
+    private static final String SCRIPT_PREFIX =
+        "import sys,sympy\n"
+            + "from sympy.parsing.sympy_parser import parse_expr,"
+            + "standard_transformations,convert_xor\n"
+            + "t=standard_transformations+(convert_xor,)\n"
+            + "d={}\n"
+            + "for a in sys.argv[2:]:\n"
+            + "    s,_,k=a.rpartition('|')\n"
+            + "    if not s.isidentifier() or not k:\n"
+            + "        continue\n"
+            + "    d[s]=sympy.Symbol(s,**{k:True})\n"
+            + "a=parse_expr(sys.argv[1],transformations=t,evaluate=False,"
+            + "local_dict=d)\n";
+    static final String SIMPLIFY_SCRIPT = script(Operation.SIMPLIFY);
+
+    private final String backendId;
+    private final Operation operation;
+    private final String backendVersion;
+    private final String python;
+    private final Duration timeout;
+    private final boolean available;
+    private final String detail;
+    private final String script;
+    private final String configurationHash;
+
+    private ExternalSymPySimplificationBaseline(
+        Operation operation,
+        String backendVersion,
+        String python,
+        Duration timeout,
+        boolean available,
+        String detail
+    ) {
+        this.operation = Objects.requireNonNull(operation, "operation");
+        this.backendId = operation.backendId();
+        if (backendVersion == null || backendVersion.isBlank()) {
+            throw new IllegalArgumentException("backendVersion must not be blank");
+        }
+        if (python == null || python.isBlank()) {
+            throw new IllegalArgumentException("python must not be blank");
+        }
+        this.backendVersion = backendVersion.trim();
+        this.python = python;
+        this.timeout = Objects.requireNonNull(timeout, "timeout");
+        this.available = available;
+        this.detail = detail == null ? "" : detail;
+        this.script = script(operation);
+        // The interpreter path is runtime placement, not semantic
+        // configuration. Evidence must stay stable when the same SymPy
+        // revision runs from a different absolute path.
+        this.configurationHash = SolverIr.sha256(
+            "timeoutMillis=" + Math.max(100L, timeout.toMillis())
+                + "\nrole=TARGET_FREE_SIMPLIFICATION"
+                + "\noperation=" + operation.functionName()
+                + "\nassumptionContract="
+                    + SimplificationAssumptionContract.CONTRACT_ID
+                + "\nscript=" + script);
+    }
+
+    String backendId() {
+        return backendId;
+    }
+
+    Operation operation() {
+        return operation;
+    }
+
+    String backendVersion() {
+        return backendVersion;
+    }
+
+    boolean available() {
+        return available;
+    }
+
+    String detail() {
+        return detail;
+    }
+
+    String configurationHash() {
+        return configurationHash;
+    }
+
+    String environmentIdentity() {
+        return "sympy=" + backendVersion
+            + "\nrole=target-free-simplifier"
+            + "\noperation=" + operation.functionName();
+    }
+
+    /**
+     * Applies the configured operation without any knowledge of a target.
+     *
+     * @param inputExpression the only expression handed to the baseline
+     * @param contract the declared case assumptions, injected identically for
+     *     every configured competitor
+     * @return the produced operation outcome, never {@code null}
+     */
+    Simplification simplify(
+        String inputExpression,
+        SimplificationAssumptionContract contract
+    ) {
+        Objects.requireNonNull(inputExpression, "inputExpression");
+        Objects.requireNonNull(contract, "contract");
+        if (!available) {
+            return new Simplification(
+                Outcome.UNAVAILABLE, "", List.of("BACKEND_UNAVAILABLE"));
+        }
+        List<String> command = new ArrayList<>(
+            List.of(python, "-c", script, inputExpression));
+        List<String> unbound = new ArrayList<>();
+        for (SimplificationAssumptionContract.Declaration declaration
+                : contract.declarations()) {
+            if (declaration.symbolScoped()) {
+                command.add(declaration.subject() + '|'
+                    + declaration.kind().externalAssumptionName());
+            } else {
+                unbound.add(declaration.canonicalText());
+            }
+        }
+        ExternalCommand.Output output = ExternalCommand.run(command, timeout);
+        if (!output.available()) {
+            return new Simplification(
+                Outcome.ERROR, "", List.of("EXTERNAL_PROCESS_UNAVAILABLE"));
+        }
+        if (output.timedOut()) {
+            return new Simplification(
+                Outcome.TIMEOUT, "", List.of("EXTERNAL_PROCESS_TIMEOUT"));
+        }
+        if (output.exitCode() != 0) {
+            return new Simplification(
+                Outcome.ERROR, "", List.of("EXTERNAL_PROCESS_FAILED"));
+        }
+        String produced = output.stdout().lines()
+            .map(String::trim)
+            .filter(line -> !line.isBlank())
+            .reduce((first, second) -> second)
+            .orElse("");
+        if (produced.isEmpty()) {
+            return new Simplification(
+                Outcome.ERROR, "", List.of("EMPTY_EXTERNAL_OUTPUT"));
+        }
+        return new Simplification(
+            Outcome.PRODUCED,
+            produced,
+            unbound.isEmpty()
+                ? List.of()
+                : List.of(
+                    "COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS"));
+    }
+
+    static ExternalSymPySimplificationBaseline detectSystemSymPy() {
+        return detectSystemSymPy(Operation.SIMPLIFY);
+    }
+
+    static ExternalSymPySimplificationBaseline detectSystemSymPy(
+        Operation operation
+    ) {
+        RuntimeDetection detection = detectRuntime();
+        return create(operation, detection);
+    }
+
+    static List<ExternalSymPySimplificationBaseline>
+            detectSystemSymPyOperations() {
+        RuntimeDetection detection = detectRuntime();
+        return Arrays.stream(Operation.values())
+            .map(operation -> create(operation, detection))
+            .toList();
+    }
+
+    private static ExternalSymPySimplificationBaseline create(
+        Operation operation,
+        RuntimeDetection detection
+    ) {
+        return new ExternalSymPySimplificationBaseline(
+            operation,
+            detection.version(),
+            detection.python(),
+            Duration.ofSeconds(20),
+            detection.available(),
+            detection.detail());
+    }
+
+    private static RuntimeDetection detectRuntime() {
+        String python = System.getenv().getOrDefault(
+            "REGELSUCHE_SYMPY_PYTHON", "python3");
+        ExternalCommand.Output output = ExternalCommand.run(
+            List.of(python, "-c", "import sympy; print(sympy.__version__)"),
+            Duration.ofSeconds(5));
+        if (!output.available() || output.timedOut() || output.exitCode() != 0) {
+            return new RuntimeDetection(
+                "unavailable",
+                python,
+                false,
+                normalize(output.stdout() + " " + output.stderr()));
+        }
+        String version = normalize(output.stdout());
+        return new RuntimeDetection(
+            version.isBlank() ? "system" : version,
+            python,
+            true,
+            version);
+    }
+
+    private static String script(Operation operation) {
+        return SCRIPT_PREFIX
+            + "print(str(sympy." + operation.functionName()
+            + "(a)).replace('**','^'))\n";
+    }
+
+    private static String normalize(String value) {
+        return value == null ? "" : value.trim().replaceAll("\\s+", " ");
+    }
+
+    enum Operation {
+        SIMPLIFY("simplify", "sympy-cas-simplifier"),
+        FACTOR("factor", "sympy-cas-factor"),
+        CANCEL("cancel", "sympy-cas-cancel"),
+        TOGETHER("together", "sympy-cas-together"),
+        APART("apart", "sympy-cas-apart"),
+        TRIGSIMPLIFY("trigsimp", "sympy-cas-trigsimp");
+
+        private final String functionName;
+        private final String backendId;
+
+        Operation(String functionName, String backendId) {
+            this.functionName = functionName;
+            this.backendId = backendId;
+        }
+
+        String functionName() {
+            return functionName;
+        }
+
+        String backendId() {
+            return backendId;
+        }
+
+        String limitationId() {
+            return "EXTERNAL_CAS_NATIVE_OPERATION_" + name();
+        }
+    }
+
+    private record RuntimeDetection(
+        String version,
+        String python,
+        boolean available,
+        String detail
+    ) {
+    }
+
+    enum Outcome {
+        PRODUCED,
+        UNAVAILABLE,
+        TIMEOUT,
+        ERROR
+    }
+
+    record Simplification(
+        Outcome outcome,
+        String producedExpression,
+        List<String> issues
+    ) {
+        Simplification {
+            Objects.requireNonNull(outcome, "outcome");
+            producedExpression = producedExpression == null
+                ? "" : producedExpression.trim();
+            issues = issues == null ? List.of() : issues.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .distinct()
+                .sorted()
+                .toList();
+        }
+    }
+}
+''', encoding="utf-8")
+
+          runner = Path("regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ComparativeBenchmarkRunner.java")
+          replace_once(
+              runner,
+              '    public static final String SUITE_ID =\n        "comparative-baselines-initial/v2";',
+              '    public static final String SUITE_ID =\n        "comparative-baselines-initial/v3";')
+          replace_once(
+              runner,
+              '''        ExternalSymPySimplificationBaseline simplifier =
+            ExternalSymPySimplificationBaseline.detectSystemSymPy();
+        List<SimplificationSystem> simplification = List.of(
+            SimplificationSystem.internal(
+                "regelsuche-untargeted-best-first",
+                "1",
+                new BestFirstSearchStrategy(),
+                List.of(
+                    "INTERNAL_REGELSUCHE_SEARCH",
+                    "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                    "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
+                        + SimplificationAssumptionContract.CONTRACT_ID)),
+            SimplificationSystem.internalControl(
+                "randomized-valid-rewrite-control",
+                "1",
+                new DeterministicRandomValidRewriteStrategy(),
+                List.of(
+                    "INTERNAL_RANDOMIZED_CONTROL",
+                    "FIXED_SEED_BOUND_IN_CONFIGURATION_IDENTITY",
+                    "PER_CASE_RANDOM_STATE_RESET",
+                    "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                    "SAME_REWRITE_INVENTORY_AND_SEARCH_BUDGET_AS_REGELSUCHE",
+                    "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
+                        + SimplificationAssumptionContract.CONTRACT_ID,
+                    "CONTROL_IS_NOT_AN_EXTERNAL_SYMBOLIC_SYSTEM")),
+            SimplificationSystem.external(
+                simplifier,
+                simplifier.available()
+                    ? List.of(
+                        "EXTERNAL_CAS_NATIVE_SIMPLIFIER",
+                        "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                        "DECLARED_ASSUMPTIONS_PASSED_VIA_"
+                            + SimplificationAssumptionContract.CONTRACT_ID,
+                        "COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS",
+                        "INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION_NOT_YET_AVAILABLE",
+                        "SIMPLIFICATION_IS_NOT_DISCOVERY_OR_FORMAL_PROOF")
+                    : List.of(
+                        "BACKEND_UNAVAILABLE",
+                        simplifier.detail())));
+        return new ComparativeBenchmarkRunner(
+            search, validation, simplification);
+    }
+''',
+              '''        return new ComparativeBenchmarkRunner(
+            search, validation, defaultSimplificationSystems());
+    }
+
+    static List<SimplificationSystem> defaultSimplificationSystems() {
+        List<SimplificationSystem> systems = new ArrayList<>();
+        systems.add(SimplificationSystem.internal(
+            "regelsuche-untargeted-best-first",
+            "1",
+            new BestFirstSearchStrategy(),
+            List.of(
+                "INTERNAL_REGELSUCHE_SEARCH",
+                "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
+                    + SimplificationAssumptionContract.CONTRACT_ID)));
+        systems.add(SimplificationSystem.internalControl(
+            "randomized-valid-rewrite-control",
+            "1",
+            new DeterministicRandomValidRewriteStrategy(),
+            List.of(
+                "INTERNAL_RANDOMIZED_CONTROL",
+                "FIXED_SEED_BOUND_IN_CONFIGURATION_IDENTITY",
+                "PER_CASE_RANDOM_STATE_RESET",
+                "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                "SAME_REWRITE_INVENTORY_AND_SEARCH_BUDGET_AS_REGELSUCHE",
+                "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
+                    + SimplificationAssumptionContract.CONTRACT_ID,
+                "CONTROL_IS_NOT_AN_EXTERNAL_SYMBOLIC_SYSTEM")));
+        for (ExternalSymPySimplificationBaseline simplifier
+                : ExternalSymPySimplificationBaseline
+                    .detectSystemSymPyOperations()) {
+            systems.add(SimplificationSystem.external(
+                simplifier,
+                simplifier.available()
+                    ? List.of(
+                        "EXTERNAL_CAS_NATIVE_SIMPLIFIER",
+                        simplifier.operation().limitationId(),
+                        "ONE_NAMED_CAS_OPERATION_PER_CONFIGURATION",
+                        "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                        "DECLARED_ASSUMPTIONS_PASSED_VIA_"
+                            + SimplificationAssumptionContract.CONTRACT_ID,
+                        "COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS",
+                        "INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION_NOT_YET_AVAILABLE",
+                        "SIMPLIFICATION_IS_NOT_DISCOVERY_OR_FORMAL_PROOF")
+                    : List.of(
+                        "BACKEND_UNAVAILABLE",
+                        simplifier.operation().limitationId(),
+                        simplifier.detail())));
+        }
+        return List.copyOf(systems);
+    }
+''')
+
+          main = Path("regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ComparativeBenchmarkMain.java")
+          main.write_text(r'''package de.regelsuche.benchmarks;
+
+import de.regelsuche.benchmarks.ComparativeBenchmark.CapabilityClaim;
+import de.regelsuche.benchmarks.ComparativeBenchmark.ClaimStatus;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Disposition;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Report;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Result;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
+import java.nio.file.Path;
+import java.util.List;
+
+/**
+ * Writes the real #235 bundle and fails closed on overclaiming.
+ *
+ * <p>The gate deliberately does <em>not</em> require every configured system to
+ * win. A comparative benchmark that can only be published when the local system
+ * succeeds everywhere cannot produce information about competing systems. What
+ * must not happen is an incomplete toolchain silently replacing prior evidence,
+ * or a claim that is stronger than its own track's retained results.</p>
+ */
+public final class ComparativeBenchmarkMain {
+    private ComparativeBenchmarkMain() {
+    }
+
+    public static void main(String[] args) {
+        Path output = args.length == 0
+            ? Path.of("build", "reports", "comparative-benchmarks")
+            : Path.of(args[0]);
+        Report report = ComparativeBenchmarkRunner.system().run();
+        new ComparativeBenchmarkBundleWriter().write(output, report);
+        verify(report);
+    }
+
+    static void verify(Report report) {
+        List<Track> measuredTracks = report.configurations().stream()
+            .map(ComparativeBenchmark.Configuration::track)
+            .distinct()
+            .sorted()
+            .toList();
+        for (Track track : measuredTracks) {
+            long configurations = report.configurations().stream()
+                .filter(configuration -> configuration.track() == track)
+                .count();
+            long cases = report.cases().stream()
+                .filter(benchmarkCase -> benchmarkCase.track() == track)
+                .count();
+            long expected = Math.multiplyExact(configurations, cases);
+            long actual = report.results().stream()
+                .filter(result -> result.track() == track)
+                .count();
+            if (actual != expected) {
+                throw new IllegalStateException(
+                    "incomplete comparative result matrix for " + track
+                        + ": expected " + expected + ", found " + actual);
+            }
+        }
+
+        // An unavailable, timed-out or crashed system means the evidence was
+        // not produced at all. That must never replace a prior complete bundle.
+        List<Result> notExecuted = report.results().stream()
+            .filter(result -> result.disposition() != Disposition.EXECUTED)
+            .toList();
+        if (!notExecuted.isEmpty()) {
+            throw new IllegalStateException(
+                "comparative benchmark did not execute every configured system: "
+                    + report.toCanonicalJson());
+        }
+
+        // Retained incorrect results are legitimate evidence, but they must be
+        // reflected in the claim of their own track.
+        for (CapabilityClaim claim : report.claims()) {
+            List<Result> trackResults = report.results().stream()
+                .filter(result -> result.track() == claim.track())
+                .toList();
+            if (trackResults.isEmpty()) {
+                throw new IllegalStateException(
+                    "comparative claim without track evidence: " + claim.id());
+            }
+            ClaimStatus derived = trackResults.stream().allMatch(Result::correct)
+                ? ClaimStatus.SUPPORTED
+                : ClaimStatus.NEGATIVE;
+            if (claim.status() != derived) {
+                throw new IllegalStateException(
+                    "comparative claim status is not derived from its own track: "
+                        + claim.id() + " declares " + claim.status()
+                        + " but its results imply " + derived);
+            }
+        }
+
+        for (Track track : measuredTracks) {
+            if (report.claims().stream()
+                    .noneMatch(claim -> claim.track() == track)) {
+                throw new IllegalStateException(
+                    "comparative track without a retained claim: " + track);
+            }
+        }
+    }
+}
+''', encoding="utf-8")
+
+          catalog = Path("regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ComparativeBenchmarkCatalog.java")
+          source = catalog.read_text(encoding="utf-8")
+          if source.count("target-free-simplification/v1") != 2:
+              raise SystemExit("unexpected target-free simplification identity count")
+          source = source.replace(
+              "target-free-simplification/v1",
+              "target-free-simplification/v2")
+          old_inventory = '''                "regelsuche-inventory=" + searchInventoryHash()
+                    + "\\nexternal-inventory=CAS_NATIVE_SIMPLIFIER"),'''
+          new_inventory = '''                "regelsuche-inventory=" + searchInventoryHash()
+                    + "\\nexternal-inventory=SYMPY_NATIVE_OPERATIONS_"
+                    + "[simplify,factor,cancel,together,apart,trigsimp]"),'''
+          if source.count(old_inventory) != 1:
+              raise SystemExit("unexpected external inventory block")
+          source = source.replace(old_inventory, new_inventory)
+          old_gap = "The target-free simplification corpus is small and single-domain; equality saturation and an independent assumption-aware output validator remain unmeasured. A deterministic seeded randomized-valid rewrite control is now retained."
+          new_gap = "The target-free simplification corpus is small and single-domain; equality saturation and an independent assumption-aware output validator remain unmeasured. Separate native SymPy simplify/factor/cancel/together/apart/trigsimp configurations and a deterministic seeded randomized-valid rewrite control are retained."
+          if source.count(old_gap) != 1:
+              raise SystemExit("unexpected simplification coverage-gap text")
+          catalog.write_text(source.replace(old_gap, new_gap), encoding="utf-8")
+
+          docs = Path("docs/discovery-benchmarks.md")
+          source = docs.read_text(encoding="utf-8")
+          source = source.replace(
+              "`comparative-baselines-initial/v2`",
+              "`comparative-baselines-initial/v3`")
+          old_configs = '''The equality-validation track uses external systems as validators: they receive both sides of a statement and decide equality. That role cannot show how Regelsuche compares as a rewriting system. The `SIMPLIFICATION_COMPETITION` track therefore executes three target-free configurations:
+
+1. Regelsuche untargeted best-first search over the default rewrite inventory, through `SearchProblem.withoutTarget()`;
+2. a deterministic seeded randomized-valid rewrite control over the same production inventory and search budget;
+3. external SymPy in its native `simplify` role, pinned in the same verification environment.
+
+Neither configuration receives the pinned reference form. The parity manifest `target-free-simplification/v1` therefore sets `targetVisible=false` and `hiddenReferenceVisible=false`.
+
+Each configuration contributes exactly one output. SymPy contributes its native `simplify` result. Both internal configurations select one state from their target-free search using the same fixed policy that is part of the configuration hash: lowest `ExpressionScorer` total, then normalized expression text, then search depth. A reference-shaped state that was merely visited but not selected does not count as a hit.
+
+Both selected outputs are compared by the same surface judge, `ExpressionCanonicalizer`.'''
+          new_configs = '''The equality-validation track uses external systems as validators: they receive both sides of a statement and decide equality. That role cannot show how Regelsuche compares as a rewriting system. The `SIMPLIFICATION_COMPETITION` track therefore executes eight target-free configurations:
+
+1. Regelsuche untargeted best-first search over the default rewrite inventory, through `SearchProblem.withoutTarget()`;
+2. a deterministic seeded randomized-valid rewrite control over the same production inventory and search budget;
+3. external SymPy `simplify`;
+4. external SymPy `factor`;
+5. external SymPy `cancel`;
+6. external SymPy `together`;
+7. external SymPy `apart`;
+8. external SymPy `trigsimp`.
+
+No configuration receives the pinned reference form. The parity manifest `target-free-simplification/v2` therefore sets `targetVisible=false` and `hiddenReferenceVisible=false`.
+
+Each configuration contributes exactly one output. Every SymPy configuration applies exactly one named native operation; there is no opaque operation-selection pipeline. Both internal configurations select one state from their target-free search using the same fixed policy that is part of the configuration hash: lowest `ExpressionScorer` total, then normalized expression text, then search depth. A reference-shaped state that was merely visited but not selected does not count as a hit.
+
+All selected outputs are compared by the same surface judge, `ExpressionCanonicalizer`.'''
+          if source.count(old_configs) != 1:
+              raise SystemExit("unexpected documentation configuration block")
+          source = source.replace(old_configs, new_configs)
+          old_outcome = "The randomized control’s seven per-case results are retained beside the primary configurations in the canonical bundle rather than manually copied into this prose."
+          new_outcome = old_outcome + " The five additional named SymPy operation configurations are retained as diagnostic external baselines; they do not rewrite or replace the primary Regelsuche-versus-`simplify` outcome."
+          if source.count(old_outcome) != 1:
+              raise SystemExit("unexpected retained outcome paragraph")
+          docs.write_text(source.replace(old_outcome, new_outcome), encoding="utf-8")
+
+          test = Path("regelsuche-benchmarks/src/test/java/de/regelsuche/benchmarks/SymPyNativeOperationPortfolioTest.java")
+          test.write_text(r'''package de.regelsuche.benchmarks;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import de.regelsuche.benchmarks.ComparativeBenchmark.SystemKind;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SimplificationSystem;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class SymPyNativeOperationPortfolioTest {
+    private static final List<String> EXPECTED_BACKEND_IDS = List.of(
+        "sympy-cas-apart",
+        "sympy-cas-cancel",
+        "sympy-cas-factor",
+        "sympy-cas-simplifier",
+        "sympy-cas-together",
+        "sympy-cas-trigsimp");
+
+    @Test
+    void defaultPortfolioKeepsEveryNativeOperationSeparate() {
+        List<SimplificationSystem> systems =
+            ComparativeBenchmarkRunner.defaultSimplificationSystems();
+
+        assertEquals(8, systems.size());
+        List<SimplificationSystem> external = systems.stream()
+            .filter(system -> system.kind() == SystemKind.EXTERNAL_BASELINE)
+            .toList();
+        assertEquals(6, external.size());
+        assertEquals(EXPECTED_BACKEND_IDS, external.stream()
+            .map(SimplificationSystem::id)
+            .sorted()
+            .toList());
+        assertEquals(6L, external.stream()
+            .map(SimplificationSystem::implementationIdentity)
+            .distinct()
+            .count());
+        assertEquals(6L, external.stream()
+            .map(SimplificationSystem::environmentIdentity)
+            .distinct()
+            .count());
+        assertTrue(external.stream().allMatch(system ->
+            system.limitations().contains(
+                "ONE_NAMED_CAS_OPERATION_PER_CONFIGURATION")
+                || !system.available()));
+    }
+
+    @Test
+    void operationIdentityIsBoundIntoEveryConfigurationHash() {
+        List<ExternalSymPySimplificationBaseline> baselines =
+            ExternalSymPySimplificationBaseline
+                .detectSystemSymPyOperations();
+
+        assertEquals(
+            List.of(ExternalSymPySimplificationBaseline.Operation.values()),
+            baselines.stream()
+                .map(ExternalSymPySimplificationBaseline::operation)
+                .toList());
+        assertEquals(EXPECTED_BACKEND_IDS, baselines.stream()
+            .map(ExternalSymPySimplificationBaseline::backendId)
+            .sorted()
+            .toList());
+        assertEquals(6L, baselines.stream()
+            .map(ExternalSymPySimplificationBaseline::configurationHash)
+            .distinct()
+            .count());
+        assertEquals(
+            "sympy-cas-simplifier",
+            ExternalSymPySimplificationBaseline.detectSystemSymPy()
+                .backendId());
+        assertTrue(ExternalSymPySimplificationBaseline.SIMPLIFY_SCRIPT
+            .contains("sympy.simplify(a)"));
+    }
+}
+''', encoding="utf-8")
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            docs/discovery-benchmarks.md \
+            regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ComparativeBenchmarkCatalog.java \
+            regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ComparativeBenchmarkMain.java \
+            regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ComparativeBenchmarkRunner.java \
+            regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ExternalSymPySimplificationBaseline.java \
+            regelsuche-benchmarks/src/test/java/de/regelsuche/benchmarks/SymPyNativeOperationPortfolioTest.java
+          git commit -m 'Split native SymPy operations into fair baselines'
+          git push origin HEAD:agent/sympy-native-operation-baselines
