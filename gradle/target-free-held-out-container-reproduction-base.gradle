@@ -1,0 +1,278 @@
+/*
+ * Exact host-repeat and digest-pinned container reproduction for the
+ * target-free held-out 6 x 4 x 6 matrix.
+ *
+ * The evaluated container run is offline and has networking disabled. The
+ * image build may resolve versioned Gradle dependencies, but the mathematical
+ * run receives only the frozen repository revision and writes the same three
+ * canonical artifacts as the checkout JVM runs.
+ */
+
+def repositoryRoot = rootProject.layout.projectDirectory
+def reportRoot = rootProject.layout.buildDirectory.dir(
+    'reports/target-free-held-out-container-reproduction')
+def hostRunA = reportRoot.map { directory ->
+    directory.dir('host-a').asFile
+}
+def hostRunB = reportRoot.map { directory ->
+    directory.dir('host-b').asFile
+}
+def containerRun = reportRoot.map { directory ->
+    directory.dir('container').asFile
+}
+def imageIdFile = reportRoot.map { directory ->
+    directory.file('container-image-id.txt').asFile
+}
+def reproductionManifest = reportRoot.map { directory ->
+    directory.file('reproduction-manifest.json').asFile
+}
+def dockerfile = repositoryRoot.file(
+    'Dockerfile.target-free-held-out-reproduction')
+def verifierSchema = repositoryRoot.file(
+    'docs/schemas/'
+        + 'regelsuche-target-free-held-out-container-reproduction-v1.schema.json')
+def wrapperProperties = repositoryRoot.file(
+    'gradle/wrapper/gradle-wrapper.properties')
+def containerImage =
+    'regelsuche-target-free-held-out-reproduction:verification'
+def containerPlatform = 'linux/amd64'
+def expectedArtifactNames = [
+    'target-free-held-out-candidate-freeze.json',
+    'target-free-held-out-plan.json',
+    'target-free-held-out-post-freeze-qualification.json'
+]
+
+def checkoutGitStatus = providers.exec {
+    workingDir repositoryRoot.asFile
+    commandLine 'git', 'status', '--porcelain', '--untracked-files=normal'
+}.standardOutput.asText.map { value -> value.trim() }
+def checkoutHeadRevision = providers.exec {
+    workingDir repositoryRoot.asFile
+    commandLine 'git', 'rev-parse', 'HEAD'
+}.standardOutput.asText.map { value -> value.trim() }
+def cleanCheckoutRevision = checkoutGitStatus.flatMap { status ->
+    if (!status.isEmpty()) {
+        throw new GradleException(
+            'Cannot bind held-out reproduction evidence to a dirty checkout. '
+                + 'Commit, stash or remove local changes, or pass an explicit '
+                + 'authoritative repository revision.')
+    }
+    checkoutHeadRevision
+}
+def authoritativeRevision = providers
+    .gradleProperty('regelsucheRepositoryRevision')
+    .orElse(providers.environmentVariable(
+        'REGELSUCHE_AUTHORITY_GITHUB_SHA'))
+    .orElse(providers.environmentVariable('GITHUB_SHA'))
+    .orElse(cleanCheckoutRevision)
+    .map { value ->
+        def revision = value.trim()
+        if (!(revision ==~ /[0-9a-f]{40}/)) {
+            throw new GradleException(
+                'Held-out reproduction revision must be a lowercase '
+                    + '40-character Git commit SHA')
+        }
+        revision
+    }
+
+def registerMatrixRun = { discovery, String taskName,
+        outputDirectory, String taskDescription ->
+    discovery.tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        description = taskDescription
+        dependsOn discovery.tasks.named('classes')
+        timeout = java.time.Duration.ofMinutes(8)
+        classpath = discovery.extensions.getByName('sourceSets')
+            .getByName('main').runtimeClasspath
+        mainClass =
+            'de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner'
+        argumentProviders.add({
+            [
+                authoritativeRevision.get(),
+                outputDirectory.get().absolutePath
+            ]
+        } as CommandLineArgumentProvider)
+        inputs.property('repositoryRevision', authoritativeRevision)
+        outputs.dir(outputDirectory)
+        outputs.upToDateWhen { false }
+        doFirst {
+            def output = outputDirectory.get()
+            if (output.isDirectory()) {
+                output.listFiles().each { candidate -> delete candidate }
+            } else if (!output.mkdirs()) {
+                throw new GradleException(
+                    "Cannot create held-out output directory: ${output}")
+            }
+        }
+        doLast {
+            def output = outputDirectory.get()
+            def actual = output.listFiles()
+                .findAll { candidate -> candidate.isFile() }
+                .collect { candidate -> candidate.name }
+                .sort()
+            if (actual != expectedArtifactNames) {
+                throw new GradleException(
+                    "Held-out run produced unexpected files: ${actual}; "
+                        + "expected ${expectedArtifactNames}")
+            }
+        }
+    }
+}
+
+def buildTargetFreeHeldOutReproductionImage = tasks.register(
+    'buildTargetFreeHeldOutReproductionImage', Exec) {
+    group = 'verification'
+    description = 'Builds the digest-pinned held-out reproduction image.'
+    workingDir repositoryRoot
+    inputs.file dockerfile
+    inputs.files files(
+        'gradlew', 'gradlew.bat', 'settings.gradle', 'build.gradle',
+        'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine 'docker', 'build',
+            '--pull',
+            '--platform', containerPlatform,
+            '--build-arg',
+                "REGELSUCHE_REPOSITORY_REVISION=${authoritativeRevision.get()}",
+            '--label',
+                "org.opencontainers.image.revision=${authoritativeRevision.get()}",
+            '-f', dockerfile.asFile.absolutePath,
+            '-t', containerImage,
+            repositoryRoot.asFile.absolutePath
+    }
+}
+
+def imageIdOutput = new ByteArrayOutputStream()
+def inspectTargetFreeHeldOutReproductionImage = tasks.register(
+    'inspectTargetFreeHeldOutReproductionImage', Exec) {
+    group = 'verification'
+    description = 'Retains the content-addressed local reproduction image ID.'
+    dependsOn buildTargetFreeHeldOutReproductionImage
+    commandLine 'docker', 'image', 'inspect',
+        '--format', '{{.Id}}', containerImage
+    standardOutput = imageIdOutput
+    errorOutput = System.err
+    outputs.file imageIdFile
+    outputs.upToDateWhen { false }
+    doFirst {
+        imageIdOutput.reset()
+    }
+    doLast {
+        def imageId = imageIdOutput.toString('UTF-8').trim()
+        if (!(imageId ==~ /sha256:[0-9a-f]{64}/)) {
+            throw new GradleException(
+                "Unexpected held-out reproduction image ID: ${imageId}")
+        }
+        def output = imageIdFile.get()
+        output.parentFile.mkdirs()
+        output.setText(imageId + System.lineSeparator(), 'UTF-8')
+    }
+}
+
+def runTargetFreeHeldOutReproductionImage = tasks.register(
+    'runTargetFreeHeldOutReproductionImage', Exec) {
+    group = 'verification'
+    description = 'Runs the held-out matrix offline in the pinned container.'
+    dependsOn inspectTargetFreeHeldOutReproductionImage
+    workingDir repositoryRoot
+    outputs.dir containerRun
+    outputs.upToDateWhen { false }
+    doFirst {
+        def output = containerRun.get()
+        delete output
+        if (!output.mkdirs() && !output.isDirectory()) {
+            throw new GradleException(
+                "Cannot create container output directory: ${output}")
+        }
+        output.setReadable(true, false)
+        output.setWritable(true, false)
+        output.setExecutable(true, false)
+        commandLine 'docker', 'run', '--rm',
+            '--network', 'none',
+            '--platform', containerPlatform,
+            '-v', "${output.absolutePath}:/out",
+            containerImage
+    }
+}
+
+def verifyTargetFreeHeldOutContainerReproduction = tasks.register(
+    'verifyTargetFreeHeldOutContainerReproduction', JavaExec) {
+    group = 'verification'
+    description = 'Requires byte-identical host-repeat and pinned-container held-out evidence.'
+    dependsOn ':regelsuche-discovery:classes',
+        ':regelsuche-discovery:generateTargetFreeHeldOutMatrixHostA',
+        ':regelsuche-discovery:generateTargetFreeHeldOutMatrixHostB',
+        runTargetFreeHeldOutReproductionImage
+    timeout = java.time.Duration.ofMinutes(3)
+    mainClass = 'de.regelsuche.discovery.representation.TargetFreeHeldOutContainerReproductionVerifier'
+    argumentProviders.add({
+        [
+            authoritativeRevision.get(),
+            repositoryRoot.asFile.absolutePath,
+            hostRunA.get().absolutePath,
+            hostRunB.get().absolutePath,
+            containerRun.get().absolutePath,
+            dockerfile.asFile.absolutePath,
+            imageIdFile.get().absolutePath,
+            containerPlatform,
+            verifierSchema.asFile.absolutePath,
+            reproductionManifest.get().absolutePath
+        ]
+    } as CommandLineArgumentProvider)
+    inputs.property('repositoryRevision', authoritativeRevision)
+    inputs.file verifierSchema
+    inputs.file dockerfile
+    inputs.file wrapperProperties
+    inputs.file imageIdFile
+    inputs.dir hostRunA
+    inputs.dir hostRunB
+    inputs.dir containerRun
+    outputs.file reproductionManifest
+    outputs.upToDateWhen { false }
+    doFirst {
+        reproductionManifest.get().parentFile.mkdirs()
+    }
+    doLast {
+        if (!reproductionManifest.get().isFile()) {
+            throw new GradleException(
+                'Held-out container reproduction manifest was not written')
+        }
+    }
+}
+
+project(':regelsuche-discovery') { discovery ->
+    discovery.plugins.withId('java-library') {
+        def requestedOutput = discovery.providers
+            .gradleProperty('targetFreeHeldOutOutput')
+            .map { value -> discovery.file(value).absoluteFile }
+            .orElse(discovery.layout.buildDirectory.dir(
+                'reports/representation-discovery/'
+                    + 'target-free-held-out-matrix').map { directory ->
+                        directory.asFile
+                    })
+        registerMatrixRun(
+            discovery,
+            'generateTargetFreeHeldOutMatrix',
+            requestedOutput,
+            'Executes and writes the complete target-free held-out matrix.')
+        registerMatrixRun(
+            discovery,
+            'generateTargetFreeHeldOutMatrixHostA',
+            hostRunA,
+            'Executes the first checkout-JVM held-out reproduction run.')
+        registerMatrixRun(
+            discovery,
+            'generateTargetFreeHeldOutMatrixHostB',
+            hostRunB,
+            'Executes the second checkout-JVM held-out reproduction run.')
+        verifyTargetFreeHeldOutContainerReproduction.configure {
+            classpath = discovery.extensions.getByName('sourceSets')
+                .getByName('main').runtimeClasspath
+        }
+    }
+}
+
+tasks.matching { candidate -> candidate.name == 'fullCheck' }.configureEach {
+    dependsOn verifyTargetFreeHeldOutContainerReproduction
+}
