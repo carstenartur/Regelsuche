@@ -4,27 +4,133 @@
   "title": "Target-free held-out host and container reproduction receipt v1",
   "type": "object",
   "required": [
-    "schema",
-    "evidenceStatus",
-    "repository",
-    "repositoryRevision",
-    "matrix",
-    "container",
-    "runs",
-    "artifacts",
-    "comparison",
-    "claimBoundary",
+    "content",
     "contentHash"
   ],
   "properties": {
-    "schema": {
-      "const": "regelsuche.target-free-held-out-container-reproduction/v1"
+    "content": {
+      "type": "object",
+      "required": [
+        "schema",
+        "evidenceStatus",
+        "repository",
+        "repositoryRevision",
+        "matrix",
+        "container",
+        "schemaResource",
+        "schemaSha256",
+        "artifactSetHash",
+        "runs",
+        "artifacts",
+        "comparison",
+        "claimBoundary"
+      ],
+      "properties": {
+        "schema": {
+          "const": "regelsuche.target-free-held-out-container-reproduction/v1"
+        },
+        "evidenceStatus": {
+          "const": "HOST_REPEAT_AND_PINNED_CONTAINER_BYTE_IDENTICAL"
+        },
+        "repository": {
+          "const": "carstenartur/Regelsuche"
+        },
+        "repositoryRevision": {
+          "$ref": "#/$defs/revision"
+        },
+        "matrix": {
+          "$ref": "#/$defs/matrix"
+        },
+        "container": {
+          "$ref": "#/$defs/container"
+        },
+        "schemaResource": {
+          "const": "docs/schemas/regelsuche-target-free-held-out-container-reproduction-v1.schema.json"
+        },
+        "schemaSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifactSetHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "runs": {
+          "type": "array",
+          "prefixItems": [
+            {"$ref": "#/$defs/hostRunA"},
+            {"$ref": "#/$defs/hostRunB"},
+            {"$ref": "#/$defs/containerRun"}
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "artifacts": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "allOf": [
+                {"$ref": "#/$defs/artifact"},
+                {
+                  "properties": {
+                    "path": {
+                      "const": "target-free-held-out-candidate-freeze.json"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {"$ref": "#/$defs/artifact"},
+                {
+                  "properties": {
+                    "path": {
+                      "const": "target-free-held-out-plan.json"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {"$ref": "#/$defs/artifact"},
+                {
+                  "properties": {
+                    "path": {
+                      "const": "target-free-held-out-post-freeze-qualification.json"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "comparison": {
+          "$ref": "#/$defs/comparison"
+        },
+        "claimBoundary": {
+          "const": "Exact byte reproduction for one frozen repository revision in two checkout JVM runs and one digest-pinned Linux container; no claim of external mathematical novelty, global optimality, universal policy superiority, cross-platform reproduction or equal CPU cost."
+        }
+      },
+      "additionalProperties": false
     },
-    "evidenceStatus": {
-      "const": "HOST_REPEAT_AND_PINNED_CONTAINER_BYTE_IDENTICAL"
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "repository": {"const": "carstenartur/Regelsuche"},
-    "repositoryRevision": {"$ref": "#/$defs/revision"},
+    "revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
     "matrix": {
       "type": "object",
       "required": [
@@ -46,12 +152,34 @@
         "checkpointCount": {"const": 6},
         "configuredRows": {"const": 144},
         "matchedWorkGroups": {"const": 36},
-        "exactCheckpointRows": {"type": "integer", "minimum": 0, "maximum": 144},
-        "eligibleMatchedWorkGroups": {"type": "integer", "minimum": 0, "maximum": 36},
-        "qualifiedPositiveRows": {"type": "integer", "minimum": 0, "maximum": 120},
-        "qualifiedCandidates": {"type": "integer", "minimum": 0},
-        "negativeControlPassedRows": {"type": "integer", "minimum": 0, "maximum": 24},
-        "negativeControlViolations": {"type": "integer", "minimum": 0}
+        "exactCheckpointRows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 144
+        },
+        "eligibleMatchedWorkGroups": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 36
+        },
+        "qualifiedPositiveRows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "qualifiedCandidates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "negativeControlPassedRows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 24
+        },
+        "negativeControlViolations": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
       "additionalProperties": false
     },
@@ -73,18 +201,30 @@
         "definitionPath": {
           "const": "Dockerfile.target-free-held-out-reproduction"
         },
-        "definitionSha256": {"$ref": "#/$defs/sha256"},
+        "definitionSha256": {
+          "$ref": "#/$defs/sha256"
+        },
         "baseImage": {
           "const": "eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
         },
         "baseImageDigest": {
           "const": "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
         },
-        "builtImageId": {"$ref": "#/$defs/sha256"},
-        "platform": {"const": "linux/amd64"},
-        "runtimeUser": {"const": "reproducer:10001"},
-        "buildNetworkPolicy": {"const": "DEPENDENCY_RESOLUTION_ONLY"},
-        "evaluatedRunNetworkPolicy": {"const": "DISABLED"},
+        "builtImageId": {
+          "$ref": "#/$defs/sha256"
+        },
+        "platform": {
+          "const": "linux/amd64"
+        },
+        "runtimeUser": {
+          "const": "reproducer:10001"
+        },
+        "buildNetworkPolicy": {
+          "const": "DEPENDENCY_RESOLUTION_ONLY"
+        },
+        "evaluatedRunNetworkPolicy": {
+          "const": "DISABLED"
+        },
         "gradleDistributionSha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
@@ -92,58 +232,77 @@
       },
       "additionalProperties": false
     },
-    "runs": {
-      "type": "array",
-      "prefixItems": [
-        {"$ref": "#/$defs/hostRunA"},
-        {"$ref": "#/$defs/hostRunB"},
-        {"$ref": "#/$defs/containerRun"}
+    "artifact": {
+      "type": "object",
+      "required": [
+        "path",
+        "byteLength",
+        "sha256"
       ],
-      "items": false,
-      "minItems": 3,
-      "maxItems": 3
-    },
-    "artifacts": {
-      "type": "array",
-      "prefixItems": [
-        {
-          "allOf": [
-            {"$ref": "#/$defs/artifact"},
-            {
-              "properties": {
-                "path": {"const": "target-free-held-out-candidate-freeze.json"}
-              }
-            }
-          ]
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
         },
-        {
-          "allOf": [
-            {"$ref": "#/$defs/artifact"},
-            {
-              "properties": {
-                "path": {"const": "target-free-held-out-plan.json"}
-              }
-            }
-          ]
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1
         },
-        {
-          "allOf": [
-            {"$ref": "#/$defs/artifact"},
-            {
-              "properties": {
-                "path": {"const": "target-free-held-out-post-freeze-qualification.json"}
-              }
-            }
-          ]
+        "sha256": {
+          "$ref": "#/$defs/sha256"
         }
+      },
+      "additionalProperties": false
+    },
+    "hostRunA": {
+      "type": "object",
+      "required": [
+        "id",
+        "environment",
+        "artifactSetHash"
       ],
-      "items": false,
-      "minItems": 3,
-      "maxItems": 3
+      "properties": {
+        "id": {"const": "HOST_A"},
+        "environment": {"const": "CHECKOUT_JVM"},
+        "artifactSetHash": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    },
+    "hostRunB": {
+      "type": "object",
+      "required": [
+        "id",
+        "environment",
+        "artifactSetHash"
+      ],
+      "properties": {
+        "id": {"const": "HOST_B"},
+        "environment": {"const": "CHECKOUT_JVM"},
+        "artifactSetHash": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    },
+    "containerRun": {
+      "type": "object",
+      "required": [
+        "id",
+        "environment",
+        "artifactSetHash"
+      ],
+      "properties": {
+        "id": {"const": "PINNED_CONTAINER"},
+        "environment": {"const": "DIGEST_PINNED_LINUX_CONTAINER"},
+        "artifactSetHash": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
     },
     "comparison": {
       "type": "object",
-      "required": ["hostRepeat", "hostContainer", "expectedFiles"],
+      "required": [
+        "hostRepeat",
+        "hostContainer",
+        "expectedFiles"
+      ],
       "properties": {
         "hostRepeat": {"const": "BYTE_IDENTICAL"},
         "hostContainer": {"const": "BYTE_IDENTICAL"},
@@ -154,59 +313,6 @@
             "target-free-held-out-post-freeze-qualification.json"
           ]
         }
-      },
-      "additionalProperties": false
-    },
-    "claimBoundary": {"type": "string", "minLength": 100},
-    "contentHash": {"$ref": "#/$defs/sha256"}
-  },
-  "additionalProperties": false,
-  "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "revision": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{40}$"
-    },
-    "artifact": {
-      "type": "object",
-      "required": ["path", "byteLength", "sha256"],
-      "properties": {
-        "path": {"type": "string", "minLength": 1},
-        "byteLength": {"type": "integer", "minimum": 1},
-        "sha256": {"$ref": "#/$defs/sha256"}
-      },
-      "additionalProperties": false
-    },
-    "hostRunA": {
-      "type": "object",
-      "required": ["id", "environment", "artifactSetHash"],
-      "properties": {
-        "id": {"const": "HOST_A"},
-        "environment": {"const": "CHECKOUT_JVM"},
-        "artifactSetHash": {"$ref": "#/$defs/sha256"}
-      },
-      "additionalProperties": false
-    },
-    "hostRunB": {
-      "type": "object",
-      "required": ["id", "environment", "artifactSetHash"],
-      "properties": {
-        "id": {"const": "HOST_B"},
-        "environment": {"const": "CHECKOUT_JVM"},
-        "artifactSetHash": {"$ref": "#/$defs/sha256"}
-      },
-      "additionalProperties": false
-    },
-    "containerRun": {
-      "type": "object",
-      "required": ["id", "environment", "artifactSetHash"],
-      "properties": {
-        "id": {"const": "PINNED_CONTAINER"},
-        "environment": {"const": "DIGEST_PINNED_LINUX_CONTAINER"},
-        "artifactSetHash": {"$ref": "#/$defs/sha256"}
       },
       "additionalProperties": false
     }
