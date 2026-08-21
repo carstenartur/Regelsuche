@@ -149,6 +149,18 @@ The cache is intentionally invocation-local. It cannot leak candidates between
 experiments with different assumptions, inventories or configuration
 identities, and it requires no invalidation protocol beyond the retained key.
 
+## Experiment identity and ablation
+
+A benchmark or retained experiment that enables preparation memoization must
+bind at least the planner revision, rule-inventory fingerprint, normalized
+assumption fingerprint, solver budget, cache-capacity policy and engine
+selection in its configuration identity. The no-cache capacity-zero variant is
+the required direct ablation for any performance or work-reduction claim.
+
+Memoization changes mechanical work, not the declared mathematical rule
+inventory. It therefore must never be used to rewrite historical evidence from
+configurations that did not declare this execution policy.
+
 ## Current limits
 
 This first slice is deliberately narrow. It does not yet provide general
