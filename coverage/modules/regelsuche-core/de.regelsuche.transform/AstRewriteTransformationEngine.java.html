@@ -586,7 +586,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 <span class="fc bfc" id="L586" title="All 2 branches covered.">                || !(outer.right() instanceof NumberExpr right)</span>
 <span class="fc bfc" id="L587" title="All 2 branches covered.">                || !(outer.left() instanceof BinaryExpr left)</span>
 <span class="fc bfc" id="L588" title="All 2 branches covered.">                || left.operator() != BinaryOperator.ADD</span>
-<span class="pc bpc" id="L589" title="1 of 2 branches missed.">                || !(left.right() instanceof NumberExpr leftOffset)) {</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">                || !(left.right() instanceof NumberExpr leftOffset)) {</span>
 <span class="fc" id="L590">                return null;</span>
             }
 <span class="fc bfc" id="L592" title="All 2 branches covered.">            double offset = outer.operator() == BinaryOperator.ADD</span>

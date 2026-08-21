@@ -63,8 +63,8 @@ final class UnivariatePolynomial {
 <span class="nc" id="L63">            return null;</span>
         }
 <span class="fc" id="L65">        UnivariatePolynomial left = of(binary.left());</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (left == null) {</span>
-<span class="nc" id="L67">            return null;</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (left == null) {</span>
+<span class="fc" id="L67">            return null;</span>
         }
 <span class="fc bfc" id="L69" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
 <span class="fc" id="L70">            return left.power(binary.right());</span>
@@ -207,9 +207,9 @@ final class UnivariatePolynomial {
     }
 
     private UnivariatePolynomial multiply(UnivariatePolynomial other) {
-<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (!sameVariable(other)</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (!sameVariable(other)</span>
 <span class="pc bpc" id="L211" title="1 of 2 branches missed.">                || degree() + other.degree() &gt; MAX_DEGREE) {</span>
-<span class="nc" id="L212">            return null;</span>
+<span class="fc" id="L212">            return null;</span>
         }
 <span class="fc" id="L214">        BigInteger[] result = zeroCoefficients(</span>
             coefficients.length + other.coefficients.length - 1);
@@ -266,7 +266,7 @@ final class UnivariatePolynomial {
 
     private boolean sameVariable(UnivariatePolynomial other) {
 <span class="fc bfc" id="L268" title="All 4 branches covered.">        return variable.isEmpty() || other.variable.isEmpty()</span>
-<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            || variable.equals(other.variable);</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">            || variable.equals(other.variable);</span>
     }
 
     private String mergedVariable(UnivariatePolynomial other) {

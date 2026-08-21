@@ -1,0 +1,500 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RulePreparationPlanner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">RulePreparationPlanner.java</span></div><h1>RulePreparationPlanner.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Bounded planner for making a structurally close rewrite rule applicable.
+ *
+ * &lt;p&gt;The first supported schema is factor preparation for the existing
+ * {@code ast_cancel_division_factor} rule. Given {@code P / A}, the planner
+ * binds the already visible divisor to {@code A} and asks the exact univariate
+ * polynomial solver for {@code B} in {@code P = A * B}. A plan is emitted only
+ * when the quotient is exact. No target expression or arbitrary zero-term
+ * enumeration is used.&lt;/p&gt;
+ */
+public final class RulePreparationPlanner {
+    public static final String PLANNER_ID =
+        &quot;rule-preparation-planner/exact-polynomial-cancellation/v1&quot;;
+    public static final String CERTIFICATE_SCHEMA =
+        &quot;regelsuche.rule-preparation-certificate/v1&quot;;
+    public static final String APPLICATION_SCHEMA =
+        &quot;regelsuche.rule-preparation-application/v1&quot;;
+    public static final String SOLVER_ID =
+        &quot;exact-univariate-polynomial-quotient/v1&quot;;
+    public static final String PREPARATION_RULE_ID =
+        &quot;prepare_exact_polynomial_factor&quot;;
+    public static final String PRINCIPAL_RULE_ID =
+        &quot;ast_cancel_division_factor&quot;;
+
+    private final Budget budget;
+
+    public RulePreparationPlanner() {
+<span class="fc" id="L44">        this(Budget.DEFAULT);</span>
+<span class="fc" id="L45">    }</span>
+
+<span class="fc" id="L47">    public RulePreparationPlanner(Budget budget) {</span>
+<span class="fc" id="L48">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L49">    }</span>
+
+    public Budget budget() {
+<span class="nc" id="L52">        return budget;</span>
+    }
+
+    /**
+     * Analyzes one AST subtree against the cancellation preparation schema.
+     *
+     * @return a deterministic attempt that distinguishes non-applicability,
+     *     unsupported input, an absent exact quotient and budget exhaustion
+     */
+    public PlanAttempt plan(Expr subtree) {
+<span class="fc" id="L62">        Objects.requireNonNull(subtree, &quot;subtree&quot;);</span>
+<span class="fc" id="L63">        WorkLedger untouched = WorkLedger.untouched(budget.maxSolverAttempts());</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (!(subtree instanceof BinaryExpr division)</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                || division.operator() != BinaryOperator.DIV) {</span>
+<span class="fc" id="L66">            return PlanAttempt.withoutApplication(</span>
+                Status.NOT_APPLICABLE,
+                untouched,
+                &quot;root-is-not-division&quot;);
+        }
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (isExplicitZero(division.right())) {</span>
+<span class="fc" id="L72">            return PlanAttempt.withoutApplication(</span>
+                Status.UNSUPPORTED,
+                untouched,
+                &quot;explicit-zero-divisor&quot;);
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (isDirectCancellation(division.left(), division.right())) {</span>
+<span class="fc" id="L78">            return PlanAttempt.withoutApplication(</span>
+                Status.DIRECT_MATCH_AVAILABLE,
+                untouched,
+                &quot;principal-rule-already-matches&quot;);
+        }
+<span class="fc" id="L83">        ResidualObligation obligation = residualObligation(division);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (budget.maxSolverAttempts() == 0) {</span>
+<span class="fc" id="L85">            return PlanAttempt.withoutApplication(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L87">                Optional.of(obligation),</span>
+                untouched,
+                &quot;solver-attempt-budget-exhausted&quot;);
+        }
+
+<span class="fc" id="L92">        WorkLedger attempted = WorkLedger.afterOneAttempt(</span>
+<span class="fc" id="L93">            budget.maxSolverAttempts());</span>
+<span class="fc" id="L94">        UnivariatePolynomial divisor =</span>
+<span class="fc" id="L95">            UnivariatePolynomial.of(division.right());</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">        if (divisor == null || divisor.isConstant()) {</span>
+<span class="fc" id="L97">            return PlanAttempt.withoutApplication(</span>
+                Status.UNSUPPORTED,
+<span class="fc" id="L99">                Optional.of(obligation),</span>
+                attempted,
+                &quot;divisor-outside-exact-nonconstant-univariate-polynomial-fragment&quot;);
+        }
+<span class="fc" id="L103">        UnivariatePolynomial dividend =</span>
+<span class="fc" id="L104">            UnivariatePolynomial.of(division.left());</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (dividend == null) {</span>
+<span class="fc" id="L106">            return PlanAttempt.withoutApplication(</span>
+                Status.UNSUPPORTED,
+<span class="fc" id="L108">                Optional.of(obligation),</span>
+                attempted,
+                &quot;dividend-outside-exact-univariate-polynomial-fragment&quot;);
+        }
+<span class="fc" id="L112">        UnivariatePolynomial quotient = dividend.divideExactly(divisor);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (quotient == null) {</span>
+<span class="fc" id="L114">            return PlanAttempt.withoutApplication(</span>
+                Status.NO_EXACT_QUOTIENT,
+<span class="fc" id="L116">                Optional.of(obligation),</span>
+                attempted,
+                &quot;division-has-no-supported-exact-quotient&quot;);
+        }
+
+<span class="fc" id="L121">        Expr quotientExpression = quotient.toExpression();</span>
+<span class="fc" id="L122">        Expr preparedNumerator = new BinaryExpr(</span>
+<span class="fc" id="L123">            division.right(),</span>
+            BinaryOperator.MUL,
+            quotientExpression);
+<span class="fc" id="L126">        Expr preparedSubtree = new BinaryExpr(</span>
+            preparedNumerator,
+            BinaryOperator.DIV,
+<span class="fc" id="L129">            division.right());</span>
+<span class="fc" id="L130">        List&lt;String&gt; assumptions = assumptionsFor(division.right());</span>
+<span class="fc" id="L131">        Certificate certificate = certificate(</span>
+<span class="fc" id="L132">            division.left(),</span>
+<span class="fc" id="L133">            division.right(),</span>
+            quotientExpression,
+            preparedSubtree);
+<span class="fc" id="L136">        PreparedRuleApplication application = new PreparedRuleApplication(</span>
+            APPLICATION_SCHEMA,
+            PLANNER_ID,
+            PRINCIPAL_RULE_ID,
+            subtree,
+            preparedSubtree,
+            quotientExpression,
+<span class="fc" id="L143">            Map.of(</span>
+<span class="fc" id="L144">                &quot;A&quot;, division.right(),</span>
+                &quot;B&quot;, quotientExpression),
+            obligation,
+            assumptions,
+<span class="fc" id="L148">            List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID),</span>
+            certificate,
+            attempted);
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (!verify(application)) {</span>
+<span class="nc" id="L152">            throw new IllegalStateException(</span>
+                &quot;generated rule-preparation application failed verification&quot;);
+        }
+<span class="fc" id="L155">        return PlanAttempt.prepared(application);</span>
+    }
+
+    /** Independently recomputes the exact quotient and all bound plan fields. */
+    public boolean verify(PreparedRuleApplication application) {
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (application == null</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                || !APPLICATION_SCHEMA.equals(application.schema())</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">                || !PLANNER_ID.equals(application.plannerId())</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                || !PRINCIPAL_RULE_ID.equals(application.principalRuleId())</span>
+<span class="fc" id="L164">                || !List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID)</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                    .equals(application.primitiveRuleIds())</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">                || !(application.originalSubtree()</span>
+<span class="fc" id="L167">                    instanceof BinaryExpr division)</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                || division.operator() != BinaryOperator.DIV</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                || isExplicitZero(division.right())) {</span>
+<span class="fc" id="L170">            return false;</span>
+        }
+<span class="fc" id="L172">        UnivariatePolynomial divisor =</span>
+<span class="fc" id="L173">            UnivariatePolynomial.of(division.right());</span>
+<span class="fc" id="L174">        UnivariatePolynomial dividend =</span>
+<span class="fc" id="L175">            UnivariatePolynomial.of(division.left());</span>
+<span class="pc bpc" id="L176" title="3 of 6 branches missed.">        if (divisor == null || divisor.isConstant() || dividend == null) {</span>
+<span class="nc" id="L177">            return false;</span>
+        }
+<span class="fc" id="L179">        UnivariatePolynomial quotient = dividend.divideExactly(divisor);</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (quotient == null) {</span>
+<span class="nc" id="L181">            return false;</span>
+        }
+<span class="fc" id="L183">        Expr expectedResult = quotient.toExpression();</span>
+<span class="fc" id="L184">        Expr expectedPrepared = new BinaryExpr(</span>
+            new BinaryExpr(
+<span class="fc" id="L186">                division.right(),</span>
+                BinaryOperator.MUL,
+                expectedResult),
+            BinaryOperator.DIV,
+<span class="fc" id="L190">            division.right());</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (!expectedResult.equals(application.resultSubtree())</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                || !expectedPrepared.equals(application.preparedSubtree())</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                || !division.right().equals(application.bindings().get(&quot;A&quot;))</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                || !expectedResult.equals(application.bindings().get(&quot;B&quot;))</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                || application.bindings().size() != 2</span>
+<span class="fc" id="L196">                || !residualObligation(division)</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                    .equals(application.residualObligation())</span>
+<span class="fc" id="L198">                || !assumptionsFor(division.right())</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                    .equals(application.assumptions())) {</span>
+<span class="nc" id="L200">            return false;</span>
+        }
+<span class="fc" id="L202">        Certificate expectedCertificate = certificate(</span>
+<span class="fc" id="L203">            division.left(),</span>
+<span class="fc" id="L204">            division.right(),</span>
+            expectedResult,
+            expectedPrepared);
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        return expectedCertificate.equals(application.certificate())</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            &amp;&amp; application.work().consumedSolverAttempts() == 1;</span>
+    }
+
+    private static Certificate certificate(
+        Expr dividend,
+        Expr divisor,
+        Expr quotient,
+        Expr preparedSubtree
+    ) {
+<span class="fc" id="L217">        String dividendText = ExpressionFormatter.format(dividend);</span>
+<span class="fc" id="L218">        String divisorText = ExpressionFormatter.format(divisor);</span>
+<span class="fc" id="L219">        String quotientText = ExpressionFormatter.format(quotient);</span>
+<span class="fc" id="L220">        String preparedText = ExpressionFormatter.format(preparedSubtree);</span>
+<span class="fc" id="L221">        String payload = String.join(&quot;\n&quot;,</span>
+            &quot;schema=&quot; + CERTIFICATE_SCHEMA,
+            &quot;planner=&quot; + PLANNER_ID,
+            &quot;principalRule=&quot; + PRINCIPAL_RULE_ID,
+            &quot;solver=&quot; + SOLVER_ID,
+            &quot;dividend=&quot; + dividendText,
+            &quot;divisor=&quot; + divisorText,
+            &quot;quotient=&quot; + quotientText,
+            &quot;remainder=0&quot;,
+            &quot;prepared=&quot; + preparedText);
+<span class="fc" id="L231">        return new Certificate(</span>
+            CERTIFICATE_SCHEMA,
+            SOLVER_ID,
+            dividendText,
+            divisorText,
+            quotientText,
+            &quot;0&quot;,
+            preparedText,
+<span class="fc" id="L239">            sha256(payload));</span>
+    }
+
+    private static ResidualObligation residualObligation(
+        BinaryExpr division
+    ) {
+<span class="fc" id="L245">        String dividend = ExpressionFormatter.format(division.left());</span>
+<span class="fc" id="L246">        String divisor = ExpressionFormatter.format(division.right());</span>
+<span class="fc" id="L247">        return new ResidualObligation(</span>
+            &quot;EXACT_FACTOR&quot;,
+            dividend,
+            divisor,
+            &quot;B&quot;,
+            dividend + &quot; = (&quot; + divisor + &quot;) * B&quot;);
+    }
+
+    private static List&lt;String&gt; assumptionsFor(Expr divisor) {
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        if (divisor instanceof NumberExpr) {</span>
+<span class="nc" id="L257">            return List.of();</span>
+        }
+<span class="fc" id="L259">        return List.of(</span>
+<span class="fc" id="L260">            Assumption.nonZero(ExpressionFormatter.format(divisor))</span>
+<span class="fc" id="L261">                .expression());</span>
+    }
+
+    private static boolean isDirectCancellation(
+        Expr numerator,
+        Expr divisor
+    ) {
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (!(numerator instanceof BinaryExpr product)</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                || product.operator() != BinaryOperator.MUL) {</span>
+<span class="fc" id="L270">            return false;</span>
+        }
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        return product.left().equals(divisor)</span>
+<span class="pc bnc" id="L273" title="All 2 branches missed.">            || product.right().equals(divisor);</span>
+    }
+
+    private static boolean isExplicitZero(Expr expression) {
+<span class="fc" id="L277">        return expression instanceof NumberExpr number</span>
+<span class="fc bfc" id="L278" title="All 4 branches covered.">            &amp;&amp; number.value() == 0;</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L283">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L284">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L285">            return java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L286">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L287">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L291">    public enum Status {</span>
+<span class="fc" id="L292">        PREPARED,</span>
+<span class="fc" id="L293">        DIRECT_MATCH_AVAILABLE,</span>
+<span class="fc" id="L294">        NOT_APPLICABLE,</span>
+<span class="fc" id="L295">        UNSUPPORTED,</span>
+<span class="fc" id="L296">        NO_EXACT_QUOTIENT,</span>
+<span class="fc" id="L297">        BUDGET_INCONCLUSIVE</span>
+    }
+
+    public record Budget(int maxSolverAttempts) {
+<span class="fc" id="L301">        public static final Budget DEFAULT = new Budget(1);</span>
+
+<span class="fc" id="L303">        public Budget {</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">            if (maxSolverAttempts &lt; 0) {</span>
+<span class="nc" id="L305">                throw new IllegalArgumentException(</span>
+                    &quot;maxSolverAttempts must not be negative&quot;);
+            }
+<span class="fc" id="L308">        }</span>
+    }
+
+    public record WorkLedger(
+        int configuredSolverAttempts,
+        int consumedSolverAttempts,
+        int remainingSolverAttempts
+    ) {
+<span class="fc" id="L316">        public WorkLedger {</span>
+<span class="pc bpc" id="L317" title="4 of 8 branches missed.">            if (configuredSolverAttempts &lt; 0</span>
+                    || consumedSolverAttempts &lt; 0
+                    || remainingSolverAttempts &lt; 0
+                    || configuredSolverAttempts
+                        != consumedSolverAttempts
+                            + remainingSolverAttempts) {
+<span class="nc" id="L323">                throw new IllegalArgumentException(</span>
+                    &quot;solver work must be non-negative and balanced&quot;);
+            }
+<span class="fc" id="L326">        }</span>
+
+        private static WorkLedger untouched(int configured) {
+<span class="fc" id="L329">            return new WorkLedger(configured, 0, configured);</span>
+        }
+
+        private static WorkLedger afterOneAttempt(int configured) {
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">            if (configured &lt; 1) {</span>
+<span class="nc" id="L334">                throw new IllegalArgumentException(</span>
+                    &quot;one solver attempt requires positive configured work&quot;);
+            }
+<span class="fc" id="L337">            return new WorkLedger(configured, 1, configured - 1);</span>
+        }
+    }
+
+    public record ResidualObligation(
+        String kind,
+        String actualExpression,
+        String knownFactorExpression,
+        String quotientPlaceholder,
+        String equationTemplate
+    ) {
+<span class="fc" id="L348">        public ResidualObligation {</span>
+<span class="pc bpc" id="L349" title="3 of 6 branches missed.">            if (kind == null || kind.isBlank()</span>
+                    || actualExpression == null
+<span class="pc bpc" id="L351" title="2 of 4 branches missed.">                        || actualExpression.isBlank()</span>
+                    || knownFactorExpression == null
+<span class="pc bpc" id="L353" title="2 of 4 branches missed.">                        || knownFactorExpression.isBlank()</span>
+                    || quotientPlaceholder == null
+<span class="pc bpc" id="L355" title="2 of 4 branches missed.">                        || quotientPlaceholder.isBlank()</span>
+                    || equationTemplate == null
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                        || equationTemplate.isBlank()) {</span>
+<span class="nc" id="L358">                throw new IllegalArgumentException(</span>
+                    &quot;residual-obligation fields must not be blank&quot;);
+            }
+<span class="fc" id="L361">        }</span>
+    }
+
+    public record Certificate(
+        String schema,
+        String solverId,
+        String dividendExpression,
+        String divisorExpression,
+        String quotientExpression,
+        String remainderExpression,
+        String preparedExpression,
+        String contentHash
+    ) {
+<span class="fc" id="L374">        public Certificate {</span>
+<span class="pc bpc" id="L375" title="3 of 6 branches missed.">            if (schema == null || schema.isBlank()</span>
+<span class="pc bpc" id="L376" title="2 of 4 branches missed.">                    || solverId == null || solverId.isBlank()</span>
+                    || dividendExpression == null
+<span class="pc bpc" id="L378" title="2 of 4 branches missed.">                        || dividendExpression.isBlank()</span>
+                    || divisorExpression == null
+<span class="pc bpc" id="L380" title="2 of 4 branches missed.">                        || divisorExpression.isBlank()</span>
+                    || quotientExpression == null
+<span class="pc bpc" id="L382" title="2 of 4 branches missed.">                        || quotientExpression.isBlank()</span>
+                    || remainderExpression == null
+<span class="pc bpc" id="L384" title="2 of 4 branches missed.">                        || remainderExpression.isBlank()</span>
+                    || preparedExpression == null
+<span class="pc bpc" id="L386" title="2 of 4 branches missed.">                        || preparedExpression.isBlank()</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">                    || contentHash == null || contentHash.isBlank()) {</span>
+<span class="nc" id="L388">                throw new IllegalArgumentException(</span>
+                    &quot;certificate fields must not be blank&quot;);
+            }
+<span class="fc" id="L391">        }</span>
+    }
+
+    public record PreparedRuleApplication(
+        String schema,
+        String plannerId,
+        String principalRuleId,
+        Expr originalSubtree,
+        Expr preparedSubtree,
+        Expr resultSubtree,
+        Map&lt;String, Expr&gt; bindings,
+        ResidualObligation residualObligation,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; primitiveRuleIds,
+        Certificate certificate,
+        WorkLedger work
+    ) {
+<span class="fc" id="L408">        public PreparedRuleApplication {</span>
+<span class="pc bpc" id="L409" title="3 of 6 branches missed.">            if (schema == null || schema.isBlank()</span>
+<span class="pc bpc" id="L410" title="2 of 4 branches missed.">                    || plannerId == null || plannerId.isBlank()</span>
+                    || principalRuleId == null
+<span class="pc bpc" id="L412" title="8 of 16 branches missed.">                        || principalRuleId.isBlank()</span>
+                    || originalSubtree == null
+                    || preparedSubtree == null
+                    || resultSubtree == null
+                    || bindings == null
+                    || residualObligation == null
+                    || assumptions == null
+                    || primitiveRuleIds == null
+<span class="pc bpc" id="L420" title="3 of 6 branches missed.">                        || primitiveRuleIds.isEmpty()</span>
+                    || certificate == null
+                    || work == null) {
+<span class="nc" id="L423">                throw new IllegalArgumentException(</span>
+                    &quot;prepared application fields are required&quot;);
+            }
+<span class="fc" id="L426">            bindings = Map.copyOf(bindings);</span>
+<span class="fc" id="L427">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L428">            primitiveRuleIds = List.copyOf(primitiveRuleIds);</span>
+<span class="fc" id="L429">        }</span>
+    }
+
+    public record PlanAttempt(
+        Status status,
+        Optional&lt;PreparedRuleApplication&gt; application,
+        Optional&lt;ResidualObligation&gt; residualObligation,
+        WorkLedger work,
+        String detail
+    ) {
+<span class="fc" id="L439">        public PlanAttempt {</span>
+<span class="fc" id="L440">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L441">            application = Objects.requireNonNull(</span>
+                application,
+                &quot;application&quot;);
+<span class="fc" id="L444">            residualObligation = Objects.requireNonNull(</span>
+                residualObligation,
+                &quot;residualObligation&quot;);
+<span class="fc" id="L447">            Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="pc bpc" id="L449" title="1 of 4 branches missed.">            if ((status == Status.PREPARED) != application.isPresent()) {</span>
+<span class="nc" id="L450">                throw new IllegalArgumentException(</span>
+                    &quot;only PREPARED attempts may contain an application&quot;);
+            }
+<span class="fc bfc" id="L453" title="All 2 branches covered.">            if (application.isPresent()</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">                    &amp;&amp; (!application.get().work().equals(work)</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">                        || !residualObligation.equals(Optional.of(</span>
+<span class="fc" id="L456">                            application.get().residualObligation())))) {</span>
+<span class="nc" id="L457">                throw new IllegalArgumentException(</span>
+                    &quot;attempt and application work must agree&quot;);
+            }
+<span class="fc" id="L460">        }</span>
+
+        private static PlanAttempt prepared(
+            PreparedRuleApplication application
+        ) {
+<span class="fc" id="L465">            return new PlanAttempt(</span>
+                Status.PREPARED,
+<span class="fc" id="L467">                Optional.of(application),</span>
+<span class="fc" id="L468">                Optional.of(application.residualObligation()),</span>
+<span class="fc" id="L469">                application.work(),</span>
+                &quot;exact-polynomial-factor-prepared&quot;);
+        }
+
+        private static PlanAttempt withoutApplication(
+            Status status,
+            WorkLedger work,
+            String detail
+        ) {
+<span class="fc" id="L478">            return withoutApplication(</span>
+                status,
+<span class="fc" id="L480">                Optional.empty(),</span>
+                work,
+                detail);
+        }
+
+        private static PlanAttempt withoutApplication(
+            Status status,
+            Optional&lt;ResidualObligation&gt; residualObligation,
+            WorkLedger work,
+            String detail
+        ) {
+<span class="fc" id="L491">            return new PlanAttempt(</span>
+                status,
+<span class="fc" id="L493">                Optional.empty(),</span>
+                residualObligation,
+                work,
+                detail);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RulePreparationTransformationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">RulePreparationTransformationEngine.java</span></div><h1>RulePreparationTransformationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.RulePreparationPlanner.PreparedRuleApplication;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Opt-in transformation engine that augments direct rewrites with bounded,
+ * rule-directed preparation plans.
+ *
+ * &lt;p&gt;Direct transformations are generated first and returned unchanged. Only
+ * when the visible principal rule does not match directly does the planner
+ * inspect a subtree. Historical users of {@link AstRewriteTransformationEngine}
+ * therefore retain exactly their existing behavior and benchmark identity.&lt;/p&gt;
+ */
+public final class RulePreparationTransformationEngine
+        implements TransformationEngine {
+    private static final int DEFAULT_MAX_PREPARED_CANDIDATES = 16;
+    private static final String PREPARATION_PACK_ID =
+        &quot;core-rule-preparation&quot;;
+
+    private final TransformationEngine directEngine;
+    private final Set&lt;String&gt; visibleRuleIds;
+    private final RulePreparationPlanner planner;
+    private final int maxPreparedCandidates;
+<span class="fc" id="L39">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L40">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+
+    public RulePreparationTransformationEngine() {
+<span class="fc" id="L44">        this(AstRewriteTransformationEngine.defaultRules());</span>
+<span class="fc" id="L45">    }</span>
+
+    public RulePreparationTransformationEngine(List&lt;RewriteRule&gt; rules) {
+<span class="fc" id="L48">        this(</span>
+            new AstRewriteTransformationEngine(
+<span class="fc" id="L50">                List.copyOf(Objects.requireNonNull(rules, &quot;rules&quot;))),</span>
+<span class="fc" id="L51">            ruleIds(rules),</span>
+            new RulePreparationPlanner(),
+            DEFAULT_MAX_PREPARED_CANDIDATES);
+<span class="fc" id="L54">    }</span>
+
+    public RulePreparationTransformationEngine(
+        TransformationEngine directEngine,
+        Set&lt;String&gt; visibleRuleIds,
+        RulePreparationPlanner planner,
+        int maxPreparedCandidates
+<span class="fc" id="L61">    ) {</span>
+<span class="fc" id="L62">        this.directEngine = Objects.requireNonNull(</span>
+            directEngine,
+            &quot;directEngine&quot;);
+<span class="fc" id="L65">        this.visibleRuleIds = Set.copyOf(</span>
+<span class="fc" id="L66">            Objects.requireNonNull(visibleRuleIds, &quot;visibleRuleIds&quot;));</span>
+<span class="fc" id="L67">        this.planner = Objects.requireNonNull(planner, &quot;planner&quot;);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (maxPreparedCandidates &lt; 0) {</span>
+<span class="nc" id="L69">            throw new IllegalArgumentException(</span>
+                &quot;maxPreparedCandidates must not be negative&quot;);
+        }
+<span class="fc" id="L72">        this.maxPreparedCandidates = maxPreparedCandidates;</span>
+<span class="fc" id="L73">    }</span>
+
+    public static RulePreparationTransformationEngine withKnowledgePacks(
+        KnowledgePackSelection selection
+    ) {
+<span class="nc" id="L78">        List&lt;RewriteRule&gt; rules = new ArrayList&lt;&gt;(</span>
+<span class="nc" id="L79">            AstRewriteTransformationEngine.defaultRules(selection));</span>
+<span class="nc" id="L80">        rules.addAll(new KnowledgePackRegistry().enabledRules(selection));</span>
+<span class="nc" id="L81">        return new RulePreparationTransformationEngine(rules);</span>
+    }
+
+    public String plannerId() {
+<span class="nc" id="L85">        return RulePreparationPlanner.PLANNER_ID;</span>
+    }
+
+    public Set&lt;String&gt; visibleRuleIds() {
+<span class="nc" id="L89">        return visibleRuleIds;</span>
+    }
+
+    @Override
+    public List&lt;Transformation&gt; transform(String expression) {
+<span class="fc" id="L94">        List&lt;Transformation&gt; direct = List.copyOf(</span>
+<span class="fc" id="L95">            directEngine.transform(expression));</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (maxPreparedCandidates == 0</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">                || !visibleRuleIds.contains(</span>
+                    RulePreparationPlanner.PRINCIPAL_RULE_ID)
+                || expression == null
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">                || expression.isBlank()) {</span>
+<span class="fc" id="L101">            return direct;</span>
+        }
+
+        Expr root;
+        try {
+<span class="fc" id="L106">            root = parser.parse(new InputRequest(InputType.TERM, expression))</span>
+<span class="fc" id="L107">                .terms()</span>
+<span class="fc" id="L108">                .getFirst();</span>
+<span class="nc" id="L109">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L110">            return direct;</span>
+<span class="fc" id="L111">        }</span>
+
+<span class="fc" id="L113">        String formattedRoot = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L114">        Set&lt;String&gt; retainedOutputKeys = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (Transformation transformation : direct) {</span>
+<span class="fc" id="L116">            retainedOutputKeys.add(outputKey(</span>
+<span class="fc" id="L117">                transformation.transformedExpression(),</span>
+<span class="fc" id="L118">                transformation.assumptions()));</span>
+<span class="fc" id="L119">        }</span>
+
+<span class="fc" id="L121">        List&lt;Transformation&gt; prepared = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (PositionedNode positioned : positionedNodes(root)) {</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            if (prepared.size() &gt;= maxPreparedCandidates) {</span>
+<span class="nc" id="L124">                break;</span>
+            }
+<span class="fc" id="L126">            RulePreparationPlanner.PlanAttempt attempt =</span>
+<span class="fc" id="L127">                planner.plan(positioned.expression());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (attempt.status()</span>
+                    != RulePreparationPlanner.Status.PREPARED) {
+<span class="fc" id="L130">                continue;</span>
+            }
+<span class="fc" id="L132">            PreparedRuleApplication application =</span>
+<span class="fc" id="L133">                attempt.application().orElseThrow();</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            if (!planner.verify(application)) {</span>
+                // A malformed or stale preparation is not a reason to fail the
+                // complete transformation request. Preserve the direct results
+                // and continue scanning other AST positions fail-closed.
+<span class="nc" id="L138">                continue;</span>
+            }
+<span class="fc" id="L140">            Transformation principal = replayPrincipal(application);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (principal == null) {</span>
+<span class="fc" id="L142">                continue;</span>
+            }
+<span class="fc" id="L144">            Expr rewrittenRoot = replaceAt(</span>
+                root,
+<span class="fc" id="L146">                positioned.path(),</span>
+                0,
+<span class="fc" id="L148">                application.resultSubtree());</span>
+<span class="fc" id="L149">            String transformed = ExpressionFormatter.format(rewrittenRoot);</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">            if (transformed.equals(formattedRoot)) {</span>
+<span class="nc" id="L151">                continue;</span>
+            }
+<span class="fc" id="L153">            String outputKey = outputKey(</span>
+                transformed,
+<span class="fc" id="L155">                application.assumptions());</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            if (!retainedOutputKeys.add(outputKey)) {</span>
+<span class="nc" id="L157">                continue;</span>
+            }
+<span class="fc" id="L159">            prepared.add(new Transformation(</span>
+<span class="fc" id="L160">                application.principalRuleId(),</span>
+                transformed,
+<span class="fc" id="L162">                principal.kind(),</span>
+                true,
+<span class="fc" id="L164">                principal.estimatedCostDelta(),</span>
+<span class="fc" id="L165">                principal.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L166">                &quot;prepared:&quot; + application.certificate().contentHash()</span>
+<span class="fc" id="L167">                    + &quot;:&quot; + positionKey(positioned.path()),</span>
+<span class="fc" id="L168">                application.assumptions(),</span>
+                PREPARATION_PACK_ID,
+                &quot;PROJECT&quot;,
+<span class="fc" id="L171">                application.primitiveRuleIds()));</span>
+<span class="fc" id="L172">        }</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (prepared.isEmpty()) {</span>
+<span class="fc" id="L174">            return direct;</span>
+        }
+<span class="fc" id="L176">        List&lt;Transformation&gt; result = new ArrayList&lt;&gt;(direct);</span>
+<span class="fc" id="L177">        result.addAll(prepared);</span>
+<span class="fc" id="L178">        return List.copyOf(result);</span>
+    }
+
+    private Transformation replayPrincipal(
+        PreparedRuleApplication application
+    ) {
+<span class="fc" id="L184">        String prepared = ExpressionFormatter.format(</span>
+<span class="fc" id="L185">            application.preparedSubtree());</span>
+<span class="fc" id="L186">        String expectedResultKey = outputKey(</span>
+<span class="fc" id="L187">            ExpressionFormatter.format(application.resultSubtree()),</span>
+<span class="fc" id="L188">            application.assumptions());</span>
+<span class="fc" id="L189">        return directEngine.transform(prepared).stream()</span>
+<span class="fc" id="L190">            .filter(transformation -&gt; application.principalRuleId()</span>
+<span class="fc" id="L191">                .equals(transformation.rule()))</span>
+<span class="fc" id="L192">            .filter(transformation -&gt; expectedResultKey.equals(outputKey(</span>
+<span class="fc" id="L193">                transformation.transformedExpression(),</span>
+<span class="fc" id="L194">                transformation.assumptions())))</span>
+<span class="fc" id="L195">            .findFirst()</span>
+<span class="fc" id="L196">            .orElse(null);</span>
+    }
+
+    private String outputKey(
+        String expression,
+        List&lt;String&gt; assumptions
+    ) {
+        String expressionKey;
+        try {
+<span class="fc" id="L205">            expressionKey = canonicalizer.stableHash(expression);</span>
+<span class="nc" id="L206">        } catch (RuntimeException exception) {</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">            expressionKey = expression == null ? &quot;&quot; : expression.trim();</span>
+<span class="fc" id="L208">        }</span>
+<span class="fc" id="L209">        return expressionKey + &quot;\u0000&quot; + String.join(&quot;\u0000&quot;, assumptions);</span>
+    }
+
+    private static List&lt;PositionedNode&gt; positionedNodes(Expr root) {
+<span class="fc" id="L213">        List&lt;PositionedNode&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L214">        collect(root, List.of(), result);</span>
+<span class="fc" id="L215">        return List.copyOf(result);</span>
+    }
+
+    private static void collect(
+        Expr expression,
+        List&lt;Integer&gt; path,
+        List&lt;PositionedNode&gt; result
+    ) {
+<span class="fc" id="L223">        result.add(new PositionedNode(expression, path));</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L225">            collect(binary.left(), append(path, 0), result);</span>
+<span class="fc" id="L226">            collect(binary.right(), append(path, 1), result);</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L228">            for (int index = 0;</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">                    index &lt; function.arguments().size();</span>
+<span class="fc" id="L230">                    index++) {</span>
+<span class="fc" id="L231">                collect(</span>
+<span class="fc" id="L232">                    function.arguments().get(index),</span>
+<span class="fc" id="L233">                    append(path, index),</span>
+                    result);
+            }
+        }
+<span class="fc" id="L237">    }</span>
+
+    private static List&lt;Integer&gt; append(
+        List&lt;Integer&gt; path,
+        int component
+    ) {
+<span class="fc" id="L243">        List&lt;Integer&gt; appended = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L244">        appended.add(component);</span>
+<span class="fc" id="L245">        return List.copyOf(appended);</span>
+    }
+
+    private static Expr replaceAt(
+        Expr current,
+        List&lt;Integer&gt; path,
+        int pathIndex,
+        Expr replacement
+    ) {
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        if (pathIndex == path.size()) {</span>
+<span class="fc" id="L255">            return replacement;</span>
+        }
+<span class="fc" id="L257">        int component = path.get(pathIndex);</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (current instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">            if (component == 0) {</span>
+<span class="nc" id="L260">                return new BinaryExpr(</span>
+<span class="nc" id="L261">                    replaceAt(</span>
+<span class="nc" id="L262">                        binary.left(),</span>
+                        path,
+                        pathIndex + 1,
+                        replacement),
+<span class="nc" id="L266">                    binary.operator(),</span>
+<span class="nc" id="L267">                    binary.right());</span>
+            }
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            if (component == 1) {</span>
+<span class="fc" id="L270">                return new BinaryExpr(</span>
+<span class="fc" id="L271">                    binary.left(),</span>
+<span class="fc" id="L272">                    binary.operator(),</span>
+<span class="fc" id="L273">                    replaceAt(</span>
+<span class="fc" id="L274">                        binary.right(),</span>
+                        path,
+                        pathIndex + 1,
+                        replacement));
+            }
+<span class="nc" id="L279">            throw new IllegalArgumentException(</span>
+                &quot;binary path component must be 0 or 1&quot;);
+        }
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (current instanceof FunctionExpr function) {</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">            if (component &lt; 0</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">                    || component &gt;= function.arguments().size()) {</span>
+<span class="nc" id="L285">                throw new IllegalArgumentException(</span>
+                    &quot;function path component out of bounds&quot;);
+            }
+<span class="fc" id="L288">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
+<span class="fc" id="L289">            arguments.set(</span>
+                component,
+<span class="fc" id="L291">                replaceAt(</span>
+<span class="fc" id="L292">                    arguments.get(component),</span>
+                    path,
+                    pathIndex + 1,
+                    replacement));
+<span class="fc" id="L296">            return new FunctionExpr(function.name(), arguments);</span>
+        }
+<span class="nc" id="L298">        throw new IllegalArgumentException(</span>
+            &quot;path descends through a leaf expression&quot;);
+    }
+
+    private static String positionKey(List&lt;Integer&gt; path) {
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
+<span class="fc" id="L304">            return &quot;root&quot;;</span>
+        }
+<span class="fc" id="L306">        return path.stream()</span>
+<span class="fc" id="L307">            .map(String::valueOf)</span>
+<span class="fc" id="L308">            .collect(java.util.stream.Collectors.joining(&quot;.&quot;));</span>
+    }
+
+    private static Set&lt;String&gt; ruleIds(List&lt;RewriteRule&gt; rules) {
+<span class="fc" id="L312">        Objects.requireNonNull(rules, &quot;rules&quot;);</span>
+<span class="fc" id="L313">        Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
+<span class="fc" id="L315">            ids.add(Objects.requireNonNull(rule, &quot;rule&quot;).id());</span>
+<span class="fc" id="L316">        }</span>
+<span class="fc" id="L317">        return Set.copyOf(ids);</span>
+    }
+
+    private record PositionedNode(
+        Expr expression,
+        List&lt;Integer&gt; path
+    ) {
+<span class="fc" id="L324">        private PositionedNode {</span>
+<span class="fc" id="L325">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L326">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="fc" id="L327">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
