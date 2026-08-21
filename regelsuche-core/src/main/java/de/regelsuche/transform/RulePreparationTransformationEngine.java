@@ -135,6 +135,10 @@ public final class RulePreparationTransformationEngine
                 throw new IllegalStateException(
                     "prepared application failed independent verification");
             }
+            Transformation principal = replayPrincipal(application);
+            if (principal == null) {
+                continue;
+            }
             Expr rewrittenRoot = replaceAt(
                 root,
                 positioned.path(),
@@ -153,10 +157,10 @@ public final class RulePreparationTransformationEngine
             prepared.add(new Transformation(
                 application.principalRuleId(),
                 transformed,
-                RewriteKind.SIMPLIFY,
+                principal.kind(),
                 true,
-                -4,
-                true,
+                principal.estimatedCostDelta(),
+                principal.equivalencePreservingByConstruction(),
                 "prepared:" + application.certificate().contentHash()
                     + ":" + positionKey(positioned.path()),
                 application.assumptions(),
@@ -170,6 +174,24 @@ public final class RulePreparationTransformationEngine
         List<Transformation> result = new ArrayList<>(direct);
         result.addAll(prepared);
         return List.copyOf(result);
+    }
+
+    private Transformation replayPrincipal(
+        PreparedRuleApplication application
+    ) {
+        String prepared = ExpressionFormatter.format(
+            application.preparedSubtree());
+        String expectedResultKey = outputKey(
+            ExpressionFormatter.format(application.resultSubtree()),
+            application.assumptions());
+        return directEngine.transform(prepared).stream()
+            .filter(transformation -> application.principalRuleId()
+                .equals(transformation.rule()))
+            .filter(transformation -> expectedResultKey.equals(outputKey(
+                transformation.transformedExpression(),
+                transformation.assumptions())))
+            .findFirst()
+            .orElse(null);
     }
 
     private String outputKey(
