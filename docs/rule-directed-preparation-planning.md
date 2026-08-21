@@ -121,6 +121,11 @@ equivalent or identically formatted but structurally different occurrences may
 require different bindings and retained evidence; they are analyzed
 independently.
 
+Structural hashes are computed once per invocation as a bottom-up Merkle tree.
+Each AST occurrence contributes one node descriptor and refers to its child
+hashes, so fingerprint construction is linear in the number of AST nodes rather
+than repeatedly traversing every subtree.
+
 The standard rule-list constructor uses `RuleInventoryFingerprint`, so changes
 to rule implementations, patterns, recognition profiles, descriptors or pack
 metadata invalidate the cache identity. Callers that inject a custom direct
