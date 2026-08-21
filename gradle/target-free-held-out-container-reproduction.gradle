@@ -42,16 +42,29 @@ def expectedArtifactNames = [
     'target-free-held-out-post-freeze-qualification.json'
 ]
 
+def checkoutGitStatus = providers.exec {
+    workingDir repositoryRoot.asFile
+    commandLine 'git', 'status', '--porcelain', '--untracked-files=normal'
+}.standardOutput.asText.map { value -> value.trim() }
 def checkoutHeadRevision = providers.exec {
     workingDir repositoryRoot.asFile
     commandLine 'git', 'rev-parse', 'HEAD'
 }.standardOutput.asText.map { value -> value.trim() }
+def cleanCheckoutRevision = checkoutGitStatus.flatMap { status ->
+    if (!status.isEmpty()) {
+        throw new GradleException(
+            'Cannot bind held-out reproduction evidence to a dirty checkout. '
+                + 'Commit, stash or remove local changes, or pass an explicit '
+                + 'authoritative repository revision.')
+    }
+    checkoutHeadRevision
+}
 def authoritativeRevision = providers
     .gradleProperty('regelsucheRepositoryRevision')
     .orElse(providers.environmentVariable(
         'REGELSUCHE_AUTHORITY_GITHUB_SHA'))
     .orElse(providers.environmentVariable('GITHUB_SHA'))
-    .orElse(checkoutHeadRevision)
+    .orElse(cleanCheckoutRevision)
     .map { value ->
         def revision = value.trim()
         if (!(revision ==~ /[0-9a-f]{40}/)) {
