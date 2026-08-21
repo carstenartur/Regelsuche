@@ -27,7 +27,7 @@ import java.util.Objects;
 /** Executable #235 suite with honest track-scoped capability claims. */
 public final class ComparativeBenchmarkRunner {
     public static final String SUITE_ID =
-        "comparative-baselines-initial/v2";
+        "comparative-baselines-initial/v3";
 
     private final List<SearchSystem> searchSystems;
     private final List<ValidationSystem> validationSystems;
@@ -122,36 +122,44 @@ public final class ComparativeBenchmarkRunner {
                         "BACKEND_UNAVAILABLE",
                         z3.detail())));
 
-        ExternalSymPySimplificationBaseline simplifier =
-            ExternalSymPySimplificationBaseline.detectSystemSymPy();
-        List<SimplificationSystem> simplification = List.of(
-            SimplificationSystem.internal(
-                "regelsuche-untargeted-best-first",
-                "1",
-                new BestFirstSearchStrategy(),
-                List.of(
-                    "INTERNAL_REGELSUCHE_SEARCH",
-                    "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
-                    "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
-                        + SimplificationAssumptionContract.CONTRACT_ID)),
-            SimplificationSystem.internalControl(
-                "randomized-valid-rewrite-control",
-                "1",
-                new DeterministicRandomValidRewriteStrategy(),
-                List.of(
-                    "INTERNAL_RANDOMIZED_CONTROL",
-                    "FIXED_SEED_BOUND_IN_CONFIGURATION_IDENTITY",
-                    "PER_CASE_RANDOM_STATE_RESET",
-                    "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
-                    "SAME_REWRITE_INVENTORY_AND_SEARCH_BUDGET_AS_REGELSUCHE",
-                    "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
-                        + SimplificationAssumptionContract.CONTRACT_ID,
-                    "CONTROL_IS_NOT_AN_EXTERNAL_SYMBOLIC_SYSTEM")),
-            SimplificationSystem.external(
+        return new ComparativeBenchmarkRunner(
+            search, validation, defaultSimplificationSystems());
+    }
+
+    static List<SimplificationSystem> defaultSimplificationSystems() {
+        List<SimplificationSystem> systems = new ArrayList<>();
+        systems.add(SimplificationSystem.internal(
+            "regelsuche-untargeted-best-first",
+            "1",
+            new BestFirstSearchStrategy(),
+            List.of(
+                "INTERNAL_REGELSUCHE_SEARCH",
+                "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
+                    + SimplificationAssumptionContract.CONTRACT_ID)));
+        systems.add(SimplificationSystem.internalControl(
+            "randomized-valid-rewrite-control",
+            "1",
+            new DeterministicRandomValidRewriteStrategy(),
+            List.of(
+                "INTERNAL_RANDOMIZED_CONTROL",
+                "FIXED_SEED_BOUND_IN_CONFIGURATION_IDENTITY",
+                "PER_CASE_RANDOM_STATE_RESET",
+                "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                "SAME_REWRITE_INVENTORY_AND_SEARCH_BUDGET_AS_REGELSUCHE",
+                "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
+                    + SimplificationAssumptionContract.CONTRACT_ID,
+                "CONTROL_IS_NOT_AN_EXTERNAL_SYMBOLIC_SYSTEM")));
+        for (ExternalSymPySimplificationBaseline simplifier
+                : ExternalSymPySimplificationBaseline
+                    .detectSystemSymPyOperations()) {
+            systems.add(SimplificationSystem.external(
                 simplifier,
                 simplifier.available()
                     ? List.of(
                         "EXTERNAL_CAS_NATIVE_SIMPLIFIER",
+                        simplifier.operation().limitationId(),
+                        "ONE_NAMED_CAS_OPERATION_PER_CONFIGURATION",
                         "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
                         "DECLARED_ASSUMPTIONS_PASSED_VIA_"
                             + SimplificationAssumptionContract.CONTRACT_ID,
@@ -160,9 +168,10 @@ public final class ComparativeBenchmarkRunner {
                         "SIMPLIFICATION_IS_NOT_DISCOVERY_OR_FORMAL_PROOF")
                     : List.of(
                         "BACKEND_UNAVAILABLE",
+                        simplifier.operation().limitationId(),
                         simplifier.detail())));
-        return new ComparativeBenchmarkRunner(
-            search, validation, simplification);
+        }
+        return List.copyOf(systems);
     }
 
     public Report run() {
@@ -273,24 +282,26 @@ public final class ComparativeBenchmarkRunner {
                 "ONLY_Z3_PROOF_OBJECTS_COUNT_AS_FORMAL_PROOF"));
     }
 
-    /** Head-to-head claim for the target-free simplification track. */
+    /** Portfolio claim for the target-free simplification track. */
     private static CapabilityClaim simplificationClaim(List<Result> results) {
         ClaimStatus status = status(results);
         return CapabilityClaim.create(
-            "target-free-simplification-head-to-head",
+            "target-free-simplification-operation-portfolio",
             Track.SIMPLIFICATION_COMPETITION,
             status,
             switch (status) {
                 case SUPPORTED ->
-                    "Every configured competitor reached the pinned reference form of every case from the input expression alone.";
+                    "Every configured target-free competitor and named native CAS operation reached every pinned reference form from the input expression alone.";
                 case NEGATIVE ->
-                    "At least one configured competitor did not reach a pinned reference form; all per-result outcomes are retained unchanged.";
+                    "At least one configured target-free competitor or named native CAS operation did not reach a pinned reference form; all per-result outcomes are retained unchanged.";
                 case INSUFFICIENT_EVIDENCE ->
-                    "At least one configured competitor could not be executed, so no head-to-head comparison is authorized.";
+                    "At least one configured competitor could not be executed, so no complete operation-portfolio comparison is authorized.";
             },
             hashes(results),
             List.of(
                 "SEVEN_SMALL_ALGEBRAIC_CASES_ONLY",
+                "ONE_NAMED_CAS_OPERATION_PER_CONFIGURATION",
+                "PRIMARY_SIMPLIFY_HEAD_TO_HEAD_REMAINS_SEPARATELY_INTERPRETABLE",
                 "PINNED_REFERENCE_FORM_IS_NOT_A_UNIVERSAL_SIMPLICITY_ORDER",
                 "NO_RUNTIME_OR_SCALABILITY_CLAIM",
                 "SHARED_SURFACE_JUDGE_IS_THE_REGELSUCHE_CANONICALIZER",
