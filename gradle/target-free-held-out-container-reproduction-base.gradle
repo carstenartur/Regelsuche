@@ -42,38 +42,46 @@ def expectedArtifactNames = [
     'target-free-held-out-post-freeze-qualification.json'
 ]
 
-def checkoutGitStatus = providers.exec {
-    workingDir repositoryRoot.asFile
-    commandLine 'git', 'status', '--porcelain', '--untracked-files=normal'
-}.standardOutput.asText.map { value -> value.trim() }
-def checkoutHeadRevision = providers.exec {
-    workingDir repositoryRoot.asFile
-    commandLine 'git', 'rev-parse', 'HEAD'
-}.standardOutput.asText.map { value -> value.trim() }
-def cleanCheckoutRevision = checkoutGitStatus.flatMap { status ->
-    if (!status.isEmpty()) {
-        throw new GradleException(
-            'Cannot bind held-out reproduction evidence to a dirty checkout. '
-                + 'Commit, stash or remove local changes, or pass an explicit '
-                + 'authoritative repository revision.')
-    }
-    checkoutHeadRevision
-}
-def authoritativeRevision = providers
+/*
+ * Do not construct providers.exec fallbacks as part of the provider graph.
+ * Gradle may inspect every provider while deriving task dependencies, even
+ * when an earlier orElse value is present. That would require a git binary in
+ * the intentionally minimal reproduction image although the immutable
+ * revision is already supplied explicitly. Keep the VCS lookup inside a
+ * plain lazy provider and execute it only when no authoritative value exists.
+ */
+def configuredRevision = providers
     .gradleProperty('regelsucheRepositoryRevision')
     .orElse(providers.environmentVariable(
         'REGELSUCHE_AUTHORITY_GITHUB_SHA'))
     .orElse(providers.environmentVariable('GITHUB_SHA'))
-    .orElse(cleanCheckoutRevision)
-    .map { value ->
-        def revision = value.trim()
-        if (!(revision ==~ /[0-9a-f]{40}/)) {
+def authoritativeRevision = providers.provider {
+    def revision = configuredRevision.orNull
+    if (revision == null) {
+        def checkoutStatus = providers.exec {
+            workingDir repositoryRoot.asFile
+            commandLine 'git', 'status', '--porcelain',
+                '--untracked-files=normal'
+        }.standardOutput.asText.get().trim()
+        if (!checkoutStatus.isEmpty()) {
             throw new GradleException(
-                'Held-out reproduction revision must be a lowercase '
-                    + '40-character Git commit SHA')
+                'Cannot bind held-out reproduction evidence to a dirty '
+                    + 'checkout. Commit, stash or remove local changes, or '
+                    + 'pass an explicit authoritative repository revision.')
         }
-        revision
+        revision = providers.exec {
+            workingDir repositoryRoot.asFile
+            commandLine 'git', 'rev-parse', 'HEAD'
+        }.standardOutput.asText.get()
     }
+    revision = revision.trim()
+    if (!(revision ==~ /[0-9a-f]{40}/)) {
+        throw new GradleException(
+            'Held-out reproduction revision must be a lowercase '
+                + '40-character Git commit SHA')
+    }
+    revision
+}
 
 def registerMatrixRun = { discovery, String taskName,
         outputDirectory, String taskDescription ->
