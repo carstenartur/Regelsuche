@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
@@ -8,12 +9,19 @@ import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.knowledge.KnowledgePackRegistry;
 import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.RulePreparationPlanner.PreparedRuleApplication;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -29,6 +37,7 @@ import java.util.Set;
 public final class RulePreparationTransformationEngine
         implements TransformationEngine {
     private static final int DEFAULT_MAX_PREPARED_CANDIDATES = 16;
+    private static final int DEFAULT_MAX_PREPARATION_CACHE_ENTRIES = 128;
     private static final String PREPARATION_PACK_ID =
         "core-rule-preparation";
 
@@ -36,6 +45,9 @@ public final class RulePreparationTransformationEngine
     private final Set<String> visibleRuleIds;
     private final RulePreparationPlanner planner;
     private final int maxPreparedCandidates;
+    private final AssumptionSignature assumptionSignature;
+    private final String ruleInventoryHash;
+    private final int maxPreparationCacheEntries;
     private final ExpressionParser parser = new ExpressionParser();
     private final ExpressionCanonicalizer canonicalizer =
         new ExpressionCanonicalizer();
@@ -45,12 +57,22 @@ public final class RulePreparationTransformationEngine
     }
 
     public RulePreparationTransformationEngine(List<RewriteRule> rules) {
+        this(rules, AssumptionSignature.ofExpressions(List.of()));
+    }
+
+    public RulePreparationTransformationEngine(
+        List<RewriteRule> rules,
+        AssumptionSignature assumptionSignature
+    ) {
         this(
             new AstRewriteTransformationEngine(
                 List.copyOf(Objects.requireNonNull(rules, "rules"))),
             ruleIds(rules),
             new RulePreparationPlanner(),
-            DEFAULT_MAX_PREPARED_CANDIDATES);
+            DEFAULT_MAX_PREPARED_CANDIDATES,
+            assumptionSignature,
+            RuleInventoryFingerprint.contentHash(rules),
+            DEFAULT_MAX_PREPARATION_CACHE_ENTRIES);
     }
 
     public RulePreparationTransformationEngine(
@@ -59,17 +81,46 @@ public final class RulePreparationTransformationEngine
         RulePreparationPlanner planner,
         int maxPreparedCandidates
     ) {
+        this(
+            directEngine,
+            visibleRuleIds,
+            planner,
+            maxPreparedCandidates,
+            AssumptionSignature.ofExpressions(List.of()),
+            idOnlyInventoryHash(visibleRuleIds),
+            DEFAULT_MAX_PREPARATION_CACHE_ENTRIES);
+    }
+
+    public RulePreparationTransformationEngine(
+        TransformationEngine directEngine,
+        Set<String> visibleRuleIds,
+        RulePreparationPlanner planner,
+        int maxPreparedCandidates,
+        AssumptionSignature assumptionSignature,
+        String ruleInventoryHash,
+        int maxPreparationCacheEntries
+    ) {
         this.directEngine = Objects.requireNonNull(
             directEngine,
             "directEngine");
         this.visibleRuleIds = Set.copyOf(
             Objects.requireNonNull(visibleRuleIds, "visibleRuleIds"));
         this.planner = Objects.requireNonNull(planner, "planner");
-        if (maxPreparedCandidates < 0) {
+        this.assumptionSignature = Objects.requireNonNull(
+            assumptionSignature,
+            "assumptionSignature");
+        if (ruleInventoryHash == null || ruleInventoryHash.isBlank()) {
             throw new IllegalArgumentException(
-                "maxPreparedCandidates must not be negative");
+                "ruleInventoryHash must not be blank");
+        }
+        this.ruleInventoryHash = ruleInventoryHash.trim();
+        if (maxPreparedCandidates < 0
+                || maxPreparationCacheEntries < 0) {
+            throw new IllegalArgumentException(
+                "candidate and cache limits must not be negative");
         }
         this.maxPreparedCandidates = maxPreparedCandidates;
+        this.maxPreparationCacheEntries = maxPreparationCacheEntries;
     }
 
     public static RulePreparationTransformationEngine withKnowledgePacks(
@@ -89,8 +140,28 @@ public final class RulePreparationTransformationEngine
         return visibleRuleIds;
     }
 
+    public AssumptionSignature assumptionSignature() {
+        return assumptionSignature;
+    }
+
+    public String ruleInventoryHash() {
+        return ruleInventoryHash;
+    }
+
     @Override
     public List<Transformation> transform(String expression) {
+        return transformWithEvidence(expression).transformations();
+    }
+
+    /**
+     * Executes direct and prepared rewrites while retaining invocation-local
+     * memoization metrics. The cache is intentionally scoped to one call so
+     * its insertion and eviction order is deterministic and cannot leak across
+     * experiments with different identities.
+     */
+    public Execution transformWithEvidence(String expression) {
+        PreparationMemoizer memoizer = new PreparationMemoizer(
+            maxPreparationCacheEntries);
         List<Transformation> direct = List.copyOf(
             directEngine.transform(expression));
         if (maxPreparedCandidates == 0
@@ -98,7 +169,7 @@ public final class RulePreparationTransformationEngine
                     RulePreparationPlanner.PRINCIPAL_RULE_ID)
                 || expression == null
                 || expression.isBlank()) {
-            return direct;
+            return new Execution(direct, memoizer.metrics());
         }
 
         Expr root;
@@ -107,7 +178,7 @@ public final class RulePreparationTransformationEngine
                 .terms()
                 .getFirst();
         } catch (IllegalArgumentException exception) {
-            return direct;
+            return new Execution(direct, memoizer.metrics());
         }
 
         String formattedRoot = ExpressionFormatter.format(root);
@@ -123,8 +194,13 @@ public final class RulePreparationTransformationEngine
             if (prepared.size() >= maxPreparedCandidates) {
                 break;
             }
+            CacheKey cacheKey = cacheKey(positioned.expression());
             RulePreparationPlanner.PlanAttempt attempt =
-                planner.plan(positioned.expression());
+                memoizer.find(cacheKey);
+            if (attempt == null) {
+                attempt = planner.plan(positioned.expression());
+                memoizer.retain(cacheKey, attempt);
+            }
             if (attempt.status()
                     != RulePreparationPlanner.Status.PREPARED) {
                 continue;
@@ -171,11 +247,21 @@ public final class RulePreparationTransformationEngine
                 application.primitiveRuleIds()));
         }
         if (prepared.isEmpty()) {
-            return direct;
+            return new Execution(direct, memoizer.metrics());
         }
         List<Transformation> result = new ArrayList<>(direct);
         result.addAll(prepared);
-        return List.copyOf(result);
+        return new Execution(result, memoizer.metrics());
+    }
+
+    private CacheKey cacheKey(Expr expression) {
+        return new CacheKey(
+            plannerId(),
+            RulePreparationPlanner.PRINCIPAL_RULE_ID,
+            canonicalizer.stableHash(ExpressionFormatter.format(expression)),
+            assumptionSignature.fingerprint(),
+            ruleInventoryHash,
+            "maxSolverAttempts=" + planner.budget().maxSolverAttempts());
     }
 
     private Transformation replayPrincipal(
@@ -315,6 +401,126 @@ public final class RulePreparationTransformationEngine
             ids.add(Objects.requireNonNull(rule, "rule").id());
         }
         return Set.copyOf(ids);
+    }
+
+    private static String idOnlyInventoryHash(Set<String> ruleIds) {
+        Objects.requireNonNull(ruleIds, "ruleIds");
+        String payload = ruleIds.stream().sorted().toList().toString();
+        try {
+            return "sha256:" + HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                    .digest(payload.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
+    public record Execution(
+        List<Transformation> transformations,
+        CacheMetrics cacheMetrics
+    ) {
+        public Execution {
+            transformations = List.copyOf(
+                Objects.requireNonNull(transformations, "transformations"));
+            cacheMetrics = Objects.requireNonNull(
+                cacheMetrics,
+                "cacheMetrics");
+        }
+    }
+
+    public record CacheMetrics(
+        int lookups,
+        int hits,
+        int misses,
+        int retainedEntries,
+        int evictions,
+        int skippedInconclusive
+    ) {
+        public CacheMetrics {
+            if (lookups < 0 || hits < 0 || misses < 0
+                    || retainedEntries < 0 || evictions < 0
+                    || skippedInconclusive < 0
+                    || lookups != hits + misses) {
+                throw new IllegalArgumentException(
+                    "cache metrics must be non-negative and balanced");
+            }
+        }
+    }
+
+    private record CacheKey(
+        String plannerId,
+        String principalRuleId,
+        String subtreeHash,
+        String assumptionFingerprint,
+        String ruleInventoryHash,
+        String budgetIdentity
+    ) {
+        private CacheKey {
+            Objects.requireNonNull(plannerId, "plannerId");
+            Objects.requireNonNull(principalRuleId, "principalRuleId");
+            Objects.requireNonNull(subtreeHash, "subtreeHash");
+            Objects.requireNonNull(
+                assumptionFingerprint,
+                "assumptionFingerprint");
+            Objects.requireNonNull(ruleInventoryHash, "ruleInventoryHash");
+            Objects.requireNonNull(budgetIdentity, "budgetIdentity");
+        }
+    }
+
+    private static final class PreparationMemoizer {
+        private final int maxEntries;
+        private final Map<CacheKey, RulePreparationPlanner.PlanAttempt> entries =
+            new LinkedHashMap<>();
+        private int lookups;
+        private int hits;
+        private int misses;
+        private int evictions;
+        private int skippedInconclusive;
+
+        private PreparationMemoizer(int maxEntries) {
+            this.maxEntries = maxEntries;
+        }
+
+        private RulePreparationPlanner.PlanAttempt find(CacheKey key) {
+            lookups++;
+            RulePreparationPlanner.PlanAttempt attempt = entries.get(key);
+            if (attempt == null) {
+                misses++;
+            } else {
+                hits++;
+            }
+            return attempt;
+        }
+
+        private void retain(
+            CacheKey key,
+            RulePreparationPlanner.PlanAttempt attempt
+        ) {
+            if (attempt.status()
+                    == RulePreparationPlanner.Status.BUDGET_INCONCLUSIVE) {
+                skippedInconclusive++;
+                return;
+            }
+            if (maxEntries == 0 || entries.containsKey(key)) {
+                return;
+            }
+            if (entries.size() >= maxEntries) {
+                CacheKey oldest = entries.keySet().iterator().next();
+                entries.remove(oldest);
+                evictions++;
+            }
+            entries.put(key, attempt);
+        }
+
+        private CacheMetrics metrics() {
+            return new CacheMetrics(
+                lookups,
+                hits,
+                misses,
+                entries.size(),
+                evictions,
+                skippedInconclusive);
+        }
     }
 
     private record PositionedNode(
