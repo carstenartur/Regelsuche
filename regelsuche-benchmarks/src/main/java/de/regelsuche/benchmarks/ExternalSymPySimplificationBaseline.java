@@ -37,7 +37,7 @@ import java.util.Objects;
  * Symbol-scoped declarations are bound as SymPy symbol assumptions before
  * parsing, which is the mechanism SymPy's own operations consult. A declaration
  * whose subject is a composite expression has no symbol to bind to and is
- * therefore passed but unused; that residue remains an explicit limitation.</p>
+ * therefore not passed to SymPy; that residue remains an explicit limitation.</p>
  */
 final class ExternalSymPySimplificationBaseline {
     private static final String NOT_APPLICABLE_MARKER =
@@ -135,8 +135,8 @@ final class ExternalSymPySimplificationBaseline {
      * Applies the configured operation without any knowledge of a target.
      *
      * @param inputExpression the only expression handed to the baseline
-     * @param contract the declared case assumptions, injected identically for
-     *     every configured competitor
+     * @param contract the declared case-assumption contract evaluated for every
+     *     competitor; only symbol-scoped declarations can be encoded here
      * @return the produced operation outcome, never {@code null}
      */
     Simplification simplify(
