@@ -3,6 +3,7 @@ package de.regelsuche.transform;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +35,9 @@ class PatternMatchAnalyzerRepresentativeTest {
         assertTrue(analysis.matches().stream().anyMatch(match ->
             match.recognitionStrength()
                 == ExprMatcher.RecognitionStrength.BOUNDED_REPRESENTATIVE));
-        assertEquals("x", analysis.matches().getFirst().representative().toString());
+        assertEquals(
+            "x",
+            ExpressionFormatter.format(
+                analysis.matches().getFirst().representative()));
     }
 }
