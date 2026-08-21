@@ -92,7 +92,90 @@ The planner distinguishes:
 - `BUDGET_INCONCLUSIVE`.
 
 Unsupported multivariate input, a non-exact quotient, an explicit zero divisor
-or exhausted solver work never produces a guessed candidate.
+or exhausted solver work never produces a guessed candidate. A prepared
+application that fails independent verification is skipped while direct
+results and other AST positions remain available.
+
+## Invocation-local memoization
+
+One transformation invocation may contain the same subtree at several AST
+positions. Repeating the same residual solver call at each occurrence adds no
+mathematical information. `RulePreparationTransformationEngine` therefore
+maintains a bounded deterministic cache for the duration of one
+`transformWithEvidence` call.
+
+Each key binds:
+
+- planner revision;
+- principal rule ID;
+- exact recursive AST-structure hash;
+- normalized assumption fingerprint;
+- deterministic rule-inventory fingerprint;
+- preparation-budget identity.
+
+The subtree descriptor records node kinds, operators, child order, variable and
+function names, argument counts and exact floating-point number bits using
+length-prefixed tokens before hashing. It does not rely on pretty-printed text:
+the formatter may intentionally hide associative parentheses. Algebraically
+equivalent or identically formatted but structurally different occurrences may
+require different bindings and retained evidence; they are analyzed
+independently.
+
+Structural hashes are computed once per invocation as a bottom-up Merkle tree.
+Each AST occurrence contributes one node descriptor and refers to its child
+hashes, so fingerprint construction is linear in the number of AST nodes rather
+than repeatedly traversing every subtree.
+
+The standard rule-list constructor uses `RuleInventoryFingerprint`. Pattern
+rules bind their source, target and recognition profile; every rule binds its
+implementation class and public execution metadata. A changed Java body behind
+the same implementation class is not content-addressed by this fingerprint, so
+retained experiments must additionally bind the repository revision. Callers
+that inject a custom direct engine must provide or accept an explicit ID-only
+inventory hash.
+
+Only analyses that consumed residual-solver work are retained. Cheap decisions
+such as “this node is not a division” remain visible in the metrics but cannot
+occupy cache capacity or evict a verified quotient. `BUDGET_INCONCLUSIVE`
+results are also never retained: a budget-limited non-result must not become a
+semantic negative fact.
+
+Prepared applications enter the cache only after independent verification. A
+cache hit therefore reuses already verified formation evidence without
+rerunning the exact quotient proposal or its verification. The visible
+principal rule is still replayed for each concrete AST position before a
+transformation is emitted.
+
+Insertion order and oldest-expensive-entry eviction are deterministic. Cache
+capacity is configurable and may be set to zero for an exact no-cache ablation.
+`transformWithEvidence` returns balanced cache metrics:
+
+```text
+lookups = hits + misses
+retained entries
+oldest expensive-entry evictions
+skipped budget-inconclusive results
+skipped zero-solver-work decisions
+prepared-application verifications
+skipped unverifiable applications
+```
+
+The cache is intentionally invocation-local. It cannot leak candidates between
+experiments with different assumptions, inventories or configuration
+identities, and it requires no invalidation protocol beyond the retained key.
+
+## Experiment identity and ablation
+
+A benchmark or retained experiment that enables preparation memoization must
+bind at least the repository revision, planner revision, rule-inventory
+fingerprint, normalized assumption fingerprint, solver budget, cache-capacity
+policy and engine selection in its configuration identity. The no-cache
+capacity-zero variant is the required direct ablation for any performance or
+work-reduction claim.
+
+Memoization changes mechanical work, not the declared mathematical rule
+inventory. It therefore must never be used to rewrite historical evidence from
+configurations that did not declare this execution policy.
 
 ## Current limits
 
