@@ -18,18 +18,23 @@ record ExactPositiveMonomial(
     long coefficient,
     SortedMap<String, Integer> powers
 ) {
+    static final long MAX_EXACT_DOUBLE_INTEGER = 1L << 53;
+
     ExactPositiveMonomial(long coefficient, Map<String, Integer> powers) {
         this(coefficient, new TreeMap<>(Objects.requireNonNull(powers, "powers")));
     }
 
     ExactPositiveMonomial {
-        if (coefficient < 1 || powers == null || powers.entrySet().stream()
-                .anyMatch(entry -> entry.getKey() == null
-                    || entry.getKey().isBlank()
-                    || entry.getValue() == null
-                    || entry.getValue() < 1)) {
+        if (coefficient < 1
+                || coefficient > MAX_EXACT_DOUBLE_INTEGER
+                || powers == null
+                || powers.entrySet().stream().anyMatch(entry ->
+                    entry.getKey() == null
+                        || entry.getKey().isBlank()
+                        || entry.getValue() == null
+                        || entry.getValue() < 1)) {
             throw new IllegalArgumentException(
-                "monomials require a positive coefficient and powers");
+                "monomials require an exactly representable positive coefficient and powers");
         }
         powers = Collections.unmodifiableSortedMap(new TreeMap<>(powers));
     }
@@ -76,6 +81,9 @@ record ExactPositiveMonomial(
         try {
             product = Math.multiplyExact(coefficient, other.coefficient);
         } catch (ArithmeticException exception) {
+            return null;
+        }
+        if (product > MAX_EXACT_DOUBLE_INTEGER) {
             return null;
         }
         TreeMap<String, Integer> combined = new TreeMap<>(powers);
@@ -128,9 +136,12 @@ record ExactPositiveMonomial(
 
     record Limits(int maxFactors, int maxExponent, long maxCoefficient) {
         Limits {
-            if (maxFactors < 0 || maxExponent < 1 || maxCoefficient < 1) {
+            if (maxFactors < 0
+                    || maxExponent < 1
+                    || maxCoefficient < 1
+                    || maxCoefficient > MAX_EXACT_DOUBLE_INTEGER) {
                 throw new IllegalArgumentException(
-                    "factor limit must be non-negative and algebra limits positive");
+                    "limits must remain inside the exact positive double-integer fragment");
             }
         }
     }
@@ -210,7 +221,7 @@ record ExactPositiveMonomial(
             long value = exactPositiveInteger(number.value());
             if (value < 1) {
                 return ParseResult.unsupported(
-                    "coefficient-is-not-a-positive-exact-integer");
+                    "coefficient-is-not-an-exactly-representable-positive-integer");
             }
             return value > limits.maxCoefficient()
                 ? ParseResult.inconclusive("monomial-coefficient-limit-exhausted")
@@ -268,7 +279,7 @@ record ExactPositiveMonomial(
             return Double.isFinite(value)
                     && value >= 1
                     && value == Math.rint(value)
-                    && value <= Long.MAX_VALUE
+                    && value <= MAX_EXACT_DOUBLE_INTEGER
                 ? (long) value
                 : -1;
         }
