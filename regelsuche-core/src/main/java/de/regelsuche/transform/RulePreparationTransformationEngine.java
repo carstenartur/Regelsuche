@@ -167,92 +167,190 @@ public final class RulePreparationTransformationEngine
             maxPreparationCacheEntries);
         List<Transformation> direct = List.copyOf(
             directEngine.transform(expression));
-        if (maxPreparedCandidates == 0
-                || !visibleRuleIds.contains(
-                    RulePreparationPlanner.PRINCIPAL_RULE_ID)
-                || expression == null
-                || expression.isBlank()) {
-            return new Execution(direct, memoizer.metrics());
+        if (!preparationEnabledFor(expression)) {
+            return execution(direct, List.of(), memoizer);
         }
 
-        Expr root;
-        try {
-            root = parser.parse(new InputRequest(InputType.TERM, expression))
-                .terms()
-                .getFirst();
-        } catch (IllegalArgumentException exception) {
-            return new Execution(direct, memoizer.metrics());
+        Expr root = parseRoot(expression);
+        if (root == null) {
+            return execution(direct, List.of(), memoizer);
         }
 
         String formattedRoot = ExpressionFormatter.format(root);
-        Set<String> retainedOutputKeys = new LinkedHashSet<>();
-        for (Transformation transformation : direct) {
-            retainedOutputKeys.add(outputKey(
+        Set<String> retainedOutputKeys = outputKeys(direct);
+        List<Transformation> prepared = preparedTransformations(
+            root,
+            formattedRoot,
+            retainedOutputKeys,
+            memoizer);
+        return execution(direct, prepared, memoizer);
+    }
+
+    private boolean preparationEnabledFor(String expression) {
+        return maxPreparedCandidates > 0
+            && visibleRuleIds.contains(
+                RulePreparationPlanner.PRINCIPAL_RULE_ID)
+            && expression != null
+            && !expression.isBlank();
+    }
+
+    private Expr parseRoot(String expression) {
+        try {
+            return parser.parse(new InputRequest(InputType.TERM, expression))
+                .terms()
+                .getFirst();
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    private Set<String> outputKeys(List<Transformation> transformations) {
+        Set<String> result = new LinkedHashSet<>();
+        for (Transformation transformation : transformations) {
+            result.add(outputKey(
                 transformation.transformedExpression(),
                 transformation.assumptions()));
         }
+        return result;
+    }
 
+    private List<Transformation> preparedTransformations(
+        Expr root,
+        String formattedRoot,
+        Set<String> retainedOutputKeys,
+        PreparationMemoizer memoizer
+    ) {
         List<Transformation> prepared = new ArrayList<>();
         for (PositionedNode positioned : positionedNodes(root)) {
             if (prepared.size() >= maxPreparedCandidates) {
                 break;
             }
-            CacheKey cacheKey = cacheKey(positioned.subtreeHash());
-            RulePreparationPlanner.PlanAttempt attempt =
-                memoizer.find(cacheKey);
-            if (attempt == null) {
-                attempt = planner.plan(positioned.expression());
-                if (attempt.status()
-                        == RulePreparationPlanner.Status.PREPARED) {
-                    memoizer.recordPreparedVerification();
-                    PreparedRuleApplication proposed =
-                        attempt.application().orElseThrow();
-                    if (!verifyPreparedApplication(proposed)) {
-                        memoizer.recordUnverifiable();
-                        continue;
-                    }
-                }
-                memoizer.retain(cacheKey, attempt);
-            }
-            if (attempt.status()
-                    != RulePreparationPlanner.Status.PREPARED) {
-                continue;
-            }
-            PreparedRuleApplication application =
-                attempt.application().orElseThrow();
-            Transformation principal = replayPrincipal(application);
-            if (principal == null) {
-                continue;
-            }
-            Expr rewrittenRoot = replaceAt(
+            RulePreparationPlanner.PlanAttempt attempt = resolveAttempt(
+                positioned,
+                memoizer);
+            Transformation candidate = preparedTransformation(
                 root,
-                positioned.path(),
-                0,
-                application.resultSubtree());
-            String transformed = ExpressionFormatter.format(rewrittenRoot);
-            if (transformed.equals(formattedRoot)) {
-                continue;
+                formattedRoot,
+                positioned,
+                attempt,
+                retainedOutputKeys);
+            if (candidate != null) {
+                prepared.add(candidate);
             }
-            String outputKey = outputKey(
-                transformed,
-                application.assumptions());
-            if (!retainedOutputKeys.add(outputKey)) {
-                continue;
-            }
-            prepared.add(new Transformation(
-                application.principalRuleId(),
-                transformed,
-                principal.kind(),
-                true,
-                principal.estimatedCostDelta(),
-                principal.equivalencePreservingByConstruction(),
-                "prepared:" + application.certificate().contentHash()
-                    + ":" + positionKey(positioned.path()),
-                application.assumptions(),
-                PREPARATION_PACK_ID,
-                "PROJECT",
-                application.primitiveRuleIds()));
         }
+        return List.copyOf(prepared);
+    }
+
+    private RulePreparationPlanner.PlanAttempt resolveAttempt(
+        PositionedNode positioned,
+        PreparationMemoizer memoizer
+    ) {
+        CacheKey key = cacheKey(positioned.subtreeHash());
+        RulePreparationPlanner.PlanAttempt cached = memoizer.find(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        RulePreparationPlanner.PlanAttempt proposed =
+            planner.plan(positioned.expression());
+        if (!verifiedIfPrepared(proposed, memoizer)) {
+            return null;
+        }
+        memoizer.retain(key, proposed);
+        return proposed;
+    }
+
+    private boolean verifiedIfPrepared(
+        RulePreparationPlanner.PlanAttempt attempt,
+        PreparationMemoizer memoizer
+    ) {
+        if (attempt.status() != RulePreparationPlanner.Status.PREPARED) {
+            return true;
+        }
+        memoizer.recordPreparedVerification();
+        PreparedRuleApplication application =
+            attempt.application().orElseThrow();
+        if (verifyPreparedApplication(application)) {
+            return true;
+        }
+        memoizer.recordUnverifiable();
+        return false;
+    }
+
+    private Transformation preparedTransformation(
+        Expr root,
+        String formattedRoot,
+        PositionedNode positioned,
+        RulePreparationPlanner.PlanAttempt attempt,
+        Set<String> retainedOutputKeys
+    ) {
+        if (attempt == null
+                || attempt.status()
+                    != RulePreparationPlanner.Status.PREPARED) {
+            return null;
+        }
+        PreparedRuleApplication application =
+            attempt.application().orElseThrow();
+        Transformation principal = replayPrincipal(application);
+        if (principal == null) {
+            return null;
+        }
+        String transformed = transformedRoot(
+            root,
+            positioned,
+            application);
+        if (transformed.equals(formattedRoot)
+                || !retainedOutputKeys.add(outputKey(
+                    transformed,
+                    application.assumptions()))) {
+            return null;
+        }
+        return preparedTransformation(
+            positioned,
+            application,
+            principal,
+            transformed);
+    }
+
+    private static String transformedRoot(
+        Expr root,
+        PositionedNode positioned,
+        PreparedRuleApplication application
+    ) {
+        Expr rewrittenRoot = replaceAt(
+            root,
+            positioned.path(),
+            0,
+            application.resultSubtree());
+        return ExpressionFormatter.format(rewrittenRoot);
+    }
+
+    private static Transformation preparedTransformation(
+        PositionedNode positioned,
+        PreparedRuleApplication application,
+        Transformation principal,
+        String transformed
+    ) {
+        return new Transformation(
+            application.principalRuleId(),
+            transformed,
+            principal.kind(),
+            true,
+            principal.estimatedCostDelta(),
+            principal.equivalencePreservingByConstruction(),
+            "prepared:" + application.certificate().contentHash()
+                + ":" + positionKey(positioned.path()),
+            application.assumptions(),
+            PREPARATION_PACK_ID,
+            "PROJECT",
+            application.primitiveRuleIds());
+    }
+
+    private static Execution execution(
+        List<Transformation> direct,
+        List<Transformation> prepared,
+        PreparationMemoizer memoizer
+    ) {
         if (prepared.isEmpty()) {
             return new Execution(direct, memoizer.metrics());
         }
