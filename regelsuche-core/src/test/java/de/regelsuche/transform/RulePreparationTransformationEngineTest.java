@@ -1,6 +1,7 @@
 package de.regelsuche.transform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.AssumptionSignature;
@@ -152,6 +153,8 @@ class RulePreparationTransformationEngineTest {
         assertTrue(metrics.misses() > 0);
         assertTrue(metrics.retainedEntries() > 0);
         assertEquals(metrics.lookups(), metrics.hits() + metrics.misses());
+        assertEquals(1, metrics.preparedVerifications());
+        assertEquals(0, metrics.skippedUnverifiable());
         assertTrue(engine.ruleInventoryHash().startsWith("sha256:"));
     }
 
@@ -180,6 +183,7 @@ class RulePreparationTransformationEngineTest {
         assertEquals(0, execution.cacheMetrics().hits());
         assertEquals(0, execution.cacheMetrics().retainedEntries());
         assertTrue(execution.cacheMetrics().misses() > 0);
+        assertTrue(execution.cacheMetrics().preparedVerifications() >= 2);
         assertTrue(execution.transformations().stream()
             .anyMatch(transformation -> transformation.primitiveRuleIds()
                 .contains(RulePreparationPlanner.PREPARATION_RULE_ID)));
@@ -208,8 +212,95 @@ class RulePreparationTransformationEngineTest {
                 "(x^3 - 1) / (x - 1) + (x^3 - 1) / (x - 1)");
 
         assertTrue(execution.cacheMetrics().skippedInconclusive() >= 2);
+        assertEquals(0, execution.cacheMetrics().preparedVerifications());
         assertTrue(execution.transformations().stream()
             .noneMatch(transformation -> transformation.primitiveRuleIds()
                 .contains(RulePreparationPlanner.PREPARATION_RULE_ID)));
+    }
+
+    @Test
+    void boundedCacheEvictsTheOldestDeterministically() {
+        AstRewriteTransformationEngine direct =
+            new AstRewriteTransformationEngine();
+        Set<String> visibleRuleIds = direct.rules().stream()
+            .map(RewriteRule::id)
+            .collect(java.util.stream.Collectors.toSet());
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine(
+                direct,
+                visibleRuleIds,
+                new RulePreparationPlanner(),
+                16,
+                AssumptionSignature.ofExpressions(List.of()),
+                "sha256:test-inventory",
+                1);
+
+        RulePreparationTransformationEngine.Execution execution =
+            engine.transformWithEvidence(
+                "(x^3 - 1) / (x - 1) + (x^3 - 1) / (x - 1)");
+
+        assertEquals(1, execution.cacheMetrics().retainedEntries());
+        assertTrue(execution.cacheMetrics().evictions() > 0);
+        assertTrue(execution.cacheMetrics().preparedVerifications() >= 2);
+    }
+
+    @Test
+    void cacheContextRetainsNormalizedAssumptionsAndInventoryIdentity() {
+        List<RewriteRule> rules = AstRewriteTransformationEngine.defaultRules();
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine(
+                rules,
+                AssumptionSignature.ofExpressions(
+                    List.of("0 != (x - 1)")));
+        RulePreparationTransformationEngine sameInventory =
+            new RulePreparationTransformationEngine(rules);
+
+        assertEquals(
+            "x - 1 != 0",
+            engine.assumptionSignature().fingerprint());
+        assertEquals(
+            sameInventory.ruleInventoryHash(),
+            engine.ruleInventoryHash());
+    }
+
+    @Test
+    void invalidCacheConfigurationFailsClosed() {
+        AstRewriteTransformationEngine direct =
+            new AstRewriteTransformationEngine();
+        Set<String> visibleRuleIds = direct.rules().stream()
+            .map(RewriteRule::id)
+            .collect(java.util.stream.Collectors.toSet());
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new RulePreparationTransformationEngine(
+                direct,
+                visibleRuleIds,
+                new RulePreparationPlanner(),
+                16,
+                AssumptionSignature.ofExpressions(List.of()),
+                " ",
+                1));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new RulePreparationTransformationEngine(
+                direct,
+                visibleRuleIds,
+                new RulePreparationPlanner(),
+                16,
+                AssumptionSignature.ofExpressions(List.of()),
+                "sha256:test-inventory",
+                -1));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new RulePreparationTransformationEngine.CacheMetrics(
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0));
     }
 }
