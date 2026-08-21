@@ -3,6 +3,7 @@ package de.regelsuche.transform;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import java.util.List;
 import java.util.Set;
@@ -131,6 +132,83 @@ class RulePreparationTransformationEngineTest {
 
         assertTrue(engine.transform("(x^3 + 1) / (x - 1)")
             .stream()
+            .noneMatch(transformation -> transformation.primitiveRuleIds()
+                .contains(RulePreparationPlanner.PREPARATION_RULE_ID)));
+    }
+
+    @Test
+    void memoizesRepeatedPreparationAnalysisWithinOneInvocation() {
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine();
+
+        RulePreparationTransformationEngine.Execution execution =
+            engine.transformWithEvidence(
+                "(x^3 - 1) / (x - 1) + (x^3 - 1) / (x - 1)");
+        RulePreparationTransformationEngine.CacheMetrics metrics =
+            execution.cacheMetrics();
+
+        assertTrue(metrics.lookups() > 0);
+        assertTrue(metrics.hits() > 0);
+        assertTrue(metrics.misses() > 0);
+        assertTrue(metrics.retainedEntries() > 0);
+        assertEquals(metrics.lookups(), metrics.hits() + metrics.misses());
+        assertTrue(engine.ruleInventoryHash().startsWith("sha256:"));
+    }
+
+    @Test
+    void zeroCacheCapacityPreservesResultsWithoutMemoization() {
+        AstRewriteTransformationEngine direct =
+            new AstRewriteTransformationEngine();
+        Set<String> visibleRuleIds = direct.rules().stream()
+            .map(RewriteRule::id)
+            .collect(java.util.stream.Collectors.toSet());
+        RulePreparationTransformationEngine uncached =
+            new RulePreparationTransformationEngine(
+                direct,
+                visibleRuleIds,
+                new RulePreparationPlanner(),
+                16,
+                AssumptionSignature.ofExpressions(List.of()),
+                "sha256:test-inventory",
+                0);
+        String expression =
+            "(x^3 - 1) / (x - 1) + (x^3 - 1) / (x - 1)";
+
+        RulePreparationTransformationEngine.Execution execution =
+            uncached.transformWithEvidence(expression);
+
+        assertEquals(0, execution.cacheMetrics().hits());
+        assertEquals(0, execution.cacheMetrics().retainedEntries());
+        assertTrue(execution.cacheMetrics().misses() > 0);
+        assertTrue(execution.transformations().stream()
+            .anyMatch(transformation -> transformation.primitiveRuleIds()
+                .contains(RulePreparationPlanner.PREPARATION_RULE_ID)));
+    }
+
+    @Test
+    void budgetInconclusiveResultsAreNotMemoized() {
+        AstRewriteTransformationEngine direct =
+            new AstRewriteTransformationEngine();
+        Set<String> visibleRuleIds = direct.rules().stream()
+            .map(RewriteRule::id)
+            .collect(java.util.stream.Collectors.toSet());
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine(
+                direct,
+                visibleRuleIds,
+                new RulePreparationPlanner(
+                    new RulePreparationPlanner.Budget(0)),
+                16,
+                AssumptionSignature.ofExpressions(List.of()),
+                "sha256:test-inventory",
+                128);
+
+        RulePreparationTransformationEngine.Execution execution =
+            engine.transformWithEvidence(
+                "(x^3 - 1) / (x - 1) + (x^3 - 1) / (x - 1)");
+
+        assertTrue(execution.cacheMetrics().skippedInconclusive() >= 2);
+        assertTrue(execution.transformations().stream()
             .noneMatch(transformation -> transformation.primitiveRuleIds()
                 .contains(RulePreparationPlanner.PREPARATION_RULE_ID)));
     }
