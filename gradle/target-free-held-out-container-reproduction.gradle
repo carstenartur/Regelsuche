@@ -97,8 +97,9 @@ def registerMatrixRun = { discovery, String taskName,
         outputs.upToDateWhen { false }
         doFirst {
             def output = outputDirectory.get()
-            delete output
-            if (!output.mkdirs() && !output.isDirectory()) {
+            if (output.isDirectory()) {
+                output.listFiles().each { candidate -> delete candidate }
+            } else if (!output.mkdirs()) {
                 throw new GradleException(
                     "Cannot create held-out output directory: ${output}")
             }
