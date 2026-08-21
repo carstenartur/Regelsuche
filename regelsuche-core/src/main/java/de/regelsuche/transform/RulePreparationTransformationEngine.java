@@ -508,6 +508,7 @@ public final class RulePreparationTransformationEngine
         int retainedEntries,
         int evictions,
         int skippedInconclusive,
+        int skippedZeroSolverWork,
         int preparedVerifications,
         int skippedUnverifiable
     ) {
@@ -515,6 +516,7 @@ public final class RulePreparationTransformationEngine
             if (lookups < 0 || hits < 0 || misses < 0
                     || retainedEntries < 0 || evictions < 0
                     || skippedInconclusive < 0
+                    || skippedZeroSolverWork < 0
                     || preparedVerifications < 0
                     || skippedUnverifiable < 0
                     || lookups != hits + misses) {
@@ -553,6 +555,7 @@ public final class RulePreparationTransformationEngine
         private int misses;
         private int evictions;
         private int skippedInconclusive;
+        private int skippedZeroSolverWork;
         private int preparedVerifications;
         private int skippedUnverifiable;
 
@@ -578,6 +581,10 @@ public final class RulePreparationTransformationEngine
             if (attempt.status()
                     == RulePreparationPlanner.Status.BUDGET_INCONCLUSIVE) {
                 skippedInconclusive++;
+                return;
+            }
+            if (attempt.work().consumedSolverAttempts() == 0) {
+                skippedZeroSolverWork++;
                 return;
             }
             if (maxEntries == 0 || entries.containsKey(key)) {
@@ -607,6 +614,7 @@ public final class RulePreparationTransformationEngine
                 entries.size(),
                 evictions,
                 skippedInconclusive,
+                skippedZeroSolverWork,
                 preparedVerifications,
                 skippedUnverifiable);
         }
