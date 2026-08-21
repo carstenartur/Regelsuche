@@ -10,7 +10,7 @@ NO_UNIVERSAL_SCORE_TRACK_SCOPED_CLAIMS_ONLY
 
 ## Executable suite
 
-The suite `comparative-baselines-initial/v2` measures three separate tracks.
+The suite `comparative-baselines-initial/v3` measures three separate tracks.
 
 ### Target-directed search
 
@@ -32,19 +32,30 @@ The SymPy adapter rejects assumptions, division, calls and unsupported exponent 
 
 ### Target-free simplification competition
 
-The equality-validation track uses external systems as validators: they receive both sides of a statement and decide equality. That role cannot show how Regelsuche compares as a rewriting system. The `SIMPLIFICATION_COMPETITION` track therefore executes three target-free configurations:
+The equality-validation track uses external systems as validators: they receive both sides of a statement and decide equality. That role cannot show how Regelsuche compares as a rewriting system. The `SIMPLIFICATION_COMPETITION` track therefore executes eight target-free configurations:
 
 1. Regelsuche untargeted best-first search over the default rewrite inventory, through `SearchProblem.withoutTarget()`;
 2. a deterministic seeded randomized-valid rewrite control over the same production inventory and search budget;
-3. external SymPy in its native `simplify` role, pinned in the same verification environment.
+3. external SymPy `simplify`;
+4. external SymPy `factor`;
+5. external SymPy `cancel`;
+6. external SymPy `together`;
+7. external SymPy `apart`;
+8. external SymPy `trigsimp`.
 
-Neither configuration receives the pinned reference form. The parity manifest `target-free-simplification/v1` therefore sets `targetVisible=false` and `hiddenReferenceVisible=false`.
+No configuration receives the pinned reference form. The parity manifest `target-free-simplification/v2` therefore sets `targetVisible=false` and `hiddenReferenceVisible=false`.
 
-Each configuration contributes exactly one output. SymPy contributes its native `simplify` result. Both internal configurations select one state from their target-free search using the same fixed policy that is part of the configuration hash: lowest `ExpressionScorer` total, then normalized expression text, then search depth. A reference-shaped state that was merely visited but not selected does not count as a hit.
+Each configuration contributes exactly one output. Every SymPy configuration applies exactly one named native operation; there is no opaque operation-selection pipeline. Both internal configurations select one state from their target-free search using the same fixed policy that is part of the configuration hash: lowest `ExpressionScorer` total, then normalized expression text, then search depth. A reference-shaped state that was merely visited but not selected does not count as a hit.
 
-Both selected outputs are compared by the same surface judge, `ExpressionCanonicalizer`. A case is reached when the canonical hash of the selected expression equals the canonical hash of the pinned reference form. This avoids treating notation differences such as SymPy’s `**` and Regelsuche’s `^` as different results.
+All selected outputs are compared by the same surface judge, `ExpressionCanonicalizer`. A case is reached when the canonical hash of the selected expression equals the canonical hash of the pinned reference form. This avoids treating notation differences such as SymPy’s `**` and Regelsuche’s `^` as different results.
 
 The reference is intentionally called a **pinned reference form**, not “the simplest form”. The current benchmark does not define a universal simplicity ordering and therefore cannot claim that a different equivalent output is worse in general.
+
+#### Why the native operations are separate
+
+`simplify`, `factor`, `cancel`, `together`, `apart` and `trigsimp` are materially different algorithms with different preferred output forms. Combining them into one hidden sequence or choosing the best result after observing the reference would give the external system an undeclared portfolio advantage.
+
+Each operation therefore has its own backend ID, environment identity, policy hash and seven-case result matrix. The operation name and exact Python script are content-bound. A result from `factor` cannot silently stand in for a result from `simplify`, and an operation that leaves an expression unchanged remains visible rather than being replaced by a more favorable operation after evaluation.
 
 #### Seeded randomized-valid control
 
@@ -62,7 +73,7 @@ The external adapter can bind symbol-scoped assumptions directly. Composite decl
 
 #### Retained primary head-to-head outcome
 
-The pinned corpus contains seven algebraic cases. The primary Regelsuche-versus-SymPy result remains unchanged and is not rewritten merely because an additional control is added:
+The pinned corpus contains seven algebraic cases. The primary Regelsuche-versus-SymPy-`simplify` result remains unchanged and is not rewritten merely because additional diagnostic operations are added:
 
 | Case | Family | Regelsuche untargeted best-first | SymPy `simplify` |
 |---|---|---|---|
@@ -74,7 +85,7 @@ The pinned corpus contains seven algebraic cases. The primary Regelsuche-versus-
 | `(x^2 - 1) / (x - 1)` → `x + 1` | rational-cancellation | reached | reached |
 | `(x^3 - 1) / (x - 1)` → `x ^ 2 + x + 1` | polynomial-division | **not reached** | reached |
 
-Regelsuche reaches six of seven pinned reference forms, SymPy reaches seven of seven. The track claim `target-free-simplification-head-to-head` remains `NEGATIVE`; losing evidence is not deleted or converted into a passing claim. The randomized control’s seven per-case results are retained beside the primary configurations in the canonical bundle rather than manually copied into this prose.
+Regelsuche reaches six of seven pinned reference forms, SymPy `simplify` reaches seven of seven. The expanded track claim remains `NEGATIVE`; losing evidence is not deleted or converted into a passing claim. The randomized control and the five additional named SymPy operation configurations each contribute seven retained per-case results to the canonical bundle. They diagnose operation-specific behavior but do not rewrite or replace the primary comparison.
 
 #### What the first retained loss diagnosed
 
@@ -112,13 +123,15 @@ The gate is fail-closed in these ways:
 
 An `EXECUTED` but incorrect result is legitimate retained evidence. Deleting it would be selective reporting.
 
+The expected matrix size is derived from the number of same-track configurations and cases. Adding a named operation therefore cannot be accidentally omitted by forgetting to update a separate hard-coded result total.
+
 ## Information parity
 
 Each track has one `InformationParityManifest` containing visibility flags and hashes for the input corpus, inventory, budget, Research Brief, qualification split and mandatory evaluations. Each configuration references exactly one same-track manifest.
 
 The current suite keeps all hidden-reference, family-label, TEST-label, qualification-label and review-label visibility flags false. Target visibility is true only for target-directed search and equality validation. The simplification competition sets it false.
 
-The two internal simplification configurations share the exact same input corpus, default rewrite inventory and `SearchHeuristic` budget. Their different scheduling policies remain configuration identities, not hidden information differences.
+The two internal simplification configurations share the exact same input corpus, default rewrite inventory and `SearchHeuristic` budget. Their different scheduling policies remain configuration identities, not hidden information differences. All six external configurations receive the same source expression and declared assumptions; only the one explicitly named native SymPy operation differs, and that difference is bound into the configuration identity.
 
 ## Canonical evidence
 
@@ -159,7 +172,7 @@ Unmeasured work is not omitted. The report currently retains machine-readable ga
 - autonomous campaign-controller comparison over the #355 Research Brief and ledger;
 - discovery-component and controller ablations.
 
-The randomized-valid simplification control is no longer a coverage gap: it is a configured seven-case matrix whose seed and scheduling policy are content-bound. A remaining gap disappears only when its required raw evidence is executed and retained under the corresponding information-parity manifest.
+The randomized-valid simplification control and the six named native SymPy operation baselines are no longer coverage gaps: each is a configured seven-case matrix whose operation or scheduling policy is content-bound. A remaining gap disappears only when its required raw evidence is executed and retained under the corresponding information-parity manifest.
 
 ## Reproduction and verification
 

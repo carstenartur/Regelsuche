@@ -187,7 +187,7 @@ final class ComparativeBenchmarkCatalog {
 
     static InformationParityManifest simplificationParity(List<Case> cases) {
         return InformationParityManifest.create(
-            "target-free-simplification/v1",
+            "target-free-simplification/v2",
             Track.SIMPLIFICATION_COMPETITION,
             false,
             false,
@@ -198,7 +198,8 @@ final class ComparativeBenchmarkCatalog {
             corpusHash(cases),
             SolverIr.sha256(
                 "regelsuche-inventory=" + searchInventoryHash()
-                    + "\nexternal-inventory=CAS_NATIVE_SIMPLIFIER"),
+                    + "\nexternal-inventory=SYMPY_NATIVE_OPERATIONS_"
+                    + "[simplify,factor,cancel,together,apart,trigsimp]"),
             SolverIr.sha256(
                 "regelsuche-budget=" + searchBudgetHash()
                     + "\nexternal-timeoutMillis=20000"),
@@ -260,7 +261,7 @@ final class ComparativeBenchmarkCatalog {
             system.id(),
             system.version(),
             SolverIr.sha256(
-                "target-free-simplification/v1\nimplementation="
+                "target-free-simplification/v2\nimplementation="
                     + system.implementationIdentity()),
             SolverIr.sha256("NO_MODEL"),
             SolverIr.sha256(system.environmentIdentity()),
@@ -286,7 +287,7 @@ final class ComparativeBenchmarkCatalog {
                     "PROJECT_NOVELTY_AND_FALSIFICATION")),
             CoverageGap.create(
                 Track.SIMPLIFICATION_COMPETITION,
-                "The target-free simplification corpus is small and single-domain; equality saturation and an independent assumption-aware output validator remain unmeasured. A deterministic seeded randomized-valid rewrite control is now retained.",
+                "The target-free simplification corpus is small and single-domain; equality saturation and an independent assumption-aware output validator remain unmeasured. Separate native SymPy simplify/factor/cancel/together/apart/trigsimp configurations and a deterministic seeded randomized-valid rewrite control are retained.",
                 List.of(
                     "EQUALITY_SATURATION_COMPETITOR_WITH_EXACT_SIDE_CONDITION_PROVENANCE",
                     "MULTI_DOMAIN_SIMPLIFICATION_CORPUS",
