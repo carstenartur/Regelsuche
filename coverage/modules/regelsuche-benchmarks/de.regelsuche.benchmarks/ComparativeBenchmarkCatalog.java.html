@@ -187,7 +187,7 @@ final class ComparativeBenchmarkCatalog {
 
     static InformationParityManifest simplificationParity(List&lt;Case&gt; cases) {
 <span class="fc" id="L189">        return InformationParityManifest.create(</span>
-            &quot;target-free-simplification/v1&quot;,
+            &quot;target-free-simplification/v2&quot;,
             Track.SIMPLIFICATION_COMPETITION,
             false,
             false,
@@ -198,157 +198,158 @@ final class ComparativeBenchmarkCatalog {
 <span class="fc" id="L198">            corpusHash(cases),</span>
 <span class="fc" id="L199">            SolverIr.sha256(</span>
 <span class="fc" id="L200">                &quot;regelsuche-inventory=&quot; + searchInventoryHash()</span>
-                    + &quot;\nexternal-inventory=CAS_NATIVE_SIMPLIFIER&quot;),
-<span class="fc" id="L202">            SolverIr.sha256(</span>
-<span class="fc" id="L203">                &quot;regelsuche-budget=&quot; + searchBudgetHash()</span>
+                    + &quot;\nexternal-inventory=SYMPY_NATIVE_OPERATIONS_&quot;
+                    + &quot;[simplify,factor,cancel,together,apart,trigsimp]&quot;),
+<span class="fc" id="L203">            SolverIr.sha256(</span>
+<span class="fc" id="L204">                &quot;regelsuche-budget=&quot; + searchBudgetHash()</span>
                     + &quot;\nexternal-timeoutMillis=20000&quot;),
-<span class="fc" id="L205">            notApplicable(&quot;research-brief&quot;),</span>
-<span class="fc" id="L206">            notApplicable(&quot;qualification-split&quot;),</span>
-<span class="fc" id="L207">            List.of(&quot;PINNED_REFERENCE_FORM_REACHABILITY&quot;));</span>
+<span class="fc" id="L206">            notApplicable(&quot;research-brief&quot;),</span>
+<span class="fc" id="L207">            notApplicable(&quot;qualification-split&quot;),</span>
+<span class="fc" id="L208">            List.of(&quot;PINNED_REFERENCE_FORM_REACHABILITY&quot;));</span>
     }
 
     static Configuration searchConfiguration(
         SearchSystem system,
         InformationParityManifest parity
     ) {
-<span class="fc" id="L214">        return Configuration.create(</span>
-<span class="fc" id="L215">            &quot;search-&quot; + system.id(),</span>
+<span class="fc" id="L215">        return Configuration.create(</span>
+<span class="fc" id="L216">            &quot;search-&quot; + system.id(),</span>
             Track.TARGET_DIRECTED_SEARCH,
             SystemKind.REGELSUCHE,
-<span class="fc" id="L218">            List.of(Role.SEARCH),</span>
-<span class="fc" id="L219">            parity.contentHash(),</span>
-<span class="fc" id="L220">            system.id(),</span>
-<span class="fc" id="L221">            system.version(),</span>
-<span class="fc" id="L222">            SolverIr.sha256(</span>
-<span class="fc" id="L223">                &quot;search-strategy=&quot; + system.strategy().getClass().getName()),</span>
-<span class="fc" id="L224">            SolverIr.sha256(&quot;NO_MODEL&quot;),</span>
-<span class="fc" id="L225">            SolverIr.sha256(</span>
+<span class="fc" id="L219">            List.of(Role.SEARCH),</span>
+<span class="fc" id="L220">            parity.contentHash(),</span>
+<span class="fc" id="L221">            system.id(),</span>
+<span class="fc" id="L222">            system.version(),</span>
+<span class="fc" id="L223">            SolverIr.sha256(</span>
+<span class="fc" id="L224">                &quot;search-strategy=&quot; + system.strategy().getClass().getName()),</span>
+<span class="fc" id="L225">            SolverIr.sha256(&quot;NO_MODEL&quot;),</span>
+<span class="fc" id="L226">            SolverIr.sha256(</span>
                 &quot;java=21\nsearch-kernel=regelsuche-search/v1&quot;),
             true,
-<span class="fc" id="L228">            system.limitations());</span>
+<span class="fc" id="L229">            system.limitations());</span>
     }
 
     static Configuration validationConfiguration(
         ValidationSystem system,
         InformationParityManifest parity
     ) {
-<span class="fc" id="L235">        return Configuration.create(</span>
-<span class="fc" id="L236">            &quot;validation-&quot; + system.backend().descriptor().backendId(),</span>
+<span class="fc" id="L236">        return Configuration.create(</span>
+<span class="fc" id="L237">            &quot;validation-&quot; + system.backend().descriptor().backendId(),</span>
             Track.EQUALITY_VALIDATION,
-<span class="fc" id="L238">            system.kind(),</span>
-<span class="fc" id="L239">            system.roles(),</span>
-<span class="fc" id="L240">            parity.contentHash(),</span>
-<span class="fc" id="L241">            system.backend().descriptor().backendId(),</span>
-<span class="fc" id="L242">            system.backend().descriptor().backendVersion(),</span>
-<span class="fc" id="L243">            SolverIr.sha256(&quot;direct-equality-validation/v1&quot;),</span>
-<span class="fc" id="L244">            SolverIr.sha256(&quot;NO_MODEL&quot;),</span>
-<span class="fc" id="L245">            SolverIr.sha256(system.environmentIdentity()),</span>
-<span class="fc" id="L246">            system.backend().descriptor().deterministic(),</span>
-<span class="fc" id="L247">            system.limitations());</span>
+<span class="fc" id="L239">            system.kind(),</span>
+<span class="fc" id="L240">            system.roles(),</span>
+<span class="fc" id="L241">            parity.contentHash(),</span>
+<span class="fc" id="L242">            system.backend().descriptor().backendId(),</span>
+<span class="fc" id="L243">            system.backend().descriptor().backendVersion(),</span>
+<span class="fc" id="L244">            SolverIr.sha256(&quot;direct-equality-validation/v1&quot;),</span>
+<span class="fc" id="L245">            SolverIr.sha256(&quot;NO_MODEL&quot;),</span>
+<span class="fc" id="L246">            SolverIr.sha256(system.environmentIdentity()),</span>
+<span class="fc" id="L247">            system.backend().descriptor().deterministic(),</span>
+<span class="fc" id="L248">            system.limitations());</span>
     }
 
     static Configuration simplificationConfiguration(
         SimplificationSystem system,
         InformationParityManifest parity
     ) {
-<span class="fc" id="L254">        return Configuration.create(</span>
-<span class="fc" id="L255">            &quot;simplify-&quot; + system.id(),</span>
+<span class="fc" id="L255">        return Configuration.create(</span>
+<span class="fc" id="L256">            &quot;simplify-&quot; + system.id(),</span>
             Track.SIMPLIFICATION_COMPETITION,
-<span class="fc" id="L257">            system.kind(),</span>
-<span class="fc" id="L258">            List.of(Role.EQUALITY_REWRITE),</span>
-<span class="fc" id="L259">            parity.contentHash(),</span>
-<span class="fc" id="L260">            system.id(),</span>
-<span class="fc" id="L261">            system.version(),</span>
-<span class="fc" id="L262">            SolverIr.sha256(</span>
-                &quot;target-free-simplification/v1\nimplementation=&quot;
-<span class="fc" id="L264">                    + system.implementationIdentity()),</span>
-<span class="fc" id="L265">            SolverIr.sha256(&quot;NO_MODEL&quot;),</span>
-<span class="fc" id="L266">            SolverIr.sha256(system.environmentIdentity()),</span>
+<span class="fc" id="L258">            system.kind(),</span>
+<span class="fc" id="L259">            List.of(Role.EQUALITY_REWRITE),</span>
+<span class="fc" id="L260">            parity.contentHash(),</span>
+<span class="fc" id="L261">            system.id(),</span>
+<span class="fc" id="L262">            system.version(),</span>
+<span class="fc" id="L263">            SolverIr.sha256(</span>
+                &quot;target-free-simplification/v2\nimplementation=&quot;
+<span class="fc" id="L265">                    + system.implementationIdentity()),</span>
+<span class="fc" id="L266">            SolverIr.sha256(&quot;NO_MODEL&quot;),</span>
+<span class="fc" id="L267">            SolverIr.sha256(system.environmentIdentity()),</span>
             true,
-<span class="fc" id="L268">            system.limitations());</span>
+<span class="fc" id="L269">            system.limitations());</span>
     }
 
     static List&lt;CoverageGap&gt; coverageGaps() {
-<span class="fc" id="L272">        return List.of(</span>
-<span class="fc" id="L273">            CoverageGap.create(</span>
+<span class="fc" id="L273">        return List.of(</span>
+<span class="fc" id="L274">            CoverageGap.create(</span>
                 Track.HIDDEN_RULE_REDISCOVERY,
                 &quot;The initial slice does not yet replay the leak-free #227 manifest.&quot;,
-<span class="fc" id="L276">                List.of(</span>
+<span class="fc" id="L277">                List.of(</span>
                     &quot;PINNED_HIDDEN_RULE_MANIFEST&quot;,
                     &quot;NEGATIVE_HOLDOUT_EXECUTIONS&quot;,
                     &quot;POST_HOC_REFERENCE_RELATION&quot;)),
-<span class="fc" id="L280">            CoverageGap.create(</span>
+<span class="fc" id="L281">            CoverageGap.create(</span>
                 Track.OPEN_TARGET_DISCOVERY,
                 &quot;No external target-free conjecture generator has yet been run under information parity.&quot;,
-<span class="fc" id="L283">                List.of(</span>
+<span class="fc" id="L284">                List.of(</span>
                     &quot;TARGET_FREE_EXTERNAL_BASELINE&quot;,
                     &quot;ZERO_TO_MANY_CANDIDATE_OUTPUTS&quot;,
                     &quot;PROJECT_NOVELTY_AND_FALSIFICATION&quot;)),
-<span class="fc" id="L287">            CoverageGap.create(</span>
+<span class="fc" id="L288">            CoverageGap.create(</span>
                 Track.SIMPLIFICATION_COMPETITION,
-                &quot;The target-free simplification corpus is small and single-domain; equality saturation and an independent assumption-aware output validator remain unmeasured. A deterministic seeded randomized-valid rewrite control is now retained.&quot;,
-<span class="fc" id="L290">                List.of(</span>
+                &quot;The target-free simplification corpus is small and single-domain; equality saturation and an independent assumption-aware output validator remain unmeasured. Separate native SymPy simplify/factor/cancel/together/apart/trigsimp configurations and a deterministic seeded randomized-valid rewrite control are retained.&quot;,
+<span class="fc" id="L291">                List.of(</span>
                     &quot;EQUALITY_SATURATION_COMPETITOR_WITH_EXACT_SIDE_CONDITION_PROVENANCE&quot;,
                     &quot;MULTI_DOMAIN_SIMPLIFICATION_CORPUS&quot;,
                     &quot;INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION&quot;)),
-<span class="fc" id="L294">            CoverageGap.create(</span>
+<span class="fc" id="L295">            CoverageGap.create(</span>
                 Track.CROSS_FAMILY_TRANSFER,
                 &quot;The fully held-out #222 transfer split is not part of the first executable slice.&quot;,
-<span class="fc" id="L297">                List.of(</span>
+<span class="fc" id="L298">                List.of(</span>
                     &quot;FAMILY_BLIND_FORMATION&quot;,
                     &quot;HELD_OUT_TRANSFER_RESULTS&quot;,
                     &quot;PAIRED_UTILITY&quot;)),
-<span class="fc" id="L301">            CoverageGap.create(</span>
+<span class="fc" id="L302">            CoverageGap.create(</span>
                 Track.AUTONOMOUS_CAMPAIGN,
                 &quot;Controller baselines have not yet consumed the pinned #355 research brief and budget ledger.&quot;,
-<span class="fc" id="L304">                List.of(</span>
+<span class="fc" id="L305">                List.of(</span>
                     &quot;COMMON_RESEARCH_BRIEF&quot;,
                     &quot;COMMON_RESOURCE_LEDGER&quot;,
                     &quot;COMPLETE_RECEIPT_DAG&quot;)),
-<span class="fc" id="L308">            CoverageGap.create(</span>
+<span class="fc" id="L309">            CoverageGap.create(</span>
                 Track.DISCOVERY_COMPONENT_ABLATION,
                 &quot;At least three production discovery-component ablations remain to be measured.&quot;,
-<span class="fc" id="L311">                List.of(</span>
+<span class="fc" id="L312">                List.of(</span>
                     &quot;THREE_COMPONENT_ABLATIONS&quot;,
                     &quot;IDENTICAL_INPUT_EVIDENCE&quot;,
                     &quot;SEPARATE_CORRECTNESS_AND_UTILITY&quot;)),
-<span class="fc" id="L315">            CoverageGap.create(</span>
+<span class="fc" id="L316">            CoverageGap.create(</span>
                 Track.CONTROLLER_ABLATION,
                 &quot;At least two autonomous-controller ablations remain to be measured.&quot;,
-<span class="fc" id="L318">                List.of(</span>
+<span class="fc" id="L319">                List.of(</span>
                     &quot;TWO_CONTROLLER_ABLATIONS&quot;,
                     &quot;BALANCED_RESOURCE_ACCOUNTING&quot;,
                     &quot;DETERMINISTIC_NEXT_PLAN&quot;)));
     }
 
     private static String corpusHash(List&lt;Case&gt; cases) {
-<span class="fc" id="L325">        return SolverIr.sha256(</span>
-<span class="fc" id="L326">            cases.stream().map(Case::contentHash).sorted().toList().toString());</span>
+<span class="fc" id="L326">        return SolverIr.sha256(</span>
+<span class="fc" id="L327">            cases.stream().map(Case::contentHash).sorted().toList().toString());</span>
     }
 
     private static String searchInventoryHash() {
-<span class="fc" id="L330">        List&lt;String&gt; ruleIds = new AstRewriteTransformationEngine().rules()</span>
-<span class="fc" id="L331">            .stream()</span>
-<span class="fc" id="L332">            .map(rule -&gt; rule.id())</span>
-<span class="fc" id="L333">            .sorted()</span>
-<span class="fc" id="L334">            .toList();</span>
-<span class="fc" id="L335">        return SolverIr.sha256(ruleIds.toString());</span>
+<span class="fc" id="L331">        List&lt;String&gt; ruleIds = new AstRewriteTransformationEngine().rules()</span>
+<span class="fc" id="L332">            .stream()</span>
+<span class="fc" id="L333">            .map(rule -&gt; rule.id())</span>
+<span class="fc" id="L334">            .sorted()</span>
+<span class="fc" id="L335">            .toList();</span>
+<span class="fc" id="L336">        return SolverIr.sha256(ruleIds.toString());</span>
     }
 
     private static String searchBudgetHash() {
-<span class="fc" id="L339">        return SolverIr.sha256(</span>
-<span class="fc" id="L340">            &quot;maxDepth=&quot; + SEARCH_BUDGET.maxDepth()</span>
+<span class="fc" id="L340">        return SolverIr.sha256(</span>
+<span class="fc" id="L341">            &quot;maxDepth=&quot; + SEARCH_BUDGET.maxDepth()</span>
                 + &quot;\nmaxVisitedExpressions=&quot;
-<span class="fc" id="L342">                    + SEARCH_BUDGET.maxVisitedExpressions()</span>
+<span class="fc" id="L343">                    + SEARCH_BUDGET.maxVisitedExpressions()</span>
                 + &quot;\nmaxExpandingSteps=&quot;
-<span class="fc" id="L344">                    + SEARCH_BUDGET.maxExpandingSteps()</span>
+<span class="fc" id="L345">                    + SEARCH_BUDGET.maxExpandingSteps()</span>
                 + &quot;\nmaxCandidatesPerState=&quot;
-<span class="fc" id="L346">                    + SEARCH_BUDGET.maxCandidatesPerState()</span>
-<span class="fc" id="L347">                + &quot;\nbeamWidth=&quot; + SEARCH_BUDGET.beamWidth());</span>
+<span class="fc" id="L347">                    + SEARCH_BUDGET.maxCandidatesPerState()</span>
+<span class="fc" id="L348">                + &quot;\nbeamWidth=&quot; + SEARCH_BUDGET.beamWidth());</span>
     }
 
     private static String notApplicable(String name) {
-<span class="fc" id="L351">        return SolverIr.sha256(&quot;NOT_APPLICABLE:&quot; + name);</span>
+<span class="fc" id="L352">        return SolverIr.sha256(&quot;NOT_APPLICABLE:&quot; + name);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

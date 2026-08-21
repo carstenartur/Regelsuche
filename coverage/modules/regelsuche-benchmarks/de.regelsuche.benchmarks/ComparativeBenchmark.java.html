@@ -872,7 +872,7 @@ public final class ComparativeBenchmark {
 <span class="fc" id="L872">                InformationParityManifest manifest = manifests.stream()</span>
 <span class="fc bfc" id="L873" title="All 2 branches covered.">                    .filter(item -&gt; item.track() == benchmarkCase.track())</span>
 <span class="fc" id="L874">                    .findFirst().orElse(null);</span>
-<span class="pc bpc" id="L875" title="1 of 4 branches missed.">                if (manifest != null &amp;&amp; manifest.targetVisible()</span>
+<span class="fc bfc" id="L875" title="All 4 branches covered.">                if (manifest != null &amp;&amp; manifest.targetVisible()</span>
 <span class="pc bpc" id="L876" title="1 of 2 branches missed.">                        &amp;&amp; benchmarkCase.targetExpression().isBlank()) {</span>
 <span class="nc" id="L877">                    throw new IllegalArgumentException(&quot;visible target case lacks target&quot;);</span>
                 }
