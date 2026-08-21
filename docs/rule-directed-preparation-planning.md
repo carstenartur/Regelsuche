@@ -131,10 +131,11 @@ to rule implementations, patterns, recognition profiles, descriptors or pack
 metadata invalidate the cache identity. Callers that inject a custom direct
 engine must provide or accept an explicit ID-only inventory hash.
 
-Insertion order and oldest-entry eviction are deterministic. Cache capacity is
-configurable and may be set to zero for an exact no-cache ablation.
-`BUDGET_INCONCLUSIVE` results are never retained: a budget-limited non-result
-must not become a semantic negative fact.
+Only analyses that consumed residual-solver work are retained. Cheap decisions
+such as “this node is not a division” remain visible in the metrics but cannot
+occupy cache capacity or evict a verified quotient. `BUDGET_INCONCLUSIVE`
+results are also never retained: a budget-limited non-result must not become a
+semantic negative fact.
 
 Prepared applications enter the cache only after independent verification. A
 cache hit therefore reuses already verified formation evidence without
@@ -142,13 +143,16 @@ rerunning the exact quotient proposal or its verification. The visible
 principal rule is still replayed for each concrete AST position before a
 transformation is emitted.
 
+Insertion order and oldest-expensive-entry eviction are deterministic. Cache
+capacity is configurable and may be set to zero for an exact no-cache ablation.
 `transformWithEvidence` returns balanced cache metrics:
 
 ```text
 lookups = hits + misses
 retained entries
-oldest-entry evictions
+oldest expensive-entry evictions
 skipped budget-inconclusive results
+skipped zero-solver-work decisions
 prepared-application verifications
 skipped unverifiable applications
 ```
