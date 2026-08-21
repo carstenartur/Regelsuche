@@ -15,10 +15,12 @@ target-free-held-out-candidate-freeze.json
 target-free-held-out-post-freeze-qualification.json
 ```
 
-The verification gate rejects a missing or additional file, malformed or
-non-canonical content hashes, row-identity drift, an invalid plan/freeze/
+The Java verifier rejects a missing or additional file, symlink, malformed or
+non-canonical artifact, row-identity drift, an invalid plan/freeze/
 qualification binding, premature qualification disclosure, or any byte
-difference between the three executions.
+difference between the three executions. Its JUnit characterization also
+proves that byte drift, an invalid image identity and an additional artifact
+fail closed.
 
 ## Reproduction command
 
@@ -30,7 +32,19 @@ Run the complete gate from a checkout with Docker available:
 ```
 
 The task is also part of `fullCheck` and therefore the authoritative `ciCheck`
-lifecycle.
+lifecycle. The focused Java/JUnit contract is available through either build
+surface:
+
+```bash
+./gradlew --no-configuration-cache \
+  :regelsuche-discovery:test \
+  --tests '*TargetFreeHeldOutContainerReproductionVerifierTest'
+
+mvn -pl regelsuche-discovery \
+  -Dtest=TargetFreeHeldOutContainerReproductionVerifierTest test
+```
+
+No new host-side Python, Node or shell verification semantics are introduced.
 
 The generated evidence is written below:
 
@@ -57,10 +71,15 @@ matrix run itself then uses Gradle offline mode, runs as the unprivileged user
 The receipt retains both the pinned base-image digest and the content-addressed
 local built-image ID.
 
+The runner preserves the bind-mounted `/out` directory and clears only its
+contents before execution. This avoids relying on deletion of a mount point and
+keeps the same output contract for host and container runs.
+
 ## Reproduction receipt
 
 The schema
-`regelsuche.target-free-held-out-container-reproduction/v1` binds:
+`regelsuche.target-free-held-out-container-reproduction/v1` and the matching
+immutable Java record model bind:
 
 - the repository revision;
 - the six cases, four policies, six checkpoints and 144 rows;
@@ -68,12 +87,14 @@ The schema
 - exact artifact byte lengths and SHA-256 values;
 - the Dockerfile and base-image digests;
 - the built-image ID, platform and runtime network policy;
+- the Gradle-wrapper distribution checksum;
 - the common artifact-set hash of both host runs and the container run;
-- the host-repeat and host-versus-container byte-equality decisions.
+- the host-repeat and host-versus-container byte-equality decisions;
+- the schema path, exact schema bytes and receipt content hash.
 
-The verifier recomputes the Java artifacts' canonical content hashes and checks
-that the qualification is bound to the exact candidate freeze that was already
-written under `NOT_DISCLOSED` status.
+The verifier reconstructs each existing Java artifact through its canonical
+codec, rather than trusting JSON field inspection alone. It then recomputes the
+complete receipt hash and rejects a non-canonical round trip.
 
 ## Claim boundary
 
