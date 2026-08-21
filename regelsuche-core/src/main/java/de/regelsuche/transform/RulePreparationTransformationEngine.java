@@ -274,10 +274,14 @@ public final class RulePreparationTransformationEngine
         return new CacheKey(
             plannerId(),
             RulePreparationPlanner.PRINCIPAL_RULE_ID,
-            canonicalizer.stableHash(ExpressionFormatter.format(expression)),
+            exactSubtreeHash(expression),
             assumptionSignature.fingerprint(),
             ruleInventoryHash,
             "maxSolverAttempts=" + planner.budget().maxSolverAttempts());
+    }
+
+    private static String exactSubtreeHash(Expr expression) {
+        return sha256(ExpressionFormatter.format(expression));
     }
 
     private Transformation replayPrincipal(
@@ -421,7 +425,10 @@ public final class RulePreparationTransformationEngine
 
     private static String idOnlyInventoryHash(Set<String> ruleIds) {
         Objects.requireNonNull(ruleIds, "ruleIds");
-        String payload = ruleIds.stream().sorted().toList().toString();
+        return sha256(ruleIds.stream().sorted().toList().toString());
+    }
+
+    private static String sha256(String payload) {
         try {
             return "sha256:" + HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256")
