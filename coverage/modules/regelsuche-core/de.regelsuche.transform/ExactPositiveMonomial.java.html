@@ -104,8 +104,8 @@ record ExactPositiveMonomial(
         }
 <span class="fc" id="L105">        powers.forEach((name, exponent) -&gt; {</span>
 <span class="fc" id="L106">            Expr variable = new VariableExpr(name);</span>
-<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            factors.add(exponent == 1 ? variable : new BinaryExpr(</span>
-<span class="nc" id="L108">                variable, BinaryOperator.POW, new NumberExpr(exponent)));</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            factors.add(exponent == 1 ? variable : new BinaryExpr(</span>
+<span class="fc" id="L108">                variable, BinaryOperator.POW, new NumberExpr(exponent)));</span>
 <span class="fc" id="L109">        });</span>
 <span class="fc" id="L110">        Expr result = factors.getFirst();</span>
 <span class="fc bfc" id="L111" title="All 2 branches covered.">        for (int index = 1; index &lt; factors.size(); index++) {</span>
@@ -255,8 +255,8 @@ record ExactPositiveMonomial(
 
         private ParseResult parseProduct(BinaryExpr product) {
 <span class="fc" id="L257">            ParseResult left = parse(product.left());</span>
-<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (!left.supported()) {</span>
-<span class="nc" id="L259">                return left;</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            if (!left.supported()) {</span>
+<span class="fc" id="L259">                return left;</span>
             }
 <span class="fc" id="L261">            ParseResult right = parse(product.right());</span>
 <span class="fc bfc" id="L262" title="All 2 branches covered.">            if (!right.supported()) {</span>

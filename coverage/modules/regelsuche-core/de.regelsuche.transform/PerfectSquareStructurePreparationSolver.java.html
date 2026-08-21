@@ -1,0 +1,699 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PerfectSquareStructurePreparationSolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">PerfectSquareStructurePreparationSolver.java</span></div><h1>PerfectSquareStructurePreparationSolver.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.TreeMap;
+
+/**
+ * Exposes exact positive-monomial squares to the ordinary difference-of-squares
+ * rewrite rule.
+ *
+ * &lt;p&gt;Given {@code L - R}, both terms are parsed in the bounded exact monomial
+ * fragment. If both have an exact monomial square root, the solver constructs
+ * {@code root(L)^2 - root(R)^2}. It never guesses a root or changes subtraction
+ * order, and the visible principal rule must replay successfully.&lt;/p&gt;
+ */
+public final class PerfectSquareStructurePreparationSolver {
+    public static final String SOLVER_ID =
+        &quot;perfect-square-structure/exact-positive-monomial/v1&quot;;
+    public static final String CERTIFICATE_SCHEMA =
+        &quot;regelsuche.perfect-square-structure-certificate/v1&quot;;
+    public static final String APPLICATION_SCHEMA =
+        &quot;regelsuche.perfect-square-structure-application/v1&quot;;
+    public static final String PREPARATION_RULE_ID =
+        &quot;prepare_exact_monomial_square_structure&quot;;
+    public static final String PRINCIPAL_RULE_ID =
+        &quot;ast_square_difference_factor&quot;;
+
+    private final Budget budget;
+
+    public PerfectSquareStructurePreparationSolver() {
+<span class="fc" id="L43">        this(Budget.DEFAULT);</span>
+<span class="fc" id="L44">    }</span>
+
+<span class="fc" id="L46">    public PerfectSquareStructurePreparationSolver(Budget budget) {</span>
+<span class="fc" id="L47">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L48">        budget.limits();</span>
+<span class="fc" id="L49">    }</span>
+
+    public Budget budget() {
+<span class="nc" id="L52">        return budget;</span>
+    }
+
+    public PlanAttempt plan(Expr subtree) {
+<span class="fc" id="L56">        Objects.requireNonNull(subtree, &quot;subtree&quot;);</span>
+<span class="fc" id="L57">        WorkLedger untouched = WorkLedger.untouched(budget.maxFactors());</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (!(subtree instanceof BinaryExpr difference)</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                || difference.operator() != BinaryOperator.SUB) {</span>
+<span class="nc" id="L60">            return PlanAttempt.withoutApplication(</span>
+                Status.NOT_APPLICABLE,
+                untouched,
+                &quot;root-is-not-subtraction&quot;);
+        }
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (isExplicitSquare(difference.left())</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                &amp;&amp; isExplicitSquare(difference.right())) {</span>
+<span class="fc" id="L67">            return PlanAttempt.withoutApplication(</span>
+                Status.DIRECT_MATCH_AVAILABLE,
+                untouched,
+                &quot;principal-rule-already-matches&quot;);
+        }
+
+<span class="fc" id="L73">        ResidualObligation obligation = residualObligation(difference);</span>
+<span class="fc" id="L74">        ParsedTerms parsed = parseTerms(difference, obligation);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (parsed.failure() != null) {</span>
+<span class="fc" id="L76">            return parsed.failure();</span>
+        }
+<span class="fc" id="L78">        ExactRoots roots = roots(parsed.left(), parsed.right());</span>
+<span class="fc" id="L79">        WorkLedger work = parsed.work();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (roots == null) {</span>
+<span class="fc" id="L81">            return PlanAttempt.withoutApplication(</span>
+                Status.NOT_APPLICABLE,
+<span class="fc" id="L83">                Optional.of(obligation),</span>
+                work,
+                &quot;one-or-both-terms-are-not-exact-monomial-squares&quot;);
+        }
+
+<span class="fc" id="L88">        ExpectedApplication expected = expectedApplication(roots);</span>
+<span class="fc" id="L89">        Certificate certificate = certificate(</span>
+            difference,
+<span class="fc" id="L91">            parsed.left(),</span>
+<span class="fc" id="L92">            parsed.right(),</span>
+            roots,
+            expected);
+<span class="fc" id="L95">        PreparedApplication application = new PreparedApplication(</span>
+            APPLICATION_SCHEMA,
+            SOLVER_ID,
+            PRINCIPAL_RULE_ID,
+            subtree,
+<span class="fc" id="L100">            expected.prepared(),</span>
+<span class="fc" id="L101">            expected.result(),</span>
+<span class="fc" id="L102">            expected.leftRoot(),</span>
+<span class="fc" id="L103">            expected.rightRoot(),</span>
+<span class="fc" id="L104">            Map.of(</span>
+<span class="fc" id="L105">                &quot;A&quot;, expected.leftRoot(),</span>
+<span class="fc" id="L106">                &quot;B&quot;, expected.rightRoot()),</span>
+            obligation,
+<span class="fc" id="L108">            List.of(),</span>
+<span class="fc" id="L109">            List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID),</span>
+            budget,
+            certificate,
+            work);
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (!verify(application)) {</span>
+<span class="nc" id="L114">            return PlanAttempt.withoutApplication(</span>
+                Status.INVALID_CERTIFICATE,
+<span class="nc" id="L116">                Optional.of(obligation),</span>
+                work,
+                &quot;generated-square-structure-certificate-rejected&quot;);
+        }
+<span class="fc" id="L120">        return PlanAttempt.prepared(application);</span>
+    }
+
+    public boolean verify(PreparedApplication application) {
+<span class="fc" id="L124">        BinaryExpr difference = verificationSource(application);</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (difference == null) {</span>
+<span class="nc" id="L126">            return false;</span>
+        }
+<span class="fc" id="L128">        ParsedTerms parsed = parseTerms(difference, null);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (parsed.failure() != null</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                || !parsed.work().equals(application.work())) {</span>
+<span class="nc" id="L131">            return false;</span>
+        }
+<span class="fc" id="L133">        ExactRoots roots = roots(parsed.left(), parsed.right());</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (roots == null</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                || !reconstructs(parsed.left(), roots.left())</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                || !reconstructs(parsed.right(), roots.right())) {</span>
+<span class="nc" id="L137">            return false;</span>
+        }
+<span class="fc" id="L139">        ExpectedApplication expected = expectedApplication(roots);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (!expressionsMatch(application, expected)</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                || !bindingsMatch(application, expected)</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                || !contextMatches(application, difference)) {</span>
+<span class="nc" id="L143">            return false;</span>
+        }
+<span class="fc" id="L145">        return certificate(</span>
+            difference,
+<span class="fc" id="L147">            parsed.left(),</span>
+<span class="fc" id="L148">            parsed.right(),</span>
+            roots,
+<span class="fc" id="L150">            expected).equals(application.certificate());</span>
+    }
+
+    private BinaryExpr verificationSource(PreparedApplication application) {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (!hasExpectedMetadata(application)</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                || !budget.equals(application.budget())</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                || !(application.originalSubtree()</span>
+<span class="fc" id="L157">                    instanceof BinaryExpr difference)</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                || difference.operator() != BinaryOperator.SUB</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                || isExplicitSquare(difference.left())</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                    &amp;&amp; isExplicitSquare(difference.right())) {</span>
+<span class="nc" id="L161">            return null;</span>
+        }
+<span class="fc" id="L163">        return difference;</span>
+    }
+
+    private ParsedTerms parseTerms(
+        BinaryExpr difference,
+        ResidualObligation obligation
+    ) {
+<span class="fc" id="L170">        ExactPositiveMonomial.Parser parser =</span>
+<span class="fc" id="L171">            new ExactPositiveMonomial.Parser(budget.limits());</span>
+<span class="fc" id="L172">        ExactPositiveMonomial.ParseResult left = parser.parse(difference.left());</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (!left.supported()) {</span>
+<span class="fc" id="L174">            return ParsedTerms.failed(</span>
+<span class="fc" id="L175">                parseFailure(left, obligation, parser));</span>
+        }
+<span class="fc" id="L177">        ExactPositiveMonomial.ParseResult right = parser.parse(difference.right());</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (!right.supported()) {</span>
+<span class="nc" id="L179">            return ParsedTerms.failed(</span>
+<span class="nc" id="L180">                parseFailure(right, obligation, parser));</span>
+        }
+<span class="fc" id="L182">        return ParsedTerms.supported(</span>
+<span class="fc" id="L183">            left.monomial(),</span>
+<span class="fc" id="L184">            right.monomial(),</span>
+<span class="fc" id="L185">            work(parser));</span>
+    }
+
+    private PlanAttempt parseFailure(
+        ExactPositiveMonomial.ParseResult result,
+        ResidualObligation obligation,
+        ExactPositiveMonomial.Parser parser
+    ) {
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        Status status = result.status()</span>
+<span class="fc" id="L194">                == ExactPositiveMonomial.ParseStatus.INCONCLUSIVE</span>
+<span class="fc" id="L195">            ? Status.BUDGET_INCONCLUSIVE</span>
+<span class="fc" id="L196">            : Status.UNSUPPORTED;</span>
+<span class="fc" id="L197">        return PlanAttempt.withoutApplication(</span>
+            status,
+<span class="fc" id="L199">            Optional.ofNullable(obligation),</span>
+<span class="fc" id="L200">            work(parser),</span>
+<span class="fc" id="L201">            result.detail());</span>
+    }
+
+    private WorkLedger work(ExactPositiveMonomial.Parser parser) {
+<span class="fc" id="L205">        return new WorkLedger(</span>
+<span class="fc" id="L206">            budget.maxFactors(),</span>
+<span class="fc" id="L207">            parser.inspectedFactors(),</span>
+<span class="fc" id="L208">            parser.remainingFactors());</span>
+    }
+
+    private static ExactRoots roots(
+        ExactPositiveMonomial left,
+        ExactPositiveMonomial right
+    ) {
+<span class="fc" id="L215">        ExactPositiveMonomial leftRoot = exactSquareRoot(left);</span>
+<span class="fc" id="L216">        ExactPositiveMonomial rightRoot = exactSquareRoot(right);</span>
+<span class="pc bpc" id="L217" title="1 of 4 branches missed.">        return leftRoot == null || rightRoot == null</span>
+<span class="fc" id="L218">            ? null</span>
+<span class="fc" id="L219">            : new ExactRoots(leftRoot, rightRoot);</span>
+    }
+
+    private static ExactPositiveMonomial exactSquareRoot(
+        ExactPositiveMonomial monomial
+    ) {
+<span class="fc" id="L225">        long coefficientRoot = perfectSquareRoot(monomial.coefficient());</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (coefficientRoot &lt; 1</span>
+<span class="fc" id="L227">                || monomial.powers().values().stream()</span>
+<span class="fc bfc" id="L228" title="All 4 branches covered.">                    .anyMatch(exponent -&gt; exponent % 2 != 0)) {</span>
+<span class="fc" id="L229">            return null;</span>
+        }
+<span class="fc" id="L231">        TreeMap&lt;String, Integer&gt; powers = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L232">        monomial.powers().forEach((name, exponent) -&gt;</span>
+<span class="fc" id="L233">            powers.put(name, exponent / 2));</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        powers.values().removeIf(exponent -&gt; exponent == 0);</span>
+<span class="fc" id="L235">        return new ExactPositiveMonomial(coefficientRoot, powers);</span>
+    }
+
+    private static long perfectSquareRoot(long value) {
+<span class="fc" id="L239">        long root = Math.round(Math.sqrt(value));</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        return root * root == value ? root : -1;</span>
+    }
+
+    private static boolean reconstructs(
+        ExactPositiveMonomial original,
+        ExactPositiveMonomial root
+    ) {
+<span class="fc" id="L247">        return original.equals(root.multiply(root));</span>
+    }
+
+    private static ExpectedApplication expectedApplication(ExactRoots roots) {
+<span class="fc" id="L251">        Expr leftRoot = roots.left().toExpression();</span>
+<span class="fc" id="L252">        Expr rightRoot = roots.right().toExpression();</span>
+<span class="fc" id="L253">        Expr prepared = new BinaryExpr(</span>
+<span class="fc" id="L254">            square(leftRoot),</span>
+            BinaryOperator.SUB,
+<span class="fc" id="L256">            square(rightRoot));</span>
+<span class="fc" id="L257">        Expr result = new BinaryExpr(</span>
+            new BinaryExpr(leftRoot, BinaryOperator.SUB, rightRoot),
+            BinaryOperator.MUL,
+            new BinaryExpr(leftRoot, BinaryOperator.ADD, rightRoot));
+<span class="fc" id="L261">        return new ExpectedApplication(</span>
+            leftRoot,
+            rightRoot,
+            prepared,
+            result);
+    }
+
+    private static Expr square(Expr expression) {
+<span class="fc" id="L269">        return new BinaryExpr(</span>
+            expression,
+            BinaryOperator.POW,
+            new NumberExpr(2));
+    }
+
+    private static boolean expressionsMatch(
+        PreparedApplication application,
+        ExpectedApplication expected
+    ) {
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        return expected.leftRoot().equals(application.leftRoot())</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">            &amp;&amp; expected.rightRoot().equals(application.rightRoot())</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">            &amp;&amp; expected.prepared().equals(application.preparedSubtree())</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">            &amp;&amp; expected.result().equals(application.resultSubtree());</span>
+    }
+
+    private static boolean bindingsMatch(
+        PreparedApplication application,
+        ExpectedApplication expected
+    ) {
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        return application.bindings().size() == 2</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            &amp;&amp; expected.leftRoot().equals(application.bindings().get(&quot;A&quot;))</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            &amp;&amp; expected.rightRoot().equals(application.bindings().get(&quot;B&quot;));</span>
+    }
+
+    private static boolean contextMatches(
+        PreparedApplication application,
+        BinaryExpr difference
+    ) {
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        return application.assumptions().isEmpty()</span>
+<span class="fc" id="L299">            &amp;&amp; residualObligation(difference)</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">                .equals(application.residualObligation());</span>
+    }
+
+    private static boolean hasExpectedMetadata(
+        PreparedApplication application
+    ) {
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">        return application != null</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            &amp;&amp; APPLICATION_SCHEMA.equals(application.schema())</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">            &amp;&amp; SOLVER_ID.equals(application.solverId())</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">            &amp;&amp; PRINCIPAL_RULE_ID.equals(application.principalRuleId())</span>
+<span class="fc" id="L310">            &amp;&amp; List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID)</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">                .equals(application.primitiveRuleIds());</span>
+    }
+
+    private static boolean isExplicitSquare(Expr expression) {
+<span class="fc" id="L315">        return expression instanceof BinaryExpr power</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">            &amp;&amp; power.operator() == BinaryOperator.POW</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">            &amp;&amp; power.right() instanceof NumberExpr exponent</span>
+<span class="fc bfc" id="L318" title="All 4 branches covered.">            &amp;&amp; exponent.value() == 2;</span>
+    }
+
+    private static ResidualObligation residualObligation(
+        BinaryExpr difference
+    ) {
+<span class="fc" id="L324">        String left = ExpressionFormatter.format(difference.left());</span>
+<span class="fc" id="L325">        String right = ExpressionFormatter.format(difference.right());</span>
+<span class="fc" id="L326">        return new ResidualObligation(</span>
+            &quot;EXACT_MONOMIAL_SQUARES&quot;,
+            left,
+            right,
+            &quot;A&quot;,
+            &quot;B&quot;,
+            left + &quot; = A^2; &quot; + right + &quot; = B^2&quot;);
+    }
+
+    private static Certificate certificate(
+        BinaryExpr difference,
+        ExactPositiveMonomial left,
+        ExactPositiveMonomial right,
+        ExactRoots roots,
+        ExpectedApplication expected
+    ) {
+<span class="fc" id="L342">        String leftText = ExpressionFormatter.format(difference.left());</span>
+<span class="fc" id="L343">        String rightText = ExpressionFormatter.format(difference.right());</span>
+<span class="fc" id="L344">        String leftRootText = ExpressionFormatter.format(expected.leftRoot());</span>
+<span class="fc" id="L345">        String rightRootText = ExpressionFormatter.format(expected.rightRoot());</span>
+<span class="fc" id="L346">        String preparedText = ExpressionFormatter.format(expected.prepared());</span>
+<span class="fc" id="L347">        String resultText = ExpressionFormatter.format(expected.result());</span>
+<span class="fc" id="L348">        String payload = String.join(&quot;\n&quot;,</span>
+            &quot;schema=&quot; + CERTIFICATE_SCHEMA,
+            &quot;solver=&quot; + SOLVER_ID,
+            &quot;principalRule=&quot; + PRINCIPAL_RULE_ID,
+            &quot;left=&quot; + leftText,
+            &quot;right=&quot; + rightText,
+<span class="fc" id="L354">            &quot;leftMonomial=&quot; + left.descriptor(),</span>
+<span class="fc" id="L355">            &quot;rightMonomial=&quot; + right.descriptor(),</span>
+            &quot;leftRoot=&quot; + leftRootText,
+            &quot;rightRoot=&quot; + rightRootText,
+<span class="fc" id="L358">            &quot;leftRootMonomial=&quot; + roots.left().descriptor(),</span>
+<span class="fc" id="L359">            &quot;rightRootMonomial=&quot; + roots.right().descriptor(),</span>
+            &quot;prepared=&quot; + preparedText,
+            &quot;result=&quot; + resultText);
+<span class="fc" id="L362">        return new Certificate(</span>
+            CERTIFICATE_SCHEMA,
+            SOLVER_ID,
+            leftText,
+            rightText,
+            leftRootText,
+            rightRootText,
+            preparedText,
+            resultText,
+<span class="fc" id="L371">            left.descriptor(),</span>
+<span class="fc" id="L372">            right.descriptor(),</span>
+<span class="fc" id="L373">            roots.left().descriptor(),</span>
+<span class="fc" id="L374">            roots.right().descriptor(),</span>
+<span class="fc" id="L375">            sha256(payload));</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L380">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L381">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L382">            return java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L383">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L384">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L388">    public enum Status {</span>
+<span class="fc" id="L389">        PREPARED,</span>
+<span class="fc" id="L390">        DIRECT_MATCH_AVAILABLE,</span>
+<span class="fc" id="L391">        NOT_APPLICABLE,</span>
+<span class="fc" id="L392">        UNSUPPORTED,</span>
+<span class="fc" id="L393">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L394">        INVALID_CERTIFICATE</span>
+    }
+
+    public record Budget(
+        int maxFactors,
+        int maxExponent,
+        long maxCoefficient
+    ) {
+<span class="fc" id="L402">        public static final Budget DEFAULT = new Budget(32, 16, 1_000_000L);</span>
+
+<span class="fc" id="L404">        public Budget {</span>
+<span class="pc bpc" id="L405" title="1 of 6 branches missed.">            if (maxFactors &lt; 0 || maxExponent &lt; 1 || maxCoefficient &lt; 1) {</span>
+<span class="fc" id="L406">                throw new IllegalArgumentException(</span>
+                    &quot;factor limit must be non-negative and algebra limits positive&quot;);
+            }
+<span class="fc" id="L409">        }</span>
+
+        private ExactPositiveMonomial.Limits limits() {
+<span class="fc" id="L412">            return new ExactPositiveMonomial.Limits(</span>
+                maxFactors,
+                maxExponent,
+                maxCoefficient);
+        }
+    }
+
+    public record WorkLedger(
+        int configuredFactorLimit,
+        int inspectedFactors,
+        int remainingFactorBudget
+    ) {
+<span class="fc" id="L424">        public WorkLedger {</span>
+<span class="pc bpc" id="L425" title="4 of 8 branches missed.">            if (configuredFactorLimit &lt; 0</span>
+                    || inspectedFactors &lt; 0
+                    || remainingFactorBudget &lt; 0
+                    || configuredFactorLimit
+                        != inspectedFactors + remainingFactorBudget) {
+<span class="nc" id="L430">                throw new IllegalArgumentException(</span>
+                    &quot;factor work must be non-negative and balanced&quot;);
+            }
+<span class="fc" id="L433">        }</span>
+
+        private static WorkLedger untouched(int configured) {
+<span class="fc" id="L436">            return new WorkLedger(configured, 0, configured);</span>
+        }
+    }
+
+    public record ResidualObligation(
+        String kind,
+        String leftTermExpression,
+        String rightTermExpression,
+        String leftRootPlaceholder,
+        String rightRootPlaceholder,
+        String equationTemplate
+    ) {
+<span class="fc" id="L448">        public ResidualObligation {</span>
+<span class="fc" id="L449">            kind = requireText(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L450">            leftTermExpression = requireText(</span>
+                leftTermExpression,
+                &quot;leftTermExpression&quot;);
+<span class="fc" id="L453">            rightTermExpression = requireText(</span>
+                rightTermExpression,
+                &quot;rightTermExpression&quot;);
+<span class="fc" id="L456">            leftRootPlaceholder = requireText(</span>
+                leftRootPlaceholder,
+                &quot;leftRootPlaceholder&quot;);
+<span class="fc" id="L459">            rightRootPlaceholder = requireText(</span>
+                rightRootPlaceholder,
+                &quot;rightRootPlaceholder&quot;);
+<span class="fc" id="L462">            equationTemplate = requireText(</span>
+                equationTemplate,
+                &quot;equationTemplate&quot;);
+<span class="fc" id="L465">        }</span>
+    }
+
+    public record Certificate(
+        String schema,
+        String solverId,
+        String leftTermExpression,
+        String rightTermExpression,
+        String leftRootExpression,
+        String rightRootExpression,
+        String preparedExpression,
+        String resultExpression,
+        String leftMonomialDescriptor,
+        String rightMonomialDescriptor,
+        String leftRootMonomialDescriptor,
+        String rightRootMonomialDescriptor,
+        String contentHash
+    ) {
+<span class="fc" id="L483">        public Certificate {</span>
+<span class="fc" id="L484">            schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L485">            solverId = requireText(solverId, &quot;solverId&quot;);</span>
+<span class="fc" id="L486">            leftTermExpression = requireText(</span>
+                leftTermExpression,
+                &quot;leftTermExpression&quot;);
+<span class="fc" id="L489">            rightTermExpression = requireText(</span>
+                rightTermExpression,
+                &quot;rightTermExpression&quot;);
+<span class="fc" id="L492">            leftRootExpression = requireText(</span>
+                leftRootExpression,
+                &quot;leftRootExpression&quot;);
+<span class="fc" id="L495">            rightRootExpression = requireText(</span>
+                rightRootExpression,
+                &quot;rightRootExpression&quot;);
+<span class="fc" id="L498">            preparedExpression = requireText(</span>
+                preparedExpression,
+                &quot;preparedExpression&quot;);
+<span class="fc" id="L501">            resultExpression = requireText(</span>
+                resultExpression,
+                &quot;resultExpression&quot;);
+<span class="fc" id="L504">            leftMonomialDescriptor = requireText(</span>
+                leftMonomialDescriptor,
+                &quot;leftMonomialDescriptor&quot;);
+<span class="fc" id="L507">            rightMonomialDescriptor = requireText(</span>
+                rightMonomialDescriptor,
+                &quot;rightMonomialDescriptor&quot;);
+<span class="fc" id="L510">            leftRootMonomialDescriptor = requireText(</span>
+                leftRootMonomialDescriptor,
+                &quot;leftRootMonomialDescriptor&quot;);
+<span class="fc" id="L513">            rightRootMonomialDescriptor = requireText(</span>
+                rightRootMonomialDescriptor,
+                &quot;rightRootMonomialDescriptor&quot;);
+<span class="fc" id="L516">            contentHash = requireText(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L517">        }</span>
+    }
+
+    public record PreparedApplication(
+        String schema,
+        String solverId,
+        String principalRuleId,
+        Expr originalSubtree,
+        Expr preparedSubtree,
+        Expr resultSubtree,
+        Expr leftRoot,
+        Expr rightRoot,
+        Map&lt;String, Expr&gt; bindings,
+        ResidualObligation residualObligation,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; primitiveRuleIds,
+        Budget budget,
+        Certificate certificate,
+        WorkLedger work
+    ) {
+<span class="fc" id="L537">        public PreparedApplication {</span>
+<span class="fc" id="L538">            schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L539">            solverId = requireText(solverId, &quot;solverId&quot;);</span>
+<span class="fc" id="L540">            principalRuleId = requireText(</span>
+                principalRuleId,
+                &quot;principalRuleId&quot;);
+<span class="fc" id="L543">            originalSubtree = Objects.requireNonNull(</span>
+                originalSubtree,
+                &quot;originalSubtree&quot;);
+<span class="fc" id="L546">            preparedSubtree = Objects.requireNonNull(</span>
+                preparedSubtree,
+                &quot;preparedSubtree&quot;);
+<span class="fc" id="L549">            resultSubtree = Objects.requireNonNull(</span>
+                resultSubtree,
+                &quot;resultSubtree&quot;);
+<span class="fc" id="L552">            leftRoot = Objects.requireNonNull(leftRoot, &quot;leftRoot&quot;);</span>
+<span class="fc" id="L553">            rightRoot = Objects.requireNonNull(rightRoot, &quot;rightRoot&quot;);</span>
+<span class="fc" id="L554">            bindings = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(</span>
+<span class="fc" id="L555">                Objects.requireNonNull(bindings, &quot;bindings&quot;)));</span>
+<span class="fc" id="L556">            residualObligation = Objects.requireNonNull(</span>
+                residualObligation,
+                &quot;residualObligation&quot;);
+<span class="fc" id="L559">            assumptions = List.copyOf(</span>
+<span class="fc" id="L560">                Objects.requireNonNull(assumptions, &quot;assumptions&quot;));</span>
+<span class="fc" id="L561">            primitiveRuleIds = List.copyOf(</span>
+<span class="fc" id="L562">                Objects.requireNonNull(</span>
+                    primitiveRuleIds,
+                    &quot;primitiveRuleIds&quot;));
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">            if (primitiveRuleIds.isEmpty()) {</span>
+<span class="nc" id="L566">                throw new IllegalArgumentException(</span>
+                    &quot;primitiveRuleIds must not be empty&quot;);
+            }
+<span class="fc" id="L569">            budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L570">            certificate = Objects.requireNonNull(certificate, &quot;certificate&quot;);</span>
+<span class="fc" id="L571">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L572">        }</span>
+    }
+
+    public record PlanAttempt(
+        Status status,
+        Optional&lt;PreparedApplication&gt; application,
+        Optional&lt;ResidualObligation&gt; residualObligation,
+        WorkLedger work,
+        String detail
+    ) {
+<span class="fc" id="L582">        public PlanAttempt {</span>
+<span class="fc" id="L583">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L584">            application = Objects.requireNonNull(</span>
+                application,
+                &quot;application&quot;);
+<span class="fc" id="L587">            residualObligation = Objects.requireNonNull(</span>
+                residualObligation,
+                &quot;residualObligation&quot;);
+<span class="fc" id="L590">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="pc bpc" id="L592" title="1 of 4 branches missed.">            if ((status == Status.PREPARED) != application.isPresent()) {</span>
+<span class="nc" id="L593">                throw new IllegalArgumentException(</span>
+                    &quot;only PREPARED attempts may retain an application&quot;);
+            }
+<span class="fc bfc" id="L596" title="All 2 branches covered.">            if (application.isPresent()</span>
+<span class="pc bpc" id="L597" title="1 of 2 branches missed.">                    &amp;&amp; (!application.get().work().equals(work)</span>
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">                        || !residualObligation.equals(Optional.of(</span>
+<span class="fc" id="L599">                            application.get().residualObligation())))) {</span>
+<span class="nc" id="L600">                throw new IllegalArgumentException(</span>
+                    &quot;attempt and application evidence must agree&quot;);
+            }
+<span class="fc" id="L603">        }</span>
+
+        private static PlanAttempt prepared(PreparedApplication application) {
+<span class="fc" id="L606">            return new PlanAttempt(</span>
+                Status.PREPARED,
+<span class="fc" id="L608">                Optional.of(application),</span>
+<span class="fc" id="L609">                Optional.of(application.residualObligation()),</span>
+<span class="fc" id="L610">                application.work(),</span>
+                &quot;exact-monomial-square-structure-prepared&quot;);
+        }
+
+        private static PlanAttempt withoutApplication(
+            Status status,
+            WorkLedger work,
+            String detail
+        ) {
+<span class="fc" id="L619">            return withoutApplication(</span>
+                status,
+<span class="fc" id="L621">                Optional.empty(),</span>
+                work,
+                detail);
+        }
+
+        private static PlanAttempt withoutApplication(
+            Status status,
+            Optional&lt;ResidualObligation&gt; obligation,
+            WorkLedger work,
+            String detail
+        ) {
+<span class="fc" id="L632">            return new PlanAttempt(</span>
+                status,
+<span class="fc" id="L634">                Optional.empty(),</span>
+                obligation,
+                work,
+                detail);
+        }
+    }
+
+<span class="fc" id="L641">    private record ParsedTerms(</span>
+        ExactPositiveMonomial left,
+        ExactPositiveMonomial right,
+        WorkLedger work,
+        PlanAttempt failure
+    ) {
+        private static ParsedTerms supported(
+            ExactPositiveMonomial left,
+            ExactPositiveMonomial right,
+            WorkLedger work
+        ) {
+<span class="fc" id="L652">            return new ParsedTerms(</span>
+<span class="fc" id="L653">                Objects.requireNonNull(left, &quot;left&quot;),</span>
+<span class="fc" id="L654">                Objects.requireNonNull(right, &quot;right&quot;),</span>
+<span class="fc" id="L655">                Objects.requireNonNull(work, &quot;work&quot;),</span>
+                null);
+        }
+
+        private static ParsedTerms failed(PlanAttempt failure) {
+<span class="fc" id="L660">            return new ParsedTerms(</span>
+                null,
+                null,
+<span class="fc" id="L663">                Objects.requireNonNull(failure, &quot;failure&quot;).work(),</span>
+                failure);
+        }
+    }
+
+    private record ExactRoots(
+        ExactPositiveMonomial left,
+        ExactPositiveMonomial right
+    ) {
+<span class="fc" id="L672">        private ExactRoots {</span>
+<span class="fc" id="L673">            left = Objects.requireNonNull(left, &quot;left&quot;);</span>
+<span class="fc" id="L674">            right = Objects.requireNonNull(right, &quot;right&quot;);</span>
+<span class="fc" id="L675">        }</span>
+    }
+
+    private record ExpectedApplication(
+        Expr leftRoot,
+        Expr rightRoot,
+        Expr prepared,
+        Expr result
+    ) {
+<span class="fc" id="L684">        private ExpectedApplication {</span>
+<span class="fc" id="L685">            leftRoot = Objects.requireNonNull(leftRoot, &quot;leftRoot&quot;);</span>
+<span class="fc" id="L686">            rightRoot = Objects.requireNonNull(rightRoot, &quot;rightRoot&quot;);</span>
+<span class="fc" id="L687">            prepared = Objects.requireNonNull(prepared, &quot;prepared&quot;);</span>
+<span class="fc" id="L688">            result = Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L689">        }</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L693" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L694">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L696">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

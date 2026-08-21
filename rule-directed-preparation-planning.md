@@ -49,18 +49,42 @@ normalization can expose it directly. For example:
 No factor is invented: the solver retains and checks the exact multiset of
 existing factors before the ordinary cancellation implementation is replayed.
 
+A third solver handles a common monomial that is mathematically present but not
+an identical outer AST factor. In the bounded positive-integer monomial
+fragment it derives, for example:
+
+```text
+x^2 * y + x * z
+  -> prepared as x * (x * y) + x * z
+  -> x * (x * y + z)
+```
+
+The greatest common monomial and both exact quotients are retained and
+independently verified before the visible common-factor rule is replayed.
+
+A fourth solver exposes exact square structure. For example:
+
+```text
+4 * x^4 * y^2 - 9 * z^2
+  -> prepared as (2 * x^2 * y)^2 - (3 * z)^2
+  -> (2 * x^2 * y - 3 * z) * (2 * x^2 * y + 3 * z)
+```
+
+Both monomial roots must be exact under the configured bounds. The existing
+difference-of-squares rule remains the principal transformation.
+
 ## Information boundary
 
 A preparation solver consumes only:
 
 - the current AST subtree;
-- the visible principal rule ID;
+- the visible principal rule or operator ID;
 - its declared mathematical fragment;
 - its local work budget.
 
 It receives no search target, pinned benchmark reference, hidden family label
-or post-hoc qualification result. If the cancellation rule is absent from the
-visible rule inventory, no prepared application is generated.
+or post-hoc qualification result. If the required principal rule or operator is
+absent from the visible inventory, no prepared application is generated.
 
 ## Opt-in use
 
@@ -79,7 +103,21 @@ TransformationEngine engine =
     new AcNormalizationPreparationTransformationEngine();
 ```
 
-Both engines also support an explicit rule selection through their
+Exact two-term common-monomial synthesis is available through:
+
+```java
+TransformationEngine engine =
+    new MonomialCommonFactorPreparationTransformationEngine();
+```
+
+Exact monomial-square exposure composes all earlier paths:
+
+```java
+TransformationEngine engine =
+    new PerfectSquareStructurePreparationTransformationEngine();
+```
+
+The engines also support explicit rule selection through their
 `withKnowledgePacks(selection)` factories.
 
 `AstRewriteTransformationEngine` remains unchanged. Historical benchmark
@@ -105,7 +143,22 @@ configurations therefore retain their previous rule inventory and output.
 - the factor-count budget and inspected work;
 - an AC multiset certificate independent of the later cancellation replay.
 
-The transformation edge keeps both primitive IDs, so treating a composed
+`MonomialCommonFactorPreparationSolver.PreparedApplication` records:
+
+- the original, prepared and result ASTs;
+- the greatest common monomial and both exact quotient monomials;
+- bindings `A`, `B` and `C` plus the residual factor equations;
+- exact monomial descriptors and a content-addressed certificate;
+- balanced factor work and the two retained primitive IDs.
+
+`PerfectSquareStructurePreparationSolver.PreparedApplication` records:
+
+- the original, prepared and result ASTs;
+- both exact monomial square roots and bindings `A` and `B`;
+- residual square equations, source/root descriptors and a content hash;
+- balanced work and the preparation/principal primitive lineage.
+
+The transformation edge keeps every primitive ID, so treating a composed
 operation as one frontier move does not hide its mathematical work.
 
 ## AC-normalization preparation
@@ -148,6 +201,45 @@ The solver does not:
 
 A factor-limit hit is `BUDGET_INCONCLUSIVE`, never a proven non-match.
 
+## Exact common-monomial preparation
+
+The monomial solver supports exactly two additive terms built from positive
+exact integer coefficients, variables, positive integer variable powers and
+multiplication. It computes the coefficient GCD and the minimum exponent of
+each shared variable. Exact division yields the two remainders.
+
+For example:
+
+```text
+6 * x^2 * y + 9 * x * z
+  -> (3 * x) * (2 * x * y + 3 * z)
+```
+
+A quotient of one is permitted only when exact division proves it, as in
+`x^2 + x -> x * (x + 1)`. Coefficients outside the exactly representable
+integer range of `NumberExpr`, unsupported syntax and exhausted factor,
+coefficient or exponent limits never become guessed factors.
+
+The prepared AST is retained directly. Formatting and reparsing could erase
+associative multiplication grouping, so the concrete visible
+`ast_factor_common_left` rule must match and apply to that retained AST before a
+candidate is emitted. See
+[`monomial-common-factor-preparation.md`](monomial-common-factor-preparation.md)
+for the complete fragment and certificate contract.
+
+## Exact perfect-square preparation
+
+The square solver accepts a subtraction of two positive exact integer monomials.
+Each coefficient must be a perfect square and every variable exponent must be
+even. It computes both roots exactly, squares them back to the source monomials
+and prepares the syntactic form required by `ast_square_difference_factor`.
+
+It does not reorder subtraction, approximate a root or introduce assumptions.
+The concrete visible principal rule must replay on the retained prepared AST and
+produce the exact expected result. See
+[`perfect-square-structure-preparation.md`](perfect-square-structure-preparation.md)
+for the complete evidence and claim boundary.
+
 ## Fail-closed outcomes
 
 The exact-polynomial planner distinguishes:
@@ -159,7 +251,7 @@ The exact-polynomial planner distinguishes:
 - `NO_EXACT_QUOTIENT`;
 - `BUDGET_INCONCLUSIVE`.
 
-The AC solver distinguishes:
+The AC, common-monomial and perfect-square solvers distinguish:
 
 - `PREPARED`;
 - `DIRECT_MATCH_AVAILABLE`;
@@ -168,10 +260,10 @@ The AC solver distinguishes:
 - `BUDGET_INCONCLUSIVE`;
 - `INVALID_CERTIFICATE`.
 
-Unsupported input, a missing factor, an explicit zero divisor, exhausted work
-or a rejected certificate never produces a guessed candidate. A prepared
-application that fails independent verification is skipped while direct
-results and other AST positions remain available.
+Unsupported input, a missing factor, a non-square monomial, an explicit zero
+divisor, exhausted work or a rejected certificate never produces a guessed
+candidate. A prepared application that fails independent verification is
+skipped while direct results and other AST positions remain available.
 
 ## Invocation-local memoization
 
@@ -255,9 +347,14 @@ from configurations that did not declare these execution policies.
 
 ## Current limits
 
-The implemented solvers cover exact univariate integer-polynomial quotient
-synthesis and existing-factor exposure modulo scalar multiplication AC. They do
-not yet provide general partial-pattern obligations, e-class representative
-planning, monomial/common-factor synthesis, power or square-structure exposure,
-rational common-denominator preparation, or bounded local pattern-targeted
-BFS. Those remain in #708.
+The implemented solvers now cover exact univariate integer-polynomial quotient
+synthesis, existing-factor exposure modulo scalar multiplication AC, exact
+common-factor synthesis for two positive integer monomials and exact
+perfect-square exposure for two such monomials.
+
+They do not yet provide general partial-pattern obligations, e-class
+representative planning, rational common-denominator preparation or bounded
+local pattern-targeted BFS. The exact monomial solvers also do not establish
+general polynomial factorization, subtraction-aware or rational-coefficient
+GCD extraction, multiterm common-factor synthesis or arbitrary algebraic root
+extraction. Those remaining capabilities stay in #708.

@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PerfectSquareStructurePreparationTransformationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">PerfectSquareStructurePreparationTransformationEngine.java</span></div><h1>PerfectSquareStructurePreparationTransformationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Opt-in engine that adds exact perfect-square exposure to all earlier
+ * preparation paths.
+ *
+ * &lt;p&gt;The concrete difference-of-squares rule is replayed directly on the
+ * retained prepared AST, preserving the grouping that a formatting round trip
+ * could erase.&lt;/p&gt;
+ */
+public final class PerfectSquareStructurePreparationTransformationEngine
+        implements TransformationEngine {
+    private static final int DEFAULT_MAX_PREPARED_CANDIDATES = 16;
+    private static final String PREPARATION_PACK_ID =
+        &quot;core-rule-preparation&quot;;
+
+    private final TransformationEngine baseEngine;
+    private final TransformationEngine principalEngine;
+    private final RewriteRule principalRule;
+    private final Set&lt;String&gt; visibleRuleIds;
+    private final PerfectSquareStructurePreparationSolver solver;
+    private final int maxPreparedCandidates;
+<span class="fc" id="L41">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L42">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+
+    public PerfectSquareStructurePreparationTransformationEngine() {
+<span class="fc" id="L46">        this(AstRewriteTransformationEngine.defaultRules());</span>
+<span class="fc" id="L47">    }</span>
+
+    public PerfectSquareStructurePreparationTransformationEngine(
+        List&lt;RewriteRule&gt; rules
+    ) {
+<span class="fc" id="L52">        this(</span>
+            new MonomialCommonFactorPreparationTransformationEngine(
+<span class="fc" id="L54">                copyRules(rules)),</span>
+<span class="fc" id="L55">            new AstRewriteTransformationEngine(copyRules(rules)),</span>
+<span class="fc" id="L56">            findPrincipalRule(rules),</span>
+<span class="fc" id="L57">            ruleIds(rules),</span>
+            new PerfectSquareStructurePreparationSolver(),
+            DEFAULT_MAX_PREPARED_CANDIDATES);
+<span class="fc" id="L60">    }</span>
+
+    public PerfectSquareStructurePreparationTransformationEngine(
+        TransformationEngine baseEngine,
+        TransformationEngine principalEngine,
+        Set&lt;String&gt; visibleRuleIds,
+        PerfectSquareStructurePreparationSolver solver,
+        int maxPreparedCandidates
+    ) {
+<span class="fc" id="L69">        this(</span>
+            baseEngine,
+            principalEngine,
+            null,
+            visibleRuleIds,
+            solver,
+            maxPreparedCandidates);
+<span class="fc" id="L76">    }</span>
+
+    private PerfectSquareStructurePreparationTransformationEngine(
+        TransformationEngine baseEngine,
+        TransformationEngine principalEngine,
+        RewriteRule principalRule,
+        Set&lt;String&gt; visibleRuleIds,
+        PerfectSquareStructurePreparationSolver solver,
+        int maxPreparedCandidates
+<span class="fc" id="L85">    ) {</span>
+<span class="fc" id="L86">        this.baseEngine = Objects.requireNonNull(baseEngine, &quot;baseEngine&quot;);</span>
+<span class="fc" id="L87">        this.principalEngine = Objects.requireNonNull(</span>
+            principalEngine,
+            &quot;principalEngine&quot;);
+<span class="fc" id="L90">        this.principalRule = principalRule;</span>
+<span class="fc" id="L91">        this.visibleRuleIds = Set.copyOf(</span>
+<span class="fc" id="L92">            Objects.requireNonNull(visibleRuleIds, &quot;visibleRuleIds&quot;));</span>
+<span class="fc" id="L93">        this.solver = Objects.requireNonNull(solver, &quot;solver&quot;);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (maxPreparedCandidates &lt; 0) {</span>
+<span class="nc" id="L95">            throw new IllegalArgumentException(</span>
+                &quot;maxPreparedCandidates must not be negative&quot;);
+        }
+<span class="fc" id="L98">        this.maxPreparedCandidates = maxPreparedCandidates;</span>
+<span class="fc" id="L99">    }</span>
+
+    public static PerfectSquareStructurePreparationTransformationEngine
+            withKnowledgePacks(KnowledgePackSelection selection) {
+<span class="nc" id="L103">        List&lt;RewriteRule&gt; rules = new ArrayList&lt;&gt;(</span>
+<span class="nc" id="L104">            AstRewriteTransformationEngine.defaultRules(selection));</span>
+<span class="nc" id="L105">        rules.addAll(new KnowledgePackRegistry().enabledRules(selection));</span>
+<span class="nc" id="L106">        return new PerfectSquareStructurePreparationTransformationEngine(rules);</span>
+    }
+
+    public String solverId() {
+<span class="nc" id="L110">        return PerfectSquareStructurePreparationSolver.SOLVER_ID;</span>
+    }
+
+    public Set&lt;String&gt; visibleRuleIds() {
+<span class="nc" id="L114">        return visibleRuleIds;</span>
+    }
+
+    @Override
+    public List&lt;Transformation&gt; transform(String expression) {
+<span class="fc" id="L119">        return transformWithEvidence(expression).transformations();</span>
+    }
+
+    public Execution transformWithEvidence(String expression) {
+<span class="fc" id="L123">        List&lt;Transformation&gt; base = List.copyOf(baseEngine.transform(expression));</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (!preparationEnabledFor(expression)) {</span>
+<span class="fc" id="L125">            return new Execution(base, List.of());</span>
+        }
+<span class="fc" id="L127">        Expr root = parseRoot(expression);</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L129">            return new Execution(base, List.of());</span>
+        }
+
+<span class="fc" id="L132">        String formattedRoot = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L133">        Set&lt;String&gt; retainedOutputs = outputKeys(base);</span>
+<span class="fc" id="L134">        List&lt;Transformation&gt; prepared = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L135">        List&lt;PreparationObservation&gt; observations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (PositionedNode positioned : positionedNodes(root)) {</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (prepared.size() &gt;= maxPreparedCandidates) {</span>
+<span class="nc" id="L138">                break;</span>
+            }
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (!isSubtraction(positioned.expression())) {</span>
+<span class="fc" id="L141">                continue;</span>
+            }
+<span class="fc" id="L143">            PerfectSquareStructurePreparationSolver.PlanAttempt attempt =</span>
+<span class="fc" id="L144">                solver.plan(positioned.expression());</span>
+<span class="fc" id="L145">            observations.add(new PreparationObservation(</span>
+<span class="fc" id="L146">                positionKey(positioned.path()),</span>
+<span class="fc" id="L147">                ExpressionFormatter.format(positioned.expression()),</span>
+                attempt));
+<span class="fc" id="L149">            Transformation candidate = preparedTransformation(</span>
+                root,
+                formattedRoot,
+                positioned,
+                attempt,
+                retainedOutputs);
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (candidate != null) {</span>
+<span class="fc" id="L156">                prepared.add(candidate);</span>
+            }
+<span class="fc" id="L158">        }</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (prepared.isEmpty()) {</span>
+<span class="fc" id="L160">            return new Execution(base, observations);</span>
+        }
+<span class="fc" id="L162">        List&lt;Transformation&gt; result = new ArrayList&lt;&gt;(base);</span>
+<span class="fc" id="L163">        result.addAll(prepared);</span>
+<span class="fc" id="L164">        return new Execution(result, observations);</span>
+    }
+
+    private boolean preparationEnabledFor(String expression) {
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        return maxPreparedCandidates &gt; 0</span>
+<span class="pc bpc" id="L169" title="1 of 4 branches missed.">            &amp;&amp; visibleRuleIds.contains(</span>
+                PerfectSquareStructurePreparationSolver.PRINCIPAL_RULE_ID)
+            &amp;&amp; expression != null
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            &amp;&amp; !expression.isBlank();</span>
+    }
+
+    private Expr parseRoot(String expression) {
+        try {
+<span class="fc" id="L177">            return parser.parse(new InputRequest(InputType.TERM, expression))</span>
+<span class="fc" id="L178">                .terms()</span>
+<span class="fc" id="L179">                .getFirst();</span>
+<span class="nc" id="L180">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L181">            return null;</span>
+        }
+    }
+
+    private Set&lt;String&gt; outputKeys(List&lt;Transformation&gt; transformations) {
+<span class="fc" id="L186">        Set&lt;String&gt; result = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (Transformation transformation : transformations) {</span>
+<span class="fc" id="L188">            result.add(outputKey(</span>
+<span class="fc" id="L189">                transformation.transformedExpression(),</span>
+<span class="fc" id="L190">                transformation.assumptions()));</span>
+<span class="fc" id="L191">        }</span>
+<span class="fc" id="L192">        return result;</span>
+    }
+
+    private Transformation preparedTransformation(
+        Expr root,
+        String formattedRoot,
+        PositionedNode positioned,
+        PerfectSquareStructurePreparationSolver.PlanAttempt attempt,
+        Set&lt;String&gt; retainedOutputs
+    ) {
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (attempt.status()</span>
+                != PerfectSquareStructurePreparationSolver.Status.PREPARED) {
+<span class="fc" id="L204">            return null;</span>
+        }
+<span class="fc" id="L206">        PerfectSquareStructurePreparationSolver.PreparedApplication application =</span>
+<span class="fc" id="L207">            attempt.application().orElseThrow();</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (!verified(application)) {</span>
+<span class="nc" id="L209">            return null;</span>
+        }
+<span class="fc" id="L211">        Transformation principal = replayPrincipal(application);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (principal == null) {</span>
+<span class="fc" id="L213">            return null;</span>
+        }
+
+<span class="fc" id="L216">        Expr rewrittenRoot = replaceAt(</span>
+            root,
+<span class="fc" id="L218">            positioned.path(),</span>
+            0,
+<span class="fc" id="L220">            application.resultSubtree());</span>
+<span class="fc" id="L221">        String transformed = ExpressionFormatter.format(rewrittenRoot);</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (transformed.equals(formattedRoot)</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">                || !retainedOutputs.add(outputKey(</span>
+                    transformed,
+<span class="fc" id="L225">                    application.assumptions()))) {</span>
+<span class="nc" id="L226">            return null;</span>
+        }
+<span class="fc" id="L228">        return new Transformation(</span>
+<span class="fc" id="L229">            application.principalRuleId(),</span>
+            transformed,
+<span class="fc" id="L231">            principal.kind(),</span>
+<span class="fc" id="L232">            principal.mayIncreaseComplexity(),</span>
+<span class="fc" id="L233">            principal.estimatedCostDelta(),</span>
+<span class="fc" id="L234">            principal.equivalencePreservingByConstruction(),</span>
+            &quot;prepared-square:&quot;
+<span class="fc" id="L236">                + application.certificate().contentHash()</span>
+                + &quot;:&quot;
+<span class="fc" id="L238">                + positionKey(positioned.path()),</span>
+<span class="fc" id="L239">            application.assumptions(),</span>
+            PREPARATION_PACK_ID,
+            &quot;PROJECT&quot;,
+<span class="fc" id="L242">            application.primitiveRuleIds());</span>
+    }
+
+    private boolean verified(
+        PerfectSquareStructurePreparationSolver.PreparedApplication application
+    ) {
+        try {
+<span class="fc" id="L249">            return solver.verify(application);</span>
+<span class="nc" id="L250">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L251">            return false;</span>
+        }
+    }
+
+    private Transformation replayPrincipal(
+        PerfectSquareStructurePreparationSolver.PreparedApplication application
+    ) {
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        return principalRule == null</span>
+<span class="fc" id="L259">            ? replayPrincipalThroughEngine(application)</span>
+<span class="fc" id="L260">            : replayPrincipalOnAst(application);</span>
+    }
+
+    private Transformation replayPrincipalOnAst(
+        PerfectSquareStructurePreparationSolver.PreparedApplication application
+    ) {
+<span class="fc" id="L266">        Expr prepared = application.preparedSubtree();</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (!principalRule.id().equals(application.principalRuleId())</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">                || !principalRule.matches(prepared)) {</span>
+<span class="nc" id="L269">            return null;</span>
+        }
+        try {
+<span class="fc" id="L272">            Expr actual = principalRule.apply(prepared);</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">            if (!actual.equals(application.resultSubtree())) {</span>
+<span class="nc" id="L274">                return null;</span>
+            }
+<span class="fc" id="L276">            Transformation replay = new Transformation(</span>
+<span class="fc" id="L277">                principalRule.id(),</span>
+<span class="fc" id="L278">                ExpressionFormatter.format(actual),</span>
+<span class="fc" id="L279">                principalRule.kind(),</span>
+<span class="fc" id="L280">                principalRule.mayIncreaseComplexity(),</span>
+<span class="fc" id="L281">                principalRule.estimatedCostDelta(),</span>
+<span class="fc" id="L282">                principalRule.isEquivalencePreservingByConstruction(),</span>
+                &quot;principal-ast-replay:&quot;
+<span class="fc" id="L284">                    + application.certificate().contentHash(),</span>
+<span class="fc" id="L285">                principalRule.assumptions(prepared).stream()</span>
+<span class="fc" id="L286">                    .map(de.regelsuche.assumption.Assumption::expression)</span>
+<span class="fc" id="L287">                    .toList(),</span>
+<span class="fc" id="L288">                principalRule.descriptor().packId(),</span>
+<span class="fc" id="L289">                principalRule.descriptor().license());</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            return replay.assumptions().equals(application.assumptions())</span>
+<span class="fc" id="L291">                ? replay</span>
+<span class="nc" id="L292">                : null;</span>
+<span class="nc" id="L293">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L294">            return null;</span>
+        }
+    }
+
+    private Transformation replayPrincipalThroughEngine(
+        PerfectSquareStructurePreparationSolver.PreparedApplication application
+    ) {
+<span class="fc" id="L301">        String prepared = ExpressionFormatter.format(</span>
+<span class="fc" id="L302">            application.preparedSubtree());</span>
+<span class="fc" id="L303">        String expectedExpression = canonicalExpressionKey(</span>
+<span class="fc" id="L304">            ExpressionFormatter.format(application.resultSubtree()));</span>
+<span class="fc" id="L305">        return principalEngine.transform(prepared).stream()</span>
+<span class="pc" id="L306">            .filter(transformation -&gt; application.principalRuleId()</span>
+<span class="nc" id="L307">                .equals(transformation.rule()))</span>
+<span class="pc" id="L308">            .filter(transformation -&gt; expectedExpression.equals(</span>
+<span class="nc" id="L309">                canonicalExpressionKey(</span>
+<span class="nc" id="L310">                    transformation.transformedExpression())))</span>
+<span class="pc" id="L311">            .filter(transformation -&gt; transformation.assumptions()</span>
+<span class="nc" id="L312">                .equals(application.assumptions()))</span>
+<span class="fc" id="L313">            .findFirst()</span>
+<span class="fc" id="L314">            .orElse(null);</span>
+    }
+
+    private String outputKey(String expression, List&lt;String&gt; assumptions) {
+<span class="fc" id="L318">        return canonicalExpressionKey(expression)</span>
+            + &quot;\u0000&quot;
+<span class="fc" id="L320">            + String.join(&quot;\u0000&quot;, assumptions);</span>
+    }
+
+    private String canonicalExpressionKey(String expression) {
+        try {
+<span class="fc" id="L325">            return canonicalizer.stableHash(expression);</span>
+<span class="nc" id="L326">        } catch (RuntimeException exception) {</span>
+<span class="nc bnc" id="L327" title="All 2 branches missed.">            return expression == null ? &quot;&quot; : expression.trim();</span>
+        }
+    }
+
+    private static boolean isSubtraction(Expr expression) {
+<span class="fc" id="L332">        return expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L333" title="All 4 branches covered.">            &amp;&amp; binary.operator() == BinaryOperator.SUB;</span>
+    }
+
+    private static List&lt;PositionedNode&gt; positionedNodes(Expr root) {
+<span class="fc" id="L337">        List&lt;PositionedNode&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L338">        collect(root, List.of(), result);</span>
+<span class="fc" id="L339">        return List.copyOf(result);</span>
+    }
+
+    private static void collect(
+        Expr expression,
+        List&lt;Integer&gt; path,
+        List&lt;PositionedNode&gt; result
+    ) {
+<span class="fc" id="L347">        result.add(new PositionedNode(expression, path));</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L349">            collect(binary.left(), append(path, 0), result);</span>
+<span class="fc" id="L350">            collect(binary.right(), append(path, 1), result);</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L352">            for (int index = 0;</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">                    index &lt; function.arguments().size();</span>
+<span class="fc" id="L354">                    index++) {</span>
+<span class="fc" id="L355">                collect(</span>
+<span class="fc" id="L356">                    function.arguments().get(index),</span>
+<span class="fc" id="L357">                    append(path, index),</span>
+                    result);
+            }
+        }
+<span class="fc" id="L361">    }</span>
+
+    private static List&lt;Integer&gt; append(List&lt;Integer&gt; path, int component) {
+<span class="fc" id="L364">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L365">        result.add(component);</span>
+<span class="fc" id="L366">        return List.copyOf(result);</span>
+    }
+
+    private static Expr replaceAt(
+        Expr current,
+        List&lt;Integer&gt; path,
+        int offset,
+        Expr replacement
+    ) {
+<span class="fc bfc" id="L375" title="All 2 branches covered.">        if (offset == path.size()) {</span>
+<span class="fc" id="L376">            return replacement;</span>
+        }
+<span class="fc" id="L378">        int component = path.get(offset);</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        if (current instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">            if (component == 0) {</span>
+<span class="nc" id="L381">                return new BinaryExpr(</span>
+<span class="nc" id="L382">                    replaceAt(</span>
+<span class="nc" id="L383">                        binary.left(),</span>
+                        path,
+                        offset + 1,
+                        replacement),
+<span class="nc" id="L387">                    binary.operator(),</span>
+<span class="nc" id="L388">                    binary.right());</span>
+            }
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">            if (component == 1) {</span>
+<span class="fc" id="L391">                return new BinaryExpr(</span>
+<span class="fc" id="L392">                    binary.left(),</span>
+<span class="fc" id="L393">                    binary.operator(),</span>
+<span class="fc" id="L394">                    replaceAt(</span>
+<span class="fc" id="L395">                        binary.right(),</span>
+                        path,
+                        offset + 1,
+                        replacement));
+            }
+<span class="nc" id="L400">            throw new IllegalArgumentException(</span>
+                &quot;binary path component must be 0 or 1&quot;);
+        }
+<span class="pc bpc" id="L403" title="2 of 4 branches missed.">        if (current instanceof FunctionExpr function</span>
+                &amp;&amp; component &gt;= 0
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">                &amp;&amp; component &lt; function.arguments().size()) {</span>
+<span class="fc" id="L406">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
+<span class="fc" id="L407">            arguments.set(</span>
+                component,
+<span class="fc" id="L409">                replaceAt(</span>
+<span class="fc" id="L410">                    arguments.get(component),</span>
+                    path,
+                    offset + 1,
+                    replacement));
+<span class="fc" id="L414">            return new FunctionExpr(function.name(), arguments);</span>
+        }
+<span class="nc" id="L416">        throw new IllegalArgumentException(</span>
+            &quot;path does not address the supplied expression&quot;);
+    }
+
+    private static String positionKey(List&lt;Integer&gt; path) {
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
+<span class="fc" id="L422">            return &quot;root&quot;;</span>
+        }
+<span class="fc" id="L424">        return path.stream()</span>
+<span class="fc" id="L425">            .map(String::valueOf)</span>
+<span class="fc" id="L426">            .collect(java.util.stream.Collectors.joining(&quot;.&quot;));</span>
+    }
+
+    private static RewriteRule findPrincipalRule(List&lt;RewriteRule&gt; rules) {
+<span class="fc" id="L430">        return copyRules(rules).stream()</span>
+<span class="fc" id="L431">            .filter(rule -&gt; rule.id().equals(</span>
+                PerfectSquareStructurePreparationSolver.PRINCIPAL_RULE_ID))
+<span class="fc" id="L433">            .findFirst()</span>
+<span class="fc" id="L434">            .orElse(null);</span>
+    }
+
+    private static List&lt;RewriteRule&gt; copyRules(List&lt;RewriteRule&gt; rules) {
+<span class="fc" id="L438">        return List.copyOf(Objects.requireNonNull(rules, &quot;rules&quot;));</span>
+    }
+
+    private static Set&lt;String&gt; ruleIds(List&lt;RewriteRule&gt; rules) {
+<span class="fc" id="L442">        Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">        for (RewriteRule rule : copyRules(rules)) {</span>
+<span class="fc" id="L444">            ids.add(Objects.requireNonNull(rule, &quot;rule&quot;).id());</span>
+<span class="fc" id="L445">        }</span>
+<span class="fc" id="L446">        return Set.copyOf(ids);</span>
+    }
+
+    public record PreparationObservation(
+        String path,
+        String subtree,
+        PerfectSquareStructurePreparationSolver.PlanAttempt attempt
+    ) {
+<span class="fc" id="L454">        public PreparationObservation {</span>
+<span class="pc bpc" id="L455" title="3 of 6 branches missed.">            if (path == null || path.isBlank()</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">                    || subtree == null || subtree.isBlank()) {</span>
+<span class="nc" id="L457">                throw new IllegalArgumentException(</span>
+                    &quot;path and subtree must not be blank&quot;);
+            }
+<span class="fc" id="L460">            attempt = Objects.requireNonNull(attempt, &quot;attempt&quot;);</span>
+<span class="fc" id="L461">        }</span>
+
+        public Optional&lt;PerfectSquareStructurePreparationSolver.PreparedApplication&gt;
+                application() {
+<span class="nc" id="L465">            return attempt.application();</span>
+        }
+    }
+
+    public record Execution(
+        List&lt;Transformation&gt; transformations,
+        List&lt;PreparationObservation&gt; observations
+    ) {
+<span class="fc" id="L473">        public Execution {</span>
+<span class="fc" id="L474">            transformations = List.copyOf(</span>
+<span class="fc" id="L475">                Objects.requireNonNull(transformations, &quot;transformations&quot;));</span>
+<span class="fc" id="L476">            observations = List.copyOf(</span>
+<span class="fc" id="L477">                Objects.requireNonNull(observations, &quot;observations&quot;));</span>
+<span class="fc" id="L478">        }</span>
+    }
+
+    private record PositionedNode(Expr expression, List&lt;Integer&gt; path) {
+<span class="fc" id="L482">        private PositionedNode {</span>
+<span class="fc" id="L483">            expression = Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L484">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="fc" id="L485">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
