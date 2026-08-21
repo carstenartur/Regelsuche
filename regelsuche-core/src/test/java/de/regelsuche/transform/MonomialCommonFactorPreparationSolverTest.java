@@ -58,7 +58,7 @@ class MonomialCommonFactorPreparationSolverTest {
     @Test
     void classifiesNoFactorUnsupportedDirectAndLimitedCases() {
         assertAttempt("x^2 + y", "NOT_APPLICABLE", true);
-        assertAttempt("sin(x) + x", "UNSUPPORTED", false);
+        assertAttempt("sin(x) + x", "UNSUPPORTED", true);
         assertAttempt("x * y + x * z", "DIRECT_MATCH_AVAILABLE", false);
 
         var limited = new MonomialCommonFactorPreparationSolver(
