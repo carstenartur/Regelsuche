@@ -9,28 +9,17 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class MonomialCommonFactorPreparationTransformationEngineTest {
+    private static final String SOURCE = "x^2 * y + x * z";
     private final ExpressionCanonicalizer canonicalizer =
         new ExpressionCanonicalizer();
 
     @Test
-    void exposesTheSynthesizedCommonMonomialAsACompositeMove() {
-        Transformation candidate =
-            new MonomialCommonFactorPreparationTransformationEngine()
-                .transform("x^2 * y + x * z")
-                .stream()
-                .filter(transformation -> transformation.primitiveRuleIds()
-                    .contains(
-                        MonomialCommonFactorPreparationSolver
-                            .PREPARATION_RULE_ID))
-                .findFirst()
-                .orElseThrow();
-
+    void emitsTheCertifiedCompositeMoveThroughTheRealRule() {
+        Transformation candidate = prepared(engine().transform(SOURCE));
         assertEquals(
             MonomialCommonFactorPreparationSolver.PRINCIPAL_RULE_ID,
             candidate.rule());
-        assertEquals(
-            canonicalizer.stableHash("x * (x * y + z)"),
-            canonicalizer.stableHash(candidate.transformedExpression()));
+        assertExpression("x * (x * y + z)", candidate.transformedExpression());
         assertEquals(List.of(), candidate.assumptions());
         assertEquals(
             List.of(
@@ -41,130 +30,100 @@ class MonomialCommonFactorPreparationTransformationEngineTest {
     }
 
     @Test
-    void preparesANestedFunctionArgument() {
-        boolean reached =
-            new MonomialCommonFactorPreparationTransformationEngine()
-                .transform("sin(x^2 * y + x * z)")
-                .stream()
-                .filter(transformation -> transformation.primitiveRuleIds()
-                    .contains(
-                        MonomialCommonFactorPreparationSolver
-                            .PREPARATION_RULE_ID))
-                .anyMatch(transformation -> canonicalizer.stableHash(
-                        transformation.transformedExpression())
-                    .equals(canonicalizer.stableHash(
-                        "sin(x * (x * y + z))")));
-
-        assertTrue(reached);
+    void handlesNestedAndNumericVariableCases() {
+        assertContainsExpression(
+            engine().transform("sin(" + SOURCE + ")"),
+            "sin(x * (x * y + z))");
+        assertContainsExpression(
+            engine().transform("6 * x^2 * y + 9 * x * z"),
+            "(3 * x) * (2 * x * y + 3 * z)");
     }
 
     @Test
-    void extractsNumericAndVariableFactorsThroughTheRealPrincipalRule() {
-        boolean reached =
-            new MonomialCommonFactorPreparationTransformationEngine()
-                .transform("6 * x^2 * y + 9 * x * z")
-                .stream()
-                .anyMatch(transformation -> transformation.primitiveRuleIds()
-                    .contains(
-                        MonomialCommonFactorPreparationSolver
-                            .PREPARATION_RULE_ID)
-                    && canonicalizer.stableHash(
-                        transformation.transformedExpression()).equals(
-                            canonicalizer.stableHash(
-                                "(3 * x) * (2 * x * y + 3 * z)")));
-
-        assertTrue(reached);
-    }
-
-    @Test
-    void hiddenPrincipalRulePreventsPreparedApplications() {
-        AstRewriteTransformationEngine direct =
-            new AstRewriteTransformationEngine();
-        Set<String> visible = direct.rules().stream()
-            .map(RewriteRule::id)
+    void hiddenRuleAndMissingReplayFailClosed() {
+        AstRewriteTransformationEngine direct = new AstRewriteTransformationEngine();
+        Set<String> hidden = direct.rules().stream().map(RewriteRule::id)
             .filter(id -> !id.equals(
                 MonomialCommonFactorPreparationSolver.PRINCIPAL_RULE_ID))
             .collect(java.util.stream.Collectors.toSet());
-        MonomialCommonFactorPreparationTransformationEngine engine =
-            new MonomialCommonFactorPreparationTransformationEngine(
-                direct,
-                direct,
-                visible,
-                new MonomialCommonFactorPreparationSolver(),
-                16);
+        var hiddenEngine = new MonomialCommonFactorPreparationTransformationEngine(
+            direct, direct, hidden, new MonomialCommonFactorPreparationSolver(), 16);
+        assertTrue(hiddenEngine.transform(SOURCE).stream()
+            .noneMatch(this::isPrepared));
 
-        assertTrue(engine.transform("x^2 * y + x * z").stream()
-            .noneMatch(transformation -> transformation.primitiveRuleIds()
-                .contains(
-                    MonomialCommonFactorPreparationSolver
-                        .PREPARATION_RULE_ID)));
-    }
-
-    @Test
-    void principalReplayIsMandatory() {
         TransformationEngine empty = expression -> List.of();
-        MonomialCommonFactorPreparationTransformationEngine engine =
-            new MonomialCommonFactorPreparationTransformationEngine(
-                empty,
-                empty,
-                Set.of(
-                    MonomialCommonFactorPreparationSolver.PRINCIPAL_RULE_ID),
-                new MonomialCommonFactorPreparationSolver(),
-                16);
-
-        assertTrue(engine.transform("x^2 * y + x * z").isEmpty());
+        var noReplay = new MonomialCommonFactorPreparationTransformationEngine(
+            empty, empty,
+            Set.of(MonomialCommonFactorPreparationSolver.PRINCIPAL_RULE_ID),
+            new MonomialCommonFactorPreparationSolver(), 16);
+        assertTrue(noReplay.transform(SOURCE).isEmpty());
     }
 
     @Test
-    void retainsTheExistingAcCancellationPreparationPath() {
-        assertTrue(
-            new MonomialCommonFactorPreparationTransformationEngine()
-                .transform("(b * (a * c)) / a")
-                .stream()
-                .anyMatch(transformation -> transformation.primitiveRuleIds()
-                    .contains(
-                        AcNormalizationPreparationSolver.PREPARATION_RULE_ID)));
+    void retainsEarlierPreparationPaths() {
+        assertTrue(containsPrimitive(
+            engine().transform("(b * (a * c)) / a"),
+            AcNormalizationPreparationSolver.PREPARATION_RULE_ID));
+        assertTrue(containsPrimitive(
+            engine().transform("(x^3 - 1) / (x - 1)"),
+            RulePreparationPlanner.PREPARATION_RULE_ID));
     }
 
     @Test
-    void retainsTheExistingExactPolynomialPreparationPath() {
-        assertTrue(
-            new MonomialCommonFactorPreparationTransformationEngine()
-                .transform("(x^3 - 1) / (x - 1)")
-                .stream()
-                .anyMatch(transformation -> transformation.primitiveRuleIds()
-                    .contains(RulePreparationPlanner.PREPARATION_RULE_ID)));
+    void disabledPreparationPreservesBaseResults() {
+        AstRewriteTransformationEngine direct = new AstRewriteTransformationEngine();
+        var disabled = new MonomialCommonFactorPreparationTransformationEngine(
+            direct, direct,
+            direct.rules().stream().map(RewriteRule::id)
+                .collect(java.util.stream.Collectors.toSet()),
+            new MonomialCommonFactorPreparationSolver(), 0);
+        assertEquals(direct.transform(SOURCE), disabled.transform(SOURCE));
     }
 
     @Test
-    void disabledPreparationPreservesTheBaseEngineResults() {
-        AstRewriteTransformationEngine direct =
-            new AstRewriteTransformationEngine();
-        MonomialCommonFactorPreparationTransformationEngine disabled =
-            new MonomialCommonFactorPreparationTransformationEngine(
-                direct,
-                direct,
-                direct.rules().stream()
-                    .map(RewriteRule::id)
-                    .collect(java.util.stream.Collectors.toSet()),
-                new MonomialCommonFactorPreparationSolver(),
-                0);
-        String expression = "x^2 * y + x * z";
-
-        assertEquals(
-            direct.transform(expression),
-            disabled.transform(expression));
-    }
-
-    @Test
-    void observationsRetainThePreparationStatusAndAstPosition() {
-        MonomialCommonFactorPreparationTransformationEngine.Execution execution =
-            new MonomialCommonFactorPreparationTransformationEngine()
-                .transformWithEvidence("1 + sin(x^2 * y + x * z)");
-
+    void evidenceRetainsTheExactNestedAstPosition() {
+        var execution = engine().transformWithEvidence("1 + sin(" + SOURCE + ")");
         assertTrue(execution.observations().stream().anyMatch(observation ->
             observation.path().equals("1.0")
                 && observation.attempt().status()
                     == MonomialCommonFactorPreparationSolver.Status.PREPARED));
+    }
+
+    private MonomialCommonFactorPreparationTransformationEngine engine() {
+        return new MonomialCommonFactorPreparationTransformationEngine();
+    }
+
+    private Transformation prepared(List<Transformation> transformations) {
+        return transformations.stream().filter(this::isPrepared)
+            .findFirst().orElseThrow();
+    }
+
+    private boolean isPrepared(Transformation transformation) {
+        return transformation.primitiveRuleIds().contains(
+            MonomialCommonFactorPreparationSolver.PREPARATION_RULE_ID);
+    }
+
+    private boolean containsPrimitive(
+        List<Transformation> transformations,
+        String ruleId
+    ) {
+        return transformations.stream().anyMatch(transformation ->
+            transformation.primitiveRuleIds().contains(ruleId));
+    }
+
+    private void assertContainsExpression(
+        List<Transformation> transformations,
+        String expected
+    ) {
+        assertTrue(transformations.stream().filter(this::isPrepared)
+            .anyMatch(transformation -> canonicalizer.stableHash(
+                    transformation.transformedExpression())
+                .equals(canonicalizer.stableHash(expected))));
+    }
+
+    private void assertExpression(String expected, String actual) {
+        assertEquals(
+            canonicalizer.stableHash(expected),
+            canonicalizer.stableHash(actual));
     }
 }
