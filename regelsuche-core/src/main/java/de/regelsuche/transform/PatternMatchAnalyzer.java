@@ -60,45 +60,68 @@ public final class PatternMatchAnalyzer {
         ExprMatcher.MatchOutcome outcome =
             ExprMatcher.pattern(pattern, profile).match(expression, options);
         if (outcome.matched()) {
-            ExprMatcher.MatchResult preferred = preferred(outcome.matches());
-            boolean exact = outcome.matches().stream().anyMatch(result ->
-                result.recognitionStrength()
-                    == ExprMatcher.RecognitionStrength.EXACT);
-            return new Analysis(
-                exact ? Status.EXACT_MATCH : Status.MATCH_MODULO_THEORY,
-                outcome.matches(),
-                preferred.bindings(),
-                List.of(),
-                outcome.diagnostics(),
-                outcome.evaluatedSteps(),
-                outcome.patternBranches(),
-                0,
-                0,
-                patternNodeCount(pattern),
-                exact
-                    ? "EXACT_PATTERN_MATCH"
-                    : "EQUIVALENCE_AWARE_PATTERN_MATCH");
+            return fullMatch(pattern, outcome);
         }
         if (!outcome.complete()) {
-            return new Analysis(
-                Status.INCONCLUSIVE,
-                List.of(),
-                Map.of(),
-                List.of(),
-                outcome.diagnostics(),
-                outcome.evaluatedSteps(),
-                outcome.patternBranches(),
-                0,
-                0,
-                patternNodeCount(pattern),
-                "MATCH_BUDGET_INCONCLUSIVE");
+            return inconclusive(pattern, outcome);
         }
+        return partialMatch(pattern, expression, outcome);
+    }
 
+    private static Analysis fullMatch(
+        PatternExpr pattern,
+        ExprMatcher.MatchOutcome outcome
+    ) {
+        ExprMatcher.MatchResult preferred = preferred(outcome.matches());
+        boolean exact = outcome.matches().stream().anyMatch(result ->
+            result.recognitionStrength()
+                == ExprMatcher.RecognitionStrength.EXACT);
+        return new Analysis(
+            exact ? Status.EXACT_MATCH : Status.MATCH_MODULO_THEORY,
+            outcome.matches(),
+            preferred.bindings(),
+            List.of(),
+            outcome.diagnostics(),
+            outcome.evaluatedSteps(),
+            outcome.patternBranches(),
+            0,
+            0,
+            patternNodeCount(pattern),
+            exact
+                ? "EXACT_PATTERN_MATCH"
+                : "EQUIVALENCE_AWARE_PATTERN_MATCH");
+    }
+
+    private static Analysis inconclusive(
+        PatternExpr pattern,
+        ExprMatcher.MatchOutcome outcome
+    ) {
+        return new Analysis(
+            Status.INCONCLUSIVE,
+            List.of(),
+            Map.of(),
+            List.of(),
+            outcome.diagnostics(),
+            outcome.evaluatedSteps(),
+            outcome.patternBranches(),
+            0,
+            0,
+            patternNodeCount(pattern),
+            "MATCH_BUDGET_INCONCLUSIVE");
+    }
+
+    private static Analysis partialMatch(
+        PatternExpr pattern,
+        Expr expression,
+        ExprMatcher.MatchOutcome outcome
+    ) {
         PartialState partial = new PartialState();
         compare(pattern, expression, List.of(), partial);
-        if (partial.obligations.isEmpty()
-                || partial.matchedPatternNodes == 0
-                    && partial.bindings.isEmpty()) {
+        int totalNodes = patternNodeCount(pattern);
+        boolean unrelated = partial.obligations.isEmpty()
+            || (partial.matchedPatternNodes == 0
+                && partial.bindings.isEmpty());
+        if (unrelated) {
             return new Analysis(
                 Status.NOT_MATCHED,
                 List.of(),
@@ -109,7 +132,7 @@ public final class PatternMatchAnalyzer {
                 outcome.patternBranches(),
                 partial.structuralComparisons,
                 partial.matchedPatternNodes,
-                patternNodeCount(pattern),
+                totalNodes,
                 "CONCLUSIVE_PATTERN_NON_MATCH");
         }
 
@@ -126,7 +149,7 @@ public final class PatternMatchAnalyzer {
             outcome.patternBranches(),
             partial.structuralComparisons,
             partial.matchedPatternNodes,
-            patternNodeCount(pattern),
+            totalNodes,
             "STRUCTURALLY_CLOSE_WITH_RESIDUAL_OBLIGATIONS");
     }
 
@@ -149,73 +172,130 @@ public final class PatternMatchAnalyzer {
     ) {
         state.structuralComparisons++;
         if (pattern instanceof PatternExpr.Placeholder placeholder) {
-            Expr previous = state.bindings.get(placeholder.name());
-            if (previous == null) {
-                state.bindings.put(placeholder.name(), expression);
-                state.matchedPatternNodes++;
-            } else if (previous.equals(expression)) {
-                state.matchedPatternNodes++;
-            } else {
-                state.obligations.add(new DraftObligation(
-                    ResidualKind.BINDING_CONFLICT,
-                    path,
-                    pattern,
-                    expression));
-            }
+            comparePlaceholder(placeholder, expression, path, state);
             return;
         }
         if (pattern instanceof PatternExpr.LiteralNumber literal) {
-            if (expression instanceof NumberExpr number
-                    && Double.compare(number.value(), literal.value()) == 0) {
-                state.matchedPatternNodes++;
-            } else {
-                state.obligations.add(new DraftObligation(
-                    ResidualKind.LITERAL_MISMATCH,
-                    path,
-                    pattern,
-                    expression));
-            }
+            compareLiteralNumber(literal, expression, path, state);
             return;
         }
         if (pattern instanceof PatternExpr.LiteralVariable literal) {
-            if (expression instanceof VariableExpr variable
-                    && variable.name().equals(literal.name())) {
-                state.matchedPatternNodes++;
-            } else {
-                state.obligations.add(new DraftObligation(
-                    ResidualKind.LITERAL_MISMATCH,
-                    path,
-                    pattern,
-                    expression));
-            }
+            compareLiteralVariable(literal, expression, path, state);
             return;
         }
         if (pattern instanceof PatternExpr.Operation operation) {
-            if (!(expression instanceof BinaryExpr binary)
-                    || binary.operator() != operation.operator()) {
-                state.obligations.add(new DraftObligation(
-                    ResidualKind.SHAPE_MISMATCH,
-                    path,
-                    pattern,
-                    expression));
-                return;
-            }
-            state.matchedPatternNodes++;
-            compare(operation.left(), binary.left(), append(path, 0), state);
-            compare(operation.right(), binary.right(), append(path, 1), state);
+            compareOperation(operation, expression, path, state);
             return;
         }
+        compareFunction(
+            (PatternExpr.Function) pattern,
+            expression,
+            path,
+            state);
+    }
 
-        PatternExpr.Function function = (PatternExpr.Function) pattern;
+    private static void comparePlaceholder(
+        PatternExpr.Placeholder placeholder,
+        Expr expression,
+        List<Integer> path,
+        PartialState state
+    ) {
+        Expr previous = state.bindings.get(placeholder.name());
+        if (previous == null) {
+            state.bindings.put(placeholder.name(), expression);
+            state.matchedPatternNodes++;
+            return;
+        }
+        if (previous.equals(expression)) {
+            state.matchedPatternNodes++;
+            return;
+        }
+        mismatch(
+            ResidualKind.BINDING_CONFLICT,
+            path,
+            placeholder,
+            expression,
+            state);
+    }
+
+    private static void compareLiteralNumber(
+        PatternExpr.LiteralNumber literal,
+        Expr expression,
+        List<Integer> path,
+        PartialState state
+    ) {
+        boolean matched = expression instanceof NumberExpr number
+            && Double.compare(number.value(), literal.value()) == 0;
+        retainLiteralResult(literal, expression, path, state, matched);
+    }
+
+    private static void compareLiteralVariable(
+        PatternExpr.LiteralVariable literal,
+        Expr expression,
+        List<Integer> path,
+        PartialState state
+    ) {
+        boolean matched = expression instanceof VariableExpr variable
+            && variable.name().equals(literal.name());
+        retainLiteralResult(literal, expression, path, state, matched);
+    }
+
+    private static void retainLiteralResult(
+        PatternExpr literal,
+        Expr expression,
+        List<Integer> path,
+        PartialState state,
+        boolean matched
+    ) {
+        if (matched) {
+            state.matchedPatternNodes++;
+            return;
+        }
+        mismatch(
+            ResidualKind.LITERAL_MISMATCH,
+            path,
+            literal,
+            expression,
+            state);
+    }
+
+    private static void compareOperation(
+        PatternExpr.Operation operation,
+        Expr expression,
+        List<Integer> path,
+        PartialState state
+    ) {
+        if (!(expression instanceof BinaryExpr binary)
+                || binary.operator() != operation.operator()) {
+            mismatch(
+                ResidualKind.SHAPE_MISMATCH,
+                path,
+                operation,
+                expression,
+                state);
+            return;
+        }
+        state.matchedPatternNodes++;
+        compare(operation.left(), binary.left(), append(path, 0), state);
+        compare(operation.right(), binary.right(), append(path, 1), state);
+    }
+
+    private static void compareFunction(
+        PatternExpr.Function function,
+        Expr expression,
+        List<Integer> path,
+        PartialState state
+    ) {
         if (!(expression instanceof FunctionExpr candidate)
                 || !candidate.name().equals(function.name())
                 || candidate.arguments().size()
                     != function.arguments().size()) {
-            state.obligations.add(new DraftObligation(
+            mismatch(
                 ResidualKind.FUNCTION_SHAPE_MISMATCH,
                 path,
-                pattern,
-                expression));
+                function,
+                expression,
+                state);
             return;
         }
         state.matchedPatternNodes++;
@@ -226,6 +306,20 @@ public final class PatternMatchAnalyzer {
                 append(path, index),
                 state);
         }
+    }
+
+    private static void mismatch(
+        ResidualKind kind,
+        List<Integer> path,
+        PatternExpr requiredPattern,
+        Expr actualExpression,
+        PartialState state
+    ) {
+        state.obligations.add(new DraftObligation(
+            kind,
+            path,
+            requiredPattern,
+            actualExpression));
     }
 
     private static List<Integer> append(List<Integer> path, int component) {
@@ -275,6 +369,11 @@ public final class PatternMatchAnalyzer {
             : path.stream()
                 .map(String::valueOf)
                 .collect(java.util.stream.Collectors.joining("."));
+    }
+
+    private static boolean fullMatchStatus(Status status) {
+        return status == Status.EXACT_MATCH
+            || status == Status.MATCH_MODULO_THEORY;
     }
 
     public enum Status {
@@ -353,14 +452,15 @@ public final class PatternMatchAnalyzer {
                 throw new IllegalArgumentException(
                     "detailCode must not be blank");
             }
-            boolean full = status == Status.EXACT_MATCH
-                || status == Status.MATCH_MODULO_THEORY;
-            if (full != !matches.isEmpty()) {
+            boolean fullMatch = fullMatchStatus(status);
+            boolean hasMatches = !matches.isEmpty();
+            if (fullMatch != hasMatches) {
                 throw new IllegalArgumentException(
                     "only full-match statuses may retain matches");
             }
-            if ((status == Status.RESIDUAL)
-                    != !residualObligations.isEmpty()) {
+            boolean residual = status == Status.RESIDUAL;
+            boolean hasObligations = !residualObligations.isEmpty();
+            if (residual != hasObligations) {
                 throw new IllegalArgumentException(
                     "only residual status may retain obligations");
             }
@@ -371,8 +471,7 @@ public final class PatternMatchAnalyzer {
         }
 
         public boolean matched() {
-            return status == Status.EXACT_MATCH
-                || status == Status.MATCH_MODULO_THEORY;
+            return fullMatchStatus(status);
         }
 
         public boolean residual() {
