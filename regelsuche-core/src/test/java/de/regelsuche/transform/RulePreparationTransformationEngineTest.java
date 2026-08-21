@@ -1,8 +1,10 @@
 package de.regelsuche.transform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import java.util.List;
 import java.util.Set;
@@ -133,5 +135,193 @@ class RulePreparationTransformationEngineTest {
             .stream()
             .noneMatch(transformation -> transformation.primitiveRuleIds()
                 .contains(RulePreparationPlanner.PREPARATION_RULE_ID)));
+    }
+
+    @Test
+    void memoizesRepeatedPreparationAnalysisWithinOneInvocation() {
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine();
+
+        RulePreparationTransformationEngine.Execution execution =
+            engine.transformWithEvidence(
+                "(x^3 - 1) / (x - 1) + (x^3 - 1) / (x - 1)");
+        RulePreparationTransformationEngine.CacheMetrics metrics =
+            execution.cacheMetrics();
+
+        assertTrue(metrics.lookups() > 0);
+        assertTrue(metrics.hits() > 0);
+        assertTrue(metrics.misses() > 0);
+        assertTrue(metrics.retainedEntries() > 0);
+        assertEquals(metrics.lookups(), metrics.hits() + metrics.misses());
+        assertEquals(1, metrics.preparedVerifications());
+        assertEquals(0, metrics.skippedUnverifiable());
+        assertTrue(metrics.skippedZeroSolverWork() > 0);
+        assertTrue(engine.ruleInventoryHash().startsWith("sha256:"));
+    }
+
+    @Test
+    void distinctAstStructuresDoNotReuseOccurrenceSpecificEvidence() {
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine();
+
+        RulePreparationTransformationEngine.Execution execution =
+            engine.transformWithEvidence(
+                "(x^3 + x^2 + x + 1) / (x + 1)"
+                    + " + (x^3 + (x^2 + (x + 1))) / (x + 1)");
+
+        assertEquals(2, execution.cacheMetrics().preparedVerifications());
+        assertEquals(0, execution.cacheMetrics().skippedUnverifiable());
+        assertTrue(execution.transformations().stream()
+            .anyMatch(transformation -> transformation.primitiveRuleIds()
+                .contains(RulePreparationPlanner.PREPARATION_RULE_ID)));
+    }
+
+    @Test
+    void zeroCacheCapacityPreservesResultsWithoutMemoization() {
+        AstRewriteTransformationEngine direct =
+            new AstRewriteTransformationEngine();
+        Set<String> visibleRuleIds = direct.rules().stream()
+            .map(RewriteRule::id)
+            .collect(java.util.stream.Collectors.toSet());
+        RulePreparationTransformationEngine uncached =
+            new RulePreparationTransformationEngine(
+                direct,
+                visibleRuleIds,
+                new RulePreparationPlanner(),
+                16,
+                AssumptionSignature.ofExpressions(List.of()),
+                "sha256:test-inventory",
+                0);
+        String expression =
+            "(x^3 - 1) / (x - 1) + (x^3 - 1) / (x - 1)";
+
+        RulePreparationTransformationEngine.Execution execution =
+            uncached.transformWithEvidence(expression);
+
+        assertEquals(0, execution.cacheMetrics().hits());
+        assertEquals(0, execution.cacheMetrics().retainedEntries());
+        assertTrue(execution.cacheMetrics().misses() > 0);
+        assertTrue(execution.cacheMetrics().preparedVerifications() >= 2);
+        assertTrue(execution.transformations().stream()
+            .anyMatch(transformation -> transformation.primitiveRuleIds()
+                .contains(RulePreparationPlanner.PREPARATION_RULE_ID)));
+    }
+
+    @Test
+    void budgetInconclusiveResultsAreNotMemoized() {
+        AstRewriteTransformationEngine direct =
+            new AstRewriteTransformationEngine();
+        Set<String> visibleRuleIds = direct.rules().stream()
+            .map(RewriteRule::id)
+            .collect(java.util.stream.Collectors.toSet());
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine(
+                direct,
+                visibleRuleIds,
+                new RulePreparationPlanner(
+                    new RulePreparationPlanner.Budget(0)),
+                16,
+                AssumptionSignature.ofExpressions(List.of()),
+                "sha256:test-inventory",
+                128);
+
+        RulePreparationTransformationEngine.Execution execution =
+            engine.transformWithEvidence(
+                "(x^3 - 1) / (x - 1) + (x^3 - 1) / (x - 1)");
+
+        assertTrue(execution.cacheMetrics().skippedInconclusive() >= 2);
+        assertEquals(0, execution.cacheMetrics().preparedVerifications());
+        assertTrue(execution.transformations().stream()
+            .noneMatch(transformation -> transformation.primitiveRuleIds()
+                .contains(RulePreparationPlanner.PREPARATION_RULE_ID)));
+    }
+
+    @Test
+    void boundedCacheEvictsTheOldestExpensiveAnalysisDeterministically() {
+        AstRewriteTransformationEngine direct =
+            new AstRewriteTransformationEngine();
+        Set<String> visibleRuleIds = direct.rules().stream()
+            .map(RewriteRule::id)
+            .collect(java.util.stream.Collectors.toSet());
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine(
+                direct,
+                visibleRuleIds,
+                new RulePreparationPlanner(),
+                16,
+                AssumptionSignature.ofExpressions(List.of()),
+                "sha256:test-inventory",
+                1);
+
+        RulePreparationTransformationEngine.Execution execution =
+            engine.transformWithEvidence(
+                "(x^3 - 1) / (x - 1)"
+                    + " + (x^4 - 1) / (x - 1)"
+                    + " + (x^3 - 1) / (x - 1)");
+
+        assertEquals(1, execution.cacheMetrics().retainedEntries());
+        assertTrue(execution.cacheMetrics().evictions() >= 2);
+        assertEquals(3, execution.cacheMetrics().preparedVerifications());
+    }
+
+    @Test
+    void cacheContextRetainsNormalizedAssumptionsAndInventoryIdentity() {
+        List<RewriteRule> rules = AstRewriteTransformationEngine.defaultRules();
+        RulePreparationTransformationEngine engine =
+            new RulePreparationTransformationEngine(
+                rules,
+                AssumptionSignature.ofExpressions(
+                    List.of("0 != (x - 1)")));
+        RulePreparationTransformationEngine sameInventory =
+            new RulePreparationTransformationEngine(rules);
+
+        assertEquals(
+            "x - 1 != 0",
+            engine.assumptionSignature().fingerprint());
+        assertEquals(
+            sameInventory.ruleInventoryHash(),
+            engine.ruleInventoryHash());
+    }
+
+    @Test
+    void invalidCacheConfigurationFailsClosed() {
+        AstRewriteTransformationEngine direct =
+            new AstRewriteTransformationEngine();
+        Set<String> visibleRuleIds = direct.rules().stream()
+            .map(RewriteRule::id)
+            .collect(java.util.stream.Collectors.toSet());
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new RulePreparationTransformationEngine(
+                direct,
+                visibleRuleIds,
+                new RulePreparationPlanner(),
+                16,
+                AssumptionSignature.ofExpressions(List.of()),
+                " ",
+                1));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new RulePreparationTransformationEngine(
+                direct,
+                visibleRuleIds,
+                new RulePreparationPlanner(),
+                16,
+                AssumptionSignature.ofExpressions(List.of()),
+                "sha256:test-inventory",
+                -1));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new RulePreparationTransformationEngine.CacheMetrics(
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0));
     }
 }
