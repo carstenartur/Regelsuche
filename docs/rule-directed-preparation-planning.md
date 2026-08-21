@@ -123,6 +123,12 @@ configurable and may be set to zero for an exact no-cache ablation.
 `BUDGET_INCONCLUSIVE` results are never retained: a budget-limited non-result
 must not become a semantic negative fact.
 
+Prepared applications enter the cache only after independent verification. A
+cache hit therefore reuses already verified formation evidence without
+rerunning the exact quotient proposal or its verification. The visible
+principal rule is still replayed for each concrete AST position before a
+transformation is emitted.
+
 `transformWithEvidence` returns balanced cache metrics:
 
 ```text
@@ -130,6 +136,8 @@ lookups = hits + misses
 retained entries
 oldest-entry evictions
 skipped budget-inconclusive results
+prepared-application verifications
+skipped unverifiable applications
 ```
 
 The cache is intentionally invocation-local. It cannot leak candidates between
