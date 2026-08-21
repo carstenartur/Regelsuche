@@ -205,8 +205,7 @@ def verifyTargetFreeHeldOutContainerReproduction = tasks.register(
         ':regelsuche-discovery:generateTargetFreeHeldOutMatrixHostB',
         runTargetFreeHeldOutReproductionImage
     timeout = java.time.Duration.ofMinutes(3)
-    mainClass = 'de.regelsuche.discovery.representation.'
-        + 'TargetFreeHeldOutContainerReproductionVerifier'
+    mainClass = 'de.regelsuche.discovery.representation.TargetFreeHeldOutContainerReproductionVerifier'
     argumentProviders.add({
         [
             authoritativeRevision.get(),
