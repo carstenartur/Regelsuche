@@ -4,6 +4,8 @@ import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
@@ -281,7 +283,43 @@ public final class RulePreparationTransformationEngine
     }
 
     private static String exactSubtreeHash(Expr expression) {
-        return sha256(ExpressionFormatter.format(expression));
+        StringBuilder descriptor = new StringBuilder();
+        appendAst(descriptor, Objects.requireNonNull(expression, "expression"));
+        return sha256(descriptor.toString());
+    }
+
+    private static void appendAst(StringBuilder target, Expr expression) {
+        if (expression instanceof NumberExpr number) {
+            appendToken(target, "number");
+            appendToken(target, Long.toHexString(
+                Double.doubleToLongBits(number.value())));
+            return;
+        }
+        if (expression instanceof VariableExpr variable) {
+            appendToken(target, "variable");
+            appendToken(target, variable.name());
+            return;
+        }
+        if (expression instanceof BinaryExpr binary) {
+            appendToken(target, "binary");
+            appendToken(target, binary.operator().name());
+            appendAst(target, binary.left());
+            appendAst(target, binary.right());
+            return;
+        }
+        if (expression instanceof FunctionExpr function) {
+            appendToken(target, "function");
+            appendToken(target, function.name());
+            appendToken(target, Integer.toString(function.arguments().size()));
+            function.arguments().forEach(argument -> appendAst(target, argument));
+            return;
+        }
+        throw new IllegalArgumentException(
+            "unsupported expression type: " + expression.getClass().getName());
+    }
+
+    private static void appendToken(StringBuilder target, String value) {
+        target.append(value.length()).append(':').append(value);
     }
 
     private Transformation replayPrincipal(
