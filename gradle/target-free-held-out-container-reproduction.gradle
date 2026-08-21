@@ -3,9 +3,9 @@
  * target-free held-out 6 x 4 x 6 matrix.
  *
  * The evaluated container run is offline and has networking disabled. The
- * image build may resolve the already versioned Gradle dependencies, but the
- * mathematical run itself receives only the frozen repository revision and
- * writes the same three canonical artifacts as the checkout JVM runs.
+ * image build may resolve versioned Gradle dependencies, but the mathematical
+ * run receives only the frozen repository revision and writes the same three
+ * canonical artifacts as the checkout JVM runs.
  */
 
 def repositoryRoot = rootProject.layout.projectDirectory
@@ -28,11 +28,11 @@ def reproductionManifest = reportRoot.map { directory ->
 }
 def dockerfile = repositoryRoot.file(
     'Dockerfile.target-free-held-out-reproduction')
-def verifier = repositoryRoot.file(
-    'scripts/verify-target-free-held-out-container-reproduction.py')
 def verifierSchema = repositoryRoot.file(
     'docs/schemas/'
         + 'regelsuche-target-free-held-out-container-reproduction-v1.schema.json')
+def wrapperProperties = repositoryRoot.file(
+    'gradle/wrapper/gradle-wrapper.properties')
 def containerImage =
     'regelsuche-target-free-held-out-reproduction:verification'
 def containerPlatform = 'linux/amd64'
@@ -119,34 +119,6 @@ def registerMatrixRun = { discovery, String taskName,
     }
 }
 
-project(':regelsuche-discovery') { discovery ->
-    discovery.plugins.withId('java-library') {
-        def requestedOutput = discovery.providers
-            .gradleProperty('targetFreeHeldOutOutput')
-            .map { value -> discovery.file(value).absoluteFile }
-            .orElse(discovery.layout.buildDirectory.dir(
-                'reports/representation-discovery/'
-                    + 'target-free-held-out-matrix').map { directory ->
-                        directory.asFile
-                    })
-        registerMatrixRun(
-            discovery,
-            'generateTargetFreeHeldOutMatrix',
-            requestedOutput,
-            'Executes and writes the complete target-free held-out matrix.')
-        registerMatrixRun(
-            discovery,
-            'generateTargetFreeHeldOutMatrixHostA',
-            hostRunA,
-            'Executes the first checkout-JVM held-out reproduction run.')
-        registerMatrixRun(
-            discovery,
-            'generateTargetFreeHeldOutMatrixHostB',
-            hostRunB,
-            'Executes the second checkout-JVM held-out reproduction run.')
-    }
-}
-
 def buildTargetFreeHeldOutReproductionImage = tasks.register(
     'buildTargetFreeHeldOutReproductionImage', Exec) {
     group = 'verification'
@@ -224,26 +196,35 @@ def runTargetFreeHeldOutReproductionImage = tasks.register(
     }
 }
 
-def verificationVenv = rootProject.layout.buildDirectory.dir(
-    'verification-venv')
-def verificationPython = providers.provider {
-    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
-        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
-    new File(verificationVenv.get().asFile, executable)
-}
-
 def verifyTargetFreeHeldOutContainerReproduction = tasks.register(
-    'verifyTargetFreeHeldOutContainerReproduction', Exec) {
+    'verifyTargetFreeHeldOutContainerReproduction', JavaExec) {
     group = 'verification'
     description = 'Requires byte-identical host-repeat and pinned-container held-out evidence.'
-    dependsOn 'prepareVerificationEnvironment',
+    dependsOn ':regelsuche-discovery:classes',
         ':regelsuche-discovery:generateTargetFreeHeldOutMatrixHostA',
         ':regelsuche-discovery:generateTargetFreeHeldOutMatrixHostB',
         runTargetFreeHeldOutReproductionImage
-    workingDir repositoryRoot
-    inputs.file verifier
+    timeout = java.time.Duration.ofMinutes(3)
+    mainClass = 'de.regelsuche.discovery.representation.'
+        + 'TargetFreeHeldOutContainerReproductionVerifier'
+    argumentProviders.add({
+        [
+            authoritativeRevision.get(),
+            repositoryRoot.asFile.absolutePath,
+            hostRunA.get().absolutePath,
+            hostRunB.get().absolutePath,
+            containerRun.get().absolutePath,
+            dockerfile.asFile.absolutePath,
+            imageIdFile.get().absolutePath,
+            containerPlatform,
+            verifierSchema.asFile.absolutePath,
+            reproductionManifest.get().absolutePath
+        ]
+    } as CommandLineArgumentProvider)
+    inputs.property('repositoryRevision', authoritativeRevision)
     inputs.file verifierSchema
     inputs.file dockerfile
+    inputs.file wrapperProperties
     inputs.file imageIdFile
     inputs.dir hostRunA
     inputs.dir hostRunB
@@ -251,25 +232,44 @@ def verifyTargetFreeHeldOutContainerReproduction = tasks.register(
     outputs.file reproductionManifest
     outputs.upToDateWhen { false }
     doFirst {
-        def output = reproductionManifest.get()
-        output.parentFile.mkdirs()
-        commandLine verificationPython.get().absolutePath,
-            verifier.asFile.absolutePath,
-            '--repository-root', repositoryRoot.asFile.absolutePath,
-            '--repository-revision', authoritativeRevision.get(),
-            '--host-a', hostRunA.get().absolutePath,
-            '--host-b', hostRunB.get().absolutePath,
-            '--container-run', containerRun.get().absolutePath,
-            '--dockerfile', dockerfile.asFile.absolutePath,
-            '--image-id-file', imageIdFile.get().absolutePath,
-            '--platform', containerPlatform,
-            '--schema', verifierSchema.asFile.absolutePath,
-            '--output', output.absolutePath
+        reproductionManifest.get().parentFile.mkdirs()
     }
     doLast {
         if (!reproductionManifest.get().isFile()) {
             throw new GradleException(
                 'Held-out container reproduction manifest was not written')
+        }
+    }
+}
+
+project(':regelsuche-discovery') { discovery ->
+    discovery.plugins.withId('java-library') {
+        def requestedOutput = discovery.providers
+            .gradleProperty('targetFreeHeldOutOutput')
+            .map { value -> discovery.file(value).absoluteFile }
+            .orElse(discovery.layout.buildDirectory.dir(
+                'reports/representation-discovery/'
+                    + 'target-free-held-out-matrix').map { directory ->
+                        directory.asFile
+                    })
+        registerMatrixRun(
+            discovery,
+            'generateTargetFreeHeldOutMatrix',
+            requestedOutput,
+            'Executes and writes the complete target-free held-out matrix.')
+        registerMatrixRun(
+            discovery,
+            'generateTargetFreeHeldOutMatrixHostA',
+            hostRunA,
+            'Executes the first checkout-JVM held-out reproduction run.')
+        registerMatrixRun(
+            discovery,
+            'generateTargetFreeHeldOutMatrixHostB',
+            hostRunB,
+            'Executes the second checkout-JVM held-out reproduction run.')
+        verifyTargetFreeHeldOutContainerReproduction.configure {
+            classpath = discovery.extensions.getByName('sourceSets')
+                .getByName('main').runtimeClasspath
         }
     }
 }
