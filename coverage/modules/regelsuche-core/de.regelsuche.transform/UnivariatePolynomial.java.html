@@ -70,8 +70,8 @@ final class UnivariatePolynomial {
 <span class="fc" id="L70">            return left.power(binary.right());</span>
         }
 <span class="fc" id="L72">        UnivariatePolynomial right = of(binary.right());</span>
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (right == null) {</span>
-<span class="nc" id="L74">            return null;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (right == null) {</span>
+<span class="fc" id="L74">            return null;</span>
         }
 <span class="pc bpc" id="L76" title="2 of 5 branches missed.">        return switch (binary.operator()) {</span>
 <span class="fc" id="L77">            case ADD -&gt; left.combine(right, BigInteger.ONE);</span>
