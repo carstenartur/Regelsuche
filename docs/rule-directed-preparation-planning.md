@@ -126,10 +126,13 @@ Each AST occurrence contributes one node descriptor and refers to its child
 hashes, so fingerprint construction is linear in the number of AST nodes rather
 than repeatedly traversing every subtree.
 
-The standard rule-list constructor uses `RuleInventoryFingerprint`, so changes
-to rule implementations, patterns, recognition profiles, descriptors or pack
-metadata invalidate the cache identity. Callers that inject a custom direct
-engine must provide or accept an explicit ID-only inventory hash.
+The standard rule-list constructor uses `RuleInventoryFingerprint`. Pattern
+rules bind their source, target and recognition profile; every rule binds its
+implementation class and public execution metadata. A changed Java body behind
+the same implementation class is not content-addressed by this fingerprint, so
+retained experiments must additionally bind the repository revision. Callers
+that inject a custom direct engine must provide or accept an explicit ID-only
+inventory hash.
 
 Only analyses that consumed residual-solver work are retained. Cheap decisions
 such as “this node is not a division” remain visible in the metrics but cannot
@@ -164,10 +167,11 @@ identities, and it requires no invalidation protocol beyond the retained key.
 ## Experiment identity and ablation
 
 A benchmark or retained experiment that enables preparation memoization must
-bind at least the planner revision, rule-inventory fingerprint, normalized
-assumption fingerprint, solver budget, cache-capacity policy and engine
-selection in its configuration identity. The no-cache capacity-zero variant is
-the required direct ablation for any performance or work-reduction claim.
+bind at least the repository revision, planner revision, rule-inventory
+fingerprint, normalized assumption fingerprint, solver budget, cache-capacity
+policy and engine selection in its configuration identity. The no-cache
+capacity-zero variant is the required direct ablation for any performance or
+work-reduction claim.
 
 Memoization changes mechanical work, not the declared mathematical rule
 inventory. It therefore must never be used to rewrite historical evidence from
