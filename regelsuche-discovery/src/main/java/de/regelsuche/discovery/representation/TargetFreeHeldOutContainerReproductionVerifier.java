@@ -15,8 +15,10 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -144,12 +146,15 @@ public final class TargetFreeHeldOutContainerReproductionVerifier {
         Path schema = requireFile(schemaPath, "schemaPath");
         requireSchemaIdentity(schema);
 
-        List<ArtifactIdentity> artifacts = first.bytes().entrySet().stream()
-            .map(entry -> new ArtifactIdentity(
-                entry.getKey(),
-                entry.getValue().length,
-                TargetFreeRepresentationEvaluationPlan.sha256(
-                    entry.getValue())))
+        List<ArtifactIdentity> artifacts = EXPECTED_FILES.stream()
+            .map(name -> {
+                byte[] value = Objects.requireNonNull(
+                    first.bytes().get(name), name);
+                return new ArtifactIdentity(
+                    name,
+                    value.length,
+                    TargetFreeRepresentationEvaluationPlan.sha256(value));
+            })
             .toList();
         String artifactSetHash = KnownStructureCatalog.sha256(
             TargetFreeHeldOutMatrixRunner.canonical(artifacts));
@@ -235,8 +240,7 @@ public final class TargetFreeHeldOutContainerReproductionVerifier {
             QualificationArtifact.fromCanonicalJson(text(bytes.get(
                 TargetFreeHeldOutMatrixRunner.QUALIFICATION_FILE_NAME)));
         validateRun(revision, plan, freeze, qualification);
-        return new RunSnapshot(
-            Map.copyOf(bytes), plan, freeze, qualification);
+        return new RunSnapshot(bytes, plan, freeze, qualification);
     }
 
     private static void validateRun(
@@ -350,11 +354,11 @@ public final class TargetFreeHeldOutContainerReproductionVerifier {
                     "unsupported Dockerfile FROM syntax: " + line);
             }
             String image = matcher.group(1);
-            if (!aliases.contains(image.toLowerCase())) {
+            if (!aliases.contains(image.toLowerCase(Locale.ROOT))) {
                 external.add(image);
             }
             if (matcher.group(2) != null) {
-                aliases.add(matcher.group(2).toLowerCase());
+                aliases.add(matcher.group(2).toLowerCase(Locale.ROOT));
             }
         }
         if (!external.equals(List.of(BASE_IMAGE))) {
@@ -366,8 +370,9 @@ public final class TargetFreeHeldOutContainerReproductionVerifier {
     private static void requireSchemaIdentity(Path schema) throws IOException {
         JsonNode value = TargetFreeHeldOutMatrixRunner.JSON.readTree(
             Files.readAllBytes(schema));
-        if (!"https://json-schema.org/draft/2020-12/schema".equals(
-                value.path("$schema").asText())
+        if (value == null
+                || !"https://json-schema.org/draft/2020-12/schema".equals(
+                    value.path("$schema").asText())
                 || !SCHEMA.equals(value.path("$id").asText())
                 || !"object".equals(value.path("type").asText())) {
             throw new IllegalArgumentException(
@@ -447,7 +452,10 @@ public final class TargetFreeHeldOutContainerReproductionVerifier {
         QualificationArtifact qualification
     ) {
         private RunSnapshot {
-            bytes = Map.copyOf(bytes);
+            Map<String, byte[]> retained = new TreeMap<>();
+            bytes.forEach((key, value) ->
+                retained.put(key, value.clone()));
+            bytes = Collections.unmodifiableMap(retained);
             Objects.requireNonNull(plan, "plan");
             Objects.requireNonNull(freeze, "freeze");
             Objects.requireNonNull(qualification, "qualification");
