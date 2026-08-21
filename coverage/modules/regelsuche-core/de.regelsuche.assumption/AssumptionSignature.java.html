@@ -98,8 +98,8 @@ public record AssumptionSignature(List&lt;String&gt; normalizedAssumptions, Stri
 
     private static String stripOuterParens(String value) {
 <span class="fc" id="L100">        String result = value;</span>
-<span class="pc bpc" id="L101" title="5 of 6 branches missed.">        while (result.startsWith(&quot;(&quot;) &amp;&amp; result.endsWith(&quot;)&quot;) &amp;&amp; result.length() &gt; 1) {</span>
-<span class="nc" id="L102">            result = result.substring(1, result.length() - 1).trim();</span>
+<span class="pc bpc" id="L101" title="2 of 6 branches missed.">        while (result.startsWith(&quot;(&quot;) &amp;&amp; result.endsWith(&quot;)&quot;) &amp;&amp; result.length() &gt; 1) {</span>
+<span class="fc" id="L102">            result = result.substring(1, result.length() - 1).trim();</span>
         }
 <span class="fc" id="L104">        return result;</span>
     }
