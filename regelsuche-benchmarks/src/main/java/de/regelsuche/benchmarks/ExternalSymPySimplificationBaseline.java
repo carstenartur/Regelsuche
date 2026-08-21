@@ -22,6 +22,12 @@ import java.util.Objects;
  * among simplify, factor, cancel, together, apart or trigsimp after seeing a
  * case result.</p>
  *
+ * <p>A native operation that explicitly reports that the expression class is
+ * not implemented contributes the parsed input unchanged, together with the
+ * issue {@code NATIVE_OPERATION_NOT_APPLICABLE_RETURNS_INPUT}. It is therefore
+ * an executed negative result, not a crash and not an invitation to substitute
+ * another native operation after observing the case.</p>
+ *
  * <p>The produced expression is rendered in Regelsuche surface syntax so that a
  * single shared judge can canonicalize all competitors' outputs. Rendering is
  * a printing concern only; it never changes the native operation result.</p>
@@ -34,6 +40,8 @@ import java.util.Objects;
  * therefore passed but unused; that residue remains an explicit limitation.</p>
  */
 final class ExternalSymPySimplificationBaseline {
+    private static final String NOT_APPLICABLE_MARKER =
+        "__REGELSUCHE_NATIVE_OPERATION_NOT_APPLICABLE__";
     private static final String SCRIPT_PREFIX =
         "import sys,sympy\n"
             + "from sympy.parsing.sympy_parser import parse_expr,"
@@ -166,22 +174,31 @@ final class ExternalSymPySimplificationBaseline {
             return new Simplification(
                 Outcome.ERROR, "", List.of("EXTERNAL_PROCESS_FAILED"));
         }
-        String produced = output.stdout().lines()
+        List<String> lines = output.stdout().lines()
             .map(String::trim)
             .filter(line -> !line.isBlank())
+            .toList();
+        boolean notApplicable = lines.contains(NOT_APPLICABLE_MARKER);
+        String produced = lines.stream()
+            .filter(line -> !NOT_APPLICABLE_MARKER.equals(line))
             .reduce((first, second) -> second)
             .orElse("");
         if (produced.isEmpty()) {
             return new Simplification(
                 Outcome.ERROR, "", List.of("EMPTY_EXTERNAL_OUTPUT"));
         }
+        List<String> issues = new ArrayList<>();
+        if (notApplicable) {
+            issues.add("NATIVE_OPERATION_NOT_APPLICABLE_RETURNS_INPUT");
+        }
+        if (!unbound.isEmpty()) {
+            issues.add(
+                "COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS");
+        }
         return new Simplification(
             Outcome.PRODUCED,
             produced,
-            unbound.isEmpty()
-                ? List.of()
-                : List.of(
-                    "COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS"));
+            issues);
     }
 
     static ExternalSymPySimplificationBaseline detectSystemSymPy() {
@@ -239,8 +256,12 @@ final class ExternalSymPySimplificationBaseline {
 
     private static String script(Operation operation) {
         return SCRIPT_PREFIX
-            + "print(str(sympy." + operation.functionName()
-            + "(a)).replace('**','^'))\n";
+            + "try:\n"
+            + "    r=sympy." + operation.functionName() + "(a)\n"
+            + "except NotImplementedError:\n"
+            + "    print('" + NOT_APPLICABLE_MARKER + "')\n"
+            + "    r=a\n"
+            + "print(str(r).replace('**','^'))\n";
     }
 
     private static String normalize(String value) {
