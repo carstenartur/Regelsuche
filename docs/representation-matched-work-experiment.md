@@ -33,6 +33,21 @@ The old product behavior that submitted each equation as an unrelated search
 root is not a baseline. It does not solve the same system-level task and would
 make any comparison meaningless.
 
+## Identical accepted fragment
+
+Both routes receive the same already parsed equation ASTs and declared variable
+order. Their exact affine fragment has the same power boundary:
+
+- exponent one preserves an affine base;
+- every other exponent requires a constant base;
+- the exponent must be an exact integer with bounded absolute value;
+- negative exponents are allowed only for non-zero constant bases;
+- `0^0` and zero to a negative exponent are unsupported;
+- a variable base such as `x^0` remains nonlinear rather than becoming one.
+
+The cross-route tests characterize these cases directly. A case outside either
+route's common fragment is not eligible for a matched-work result.
+
 ## Identical terminal obligation
 
 A case is comparable only if both routes independently verify the identical
@@ -58,8 +73,13 @@ an isomorphism guessed after the experiment.
 
 ## Equal budget
 
-Each route receives one total primitive-work budget. A route cannot reset the
-budget between parsing, representation and solving.
+Both routes consume the same already parsed ASTs. Parsing is common input
+preparation and is deliberately outside the route comparison; neither route is
+credited or charged for it.
+
+After that common boundary, each route receives one total primitive-work budget
+and cannot reset it between analysis, representation, elimination, consequence
+formation and internal evidence production.
 
 For the representation route:
 
@@ -96,8 +116,9 @@ The report exports source-stage, consequence-stage and total work for both
 routes. The direct route additionally retains its source-analysis, elimination
 and evidence split in the JSON stage details.
 
-A work unit is an algorithmic accounting unit, not a CPU instruction. Its value
-is reproducibility under a frozen implementation and configuration. Wall-clock
+A work unit is an implementation-defined algorithmic accounting unit, not a CPU
+instruction or a theorem about intrinsic complexity. Its value is reproducible
+comparison under this frozen implementation and configuration. Wall-clock
 measurements may be added as secondary observations but cannot replace this
 ledger.
 
@@ -133,8 +154,8 @@ build/reports/representation-matched-work/matched-work-report.json
 build/reports/representation-matched-work/matched-work-report.md
 ```
 
-The experiments module `check` task depends on this task. The generated report
-contains:
+The experiments module `check` task and the root `check` task depend on this
+task. The generated report contains:
 
 - schema and configuration identity;
 - total budget per route;
