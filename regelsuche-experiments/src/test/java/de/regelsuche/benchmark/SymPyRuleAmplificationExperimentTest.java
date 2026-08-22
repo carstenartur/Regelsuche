@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.search.reachability.PatternTargetedLocalBridgeSearch;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,33 @@ class SymPyRuleAmplificationExperimentTest {
                 .collect(Collectors.toSet()));
         assertTrue(report.principals().stream()
             .allMatch(value -> "low".equals(value.riskLevel())));
+    }
+
+    @Test
+    void squareDifferenceRequiresCancellationToExposeItsPowers() {
+        SymPyRuleAmplificationExperiment.Report report =
+            new SymPyRuleAmplificationExperiment().run(REVISION);
+        SymPyRuleAmplificationExperiment.Row row = report.rows().stream()
+            .filter(value -> value.caseId().equals(
+                "difference-squares-two-hidden-cancellations"))
+            .findFirst()
+            .orElseThrow();
+
+        assertEquals(
+            PatternTargetedLocalBridgeSearch.Status.PREPARED,
+            row.coordinatorStatus(),
+            report.toJson());
+        assertEquals(2, row.preparationDepth());
+        assertEquals("(x - y) * (x + y)", row.resultExpression());
+        assertEquals(
+            List.of(
+                "ast_cancel_division_factor",
+                "ast_cancel_division_factor",
+                SymPyRuleAmplificationExperiment
+                    .DIFFERENCE_OF_SQUARES_RULE_ID),
+            row.primitiveRuleIds());
+        assertEquals(List.of("a != 0", "b != 0"),
+            row.resultAssumptions());
     }
 
     @Test
