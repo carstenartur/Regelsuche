@@ -17,8 +17,8 @@ dependencies {
     api project(':regelsuche-search')
     api project(':regelsuche-validation')
     api project(':regelsuche-discovery')
+    api project(':regelsuche-math-algorithms')
 
-    implementation project(':regelsuche-math-algorithms')
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
