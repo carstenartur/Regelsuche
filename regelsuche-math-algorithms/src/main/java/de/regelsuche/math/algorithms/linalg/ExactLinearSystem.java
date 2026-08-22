@@ -122,16 +122,16 @@ public record ExactLinearSystem(
         INCONSISTENT
     }
 
-    public record ExactMatrix(List<List<Rational>> rows) {
+    public record ExactMatrix(List<List<Rational>> entries) {
         public ExactMatrix {
-            Objects.requireNonNull(rows, "rows");
-            if (rows.isEmpty()) {
+            Objects.requireNonNull(entries, "entries");
+            if (entries.isEmpty()) {
                 throw new IllegalArgumentException(
                     "matrix must contain at least one row");
             }
-            List<List<Rational>> retained = new ArrayList<>(rows.size());
+            List<List<Rational>> retained = new ArrayList<>(entries.size());
             int columns = -1;
-            for (List<Rational> row : rows) {
+            for (List<Rational> row : entries) {
                 Objects.requireNonNull(row, "matrix row");
                 if (columns < 0) {
                     columns = row.size();
@@ -150,23 +150,19 @@ public record ExactLinearSystem(
                     .toList();
                 retained.add(retainedRow);
             }
-            rows = List.copyOf(retained);
-        }
-
-        public int rowCount() {
-            return rows.size();
+            entries = List.copyOf(retained);
         }
 
         public int rows() {
-            return rowCount();
+            return entries.size();
         }
 
         public int columns() {
-            return rows.getFirst().size();
+            return entries.getFirst().size();
         }
 
         public Rational get(int row, int column) {
-            return rows.get(row).get(column);
+            return entries.get(row).get(column);
         }
     }
 
