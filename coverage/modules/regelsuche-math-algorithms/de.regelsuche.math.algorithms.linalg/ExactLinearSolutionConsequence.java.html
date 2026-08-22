@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactLinearSolutionConsequence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">ExactLinearSolutionConsequence.java</span></div><h1>ExactLinearSolutionConsequence.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.SolutionClassification;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Canonical terminal consequence shared by independent exact system-solving
+ * routes. It intentionally contains no matrix- or scalar-elimination lineage;
+ * route-specific evidence must prove how the consequence was obtained.
+ */
+public record ExactLinearSolutionConsequence(
+    List&lt;String&gt; variables,
+    SolutionClassification classification,
+    Optional&lt;ExactVector&gt; particularSolution,
+    List&lt;ExactVector&gt; nullspaceBasis,
+    Optional&lt;Rational&gt; normalizedContradiction
+) {
+<span class="fc" id="L24">    public ExactLinearSolutionConsequence {</span>
+<span class="fc" id="L25">        variables = normalizedVariables(variables);</span>
+<span class="fc" id="L26">        classification = Objects.requireNonNull(</span>
+            classification,
+            &quot;classification&quot;);
+<span class="fc" id="L29">        particularSolution = Objects.requireNonNull(</span>
+            particularSolution,
+            &quot;particularSolution&quot;);
+<span class="fc" id="L32">        nullspaceBasis = List.copyOf(Objects.requireNonNull(</span>
+            nullspaceBasis,
+            &quot;nullspaceBasis&quot;));
+<span class="fc" id="L35">        normalizedContradiction = Objects.requireNonNull(</span>
+            normalizedContradiction,
+            &quot;normalizedContradiction&quot;);
+
+<span class="fc" id="L39">        int dimension = variables.size();</span>
+<span class="fc" id="L40">        particularSolution.ifPresent(vector -&gt;</span>
+<span class="fc" id="L41">            requireDimension(vector, dimension, &quot;particularSolution&quot;));</span>
+<span class="fc" id="L42">        nullspaceBasis.forEach(vector -&gt;</span>
+<span class="fc" id="L43">            requireDimension(vector, dimension, &quot;nullspaceBasis&quot;));</span>
+
+<span class="pc bpc" id="L45" title="1 of 4 branches missed.">        switch (classification) {</span>
+            case UNIQUE -&gt; {
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                if (particularSolution.isEmpty()</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                        || !nullspaceBasis.isEmpty()</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">                        || normalizedContradiction.isPresent()) {</span>
+<span class="nc" id="L50">                    throw new IllegalArgumentException(</span>
+                        &quot;unique consequence requires one solution only&quot;);
+                }
+            }
+            case UNDERDETERMINED -&gt; {
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                if (particularSolution.isEmpty()</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                        || nullspaceBasis.isEmpty()</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">                        || normalizedContradiction.isPresent()) {</span>
+<span class="nc" id="L58">                    throw new IllegalArgumentException(</span>
+                        &quot;underdetermined consequence requires affine basis&quot;);
+                }
+            }
+            case INCONSISTENT -&gt; {
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                if (particularSolution.isPresent()</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                        || !nullspaceBasis.isEmpty()</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                        || normalizedContradiction.isEmpty()</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                        || !normalizedContradiction.orElseThrow().isOne()) {</span>
+<span class="nc" id="L67">                    throw new IllegalArgumentException(</span>
+                        &quot;inconsistent consequence requires normalized 0=1 witness&quot;);
+                }
+            }
+        }
+<span class="fc" id="L72">    }</span>
+
+    public static ExactLinearSolutionConsequence fromRref(
+        ExactRrefReduction reduction
+    ) {
+<span class="nc" id="L77">        Objects.requireNonNull(reduction, &quot;reduction&quot;);</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        return switch (reduction.solutionClassification()) {</span>
+            case UNIQUE, UNDERDETERMINED -&gt;
+<span class="nc" id="L80">                new ExactLinearSolutionConsequence(</span>
+<span class="nc" id="L81">                    reduction.variables(),</span>
+<span class="nc" id="L82">                    reduction.solutionClassification(),</span>
+<span class="nc" id="L83">                    reduction.particularSolution(),</span>
+<span class="nc" id="L84">                    reduction.nullspaceBasis(),</span>
+<span class="nc" id="L85">                    Optional.empty());</span>
+<span class="nc" id="L86">            case INCONSISTENT -&gt; new ExactLinearSolutionConsequence(</span>
+<span class="nc" id="L87">                reduction.variables(),</span>
+                SolutionClassification.INCONSISTENT,
+<span class="nc" id="L89">                Optional.empty(),</span>
+<span class="nc" id="L90">                List.of(),</span>
+<span class="nc" id="L91">                Optional.of(Rational.ONE));</span>
+        };
+    }
+
+    public List&lt;String&gt; canonicalLines() {
+<span class="fc" id="L96">        List&lt;String&gt; lines = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L97">        lines.add(&quot;classification=&quot; + classification.name());</span>
+<span class="fc" id="L98">        lines.add(&quot;variables=&quot; + String.join(&quot;,&quot;, variables));</span>
+<span class="fc" id="L99">        particularSolution.ifPresent(vector -&gt;</span>
+<span class="fc" id="L100">            lines.add(&quot;particular=&quot; + canonicalVector(vector)));</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (int index = 0; index &lt; nullspaceBasis.size(); index++) {</span>
+<span class="fc" id="L102">            lines.add(&quot;basis[&quot; + index + &quot;]=&quot;</span>
+<span class="fc" id="L103">                + canonicalVector(nullspaceBasis.get(index)));</span>
+        }
+<span class="fc" id="L105">        normalizedContradiction.ifPresent(value -&gt;</span>
+<span class="fc" id="L106">            lines.add(&quot;contradiction=0=&quot; + value));</span>
+<span class="fc" id="L107">        return List.copyOf(lines);</span>
+    }
+
+    private static String canonicalVector(ExactVector vector) {
+<span class="fc" id="L111">        return vector.values().stream()</span>
+<span class="fc" id="L112">            .map(Rational::toString)</span>
+<span class="fc" id="L113">            .collect(java.util.stream.Collectors.joining(&quot;,&quot;, &quot;[&quot;, &quot;]&quot;));</span>
+    }
+
+    private static List&lt;String&gt; normalizedVariables(List&lt;String&gt; values) {
+<span class="fc" id="L117">        Objects.requireNonNull(values, &quot;variables&quot;);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L119">            throw new IllegalArgumentException(&quot;variables must not be empty&quot;);</span>
+        }
+<span class="fc" id="L121">        List&lt;String&gt; normalized = values.stream().map(value -&gt; {</span>
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L123">                throw new IllegalArgumentException(</span>
+                    &quot;variable names must not be blank&quot;);
+            }
+<span class="fc" id="L126">            return value.trim();</span>
+<span class="fc" id="L127">        }).toList();</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(normalized).size() != normalized.size()) {</span>
+<span class="nc" id="L129">            throw new IllegalArgumentException(</span>
+                &quot;variable names must be unique&quot;);
+        }
+<span class="fc" id="L132">        return normalized;</span>
+    }
+
+    private static void requireDimension(
+        ExactVector vector,
+        int dimension,
+        String field
+    ) {
+<span class="fc" id="L140">        Objects.requireNonNull(vector, field);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (vector.dimension() != dimension) {</span>
+<span class="nc" id="L142">            throw new IllegalArgumentException(</span>
+                field + &quot; dimension disagrees with variables&quot;);
+        }
+<span class="fc" id="L145">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
