@@ -1,6 +1,5 @@
 package de.regelsuche.math.algorithms.linalg;
 
-import de.regelsuche.math.algorithms.equivalence.Polynomial;
 import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
 import java.util.HashSet;
 import java.util.List;
@@ -13,7 +12,9 @@ import java.util.Set;
  * <p>The mathematical eigenproblem and a possible physical interpretation are
  * retained separately. A quantum interpretation can appear only when the source
  * request declared a quantum model domain; symbol names such as {@code H} or
- * {@code psi} have no interpretive authority.</p>
+ * {@code psi} have no interpretive authority. Operator properties remain
+ * explicitly declared metadata until a separate proof or validation stage
+ * confirms them.</p>
  */
 public record EigenproblemRepresentation(
     PolynomialMatrix operator,
@@ -33,9 +34,9 @@ public record EigenproblemRepresentation(
     public static final String CAPABILITY_SINGULAR_SHIFTED_OPERATOR =
         "SINGULAR_SHIFTED_OPERATOR_CONDITION";
     public static final String CAPABILITY_QUANTUM_OPERATOR_MODEL =
-        "QUANTUM_OPERATOR_MODEL_INTERPRETATION";
+        "DECLARED_QUANTUM_OPERATOR_MODEL_INTERPRETATION";
     public static final String CAPABILITY_HERMITIAN_SPECTRAL_MODEL =
-        "HERMITIAN_SPECTRAL_MODEL";
+        "DECLARED_HERMITIAN_SPECTRAL_MODEL";
 
     public EigenproblemRepresentation {
         operator = Objects.requireNonNull(operator, "operator");
@@ -56,7 +57,7 @@ public record EigenproblemRepresentation(
             scalarParameters,
             "scalarParameters",
             true);
-        requiredAssumptions = texts(
+        requiredAssumptions = uniqueTexts(
             requiredAssumptions,
             "requiredAssumptions",
             false);
@@ -66,7 +67,7 @@ public record EigenproblemRepresentation(
         declaredOperatorProperties = Set.copyOf(Objects.requireNonNull(
             declaredOperatorProperties,
             "declaredOperatorProperties"));
-        unlockedCapabilities = texts(
+        unlockedCapabilities = uniqueTexts(
             unlockedCapabilities,
             "unlockedCapabilities",
             false);
@@ -101,16 +102,16 @@ public record EigenproblemRepresentation(
         requireCapability(CAPABILITY_HERMITIAN_SPECTRAL_MODEL,
             quantum && hermitian);
         if (modelInterpretation
-                == ModelInterpretation.HERMITIAN_QUANTUM_OBSERVABLE
+                == ModelInterpretation.DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
                 && !hermitian) {
             throw new IllegalArgumentException(
                 "Hermitian interpretation requires declared Hermiticity");
         }
         if (modelInterpretation
-                == ModelInterpretation.QUANTUM_OPERATOR
+                == ModelInterpretation.DECLARED_QUANTUM_OPERATOR
                 && hermitian) {
             throw new IllegalArgumentException(
-                "Hermitian quantum operator needs the stronger interpretation");
+                "declared Hermitian operator needs the stronger interpretation");
         }
     }
 
@@ -127,6 +128,14 @@ public record EigenproblemRepresentation(
     }
 
     private static List<String> names(
+        List<String> values,
+        String field,
+        boolean allowEmpty
+    ) {
+        return uniqueTexts(values, field, allowEmpty);
+    }
+
+    private static List<String> uniqueTexts(
         List<String> values,
         String field,
         boolean allowEmpty
@@ -164,8 +173,8 @@ public record EigenproblemRepresentation(
 
     public enum ModelInterpretation {
         NONE,
-        QUANTUM_OPERATOR,
-        HERMITIAN_QUANTUM_OBSERVABLE
+        DECLARED_QUANTUM_OPERATOR,
+        DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
     }
 
     public enum OperatorProperty {
