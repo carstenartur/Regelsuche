@@ -218,7 +218,7 @@ public final class SymPyRuleAmplificationExperiment {
             new ExperimentCase(
                 "difference-squares-two-hidden-cancellations",
                 DIFFERENCE_OF_SQUARES_RULE_ID,
-                "((x * a) / a)^2 - ((y * b) / b)^2",
+                "((x^2 * a) / a) - ((y^2 * b) / b)",
                 List.of(),
                 PatternTargetedLocalBridgeSearch.Status.PREPARED,
                 List.of("a != 0", "b != 0")),
