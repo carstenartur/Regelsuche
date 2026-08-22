@@ -53,6 +53,12 @@ again while checking that all cross-component coefficients are zero. Exhausted
 work yields `BUDGET_INCONCLUSIVE`; a connected matrix yields
 `DIRECT_REPRESENTATION_AVAILABLE` and no manufactured decomposition.
 
+The result model also checks that the row and column permutations are exactly
+the concatenation of the retained component partitions and that reported
+capabilities agree with the actual component kinds. Invalid permutations or
+capability claims therefore fail during construction before they can enter a
+search or evidence artifact.
+
 ## Material capability
 
 A successful result exposes a mechanically actionable partition into independent
@@ -73,6 +79,20 @@ The next slice can use the component indices to construct exact submatrices and
 run the same fixed solver or rule inventory independently on each block. A
 matched-work comparison must still determine whether that reduces total search
 work compared with direct scalar or full-matrix solving.
+
+## Activation policy
+
+No compatibility wrapper is maintained for an obsolete matrix demo API. Once
+the representation and decomposition contracts are integrated, exact
+recognition may become the normal product path. Automatic use as a search
+shortcut still requires the matched-work comparison because correctness and
+usefulness are separate questions.
+
+The original scalar equations remain retained as occurrence/provenance data,
+not because the old implementation is an API compatibility requirement. This
+allows the Workbench and replay layer to show both scalar and matrix views while
+the search engine uses the representation that exposes the stronger exact
+capability.
 
 ## Boundaries
 
