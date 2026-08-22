@@ -14,6 +14,7 @@ import de.regelsuche.notify.ConsoleNotifier;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.SimplificationSuccess;
 import de.regelsuche.search.TransformationSearchService;
+import de.regelsuche.system.EquationSystemRepresentationService;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
@@ -60,6 +61,11 @@ public class App {
             " ",
             Arrays.copyOfRange(args, 1, args.length));
 
+        if (type == InputType.SYSTEM) {
+            analyzeEquationSystem(expression);
+            return;
+        }
+
         try (ExpressionGraphStore store = createStore()) {
             TransformationSearchService service =
                 new TransformationSearchService(
@@ -84,6 +90,17 @@ public class App {
         }
     }
 
+    private static void analyzeEquationSystem(String expression) {
+        try {
+            EquationSystemRepresentationService.Analysis analysis =
+                new EquationSystemRepresentationService().analyze(expression);
+            System.out.println(analysis.renderSummary());
+        } catch (IllegalArgumentException exception) {
+            System.out.println(
+                "Invalid equation system: " + exception.getMessage());
+        }
+    }
+
     private static ExpressionGraphStore createStore() {
         String uri = System.getenv("NEO4J_URI");
         String user = System.getenv("NEO4J_USER");
@@ -97,7 +114,9 @@ public class App {
 
     private static void printUsage() {
         System.out.println("Usage:");
-        System.out.println("  <term|equation|system> <expression>");
+        System.out.println("  <term|equation> <expression>");
+        System.out.println(
+            "  system <equation-1; equation-2; ...>");
         System.out.println(
             "  discover [--min N] [--max N] "
                 + "[--export json,markdown,mermaid,latex,inventory] "
