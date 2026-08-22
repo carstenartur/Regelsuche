@@ -1,6 +1,7 @@
 package de.regelsuche.benchmark;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.search.reachability.PatternTargetedLocalBridgeSearch;
@@ -36,6 +37,15 @@ class SymPyRuleAmplificationExperimentTest {
                 "different-argument-near-miss"))
             .allMatch(row -> row.reachedLimits().isEmpty()
                 && row.resultExpression().isEmpty()));
+    }
+
+    @Test
+    void jsonEncodingEscapesTabs() {
+        String encoded = SymPyRuleAmplificationExperiment.json(
+            "left\tright");
+
+        assertEquals("left\\tright", encoded);
+        assertFalse(encoded.contains("\t"));
     }
 
     @Test
