@@ -36,7 +36,7 @@ class PatternTargetedLocalBridgeSearchTest {
         PatternTargetedLocalBridgeSearch search = search(
             principal,
             preparationRules,
-            PatternTargetedLocalBridgeSearch.Budget.defaults());
+            defaultBudget());
         PatternTargetedLocalBridgeSearch.Attempt attempt = search.analyze(
             PYTHAGOREAN_SOURCE,
             AssumptionSignature.ofExpressions(List.of()));
@@ -80,7 +80,7 @@ class PatternTargetedLocalBridgeSearchTest {
         PatternTargetedLocalBridgeSearch search = search(
             pythagoreanRule(),
             cancellationRules(),
-            PatternTargetedLocalBridgeSearch.Budget.defaults());
+            defaultBudget());
 
         PatternTargetedLocalBridgeSearch.Attempt attempt = search.analyze(
             "sin(x)^2 + cos(x)^2",
@@ -98,7 +98,7 @@ class PatternTargetedLocalBridgeSearchTest {
         PatternTargetedLocalBridgeSearch search = search(
             pythagoreanRule(),
             List.of(),
-            PatternTargetedLocalBridgeSearch.Budget.defaults());
+            defaultBudget());
 
         PatternTargetedLocalBridgeSearch.Attempt attempt = search.analyze(
             "sin(x)^2 + cos(y)^2",
@@ -206,7 +206,7 @@ class PatternTargetedLocalBridgeSearchTest {
         PatternTargetedLocalBridgeSearch search = search(
             principal,
             rules,
-            PatternTargetedLocalBridgeSearch.Budget.defaults());
+            defaultBudget());
         PatternTargetedLocalBridgeSearch.Bridge bridge = search.analyze(
             PYTHAGOREAN_SOURCE,
             AssumptionSignature.ofExpressions(List.of()))
@@ -217,9 +217,14 @@ class PatternTargetedLocalBridgeSearchTest {
         assertFalse(search.verify(corrupted).valid());
         assertThrows(
             IllegalArgumentException.class,
-            () -> search(principal, List.of(principal),
-                PatternTargetedLocalBridgeSearch.Budget.defaults()));
+            () -> search(principal, List.of(principal), defaultBudget()));
         assertNotNull(bridge.principalStep().applicationKey());
+    }
+
+    private static PatternTargetedLocalBridgeSearch.Budget defaultBudget() {
+        return new PatternTargetedLocalBridgeSearch.Budget(
+            3, 128, 1_024, 8, 128, 128,
+            32, 5_000, 2_500);
     }
 
     private static PatternTargetedLocalBridgeSearch search(
