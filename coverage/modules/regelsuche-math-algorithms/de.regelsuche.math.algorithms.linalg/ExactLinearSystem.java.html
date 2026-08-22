@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactLinearSystem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">ExactLinearSystem.java</span></div><h1>ExactLinearSystem.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Exact symbolic representation of a scalar equation system as {@code A*x=b}.
+ * Source row and variable identities are retained so the matrix view can be
+ * replayed back to the original equations without losing occurrence meaning.
+ */
+public record ExactLinearSystem(
+    ExactMatrix coefficients,
+    List&lt;String&gt; variables,
+    ExactVector rightHandSide,
+    List&lt;RowOrigin&gt; rowOrigins,
+    int coefficientRank,
+    int augmentedRank,
+    SolutionClassification solutionClassification
+) {
+<span class="fc" id="L24">    public ExactLinearSystem {</span>
+<span class="fc" id="L25">        coefficients = Objects.requireNonNull(coefficients, &quot;coefficients&quot;);</span>
+<span class="fc" id="L26">        rightHandSide = Objects.requireNonNull(</span>
+            rightHandSide,
+            &quot;rightHandSide&quot;);
+<span class="fc" id="L29">        rowOrigins = List.copyOf(Objects.requireNonNull(</span>
+            rowOrigins,
+            &quot;rowOrigins&quot;));
+<span class="fc" id="L32">        solutionClassification = Objects.requireNonNull(</span>
+            solutionClassification,
+            &quot;solutionClassification&quot;);
+
+<span class="fc" id="L36">        Objects.requireNonNull(variables, &quot;variables&quot;);</span>
+<span class="fc" id="L37">        List&lt;String&gt; normalizedVariables = new ArrayList&lt;&gt;(variables.size());</span>
+<span class="fc" id="L38">        Set&lt;String&gt; uniqueVariables = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (String variable : variables) {</span>
+<span class="pc bpc" id="L40" title="2 of 4 branches missed.">            if (variable == null || variable.isBlank()) {</span>
+<span class="nc" id="L41">                throw new IllegalArgumentException(</span>
+                    &quot;variable names must not be blank&quot;);
+            }
+<span class="fc" id="L44">            String normalized = variable.trim();</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            if (!uniqueVariables.add(normalized)) {</span>
+<span class="nc" id="L46">                throw new IllegalArgumentException(</span>
+                    &quot;variable names must be unique: &quot; + normalized);
+            }
+<span class="fc" id="L49">            normalizedVariables.add(normalized);</span>
+<span class="fc" id="L50">        }</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (normalizedVariables.isEmpty()) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(</span>
+                &quot;an exact linear system needs at least one variable&quot;);
+        }
+<span class="fc" id="L55">        variables = List.copyOf(normalizedVariables);</span>
+
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (coefficients.columns() != variables.size()) {</span>
+<span class="nc" id="L58">            throw new IllegalArgumentException(</span>
+                &quot;coefficient columns and variable count disagree&quot;);
+        }
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (coefficients.rowCount() != rightHandSide.dimension()</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                || coefficients.rowCount() != rowOrigins.size()) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(</span>
+                &quot;coefficient rows, RHS and row origins disagree&quot;);
+        }
+
+<span class="fc" id="L67">        int maximumCoefficientRank = Math.min(</span>
+<span class="fc" id="L68">            coefficients.rowCount(),</span>
+<span class="fc" id="L69">            coefficients.columns());</span>
+<span class="fc" id="L70">        int maximumAugmentedRank = Math.min(</span>
+<span class="fc" id="L71">            coefficients.rowCount(),</span>
+<span class="fc" id="L72">            coefficients.columns() + 1);</span>
+<span class="pc bpc" id="L73" title="4 of 8 branches missed.">        if (coefficientRank &lt; 0</span>
+                || coefficientRank &gt; maximumCoefficientRank
+                || augmentedRank &lt; coefficientRank
+                || augmentedRank &gt; maximumAugmentedRank) {
+<span class="nc" id="L77">            throw new IllegalArgumentException(&quot;invalid exact ranks&quot;);</span>
+        }
+
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        SolutionClassification expected = augmentedRank &gt; coefficientRank</span>
+<span class="fc" id="L81">            ? SolutionClassification.INCONSISTENT</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            : coefficientRank == coefficients.columns()</span>
+<span class="fc" id="L83">                ? SolutionClassification.UNIQUE</span>
+<span class="fc" id="L84">                : SolutionClassification.UNDERDETERMINED;</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (solutionClassification != expected) {</span>
+<span class="nc" id="L86">            throw new IllegalArgumentException(</span>
+                &quot;solution classification disagrees with exact ranks&quot;);
+        }
+<span class="fc" id="L89">    }</span>
+
+    public int equationCount() {
+<span class="fc" id="L92">        return coefficients.rowCount();</span>
+    }
+
+    public int variableCount() {
+<span class="fc" id="L96">        return coefficients.columns();</span>
+    }
+
+    public DimensionShape dimensionShape() {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (equationCount() == variableCount()) {</span>
+<span class="nc" id="L101">            return DimensionShape.SQUARE;</span>
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        return equationCount() &lt; variableCount()</span>
+<span class="fc" id="L104">            ? DimensionShape.MORE_VARIABLES_THAN_EQUATIONS</span>
+<span class="fc" id="L105">            : DimensionShape.MORE_EQUATIONS_THAN_VARIABLES;</span>
+    }
+
+    /** Number of rows not contributing to the augmented-system rank. */
+    public int redundantEquationCount() {
+<span class="fc" id="L110">        return equationCount() - augmentedRank;</span>
+    }
+
+<span class="fc" id="L113">    public enum DimensionShape {</span>
+<span class="fc" id="L114">        SQUARE,</span>
+<span class="fc" id="L115">        MORE_VARIABLES_THAN_EQUATIONS,</span>
+<span class="fc" id="L116">        MORE_EQUATIONS_THAN_VARIABLES</span>
+    }
+
+<span class="fc" id="L119">    public enum SolutionClassification {</span>
+<span class="fc" id="L120">        UNIQUE,</span>
+<span class="fc" id="L121">        UNDERDETERMINED,</span>
+<span class="fc" id="L122">        INCONSISTENT</span>
+    }
+
+    public record ExactMatrix(List&lt;List&lt;Rational&gt;&gt; rows) {
+<span class="fc" id="L126">        public ExactMatrix {</span>
+<span class="fc" id="L127">            Objects.requireNonNull(rows, &quot;rows&quot;);</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (rows.isEmpty()) {</span>
+<span class="nc" id="L129">                throw new IllegalArgumentException(</span>
+                    &quot;matrix must contain at least one row&quot;);
+            }
+<span class="fc" id="L132">            List&lt;List&lt;Rational&gt;&gt; retained = new ArrayList&lt;&gt;(rows.size());</span>
+<span class="fc" id="L133">            int columns = -1;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            for (List&lt;Rational&gt; row : rows) {</span>
+<span class="fc" id="L135">                Objects.requireNonNull(row, &quot;matrix row&quot;);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                if (columns &lt; 0) {</span>
+<span class="fc" id="L137">                    columns = row.size();</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                    if (columns == 0) {</span>
+<span class="nc" id="L139">                        throw new IllegalArgumentException(</span>
+                            &quot;matrix must contain at least one column&quot;);
+                    }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                } else if (row.size() != columns) {</span>
+<span class="nc" id="L143">                    throw new IllegalArgumentException(</span>
+                        &quot;matrix rows must have equal length&quot;);
+                }
+<span class="fc" id="L146">                List&lt;Rational&gt; retainedRow = row.stream()</span>
+<span class="fc" id="L147">                    .map(value -&gt; Objects.requireNonNull(</span>
+                        value,
+                        &quot;matrix entry&quot;))
+<span class="fc" id="L150">                    .toList();</span>
+<span class="fc" id="L151">                retained.add(retainedRow);</span>
+<span class="fc" id="L152">            }</span>
+<span class="fc" id="L153">            rows = List.copyOf(retained);</span>
+<span class="fc" id="L154">        }</span>
+
+        public int rowCount() {
+<span class="fc" id="L157">            return rows.size();</span>
+        }
+
+        public int columns() {
+<span class="fc" id="L161">            return rows.getFirst().size();</span>
+        }
+
+        public Rational get(int row, int column) {
+<span class="fc" id="L165">            return rows.get(row).get(column);</span>
+        }
+    }
+
+    public record ExactVector(List&lt;Rational&gt; values) {
+<span class="fc" id="L170">        public ExactVector {</span>
+<span class="fc" id="L171">            Objects.requireNonNull(values, &quot;values&quot;);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            if (values.isEmpty()) {</span>
+<span class="nc" id="L173">                throw new IllegalArgumentException(</span>
+                    &quot;vector must contain at least one entry&quot;);
+            }
+<span class="fc" id="L176">            values = values.stream()</span>
+<span class="fc" id="L177">                .map(value -&gt; Objects.requireNonNull(value, &quot;vector entry&quot;))</span>
+<span class="fc" id="L178">                .toList();</span>
+<span class="fc" id="L179">        }</span>
+
+        public int dimension() {
+<span class="fc" id="L182">            return values.size();</span>
+        }
+
+        public Rational get(int index) {
+<span class="fc" id="L186">            return values.get(index);</span>
+        }
+    }
+
+    public record RowOrigin(int sourceIndex, String sourceEquation) {
+<span class="fc" id="L191">        public RowOrigin {</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (sourceIndex &lt; 0) {</span>
+<span class="nc" id="L193">                throw new IllegalArgumentException(</span>
+                    &quot;sourceIndex must not be negative&quot;);
+            }
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">            if (sourceEquation == null || sourceEquation.isBlank()) {</span>
+<span class="nc" id="L197">                throw new IllegalArgumentException(</span>
+                    &quot;sourceEquation must not be blank&quot;);
+            }
+<span class="fc" id="L200">            sourceEquation = sourceEquation.trim();</span>
+<span class="fc" id="L201">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
