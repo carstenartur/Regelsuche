@@ -92,7 +92,8 @@ public final class SymPyRuleAmplificationExperiment {
         RulePreparationCoordinator.Evaluation evaluation =
             coordinator.analyze(
                 experimentCase.sourceExpression(),
-                AssumptionSignature.ofExpressions(List.of()));
+                AssumptionSignature.ofExpressions(
+                    experimentCase.sourceAssumptions()));
         RulePreparationCoordinator.Outcome selected = evaluation
             .outcome(experimentCase.principalRuleId())
             .orElseThrow(() -> new IllegalStateException(
@@ -113,13 +114,14 @@ public final class SymPyRuleAmplificationExperiment {
             experimentCase.id(),
             experimentCase.principalRuleId(),
             experimentCase.sourceExpression(),
+            experimentCase.sourceAssumptions(),
             experimentCase.expectedStatus(),
             selected.status(),
             candidate == null ? "" : candidate.transformedExpression(),
             preparationDepth,
             candidate == null ? List.of() : candidate.primitiveRuleIds(),
             candidate == null ? List.of() : candidate.assumptions(),
-            experimentCase.requiredAssumptions(),
+            experimentCase.requiredResultAssumptions(),
             unexpectedApplicableRuleIds,
             coordinator.verify(evaluation).valid(),
             selected.replayVerified(),
@@ -167,6 +169,7 @@ public final class SymPyRuleAmplificationExperiment {
                 "pythagorean-direct-canonical",
                 PYTHAGOREAN_RULE_ID,
                 "sin(x)^2 + cos(x)^2",
+                List.of(),
                 PatternTargetedLocalBridgeSearch.Status
                     .DIRECT_MATCH_AVAILABLE,
                 List.of()),
@@ -174,6 +177,7 @@ public final class SymPyRuleAmplificationExperiment {
                 "pythagorean-direct-ac-reordered",
                 PYTHAGOREAN_RULE_ID,
                 "cos(x)^2 + sin(x)^2",
+                List.of(),
                 PatternTargetedLocalBridgeSearch.Status
                     .DIRECT_MATCH_AVAILABLE,
                 List.of()),
@@ -181,18 +185,21 @@ public final class SymPyRuleAmplificationExperiment {
                 "pythagorean-one-hidden-cancellation",
                 PYTHAGOREAN_RULE_ID,
                 "((sin(x) * a) / a)^2 + cos(x)^2",
+                List.of(),
                 PatternTargetedLocalBridgeSearch.Status.PREPARED,
                 List.of("a != 0")),
             new ExperimentCase(
                 "pythagorean-two-hidden-cancellations",
                 PYTHAGOREAN_RULE_ID,
                 "((sin(x) * a) / a)^2 + ((cos(x) * b) / b)^2",
+                List.of(),
                 PatternTargetedLocalBridgeSearch.Status.PREPARED,
                 List.of("a != 0", "b != 0")),
             new ExperimentCase(
                 "pythagorean-different-argument-near-miss",
                 PYTHAGOREAN_RULE_ID,
                 "((sin(x) * a) / a)^2 + ((cos(y) * b) / b)^2",
+                List.of(),
                 PatternTargetedLocalBridgeSearch.Status
                     .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE,
                 List.of()),
@@ -200,6 +207,7 @@ public final class SymPyRuleAmplificationExperiment {
                 "difference-squares-direct",
                 DIFFERENCE_OF_SQUARES_RULE_ID,
                 "x^2 - y^2",
+                List.of(),
                 PatternTargetedLocalBridgeSearch.Status
                     .DIRECT_MATCH_AVAILABLE,
                 List.of()),
@@ -207,12 +215,14 @@ public final class SymPyRuleAmplificationExperiment {
                 "difference-squares-two-hidden-cancellations",
                 DIFFERENCE_OF_SQUARES_RULE_ID,
                 "((x * a) / a)^2 - ((y * b) / b)^2",
+                List.of(),
                 PatternTargetedLocalBridgeSearch.Status.PREPARED,
                 List.of("a != 0", "b != 0")),
             new ExperimentCase(
                 "difference-squares-sum-near-miss",
                 DIFFERENCE_OF_SQUARES_RULE_ID,
                 "x^2 + y^2",
+                List.of(),
                 PatternTargetedLocalBridgeSearch.Status
                     .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE,
                 List.of()),
@@ -220,19 +230,24 @@ public final class SymPyRuleAmplificationExperiment {
                 "telescoping-direct",
                 TELESCOPING_RULE_ID,
                 "1 / (n * (n + 1))",
+                List.of("n != 0", "n + 1 != 0"),
                 PatternTargetedLocalBridgeSearch.Status
                     .DIRECT_MATCH_AVAILABLE,
-                List.of()),
+                List.of("n != 0", "n + 1 != 0")),
             new ExperimentCase(
                 "telescoping-two-hidden-cancellations",
                 TELESCOPING_RULE_ID,
                 "1 / (((n * a) / a) * (((n + 1) * b) / b))",
+                List.of("n != 0", "n + 1 != 0"),
                 PatternTargetedLocalBridgeSearch.Status.PREPARED,
-                List.of("a != 0", "b != 0")),
+                List.of(
+                    "a != 0", "b != 0",
+                    "n != 0", "n + 1 != 0")),
             new ExperimentCase(
                 "telescoping-step-two-near-miss",
                 TELESCOPING_RULE_ID,
                 "1 / (n * (n + 2))",
+                List.of("n != 0", "n + 2 != 0"),
                 PatternTargetedLocalBridgeSearch.Status
                     .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE,
                 List.of()));
@@ -242,16 +257,19 @@ public final class SymPyRuleAmplificationExperiment {
         String id,
         String principalRuleId,
         String sourceExpression,
+        List<String> sourceAssumptions,
         PatternTargetedLocalBridgeSearch.Status expectedStatus,
-        List<String> requiredAssumptions
+        List<String> requiredResultAssumptions
     ) {
         public ExperimentCase {
             text(id, "case id");
             text(principalRuleId, "principal rule ID");
             text(sourceExpression, "source expression");
+            sourceAssumptions = AssumptionSignature.ofExpressions(
+                sourceAssumptions).normalizedAssumptions();
             Objects.requireNonNull(expectedStatus, "expectedStatus");
-            requiredAssumptions = AssumptionSignature.ofExpressions(
-                requiredAssumptions).normalizedAssumptions();
+            requiredResultAssumptions = AssumptionSignature.ofExpressions(
+                requiredResultAssumptions).normalizedAssumptions();
         }
     }
 
@@ -275,13 +293,14 @@ public final class SymPyRuleAmplificationExperiment {
         String caseId,
         String principalRuleId,
         String sourceExpression,
+        List<String> sourceAssumptions,
         PatternTargetedLocalBridgeSearch.Status expectedStatus,
         PatternTargetedLocalBridgeSearch.Status coordinatorStatus,
         String resultExpression,
         int preparationDepth,
         List<String> primitiveRuleIds,
-        List<String> assumptions,
-        List<String> requiredAssumptions,
+        List<String> resultAssumptions,
+        List<String> requiredResultAssumptions,
         List<String> unexpectedApplicableRuleIds,
         boolean coordinatorVerified,
         boolean principalReplayVerified,
@@ -293,15 +312,17 @@ public final class SymPyRuleAmplificationExperiment {
             text(caseId, "caseId");
             text(principalRuleId, "principalRuleId");
             text(sourceExpression, "sourceExpression");
+            sourceAssumptions = AssumptionSignature.ofExpressions(
+                sourceAssumptions).normalizedAssumptions();
             Objects.requireNonNull(expectedStatus, "expectedStatus");
             Objects.requireNonNull(coordinatorStatus, "coordinatorStatus");
             resultExpression = resultExpression == null
                 ? "" : resultExpression;
             primitiveRuleIds = List.copyOf(primitiveRuleIds);
-            assumptions = AssumptionSignature.ofExpressions(
-                assumptions).normalizedAssumptions();
-            requiredAssumptions = AssumptionSignature.ofExpressions(
-                requiredAssumptions).normalizedAssumptions();
+            resultAssumptions = AssumptionSignature.ofExpressions(
+                resultAssumptions).normalizedAssumptions();
+            requiredResultAssumptions = AssumptionSignature.ofExpressions(
+                requiredResultAssumptions).normalizedAssumptions();
             unexpectedApplicableRuleIds = List.copyOf(
                 unexpectedApplicableRuleIds);
             reachedLimits = List.copyOf(reachedLimits);
@@ -330,7 +351,8 @@ public final class SymPyRuleAmplificationExperiment {
                     && !primitiveRuleIds.isEmpty()
                     && principalRuleId.equals(
                         primitiveRuleIds.getLast())
-                    && assumptions.equals(requiredAssumptions)
+                    && resultAssumptions.equals(
+                        requiredResultAssumptions)
                     && (coordinatorStatus
                         == PatternTargetedLocalBridgeSearch.Status
                             .DIRECT_MATCH_AVAILABLE
@@ -342,7 +364,7 @@ public final class SymPyRuleAmplificationExperiment {
                         .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE
                 && resultExpression.isEmpty()
                 && primitiveRuleIds.isEmpty()
-                && assumptions.isEmpty()
+                && resultAssumptions.isEmpty()
                 && reachedLimits.isEmpty();
         }
     }
@@ -494,7 +516,9 @@ public final class SymPyRuleAmplificationExperiment {
                     .append(json(row.principalRuleId()))
                     .append("\",\"sourceExpression\":\"")
                     .append(json(row.sourceExpression()))
-                    .append("\",\"expectedStatus\":\"")
+                    .append("\",\"sourceAssumptions\":")
+                    .append(jsonList(row.sourceAssumptions()))
+                    .append(",\"expectedStatus\":\"")
                     .append(row.expectedStatus())
                     .append("\",\"coordinatorStatus\":\"")
                     .append(row.coordinatorStatus())
@@ -504,10 +528,10 @@ public final class SymPyRuleAmplificationExperiment {
                     .append(row.preparationDepth())
                     .append(",\"primitiveRuleIds\":")
                     .append(jsonList(row.primitiveRuleIds()))
-                    .append(",\"assumptions\":")
-                    .append(jsonList(row.assumptions()))
-                    .append(",\"requiredAssumptions\":")
-                    .append(jsonList(row.requiredAssumptions()))
+                    .append(",\"resultAssumptions\":")
+                    .append(jsonList(row.resultAssumptions()))
+                    .append(",\"requiredResultAssumptions\":")
+                    .append(jsonList(row.requiredResultAssumptions()))
                     .append(",\"unexpectedApplicableRuleIds\":")
                     .append(jsonList(row.unexpectedApplicableRuleIds()))
                     .append(",\"coordinatorVerified\":")
@@ -552,7 +576,7 @@ public final class SymPyRuleAmplificationExperiment {
                 .append(conclusiveNearMisses())
                 .append("**; qualified: **")
                 .append(qualified()).append("**.\n\n")
-                .append("This is bounded evidence for three unchanged low-risk imported rules, one frozen cancellation inventory and eleven declared cases. It is not a general SymPy performance, completeness or superiority claim.\n")
+                .append("Rational rows bind their denominator assumptions as explicit input evidence. This is bounded evidence for three unchanged low-risk imported rules, one frozen cancellation inventory and eleven declared cases. It is not a general SymPy performance, completeness or superiority claim.\n")
                 .toString();
         }
     }
