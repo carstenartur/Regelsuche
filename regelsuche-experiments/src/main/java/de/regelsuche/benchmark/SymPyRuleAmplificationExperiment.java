@@ -369,11 +369,12 @@ public final class SymPyRuleAmplificationExperiment {
         return "[" + String.join(",", escaped) + "]";
     }
 
-    private static String json(String value) {
+    static String json(String value) {
         return value.replace("\\", "\\\\")
             .replace("\"", "\\\"")
             .replace("\n", "\\n")
-            .replace("\r", "\\r");
+            .replace("\r", "\\r")
+            .replace("\t", "\\t");
     }
 
     private static void text(String value, String field) {
