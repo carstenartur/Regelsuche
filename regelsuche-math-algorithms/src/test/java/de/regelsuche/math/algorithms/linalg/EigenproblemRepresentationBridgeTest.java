@@ -96,7 +96,7 @@ class EigenproblemRepresentationBridgeTest {
     }
 
     @Test
-    void explicitQuantumDomainControlsPhysicalInterpretation() {
+    void explicitQuantumDomainControlsDeclaredPhysicalInterpretation() {
         Source quantum = source(
             "H*psi = E*psi",
             List.of("psi"),
@@ -107,7 +107,7 @@ class EigenproblemRepresentationBridgeTest {
             quantum,
             new Budget(1_000)).representation().orElseThrow();
         assertEquals(
-            ModelInterpretation.QUANTUM_OPERATOR,
+            ModelInterpretation.DECLARED_QUANTUM_OPERATOR,
             genericOperator.modelInterpretation());
         assertTrue(genericOperator.unlockedCapabilities().contains(
             EigenproblemRepresentation
@@ -126,7 +126,8 @@ class EigenproblemRepresentationBridgeTest {
             hermitian,
             new Budget(1_000)).representation().orElseThrow();
         assertEquals(
-            ModelInterpretation.HERMITIAN_QUANTUM_OBSERVABLE,
+            ModelInterpretation
+                .DECLARED_HERMITIAN_QUANTUM_OBSERVABLE,
             observable.modelInterpretation());
         assertTrue(observable.unlockedCapabilities().contains(
             EigenproblemRepresentation
