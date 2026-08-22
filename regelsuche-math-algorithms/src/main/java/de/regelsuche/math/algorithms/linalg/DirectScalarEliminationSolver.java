@@ -60,7 +60,15 @@ public final class DirectScalarEliminationSolver {
                 operations,
                 work);
 
-            boolean inconsistent = firstContradiction(reduced, work) >= 0;
+            int contradictionRow = firstContradiction(reduced, work);
+            boolean inconsistent = contradictionRow >= 0;
+            if (inconsistent) {
+                normalizeContradiction(
+                    reduced,
+                    contradictionRow,
+                    operations,
+                    work);
+            }
             List<String> freeVariables = freeVariables(
                 source.variables(),
                 pivots);
@@ -606,6 +614,40 @@ public final class DirectScalarEliminationSolver {
             }
         }
         return -1;
+    }
+
+    private static void normalizeContradiction(
+        List<ScalarEquation> equations,
+        int contradictionRow,
+        List<EquationOperation> operations,
+        WorkCounter work
+    ) {
+        ScalarEquation contradiction = equations.get(contradictionRow);
+        if (!contradiction.coefficients().isEmpty()
+                || contradiction.rightHandSide().isZero()) {
+            throw new IllegalArgumentException(
+                "contradiction row must have the form 0=c with c non-zero");
+        }
+        if (contradiction.rightHandSide().isOne()) {
+            return;
+        }
+        work.consume(Stage.ELIMINATION);
+        Rational multiplier = Rational.ONE.divide(
+            contradiction.rightHandSide());
+        ScalarEquation normalized = scaleEquation(
+            contradiction,
+            multiplier,
+            Stage.ELIMINATION,
+            work);
+        if (!normalized.coefficients().isEmpty()
+                || !normalized.rightHandSide().isOne()) {
+            throw new IllegalStateException(
+                "contradiction normalization did not produce 0=1");
+        }
+        equations.set(contradictionRow, normalized);
+        operations.add(EquationOperation.scale(
+            contradictionRow,
+            multiplier));
     }
 
     private static List<String> freeVariables(
