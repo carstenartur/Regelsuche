@@ -1,8 +1,10 @@
 package de.regelsuche.knowledge;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
 import de.regelsuche.transform.RewriteRule;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -25,7 +27,9 @@ public final class RuleInventoryFingerprint {
     private static final String REVISION =
         "regelsuche.rule-inventory-fingerprint/v2";
     private static final String APPLICABILITY_SCHEMA_REVISION =
-        "regelsuche.rewrite-applicability-schema-fingerprint/v1";
+        "regelsuche.rewrite-applicability-schema-fingerprint/v2";
+    private static final String ASSUMPTION_TEMPLATE_REVISION =
+        "regelsuche.required-assumption-template/v1";
 
     private RuleInventoryFingerprint() {
     }
@@ -33,6 +37,22 @@ public final class RuleInventoryFingerprint {
     public static String ruleContentHash(RewriteRule rule) {
         return sha256(canonicalRule(
             Objects.requireNonNull(rule, "rule")));
+    }
+
+    /**
+     * Binds one typed assumption template independently of its later concrete
+     * match bindings.
+     */
+    public static String assumptionTemplateContentHash(
+        Assumption.Kind kind,
+        PatternExpr expressionPattern
+    ) {
+        StringBuilder descriptor = new StringBuilder();
+        append(descriptor, ASSUMPTION_TEMPLATE_REVISION);
+        append(descriptor, Objects.requireNonNull(kind, "kind").name());
+        append(descriptor, canonicalPattern(Objects.requireNonNull(
+            expressionPattern, "expressionPattern")));
+        return sha256(descriptor.toString());
     }
 
     /**
@@ -44,6 +64,25 @@ public final class RuleInventoryFingerprint {
         RewriteRule executor,
         PatternExpr applicabilityPattern,
         RecognitionProfile recognitionProfile
+    ) {
+        return applicabilitySchemaContentHash(
+            schemaId,
+            executor,
+            applicabilityPattern,
+            recognitionProfile,
+            List.of());
+    }
+
+    /**
+     * Binds one explicit applicability schema, including every typed
+     * precondition that must already be available before concrete replay.
+     */
+    public static String applicabilitySchemaContentHash(
+        String schemaId,
+        RewriteRule executor,
+        PatternExpr applicabilityPattern,
+        RecognitionProfile recognitionProfile,
+        List<RequiredAssumptionTemplate> requiredAssumptions
     ) {
         if (schemaId == null || schemaId.isBlank()) {
             throw new IllegalArgumentException(
@@ -62,6 +101,13 @@ public final class RuleInventoryFingerprint {
             recognitionProfile == null
                 ? RecognitionProfile.exact()
                 : recognitionProfile));
+        List<String> assumptions = List.copyOf(Objects.requireNonNull(
+            requiredAssumptions, "requiredAssumptions")).stream()
+            .map(template -> Objects.requireNonNull(
+                template, "required assumption template").contentHash())
+            .sorted()
+            .toList();
+        appendStrings(descriptor, assumptions);
         return sha256(descriptor.toString());
     }
 
