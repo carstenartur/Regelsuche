@@ -42,7 +42,7 @@ public final class DirectScalarEliminationSolver {
         "direct-scalar-substitution-elimination/v1";
     public static final String CERTIFICATE_SCHEMA =
         "regelsuche.direct-scalar-elimination-certificate/v1";
-    private static final int MAX_ABSOLUTE_CONSTANT_EXPONENT = 20;
+    private static final int MAX_ABSOLUTE_CONSTANT_EXPONENT = 64;
 
     public Result solve(Source source, Budget budget) {
         Objects.requireNonNull(source, "source");
