@@ -433,6 +433,7 @@ public final class SymbolicLinearSystemRepresentationBridge implements
             relation = Objects.requireNonNull(relation, "relation");
             sourceEquations = textList(sourceEquations, "sourceEquations");
             unknownOrder = textList(unknownOrder, "unknownOrder");
+            int unknownCount = unknownOrder.size();
             scalarParameters = textListAllowEmpty(
                 scalarParameters,
                 "scalarParameters");
@@ -441,7 +442,7 @@ public final class SymbolicLinearSystemRepresentationBridge implements
             if (sourceEquations.size() != coefficientRows.size()
                     || sourceEquations.size() != rightHandSide.size()
                     || coefficientRows.stream()
-                        .anyMatch(row -> row.size() != unknownOrder.size())) {
+                        .anyMatch(row -> row.size() != unknownCount)) {
                 throw new IllegalArgumentException(
                     "certificate dimensions are inconsistent");
             }
