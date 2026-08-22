@@ -135,6 +135,13 @@ public record ExactRrefReduction(
         for (ExactVector basisVector : nullspaceBasis) {
             requireDimension(basisVector, variableCount, "nullspaceBasis");
         }
+        validateSolutionEvidence(
+            reducedCoefficients,
+            reducedRightHandSide,
+            freeVariableColumns,
+            particularSolution,
+            nullspaceBasis,
+            contradictionRows);
 
         for (RowOperation operation : rowOperations) {
             Objects.requireNonNull(operation, "rowOperation");
@@ -178,6 +185,91 @@ public record ExactRrefReduction(
         return freeColumns.isEmpty()
             ? SolutionClassification.UNIQUE
             : SolutionClassification.UNDERDETERMINED;
+    }
+
+    private static void validateSolutionEvidence(
+        ExactMatrix coefficients,
+        ExactVector rightHandSide,
+        List<Integer> freeColumns,
+        Optional<ExactVector> particularSolution,
+        List<ExactVector> nullspaceBasis,
+        List<Integer> contradictionRows
+    ) {
+        if (!contradictionRows.isEmpty()) {
+            return;
+        }
+        ExactVector particular = particularSolution.orElseThrow();
+        if (!satisfies(coefficients, particular, rightHandSide)) {
+            throw new IllegalArgumentException(
+                "particular solution does not satisfy reduced system");
+        }
+        for (ExactVector basisVector : nullspaceBasis) {
+            if (!satisfiesHomogeneous(coefficients, basisVector)) {
+                throw new IllegalArgumentException(
+                    "nullspace basis vector does not satisfy reduced system");
+            }
+        }
+        for (int freeIndex = 0;
+                freeIndex < freeColumns.size();
+                freeIndex++) {
+            int freeColumn = freeColumns.get(freeIndex);
+            if (!particular.get(freeColumn).isZero()) {
+                throw new IllegalArgumentException(
+                    "canonical particular solution must zero free coordinates");
+            }
+            for (int basisIndex = 0;
+                    basisIndex < nullspaceBasis.size();
+                    basisIndex++) {
+                Rational expected = freeIndex == basisIndex
+                    ? Rational.ONE
+                    : Rational.ZERO;
+                if (!nullspaceBasis.get(basisIndex)
+                        .get(freeColumn)
+                        .equals(expected)) {
+                    throw new IllegalArgumentException(
+                        "nullspace basis must be identity on free coordinates");
+                }
+            }
+        }
+    }
+
+    private static boolean satisfies(
+        ExactMatrix coefficients,
+        ExactVector candidate,
+        ExactVector rightHandSide
+    ) {
+        for (int row = 0; row < coefficients.rowCount(); row++) {
+            Rational sum = Rational.ZERO;
+            for (int column = 0;
+                    column < coefficients.columns();
+                    column++) {
+                sum = sum.add(coefficients.get(row, column)
+                    .multiply(candidate.get(column)));
+            }
+            if (!sum.equals(rightHandSide.get(row))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean satisfiesHomogeneous(
+        ExactMatrix coefficients,
+        ExactVector candidate
+    ) {
+        for (int row = 0; row < coefficients.rowCount(); row++) {
+            Rational sum = Rational.ZERO;
+            for (int column = 0;
+                    column < coefficients.columns();
+                    column++) {
+                sum = sum.add(coefficients.get(row, column)
+                    .multiply(candidate.get(column)));
+            }
+            if (!sum.isZero()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static List<String> normalizedVariables(List<String> values) {
