@@ -92,14 +92,28 @@ public record EigenproblemRepresentation(
             throw new IllegalArgumentException(
                 "eigenproblem requires a non-zero-vector assumption");
         }
-        requireCapability(CAPABILITY_EIGENPROBLEM_RECOGNIZED, true);
-        requireCapability(CAPABILITY_CHARACTERISTIC_POLYNOMIAL, true);
-        requireCapability(CAPABILITY_SINGULAR_SHIFTED_OPERATOR, true);
+        requireCapability(
+            unlockedCapabilities,
+            CAPABILITY_EIGENPROBLEM_RECOGNIZED,
+            true);
+        requireCapability(
+            unlockedCapabilities,
+            CAPABILITY_CHARACTERISTIC_POLYNOMIAL,
+            true);
+        requireCapability(
+            unlockedCapabilities,
+            CAPABILITY_SINGULAR_SHIFTED_OPERATOR,
+            true);
         boolean quantum = modelInterpretation != ModelInterpretation.NONE;
-        requireCapability(CAPABILITY_QUANTUM_OPERATOR_MODEL, quantum);
+        requireCapability(
+            unlockedCapabilities,
+            CAPABILITY_QUANTUM_OPERATOR_MODEL,
+            quantum);
         boolean hermitian = declaredOperatorProperties.contains(
             OperatorProperty.HERMITIAN);
-        requireCapability(CAPABILITY_HERMITIAN_SPECTRAL_MODEL,
+        requireCapability(
+            unlockedCapabilities,
+            CAPABILITY_HERMITIAN_SPECTRAL_MODEL,
             quantum && hermitian);
         if (modelInterpretation
                 == ModelInterpretation.DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
@@ -119,8 +133,12 @@ public record EigenproblemRepresentation(
         return vectorCoordinates.size();
     }
 
-    private void requireCapability(String capability, boolean required) {
-        if (unlockedCapabilities.contains(capability) != required) {
+    private static void requireCapability(
+        List<String> capabilities,
+        String capability,
+        boolean required
+    ) {
+        if (capabilities.contains(capability) != required) {
             throw new IllegalArgumentException(
                 "capability disagrees with eigenproblem evidence: "
                     + capability);
