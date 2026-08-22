@@ -74,9 +74,10 @@ class DirectScalarEliminationSolverTest {
     }
 
     @Test
-    void emitsNormalizedContradiction() {
+    void emitsReplayableNormalizedContradiction() {
+        String expression = "x + y = 1; x + y = 3";
         Result result = solve(
-            "x + y = 1; x + y = 2",
+            expression,
             List.of("x", "y"),
             20_000);
 
@@ -88,6 +89,12 @@ class DirectScalarEliminationSolverTest {
             consequence.normalizedContradiction());
         assertTrue(consequence.particularSolution().isEmpty());
         assertTrue(consequence.nullspaceBasis().isEmpty());
+        Certificate certificate = result.certificate().orElseThrow();
+        assertTrue(certificate.reducedEquations().contains("0=1"));
+        assertTrue(certificate.canonicalOperations().contains("scale(1,1/2)"));
+        assertTrue(solver.verify(
+            source(expression, List.of("x", "y")),
+            result));
     }
 
     @Test
