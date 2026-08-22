@@ -7,13 +7,17 @@ import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystemBlockDecomposer;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystemBlockDecomposition;
+import de.regelsuche.math.algorithms.linalg.ExactRrefReduction;
+import de.regelsuche.math.algorithms.linalg.ExactRrefSolver;
 import de.regelsuche.math.algorithms.linalg.LinearSystemRepresentationBridge;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.representation.RepresentationBridge;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Product-facing entry point for exact equation-system representation.
@@ -22,33 +26,40 @@ import java.util.Optional;
  * equation roots. This service intentionally replaces that behavior for the
  * normal product path: it first retains the system as one mathematical object,
  * constructs its exact {@code A*x=b} representation and then exposes certified
- * independent blocks when they exist.</p>
+ * independent blocks and an exact RREF capability frontier.</p>
  */
 public final class EquationSystemRepresentationService {
     public static final int DEFAULT_REPRESENTATION_WORK = 20_000;
     public static final int DEFAULT_DECOMPOSITION_WORK = 20_000;
+    public static final int DEFAULT_RREF_WORK = 100_000;
 
     private final ExpressionParser parser;
     private final LinearSystemRepresentationBridge representationBridge;
     private final ExactLinearSystemBlockDecomposer blockDecomposer;
+    private final ExactRrefSolver rrefSolver;
     private final RepresentationBridge.Budget representationBudget;
     private final RepresentationBridge.Budget decompositionBudget;
+    private final RepresentationBridge.Budget rrefBudget;
 
     public EquationSystemRepresentationService() {
         this(
             new ExpressionParser(),
             new LinearSystemRepresentationBridge(),
             new ExactLinearSystemBlockDecomposer(),
+            new ExactRrefSolver(),
             new RepresentationBridge.Budget(DEFAULT_REPRESENTATION_WORK),
-            new RepresentationBridge.Budget(DEFAULT_DECOMPOSITION_WORK));
+            new RepresentationBridge.Budget(DEFAULT_DECOMPOSITION_WORK),
+            new RepresentationBridge.Budget(DEFAULT_RREF_WORK));
     }
 
     public EquationSystemRepresentationService(
         ExpressionParser parser,
         LinearSystemRepresentationBridge representationBridge,
         ExactLinearSystemBlockDecomposer blockDecomposer,
+        ExactRrefSolver rrefSolver,
         RepresentationBridge.Budget representationBudget,
-        RepresentationBridge.Budget decompositionBudget
+        RepresentationBridge.Budget decompositionBudget,
+        RepresentationBridge.Budget rrefBudget
     ) {
         this.parser = Objects.requireNonNull(parser, "parser");
         this.representationBridge = Objects.requireNonNull(
@@ -57,12 +68,14 @@ public final class EquationSystemRepresentationService {
         this.blockDecomposer = Objects.requireNonNull(
             blockDecomposer,
             "blockDecomposer");
+        this.rrefSolver = Objects.requireNonNull(rrefSolver, "rrefSolver");
         this.representationBudget = Objects.requireNonNull(
             representationBudget,
             "representationBudget");
         this.decompositionBudget = Objects.requireNonNull(
             decompositionBudget,
             "decompositionBudget");
+        this.rrefBudget = Objects.requireNonNull(rrefBudget, "rrefBudget");
     }
 
     public Analysis analyze(String input) {
@@ -89,7 +102,15 @@ public final class EquationSystemRepresentationService {
                     .map(system -> blockDecomposer.analyze(
                         system,
                         decompositionBudget));
-        return new Analysis(input.trim(), equations, representation, decomposition);
+        Optional<ExactRrefSolver.Result> rowReduction =
+            representation.representation()
+                .map(system -> rrefSolver.solve(system, rrefBudget));
+        return new Analysis(
+            input.trim(),
+            equations,
+            representation,
+            decomposition,
+            rowReduction);
     }
 
     public record Analysis(
@@ -99,7 +120,8 @@ public final class EquationSystemRepresentationService {
             LinearSystemRepresentationBridge.Certificate> representation,
         Optional<RepresentationBridge.Result<
             ExactLinearSystemBlockDecomposition,
-            ExactLinearSystemBlockDecomposer.Certificate>> decomposition
+            ExactLinearSystemBlockDecomposer.Certificate>> decomposition,
+        Optional<ExactRrefSolver.Result> rowReduction
     ) {
         public Analysis {
             if (source == null || source.isBlank()) {
@@ -115,13 +137,18 @@ public final class EquationSystemRepresentationService {
             decomposition = Objects.requireNonNull(
                 decomposition,
                 "decomposition");
+            rowReduction = Objects.requireNonNull(
+                rowReduction,
+                "rowReduction");
             if (equations.isEmpty()) {
                 throw new IllegalArgumentException(
                     "analysis must retain at least one equation");
             }
-            if (representation.represented() != decomposition.isPresent()) {
+            if (representation.represented() != decomposition.isPresent()
+                    || representation.represented()
+                        != rowReduction.isPresent()) {
                 throw new IllegalArgumentException(
-                    "decomposition analysis must follow represented systems only");
+                    "matrix capabilities must follow represented systems only");
             }
         }
 
@@ -138,10 +165,17 @@ public final class EquationSystemRepresentationService {
                 RepresentationBridge.Result::representation);
         }
 
+        public Optional<ExactRrefReduction> rref() {
+            return rowReduction.flatMap(ExactRrefSolver.Result::reduction);
+        }
+
         public List<String> unlockedCapabilities() {
-            return blocks()
-                .map(ExactLinearSystemBlockDecomposition::unlockedCapabilities)
-                .orElseGet(List::of);
+            Set<String> capabilities = new LinkedHashSet<>();
+            blocks().ifPresent(blocks ->
+                capabilities.addAll(blocks.unlockedCapabilities()));
+            rref().ifPresent(reduction -> capabilities.addAll(
+                reduction.capabilityFrontier().newlyUnlocked()));
+            return List.copyOf(capabilities);
         }
 
         public String renderSummary() {
@@ -169,6 +203,12 @@ public final class EquationSystemRepresentationService {
                 "Representation work",
                 representation.work()));
 
+            renderBlockDecomposition(lines);
+            renderRref(lines, system.variables());
+            return String.join("\n", lines);
+        }
+
+        private void renderBlockDecomposition(List<String> lines) {
             RepresentationBridge.Result<
                 ExactLinearSystemBlockDecomposition,
                 ExactLinearSystemBlockDecomposer.Certificate> blockAttempt =
@@ -191,8 +231,10 @@ public final class EquationSystemRepresentationService {
                             ? ", contradiction=true"
                             : ""));
                 }
-                lines.add("Capabilities: "
-                    + String.join(", ", blockResult.unlockedCapabilities()));
+                lines.add("Block capabilities: "
+                    + String.join(
+                        ", ",
+                        blockResult.unlockedCapabilities()));
             } else {
                 lines.add("Independent components: none ("
                     + blockAttempt.status() + ")");
@@ -200,7 +242,54 @@ public final class EquationSystemRepresentationService {
             lines.add(renderWork(
                 "Decomposition work",
                 blockAttempt.work()));
-            return String.join("\n", lines);
+        }
+
+        private void renderRref(
+            List<String> lines,
+            List<String> variables
+        ) {
+            ExactRrefSolver.Result attempt = rowReduction.orElseThrow();
+            if (attempt.status() != ExactRrefSolver.Status.SOLVED) {
+                lines.add("Exact RREF: " + attempt.status()
+                    + " (" + attempt.detailCode() + ")");
+                lines.add(renderWork("RREF work", attempt.work()));
+                return;
+            }
+
+            ExactRrefReduction reduction = attempt.reduction().orElseThrow();
+            lines.add("RREF(A|b) = " + renderAugmentedRows(
+                reduction.reducedAugmentedRows(),
+                variables.size()));
+            lines.add("Elementary row operations: "
+                + reduction.rowOperations().size());
+            lines.add("New RREF capabilities: "
+                + String.join(
+                    ", ",
+                    reduction.capabilityFrontier().newlyUnlocked()));
+            switch (reduction.solutionClassification()) {
+                case UNIQUE -> lines.add("Exact solution: "
+                    + renderNamedSolution(
+                        variables,
+                        reduction.particularSolution()
+                            .orElseThrow()
+                            .values()));
+                case UNDERDETERMINED -> {
+                    lines.add("Particular solution: " + renderColumnVector(
+                        reduction.particularSolution()
+                            .orElseThrow()
+                            .values()));
+                    lines.add("Nullspace basis: " + reduction.nullspaceBasis()
+                        .stream()
+                        .map(vector -> renderColumnVector(vector.values()))
+                        .collect(java.util.stream.Collectors.joining(
+                            ", ",
+                            "[",
+                            "]")));
+                }
+                case INCONSISTENT -> lines.add("Contradiction rows: "
+                    + reduction.contradictionRows());
+            }
+            lines.add(renderWork("RREF work", attempt.work()));
         }
 
         private static String renderMatrix(ExactLinearSystem system) {
@@ -210,6 +299,36 @@ public final class EquationSystemRepresentationService {
                     ", ",
                     "[",
                     "]"));
+        }
+
+        private static String renderAugmentedRows(
+            List<List<Rational>> rows,
+            int coefficientColumns
+        ) {
+            return rows.stream().map(row -> {
+                String coefficients = renderRow(
+                    row.subList(0, coefficientColumns));
+                return coefficients.substring(
+                    0,
+                    coefficients.length() - 1)
+                    + " | "
+                    + row.get(coefficientColumns)
+                    + "]";
+            }).collect(java.util.stream.Collectors.joining(
+                ", ",
+                "[",
+                "]"));
+        }
+
+        private static String renderNamedSolution(
+            List<String> variables,
+            List<Rational> values
+        ) {
+            List<String> assignments = new ArrayList<>(variables.size());
+            for (int index = 0; index < variables.size(); index++) {
+                assignments.add(variables.get(index) + "=" + values.get(index));
+            }
+            return "[" + String.join(", ", assignments) + "]";
         }
 
         private static String renderVariableVector(List<String> variables) {
