@@ -17,9 +17,12 @@ import java.util.Optional;
  *
  * <p>The initial implementation uses deterministic Laplace expansion. It is
  * intentionally dimension-bounded and work-accounted rather than pretending to
- * be a scalable general determinant backend. The result makes the eigenproblem
- * consequence {@code det(A-lambda I)=0} executable instead of leaving it as a
- * structure label.</p>
+ * be a scalable general determinant backend. Exact-zero cofactors are inspected
+ * but skipped before minor construction and recursion, so sparse and diagonal
+ * systems consume work proportional to their actual expansion tree rather than
+ * the dense worst case. The result makes the eigenproblem consequence
+ * {@code det(A-lambda I)=0} executable instead of leaving it as a structure
+ * label.</p>
  */
 public final class BoundedCharacteristicPolynomialSolver {
     public static final String SOLVER_ID =
@@ -104,7 +107,11 @@ public final class BoundedCharacteristicPolynomialSolver {
         Polynomial result = Polynomial.zero();
         for (int column = 0; column < dimension; column++) {
             work.consume();
-            Polynomial term = matrix.get(0, column).multiply(
+            Polynomial cofactor = matrix.get(0, column);
+            if (cofactor.isZero()) {
+                continue;
+            }
+            Polynomial term = cofactor.multiply(
                 determinant(minor(matrix, 0, column, work), work));
             if ((column & 1) == 1) {
                 term = term.multiply(Rational.NEGATIVE_ONE);
