@@ -63,10 +63,10 @@ public sealed interface ExprMatcher
 
     static ExprMatcher pattern(PatternExpr pattern, RecognitionProfile profile) {
 <span class="fc" id="L65">        Pattern structural = new Pattern(pattern, profile);</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        return profile.recognitionRuleIds().isEmpty()</span>
-<span class="pc bnc" id="L67" title="All 2 branches missed.">                || profile.maxEquivalenceDepth() == 0</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        return profile.recognitionRuleIds().isEmpty()</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                || profile.maxEquivalenceDepth() == 0</span>
 <span class="fc" id="L68">            ? structural</span>
-<span class="nc" id="L69">            : new Equivalent(profile, structural);</span>
+<span class="fc" id="L69">            : new Equivalent(profile, structural);</span>
     }
 
     static ExprMatcher bind(String name, ExprMatcher matcher) {
@@ -167,7 +167,7 @@ public sealed interface ExprMatcher
         public MatchOptions withRepresentativeProvider(
             EquivalentExpressionProvider provider
         ) {
-<span class="nc" id="L170">            return new MatchOptions(</span>
+<span class="fc" id="L170">            return new MatchOptions(</span>
                 provider,
                 maxResults,
                 maxSteps,
@@ -256,7 +256,7 @@ public sealed interface ExprMatcher
         }
 
         public boolean complete() {
-<span class="nc" id="L259">            return diagnostics.isEmpty();</span>
+<span class="fc" id="L259">            return diagnostics.isEmpty();</span>
         }
     }
 
@@ -443,19 +443,19 @@ public sealed interface ExprMatcher
         RecognitionProfile recognitionProfile,
         ExprMatcher matcher
     ) implements ExprMatcher {
-<span class="nc" id="L446">        public Equivalent {</span>
-<span class="nc bnc" id="L447" title="All 2 branches missed.">            recognitionProfile = recognitionProfile == null</span>
+<span class="fc" id="L446">        public Equivalent {</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">            recognitionProfile = recognitionProfile == null</span>
 <span class="nc" id="L448">                ? RecognitionProfile.exact()</span>
-<span class="nc" id="L449">                : recognitionProfile;</span>
-<span class="nc" id="L450">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
-<span class="nc" id="L451">        }</span>
+<span class="fc" id="L449">                : recognitionProfile;</span>
+<span class="fc" id="L450">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
+<span class="fc" id="L451">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="nc" id="L455">            return descriptor(</span>
+<span class="fc" id="L455">            return descriptor(</span>
                 &quot;equivalent&quot;,
-<span class="nc" id="L457">                profileDescriptor(recognitionProfile),</span>
-<span class="nc" id="L458">                matcher.canonicalDescriptor()</span>
+<span class="fc" id="L457">                profileDescriptor(recognitionProfile),</span>
+<span class="fc" id="L458">                matcher.canonicalDescriptor()</span>
             );
         }
     }

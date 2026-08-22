@@ -1,0 +1,554 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PatternMatchAnalyzer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">PatternMatchAnalyzer.java</span></div><h1>PatternMatchAnalyzer.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Deque;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/**
+ * Produces an explainable, bounded analysis for one expression pattern.
+ *
+ * &lt;p&gt;The existing matcher APIs remain unchanged. This adapter first delegates
+ * complete matching to {@link ExprMatcher}, preserving its exact,
+ * equivalence-aware and bounded-representative semantics. Only after a complete
+ * and conclusive non-match does it inspect the deterministic structural
+ * skeleton and retain residual obligations for a later preparation solver.&lt;/p&gt;
+ *
+ * &lt;p&gt;Residual analysis never invents an expression and performs no search. It
+ * records the already matched structure, partial placeholder bindings and the
+ * exact AST locations that still need to satisfy a pattern fragment. Matcher
+ * and structural work share the configured matcher step limit; exhausted
+ * residual work is {@link Status#INCONCLUSIVE}, never a negative fact.&lt;/p&gt;
+ */
+<span class="fc" id="L37">public final class PatternMatchAnalyzer {</span>
+
+    public Analysis analyze(
+        PatternExpr pattern,
+        Expr expression,
+        RecognitionProfile recognitionProfile
+    ) {
+<span class="fc" id="L44">        return analyze(</span>
+            pattern,
+            expression,
+            recognitionProfile,
+<span class="fc" id="L48">            ExprMatcher.MatchOptions.defaults());</span>
+    }
+
+    public Analysis analyze(
+        PatternExpr pattern,
+        Expr expression,
+        RecognitionProfile recognitionProfile,
+        ExprMatcher.MatchOptions options
+    ) {
+<span class="fc" id="L57">        Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
+<span class="fc" id="L58">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        RecognitionProfile profile = recognitionProfile == null</span>
+<span class="nc" id="L60">            ? RecognitionProfile.exact()</span>
+<span class="fc" id="L61">            : recognitionProfile;</span>
+<span class="fc" id="L62">        Objects.requireNonNull(options, &quot;options&quot;);</span>
+
+<span class="fc" id="L64">        int totalPatternNodes = patternNodeCount(pattern);</span>
+<span class="fc" id="L65">        ExprMatcher.MatchOutcome outcome =</span>
+<span class="fc" id="L66">            ExprMatcher.pattern(pattern, profile).match(expression, options);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (outcome.matched()) {</span>
+<span class="fc" id="L68">            return fullMatch(totalPatternNodes, outcome);</span>
+        }
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (!outcome.complete()) {</span>
+<span class="fc" id="L71">            return matcherInconclusive(totalPatternNodes, outcome);</span>
+        }
+<span class="fc" id="L73">        int remainingStructuralSteps = Math.max(</span>
+            0,
+<span class="fc" id="L75">            options.maxSteps() - outcome.evaluatedSteps());</span>
+<span class="fc" id="L76">        return partialMatch(</span>
+            pattern,
+            expression,
+            totalPatternNodes,
+            remainingStructuralSteps,
+            outcome);
+    }
+
+    private static Analysis fullMatch(
+        int totalPatternNodes,
+        ExprMatcher.MatchOutcome outcome
+    ) {
+<span class="fc" id="L88">        ExprMatcher.MatchResult preferred = preferred(outcome.matches());</span>
+<span class="fc" id="L89">        ExprMatcher.RecognitionStrength strength =</span>
+<span class="fc" id="L90">            preferred.recognitionStrength();</span>
+<span class="fc bfc" id="L91" title="All 3 branches covered.">        String detailCode = switch (strength) {</span>
+<span class="fc" id="L92">            case EXACT -&gt; &quot;EXACT_PATTERN_MATCH&quot;;</span>
+<span class="fc" id="L93">            case EQUIVALENCE_AWARE -&gt; &quot;EQUIVALENCE_AWARE_PATTERN_MATCH&quot;;</span>
+            case BOUNDED_REPRESENTATIVE -&gt;
+<span class="fc" id="L95">                &quot;BOUNDED_REPRESENTATIVE_PATTERN_MATCH&quot;;</span>
+        };
+<span class="fc" id="L97">        return new Analysis(</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            strength == ExprMatcher.RecognitionStrength.EXACT</span>
+<span class="fc" id="L99">                ? Status.EXACT_MATCH</span>
+<span class="fc" id="L100">                : Status.MATCH_MODULO_THEORY,</span>
+<span class="fc" id="L101">            outcome.matches(),</span>
+<span class="fc" id="L102">            preferred.bindings(),</span>
+<span class="fc" id="L103">            List.of(),</span>
+<span class="fc" id="L104">            outcome.diagnostics(),</span>
+<span class="fc" id="L105">            outcome.evaluatedSteps(),</span>
+<span class="fc" id="L106">            outcome.patternBranches(),</span>
+            0,
+            totalPatternNodes,
+            totalPatternNodes,
+            detailCode);
+    }
+
+    private static Analysis matcherInconclusive(
+        int totalPatternNodes,
+        ExprMatcher.MatchOutcome outcome
+    ) {
+<span class="fc" id="L117">        return new Analysis(</span>
+            Status.INCONCLUSIVE,
+<span class="fc" id="L119">            List.of(),</span>
+<span class="fc" id="L120">            Map.of(),</span>
+<span class="fc" id="L121">            List.of(),</span>
+<span class="fc" id="L122">            outcome.diagnostics(),</span>
+<span class="fc" id="L123">            outcome.evaluatedSteps(),</span>
+<span class="fc" id="L124">            outcome.patternBranches(),</span>
+            0,
+            0,
+            totalPatternNodes,
+            &quot;MATCH_BUDGET_INCONCLUSIVE&quot;);
+    }
+
+    private static Analysis partialMatch(
+        PatternExpr pattern,
+        Expr expression,
+        int totalPatternNodes,
+        int structuralLimit,
+        ExprMatcher.MatchOutcome outcome
+    ) {
+<span class="fc" id="L138">        PartialState partial = structuralCompare(</span>
+            pattern,
+            expression,
+            structuralLimit);
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (partial.exhausted) {</span>
+<span class="fc" id="L143">            List&lt;ExprMatcher.MatchDiagnostic&gt; diagnostics =</span>
+<span class="fc" id="L144">                new ArrayList&lt;&gt;(outcome.diagnostics());</span>
+<span class="fc" id="L145">            diagnostics.add(new ExprMatcher.MatchDiagnostic(</span>
+                &quot;STRUCTURAL_COMPARISON_LIMIT&quot;,
+                &quot;pattern-match-analyzer&quot;));
+<span class="fc" id="L148">            return new Analysis(</span>
+                Status.INCONCLUSIVE,
+<span class="fc" id="L150">                List.of(),</span>
+<span class="fc" id="L151">                Map.of(),</span>
+<span class="fc" id="L152">                List.of(),</span>
+                diagnostics,
+<span class="fc" id="L154">                outcome.evaluatedSteps(),</span>
+<span class="fc" id="L155">                outcome.patternBranches(),</span>
+                partial.structuralComparisons,
+                partial.matchedPatternNodes,
+                totalPatternNodes,
+                &quot;STRUCTURAL_COMPARISON_BUDGET_INCONCLUSIVE&quot;);
+        }
+
+<span class="pc bpc" id="L162" title="1 of 4 branches missed.">        boolean unrelated = partial.obligations.isEmpty()</span>
+            || (partial.matchedPatternNodes == 0
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                &amp;&amp; partial.bindings.isEmpty());</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (unrelated) {</span>
+<span class="fc" id="L166">            return new Analysis(</span>
+                Status.NOT_MATCHED,
+<span class="fc" id="L168">                List.of(),</span>
+<span class="fc" id="L169">                Map.of(),</span>
+<span class="fc" id="L170">                List.of(),</span>
+<span class="fc" id="L171">                outcome.diagnostics(),</span>
+<span class="fc" id="L172">                outcome.evaluatedSteps(),</span>
+<span class="fc" id="L173">                outcome.patternBranches(),</span>
+                partial.structuralComparisons,
+                partial.matchedPatternNodes,
+                totalPatternNodes,
+                &quot;CONCLUSIVE_PATTERN_NON_MATCH&quot;);
+        }
+
+<span class="fc" id="L180">        List&lt;ResidualObligation&gt; obligations = partial.obligations.stream()</span>
+<span class="fc" id="L181">            .map(obligation -&gt; obligation.finish(partial.bindings.keySet()))</span>
+<span class="fc" id="L182">            .toList();</span>
+<span class="fc" id="L183">        return new Analysis(</span>
+            Status.RESIDUAL,
+<span class="fc" id="L185">            List.of(),</span>
+            partial.bindings,
+            obligations,
+<span class="fc" id="L188">            outcome.diagnostics(),</span>
+<span class="fc" id="L189">            outcome.evaluatedSteps(),</span>
+<span class="fc" id="L190">            outcome.patternBranches(),</span>
+            partial.structuralComparisons,
+            partial.matchedPatternNodes,
+            totalPatternNodes,
+            &quot;STRUCTURALLY_CLOSE_WITH_RESIDUAL_OBLIGATIONS&quot;);
+    }
+
+    private static ExprMatcher.MatchResult preferred(
+        List&lt;ExprMatcher.MatchResult&gt; matches
+    ) {
+<span class="fc" id="L200">        return matches.stream()</span>
+<span class="fc" id="L201">            .min(Comparator</span>
+<span class="fc" id="L202">                .comparingInt((ExprMatcher.MatchResult result) -&gt;</span>
+<span class="nc" id="L203">                    result.recognitionStrength().ordinal())</span>
+<span class="fc" id="L204">                .thenComparingInt(ExprMatcher.MatchResult::representativeIndex))</span>
+<span class="fc" id="L205">            .orElseThrow();</span>
+    }
+
+    private static PartialState structuralCompare(
+        PatternExpr pattern,
+        Expr expression,
+        int limit
+    ) {
+<span class="fc" id="L213">        PartialState state = new PartialState();</span>
+<span class="fc" id="L214">        Deque&lt;Frame&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L215">        pending.push(new Frame(pattern, expression, List.of()));</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            if (state.structuralComparisons &gt;= limit) {</span>
+<span class="fc" id="L218">                state.exhausted = true;</span>
+<span class="fc" id="L219">                break;</span>
+            }
+<span class="fc" id="L221">            Frame frame = pending.pop();</span>
+<span class="fc" id="L222">            state.structuralComparisons++;</span>
+<span class="fc" id="L223">            PatternExpr required = frame.pattern();</span>
+<span class="fc" id="L224">            Expr actual = frame.expression();</span>
+
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            if (required instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L227">                Expr previous = state.bindings.get(placeholder.name());</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">                if (previous == null) {</span>
+<span class="fc" id="L229">                    state.bindings.put(placeholder.name(), actual);</span>
+<span class="fc" id="L230">                    state.matchedPatternNodes++;</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">                } else if (previous.equals(actual)) {</span>
+<span class="fc" id="L232">                    state.matchedPatternNodes++;</span>
+                } else {
+<span class="fc" id="L234">                    state.mismatch(</span>
+                        ResidualKind.BINDING_CONFLICT,
+                        frame,
+                        required,
+                        actual);
+                }
+<span class="fc" id="L240">                continue;</span>
+            }
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (required instanceof PatternExpr.LiteralNumber literal) {</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">                if (actual instanceof NumberExpr number</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">                        &amp;&amp; Double.compare(</span>
+<span class="fc" id="L245">                            number.value(),</span>
+<span class="fc" id="L246">                            literal.value()) == 0) {</span>
+<span class="nc" id="L247">                    state.matchedPatternNodes++;</span>
+                } else {
+<span class="fc" id="L249">                    state.mismatch(</span>
+                        ResidualKind.LITERAL_MISMATCH,
+                        frame,
+                        required,
+                        actual);
+                }
+<span class="fc" id="L255">                continue;</span>
+            }
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            if (required instanceof PatternExpr.LiteralVariable literal) {</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                if (actual instanceof VariableExpr variable</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                        &amp;&amp; variable.name().equals(literal.name())) {</span>
+<span class="nc" id="L260">                    state.matchedPatternNodes++;</span>
+                } else {
+<span class="nc" id="L262">                    state.mismatch(</span>
+                        ResidualKind.LITERAL_MISMATCH,
+                        frame,
+                        required,
+                        actual);
+                }
+<span class="nc" id="L268">                continue;</span>
+            }
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (required instanceof PatternExpr.Operation operation) {</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                if (!(actual instanceof BinaryExpr binary)</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                        || binary.operator() != operation.operator()) {</span>
+<span class="fc" id="L273">                    state.mismatch(</span>
+                        ResidualKind.SHAPE_MISMATCH,
+                        frame,
+                        required,
+                        actual);
+<span class="fc" id="L278">                    continue;</span>
+                }
+<span class="fc" id="L280">                state.matchedPatternNodes++;</span>
+<span class="fc" id="L281">                pending.push(new Frame(</span>
+<span class="fc" id="L282">                    operation.right(),</span>
+<span class="fc" id="L283">                    binary.right(),</span>
+<span class="fc" id="L284">                    append(frame.path(), 1)));</span>
+<span class="fc" id="L285">                pending.push(new Frame(</span>
+<span class="fc" id="L286">                    operation.left(),</span>
+<span class="fc" id="L287">                    binary.left(),</span>
+<span class="fc" id="L288">                    append(frame.path(), 0)));</span>
+<span class="fc" id="L289">                continue;</span>
+            }
+
+<span class="fc" id="L292">            PatternExpr.Function function = (PatternExpr.Function) required;</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            if (!(actual instanceof FunctionExpr candidate)</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">                    || !candidate.name().equals(function.name())</span>
+<span class="fc" id="L295">                    || candidate.arguments().size()</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                        != function.arguments().size()) {</span>
+<span class="fc" id="L297">                state.mismatch(</span>
+                    ResidualKind.FUNCTION_SHAPE_MISMATCH,
+                    frame,
+                    required,
+                    actual);
+<span class="fc" id="L302">                continue;</span>
+            }
+<span class="fc" id="L304">            state.matchedPatternNodes++;</span>
+<span class="fc" id="L305">            for (int index = function.arguments().size() - 1;</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">                    index &gt;= 0;</span>
+<span class="fc" id="L307">                    index--) {</span>
+<span class="fc" id="L308">                pending.push(new Frame(</span>
+<span class="fc" id="L309">                    function.arguments().get(index),</span>
+<span class="fc" id="L310">                    candidate.arguments().get(index),</span>
+<span class="fc" id="L311">                    append(frame.path(), index)));</span>
+            }
+<span class="fc" id="L313">        }</span>
+<span class="fc" id="L314">        return state;</span>
+    }
+
+    private static List&lt;Integer&gt; append(List&lt;Integer&gt; path, int component) {
+<span class="fc" id="L318">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L319">        result.add(component);</span>
+<span class="fc" id="L320">        return List.copyOf(result);</span>
+    }
+
+    private static int patternNodeCount(PatternExpr pattern) {
+<span class="fc" id="L324">        int count = 0;</span>
+<span class="fc" id="L325">        Deque&lt;PatternExpr&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L326">        pending.push(pattern);</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            if (count == Integer.MAX_VALUE) {</span>
+<span class="nc" id="L329">                throw new IllegalArgumentException(&quot;pattern is too large&quot;);</span>
+            }
+<span class="fc" id="L331">            PatternExpr current = pending.pop();</span>
+<span class="fc" id="L332">            count++;</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            if (current instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L334">                pending.push(operation.right());</span>
+<span class="fc" id="L335">                pending.push(operation.left());</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">            } else if (current instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L337">                for (int index = function.arguments().size() - 1;</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">                        index &gt;= 0;</span>
+<span class="fc" id="L339">                        index--) {</span>
+<span class="fc" id="L340">                    pending.push(function.arguments().get(index));</span>
+                }
+            }
+<span class="fc" id="L343">        }</span>
+<span class="fc" id="L344">        return count;</span>
+    }
+
+    private static Set&lt;String&gt; placeholderNames(PatternExpr pattern) {
+<span class="fc" id="L348">        Set&lt;String&gt; names = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L349">        Deque&lt;PatternExpr&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L350">        pending.push(pattern);</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L352">            PatternExpr current = pending.pop();</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">            if (current instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L354">                names.add(placeholder.name());</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">            } else if (current instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L356">                pending.push(operation.right());</span>
+<span class="fc" id="L357">                pending.push(operation.left());</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">            } else if (current instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L359">                for (int index = function.arguments().size() - 1;</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">                        index &gt;= 0;</span>
+<span class="fc" id="L361">                        index--) {</span>
+<span class="fc" id="L362">                    pending.push(function.arguments().get(index));</span>
+                }
+            }
+<span class="fc" id="L365">        }</span>
+<span class="fc" id="L366">        return Set.copyOf(names);</span>
+    }
+
+    private static String pathKey(List&lt;Integer&gt; path) {
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        return path.isEmpty()</span>
+<span class="nc" id="L371">            ? &quot;root&quot;</span>
+<span class="fc" id="L372">            : path.stream()</span>
+<span class="fc" id="L373">                .map(String::valueOf)</span>
+<span class="fc" id="L374">                .collect(java.util.stream.Collectors.joining(&quot;.&quot;));</span>
+    }
+
+    private static boolean fullMatchStatus(Status status) {
+<span class="fc bfc" id="L378" title="All 4 branches covered.">        return status == Status.EXACT_MATCH</span>
+            || status == Status.MATCH_MODULO_THEORY;
+    }
+
+<span class="fc" id="L382">    public enum Status {</span>
+<span class="fc" id="L383">        EXACT_MATCH,</span>
+<span class="fc" id="L384">        MATCH_MODULO_THEORY,</span>
+<span class="fc" id="L385">        RESIDUAL,</span>
+<span class="fc" id="L386">        NOT_MATCHED,</span>
+<span class="fc" id="L387">        INCONCLUSIVE</span>
+    }
+
+<span class="fc" id="L390">    public enum ResidualKind {</span>
+<span class="fc" id="L391">        SHAPE_MISMATCH,</span>
+<span class="fc" id="L392">        FUNCTION_SHAPE_MISMATCH,</span>
+<span class="fc" id="L393">        LITERAL_MISMATCH,</span>
+<span class="fc" id="L394">        BINDING_CONFLICT</span>
+    }
+
+    public record ResidualObligation(
+        ResidualKind kind,
+        String path,
+        PatternExpr requiredPattern,
+        Expr actualExpression,
+        Set&lt;String&gt; unboundPlaceholders
+    ) {
+<span class="fc" id="L404">        public ResidualObligation {</span>
+<span class="fc" id="L405">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L406" title="2 of 4 branches missed.">            if (path == null || path.isBlank()) {</span>
+<span class="nc" id="L407">                throw new IllegalArgumentException(&quot;path must not be blank&quot;);</span>
+            }
+<span class="fc" id="L409">            requiredPattern = Objects.requireNonNull(</span>
+                requiredPattern,
+                &quot;requiredPattern&quot;);
+<span class="fc" id="L412">            actualExpression = Objects.requireNonNull(</span>
+                actualExpression,
+                &quot;actualExpression&quot;);
+<span class="fc" id="L415">            unboundPlaceholders = Collections.unmodifiableSet(</span>
+                new LinkedHashSet&lt;&gt;(new TreeSet&lt;&gt;(
+<span class="fc" id="L417">                    Objects.requireNonNull(</span>
+                        unboundPlaceholders,
+                        &quot;unboundPlaceholders&quot;))));
+<span class="fc" id="L420">        }</span>
+    }
+
+    public record Analysis(
+        Status status,
+        List&lt;ExprMatcher.MatchResult&gt; matches,
+        Map&lt;String, Expr&gt; bindings,
+        List&lt;ResidualObligation&gt; residualObligations,
+        List&lt;ExprMatcher.MatchDiagnostic&gt; diagnostics,
+        int evaluatedSteps,
+        int patternBranches,
+        int structuralComparisons,
+        int matchedPatternNodes,
+        int totalPatternNodes,
+        String detailCode
+    ) {
+<span class="fc" id="L436">        public Analysis {</span>
+<span class="fc" id="L437">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L438">            matches = List.copyOf(Objects.requireNonNull(matches, &quot;matches&quot;));</span>
+<span class="fc" id="L439">            bindings = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(</span>
+<span class="fc" id="L440">                new TreeMap&lt;&gt;(Objects.requireNonNull(bindings, &quot;bindings&quot;))));</span>
+<span class="fc" id="L441">            residualObligations = List.copyOf(Objects.requireNonNull(</span>
+                residualObligations,
+                &quot;residualObligations&quot;));
+<span class="fc" id="L444">            diagnostics = List.copyOf(Objects.requireNonNull(</span>
+                diagnostics,
+                &quot;diagnostics&quot;));
+<span class="pc bpc" id="L447" title="6 of 12 branches missed.">            if (evaluatedSteps &lt; 0 || patternBranches &lt; 0</span>
+                    || structuralComparisons &lt; 0 || matchedPatternNodes &lt; 0
+                    || totalPatternNodes &lt; 1
+                    || matchedPatternNodes &gt; totalPatternNodes) {
+<span class="nc" id="L451">                throw new IllegalArgumentException(</span>
+                    &quot;match-analysis work and node counts are invalid&quot;);
+            }
+<span class="pc bpc" id="L454" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L455">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L458">            boolean fullMatch = fullMatchStatus(status);</span>
+<span class="pc bpc" id="L459" title="1 of 4 branches missed.">            if (fullMatch != !matches.isEmpty()) {</span>
+<span class="nc" id="L460">                throw new IllegalArgumentException(</span>
+                    &quot;only full-match statuses may retain matches&quot;);
+            }
+<span class="fc bfc" id="L463" title="All 2 branches covered.">            boolean residual = status == Status.RESIDUAL;</span>
+<span class="pc bpc" id="L464" title="1 of 4 branches missed.">            if (residual != !residualObligations.isEmpty()) {</span>
+<span class="nc" id="L465">                throw new IllegalArgumentException(</span>
+                    &quot;only residual status may retain obligations&quot;);
+            }
+<span class="fc bfc" id="L468" title="All 4 branches covered.">            if (status == Status.INCONCLUSIVE &amp;&amp; diagnostics.isEmpty()) {</span>
+<span class="fc" id="L469">                throw new IllegalArgumentException(</span>
+                    &quot;inconclusive analysis requires diagnostics&quot;);
+            }
+<span class="fc bfc" id="L472" title="All 6 branches covered.">            if (!fullMatch &amp;&amp; !residual &amp;&amp; !bindings.isEmpty()) {</span>
+<span class="fc" id="L473">                throw new IllegalArgumentException(</span>
+                    &quot;only matched or residual analyses may retain bindings&quot;);
+            }
+<span class="fc" id="L476">        }</span>
+
+        public boolean matched() {
+<span class="fc" id="L479">            return fullMatchStatus(status);</span>
+        }
+
+        public boolean residual() {
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">            return status == Status.RESIDUAL;</span>
+        }
+
+        public boolean inconclusive() {
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">            return status == Status.INCONCLUSIVE;</span>
+        }
+    }
+
+<span class="fc" id="L491">    private static final class PartialState {</span>
+<span class="fc" id="L492">        private final Map&lt;String, Expr&gt; bindings = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L493">        private final List&lt;DraftObligation&gt; obligations = new ArrayList&lt;&gt;();</span>
+        private int structuralComparisons;
+        private int matchedPatternNodes;
+        private boolean exhausted;
+
+        private void mismatch(
+            ResidualKind kind,
+            Frame frame,
+            PatternExpr requiredPattern,
+            Expr actualExpression
+        ) {
+<span class="fc" id="L504">            obligations.add(new DraftObligation(</span>
+                kind,
+<span class="fc" id="L506">                frame.path(),</span>
+                requiredPattern,
+                actualExpression));
+<span class="fc" id="L509">        }</span>
+    }
+
+    private record Frame(
+        PatternExpr pattern,
+        Expr expression,
+        List&lt;Integer&gt; path
+    ) {
+<span class="fc" id="L517">        private Frame {</span>
+<span class="fc" id="L518">            pattern = Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
+<span class="fc" id="L519">            expression = Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L520">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="fc" id="L521">        }</span>
+    }
+
+    private record DraftObligation(
+        ResidualKind kind,
+        List&lt;Integer&gt; path,
+        PatternExpr requiredPattern,
+        Expr actualExpression
+    ) {
+<span class="fc" id="L530">        private DraftObligation {</span>
+<span class="fc" id="L531">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L532">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="fc" id="L533">            requiredPattern = Objects.requireNonNull(</span>
+                requiredPattern,
+                &quot;requiredPattern&quot;);
+<span class="fc" id="L536">            actualExpression = Objects.requireNonNull(</span>
+                actualExpression,
+                &quot;actualExpression&quot;);
+<span class="fc" id="L539">        }</span>
+
+        private ResidualObligation finish(Set&lt;String&gt; boundNames) {
+<span class="fc" id="L542">            Set&lt;String&gt; unbound = new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L543">                placeholderNames(requiredPattern));</span>
+<span class="fc" id="L544">            unbound.removeAll(boundNames);</span>
+<span class="fc" id="L545">            return new ResidualObligation(</span>
+                kind,
+<span class="fc" id="L547">                pathKey(path),</span>
+                requiredPattern,
+                actualExpression,
+                unbound);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

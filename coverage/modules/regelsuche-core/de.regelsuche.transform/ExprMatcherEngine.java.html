@@ -107,8 +107,8 @@ final class ExprMatcherEngine {
             );
 <span class="fc" id="L108">            return session.limit(matches, matcher.canonicalDescriptor());</span>
         }
-<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (matcher instanceof ExprMatcher.Equivalent equivalent) {</span>
-<span class="nc" id="L111">            return matchEquivalent(</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.Equivalent equivalent) {</span>
+<span class="fc" id="L111">            return matchEquivalent(</span>
                 equivalent,
                 expression,
                 state,
@@ -174,8 +174,8 @@ final class ExprMatcherEngine {
 <span class="fc" id="L174">                equivalent.limitCode(), matcher.canonicalDescriptor());</span>
 <span class="fc" id="L175">            return List.of();</span>
         }
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (!equivalent.matched()) {</span>
-<span class="nc" id="L178">            return List.of();</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (!equivalent.matched()) {</span>
+<span class="fc" id="L178">            return List.of();</span>
         }
 <span class="fc" id="L180">        return List.of(state</span>
 <span class="fc" id="L181">            .withBindings(equivalent.bindings())</span>
@@ -393,47 +393,47 @@ final class ExprMatcherEngine {
         Session session,
         boolean atRoot
     ) {
-<span class="nc" id="L396">        List&lt;Expr&gt; representatives = session.options</span>
-<span class="nc" id="L397">            .representativeProvider()</span>
-<span class="nc" id="L398">            .representatives(expression, equivalent.recognitionProfile());</span>
-<span class="nc bnc" id="L399" title="All 4 branches missed.">        if (representatives == null || representatives.isEmpty()) {</span>
+<span class="fc" id="L396">        List&lt;Expr&gt; representatives = session.options</span>
+<span class="fc" id="L397">            .representativeProvider()</span>
+<span class="fc" id="L398">            .representatives(expression, equivalent.recognitionProfile());</span>
+<span class="pc bpc" id="L399" title="2 of 4 branches missed.">        if (representatives == null || representatives.isEmpty()) {</span>
 <span class="nc" id="L400">            session.diagnostic(</span>
                 &quot;REPRESENTATIVE_PROVIDER_EMPTY&quot;,
 <span class="nc" id="L402">                equivalent.canonicalDescriptor()</span>
             );
 <span class="nc" id="L404">            return List.of();</span>
         }
-<span class="nc" id="L406">        List&lt;State&gt; matches = new ArrayList&lt;&gt;();</span>
-<span class="nc bnc" id="L407" title="All 2 branches missed.">        for (int index = 0; index &lt; representatives.size(); index++) {</span>
-<span class="nc" id="L408">            Expr representative = representatives.get(index);</span>
-<span class="nc bnc" id="L409" title="All 2 branches missed.">            if (representative == null) {</span>
+<span class="fc" id="L406">        List&lt;State&gt; matches = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        for (int index = 0; index &lt; representatives.size(); index++) {</span>
+<span class="fc" id="L408">            Expr representative = representatives.get(index);</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            if (representative == null) {</span>
 <span class="nc" id="L410">                session.diagnostic(</span>
                     &quot;REPRESENTATIVE_PROVIDER_NULL&quot;,
 <span class="nc" id="L412">                    equivalent.canonicalDescriptor()</span>
                 );
 <span class="nc" id="L414">                continue;</span>
             }
-<span class="nc bnc" id="L416" title="All 4 branches missed.">            boolean changed = index &gt; 0 || !representative.equals(expression);</span>
-<span class="nc bnc" id="L417" title="All 2 branches missed.">            for (State candidate : evaluate(</span>
-<span class="nc" id="L418">                    equivalent.matcher(),</span>
+<span class="pc bpc" id="L416" title="1 of 4 branches missed.">            boolean changed = index &gt; 0 || !representative.equals(expression);</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">            for (State candidate : evaluate(</span>
+<span class="fc" id="L418">                    equivalent.matcher(),</span>
                     representative,
                     state,
                     session,
                     atRoot)) {
-<span class="nc bnc" id="L423" title="All 2 branches missed.">                matches.add(changed</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">                matches.add(changed</span>
                     ? candidate
-<span class="nc" id="L425">                        .recognized(</span>
+<span class="fc" id="L425">                        .recognized(</span>
                             ExprMatcher.RecognitionStrength
                                 .BOUNDED_REPRESENTATIVE,
                             representative,
                             index,
                             atRoot
                         )
-<span class="nc" id="L432">                        .traced(&quot;representative:&quot; + index)</span>
+<span class="fc" id="L432">                        .traced(&quot;representative:&quot; + index)</span>
 <span class="nc" id="L433">                    : candidate);</span>
-<span class="nc" id="L434">            }</span>
+<span class="fc" id="L434">            }</span>
         }
-<span class="nc" id="L436">        return session.limit(matches, equivalent.canonicalDescriptor());</span>
+<span class="fc" id="L436">        return session.limit(matches, equivalent.canonicalDescriptor());</span>
     }
 
     private static List&lt;State&gt; evaluateConstraint(
@@ -666,11 +666,11 @@ final class ExprMatcherEngine {
         ) {
 <span class="fc" id="L667">            return new State(</span>
                 bindings,
-<span class="pc bpc" id="L669" title="1 of 2 branches missed.">                replaceRootRepresentative</span>
-<span class="nc" id="L670">                    ? matchedRepresentative</span>
+<span class="fc bfc" id="L669" title="All 2 branches covered.">                replaceRootRepresentative</span>
+<span class="fc" id="L670">                    ? matchedRepresentative</span>
 <span class="fc" id="L671">                    : representative,</span>
-<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                replaceRootRepresentative</span>
-<span class="nc" id="L673">                    ? matchedRepresentativeIndex</span>
+<span class="fc bfc" id="L672" title="All 2 branches covered.">                replaceRootRepresentative</span>
+<span class="fc" id="L673">                    ? matchedRepresentativeIndex</span>
 <span class="fc" id="L674">                    : representativeIndex,</span>
 <span class="fc" id="L675">                ExprMatcher.RecognitionStrength.strongest(</span>
                     recognitionStrength, strength),
