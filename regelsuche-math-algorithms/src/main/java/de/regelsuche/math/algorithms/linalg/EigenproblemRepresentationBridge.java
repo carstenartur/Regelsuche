@@ -201,8 +201,8 @@ public final class EigenproblemRepresentationBridge implements
             return ModelInterpretation.NONE;
         }
         return source.operatorProperties().contains(OperatorProperty.HERMITIAN)
-            ? ModelInterpretation.HERMITIAN_QUANTUM_OBSERVABLE
-            : ModelInterpretation.QUANTUM_OPERATOR;
+            ? ModelInterpretation.DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
+            : ModelInterpretation.DECLARED_QUANTUM_OPERATOR;
     }
 
     private static List<String> capabilities(
@@ -221,7 +221,7 @@ public final class EigenproblemRepresentationBridge implements
                 .CAPABILITY_QUANTUM_OPERATOR_MODEL);
         }
         if (interpretation
-                == ModelInterpretation.HERMITIAN_QUANTUM_OBSERVABLE
+                == ModelInterpretation.DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
                 && properties.contains(OperatorProperty.HERMITIAN)) {
             result.add(EigenproblemRepresentation
                 .CAPABILITY_HERMITIAN_SPECTRAL_MODEL);
