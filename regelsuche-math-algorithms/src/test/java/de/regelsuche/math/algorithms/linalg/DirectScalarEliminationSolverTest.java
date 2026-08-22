@@ -243,6 +243,31 @@ class DirectScalarEliminationSolverTest {
     }
 
     @Test
+    void independentlyValidatesDeclaredVariableSetAndOrder() {
+        Result wrongOrder = solve(
+            "x + y = 3",
+            List.of("y", "x"),
+            10_000);
+        assertEquals(Status.DOMAIN_UNSUPPORTED, wrongOrder.status());
+        assertEquals(
+            "DECLARED_VARIABLE_ORDER_OR_SET_MISMATCH",
+            wrongOrder.detailCode());
+        assertTrue(wrongOrder.workProfile().sourceAnalysisWork() > 0);
+        assertTrue(wrongOrder.consequence().isEmpty());
+
+        Result extraCoordinate = solve(
+            "x = 1",
+            List.of("x", "y"),
+            10_000);
+        assertEquals(Status.DOMAIN_UNSUPPORTED, extraCoordinate.status());
+        assertEquals(
+            "DECLARED_VARIABLE_ORDER_OR_SET_MISMATCH",
+            extraCoordinate.detailCode());
+        assertTrue(extraCoordinate.workProfile().sourceAnalysisWork() > 0);
+        assertTrue(extraCoordinate.certificate().isEmpty());
+    }
+
+    @Test
     void unsupportedAndNonlinearInputsFailClosed() {
         Result nonlinear = solve(
             "x*y = 1",
