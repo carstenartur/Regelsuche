@@ -24,6 +24,8 @@ import java.util.Objects;
 public final class RuleInventoryFingerprint {
     private static final String REVISION =
         "regelsuche.rule-inventory-fingerprint/v2";
+    private static final String APPLICABILITY_SCHEMA_REVISION =
+        "regelsuche.rewrite-applicability-schema-fingerprint/v1";
 
     private RuleInventoryFingerprint() {
     }
@@ -31,6 +33,36 @@ public final class RuleInventoryFingerprint {
     public static String ruleContentHash(RewriteRule rule) {
         return sha256(canonicalRule(
             Objects.requireNonNull(rule, "rule")));
+    }
+
+    /**
+     * Binds one explicit applicability schema to its concrete executor without
+     * pretending that an algorithmic rule has a declarative target pattern.
+     */
+    public static String applicabilitySchemaContentHash(
+        String schemaId,
+        RewriteRule executor,
+        PatternExpr applicabilityPattern,
+        RecognitionProfile recognitionProfile
+    ) {
+        if (schemaId == null || schemaId.isBlank()) {
+            throw new IllegalArgumentException(
+                "schemaId must not be blank");
+        }
+        RewriteRule checkedExecutor = Objects.requireNonNull(
+            executor, "executor");
+        StringBuilder descriptor = new StringBuilder();
+        append(descriptor, APPLICABILITY_SCHEMA_REVISION);
+        append(descriptor, schemaId.trim());
+        append(descriptor, ruleContentHash(checkedExecutor));
+        append(descriptor, checkedExecutor.getClass().getName());
+        append(descriptor, canonicalPattern(Objects.requireNonNull(
+            applicabilityPattern, "applicabilityPattern")));
+        append(descriptor, canonicalRecognition(
+            recognitionProfile == null
+                ? RecognitionProfile.exact()
+                : recognitionProfile));
+        return sha256(descriptor.toString());
     }
 
     public static String contentHash(
