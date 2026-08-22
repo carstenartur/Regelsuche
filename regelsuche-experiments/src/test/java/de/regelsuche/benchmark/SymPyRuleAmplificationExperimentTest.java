@@ -54,7 +54,8 @@ class SymPyRuleAmplificationExperimentTest {
             .allMatch(row -> row.coordinatorVerified()
                 && row.principalReplayVerified()
                 && row.preparationDepth() > 0
-                && row.assumptions().equals(row.requiredAssumptions())
+                && row.resultAssumptions().equals(
+                    row.requiredResultAssumptions())
                 && row.primitiveRuleIds().getLast()
                     .equals(row.principalRuleId())
                 && row.unexpectedApplicableRuleIds().isEmpty()));
@@ -66,8 +67,35 @@ class SymPyRuleAmplificationExperimentTest {
                 && !row.principalReplayVerified()
                 && row.reachedLimits().isEmpty()
                 && row.resultExpression().isEmpty()
+                && row.resultAssumptions().isEmpty()
                 && row.primitiveRuleIds().isEmpty()
                 && row.unexpectedApplicableRuleIds().isEmpty()));
+    }
+
+    @Test
+    void rationalCasesRetainDeclaredDenominatorAssumptions() {
+        SymPyRuleAmplificationExperiment.Report report =
+            new SymPyRuleAmplificationExperiment().run(REVISION);
+
+        assertTrue(report.rows().stream()
+            .filter(row -> row.principalRuleId().equals(
+                SymPyRuleAmplificationExperiment.TELESCOPING_RULE_ID))
+            .allMatch(row -> row.sourceAssumptions().contains("n != 0")));
+        SymPyRuleAmplificationExperiment.Row direct = report.rows().stream()
+            .filter(row -> row.caseId().equals("telescoping-direct"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(
+            Set.of("n != 0", "n + 1 != 0"),
+            Set.copyOf(direct.resultAssumptions()));
+        SymPyRuleAmplificationExperiment.Row prepared = report.rows().stream()
+            .filter(row -> row.caseId().equals(
+                "telescoping-two-hidden-cancellations"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(
+            Set.of("a != 0", "b != 0", "n != 0", "n + 1 != 0"),
+            Set.copyOf(prepared.resultAssumptions()));
     }
 
     @Test
@@ -100,6 +128,7 @@ class SymPyRuleAmplificationExperimentTest {
             "sympy-rule-amplification.json"));
         assertTrue(json.contains("\"qualified\": true"));
         assertTrue(json.contains("\"amplifiedRuleFamilies\": 3"));
+        assertTrue(json.contains("\"sourceAssumptions\""));
         assertTrue(first.toMarkdown().contains(
             "three unchanged low-risk imported rules"));
         assertTrue(first.toMarkdown().contains(
