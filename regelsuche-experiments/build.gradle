@@ -207,7 +207,7 @@ def representationMatchedWork = tasks.register(
 def symPyRuleAmplification = tasks.register(
     'symPyRuleAmplification', JavaExec) {
     group = 'verification'
-    description = 'Measures direct and bounded-prepared applicability of one unchanged imported SymPy rule.'
+    description = 'Measures coordinated direct and bounded-prepared applicability across three unchanged imported SymPy rule families.'
     dependsOn tasks.named('classes')
     timeout = java.time.Duration.ofMinutes(1)
     classpath = sourceSets.main.runtimeClasspath
@@ -221,7 +221,7 @@ def symPyRuleAmplification = tasks.register(
     inputs.property('repositoryRevision', symPyRuleAmplificationRevision)
     inputs.property(
         'configurationId',
-        'sympy-pythagorean-direct-vs-pattern-bridge-v1')
+        'sympy-three-family-safe-preparation-matrix-v2')
     outputs.dir(symPyRuleAmplificationReportDirectory)
     doLast {
         def json = symPyRuleAmplificationReportDirectory.get()
