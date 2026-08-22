@@ -203,6 +203,43 @@ class DirectScalarEliminationSolverTest {
             List.of(Rational.of(2)),
             identityDirect.consequence().orElseThrow()
                 .particularSolution().orElseThrow().values());
+
+        Source exponentAboveOldDirectLimit = source(
+            "2 ^ 21 * x = 2097152",
+            List.of("x"));
+        Result boundDirect = solver.solve(
+            exponentAboveOldDirectLimit,
+            new Budget(20_000));
+        var boundRepresented = representationBridge.analyze(
+            exponentAboveOldDirectLimit.equations(),
+            new Budget(20_000));
+        assertEquals(Status.SOLVED, boundDirect.status());
+        assertEquals(
+            de.regelsuche.representation.RepresentationBridge.Status.REPRESENTED,
+            boundRepresented.status());
+        assertEquals(
+            List.of(Rational.ONE),
+            boundDirect.consequence().orElseThrow()
+                .particularSolution().orElseThrow().values());
+        assertEquals(
+            Rational.of(2_097_152),
+            boundRepresented.representation().orElseThrow()
+                .coefficients().get(0, 0));
+
+        Source exponentOutsideSharedLimit = source(
+            "2 ^ 65 * x = 1",
+            List.of("x"));
+        assertEquals(
+            Status.DOMAIN_UNSUPPORTED,
+            solver.solve(
+                exponentOutsideSharedLimit,
+                new Budget(20_000)).status());
+        assertEquals(
+            de.regelsuche.representation.RepresentationBridge.Status
+                .DOMAIN_UNSUPPORTED,
+            representationBridge.analyze(
+                exponentOutsideSharedLimit.equations(),
+                new Budget(20_000)).status());
     }
 
     @Test
