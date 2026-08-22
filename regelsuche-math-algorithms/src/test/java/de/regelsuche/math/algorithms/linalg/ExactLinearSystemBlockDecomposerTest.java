@@ -2,6 +2,7 @@ package de.regelsuche.math.algorithms.linalg;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.Equation;
@@ -12,7 +13,6 @@ import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.representation.RepresentationBridge.Budget;
 import de.regelsuche.representation.RepresentationBridge.Result;
 import de.regelsuche.representation.RepresentationBridge.Status;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -146,35 +146,54 @@ class ExactLinearSystemBlockDecomposerTest {
     }
 
     @Test
-    void independentVerificationRejectsTamperedPermutation() {
+    void independentVerificationRejectsTamperedCertificate() {
         ExactLinearSystem source = exact("x = 1; y = 2");
         Result<ExactLinearSystemBlockDecomposition,
             ExactLinearSystemBlockDecomposer.Certificate> original =
                 decomposer.analyze(source, new Budget(1_000));
-        ExactLinearSystemBlockDecomposition decomposition =
-            original.representation().orElseThrow();
-        List<Integer> changedColumns = new ArrayList<>(
-            decomposition.columnPermutation());
-        java.util.Collections.reverse(changedColumns);
-        ExactLinearSystemBlockDecomposition changed =
-            new ExactLinearSystemBlockDecomposition(
-                decomposition.sourceRowCount(),
-                decomposition.sourceColumnCount(),
-                decomposition.components(),
-                decomposition.rowPermutation(),
-                changedColumns,
-                decomposition.unlockedCapabilities());
+        ExactLinearSystemBlockDecomposer.Certificate certificate =
+            original.certificate().orElseThrow();
+        ExactLinearSystemBlockDecomposer.Certificate changedCertificate =
+            new ExactLinearSystemBlockDecomposer.Certificate(
+                certificate.schema(),
+                certificate.decomposerId(),
+                certificate.relation(),
+                certificate.sourceHash(),
+                certificate.components(),
+                certificate.rowPermutation(),
+                certificate.columnPermutation(),
+                certificate.unlockedCapabilities(),
+                certificate.crossComponentCoefficientsAreZero(),
+                "0".repeat(64));
         Result<ExactLinearSystemBlockDecomposition,
             ExactLinearSystemBlockDecomposer.Certificate> tampered =
                 Result.represented(
-                    changed,
-                    original.certificate().orElseThrow(),
+                    original.representation().orElseThrow(),
+                    changedCertificate,
                     original.relation().orElseThrow(),
                     original.work(),
                     original.detailCode());
 
         assertFalse(decomposer.verify(source, tampered));
         assertTrue(decomposer.verify(source, original));
+    }
+
+    @Test
+    void decompositionModelRejectsPermutationOutsideComponentOrder() {
+        ExactLinearSystem source = exact("x = 1; y = 2");
+        ExactLinearSystemBlockDecomposition decomposition = decomposer
+            .analyze(source, new Budget(1_000))
+            .representation()
+            .orElseThrow();
+
+        assertThrows(IllegalArgumentException.class,
+            () -> new ExactLinearSystemBlockDecomposition(
+                decomposition.sourceRowCount(),
+                decomposition.sourceColumnCount(),
+                decomposition.components(),
+                decomposition.rowPermutation(),
+                List.of(1, 0),
+                decomposition.unlockedCapabilities()));
     }
 
     private ExactLinearSystem exact(String input) {
