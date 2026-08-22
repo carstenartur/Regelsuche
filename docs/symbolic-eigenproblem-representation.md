@@ -93,12 +93,12 @@ backend.
 
 ## Quantum interpretation boundary
 
-The mathematical decision and the physical interpretation are independent:
+The exact mathematical decision and declared model metadata are independent:
 
 ```text
 EIGENVALUE_PROBLEM_RECOGNIZED
-QUANTUM_OPERATOR_MODEL_INTERPRETATION
-HERMITIAN_SPECTRAL_MODEL
+DECLARED_QUANTUM_OPERATOR_MODEL_INTERPRETATION
+DECLARED_HERMITIAN_SPECTRAL_MODEL
 ```
 
 The first follows from exact algebraic structure. The latter two require an
@@ -109,11 +109,19 @@ GENERIC_LINEAR_ALGEBRA
 FINITE_DIMENSIONAL_QUANTUM
 ```
 
-In the quantum domain, declared `HERMITIAN` operator evidence enables the
-stronger `HERMITIAN_QUANTUM_OBSERVABLE` interpretation. In the generic domain,
-even an expression written as `H*psi=E*psi` receives no quantum interpretation.
-The software does not infer Hilbert-space meaning, observability or Hermiticity
-from symbol spelling.
+The retained interpretation values are correspondingly named
+`DECLARED_QUANTUM_OPERATOR` and
+`DECLARED_HERMITIAN_QUANTUM_OBSERVABLE`. These statuses mean that the caller
+provided the quantum-domain and operator-property declarations and that the
+algebraic eigenproblem is compatible with them. They do not by themselves prove
+that a concrete physical system realizes those declarations.
+
+In the quantum domain, declared `HERMITIAN` operator metadata enables the
+stronger declared Hermitian-observable model. In the generic domain, even an
+expression written as `H*psi=E*psi` receives no quantum interpretation. The
+software does not infer Hilbert-space meaning, observability or Hermiticity from
+symbol spelling. Declared operator properties must pass a separate proof or
+validation stage before a stronger evidential status is authorized.
 
 ## Evidence
 
@@ -125,6 +133,7 @@ retain:
 - canonical polynomial matrices and vectors;
 - relation or consequence kind;
 - assumptions and model-domain declarations;
+- declared operator properties without silently promoting them to proofs;
 - configured, consumed and remaining work;
 - content-addressed certificates;
 - independent verification by complete recomputation.
@@ -149,4 +158,5 @@ This slice does not yet provide:
 - arbitrary row-orientation normalization;
 - scalable determinant algorithms for large dimensions;
 - automatic physical-model inference;
+- proof of declared Hermiticity or other operator properties;
 - a claim that the eigenproblem route outperforms every direct solver.
