@@ -52,7 +52,7 @@ public final class ExactLinearSystemBlockDecomposer implements
                 work);
             if (drafts.size() < 2) {
                 return Result.withoutRepresentation(
-                    Status.DIRECT_REPRESENTATION_AVAILABLE,
+                    Status.NOT_APPLICABLE,
                     work.ledger(),
                     "COEFFICIENT_INCIDENCE_GRAPH_IS_CONNECTED");
             }
