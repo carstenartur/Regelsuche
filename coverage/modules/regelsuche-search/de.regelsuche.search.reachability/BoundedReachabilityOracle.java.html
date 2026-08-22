@@ -1,0 +1,976 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BoundedReachabilityOracle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">BoundedReachabilityOracle.java</span></div><h1>BoundedReachabilityOracle.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.PriorityQueue;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Complete target-aware reachability diagnostic for one explicitly bounded
+ * production-rewrite closure.
+ *
+ * &lt;p&gt;The oracle never generates a candidate or changes the rewrite inventory.
+ * It receives the target and is therefore diagnostic evidence only. Search
+ * states are distinguished by formatted syntax and normalized assumptions.
+ * Multiple non-dominated depth/primitive-work labels are retained for one
+ * mathematical state so a short macro cannot hide a longer but cheaper
+ * primitive witness, or vice versa.&lt;/p&gt;
+ */
+<span class="fc" id="L36">public final class BoundedReachabilityOracle {</span>
+    public static final String ORACLE_ID =
+        &quot;regelsuche.bounded-reachability-oracle/v1&quot;;
+
+    /**
+     * Enumerates the declared closure and retains a shortest primitive witness.
+     *
+     * @param sourceExpression source expression accepted by the ordinary parser
+     * @param targetExpression visible diagnostic target
+     * @param initialAssumptions assumptions available before the first rewrite
+     * @param engine exact transformation engine whose directed edges are tested
+     * @param budget closure and execution bounds
+     * @return complete retained diagnostic evidence
+     */
+    public Result analyze(
+        String sourceExpression,
+        String targetExpression,
+        AssumptionSignature initialAssumptions,
+        TransformationEngine engine,
+        Budget budget
+    ) {
+<span class="fc" id="L57">        String source = normalizeInput(sourceExpression, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L58">        String target = normalizeInput(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="fc" id="L59">        return new SearchRun(</span>
+            source,
+            target,
+<span class="fc" id="L62">            normalizeSignature(initialAssumptions),</span>
+<span class="fc" id="L63">            Objects.requireNonNull(engine, &quot;engine&quot;),</span>
+<span class="fc" id="L64">            Objects.requireNonNull(budget, &quot;budget&quot;))</span>
+<span class="fc" id="L65">            .execute();</span>
+    }
+
+    static AssumptionSignature normalizeSignature(
+        AssumptionSignature signature
+    ) {
+<span class="fc" id="L71">        AssumptionSignature supplied = Objects.requireNonNull(</span>
+            signature,
+            &quot;initialAssumptions&quot;);
+<span class="fc" id="L74">        return AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L75">            supplied.normalizedAssumptions());</span>
+    }
+
+    static boolean exceedsPrimitiveWorkBound(
+        int currentWork,
+        int primitiveStepCount,
+        int maximumWork
+    ) {
+<span class="pc bpc" id="L83" title="2 of 6 branches missed.">        if (currentWork &lt; 0 || primitiveStepCount &lt; 0 || maximumWork &lt; 0) {</span>
+<span class="fc" id="L84">            throw new IllegalArgumentException(</span>
+                &quot;primitive work values must not be negative&quot;);
+        }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        return (long) currentWork + primitiveStepCount &gt; maximumWork;</span>
+    }
+
+    private static long primitiveWorkTotal(
+        int currentWork,
+        int primitiveStepCount
+    ) {
+<span class="fc" id="L94">        return (long) currentWork + primitiveStepCount;</span>
+    }
+
+    private static String normalizeInput(String expression, String field) {
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L99">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+        }
+        try {
+<span class="fc" id="L102">            return ExpressionFormatter.format(</span>
+<span class="fc" id="L103">                new ExpressionParser().parseTerm(expression));</span>
+<span class="nc" id="L104">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L105">            throw new IllegalArgumentException(</span>
+                field + &quot; is not a supported term&quot;, exception);
+        }
+    }
+
+    private static String normalizeGenerated(String expression) {
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L112">            throw new IllegalStateException(</span>
+                &quot;transformation produced a blank expression&quot;);
+        }
+        try {
+<span class="fc" id="L116">            return ExpressionFormatter.format(</span>
+<span class="fc" id="L117">                new ExpressionParser().parseTerm(expression));</span>
+<span class="nc" id="L118">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L119">            throw new IllegalStateException(</span>
+                &quot;transformation produced an unparsable expression&quot;,
+                exception);
+        }
+    }
+
+    private static String sha256(String payload) {
+        try {
+<span class="fc" id="L127">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L128">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L129">                    .digest(payload.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L130">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L131">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L135">    public enum Status {</span>
+<span class="fc" id="L136">        REACHABLE,</span>
+<span class="fc" id="L137">        REACHABLE_ONLY_WITH_ADDITIONAL_ASSUMPTIONS,</span>
+<span class="fc" id="L138">        UNREACHABLE_IN_COMPLETE_BOUNDED_CLOSURE,</span>
+<span class="fc" id="L139">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L140">        TECHNICAL_FAILURE</span>
+    }
+
+<span class="fc" id="L143">    public enum EdgeDisposition {</span>
+<span class="fc" id="L144">        ENQUEUED,</span>
+<span class="fc" id="L145">        DOMINATED_BY_EXISTING_LABEL,</span>
+<span class="fc" id="L146">        OUTSIDE_PRIMITIVE_WORK_BOUND,</span>
+<span class="fc" id="L147">        VISITED_STATE_LIMIT</span>
+    }
+
+    /**
+     * Closure bounds and separate mechanical execution ceilings.
+     *
+     * &lt;p&gt;{@code maxDepth} and {@code maxPrimitivePathWork} define the finite
+     * closure being claimed. Reaching either is therefore a completed boundary,
+     * not an inconclusive failure. State and transition ceilings are execution
+     * resources; hitting either makes the result inconclusive.&lt;/p&gt;
+     */
+    public record Budget(
+        int maxDepth,
+        int maxPrimitivePathWork,
+        int maxVisitedStates,
+        int maxGeneratedTransitions
+    ) {
+<span class="fc" id="L164">        public Budget {</span>
+<span class="pc bpc" id="L165" title="3 of 8 branches missed.">            if (maxDepth &lt; 0</span>
+                    || maxPrimitivePathWork &lt; 0
+                    || maxVisitedStates &lt; 1
+                    || maxGeneratedTransitions &lt; 0) {
+<span class="fc" id="L169">                throw new IllegalArgumentException(</span>
+                    &quot;depth/work/transition limits must be non-negative &quot;
+                        + &quot;and maxVisitedStates must be positive&quot;);
+            }
+<span class="fc" id="L173">        }</span>
+    }
+
+    public record RetainedState(
+        String id,
+        String expression,
+        AssumptionSignature assumptions,
+        int depth,
+        int primitivePathWork,
+        boolean nonDominatedAtTermination
+    ) {
+<span class="fc" id="L184">        public RetainedState {</span>
+<span class="fc" id="L185">            requireHash(id, &quot;state id&quot;);</span>
+<span class="fc" id="L186">            requireText(expression, &quot;state expression&quot;);</span>
+<span class="fc" id="L187">            assumptions = Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="pc bpc" id="L188" title="2 of 4 branches missed.">            if (depth &lt; 0 || primitivePathWork &lt; 0) {</span>
+<span class="nc" id="L189">                throw new IllegalArgumentException(</span>
+                    &quot;state depth and primitive work must not be negative&quot;);
+            }
+<span class="fc" id="L192">        }</span>
+    }
+
+    public record RetainedEdge(
+        String id,
+        String fromStateId,
+        String proposedStateId,
+        String ruleId,
+        String transformedExpression,
+        AssumptionSignature resultingAssumptions,
+        List&lt;String&gt; primitiveRuleIds,
+        int primitiveStepCount,
+        EdgeDisposition disposition
+    ) {
+<span class="fc" id="L206">        public RetainedEdge {</span>
+<span class="fc" id="L207">            requireHash(id, &quot;edge id&quot;);</span>
+<span class="fc" id="L208">            requireHash(fromStateId, &quot;fromStateId&quot;);</span>
+<span class="fc" id="L209">            requireHash(proposedStateId, &quot;proposedStateId&quot;);</span>
+<span class="fc" id="L210">            requireText(ruleId, &quot;ruleId&quot;);</span>
+<span class="fc" id="L211">            requireText(transformedExpression, &quot;transformedExpression&quot;);</span>
+<span class="fc" id="L212">            resultingAssumptions = Objects.requireNonNull(</span>
+                resultingAssumptions,
+                &quot;resultingAssumptions&quot;);
+<span class="fc" id="L215">            primitiveRuleIds = List.copyOf(Objects.requireNonNull(</span>
+                primitiveRuleIds,
+                &quot;primitiveRuleIds&quot;));
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            if (primitiveRuleIds.isEmpty()</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                    || primitiveRuleIds.stream().anyMatch(</span>
+<span class="pc bpc" id="L220" title="2 of 4 branches missed.">                        value -&gt; value == null || value.isBlank())</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                    || primitiveStepCount != primitiveRuleIds.size()) {</span>
+<span class="nc" id="L222">                throw new IllegalArgumentException(</span>
+                    &quot;primitive lineage must be complete and balanced&quot;);
+            }
+<span class="fc" id="L225">            disposition = Objects.requireNonNull(</span>
+                disposition,
+                &quot;disposition&quot;);
+<span class="fc" id="L228">        }</span>
+    }
+
+    public record Witness(
+        List&lt;RetainedState&gt; states,
+        List&lt;RetainedEdge&gt; edges,
+        List&lt;String&gt; primitiveRuleIds,
+        List&lt;String&gt; additionalAssumptions,
+        int depth,
+        int primitiveSteps
+    ) {
+<span class="fc" id="L239">        public Witness {</span>
+<span class="fc" id="L240">            states = List.copyOf(Objects.requireNonNull(states, &quot;states&quot;));</span>
+<span class="fc" id="L241">            edges = List.copyOf(Objects.requireNonNull(edges, &quot;edges&quot;));</span>
+<span class="fc" id="L242">            primitiveRuleIds = List.copyOf(Objects.requireNonNull(</span>
+                primitiveRuleIds,
+                &quot;primitiveRuleIds&quot;));
+<span class="fc" id="L245">            additionalAssumptions = List.copyOf(Objects.requireNonNull(</span>
+                additionalAssumptions,
+                &quot;additionalAssumptions&quot;));
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            if (states.isEmpty()</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                    || edges.size() + 1 != states.size()</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                    || depth != edges.size()</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                    || primitiveSteps != primitiveRuleIds.size()</span>
+<span class="fc" id="L252">                    || primitiveSteps != edges.stream()</span>
+<span class="fc" id="L253">                        .mapToInt(RetainedEdge::primitiveStepCount)</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                        .sum()) {</span>
+<span class="nc" id="L255">                throw new IllegalArgumentException(</span>
+                    &quot;witness path and primitive lineage must be balanced&quot;);
+            }
+<span class="fc" id="L258">        }</span>
+    }
+
+    public record WorkLedger(
+        int expandedStates,
+        int generatedTransitions,
+        int discoveredStates,
+        int enqueuedTransitions,
+        int dominatedTransitions,
+        int outsidePrimitiveWorkTransitions,
+        int visitedStateLimitTransitions,
+        int supersededStates,
+        int depthBoundaryStates,
+        int primitiveWorkBoundaryStates,
+        int maxFrontierSize,
+        boolean generatedTransitionLimitReached,
+        boolean visitedStateLimitReached
+    ) {
+<span class="fc" id="L276">        public WorkLedger {</span>
+<span class="pc bpc" id="L277" title="13 of 26 branches missed.">            if (expandedStates &lt; 0</span>
+                    || generatedTransitions &lt; 0
+                    || discoveredStates &lt; 1
+                    || enqueuedTransitions &lt; 0
+                    || dominatedTransitions &lt; 0
+                    || outsidePrimitiveWorkTransitions &lt; 0
+                    || visitedStateLimitTransitions &lt; 0
+                    || supersededStates &lt; 0
+                    || depthBoundaryStates &lt; 0
+                    || primitiveWorkBoundaryStates &lt; 0
+                    || maxFrontierSize &lt; 1
+                    || discoveredStates != enqueuedTransitions + 1
+                    || generatedTransitions
+                        != enqueuedTransitions
+                            + dominatedTransitions
+                            + outsidePrimitiveWorkTransitions
+                            + visitedStateLimitTransitions) {
+<span class="nc" id="L294">                throw new IllegalArgumentException(</span>
+                    &quot;reachability work ledger must be non-negative &quot;
+                        + &quot;and exactly balanced&quot;);
+            }
+<span class="fc" id="L298">        }</span>
+    }
+
+    public record Result(
+        String oracleId,
+        Status status,
+        String sourceExpression,
+        String targetExpression,
+        AssumptionSignature initialAssumptions,
+        Budget budget,
+        List&lt;RetainedState&gt; states,
+        List&lt;RetainedEdge&gt; edges,
+        Optional&lt;Witness&gt; witness,
+        WorkLedger work,
+        String detailCode,
+        String technicalDetail
+    ) {
+<span class="fc" id="L315">        public Result {</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">            if (!ORACLE_ID.equals(oracleId)) {</span>
+<span class="nc" id="L317">                throw new IllegalArgumentException(</span>
+                    &quot;unexpected reachability-oracle identity&quot;);
+            }
+<span class="fc" id="L320">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L321">            requireText(sourceExpression, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L322">            requireText(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="fc" id="L323">            initialAssumptions = Objects.requireNonNull(</span>
+                initialAssumptions,
+                &quot;initialAssumptions&quot;);
+<span class="fc" id="L326">            budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L327">            states = List.copyOf(Objects.requireNonNull(states, &quot;states&quot;));</span>
+<span class="fc" id="L328">            edges = List.copyOf(Objects.requireNonNull(edges, &quot;edges&quot;));</span>
+<span class="fc" id="L329">            witness = Objects.requireNonNull(witness, &quot;witness&quot;);</span>
+<span class="fc" id="L330">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L331">            requireText(detailCode, &quot;detailCode&quot;);</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">            technicalDetail = technicalDetail == null</span>
+<span class="pc" id="L333">                ? &quot;&quot; : technicalDetail.trim();</span>
+<span class="fc bfc" id="L334" title="All 4 branches covered.">            boolean reached = status == Status.REACHABLE</span>
+                || status
+                    == Status.REACHABLE_ONLY_WITH_ADDITIONAL_ASSUMPTIONS;
+<span class="pc bpc" id="L337" title="1 of 4 branches missed.">            if (reached &amp;&amp; witness.isEmpty()) {</span>
+<span class="nc" id="L338">                throw new IllegalArgumentException(</span>
+                    &quot;conclusive reachability status requires a witness&quot;);
+            }
+<span class="fc bfc" id="L341" title="All 2 branches covered.">            if (status</span>
+                    == Status.UNREACHABLE_IN_COMPLETE_BOUNDED_CLOSURE
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">                    &amp;&amp; witness.isPresent()) {</span>
+<span class="nc" id="L344">                throw new IllegalArgumentException(</span>
+                    &quot;unreachable closure must not retain a witness&quot;);
+            }
+<span class="fc bfc" id="L347" title="All 2 branches covered.">            if (status == Status.REACHABLE</span>
+<span class="fc" id="L348">                    &amp;&amp; !witness.orElseThrow()</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">                        .additionalAssumptions().isEmpty()) {</span>
+<span class="nc" id="L350">                throw new IllegalArgumentException(</span>
+                    &quot;REACHABLE witness must use declared assumptions only&quot;);
+            }
+<span class="fc bfc" id="L353" title="All 2 branches covered.">            if (status</span>
+                    == Status.REACHABLE_ONLY_WITH_ADDITIONAL_ASSUMPTIONS
+<span class="fc" id="L355">                    &amp;&amp; witness.orElseThrow()</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">                        .additionalAssumptions().isEmpty()) {</span>
+<span class="nc" id="L357">                throw new IllegalArgumentException(</span>
+                    &quot;conditional reachability requires added assumptions&quot;);
+            }
+<span class="fc bfc" id="L360" title="All 2 branches covered.">            if (status == Status.TECHNICAL_FAILURE</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">                    &amp;&amp; technicalDetail.isBlank()) {</span>
+<span class="nc" id="L362">                throw new IllegalArgumentException(</span>
+                    &quot;technical failure requires technical detail&quot;);
+            }
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">            if (states.size() != work.discoveredStates()</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">                    || edges.size() != work.generatedTransitions()) {</span>
+<span class="nc" id="L367">                throw new IllegalArgumentException(</span>
+                    &quot;retained graph and work ledger must agree&quot;);
+            }
+<span class="fc" id="L370">        }</span>
+
+        public boolean closureComplete() {
+<span class="fc bfc" id="L373" title="All 4 branches covered.">            return status</span>
+                == Status.UNREACHABLE_IN_COMPLETE_BOUNDED_CLOSURE
+                || status
+                    == Status.REACHABLE_ONLY_WITH_ADDITIONAL_ASSUMPTIONS;
+        }
+    }
+
+    private static void requireHash(String value, String field) {
+<span class="pc bpc" id="L381" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L382">            throw new IllegalArgumentException(</span>
+                field + &quot; must be a SHA-256 identity&quot;);
+        }
+<span class="fc" id="L385">    }</span>
+
+    private static void requireText(String value, String field) {
+<span class="pc bpc" id="L388" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L389">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L391">    }</span>
+
+    private final class SearchRun {
+<span class="fc" id="L394">        private static final Comparator&lt;Node&gt; NODE_ORDER =</span>
+<span class="fc" id="L395">            Comparator.comparingInt(Node::primitivePathWork)</span>
+<span class="fc" id="L396">                .thenComparingInt(Node::depth)</span>
+<span class="fc" id="L397">                .thenComparingInt(node -&gt;</span>
+<span class="fc" id="L398">                    node.assumptions().normalizedAssumptions().size())</span>
+<span class="fc" id="L399">                .thenComparing(Node::expression)</span>
+<span class="fc" id="L400">                .thenComparing(node -&gt; node.assumptions().fingerprint())</span>
+<span class="fc" id="L401">                .thenComparing(Node::id);</span>
+
+<span class="fc" id="L403">        private static final Comparator&lt;Candidate&gt; CANDIDATE_ORDER =</span>
+<span class="fc" id="L404">            Comparator.comparing(Candidate::expression)</span>
+<span class="fc" id="L405">                .thenComparing(candidate -&gt;</span>
+<span class="fc" id="L406">                    candidate.assumptions().fingerprint())</span>
+<span class="fc" id="L407">                .thenComparingInt(candidate -&gt;</span>
+<span class="nc" id="L408">                    candidate.transformation().primitiveStepCount())</span>
+<span class="fc" id="L409">                .thenComparing(candidate -&gt;</span>
+<span class="nc" id="L410">                    candidate.transformation().rule())</span>
+<span class="fc" id="L411">                .thenComparing(candidate -&gt;</span>
+<span class="nc" id="L412">                    candidate.transformation().applicationKey())</span>
+<span class="fc" id="L413">                .thenComparing(candidate -&gt;</span>
+<span class="nc" id="L414">                    String.join(</span>
+                        &quot;\u0001&quot;,
+<span class="nc" id="L416">                        candidate.transformation().primitiveRuleIds()));</span>
+
+        private final String source;
+        private final String target;
+        private final AssumptionSignature initialAssumptions;
+        private final TransformationEngine engine;
+        private final Budget budget;
+<span class="fc" id="L423">        private final PriorityQueue&lt;Node&gt; frontier =</span>
+            new PriorityQueue&lt;&gt;(NODE_ORDER);
+<span class="fc" id="L425">        private final Map&lt;String, Node&gt; statesById = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L426">        private final Map&lt;MathematicalKey, List&lt;Node&gt;&gt; labelsByKey =</span>
+            new LinkedHashMap&lt;&gt;();
+<span class="fc" id="L428">        private final Set&lt;String&gt; activeStateIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L429">        private final List&lt;Edge&gt; edges = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L430">        private final Map&lt;String, Edge&gt; parentEdgeByStateId =</span>
+            new LinkedHashMap&lt;&gt;();
+
+        private int expandedStates;
+        private int generatedTransitions;
+        private int enqueuedTransitions;
+        private int dominatedTransitions;
+        private int outsidePrimitiveWorkTransitions;
+        private int visitedStateLimitTransitions;
+        private int supersededStates;
+        private int depthBoundaryStates;
+        private int primitiveWorkBoundaryStates;
+<span class="fc" id="L442">        private int maxFrontierSize = 1;</span>
+        private boolean generatedTransitionLimitReached;
+        private boolean visitedStateLimitReached;
+        private Node bestConditionalTarget;
+
+        private SearchRun(
+            String source,
+            String target,
+            AssumptionSignature initialAssumptions,
+            TransformationEngine engine,
+            Budget budget
+<span class="fc" id="L453">        ) {</span>
+<span class="fc" id="L454">            this.source = source;</span>
+<span class="fc" id="L455">            this.target = target;</span>
+<span class="fc" id="L456">            this.initialAssumptions = initialAssumptions;</span>
+<span class="fc" id="L457">            this.engine = engine;</span>
+<span class="fc" id="L458">            this.budget = budget;</span>
+<span class="fc" id="L459">        }</span>
+
+        private Result execute() {
+<span class="fc" id="L462">            retainSource();</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">            while (!frontier.isEmpty()) {</span>
+<span class="fc" id="L464">                Node current = frontier.remove();</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">                if (!activeStateIds.contains(current.id())) {</span>
+<span class="nc" id="L466">                    continue;</span>
+                }
+<span class="fc" id="L468">                Result reached = inspectTarget(current);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">                if (reached != null) {</span>
+<span class="fc" id="L470">                    return reached;</span>
+                }
+<span class="fc bfc" id="L472" title="All 2 branches covered.">                if (current.expression().equals(target)) {</span>
+                    // Assumptions only accumulate. Expanding a conditional
+                    // target cannot lead to an assumption-free target state.
+<span class="fc" id="L475">                    continue;</span>
+                }
+<span class="fc bfc" id="L477" title="All 2 branches covered.">                if (atClosureBoundary(current)) {</span>
+<span class="fc" id="L478">                    continue;</span>
+                }
+<span class="fc" id="L480">                expandedStates++;</span>
+                List&lt;Candidate&gt; candidates;
+                try {
+<span class="fc" id="L483">                    candidates = candidates(current);</span>
+<span class="fc" id="L484">                } catch (RuntimeException exception) {</span>
+<span class="fc" id="L485">                    return technicalFailure(exception);</span>
+<span class="fc" id="L486">                }</span>
+<span class="fc" id="L487">                Result interrupted = processCandidates(current, candidates);</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">                if (interrupted != null) {</span>
+<span class="fc" id="L489">                    return interrupted;</span>
+                }
+<span class="fc" id="L491">            }</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">            if (bestConditionalTarget != null) {</span>
+<span class="fc" id="L493">                return result(</span>
+                    Status.REACHABLE_ONLY_WITH_ADDITIONAL_ASSUMPTIONS,
+<span class="fc" id="L495">                    Optional.of(witness(bestConditionalTarget)),</span>
+                    &quot;TARGET_REQUIRES_ADDITIONAL_ASSUMPTIONS&quot;,
+                    &quot;&quot;);
+            }
+<span class="fc" id="L499">            return result(</span>
+                Status.UNREACHABLE_IN_COMPLETE_BOUNDED_CLOSURE,
+<span class="fc" id="L501">                Optional.empty(),</span>
+                &quot;COMPLETE_DECLARED_CLOSURE_EXHAUSTED&quot;,
+                &quot;&quot;);
+        }
+
+        private void retainSource() {
+<span class="fc" id="L507">            Node sourceNode = node(source, initialAssumptions, 0, 0);</span>
+<span class="fc" id="L508">            statesById.put(sourceNode.id(), sourceNode);</span>
+<span class="fc" id="L509">            labelsByKey.put(</span>
+<span class="fc" id="L510">                sourceNode.mathematicalKey(),</span>
+<span class="fc" id="L511">                new ArrayList&lt;&gt;(List.of(sourceNode)));</span>
+<span class="fc" id="L512">            activeStateIds.add(sourceNode.id());</span>
+<span class="fc" id="L513">            frontier.add(sourceNode);</span>
+<span class="fc" id="L514">        }</span>
+
+        private Result inspectTarget(Node current) {
+<span class="fc bfc" id="L517" title="All 2 branches covered.">            if (!current.expression().equals(target)) {</span>
+<span class="fc" id="L518">                return null;</span>
+            }
+<span class="fc" id="L520">            List&lt;String&gt; additional = additionalAssumptions(current);</span>
+<span class="fc bfc" id="L521" title="All 2 branches covered.">            if (additional.isEmpty()) {</span>
+<span class="fc" id="L522">                return result(</span>
+                    Status.REACHABLE,
+<span class="fc" id="L524">                    Optional.of(witness(current)),</span>
+                    &quot;TARGET_REACHED_WITHIN_DECLARED_ASSUMPTIONS&quot;,
+                    &quot;&quot;);
+            }
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">            if (bestConditionalTarget == null</span>
+<span class="nc bnc" id="L529" title="All 2 branches missed.">                    || NODE_ORDER.compare(current, bestConditionalTarget) &lt; 0) {</span>
+<span class="fc" id="L530">                bestConditionalTarget = current;</span>
+            }
+<span class="fc" id="L532">            return null;</span>
+        }
+
+        private boolean atClosureBoundary(Node current) {
+<span class="fc bfc" id="L536" title="All 2 branches covered.">            boolean depthBoundary = current.depth() &gt;= budget.maxDepth();</span>
+<span class="fc" id="L537">            boolean primitiveBoundary =</span>
+<span class="fc" id="L538">                current.primitivePathWork()</span>
+<span class="fc bfc" id="L539" title="All 2 branches covered.">                    &gt;= budget.maxPrimitivePathWork();</span>
+<span class="fc bfc" id="L540" title="All 2 branches covered.">            if (depthBoundary) {</span>
+<span class="fc" id="L541">                depthBoundaryStates++;</span>
+            }
+<span class="fc bfc" id="L543" title="All 2 branches covered.">            if (primitiveBoundary) {</span>
+<span class="fc" id="L544">                primitiveWorkBoundaryStates++;</span>
+            }
+<span class="pc bpc" id="L546" title="1 of 4 branches missed.">            return depthBoundary || primitiveBoundary;</span>
+        }
+
+        private List&lt;Candidate&gt; candidates(Node current) {
+<span class="fc" id="L550">            List&lt;Transformation&gt; transformations =</span>
+<span class="fc" id="L551">                engine.transform(current.expression());</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">            if (transformations == null) {</span>
+<span class="nc" id="L553">                throw new IllegalStateException(</span>
+                    &quot;transformation engine returned null&quot;);
+            }
+<span class="fc" id="L556">            List&lt;Candidate&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L557" title="All 2 branches covered.">            for (Transformation transformation : transformations) {</span>
+<span class="fc" id="L558">                Objects.requireNonNull(</span>
+                    transformation,
+                    &quot;transformation entry&quot;);
+<span class="fc" id="L561">                AssumptionSignature assumptions = AssumptionSignature.merge(</span>
+<span class="fc" id="L562">                    current.assumptions(),</span>
+<span class="fc" id="L563">                    AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L564">                        transformation.assumptions()));</span>
+<span class="fc" id="L565">                result.add(new Candidate(</span>
+                    transformation,
+<span class="fc" id="L567">                    normalizeGenerated(</span>
+<span class="fc" id="L568">                        transformation.transformedExpression()),</span>
+                    assumptions));
+<span class="fc" id="L570">            }</span>
+<span class="fc" id="L571">            result.sort(CANDIDATE_ORDER);</span>
+<span class="fc" id="L572">            return List.copyOf(result);</span>
+        }
+
+        private Result processCandidates(
+            Node current,
+            List&lt;Candidate&gt; candidates
+        ) {
+<span class="fc bfc" id="L579" title="All 2 branches covered.">            for (Candidate candidate : candidates) {</span>
+<span class="fc" id="L580">                if (generatedTransitions</span>
+<span class="fc bfc" id="L581" title="All 2 branches covered.">                        &gt;= budget.maxGeneratedTransitions()) {</span>
+<span class="fc" id="L582">                    generatedTransitionLimitReached = true;</span>
+<span class="fc" id="L583">                    return budgetInconclusive(</span>
+                        &quot;GENERATED_TRANSITION_LIMIT_REACHED&quot;);
+                }
+<span class="fc" id="L586">                Result interrupted = processCandidate(current, candidate);</span>
+<span class="fc bfc" id="L587" title="All 2 branches covered.">                if (interrupted != null) {</span>
+<span class="fc" id="L588">                    return interrupted;</span>
+                }
+<span class="fc" id="L590">            }</span>
+<span class="fc" id="L591">            return null;</span>
+        }
+
+        private Result processCandidate(
+            Node current,
+            Candidate candidate
+        ) {
+<span class="fc" id="L598">            generatedTransitions++;</span>
+<span class="fc" id="L599">            int depth = current.depth() + 1;</span>
+<span class="fc" id="L600">            int stepCount = candidate.transformation().primitiveStepCount();</span>
+<span class="fc" id="L601">            long primitiveWork = primitiveWorkTotal(</span>
+<span class="fc" id="L602">                current.primitivePathWork(),</span>
+                stepCount);
+<span class="fc bfc" id="L604" title="All 2 branches covered.">            if (exceedsPrimitiveWorkBound(</span>
+<span class="fc" id="L605">                    current.primitivePathWork(),</span>
+                    stepCount,
+<span class="fc" id="L607">                    budget.maxPrimitivePathWork())) {</span>
+<span class="fc" id="L608">                outsidePrimitiveWorkTransitions++;</span>
+<span class="fc" id="L609">                retainEdge(</span>
+                    current,
+<span class="fc" id="L611">                    stateId(</span>
+<span class="fc" id="L612">                        candidate.expression(),</span>
+<span class="fc" id="L613">                        candidate.assumptions(),</span>
+                        depth,
+                        primitiveWork),
+<span class="fc" id="L616">                    candidate.expression(),</span>
+<span class="fc" id="L617">                    candidate.assumptions(),</span>
+<span class="fc" id="L618">                    candidate.transformation(),</span>
+                    EdgeDisposition.OUTSIDE_PRIMITIVE_WORK_BOUND);
+<span class="fc" id="L620">                return null;</span>
+            }
+
+<span class="fc" id="L623">            Node proposed = node(</span>
+<span class="fc" id="L624">                candidate.expression(),</span>
+<span class="fc" id="L625">                candidate.assumptions(),</span>
+                depth,
+<span class="fc" id="L627">                Math.toIntExact(primitiveWork));</span>
+<span class="fc" id="L628">            List&lt;Node&gt; labels = labelsByKey.computeIfAbsent(</span>
+<span class="fc" id="L629">                proposed.mathematicalKey(),</span>
+<span class="fc" id="L630">                ignored -&gt; new ArrayList&lt;&gt;());</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">            if (isDominated(proposed, labels)) {</span>
+<span class="nc" id="L632">                dominatedTransitions++;</span>
+<span class="nc" id="L633">                retainEdge(</span>
+                    current,
+                    proposed,
+<span class="nc" id="L636">                    candidate.transformation(),</span>
+                    EdgeDisposition.DOMINATED_BY_EXISTING_LABEL);
+<span class="nc" id="L638">                return null;</span>
+            }
+<span class="fc bfc" id="L640" title="All 2 branches covered.">            if (statesById.size() &gt;= budget.maxVisitedStates()) {</span>
+<span class="fc" id="L641">                visitedStateLimitTransitions++;</span>
+<span class="fc" id="L642">                visitedStateLimitReached = true;</span>
+<span class="fc" id="L643">                retainEdge(</span>
+                    current,
+                    proposed,
+<span class="fc" id="L646">                    candidate.transformation(),</span>
+                    EdgeDisposition.VISITED_STATE_LIMIT);
+<span class="fc" id="L648">                return budgetInconclusive(</span>
+                    &quot;VISITED_STATE_LIMIT_REACHED&quot;);
+            }
+<span class="fc" id="L651">            removeDominatedLabels(proposed, labels);</span>
+<span class="fc" id="L652">            labels.add(proposed);</span>
+<span class="fc" id="L653">            activeStateIds.add(proposed.id());</span>
+<span class="fc" id="L654">            statesById.put(proposed.id(), proposed);</span>
+<span class="fc" id="L655">            frontier.add(proposed);</span>
+<span class="fc" id="L656">            maxFrontierSize = Math.max(maxFrontierSize, frontier.size());</span>
+<span class="fc" id="L657">            Edge edge = retainEdge(</span>
+                current,
+                proposed,
+<span class="fc" id="L660">                candidate.transformation(),</span>
+                EdgeDisposition.ENQUEUED);
+<span class="fc" id="L662">            parentEdgeByStateId.put(proposed.id(), edge);</span>
+<span class="fc" id="L663">            enqueuedTransitions++;</span>
+<span class="fc" id="L664">            return null;</span>
+        }
+
+        private boolean isDominated(Node proposed, List&lt;Node&gt; labels) {
+<span class="fc" id="L668">            return labels.stream().anyMatch(existing -&gt;</span>
+<span class="pc bpc" id="L669" title="1 of 2 branches missed.">                existing.depth() &lt;= proposed.depth()</span>
+<span class="fc" id="L670">                    &amp;&amp; existing.primitivePathWork()</span>
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">                        &lt;= proposed.primitivePathWork());</span>
+        }
+
+        private void removeDominatedLabels(
+            Node proposed,
+            List&lt;Node&gt; labels
+        ) {
+<span class="fc" id="L678">            List&lt;Node&gt; dominated = labels.stream()</span>
+<span class="fc" id="L679">                .filter(existing -&gt;</span>
+<span class="pc bpc" id="L680" title="1 of 2 branches missed.">                    proposed.depth() &lt;= existing.depth()</span>
+<span class="nc" id="L681">                        &amp;&amp; proposed.primitivePathWork()</span>
+<span class="pc bnc" id="L682" title="All 2 branches missed.">                            &lt;= existing.primitivePathWork())</span>
+<span class="fc" id="L683">                .toList();</span>
+<span class="fc" id="L684">            labels.removeAll(dominated);</span>
+<span class="fc" id="L685">            dominated.forEach(existing -&gt;</span>
+<span class="nc" id="L686">                activeStateIds.remove(existing.id()));</span>
+<span class="fc" id="L687">            supersededStates += dominated.size();</span>
+<span class="fc" id="L688">        }</span>
+
+        private Edge retainEdge(
+            Node from,
+            Node proposed,
+            Transformation transformation,
+            EdgeDisposition disposition
+        ) {
+<span class="fc" id="L696">            return retainEdge(</span>
+                from,
+<span class="fc" id="L698">                proposed.id(),</span>
+<span class="fc" id="L699">                proposed.expression(),</span>
+<span class="fc" id="L700">                proposed.assumptions(),</span>
+                transformation,
+                disposition);
+        }
+
+        private Edge retainEdge(
+            Node from,
+            String proposedStateId,
+            String transformedExpression,
+            AssumptionSignature resultingAssumptions,
+            Transformation transformation,
+            EdgeDisposition disposition
+        ) {
+<span class="fc" id="L713">            int ordinal = edges.size();</span>
+<span class="fc" id="L714">            String id = sha256(String.join(</span>
+                &quot;\n&quot;,
+                &quot;schema=regelsuche.reachability-edge/v1&quot;,
+                &quot;ordinal=&quot; + ordinal,
+<span class="fc" id="L718">                &quot;from=&quot; + from.id(),</span>
+                &quot;to=&quot; + proposedStateId,
+<span class="fc" id="L720">                &quot;rule=&quot; + transformation.rule(),</span>
+<span class="fc" id="L721">                &quot;application=&quot; + transformation.applicationKey(),</span>
+<span class="fc" id="L722">                &quot;disposition=&quot; + disposition.name()));</span>
+<span class="fc" id="L723">            Edge edge = new Edge(</span>
+                id,
+<span class="fc" id="L725">                from.id(),</span>
+                proposedStateId,
+<span class="fc" id="L727">                transformation.rule(),</span>
+                transformedExpression,
+                resultingAssumptions,
+<span class="fc" id="L730">                transformation.primitiveRuleIds(),</span>
+<span class="fc" id="L731">                transformation.primitiveStepCount(),</span>
+                disposition);
+<span class="fc" id="L733">            edges.add(edge);</span>
+<span class="fc" id="L734">            return edge;</span>
+        }
+
+        private Result budgetInconclusive(String detailCode) {
+            Optional&lt;Witness&gt; provisional =
+<span class="fc bfc" id="L739" title="All 2 branches covered.">                bestConditionalTarget == null</span>
+<span class="fc" id="L740">                    ? Optional.empty()</span>
+<span class="fc" id="L741">                    : Optional.of(witness(bestConditionalTarget));</span>
+<span class="fc" id="L742">            return result(</span>
+                Status.BUDGET_INCONCLUSIVE,
+                provisional,
+<span class="fc bfc" id="L745" title="All 2 branches covered.">                bestConditionalTarget == null</span>
+<span class="fc" id="L746">                    ? detailCode</span>
+<span class="fc" id="L747">                    : detailCode + &quot;_AFTER_CONDITIONAL_WITNESS&quot;,</span>
+                &quot;&quot;);
+        }
+
+        private Result technicalFailure(RuntimeException exception) {
+<span class="pc bpc" id="L752" title="1 of 2 branches missed.">            String message = exception.getMessage() == null</span>
+<span class="pc" id="L753">                ? &quot;&quot; : exception.getMessage().trim();</span>
+<span class="fc" id="L754">            String detail = exception.getClass().getName()</span>
+<span class="pc bpc" id="L755" title="1 of 2 branches missed.">                + (message.isBlank() ? &quot;&quot; : &quot;: &quot; + message);</span>
+            Optional&lt;Witness&gt; provisional =
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">                bestConditionalTarget == null</span>
+<span class="fc" id="L758">                    ? Optional.empty()</span>
+<span class="pc" id="L759">                    : Optional.of(witness(bestConditionalTarget));</span>
+<span class="fc" id="L760">            return result(</span>
+                Status.TECHNICAL_FAILURE,
+                provisional,
+                &quot;TRANSFORMATION_ENGINE_OR_OUTPUT_FAILURE&quot;,
+                detail);
+        }
+
+        private Result result(
+            Status status,
+            Optional&lt;Witness&gt; witness,
+            String detailCode,
+            String technicalDetail
+        ) {
+<span class="fc" id="L773">            List&lt;RetainedState&gt; retainedStates = statesById.values().stream()</span>
+<span class="fc" id="L774">                .map(this::retainedState)</span>
+<span class="fc" id="L775">                .toList();</span>
+<span class="fc" id="L776">            List&lt;RetainedEdge&gt; retainedEdges = edges.stream()</span>
+<span class="fc" id="L777">                .map(Edge::retained)</span>
+<span class="fc" id="L778">                .toList();</span>
+<span class="fc" id="L779">            return new Result(</span>
+                ORACLE_ID,
+                status,
+                source,
+                target,
+                initialAssumptions,
+                budget,
+                retainedStates,
+                retainedEdges,
+                witness,
+<span class="fc" id="L789">                workLedger(),</span>
+                detailCode,
+                technicalDetail);
+        }
+
+        private WorkLedger workLedger() {
+<span class="fc" id="L795">            return new WorkLedger(</span>
+                expandedStates,
+                generatedTransitions,
+<span class="fc" id="L798">                statesById.size(),</span>
+                enqueuedTransitions,
+                dominatedTransitions,
+                outsidePrimitiveWorkTransitions,
+                visitedStateLimitTransitions,
+                supersededStates,
+                depthBoundaryStates,
+                primitiveWorkBoundaryStates,
+                maxFrontierSize,
+                generatedTransitionLimitReached,
+                visitedStateLimitReached);
+        }
+
+        private Witness witness(Node targetNode) {
+<span class="fc" id="L812">            List&lt;Node&gt; reverseStates = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L813">            List&lt;Edge&gt; reverseEdges = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L814">            Node current = targetNode;</span>
+<span class="fc" id="L815">            reverseStates.add(current);</span>
+<span class="fc bfc" id="L816" title="All 2 branches covered.">            while (current.depth() &gt; 0) {</span>
+<span class="fc" id="L817">                Edge edge = parentEdgeByStateId.get(current.id());</span>
+<span class="pc bpc" id="L818" title="1 of 2 branches missed.">                if (edge == null) {</span>
+<span class="nc" id="L819">                    throw new IllegalStateException(</span>
+                        &quot;missing parent edge for witness state &quot;
+<span class="nc" id="L821">                            + current.id());</span>
+                }
+<span class="fc" id="L823">                reverseEdges.add(edge);</span>
+<span class="fc" id="L824">                current = statesById.get(edge.fromStateId());</span>
+<span class="pc bpc" id="L825" title="1 of 2 branches missed.">                if (current == null) {</span>
+<span class="nc" id="L826">                    throw new IllegalStateException(</span>
+                        &quot;missing parent state for witness edge &quot;
+<span class="nc" id="L828">                            + edge.id());</span>
+                }
+<span class="fc" id="L830">                reverseStates.add(current);</span>
+<span class="fc" id="L831">            }</span>
+<span class="fc" id="L832">            Collections.reverse(reverseStates);</span>
+<span class="fc" id="L833">            Collections.reverse(reverseEdges);</span>
+<span class="fc" id="L834">            List&lt;String&gt; primitiveRuleIds = reverseEdges.stream()</span>
+<span class="fc" id="L835">                .flatMap(edge -&gt; edge.primitiveRuleIds().stream())</span>
+<span class="fc" id="L836">                .toList();</span>
+<span class="fc" id="L837">            return new Witness(</span>
+<span class="fc" id="L838">                reverseStates.stream().map(this::retainedState).toList(),</span>
+<span class="fc" id="L839">                reverseEdges.stream().map(Edge::retained).toList(),</span>
+                primitiveRuleIds,
+<span class="fc" id="L841">                additionalAssumptions(targetNode),</span>
+<span class="fc" id="L842">                reverseEdges.size(),</span>
+<span class="fc" id="L843">                primitiveRuleIds.size());</span>
+        }
+
+        private List&lt;String&gt; additionalAssumptions(Node state) {
+<span class="fc" id="L847">            TreeSet&lt;String&gt; additional = new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L848">                state.assumptions().normalizedAssumptions());</span>
+<span class="fc" id="L849">            additional.removeAll(</span>
+<span class="fc" id="L850">                initialAssumptions.normalizedAssumptions());</span>
+<span class="fc" id="L851">            return List.copyOf(additional);</span>
+        }
+
+        private RetainedState retainedState(Node state) {
+<span class="fc" id="L855">            return new RetainedState(</span>
+<span class="fc" id="L856">                state.id(),</span>
+<span class="fc" id="L857">                state.expression(),</span>
+<span class="fc" id="L858">                state.assumptions(),</span>
+<span class="fc" id="L859">                state.depth(),</span>
+<span class="fc" id="L860">                state.primitivePathWork(),</span>
+<span class="fc" id="L861">                activeStateIds.contains(state.id()));</span>
+        }
+
+        private Node node(
+            String expression,
+            AssumptionSignature assumptions,
+            int depth,
+            int primitivePathWork
+        ) {
+<span class="fc" id="L870">            return new Node(</span>
+<span class="fc" id="L871">                stateId(</span>
+                    expression,
+                    assumptions,
+                    depth,
+                    primitivePathWork),
+                expression,
+                assumptions,
+                depth,
+                primitivePathWork);
+        }
+
+        private String stateId(
+            String expression,
+            AssumptionSignature assumptions,
+            int depth,
+            long primitivePathWork
+        ) {
+<span class="fc" id="L888">            return sha256(String.join(</span>
+                &quot;\n&quot;,
+                &quot;schema=regelsuche.reachability-state/v1&quot;,
+                &quot;expression=&quot; + expression,
+<span class="fc" id="L892">                &quot;assumptions=&quot; + assumptions.fingerprint(),</span>
+                &quot;depth=&quot; + depth,
+                &quot;primitivePathWork=&quot; + primitivePathWork));
+        }
+    }
+
+    private record MathematicalKey(
+        String expression,
+        String assumptionFingerprint
+    ) {
+<span class="fc" id="L902">        private MathematicalKey {</span>
+<span class="fc" id="L903">            requireText(expression, &quot;mathematical expression&quot;);</span>
+<span class="pc bpc" id="L904" title="1 of 2 branches missed.">            assumptionFingerprint = assumptionFingerprint == null</span>
+<span class="pc" id="L905">                ? &quot;&quot; : assumptionFingerprint;</span>
+<span class="fc" id="L906">        }</span>
+    }
+
+    private record Node(
+        String id,
+        String expression,
+        AssumptionSignature assumptions,
+        int depth,
+        int primitivePathWork
+    ) {
+<span class="fc" id="L916">        private Node {</span>
+<span class="fc" id="L917">            requireHash(id, &quot;node id&quot;);</span>
+<span class="fc" id="L918">            requireText(expression, &quot;node expression&quot;);</span>
+<span class="fc" id="L919">            assumptions = Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="pc bpc" id="L920" title="2 of 4 branches missed.">            if (depth &lt; 0 || primitivePathWork &lt; 0) {</span>
+<span class="nc" id="L921">                throw new IllegalArgumentException(</span>
+                    &quot;node depth/work must not be negative&quot;);
+            }
+<span class="fc" id="L924">        }</span>
+
+        private MathematicalKey mathematicalKey() {
+<span class="fc" id="L927">            return new MathematicalKey(</span>
+                expression,
+<span class="fc" id="L929">                assumptions.fingerprint());</span>
+        }
+    }
+
+    private record Candidate(
+        Transformation transformation,
+        String expression,
+        AssumptionSignature assumptions
+    ) {
+<span class="fc" id="L938">        private Candidate {</span>
+<span class="fc" id="L939">            transformation = Objects.requireNonNull(</span>
+                transformation,
+                &quot;transformation&quot;);
+<span class="fc" id="L942">            requireText(expression, &quot;candidate expression&quot;);</span>
+<span class="fc" id="L943">            assumptions = Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L944">        }</span>
+    }
+
+    private record Edge(
+        String id,
+        String fromStateId,
+        String proposedStateId,
+        String ruleId,
+        String transformedExpression,
+        AssumptionSignature resultingAssumptions,
+        List&lt;String&gt; primitiveRuleIds,
+        int primitiveStepCount,
+        EdgeDisposition disposition
+    ) {
+<span class="fc" id="L958">        private Edge {</span>
+<span class="fc" id="L959">            primitiveRuleIds = List.copyOf(primitiveRuleIds);</span>
+<span class="fc" id="L960">        }</span>
+
+        private RetainedEdge retained() {
+<span class="fc" id="L963">            return new RetainedEdge(</span>
+                id,
+                fromStateId,
+                proposedStateId,
+                ruleId,
+                transformedExpression,
+                resultingAssumptions,
+                primitiveRuleIds,
+                primitiveStepCount,
+                disposition);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
