@@ -56,7 +56,10 @@ The coordinator rejects:
 - external principal rules above risk level `low`;
 - invalid repository revisions or bridge budgets.
 
-The low-risk boundary is deliberately conservative. Logarithm, root, power,
+The low-risk boundary is deliberately conservative, but it is not a substitute
+for mathematical domain evidence. A rule whose validity needs side conditions
+must receive those conditions through the source assumption context or a typed
+guard before a positive result can be qualified. Logarithm, root, power,
 inequality and operator rules with incomplete typed guards remain outside this
 safe profile even if a syntactic pattern exists.
 
@@ -112,6 +115,12 @@ All three share the same preparation inventory containing only
 - one- and two-step preparation;
 - retained non-zero assumptions;
 - rejection of different-argument, wrong-operator and wrong-step controls.
+
+The rational rows explicitly declare the denominator conditions needed by the
+telescoping identity. In particular, direct and prepared unit-step cases retain
+`n != 0` and `n + 1 != 0`; cancellation preparation adds `a != 0` and `b != 0`
+where applicable. The existing pack risk label alone does not authorize those
+conditions.
 
 Generate the deterministic JSON and Markdown evidence with:
 
