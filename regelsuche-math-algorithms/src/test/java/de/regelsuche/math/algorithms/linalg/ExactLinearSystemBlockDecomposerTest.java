@@ -78,9 +78,7 @@ class ExactLinearSystemBlockDecomposerTest {
 
         var result = decomposer.analyze(source, new Budget(1_000));
 
-        assertEquals(
-            Status.DIRECT_REPRESENTATION_AVAILABLE,
-            result.status());
+        assertEquals(Status.NOT_APPLICABLE, result.status());
         assertFalse(result.represented());
         assertEquals(
             "COEFFICIENT_INCIDENCE_GRAPH_IS_CONNECTED",
