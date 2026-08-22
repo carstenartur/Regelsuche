@@ -53,6 +53,8 @@ def historicalRewriteArchitectureDecisionReportDirectory = layout.buildDirectory
     'reports/historical-rewrite-architecture-decision')
 def representationMatchedWorkReportDirectory = layout.buildDirectory.dir(
     'reports/representation-matched-work')
+def symPyRuleAmplificationReportDirectory = layout.buildDirectory.dir(
+    'reports/sympy-rule-amplification')
 def historicalRediscoveryOutputArgument =
     historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
 def historicalRewriteArchitectureDecisionInputs = [
@@ -81,6 +83,37 @@ def historicalRepositoryRevision = providers.environmentVariable('GITHUB_SHA')
         value
     }
     .orElse('WORKTREE')
+def repositoryRootDirectory = rootProject.layout.projectDirectory
+def bridgeCheckoutStatus = providers.exec {
+    workingDir repositoryRootDirectory.asFile
+    commandLine 'git', 'status', '--porcelain', '--untracked-files=normal'
+}.standardOutput.asText.map { value -> value.trim() }
+def bridgeCheckoutRevision = providers.exec {
+    workingDir repositoryRootDirectory.asFile
+    commandLine 'git', 'rev-parse', 'HEAD'
+}.standardOutput.asText.map { value -> value.trim() }
+def cleanBridgeCheckoutRevision = bridgeCheckoutStatus.flatMap { status ->
+    if (!status.isEmpty()) {
+        throw new GradleException(
+            'Cannot bind SymPy rule-amplification evidence to a dirty checkout')
+    }
+    bridgeCheckoutRevision
+}
+def symPyRuleAmplificationRevision = providers
+    .gradleProperty('regelsucheRepositoryRevision')
+    .orElse(providers.environmentVariable(
+        'REGELSUCHE_AUTHORITY_GITHUB_SHA'))
+    .orElse(providers.environmentVariable('GITHUB_SHA'))
+    .orElse(cleanBridgeCheckoutRevision)
+    .map { value ->
+        def revision = value.trim()
+        if (!(revision ==~ /[0-9a-f]{40}/)) {
+            throw new GradleException(
+                'SymPy rule-amplification revision must be a lowercase '
+                    + '40-character Git commit SHA')
+        }
+        revision
+    }
 
 def generateHistoricalRediscoveryAtlas = tasks.register(
     'generateHistoricalRediscoveryAtlas', JavaExec) {
@@ -171,13 +204,46 @@ def representationMatchedWork = tasks.register(
     }
 }
 
+def symPyRuleAmplification = tasks.register(
+    'symPyRuleAmplification', JavaExec) {
+    group = 'verification'
+    description = 'Measures direct and bounded-prepared applicability of one unchanged imported SymPy rule.'
+    dependsOn tasks.named('classes')
+    timeout = java.time.Duration.ofMinutes(1)
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.SymPyRuleAmplificationExperiment'
+    argumentProviders.add({
+        [
+            symPyRuleAmplificationRevision.get(),
+            symPyRuleAmplificationReportDirectory.get().asFile.absolutePath
+        ]
+    } as CommandLineArgumentProvider)
+    inputs.property('repositoryRevision', symPyRuleAmplificationRevision)
+    inputs.property(
+        'configurationId',
+        'sympy-pythagorean-direct-vs-pattern-bridge-v1')
+    outputs.dir(symPyRuleAmplificationReportDirectory)
+    doLast {
+        def json = symPyRuleAmplificationReportDirectory.get()
+            .file('sympy-rule-amplification.json').asFile
+        def markdown = symPyRuleAmplificationReportDirectory.get()
+            .file('sympy-rule-amplification.md').asFile
+        if (!json.isFile() || !markdown.isFile()) {
+            throw new GradleException(
+                'Missing SymPy rule-amplification report artifacts')
+        }
+    }
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
     dependsOn generateHistoricalRewriteArchitectureDecision
     dependsOn representationMatchedWork
+    dependsOn symPyRuleAmplification
 }
 
 rootProject.tasks.named('check') {
     dependsOn generateHistoricalRewriteArchitectureDecision
     dependsOn representationMatchedWork
+    dependsOn symPyRuleAmplification
 }
