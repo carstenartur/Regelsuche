@@ -254,14 +254,16 @@ public final class BoundedCharacteristicPolynomialSolver {
         public Certificate {
             if (schema == null || schema.isBlank()
                     || solverId == null || solverId.isBlank()
-                    || sourceHash == null || sourceHash.isBlank()
+                    || sourceHash == null
+                    || !sourceHash.matches("[0-9a-f]{64}")
                     || eigenvalueParameter == null
                     || eigenvalueParameter.isBlank()
                     || canonicalPolynomial == null
                     || canonicalPolynomial.isBlank()
                     || singularityEquation == null
                     || singularityEquation.isBlank()
-                    || contentHash == null || contentHash.isBlank()
+                    || contentHash == null
+                    || !contentHash.matches("[0-9a-f]{64}")
                     || dimension < 1) {
                 throw new IllegalArgumentException(
                     "certificate fields are invalid");

@@ -21,9 +21,8 @@ import java.util.TreeSet;
  *
  * <p>The bridge requires declared unknown-vector coordinates and an explicit
  * eigenvalue parameter from the upstream symbolic-system bridge. A non-zero
- * vector assumption is mandatory. Quantum meaning is retained only as declared
- * model metadata when the request explicitly names a finite-dimensional quantum
- * domain; it is not promoted to a proved physical fact.</p>
+ * vector assumption is mandatory. Quantum meaning is emitted only when the
+ * request explicitly declares a finite-dimensional quantum model domain.</p>
  */
 public final class EigenproblemRepresentationBridge implements
         RepresentationBridge<
@@ -202,8 +201,8 @@ public final class EigenproblemRepresentationBridge implements
             return ModelInterpretation.NONE;
         }
         return source.operatorProperties().contains(OperatorProperty.HERMITIAN)
-            ? ModelInterpretation.DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
-            : ModelInterpretation.DECLARED_QUANTUM_OPERATOR;
+            ? ModelInterpretation.HERMITIAN_QUANTUM_OBSERVABLE
+            : ModelInterpretation.QUANTUM_OPERATOR;
     }
 
     private static List<String> capabilities(
@@ -222,8 +221,7 @@ public final class EigenproblemRepresentationBridge implements
                 .CAPABILITY_QUANTUM_OPERATOR_MODEL);
         }
         if (interpretation
-                == ModelInterpretation
-                    .DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
+                == ModelInterpretation.HERMITIAN_QUANTUM_OBSERVABLE
                 && properties.contains(OperatorProperty.HERMITIAN)) {
             result.add(EigenproblemRepresentation
                 .CAPABILITY_HERMITIAN_SPECTRAL_MODEL);
@@ -372,12 +370,14 @@ public final class EigenproblemRepresentationBridge implements
         public Certificate {
             if (schema == null || schema.isBlank()
                     || bridgeId == null || bridgeId.isBlank()
-                    || sourceSystemHash == null || sourceSystemHash.isBlank()
+                    || sourceSystemHash == null
+                    || !sourceSystemHash.matches("[0-9a-f]{64}")
                     || eigenvalueParameter == null
                     || eigenvalueParameter.isBlank()
-                    || contentHash == null || contentHash.isBlank()) {
+                    || contentHash == null
+                    || !contentHash.matches("[0-9a-f]{64}")) {
                 throw new IllegalArgumentException(
-                    "certificate identities must not be blank");
+                    "certificate identities are invalid");
             }
             relation = Objects.requireNonNull(relation, "relation");
             vectorCoordinates = List.copyOf(Objects.requireNonNull(
@@ -417,13 +417,13 @@ public final class EigenproblemRepresentationBridge implements
                     && declaredModelDomain
                         != ModelDomain.GENERIC_LINEAR_ALGEBRA) {
                 throw new IllegalArgumentException(
-                    "missing declared interpretation for quantum domain");
+                    "missing interpretation for declared quantum domain");
             }
             if (modelInterpretation != ModelInterpretation.NONE
                     && declaredModelDomain
                         != ModelDomain.FINITE_DIMENSIONAL_QUANTUM) {
                 throw new IllegalArgumentException(
-                    "declared quantum interpretation requires quantum domain");
+                    "quantum interpretation requires quantum domain");
             }
         }
 
