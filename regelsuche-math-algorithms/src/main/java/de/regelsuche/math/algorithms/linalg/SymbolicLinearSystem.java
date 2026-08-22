@@ -3,6 +3,7 @@ package de.regelsuche.math.algorithms.linalg;
 import de.regelsuche.math.algorithms.equivalence.Polynomial;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -29,8 +30,8 @@ public record SymbolicLinearSystem(
         rightHandSide = Objects.requireNonNull(
             rightHandSide,
             "rightHandSide");
-        unknowns = distinctNames(unknowns, "unknowns", false);
-        scalarParameters = distinctNames(
+        unknowns = orderedDistinctNames(unknowns, "unknowns", false);
+        scalarParameters = sortedDistinctNames(
             scalarParameters,
             "scalarParameters",
             true);
@@ -77,7 +78,7 @@ public record SymbolicLinearSystem(
         return rightHandSide.values().stream().allMatch(Polynomial::isZero);
     }
 
-    private static List<String> distinctNames(
+    private static List<String> orderedDistinctNames(
         List<String> names,
         String field,
         boolean allowEmpty
@@ -86,18 +87,30 @@ public record SymbolicLinearSystem(
         if (!allowEmpty && names.isEmpty()) {
             throw new IllegalArgumentException(field + " must not be empty");
         }
-        Set<String> retained = new TreeSet<>();
+        Set<String> unique = new LinkedHashSet<>();
         for (String name : names) {
             if (name == null || name.isBlank()) {
                 throw new IllegalArgumentException(
                     field + " entries must not be blank");
             }
-            if (!retained.add(name.trim())) {
+            if (!unique.add(name.trim())) {
                 throw new IllegalArgumentException(
                     field + " entries must be unique");
             }
         }
-        return List.copyOf(retained);
+        return List.copyOf(unique);
+    }
+
+    private static List<String> sortedDistinctNames(
+        List<String> names,
+        String field,
+        boolean allowEmpty
+    ) {
+        List<String> retained = orderedDistinctNames(
+            names,
+            field,
+            allowEmpty);
+        return retained.stream().sorted().toList();
     }
 
     public record PolynomialMatrix(List<List<Polynomial>> entries) {
