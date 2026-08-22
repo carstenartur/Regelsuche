@@ -59,8 +59,15 @@ public record ExactLinearSystemBlockDecomposition(
 
         boolean[] seenRows = new boolean[sourceRowCount];
         boolean[] seenColumns = new boolean[sourceColumnCount];
+        List<Integer> expectedRows = new ArrayList<>(sourceRowCount);
+        List<Integer> expectedColumns = new ArrayList<>(sourceColumnCount);
+        boolean hasFreeVariables = false;
+        boolean hasConstantConstraints = false;
+        boolean hasContradiction = false;
         for (Component component : components) {
             Objects.requireNonNull(component, "component");
+            expectedRows.addAll(component.sourceRowIndices());
+            expectedColumns.addAll(component.sourceColumnIndices());
             for (int row : component.sourceRowIndices()) {
                 if (row < 0 || row >= sourceRowCount || seenRows[row]) {
                     throw new IllegalArgumentException(
@@ -77,14 +84,35 @@ public record ExactLinearSystemBlockDecomposition(
                 }
                 seenColumns[column] = true;
             }
+            hasFreeVariables |= component.kind()
+                == ComponentKind.FREE_VARIABLES;
+            hasConstantConstraints |= component.kind()
+                == ComponentKind.CONSTANT_CONSTRAINTS;
+            hasContradiction |= component.contradictoryConstantConstraint();
         }
         requireComplete(seenRows, "row");
         requireComplete(seenColumns, "column");
-        if (!unlockedCapabilities.contains(
-                CAPABILITY_INDEPENDENT_SUBSYSTEMS)) {
+        if (!expectedRows.equals(rowPermutation)
+                || !expectedColumns.equals(columnPermutation)) {
             throw new IllegalArgumentException(
-                "decomposition must unlock independent subsystems");
+                "permutations must follow deterministic component order");
         }
+        requireCapability(
+            unlockedCapabilities,
+            CAPABILITY_INDEPENDENT_SUBSYSTEMS,
+            true);
+        requireCapability(
+            unlockedCapabilities,
+            CAPABILITY_FREE_VARIABLE_COMPONENTS,
+            hasFreeVariables);
+        requireCapability(
+            unlockedCapabilities,
+            CAPABILITY_CONSTANT_CONSTRAINT_COMPONENTS,
+            hasConstantConstraints);
+        requireCapability(
+            unlockedCapabilities,
+            CAPABILITY_INCONSISTENCY_LOCALIZATION,
+            hasContradiction);
     }
 
     public boolean hasFreeVariableComponents() {
@@ -158,6 +186,18 @@ public record ExactLinearSystemBlockDecomposition(
         }
     }
 
+    private static void requireCapability(
+        List<String> capabilities,
+        String capability,
+        boolean required
+    ) {
+        if (capabilities.contains(capability) != required) {
+            throw new IllegalArgumentException(
+                "capability does not match component structure: "
+                    + capability);
+        }
+    }
+
     public enum ComponentKind {
         COUPLED_SUBSYSTEM,
         FREE_VARIABLES,
@@ -227,16 +267,19 @@ public record ExactLinearSystemBlockDecomposition(
             String field
         ) {
             Objects.requireNonNull(values, field);
-            List<Integer> retained = new ArrayList<>(values);
-            retained.sort(Integer::compareTo);
-            for (int index = 0; index < retained.size(); index++) {
-                Integer value = retained.get(index);
-                if (value == null
-                        || value < 0
-                        || (index > 0
-                            && retained.get(index - 1).equals(value))) {
+            List<Integer> retained = new ArrayList<>(values.size());
+            for (Integer value : values) {
+                if (value == null || value < 0) {
                     throw new IllegalArgumentException(
                         field + " contains invalid indices");
+                }
+                retained.add(value);
+            }
+            retained.sort(Integer::compareTo);
+            for (int index = 1; index < retained.size(); index++) {
+                if (retained.get(index - 1).equals(retained.get(index))) {
+                    throw new IllegalArgumentException(
+                        field + " contains duplicate indices");
                 }
             }
             return List.copyOf(retained);
