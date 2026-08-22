@@ -201,8 +201,8 @@ public final class EigenproblemRepresentationBridge implements
             return ModelInterpretation.NONE;
         }
         return source.operatorProperties().contains(OperatorProperty.HERMITIAN)
-            ? ModelInterpretation.HERMITIAN_QUANTUM_OBSERVABLE
-            : ModelInterpretation.QUANTUM_OPERATOR;
+            ? ModelInterpretation.DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
+            : ModelInterpretation.DECLARED_QUANTUM_OPERATOR;
     }
 
     private static List<String> capabilities(
@@ -221,7 +221,7 @@ public final class EigenproblemRepresentationBridge implements
                 .CAPABILITY_QUANTUM_OPERATOR_MODEL);
         }
         if (interpretation
-                == ModelInterpretation.HERMITIAN_QUANTUM_OBSERVABLE
+                == ModelInterpretation.DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
                 && properties.contains(OperatorProperty.HERMITIAN)) {
             result.add(EigenproblemRepresentation
                 .CAPABILITY_HERMITIAN_SPECTRAL_MODEL);
@@ -368,8 +368,8 @@ public final class EigenproblemRepresentationBridge implements
         String contentHash
     ) {
         public Certificate {
-            if (schema == null || schema.isBlank()
-                    || bridgeId == null || bridgeId.isBlank()
+            if (!CERTIFICATE_SCHEMA.equals(schema)
+                    || !BRIDGE_ID.equals(bridgeId)
                     || sourceSystemHash == null
                     || !sourceSystemHash.matches("[0-9a-f]{64}")
                     || eigenvalueParameter == null
@@ -380,6 +380,10 @@ public final class EigenproblemRepresentationBridge implements
                     "certificate identities are invalid");
             }
             relation = Objects.requireNonNull(relation, "relation");
+            if (relation != RELATION) {
+                throw new IllegalArgumentException(
+                    "certificate relation is invalid");
+            }
             vectorCoordinates = List.copyOf(Objects.requireNonNull(
                 vectorCoordinates,
                 "vectorCoordinates"));

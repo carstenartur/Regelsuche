@@ -58,6 +58,7 @@ public record ExactRrefReduction(
             reducedRightHandSide,
             "reducedRightHandSide");
         variables = normalizedVariables(variables);
+        int variableCount = variables.size();
         coefficientPivots = List.copyOf(Objects.requireNonNull(
             coefficientPivots,
             "coefficientPivots"));
@@ -85,7 +86,7 @@ public record ExactRrefReduction(
             throw new IllegalArgumentException(
                 "RREF reduction requires solution-set equivalence");
         }
-        if (reducedCoefficients.columns() != variables.size()) {
+        if (reducedCoefficients.columns() != variableCount) {
             throw new IllegalArgumentException(
                 "coefficient columns and variable order disagree");
         }
@@ -98,11 +99,11 @@ public record ExactRrefReduction(
         validatePivots(
             coefficientPivots,
             reducedCoefficients.rowCount(),
-            variables.size());
+            variableCount);
         validateComplement(
             coefficientPivots,
             freeVariableColumns,
-            variables.size());
+            variableCount);
         validateIndices(
             contradictionRows,
             reducedCoefficients.rowCount(),
@@ -118,7 +119,7 @@ public record ExactRrefReduction(
                 "only consistent systems retain a particular solution");
         }
         particularSolution.ifPresent(solution ->
-            requireDimension(solution, variables.size(), "particularSolution"));
+            requireDimension(solution, variableCount, "particularSolution"));
         if (!consistent && !nullspaceBasis.isEmpty()) {
             throw new IllegalArgumentException(
                 "an inconsistent solution set retains no affine basis");
@@ -129,7 +130,7 @@ public record ExactRrefReduction(
                 "nullspace basis and free variables disagree");
         }
         for (ExactVector basisVector : nullspaceBasis) {
-            requireDimension(basisVector, variables.size(), "nullspaceBasis");
+            requireDimension(basisVector, variableCount, "nullspaceBasis");
         }
 
         for (RowOperation operation : rowOperations) {
@@ -432,32 +433,37 @@ public record ExactRrefReduction(
         List<String> lostOrConditional
     ) {
         public CapabilityFrontier {
-            applicableBefore = distinctTexts(
+            List<String> normalizedBefore = distinctTexts(
                 applicableBefore,
                 "applicableBefore");
-            applicableAfter = distinctTexts(
+            List<String> normalizedAfter = distinctTexts(
                 applicableAfter,
                 "applicableAfter");
-            newlyUnlocked = distinctTexts(
+            List<String> normalizedNew = distinctTexts(
                 newlyUnlocked,
                 "newlyUnlocked");
-            lostOrConditional = distinctTexts(
+            List<String> normalizedLost = distinctTexts(
                 lostOrConditional,
                 "lostOrConditional");
 
-            Set<String> before = new LinkedHashSet<>(applicableBefore);
-            Set<String> after = new LinkedHashSet<>(applicableAfter);
-            List<String> expectedNew = applicableAfter.stream()
+            Set<String> before = new LinkedHashSet<>(normalizedBefore);
+            Set<String> after = new LinkedHashSet<>(normalizedAfter);
+            List<String> expectedNew = normalizedAfter.stream()
                 .filter(capability -> !before.contains(capability))
                 .toList();
-            List<String> expectedLost = applicableBefore.stream()
+            List<String> expectedLost = normalizedBefore.stream()
                 .filter(capability -> !after.contains(capability))
                 .toList();
-            if (!expectedNew.equals(newlyUnlocked)
-                    || !expectedLost.equals(lostOrConditional)) {
+            if (!expectedNew.equals(normalizedNew)
+                    || !expectedLost.equals(normalizedLost)) {
                 throw new IllegalArgumentException(
                     "capability frontier lists must be exact ordered differences");
             }
+
+            applicableBefore = normalizedBefore;
+            applicableAfter = normalizedAfter;
+            newlyUnlocked = normalizedNew;
+            lostOrConditional = normalizedLost;
         }
 
         private static List<String> distinctTexts(
