@@ -21,8 +21,9 @@ import java.util.TreeSet;
  *
  * <p>The bridge requires declared unknown-vector coordinates and an explicit
  * eigenvalue parameter from the upstream symbolic-system bridge. A non-zero
- * vector assumption is mandatory. Quantum meaning is emitted only when the
- * request explicitly declares a finite-dimensional quantum model domain.</p>
+ * vector assumption is mandatory. Quantum meaning is retained only as declared
+ * model metadata when the request explicitly names a finite-dimensional quantum
+ * domain; it is not promoted to a proved physical fact.</p>
  */
 public final class EigenproblemRepresentationBridge implements
         RepresentationBridge<
@@ -201,8 +202,8 @@ public final class EigenproblemRepresentationBridge implements
             return ModelInterpretation.NONE;
         }
         return source.operatorProperties().contains(OperatorProperty.HERMITIAN)
-            ? ModelInterpretation.HERMITIAN_QUANTUM_OBSERVABLE
-            : ModelInterpretation.QUANTUM_OPERATOR;
+            ? ModelInterpretation.DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
+            : ModelInterpretation.DECLARED_QUANTUM_OPERATOR;
     }
 
     private static List<String> capabilities(
@@ -221,7 +222,8 @@ public final class EigenproblemRepresentationBridge implements
                 .CAPABILITY_QUANTUM_OPERATOR_MODEL);
         }
         if (interpretation
-                == ModelInterpretation.HERMITIAN_QUANTUM_OBSERVABLE
+                == ModelInterpretation
+                    .DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
                 && properties.contains(OperatorProperty.HERMITIAN)) {
             result.add(EigenproblemRepresentation
                 .CAPABILITY_HERMITIAN_SPECTRAL_MODEL);
@@ -415,13 +417,13 @@ public final class EigenproblemRepresentationBridge implements
                     && declaredModelDomain
                         != ModelDomain.GENERIC_LINEAR_ALGEBRA) {
                 throw new IllegalArgumentException(
-                    "missing interpretation for declared quantum domain");
+                    "missing declared interpretation for quantum domain");
             }
             if (modelInterpretation != ModelInterpretation.NONE
                     && declaredModelDomain
                         != ModelDomain.FINITE_DIMENSIONAL_QUANTUM) {
                 throw new IllegalArgumentException(
-                    "quantum interpretation requires quantum domain");
+                    "declared quantum interpretation requires quantum domain");
             }
         }
 
