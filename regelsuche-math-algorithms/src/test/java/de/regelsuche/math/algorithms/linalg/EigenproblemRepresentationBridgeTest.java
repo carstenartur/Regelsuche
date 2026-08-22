@@ -274,7 +274,7 @@ class EigenproblemRepresentationBridgeTest {
     @Test
     void eigenvalueParameterCannotAlsoBeADeclaredCoordinate() {
         SymbolicLinearSystem system = symbolic(
-            "a*x = lambda*x",
+            "a*x = q*x; lambda = 0",
             List.of("x", "lambda"));
 
         assertThrows(IllegalArgumentException.class, () -> new Source(
