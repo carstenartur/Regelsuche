@@ -143,8 +143,8 @@ def generateHistoricalRewriteArchitectureDecision = tasks.register(
     }
 }
 
-def generateRepresentationMatchedWorkReport = tasks.register(
-    'generateRepresentationMatchedWorkReport', JavaExec) {
+def representationMatchedWork = tasks.register(
+    'representationMatchedWork', JavaExec) {
     group = 'verification'
     description = 'Executes the frozen exact representation-versus-direct matched-work experiment.'
     dependsOn tasks.named('classes')
@@ -174,10 +174,10 @@ def generateRepresentationMatchedWorkReport = tasks.register(
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
     dependsOn generateHistoricalRewriteArchitectureDecision
-    dependsOn generateRepresentationMatchedWorkReport
+    dependsOn representationMatchedWork
 }
 
 rootProject.tasks.named('check') {
     dependsOn generateHistoricalRewriteArchitectureDecision
-    dependsOn generateRepresentationMatchedWorkReport
+    dependsOn representationMatchedWork
 }
