@@ -114,6 +114,9 @@ public record ExactRrefReduction(
         }
 
         boolean consistent = contradictionRows.isEmpty();
+        SolutionClassification classification = classification(
+            contradictionRows,
+            freeVariableColumns);
         if (particularSolution.isPresent() != consistent) {
             throw new IllegalArgumentException(
                 "only consistent systems retain a particular solution");
@@ -137,9 +140,7 @@ public record ExactRrefReduction(
             Objects.requireNonNull(operation, "rowOperation");
             operation.requireRowsWithin(reducedCoefficients.rowCount());
         }
-        validateCapabilities(
-            capabilityFrontier,
-            solutionClassification());
+        validateCapabilities(capabilityFrontier, classification);
     }
 
     public int coefficientRank() {
@@ -151,12 +152,7 @@ public record ExactRrefReduction(
     }
 
     public SolutionClassification solutionClassification() {
-        if (!contradictionRows.isEmpty()) {
-            return SolutionClassification.INCONSISTENT;
-        }
-        return freeVariableColumns.isEmpty()
-            ? SolutionClassification.UNIQUE
-            : SolutionClassification.UNDERDETERMINED;
+        return classification(contradictionRows, freeVariableColumns);
     }
 
     public List<List<Rational>> reducedAugmentedRows() {
@@ -170,6 +166,18 @@ public record ExactRrefReduction(
             rows.add(List.copyOf(augmented));
         }
         return List.copyOf(rows);
+    }
+
+    private static SolutionClassification classification(
+        List<Integer> contradictions,
+        List<Integer> freeColumns
+    ) {
+        if (!contradictions.isEmpty()) {
+            return SolutionClassification.INCONSISTENT;
+        }
+        return freeColumns.isEmpty()
+            ? SolutionClassification.UNIQUE
+            : SolutionClassification.UNDERDETERMINED;
     }
 
     private static List<String> normalizedVariables(List<String> values) {
