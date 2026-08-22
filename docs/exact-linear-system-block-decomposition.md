@@ -50,8 +50,8 @@ syntactically declared coordinate.
 
 Every matrix entry is inspected while constructing the incidence graph and
 again while checking that all cross-component coefficients are zero. Exhausted
-work yields `BUDGET_INCONCLUSIVE`; a connected matrix yields
-`DIRECT_REPRESENTATION_AVAILABLE` and no manufactured decomposition.
+work yields `BUDGET_INCONCLUSIVE`; a connected matrix yields `NOT_APPLICABLE`
+and no manufactured decomposition.
 
 The result model also checks that the row and column permutations are exactly
 the concatenation of the retained component partitions and that reported
