@@ -426,9 +426,10 @@ public final class SymbolicLinearSystemRepresentationBridge implements
         public Certificate {
             if (schema == null || schema.isBlank()
                     || bridgeId == null || bridgeId.isBlank()
-                    || contentHash == null || contentHash.isBlank()) {
+                    || contentHash == null
+                    || !contentHash.matches("[0-9a-f]{64}")) {
                 throw new IllegalArgumentException(
-                    "certificate identities must not be blank");
+                    "certificate identities are invalid");
             }
             relation = Objects.requireNonNull(relation, "relation");
             sourceEquations = textList(sourceEquations, "sourceEquations");
