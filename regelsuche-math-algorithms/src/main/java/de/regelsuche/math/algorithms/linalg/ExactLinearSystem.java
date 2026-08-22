@@ -58,17 +58,17 @@ public record ExactLinearSystem(
             throw new IllegalArgumentException(
                 "coefficient columns and variable count disagree");
         }
-        if (coefficients.rows() != rightHandSide.dimension()
-                || coefficients.rows() != rowOrigins.size()) {
+        if (coefficients.rowCount() != rightHandSide.dimension()
+                || coefficients.rowCount() != rowOrigins.size()) {
             throw new IllegalArgumentException(
                 "coefficient rows, RHS and row origins disagree");
         }
 
         int maximumCoefficientRank = Math.min(
-            coefficients.rows(),
+            coefficients.rowCount(),
             coefficients.columns());
         int maximumAugmentedRank = Math.min(
-            coefficients.rows(),
+            coefficients.rowCount(),
             coefficients.columns() + 1);
         if (coefficientRank < 0
                 || coefficientRank > maximumCoefficientRank
@@ -89,7 +89,7 @@ public record ExactLinearSystem(
     }
 
     public int equationCount() {
-        return coefficients.rows();
+        return coefficients.rowCount();
     }
 
     public int variableCount() {
@@ -122,16 +122,16 @@ public record ExactLinearSystem(
         INCONSISTENT
     }
 
-    public record ExactMatrix(List<List<Rational>> entries) {
+    public record ExactMatrix(List<List<Rational>> rows) {
         public ExactMatrix {
-            Objects.requireNonNull(entries, "entries");
-            if (entries.isEmpty()) {
+            Objects.requireNonNull(rows, "rows");
+            if (rows.isEmpty()) {
                 throw new IllegalArgumentException(
                     "matrix must contain at least one row");
             }
-            List<List<Rational>> retained = new ArrayList<>(entries.size());
+            List<List<Rational>> retained = new ArrayList<>(rows.size());
             int columns = -1;
-            for (List<Rational> row : entries) {
+            for (List<Rational> row : rows) {
                 Objects.requireNonNull(row, "matrix row");
                 if (columns < 0) {
                     columns = row.size();
@@ -150,19 +150,19 @@ public record ExactLinearSystem(
                     .toList();
                 retained.add(retainedRow);
             }
-            entries = List.copyOf(retained);
+            rows = List.copyOf(retained);
         }
 
-        public int rows() {
-            return entries.size();
+        public int rowCount() {
+            return rows.size();
         }
 
         public int columns() {
-            return entries.getFirst().size();
+            return rows.getFirst().size();
         }
 
         public Rational get(int row, int column) {
-            return entries.get(row).get(column);
+            return rows.get(row).get(column);
         }
     }
 
