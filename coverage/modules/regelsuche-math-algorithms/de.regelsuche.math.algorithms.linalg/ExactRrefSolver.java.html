@@ -1,0 +1,862 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactRrefSolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">ExactRrefSolver.java</span></div><h1>ExactRrefSolver.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.SolutionClassification;
+import de.regelsuche.math.algorithms.linalg.ExactRrefReduction.CapabilityFrontier;
+import de.regelsuche.math.algorithms.linalg.ExactRrefReduction.Pivot;
+import de.regelsuche.math.algorithms.linalg.ExactRrefReduction.RowOperation;
+import de.regelsuche.representation.RepresentationBridge.Budget;
+import de.regelsuche.representation.RepresentationBridge.Relation;
+import de.regelsuche.representation.RepresentationBridge.WorkLedger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Deterministic exact Gauss-Jordan reduction for {@link ExactLinearSystem}.
+ *
+ * &lt;p&gt;The solver is bounded by explicit mechanical work. Every successful result
+ * retains the invertible elementary row-operation lineage, an exact affine
+ * solution description or inconsistency witness, a capability delta and a
+ * content-addressed certificate. Verification recomputes the complete result.&lt;/p&gt;
+ */
+<span class="fc" id="L32">public final class ExactRrefSolver {</span>
+    public static final String SOLVER_ID = &quot;exact-rref/gauss-jordan/v1&quot;;
+    public static final String CERTIFICATE_SCHEMA =
+        &quot;regelsuche.exact-rref-certificate/v1&quot;;
+
+    public Result solve(ExactLinearSystem source, Budget budget) {
+<span class="fc" id="L38">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L39">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L40">        WorkCounter work = new WorkCounter(budget.maxWorkUnits());</span>
+        try {
+<span class="fc" id="L42">            MutableAugmentedMatrix matrix = copy(source, work);</span>
+<span class="fc" id="L43">            List&lt;RowOperation&gt; operations = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L44">            List&lt;Pivot&gt; coefficientPivots = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L45">            int pivotRow = 0;</span>
+<span class="fc" id="L46">            for (int column = 0;</span>
+<span class="fc bfc" id="L47" title="All 4 branches covered.">                    column &lt; matrix.width() &amp;&amp; pivotRow &lt; matrix.rowCount();</span>
+<span class="fc" id="L48">                    column++) {</span>
+<span class="fc" id="L49">                int candidate = findPivot(matrix, pivotRow, column, work);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                if (candidate &lt; 0) {</span>
+<span class="fc" id="L51">                    continue;</span>
+                }
+<span class="fc bfc" id="L53" title="All 2 branches covered.">                if (candidate != pivotRow) {</span>
+<span class="fc" id="L54">                    swapRows(matrix, pivotRow, candidate, work);</span>
+<span class="fc" id="L55">                    operations.add(RowOperation.swap(pivotRow, candidate));</span>
+                }
+
+<span class="fc" id="L58">                Rational pivot = matrix.get(pivotRow, column);</span>
+<span class="fc" id="L59">                work.consume();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                if (!pivot.isOne()) {</span>
+<span class="fc" id="L61">                    Rational multiplier = Rational.ONE.divide(pivot);</span>
+<span class="fc" id="L62">                    scaleRow(matrix, pivotRow, multiplier, work);</span>
+<span class="fc" id="L63">                    operations.add(RowOperation.scale(pivotRow, multiplier));</span>
+                }
+
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                for (int row = 0; row &lt; matrix.rowCount(); row++) {</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                    if (row == pivotRow) {</span>
+<span class="fc" id="L68">                        continue;</span>
+                    }
+<span class="fc" id="L70">                    work.consume();</span>
+<span class="fc" id="L71">                    Rational factor = matrix.get(row, column);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">                    if (factor.isZero()) {</span>
+<span class="fc" id="L73">                        continue;</span>
+                    }
+<span class="fc" id="L75">                    Rational multiplier = factor.negate();</span>
+<span class="fc" id="L76">                    addRowMultiple(</span>
+                        matrix,
+                        row,
+                        pivotRow,
+                        multiplier,
+                        work);
+<span class="fc" id="L82">                    operations.add(RowOperation.addMultiple(</span>
+                        row,
+                        pivotRow,
+                        multiplier));
+                }
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                if (column &lt; matrix.coefficientColumns()) {</span>
+<span class="fc" id="L89">                    coefficientPivots.add(new Pivot(pivotRow, column));</span>
+                }
+<span class="fc" id="L91">                pivotRow++;</span>
+            }
+
+<span class="fc" id="L94">            List&lt;Integer&gt; contradictionRows = contradictionRows(matrix, work);</span>
+<span class="fc" id="L95">            int coefficientRank = coefficientPivots.size();</span>
+<span class="fc" id="L96">            int augmentedRank = coefficientRank</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                + (contradictionRows.isEmpty() ? 0 : 1);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            SolutionClassification classification = contradictionRows.isEmpty()</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                ? coefficientRank == matrix.coefficientColumns()</span>
+<span class="fc" id="L100">                    ? SolutionClassification.UNIQUE</span>
+<span class="fc" id="L101">                    : SolutionClassification.UNDERDETERMINED</span>
+<span class="fc" id="L102">                : SolutionClassification.INCONSISTENT;</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (source.coefficientRank() != coefficientRank</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                    || source.augmentedRank() != augmentedRank</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">                    || source.solutionClassification() != classification) {</span>
+<span class="fc" id="L106">                return Result.withoutReduction(</span>
+                    Status.INVALID_SOURCE,
+<span class="fc" id="L108">                    work.ledger(),</span>
+                    &quot;SOURCE_RANK_METADATA_MISMATCH&quot;);
+            }
+
+<span class="fc" id="L112">            ExactMatrix reducedCoefficients = reducedCoefficients(matrix);</span>
+<span class="fc" id="L113">            ExactVector reducedRightHandSide = reducedRightHandSide(matrix);</span>
+<span class="fc" id="L114">            List&lt;Integer&gt; freeColumns = freeColumns(</span>
+                coefficientPivots,
+<span class="fc" id="L116">                matrix.coefficientColumns());</span>
+<span class="fc" id="L117">            SolutionData solutionData = solutionData(</span>
+                reducedCoefficients,
+                reducedRightHandSide,
+                coefficientPivots,
+                freeColumns,
+                contradictionRows);
+<span class="fc" id="L123">            CapabilityFrontier frontier = capabilityFrontier(classification);</span>
+<span class="fc" id="L124">            ExactRrefReduction reduction = new ExactRrefReduction(</span>
+                reducedCoefficients,
+<span class="fc" id="L126">                source.variables(),</span>
+                reducedRightHandSide,
+                coefficientPivots,
+                freeColumns,
+<span class="fc" id="L130">                solutionData.particularSolution(),</span>
+<span class="fc" id="L131">                solutionData.nullspaceBasis(),</span>
+                contradictionRows,
+                operations,
+                frontier,
+                Relation.SOLUTION_SET_EQUIVALENCE);
+
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (!isReducedRowEchelon(reduction, work)</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                    || !replayMatches(source, reduction, work)) {</span>
+<span class="nc" id="L139">                return Result.withoutReduction(</span>
+                    Status.INVALID_CERTIFICATE,
+<span class="nc" id="L141">                    work.ledger(),</span>
+                    &quot;RREF_REPLAY_OR_NORMAL_FORM_MISMATCH&quot;);
+            }
+
+<span class="fc" id="L145">            Certificate certificate = certificate(source, reduction);</span>
+<span class="fc" id="L146">            return Result.solved(reduction, certificate, work.ledger());</span>
+<span class="fc" id="L147">        } catch (BudgetExceeded exception) {</span>
+<span class="fc" id="L148">            return Result.withoutReduction(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L150">                work.ledger(),</span>
+                &quot;RREF_WORK_BUDGET_EXHAUSTED&quot;);
+        }
+    }
+
+    public boolean verify(ExactLinearSystem source, Result result) {
+<span class="pc bpc" id="L156" title="2 of 4 branches missed.">        if (source == null</span>
+                || result == null
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                || result.status() != Status.SOLVED) {</span>
+<span class="fc" id="L159">            return false;</span>
+        }
+        try {
+<span class="fc" id="L162">            return solve(</span>
+                source,
+<span class="fc" id="L164">                new Budget(result.work().configuredWorkUnits()))</span>
+<span class="fc" id="L165">                .equals(result);</span>
+<span class="nc" id="L166">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L167">            return false;</span>
+        }
+    }
+
+    private static MutableAugmentedMatrix copy(
+        ExactLinearSystem source,
+        WorkCounter work
+    ) {
+<span class="fc" id="L175">        List&lt;List&lt;Rational&gt;&gt; rows = new ArrayList&lt;&gt;(source.equationCount());</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (int row = 0; row &lt; source.equationCount(); row++) {</span>
+<span class="fc" id="L177">            List&lt;Rational&gt; retained = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L178">                source.variableCount() + 1);</span>
+<span class="fc" id="L179">            for (int column = 0;</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">                    column &lt; source.variableCount();</span>
+<span class="fc" id="L181">                    column++) {</span>
+<span class="fc" id="L182">                work.consume();</span>
+<span class="fc" id="L183">                retained.add(source.coefficients().get(row, column));</span>
+            }
+<span class="fc" id="L185">            work.consume();</span>
+<span class="fc" id="L186">            retained.add(source.rightHandSide().get(row));</span>
+<span class="fc" id="L187">            rows.add(retained);</span>
+        }
+<span class="fc" id="L189">        return new MutableAugmentedMatrix(rows, source.variableCount());</span>
+    }
+
+    private static int findPivot(
+        MutableAugmentedMatrix matrix,
+        int firstRow,
+        int column,
+        WorkCounter work
+    ) {
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for (int row = firstRow; row &lt; matrix.rowCount(); row++) {</span>
+<span class="fc" id="L199">            work.consume();</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (!matrix.get(row, column).isZero()) {</span>
+<span class="fc" id="L201">                return row;</span>
+            }
+        }
+<span class="fc" id="L204">        return -1;</span>
+    }
+
+    private static void swapRows(
+        MutableAugmentedMatrix matrix,
+        int firstRow,
+        int secondRow,
+        WorkCounter work
+    ) {
+<span class="fc" id="L213">        work.consume(matrix.width());</span>
+<span class="fc" id="L214">        Collections.swap(matrix.rows(), firstRow, secondRow);</span>
+<span class="fc" id="L215">    }</span>
+
+    private static void scaleRow(
+        MutableAugmentedMatrix matrix,
+        int row,
+        Rational multiplier,
+        WorkCounter work
+    ) {
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        for (int column = 0; column &lt; matrix.width(); column++) {</span>
+<span class="fc" id="L224">            work.consume();</span>
+<span class="fc" id="L225">            matrix.set(</span>
+                row,
+                column,
+<span class="fc" id="L228">                matrix.get(row, column).multiply(multiplier));</span>
+        }
+<span class="fc" id="L230">    }</span>
+
+    private static void addRowMultiple(
+        MutableAugmentedMatrix matrix,
+        int targetRow,
+        int sourceRow,
+        Rational multiplier,
+        WorkCounter work
+    ) {
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        for (int column = 0; column &lt; matrix.width(); column++) {</span>
+<span class="fc" id="L240">            work.consume();</span>
+<span class="fc" id="L241">            Rational replacement = matrix.get(targetRow, column).add(</span>
+<span class="fc" id="L242">                matrix.get(sourceRow, column).multiply(multiplier));</span>
+<span class="fc" id="L243">            matrix.set(targetRow, column, replacement);</span>
+        }
+<span class="fc" id="L245">    }</span>
+
+    private static List&lt;Integer&gt; contradictionRows(
+        MutableAugmentedMatrix matrix,
+        WorkCounter work
+    ) {
+<span class="fc" id="L251">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        for (int row = 0; row &lt; matrix.rowCount(); row++) {</span>
+<span class="fc" id="L253">            boolean zeroCoefficients = true;</span>
+<span class="fc" id="L254">            for (int column = 0;</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">                    column &lt; matrix.coefficientColumns();</span>
+<span class="fc" id="L256">                    column++) {</span>
+<span class="fc" id="L257">                work.consume();</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                if (!matrix.get(row, column).isZero()) {</span>
+<span class="fc" id="L259">                    zeroCoefficients = false;</span>
+<span class="fc" id="L260">                    break;</span>
+                }
+            }
+<span class="fc" id="L263">            work.consume();</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            if (zeroCoefficients</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">                    &amp;&amp; !matrix.get(row, matrix.coefficientColumns()).isZero()) {</span>
+<span class="fc" id="L266">                result.add(row);</span>
+            }
+        }
+<span class="fc" id="L269">        return List.copyOf(result);</span>
+    }
+
+    private static ExactMatrix reducedCoefficients(
+        MutableAugmentedMatrix matrix
+    ) {
+<span class="fc" id="L275">        List&lt;List&lt;Rational&gt;&gt; rows = new ArrayList&lt;&gt;(matrix.rowCount());</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        for (List&lt;Rational&gt; row : matrix.rows()) {</span>
+<span class="fc" id="L277">            rows.add(List.copyOf(row.subList(</span>
+                0,
+<span class="fc" id="L279">                matrix.coefficientColumns())));</span>
+<span class="fc" id="L280">        }</span>
+<span class="fc" id="L281">        return new ExactMatrix(rows);</span>
+    }
+
+    private static ExactVector reducedRightHandSide(
+        MutableAugmentedMatrix matrix
+    ) {
+<span class="fc" id="L287">        return new ExactVector(matrix.rows().stream()</span>
+<span class="fc" id="L288">            .map(row -&gt; row.get(matrix.coefficientColumns()))</span>
+<span class="fc" id="L289">            .toList());</span>
+    }
+
+    private static List&lt;Integer&gt; freeColumns(
+        List&lt;Pivot&gt; pivots,
+        int coefficientColumns
+    ) {
+<span class="fc" id="L296">        Set&lt;Integer&gt; pivotColumns = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L297">        pivots.forEach(pivot -&gt; pivotColumns.add(pivot.column()));</span>
+<span class="fc" id="L298">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        for (int column = 0; column &lt; coefficientColumns; column++) {</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            if (!pivotColumns.contains(column)) {</span>
+<span class="fc" id="L301">                result.add(column);</span>
+            }
+        }
+<span class="fc" id="L304">        return List.copyOf(result);</span>
+    }
+
+    private static SolutionData solutionData(
+        ExactMatrix coefficients,
+        ExactVector rightHandSide,
+        List&lt;Pivot&gt; pivots,
+        List&lt;Integer&gt; freeColumns,
+        List&lt;Integer&gt; contradictionRows
+    ) {
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (!contradictionRows.isEmpty()) {</span>
+<span class="fc" id="L315">            return new SolutionData(Optional.empty(), List.of());</span>
+        }
+<span class="fc" id="L317">        List&lt;Rational&gt; particular = zeroVector(coefficients.columns());</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        for (Pivot pivot : pivots) {</span>
+<span class="fc" id="L319">            particular.set(pivot.column(), rightHandSide.get(pivot.row()));</span>
+<span class="fc" id="L320">        }</span>
+
+<span class="fc" id="L322">        List&lt;ExactVector&gt; basis = new ArrayList&lt;&gt;(freeColumns.size());</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        for (int freeColumn : freeColumns) {</span>
+<span class="fc" id="L324">            List&lt;Rational&gt; vector = zeroVector(coefficients.columns());</span>
+<span class="fc" id="L325">            vector.set(freeColumn, Rational.ONE);</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">            for (Pivot pivot : pivots) {</span>
+<span class="fc" id="L327">                vector.set(</span>
+<span class="fc" id="L328">                    pivot.column(),</span>
+<span class="fc" id="L329">                    coefficients.get(pivot.row(), freeColumn).negate());</span>
+<span class="fc" id="L330">            }</span>
+<span class="fc" id="L331">            basis.add(new ExactVector(vector));</span>
+<span class="fc" id="L332">        }</span>
+<span class="fc" id="L333">        return new SolutionData(</span>
+<span class="fc" id="L334">            Optional.of(new ExactVector(particular)),</span>
+<span class="fc" id="L335">            List.copyOf(basis));</span>
+    }
+
+    private static List&lt;Rational&gt; zeroVector(int dimension) {
+<span class="fc" id="L339">        return new ArrayList&lt;&gt;(Collections.nCopies(</span>
+            dimension,
+            Rational.ZERO));
+    }
+
+    private static CapabilityFrontier capabilityFrontier(
+        SolutionClassification classification
+    ) {
+<span class="fc" id="L347">        List&lt;String&gt; before = List.of(</span>
+            ExactRrefReduction.CAPABILITY_EXACT_LINEAR_SYSTEM,
+            ExactRrefReduction.CAPABILITY_RANK_CLASSIFICATION);
+<span class="fc" id="L350">        List&lt;String&gt; after = new ArrayList&lt;&gt;(before);</span>
+<span class="fc" id="L351">        after.add(ExactRrefReduction.CAPABILITY_EXACT_RREF);</span>
+<span class="fc" id="L352">        after.add(ExactRrefReduction.CAPABILITY_ROW_OPERATION_REPLAY);</span>
+<span class="pc bpc" id="L353" title="1 of 4 branches missed.">        switch (classification) {</span>
+            case UNIQUE -&gt; {
+<span class="fc" id="L355">                after.add(ExactRrefReduction</span>
+                    .CAPABILITY_AFFINE_SOLUTION_SPACE);
+<span class="fc" id="L357">                after.add(ExactRrefReduction.CAPABILITY_UNIQUE_SOLUTION);</span>
+<span class="fc" id="L358">            }</span>
+            case UNDERDETERMINED -&gt; {
+<span class="fc" id="L360">                after.add(ExactRrefReduction</span>
+                    .CAPABILITY_AFFINE_SOLUTION_SPACE);
+<span class="fc" id="L362">                after.add(ExactRrefReduction</span>
+                    .CAPABILITY_PARAMETRIC_SOLUTION);
+<span class="fc" id="L364">            }</span>
+<span class="fc" id="L365">            case INCONSISTENT -&gt; after.add(ExactRrefReduction</span>
+                .CAPABILITY_INCONSISTENCY_WITNESS);
+        }
+<span class="fc" id="L368">        List&lt;String&gt; immutableAfter = List.copyOf(after);</span>
+<span class="fc" id="L369">        return new CapabilityFrontier(</span>
+            before,
+            immutableAfter,
+<span class="fc" id="L372">            immutableAfter.subList(before.size(), immutableAfter.size()),</span>
+<span class="fc" id="L373">            List.of());</span>
+    }
+
+    private static boolean isReducedRowEchelon(
+        ExactRrefReduction reduction,
+        WorkCounter work
+    ) {
+<span class="fc" id="L380">        List&lt;List&lt;Rational&gt;&gt; rows = reduction.reducedAugmentedRows();</span>
+<span class="fc" id="L381">        int width = reduction.variables().size() + 1;</span>
+<span class="fc" id="L382">        int previousPivot = -1;</span>
+<span class="fc" id="L383">        boolean zeroRowSeen = false;</span>
+<span class="fc" id="L384">        List&lt;Pivot&gt; coefficientPivots = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L385">        List&lt;Integer&gt; contradictions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        for (int row = 0; row &lt; rows.size(); row++) {</span>
+<span class="fc" id="L387">            int leadingColumn = -1;</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">            for (int column = 0; column &lt; width; column++) {</span>
+<span class="fc" id="L389">                work.consume();</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">                if (!rows.get(row).get(column).isZero()) {</span>
+<span class="fc" id="L391">                    leadingColumn = column;</span>
+<span class="fc" id="L392">                    break;</span>
+                }
+            }
+<span class="fc bfc" id="L395" title="All 2 branches covered.">            if (leadingColumn &lt; 0) {</span>
+<span class="fc" id="L396">                zeroRowSeen = true;</span>
+<span class="fc" id="L397">                continue;</span>
+            }
+<span class="pc bpc" id="L399" title="2 of 4 branches missed.">            if (zeroRowSeen || leadingColumn &lt;= previousPivot) {</span>
+<span class="nc" id="L400">                return false;</span>
+            }
+<span class="fc" id="L402">            work.consume();</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">            if (!rows.get(row).get(leadingColumn).isOne()) {</span>
+<span class="nc" id="L404">                return false;</span>
+            }
+<span class="fc bfc" id="L406" title="All 2 branches covered.">            for (int otherRow = 0; otherRow &lt; rows.size(); otherRow++) {</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">                if (otherRow == row) {</span>
+<span class="fc" id="L408">                    continue;</span>
+                }
+<span class="fc" id="L410">                work.consume();</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">                if (!rows.get(otherRow).get(leadingColumn).isZero()) {</span>
+<span class="nc" id="L412">                    return false;</span>
+                }
+            }
+<span class="fc bfc" id="L415" title="All 2 branches covered.">            if (leadingColumn &lt; reduction.variables().size()) {</span>
+<span class="fc" id="L416">                coefficientPivots.add(new Pivot(row, leadingColumn));</span>
+            } else {
+<span class="fc" id="L418">                contradictions.add(row);</span>
+            }
+<span class="fc" id="L420">            previousPivot = leadingColumn;</span>
+        }
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        return coefficientPivots.equals(reduction.coefficientPivots())</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">            &amp;&amp; contradictions.equals(reduction.contradictionRows());</span>
+    }
+
+    private static boolean replayMatches(
+        ExactLinearSystem source,
+        ExactRrefReduction reduction,
+        WorkCounter work
+    ) {
+<span class="fc" id="L431">        MutableAugmentedMatrix replay = copy(source, work);</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        for (RowOperation operation : reduction.rowOperations()) {</span>
+<span class="pc bpc" id="L433" title="1 of 4 branches missed.">            switch (operation.kind()) {</span>
+<span class="fc" id="L434">                case SWAP_ROWS -&gt; swapRows(</span>
+                    replay,
+<span class="fc" id="L436">                    operation.targetRow(),</span>
+<span class="fc" id="L437">                    operation.sourceRow(),</span>
+                    work);
+<span class="fc" id="L439">                case SCALE_ROW -&gt; scaleRow(</span>
+                    replay,
+<span class="fc" id="L441">                    operation.targetRow(),</span>
+<span class="fc" id="L442">                    operation.multiplier(),</span>
+                    work);
+<span class="fc" id="L444">                case ADD_ROW_MULTIPLE -&gt; addRowMultiple(</span>
+                    replay,
+<span class="fc" id="L446">                    operation.targetRow(),</span>
+<span class="fc" id="L447">                    operation.sourceRow(),</span>
+<span class="fc" id="L448">                    operation.multiplier(),</span>
+                    work);
+            }
+<span class="fc" id="L451">        }</span>
+<span class="fc" id="L452">        List&lt;List&lt;Rational&gt;&gt; expected = reduction.reducedAugmentedRows();</span>
+<span class="fc bfc" id="L453" title="All 2 branches covered.">        for (int row = 0; row &lt; replay.rowCount(); row++) {</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">            for (int column = 0; column &lt; replay.width(); column++) {</span>
+<span class="fc" id="L455">                work.consume();</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">                if (!replay.get(row, column).equals(</span>
+<span class="fc" id="L457">                        expected.get(row).get(column))) {</span>
+<span class="nc" id="L458">                    return false;</span>
+                }
+            }
+        }
+<span class="fc" id="L462">        return true;</span>
+    }
+
+    private static Certificate certificate(
+        ExactLinearSystem source,
+        ExactRrefReduction reduction
+    ) {
+<span class="fc" id="L469">        String sourceHash = sourceHash(source);</span>
+<span class="fc" id="L470">        List&lt;List&lt;String&gt;&gt; reducedRows = canonicalRows(</span>
+<span class="fc" id="L471">            reduction.reducedAugmentedRows());</span>
+<span class="fc" id="L472">        List&lt;String&gt; operations = reduction.rowOperations().stream()</span>
+<span class="fc" id="L473">            .map(RowOperation::canonicalForm)</span>
+<span class="fc" id="L474">            .toList();</span>
+<span class="fc" id="L475">        List&lt;String&gt; particular = reduction.particularSolution()</span>
+<span class="fc" id="L476">            .map(solution -&gt; canonicalVector(solution.values()))</span>
+<span class="fc" id="L477">            .orElseGet(List::of);</span>
+<span class="fc" id="L478">        List&lt;List&lt;String&gt;&gt; nullspace = reduction.nullspaceBasis().stream()</span>
+<span class="fc" id="L479">            .map(vector -&gt; canonicalVector(vector.values()))</span>
+<span class="fc" id="L480">            .toList();</span>
+<span class="fc" id="L481">        CapabilityFrontier frontier = reduction.capabilityFrontier();</span>
+
+<span class="fc" id="L483">        StringBuilder payload = new StringBuilder();</span>
+<span class="fc" id="L484">        append(payload, CERTIFICATE_SCHEMA);</span>
+<span class="fc" id="L485">        append(payload, SOLVER_ID);</span>
+<span class="fc" id="L486">        append(payload, Relation.SOLUTION_SET_EQUIVALENCE.name());</span>
+<span class="fc" id="L487">        append(payload, sourceHash);</span>
+<span class="fc" id="L488">        append(payload, reduction.solutionClassification().name());</span>
+<span class="fc" id="L489">        appendRows(payload, reducedRows);</span>
+<span class="fc" id="L490">        operations.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L491">        reduction.coefficientPivots().forEach(pivot -&gt; {</span>
+<span class="fc" id="L492">            append(payload, Integer.toString(pivot.row()));</span>
+<span class="fc" id="L493">            append(payload, Integer.toString(pivot.column()));</span>
+<span class="fc" id="L494">        });</span>
+<span class="fc" id="L495">        reduction.freeVariableColumns().forEach(value -&gt;</span>
+<span class="fc" id="L496">            append(payload, Integer.toString(value)));</span>
+<span class="fc" id="L497">        reduction.contradictionRows().forEach(value -&gt;</span>
+<span class="fc" id="L498">            append(payload, Integer.toString(value)));</span>
+<span class="fc" id="L499">        particular.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L500">        appendRows(payload, nullspace);</span>
+<span class="fc" id="L501">        frontier.applicableBefore().forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L502">        frontier.applicableAfter().forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L503">        frontier.newlyUnlocked().forEach(value -&gt; append(payload, value));</span>
+<span class="pc" id="L504">        frontier.lostOrConditional().forEach(value -&gt; append(payload, value));</span>
+
+<span class="fc" id="L506">        return new Certificate(</span>
+            CERTIFICATE_SCHEMA,
+            SOLVER_ID,
+            Relation.SOLUTION_SET_EQUIVALENCE,
+            sourceHash,
+<span class="fc" id="L511">            reduction.solutionClassification(),</span>
+            reducedRows,
+            operations,
+<span class="fc" id="L514">            reduction.coefficientPivots(),</span>
+<span class="fc" id="L515">            reduction.freeVariableColumns(),</span>
+<span class="fc" id="L516">            reduction.contradictionRows(),</span>
+            particular,
+            nullspace,
+<span class="fc" id="L519">            frontier.applicableBefore(),</span>
+<span class="fc" id="L520">            frontier.applicableAfter(),</span>
+<span class="fc" id="L521">            frontier.newlyUnlocked(),</span>
+<span class="fc" id="L522">            frontier.lostOrConditional(),</span>
+<span class="fc" id="L523">            sha256(payload.toString()));</span>
+    }
+
+    private static String sourceHash(ExactLinearSystem source) {
+<span class="fc" id="L527">        StringBuilder payload = new StringBuilder();</span>
+<span class="fc" id="L528">        append(payload, Integer.toString(source.equationCount()));</span>
+<span class="fc" id="L529">        append(payload, Integer.toString(source.variableCount()));</span>
+<span class="fc" id="L530">        source.variables().forEach(value -&gt; append(payload, value));</span>
+<span class="fc bfc" id="L531" title="All 2 branches covered.">        for (List&lt;Rational&gt; row : source.coefficients().rows()) {</span>
+<span class="fc" id="L532">            row.stream().map(Rational::toString)</span>
+<span class="fc" id="L533">                .forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L534">        }</span>
+<span class="fc" id="L535">        source.rightHandSide().values().stream()</span>
+<span class="fc" id="L536">            .map(Rational::toString)</span>
+<span class="fc" id="L537">            .forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L538">        source.rowOrigins().forEach(origin -&gt; {</span>
+<span class="fc" id="L539">            append(payload, Integer.toString(origin.sourceIndex()));</span>
+<span class="fc" id="L540">            append(payload, origin.sourceEquation());</span>
+<span class="fc" id="L541">        });</span>
+<span class="fc" id="L542">        append(payload, Integer.toString(source.coefficientRank()));</span>
+<span class="fc" id="L543">        append(payload, Integer.toString(source.augmentedRank()));</span>
+<span class="fc" id="L544">        append(payload, source.solutionClassification().name());</span>
+<span class="fc" id="L545">        return sha256(payload.toString());</span>
+    }
+
+    private static List&lt;List&lt;String&gt;&gt; canonicalRows(
+        List&lt;List&lt;Rational&gt;&gt; rows
+    ) {
+<span class="fc" id="L551">        return rows.stream().map(ExactRrefSolver::canonicalVector).toList();</span>
+    }
+
+    private static List&lt;String&gt; canonicalVector(List&lt;Rational&gt; values) {
+<span class="fc" id="L555">        return values.stream().map(Rational::toString).toList();</span>
+    }
+
+    private static void appendRows(
+        StringBuilder target,
+        List&lt;List&lt;String&gt;&gt; rows
+    ) {
+<span class="fc" id="L562">        append(target, Integer.toString(rows.size()));</span>
+<span class="fc bfc" id="L563" title="All 2 branches covered.">        for (List&lt;String&gt; row : rows) {</span>
+<span class="fc" id="L564">            append(target, Integer.toString(row.size()));</span>
+<span class="fc" id="L565">            row.forEach(value -&gt; append(target, value));</span>
+<span class="fc" id="L566">        }</span>
+<span class="fc" id="L567">    }</span>
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L570">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L571">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L575">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L576">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="fc" id="L577">                    value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L578">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L579">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L583">    public enum Status {</span>
+<span class="fc" id="L584">        SOLVED,</span>
+<span class="fc" id="L585">        INVALID_SOURCE,</span>
+<span class="fc" id="L586">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L587">        INVALID_CERTIFICATE</span>
+    }
+
+    public record Certificate(
+        String schema,
+        String solverId,
+        Relation relation,
+        String sourceSystemHash,
+        SolutionClassification solutionClassification,
+        List&lt;List&lt;String&gt;&gt; reducedAugmentedRows,
+        List&lt;String&gt; canonicalOperations,
+        List&lt;Pivot&gt; coefficientPivots,
+        List&lt;Integer&gt; freeVariableColumns,
+        List&lt;Integer&gt; contradictionRows,
+        List&lt;String&gt; particularSolution,
+        List&lt;List&lt;String&gt;&gt; nullspaceBasis,
+        List&lt;String&gt; capabilitiesBefore,
+        List&lt;String&gt; capabilitiesAfter,
+        List&lt;String&gt; newlyUnlockedCapabilities,
+        List&lt;String&gt; lostOrConditionalCapabilities,
+        String contentHash
+    ) {
+<span class="fc" id="L609">        public Certificate {</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">            if (!CERTIFICATE_SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L611" title="1 of 4 branches missed.">                    || !SOLVER_ID.equals(solverId)</span>
+                    || sourceSystemHash == null
+<span class="pc bpc" id="L613" title="1 of 4 branches missed.">                    || !sourceSystemHash.matches(&quot;[0-9a-f]{64}&quot;)</span>
+                    || contentHash == null
+<span class="fc bfc" id="L615" title="All 2 branches covered.">                    || !contentHash.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
+<span class="fc" id="L616">                throw new IllegalArgumentException(</span>
+                    &quot;certificate identities are invalid&quot;);
+            }
+<span class="fc" id="L619">            relation = Objects.requireNonNull(relation, &quot;relation&quot;);</span>
+<span class="fc bfc" id="L620" title="All 2 branches covered.">            if (relation != Relation.SOLUTION_SET_EQUIVALENCE) {</span>
+<span class="fc" id="L621">                throw new IllegalArgumentException(</span>
+                    &quot;RREF certificate relation is invalid&quot;);
+            }
+<span class="fc" id="L624">            solutionClassification = Objects.requireNonNull(</span>
+                solutionClassification,
+                &quot;solutionClassification&quot;);
+<span class="fc" id="L627">            reducedAugmentedRows = matrixText(</span>
+                reducedAugmentedRows,
+                &quot;reducedAugmentedRows&quot;);
+<span class="fc" id="L630">            canonicalOperations = textListAllowEmpty(</span>
+                canonicalOperations,
+                &quot;canonicalOperations&quot;);
+<span class="fc" id="L633">            coefficientPivots = List.copyOf(Objects.requireNonNull(</span>
+                coefficientPivots,
+                &quot;coefficientPivots&quot;));
+<span class="fc" id="L636">            freeVariableColumns = integerList(</span>
+                freeVariableColumns,
+                &quot;freeVariableColumns&quot;);
+<span class="fc" id="L639">            contradictionRows = integerList(</span>
+                contradictionRows,
+                &quot;contradictionRows&quot;);
+<span class="fc" id="L642">            particularSolution = textListAllowEmpty(</span>
+                particularSolution,
+                &quot;particularSolution&quot;);
+<span class="fc" id="L645">            nullspaceBasis = matrixTextAllowEmpty(</span>
+                nullspaceBasis,
+                &quot;nullspaceBasis&quot;);
+<span class="fc" id="L648">            capabilitiesBefore = textList(</span>
+                capabilitiesBefore,
+                &quot;capabilitiesBefore&quot;);
+<span class="fc" id="L651">            capabilitiesAfter = textList(</span>
+                capabilitiesAfter,
+                &quot;capabilitiesAfter&quot;);
+<span class="fc" id="L654">            newlyUnlockedCapabilities = textList(</span>
+                newlyUnlockedCapabilities,
+                &quot;newlyUnlockedCapabilities&quot;);
+<span class="fc" id="L657">            lostOrConditionalCapabilities = textListAllowEmpty(</span>
+                lostOrConditionalCapabilities,
+                &quot;lostOrConditionalCapabilities&quot;);
+<span class="fc" id="L660">        }</span>
+
+        private static List&lt;List&lt;String&gt;&gt; matrixText(
+            List&lt;List&lt;String&gt;&gt; rows,
+            String field
+        ) {
+<span class="fc" id="L666">            List&lt;List&lt;String&gt;&gt; retained = matrixTextAllowEmpty(rows, field);</span>
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">            if (retained.isEmpty()) {</span>
+<span class="nc" id="L668">                throw new IllegalArgumentException(field + &quot; must not be empty&quot;);</span>
+            }
+<span class="fc" id="L670">            int width = retained.getFirst().size();</span>
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">            if (width == 0</span>
+<span class="pc bpc" id="L672" title="2 of 4 branches missed.">                    || retained.stream().anyMatch(row -&gt; row.size() != width)) {</span>
+<span class="nc" id="L673">                throw new IllegalArgumentException(</span>
+                    field + &quot; rows must have one common positive width&quot;);
+            }
+<span class="fc" id="L676">            return retained;</span>
+        }
+
+        private static List&lt;List&lt;String&gt;&gt; matrixTextAllowEmpty(
+            List&lt;List&lt;String&gt;&gt; rows,
+            String field
+        ) {
+<span class="fc" id="L683">            Objects.requireNonNull(rows, field);</span>
+<span class="fc" id="L684">            return rows.stream()</span>
+<span class="fc" id="L685">                .map(row -&gt; textList(row, field + &quot; row&quot;))</span>
+<span class="fc" id="L686">                .toList();</span>
+        }
+
+        private static List&lt;String&gt; textList(
+            List&lt;String&gt; values,
+            String field
+        ) {
+<span class="fc" id="L693">            List&lt;String&gt; retained = textListAllowEmpty(values, field);</span>
+<span class="pc bpc" id="L694" title="1 of 2 branches missed.">            if (retained.isEmpty()) {</span>
+<span class="nc" id="L695">                throw new IllegalArgumentException(field + &quot; must not be empty&quot;);</span>
+            }
+<span class="fc" id="L697">            return retained;</span>
+        }
+
+        private static List&lt;String&gt; textListAllowEmpty(
+            List&lt;String&gt; values,
+            String field
+        ) {
+<span class="fc" id="L704">            Objects.requireNonNull(values, field);</span>
+<span class="fc" id="L705">            return values.stream().map(value -&gt; {</span>
+<span class="pc bpc" id="L706" title="2 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L707">                    throw new IllegalArgumentException(</span>
+                        field + &quot; entries must not be blank&quot;);
+                }
+<span class="fc" id="L710">                return value.trim();</span>
+<span class="fc" id="L711">            }).toList();</span>
+        }
+
+        private static List&lt;Integer&gt; integerList(
+            List&lt;Integer&gt; values,
+            String field
+        ) {
+<span class="fc" id="L718">            Objects.requireNonNull(values, field);</span>
+<span class="fc" id="L719">            return values.stream()</span>
+<span class="fc" id="L720">                .map(value -&gt; Objects.requireNonNull(value, field + &quot; entry&quot;))</span>
+<span class="fc" id="L721">                .toList();</span>
+        }
+    }
+
+    public record Result(
+        Status status,
+        Optional&lt;ExactRrefReduction&gt; reduction,
+        Optional&lt;Certificate&gt; certificate,
+        WorkLedger work,
+        String detailCode
+    ) {
+<span class="fc" id="L732">        public Result {</span>
+<span class="fc" id="L733">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L734">            reduction = Objects.requireNonNull(reduction, &quot;reduction&quot;);</span>
+<span class="fc" id="L735">            certificate = Objects.requireNonNull(certificate, &quot;certificate&quot;);</span>
+<span class="fc" id="L736">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L737" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L738">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L741">            detailCode = detailCode.trim();</span>
+<span class="pc bpc" id="L742" title="1 of 4 branches missed.">            boolean complete = reduction.isPresent() &amp;&amp; certificate.isPresent();</span>
+<span class="pc bpc" id="L743" title="1 of 4 branches missed.">            if ((status == Status.SOLVED) != complete</span>
+<span class="pc bpc" id="L744" title="1 of 2 branches missed.">                    || reduction.isPresent() != certificate.isPresent()) {</span>
+<span class="nc" id="L745">                throw new IllegalArgumentException(</span>
+                    &quot;only solved results retain complete RREF evidence&quot;);
+            }
+<span class="fc" id="L748">        }</span>
+
+        private static Result solved(
+            ExactRrefReduction reduction,
+            Certificate certificate,
+            WorkLedger work
+        ) {
+<span class="fc" id="L755">            return new Result(</span>
+                Status.SOLVED,
+<span class="fc" id="L757">                Optional.of(reduction),</span>
+<span class="fc" id="L758">                Optional.of(certificate),</span>
+                work,
+                &quot;EXACT_RREF_AND_SOLUTION_SPACE_COMPUTED&quot;);
+        }
+
+        private static Result withoutReduction(
+            Status status,
+            WorkLedger work,
+            String detailCode
+        ) {
+<span class="pc bpc" id="L768" title="1 of 2 branches missed.">            if (status == Status.SOLVED) {</span>
+<span class="nc" id="L769">                throw new IllegalArgumentException(</span>
+                    &quot;solved result requires RREF evidence&quot;);
+            }
+<span class="fc" id="L772">            return new Result(</span>
+                status,
+<span class="fc" id="L774">                Optional.empty(),</span>
+<span class="fc" id="L775">                Optional.empty(),</span>
+                work,
+                detailCode);
+        }
+    }
+
+    private record SolutionData(
+        Optional&lt;ExactVector&gt; particularSolution,
+        List&lt;ExactVector&gt; nullspaceBasis
+    ) {
+<span class="fc" id="L785">        private SolutionData {</span>
+<span class="fc" id="L786">            particularSolution = Objects.requireNonNull(</span>
+                particularSolution,
+                &quot;particularSolution&quot;);
+<span class="fc" id="L789">            nullspaceBasis = List.copyOf(Objects.requireNonNull(</span>
+                nullspaceBasis,
+                &quot;nullspaceBasis&quot;));
+<span class="fc" id="L792">        }</span>
+    }
+
+    private record MutableAugmentedMatrix(
+        List&lt;List&lt;Rational&gt;&gt; rows,
+        int coefficientColumns
+    ) {
+<span class="fc" id="L799">        private MutableAugmentedMatrix {</span>
+<span class="fc" id="L800">            Objects.requireNonNull(rows, &quot;rows&quot;);</span>
+<span class="pc bpc" id="L801" title="2 of 4 branches missed.">            if (rows.isEmpty() || coefficientColumns &lt; 1) {</span>
+<span class="nc" id="L802">                throw new IllegalArgumentException(</span>
+                    &quot;augmented matrix dimensions must be positive&quot;);
+            }
+<span class="fc" id="L805">            int width = coefficientColumns + 1;</span>
+<span class="pc bpc" id="L806" title="2 of 4 branches missed.">            if (rows.stream().anyMatch(row -&gt; row.size() != width)) {</span>
+<span class="nc" id="L807">                throw new IllegalArgumentException(</span>
+                    &quot;augmented matrix rows have inconsistent widths&quot;);
+            }
+<span class="fc" id="L810">        }</span>
+
+        private int rowCount() {
+<span class="fc" id="L813">            return rows.size();</span>
+        }
+
+        private int width() {
+<span class="fc" id="L817">            return coefficientColumns + 1;</span>
+        }
+
+        private Rational get(int row, int column) {
+<span class="fc" id="L821">            return rows.get(row).get(column);</span>
+        }
+
+        private void set(int row, int column, Rational value) {
+<span class="fc" id="L825">            rows.get(row).set(column, value);</span>
+<span class="fc" id="L826">        }</span>
+    }
+
+    private static final class WorkCounter {
+        private final int configured;
+        private int consumed;
+
+<span class="fc" id="L833">        private WorkCounter(int configured) {</span>
+<span class="fc" id="L834">            this.configured = configured;</span>
+<span class="fc" id="L835">        }</span>
+
+        private void consume() {
+<span class="fc" id="L838">            consume(1);</span>
+<span class="fc" id="L839">        }</span>
+
+        private void consume(int units) {
+<span class="pc bpc" id="L842" title="1 of 2 branches missed.">            if (units &lt; 0) {</span>
+<span class="nc" id="L843">                throw new IllegalArgumentException(</span>
+                    &quot;work units must not be negative&quot;);
+            }
+<span class="fc bfc" id="L846" title="All 2 branches covered.">            if (units &gt; configured - consumed) {</span>
+<span class="fc" id="L847">                consumed = configured;</span>
+<span class="fc" id="L848">                throw new BudgetExceeded();</span>
+            }
+<span class="fc" id="L850">            consumed += units;</span>
+<span class="fc" id="L851">        }</span>
+
+        private WorkLedger ledger() {
+<span class="fc" id="L854">            return WorkLedger.of(configured, consumed);</span>
+        }
+    }
+
+    private static final class BudgetExceeded extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

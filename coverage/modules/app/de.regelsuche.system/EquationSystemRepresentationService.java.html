@@ -7,13 +7,17 @@ import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystemBlockDecomposer;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystemBlockDecomposition;
+import de.regelsuche.math.algorithms.linalg.ExactRrefReduction;
+import de.regelsuche.math.algorithms.linalg.ExactRrefSolver;
 import de.regelsuche.math.algorithms.linalg.LinearSystemRepresentationBridge;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.representation.RepresentationBridge;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Product-facing entry point for exact equation-system representation.
@@ -22,74 +26,91 @@ import java.util.Optional;
  * equation roots. This service intentionally replaces that behavior for the
  * normal product path: it first retains the system as one mathematical object,
  * constructs its exact {@code A*x=b} representation and then exposes certified
- * independent blocks when they exist.&lt;/p&gt;
+ * independent blocks and an exact RREF capability frontier.&lt;/p&gt;
  */
 public final class EquationSystemRepresentationService {
     public static final int DEFAULT_REPRESENTATION_WORK = 20_000;
     public static final int DEFAULT_DECOMPOSITION_WORK = 20_000;
+    public static final int DEFAULT_RREF_WORK = 100_000;
 
     private final ExpressionParser parser;
     private final LinearSystemRepresentationBridge representationBridge;
     private final ExactLinearSystemBlockDecomposer blockDecomposer;
+    private final ExactRrefSolver rrefSolver;
     private final RepresentationBridge.Budget representationBudget;
     private final RepresentationBridge.Budget decompositionBudget;
+    private final RepresentationBridge.Budget rrefBudget;
 
     public EquationSystemRepresentationService() {
-<span class="fc" id="L38">        this(</span>
+<span class="fc" id="L45">        this(</span>
             new ExpressionParser(),
             new LinearSystemRepresentationBridge(),
             new ExactLinearSystemBlockDecomposer(),
+            new ExactRrefSolver(),
             new RepresentationBridge.Budget(DEFAULT_REPRESENTATION_WORK),
-            new RepresentationBridge.Budget(DEFAULT_DECOMPOSITION_WORK));
-<span class="fc" id="L44">    }</span>
+            new RepresentationBridge.Budget(DEFAULT_DECOMPOSITION_WORK),
+            new RepresentationBridge.Budget(DEFAULT_RREF_WORK));
+<span class="fc" id="L53">    }</span>
 
     public EquationSystemRepresentationService(
         ExpressionParser parser,
         LinearSystemRepresentationBridge representationBridge,
         ExactLinearSystemBlockDecomposer blockDecomposer,
+        ExactRrefSolver rrefSolver,
         RepresentationBridge.Budget representationBudget,
-        RepresentationBridge.Budget decompositionBudget
-<span class="fc" id="L52">    ) {</span>
-<span class="fc" id="L53">        this.parser = Objects.requireNonNull(parser, &quot;parser&quot;);</span>
-<span class="fc" id="L54">        this.representationBridge = Objects.requireNonNull(</span>
+        RepresentationBridge.Budget decompositionBudget,
+        RepresentationBridge.Budget rrefBudget
+<span class="fc" id="L63">    ) {</span>
+<span class="fc" id="L64">        this.parser = Objects.requireNonNull(parser, &quot;parser&quot;);</span>
+<span class="fc" id="L65">        this.representationBridge = Objects.requireNonNull(</span>
             representationBridge,
             &quot;representationBridge&quot;);
-<span class="fc" id="L57">        this.blockDecomposer = Objects.requireNonNull(</span>
+<span class="fc" id="L68">        this.blockDecomposer = Objects.requireNonNull(</span>
             blockDecomposer,
             &quot;blockDecomposer&quot;);
-<span class="fc" id="L60">        this.representationBudget = Objects.requireNonNull(</span>
+<span class="fc" id="L71">        this.rrefSolver = Objects.requireNonNull(rrefSolver, &quot;rrefSolver&quot;);</span>
+<span class="fc" id="L72">        this.representationBudget = Objects.requireNonNull(</span>
             representationBudget,
             &quot;representationBudget&quot;);
-<span class="fc" id="L63">        this.decompositionBudget = Objects.requireNonNull(</span>
+<span class="fc" id="L75">        this.decompositionBudget = Objects.requireNonNull(</span>
             decompositionBudget,
             &quot;decompositionBudget&quot;);
-<span class="fc" id="L66">    }</span>
+<span class="fc" id="L78">        this.rrefBudget = Objects.requireNonNull(rrefBudget, &quot;rrefBudget&quot;);</span>
+<span class="fc" id="L79">    }</span>
 
     public Analysis analyze(String input) {
-<span class="pc bpc" id="L69" title="1 of 4 branches missed.">        if (input == null || input.isBlank()) {</span>
-<span class="fc" id="L70">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">        if (input == null || input.isBlank()) {</span>
+<span class="fc" id="L83">            throw new IllegalArgumentException(</span>
                 &quot;equation-system input must not be blank&quot;);
         }
-<span class="fc" id="L73">        List&lt;Equation&gt; equations = parser.parse(</span>
-<span class="fc" id="L74">            new InputRequest(InputType.SYSTEM, input)).equations();</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (equations.isEmpty()) {</span>
-<span class="fc" id="L76">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L86">        List&lt;Equation&gt; equations = parser.parse(</span>
+<span class="fc" id="L87">            new InputRequest(InputType.SYSTEM, input)).equations();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (equations.isEmpty()) {</span>
+<span class="fc" id="L89">            throw new IllegalArgumentException(</span>
                 &quot;equation-system input must contain at least one equation&quot;);
         }
         RepresentationBridge.Result&lt;ExactLinearSystem,
-<span class="fc" id="L80">            LinearSystemRepresentationBridge.Certificate&gt; representation =</span>
-<span class="fc" id="L81">                representationBridge.analyze(</span>
+<span class="fc" id="L93">            LinearSystemRepresentationBridge.Certificate&gt; representation =</span>
+<span class="fc" id="L94">                representationBridge.analyze(</span>
                     equations,
                     representationBudget);
 
         Optional&lt;RepresentationBridge.Result&lt;
             ExactLinearSystemBlockDecomposition,
-<span class="fc" id="L87">            ExactLinearSystemBlockDecomposer.Certificate&gt;&gt; decomposition =</span>
-<span class="fc" id="L88">                representation.representation()</span>
-<span class="fc" id="L89">                    .map(system -&gt; blockDecomposer.analyze(</span>
+<span class="fc" id="L100">            ExactLinearSystemBlockDecomposer.Certificate&gt;&gt; decomposition =</span>
+<span class="fc" id="L101">                representation.representation()</span>
+<span class="fc" id="L102">                    .map(system -&gt; blockDecomposer.analyze(</span>
                         system,
                         decompositionBudget));
-<span class="fc" id="L92">        return new Analysis(input.trim(), equations, representation, decomposition);</span>
+<span class="fc" id="L105">        Optional&lt;ExactRrefSolver.Result&gt; rowReduction =</span>
+<span class="fc" id="L106">            representation.representation()</span>
+<span class="fc" id="L107">                .map(system -&gt; rrefSolver.solve(system, rrefBudget));</span>
+<span class="fc" id="L108">        return new Analysis(</span>
+<span class="fc" id="L109">            input.trim(),</span>
+            equations,
+            representation,
+            decomposition,
+            rowReduction);
     }
 
     public record Analysis(
@@ -99,131 +120,229 @@ public final class EquationSystemRepresentationService {
             LinearSystemRepresentationBridge.Certificate&gt; representation,
         Optional&lt;RepresentationBridge.Result&lt;
             ExactLinearSystemBlockDecomposition,
-            ExactLinearSystemBlockDecomposer.Certificate&gt;&gt; decomposition
+            ExactLinearSystemBlockDecomposer.Certificate&gt;&gt; decomposition,
+        Optional&lt;ExactRrefSolver.Result&gt; rowReduction
     ) {
-<span class="fc" id="L104">        public Analysis {</span>
-<span class="pc bpc" id="L105" title="2 of 4 branches missed.">            if (source == null || source.isBlank()) {</span>
-<span class="nc" id="L106">                throw new IllegalArgumentException(&quot;source must not be blank&quot;);</span>
+<span class="fc" id="L126">        public Analysis {</span>
+<span class="pc bpc" id="L127" title="2 of 4 branches missed.">            if (source == null || source.isBlank()) {</span>
+<span class="nc" id="L128">                throw new IllegalArgumentException(&quot;source must not be blank&quot;);</span>
             }
-<span class="fc" id="L108">            source = source.trim();</span>
-<span class="fc" id="L109">            equations = List.copyOf(Objects.requireNonNull(</span>
+<span class="fc" id="L130">            source = source.trim();</span>
+<span class="fc" id="L131">            equations = List.copyOf(Objects.requireNonNull(</span>
                 equations,
                 &quot;equations&quot;));
-<span class="fc" id="L112">            representation = Objects.requireNonNull(</span>
+<span class="fc" id="L134">            representation = Objects.requireNonNull(</span>
                 representation,
                 &quot;representation&quot;);
-<span class="fc" id="L115">            decomposition = Objects.requireNonNull(</span>
+<span class="fc" id="L137">            decomposition = Objects.requireNonNull(</span>
                 decomposition,
                 &quot;decomposition&quot;);
-<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (equations.isEmpty()) {</span>
-<span class="nc" id="L119">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L140">            rowReduction = Objects.requireNonNull(</span>
+                rowReduction,
+                &quot;rowReduction&quot;);
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            if (equations.isEmpty()) {</span>
+<span class="nc" id="L144">                throw new IllegalArgumentException(</span>
                     &quot;analysis must retain at least one equation&quot;);
             }
-<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (representation.represented() != decomposition.isPresent()) {</span>
-<span class="nc" id="L123">                throw new IllegalArgumentException(</span>
-                    &quot;decomposition analysis must follow represented systems only&quot;);
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            if (representation.represented() != decomposition.isPresent()</span>
+<span class="fc" id="L148">                    || representation.represented()</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                        != rowReduction.isPresent()) {</span>
+<span class="nc" id="L150">                throw new IllegalArgumentException(</span>
+                    &quot;matrix capabilities must follow represented systems only&quot;);
             }
-<span class="fc" id="L126">        }</span>
+<span class="fc" id="L153">        }</span>
 
         public boolean represented() {
-<span class="fc" id="L129">            return representation.represented();</span>
+<span class="fc" id="L156">            return representation.represented();</span>
         }
 
         public Optional&lt;ExactLinearSystem&gt; exactSystem() {
-<span class="fc" id="L133">            return representation.representation();</span>
+<span class="fc" id="L160">            return representation.representation();</span>
         }
 
         public Optional&lt;ExactLinearSystemBlockDecomposition&gt; blocks() {
-<span class="fc" id="L137">            return decomposition.flatMap(</span>
+<span class="fc" id="L164">            return decomposition.flatMap(</span>
                 RepresentationBridge.Result::representation);
         }
 
+        public Optional&lt;ExactRrefReduction&gt; rref() {
+<span class="fc" id="L169">            return rowReduction.flatMap(ExactRrefSolver.Result::reduction);</span>
+        }
+
         public List&lt;String&gt; unlockedCapabilities() {
-<span class="fc" id="L142">            return blocks()</span>
-<span class="fc" id="L143">                .map(ExactLinearSystemBlockDecomposition::unlockedCapabilities)</span>
-<span class="fc" id="L144">                .orElseGet(List::of);</span>
+<span class="fc" id="L173">            Set&lt;String&gt; capabilities = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L174">            blocks().ifPresent(blocks -&gt;</span>
+<span class="fc" id="L175">                capabilities.addAll(blocks.unlockedCapabilities()));</span>
+<span class="fc" id="L176">            rref().ifPresent(reduction -&gt; capabilities.addAll(</span>
+<span class="fc" id="L177">                reduction.capabilityFrontier().newlyUnlocked()));</span>
+<span class="fc" id="L178">            return List.copyOf(capabilities);</span>
         }
 
         public String renderSummary() {
-<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (!represented()) {</span>
-<span class="fc" id="L149">                return String.join(&quot;\n&quot;,</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (!represented()) {</span>
+<span class="fc" id="L183">                return String.join(&quot;\n&quot;,</span>
                     &quot;Exact matrix representation: &quot;
-<span class="fc" id="L151">                        + representation.status(),</span>
-<span class="fc" id="L152">                    &quot;Detail: &quot; + representation.detailCode(),</span>
-<span class="fc" id="L153">                    renderWork(&quot;Representation work&quot;, representation.work()));</span>
+<span class="fc" id="L185">                        + representation.status(),</span>
+<span class="fc" id="L186">                    &quot;Detail: &quot; + representation.detailCode(),</span>
+<span class="fc" id="L187">                    renderWork(&quot;Representation work&quot;, representation.work()));</span>
             }
 
-<span class="fc" id="L156">            ExactLinearSystem system = exactSystem().orElseThrow();</span>
-<span class="fc" id="L157">            List&lt;String&gt; lines = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L158">            lines.add(&quot;Recognized exact matrix representation&quot;);</span>
-<span class="fc" id="L159">            lines.add(&quot;Relation: &quot;</span>
-<span class="fc" id="L160">                + representation.relation().orElseThrow());</span>
-<span class="fc" id="L161">            lines.add(&quot;A = &quot; + renderMatrix(system));</span>
-<span class="fc" id="L162">            lines.add(&quot;x = &quot; + renderVariableVector(system.variables()));</span>
-<span class="fc" id="L163">            lines.add(&quot;b = &quot; + renderColumnVector(</span>
-<span class="fc" id="L164">                system.rightHandSide().values()));</span>
-<span class="fc" id="L165">            lines.add(&quot;Classification: &quot; + system.solutionClassification());</span>
-<span class="fc" id="L166">            lines.add(&quot;rank(A) = &quot; + system.coefficientRank());</span>
-<span class="fc" id="L167">            lines.add(&quot;rank([A|b]) = &quot; + system.augmentedRank());</span>
-<span class="fc" id="L168">            lines.add(renderWork(</span>
+<span class="fc" id="L190">            ExactLinearSystem system = exactSystem().orElseThrow();</span>
+<span class="fc" id="L191">            List&lt;String&gt; lines = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L192">            lines.add(&quot;Recognized exact matrix representation&quot;);</span>
+<span class="fc" id="L193">            lines.add(&quot;Relation: &quot;</span>
+<span class="fc" id="L194">                + representation.relation().orElseThrow());</span>
+<span class="fc" id="L195">            lines.add(&quot;A = &quot; + renderMatrix(system));</span>
+<span class="fc" id="L196">            lines.add(&quot;x = &quot; + renderVariableVector(system.variables()));</span>
+<span class="fc" id="L197">            lines.add(&quot;b = &quot; + renderColumnVector(</span>
+<span class="fc" id="L198">                system.rightHandSide().values()));</span>
+<span class="fc" id="L199">            lines.add(&quot;Classification: &quot; + system.solutionClassification());</span>
+<span class="fc" id="L200">            lines.add(&quot;rank(A) = &quot; + system.coefficientRank());</span>
+<span class="fc" id="L201">            lines.add(&quot;rank([A|b]) = &quot; + system.augmentedRank());</span>
+<span class="fc" id="L202">            lines.add(renderWork(</span>
                 &quot;Representation work&quot;,
-<span class="fc" id="L170">                representation.work()));</span>
+<span class="fc" id="L204">                representation.work()));</span>
 
-            RepresentationBridge.Result&lt;
-                ExactLinearSystemBlockDecomposition,
-<span class="fc" id="L174">                ExactLinearSystemBlockDecomposer.Certificate&gt; blockAttempt =</span>
-<span class="fc" id="L175">                    decomposition.orElseThrow();</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (blockAttempt.represented()) {</span>
-<span class="fc" id="L177">                ExactLinearSystemBlockDecomposition blockResult =</span>
-<span class="fc" id="L178">                    blockAttempt.representation().orElseThrow();</span>
-<span class="fc" id="L179">                lines.add(&quot;Independent components: &quot;</span>
-<span class="fc" id="L180">                    + blockResult.components().size());</span>
-<span class="fc" id="L181">                for (int index = 0;</span>
-<span class="fc bfc" id="L182" title="All 2 branches covered.">                        index &lt; blockResult.components().size();</span>
-<span class="fc" id="L183">                        index++) {</span>
-<span class="fc" id="L184">                    ExactLinearSystemBlockDecomposition.Component component =</span>
-<span class="fc" id="L185">                        blockResult.components().get(index);</span>
-<span class="fc" id="L186">                    lines.add(&quot;  &quot; + index</span>
-<span class="fc" id="L187">                        + &quot;: &quot; + component.kind()</span>
-<span class="fc" id="L188">                        + &quot;, rows=&quot; + component.sourceRowIndices()</span>
-<span class="fc" id="L189">                        + &quot;, variables=&quot; + component.variableNames()</span>
-<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                        + (component.contradictoryConstantConstraint()</span>
-<span class="nc" id="L191">                            ? &quot;, contradiction=true&quot;</span>
-<span class="fc" id="L192">                            : &quot;&quot;));</span>
-                }
-<span class="fc" id="L194">                lines.add(&quot;Capabilities: &quot;</span>
-<span class="fc" id="L195">                    + String.join(&quot;, &quot;, blockResult.unlockedCapabilities()));</span>
-<span class="fc" id="L196">            } else {</span>
-<span class="fc" id="L197">                lines.add(&quot;Independent components: none (&quot;</span>
-<span class="fc" id="L198">                    + blockAttempt.status() + &quot;)&quot;);</span>
-            }
-<span class="fc" id="L200">            lines.add(renderWork(</span>
-                &quot;Decomposition work&quot;,
-<span class="fc" id="L202">                blockAttempt.work()));</span>
-<span class="fc" id="L203">            return String.join(&quot;\n&quot;, lines);</span>
+<span class="fc" id="L206">            renderBlockDecomposition(lines);</span>
+<span class="fc" id="L207">            renderRref(lines, system.variables());</span>
+<span class="fc" id="L208">            return String.join(&quot;\n&quot;, lines);</span>
         }
 
+        private void renderBlockDecomposition(List&lt;String&gt; lines) {
+            RepresentationBridge.Result&lt;
+                ExactLinearSystemBlockDecomposition,
+<span class="fc" id="L214">                ExactLinearSystemBlockDecomposer.Certificate&gt; blockAttempt =</span>
+<span class="fc" id="L215">                    decomposition.orElseThrow();</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            if (blockAttempt.represented()) {</span>
+<span class="fc" id="L217">                ExactLinearSystemBlockDecomposition blockResult =</span>
+<span class="fc" id="L218">                    blockAttempt.representation().orElseThrow();</span>
+<span class="fc" id="L219">                lines.add(&quot;Independent components: &quot;</span>
+<span class="fc" id="L220">                    + blockResult.components().size());</span>
+<span class="fc" id="L221">                for (int index = 0;</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                        index &lt; blockResult.components().size();</span>
+<span class="fc" id="L223">                        index++) {</span>
+<span class="fc" id="L224">                    ExactLinearSystemBlockDecomposition.Component component =</span>
+<span class="fc" id="L225">                        blockResult.components().get(index);</span>
+<span class="fc" id="L226">                    lines.add(&quot;  &quot; + index</span>
+<span class="fc" id="L227">                        + &quot;: &quot; + component.kind()</span>
+<span class="fc" id="L228">                        + &quot;, rows=&quot; + component.sourceRowIndices()</span>
+<span class="fc" id="L229">                        + &quot;, variables=&quot; + component.variableNames()</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                        + (component.contradictoryConstantConstraint()</span>
+<span class="nc" id="L231">                            ? &quot;, contradiction=true&quot;</span>
+<span class="fc" id="L232">                            : &quot;&quot;));</span>
+                }
+<span class="fc" id="L234">                lines.add(&quot;Block capabilities: &quot;</span>
+<span class="fc" id="L235">                    + String.join(</span>
+                        &quot;, &quot;,
+<span class="fc" id="L237">                        blockResult.unlockedCapabilities()));</span>
+<span class="fc" id="L238">            } else {</span>
+<span class="fc" id="L239">                lines.add(&quot;Independent components: none (&quot;</span>
+<span class="fc" id="L240">                    + blockAttempt.status() + &quot;)&quot;);</span>
+            }
+<span class="fc" id="L242">            lines.add(renderWork(</span>
+                &quot;Decomposition work&quot;,
+<span class="fc" id="L244">                blockAttempt.work()));</span>
+<span class="fc" id="L245">        }</span>
+
+        private void renderRref(
+            List&lt;String&gt; lines,
+            List&lt;String&gt; variables
+        ) {
+<span class="fc" id="L251">            ExactRrefSolver.Result attempt = rowReduction.orElseThrow();</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">            if (attempt.status() != ExactRrefSolver.Status.SOLVED) {</span>
+<span class="fc" id="L253">                lines.add(&quot;Exact RREF: &quot; + attempt.status()</span>
+<span class="fc" id="L254">                    + &quot; (&quot; + attempt.detailCode() + &quot;)&quot;);</span>
+<span class="fc" id="L255">                lines.add(renderWork(&quot;RREF work&quot;, attempt.work()));</span>
+<span class="fc" id="L256">                return;</span>
+            }
+
+<span class="fc" id="L259">            ExactRrefReduction reduction = attempt.reduction().orElseThrow();</span>
+<span class="fc" id="L260">            lines.add(&quot;RREF(A|b) = &quot; + renderAugmentedRows(</span>
+<span class="fc" id="L261">                reduction.reducedAugmentedRows(),</span>
+<span class="fc" id="L262">                variables.size()));</span>
+<span class="fc" id="L263">            lines.add(&quot;Elementary row operations: &quot;</span>
+<span class="fc" id="L264">                + reduction.rowOperations().size());</span>
+<span class="fc" id="L265">            lines.add(&quot;New RREF capabilities: &quot;</span>
+<span class="fc" id="L266">                + String.join(</span>
+                    &quot;, &quot;,
+<span class="fc" id="L268">                    reduction.capabilityFrontier().newlyUnlocked()));</span>
+<span class="pc bpc" id="L269" title="2 of 4 branches missed.">            switch (reduction.solutionClassification()) {</span>
+<span class="fc" id="L270">                case UNIQUE -&gt; lines.add(&quot;Exact solution: &quot;</span>
+<span class="fc" id="L271">                    + renderNamedSolution(</span>
+                        variables,
+<span class="fc" id="L273">                        reduction.particularSolution()</span>
+<span class="fc" id="L274">                            .orElseThrow()</span>
+<span class="fc" id="L275">                            .values()));</span>
+                case UNDERDETERMINED -&gt; {
+<span class="nc" id="L277">                    lines.add(&quot;Particular solution: &quot; + renderColumnVector(</span>
+<span class="nc" id="L278">                        reduction.particularSolution()</span>
+<span class="nc" id="L279">                            .orElseThrow()</span>
+<span class="nc" id="L280">                            .values()));</span>
+<span class="nc" id="L281">                    lines.add(&quot;Nullspace basis: &quot; + reduction.nullspaceBasis()</span>
+<span class="nc" id="L282">                        .stream()</span>
+<span class="nc" id="L283">                        .map(vector -&gt; renderColumnVector(vector.values()))</span>
+<span class="nc" id="L284">                        .collect(java.util.stream.Collectors.joining(</span>
+                            &quot;, &quot;,
+                            &quot;[&quot;,
+                            &quot;]&quot;)));
+<span class="nc" id="L288">                }</span>
+<span class="fc" id="L289">                case INCONSISTENT -&gt; lines.add(&quot;Contradiction rows: &quot;</span>
+<span class="fc" id="L290">                    + reduction.contradictionRows());</span>
+            }
+<span class="fc" id="L292">            lines.add(renderWork(&quot;RREF work&quot;, attempt.work()));</span>
+<span class="fc" id="L293">        }</span>
+
         private static String renderMatrix(ExactLinearSystem system) {
-<span class="fc" id="L207">            return system.coefficients().rows().stream()</span>
-<span class="fc" id="L208">                .map(Analysis::renderRow)</span>
-<span class="fc" id="L209">                .collect(java.util.stream.Collectors.joining(</span>
+<span class="fc" id="L296">            return system.coefficients().rows().stream()</span>
+<span class="fc" id="L297">                .map(Analysis::renderRow)</span>
+<span class="fc" id="L298">                .collect(java.util.stream.Collectors.joining(</span>
                     &quot;, &quot;,
                     &quot;[&quot;,
                     &quot;]&quot;));
         }
 
+        private static String renderAugmentedRows(
+            List&lt;List&lt;Rational&gt;&gt; rows,
+            int coefficientColumns
+        ) {
+<span class="fc" id="L308">            return rows.stream().map(row -&gt; {</span>
+<span class="fc" id="L309">                String coefficients = renderRow(</span>
+<span class="fc" id="L310">                    row.subList(0, coefficientColumns));</span>
+<span class="fc" id="L311">                return coefficients.substring(</span>
+                    0,
+<span class="fc" id="L313">                    coefficients.length() - 1)</span>
+                    + &quot; | &quot;
+<span class="fc" id="L315">                    + row.get(coefficientColumns)</span>
+                    + &quot;]&quot;;
+<span class="fc" id="L317">            }).collect(java.util.stream.Collectors.joining(</span>
+                &quot;, &quot;,
+                &quot;[&quot;,
+                &quot;]&quot;));
+        }
+
+        private static String renderNamedSolution(
+            List&lt;String&gt; variables,
+            List&lt;Rational&gt; values
+        ) {
+<span class="fc" id="L327">            List&lt;String&gt; assignments = new ArrayList&lt;&gt;(variables.size());</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">            for (int index = 0; index &lt; variables.size(); index++) {</span>
+<span class="fc" id="L329">                assignments.add(variables.get(index) + &quot;=&quot; + values.get(index));</span>
+            }
+<span class="fc" id="L331">            return &quot;[&quot; + String.join(&quot;, &quot;, assignments) + &quot;]&quot;;</span>
+        }
+
         private static String renderVariableVector(List&lt;String&gt; variables) {
-<span class="fc" id="L216">            return &quot;[&quot; + String.join(&quot;, &quot;, variables) + &quot;]^T&quot;;</span>
+<span class="fc" id="L335">            return &quot;[&quot; + String.join(&quot;, &quot;, variables) + &quot;]^T&quot;;</span>
         }
 
         private static String renderColumnVector(List&lt;Rational&gt; values) {
-<span class="fc" id="L220">            return renderRow(values) + &quot;^T&quot;;</span>
+<span class="fc" id="L339">            return renderRow(values) + &quot;^T&quot;;</span>
         }
 
         private static String renderRow(List&lt;Rational&gt; values) {
-<span class="fc" id="L224">            return values.stream()</span>
-<span class="fc" id="L225">                .map(Rational::toString)</span>
-<span class="fc" id="L226">                .collect(java.util.stream.Collectors.joining(</span>
+<span class="fc" id="L343">            return values.stream()</span>
+<span class="fc" id="L344">                .map(Rational::toString)</span>
+<span class="fc" id="L345">                .collect(java.util.stream.Collectors.joining(</span>
                     &quot;, &quot;,
                     &quot;[&quot;,
                     &quot;]&quot;));
@@ -233,10 +352,10 @@ public final class EquationSystemRepresentationService {
             String label,
             RepresentationBridge.WorkLedger work
         ) {
-<span class="fc" id="L236">            return label + &quot;: &quot;</span>
-<span class="fc" id="L237">                + work.consumedWorkUnits()</span>
+<span class="fc" id="L355">            return label + &quot;: &quot;</span>
+<span class="fc" id="L356">                + work.consumedWorkUnits()</span>
                 + &quot;/&quot;
-<span class="fc" id="L239">                + work.configuredWorkUnits();</span>
+<span class="fc" id="L358">                + work.configuredWorkUnits();</span>
         }
     }
 }

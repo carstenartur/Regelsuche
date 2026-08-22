@@ -1,0 +1,589 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactRrefReduction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">ExactRrefReduction.java</span></div><h1>ExactRrefReduction.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.SolutionClassification;
+import de.regelsuche.representation.RepresentationBridge.Relation;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Exact reduced-row-echelon representation of one {@link ExactLinearSystem}.
+ *
+ * &lt;p&gt;The retained elementary row operations are the authority for the declared
+ * solution-set relation. They can be replayed against the original augmented
+ * matrix without relying on the reduction algorithm's internal state.&lt;/p&gt;
+ */
+public record ExactRrefReduction(
+    ExactMatrix reducedCoefficients,
+    List&lt;String&gt; variables,
+    ExactVector reducedRightHandSide,
+    List&lt;Pivot&gt; coefficientPivots,
+    List&lt;Integer&gt; freeVariableColumns,
+    Optional&lt;ExactVector&gt; particularSolution,
+    List&lt;ExactVector&gt; nullspaceBasis,
+    List&lt;Integer&gt; contradictionRows,
+    List&lt;RowOperation&gt; rowOperations,
+    CapabilityFrontier capabilityFrontier,
+    Relation relation
+) {
+    public static final String CAPABILITY_EXACT_LINEAR_SYSTEM =
+        &quot;EXACT_LINEAR_SYSTEM_REPRESENTED&quot;;
+    public static final String CAPABILITY_RANK_CLASSIFICATION =
+        &quot;EXACT_RANK_CLASSIFICATION_AVAILABLE&quot;;
+    public static final String CAPABILITY_EXACT_RREF =
+        &quot;EXACT_RREF_AVAILABLE&quot;;
+    public static final String CAPABILITY_ROW_OPERATION_REPLAY =
+        &quot;REPLAYABLE_ELEMENTARY_ROW_OPERATIONS&quot;;
+    public static final String CAPABILITY_AFFINE_SOLUTION_SPACE =
+        &quot;EXACT_AFFINE_SOLUTION_SPACE_AVAILABLE&quot;;
+    public static final String CAPABILITY_UNIQUE_SOLUTION =
+        &quot;EXACT_UNIQUE_SOLUTION_AVAILABLE&quot;;
+    public static final String CAPABILITY_PARAMETRIC_SOLUTION =
+        &quot;EXACT_PARAMETRIC_SOLUTION_AVAILABLE&quot;;
+    public static final String CAPABILITY_INCONSISTENCY_WITNESS =
+        &quot;EXACT_INCONSISTENCY_WITNESS_AVAILABLE&quot;;
+
+<span class="fc" id="L53">    public ExactRrefReduction {</span>
+<span class="fc" id="L54">        reducedCoefficients = Objects.requireNonNull(</span>
+            reducedCoefficients,
+            &quot;reducedCoefficients&quot;);
+<span class="fc" id="L57">        reducedRightHandSide = Objects.requireNonNull(</span>
+            reducedRightHandSide,
+            &quot;reducedRightHandSide&quot;);
+<span class="fc" id="L60">        variables = normalizedVariables(variables);</span>
+<span class="fc" id="L61">        int variableCount = variables.size();</span>
+<span class="fc" id="L62">        coefficientPivots = List.copyOf(Objects.requireNonNull(</span>
+            coefficientPivots,
+            &quot;coefficientPivots&quot;));
+<span class="fc" id="L65">        freeVariableColumns = integerList(</span>
+            freeVariableColumns,
+            &quot;freeVariableColumns&quot;);
+<span class="fc" id="L68">        particularSolution = Objects.requireNonNull(</span>
+            particularSolution,
+            &quot;particularSolution&quot;);
+<span class="fc" id="L71">        nullspaceBasis = List.copyOf(Objects.requireNonNull(</span>
+            nullspaceBasis,
+            &quot;nullspaceBasis&quot;));
+<span class="fc" id="L74">        contradictionRows = integerList(</span>
+            contradictionRows,
+            &quot;contradictionRows&quot;);
+<span class="fc" id="L77">        rowOperations = List.copyOf(Objects.requireNonNull(</span>
+            rowOperations,
+            &quot;rowOperations&quot;));
+<span class="fc" id="L80">        capabilityFrontier = Objects.requireNonNull(</span>
+            capabilityFrontier,
+            &quot;capabilityFrontier&quot;);
+<span class="fc" id="L83">        relation = Objects.requireNonNull(relation, &quot;relation&quot;);</span>
+
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (relation != Relation.SOLUTION_SET_EQUIVALENCE) {</span>
+<span class="nc" id="L86">            throw new IllegalArgumentException(</span>
+                &quot;RREF reduction requires solution-set equivalence&quot;);
+        }
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (reducedCoefficients.columns() != variableCount) {</span>
+<span class="nc" id="L90">            throw new IllegalArgumentException(</span>
+                &quot;coefficient columns and variable order disagree&quot;);
+        }
+<span class="fc" id="L93">        if (reducedCoefficients.rowCount()</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                != reducedRightHandSide.dimension()) {</span>
+<span class="nc" id="L95">            throw new IllegalArgumentException(</span>
+                &quot;reduced coefficient rows and RHS disagree&quot;);
+        }
+
+<span class="fc" id="L99">        validatePivots(</span>
+            coefficientPivots,
+<span class="fc" id="L101">            reducedCoefficients.rowCount(),</span>
+            variableCount);
+<span class="fc" id="L103">        validateComplement(</span>
+            coefficientPivots,
+            freeVariableColumns,
+            variableCount);
+<span class="fc" id="L107">        validateIndices(</span>
+            contradictionRows,
+<span class="fc" id="L109">            reducedCoefficients.rowCount(),</span>
+            &quot;contradictionRows&quot;);
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (contradictionRows.size() &gt; 1) {</span>
+<span class="nc" id="L112">            throw new IllegalArgumentException(</span>
+                &quot;an RREF augmented matrix has at most one RHS pivot&quot;);
+        }
+
+<span class="fc" id="L116">        boolean consistent = contradictionRows.isEmpty();</span>
+<span class="fc" id="L117">        SolutionClassification classification = classification(</span>
+            contradictionRows,
+            freeVariableColumns);
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (particularSolution.isPresent() != consistent) {</span>
+<span class="nc" id="L121">            throw new IllegalArgumentException(</span>
+                &quot;only consistent systems retain a particular solution&quot;);
+        }
+<span class="fc" id="L124">        particularSolution.ifPresent(solution -&gt;</span>
+<span class="fc" id="L125">            requireDimension(solution, variableCount, &quot;particularSolution&quot;));</span>
+<span class="pc bpc" id="L126" title="1 of 4 branches missed.">        if (!consistent &amp;&amp; !nullspaceBasis.isEmpty()) {</span>
+<span class="nc" id="L127">            throw new IllegalArgumentException(</span>
+                &quot;an inconsistent solution set retains no affine basis&quot;);
+        }
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (consistent &amp;&amp; nullspaceBasis.size()</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                != freeVariableColumns.size()) {</span>
+<span class="nc" id="L132">            throw new IllegalArgumentException(</span>
+                &quot;nullspace basis and free variables disagree&quot;);
+        }
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        for (ExactVector basisVector : nullspaceBasis) {</span>
+<span class="fc" id="L136">            requireDimension(basisVector, variableCount, &quot;nullspaceBasis&quot;);</span>
+<span class="fc" id="L137">        }</span>
+<span class="fc" id="L138">        validateSolutionEvidence(</span>
+            reducedCoefficients,
+            reducedRightHandSide,
+            freeVariableColumns,
+            particularSolution,
+            nullspaceBasis,
+            contradictionRows);
+
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (RowOperation operation : rowOperations) {</span>
+<span class="fc" id="L147">            Objects.requireNonNull(operation, &quot;rowOperation&quot;);</span>
+<span class="fc" id="L148">            operation.requireRowsWithin(reducedCoefficients.rowCount());</span>
+<span class="fc" id="L149">        }</span>
+<span class="fc" id="L150">        validateCapabilities(capabilityFrontier, classification);</span>
+<span class="fc" id="L151">    }</span>
+
+    public int coefficientRank() {
+<span class="nc" id="L154">        return coefficientPivots.size();</span>
+    }
+
+    public int augmentedRank() {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        return coefficientRank() + (contradictionRows.isEmpty() ? 0 : 1);</span>
+    }
+
+    public SolutionClassification solutionClassification() {
+<span class="fc" id="L162">        return classification(contradictionRows, freeVariableColumns);</span>
+    }
+
+    public List&lt;List&lt;Rational&gt;&gt; reducedAugmentedRows() {
+<span class="fc" id="L166">        List&lt;List&lt;Rational&gt;&gt; rows = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L167">            reducedCoefficients.rowCount());</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        for (int row = 0; row &lt; reducedCoefficients.rowCount(); row++) {</span>
+<span class="fc" id="L169">            List&lt;Rational&gt; augmented = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L170">                reducedCoefficients.columns() + 1);</span>
+<span class="fc" id="L171">            augmented.addAll(reducedCoefficients.rows().get(row));</span>
+<span class="fc" id="L172">            augmented.add(reducedRightHandSide.get(row));</span>
+<span class="fc" id="L173">            rows.add(List.copyOf(augmented));</span>
+        }
+<span class="fc" id="L175">        return List.copyOf(rows);</span>
+    }
+
+    private static SolutionClassification classification(
+        List&lt;Integer&gt; contradictions,
+        List&lt;Integer&gt; freeColumns
+    ) {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (!contradictions.isEmpty()) {</span>
+<span class="fc" id="L183">            return SolutionClassification.INCONSISTENT;</span>
+        }
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        return freeColumns.isEmpty()</span>
+<span class="fc" id="L186">            ? SolutionClassification.UNIQUE</span>
+<span class="fc" id="L187">            : SolutionClassification.UNDERDETERMINED;</span>
+    }
+
+    private static void validateSolutionEvidence(
+        ExactMatrix coefficients,
+        ExactVector rightHandSide,
+        List&lt;Integer&gt; freeColumns,
+        Optional&lt;ExactVector&gt; particularSolution,
+        List&lt;ExactVector&gt; nullspaceBasis,
+        List&lt;Integer&gt; contradictionRows
+    ) {
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (!contradictionRows.isEmpty()) {</span>
+<span class="fc" id="L199">            return;</span>
+        }
+<span class="fc" id="L201">        ExactVector particular = particularSolution.orElseThrow();</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (!satisfies(coefficients, particular, rightHandSide)) {</span>
+<span class="fc" id="L203">            throw new IllegalArgumentException(</span>
+                &quot;particular solution does not satisfy reduced system&quot;);
+        }
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (ExactVector basisVector : nullspaceBasis) {</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            if (!satisfiesHomogeneous(coefficients, basisVector)) {</span>
+<span class="nc" id="L208">                throw new IllegalArgumentException(</span>
+                    &quot;nullspace basis vector does not satisfy reduced system&quot;);
+            }
+<span class="fc" id="L211">        }</span>
+<span class="fc" id="L212">        for (int freeIndex = 0;</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">                freeIndex &lt; freeColumns.size();</span>
+<span class="fc" id="L214">                freeIndex++) {</span>
+<span class="fc" id="L215">            int freeColumn = freeColumns.get(freeIndex);</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">            if (!particular.get(freeColumn).isZero()) {</span>
+<span class="nc" id="L217">                throw new IllegalArgumentException(</span>
+                    &quot;canonical particular solution must zero free coordinates&quot;);
+            }
+<span class="fc" id="L220">            for (int basisIndex = 0;</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">                    basisIndex &lt; nullspaceBasis.size();</span>
+<span class="fc" id="L222">                    basisIndex++) {</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">                Rational expected = freeIndex == basisIndex</span>
+<span class="fc" id="L224">                    ? Rational.ONE</span>
+<span class="fc" id="L225">                    : Rational.ZERO;</span>
+<span class="fc" id="L226">                if (!nullspaceBasis.get(basisIndex)</span>
+<span class="fc" id="L227">                        .get(freeColumn)</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">                        .equals(expected)) {</span>
+<span class="fc" id="L229">                    throw new IllegalArgumentException(</span>
+                        &quot;nullspace basis must be identity on free coordinates&quot;);
+                }
+            }
+        }
+<span class="fc" id="L234">    }</span>
+
+    private static boolean satisfies(
+        ExactMatrix coefficients,
+        ExactVector candidate,
+        ExactVector rightHandSide
+    ) {
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        for (int row = 0; row &lt; coefficients.rowCount(); row++) {</span>
+<span class="fc" id="L242">            Rational sum = Rational.ZERO;</span>
+<span class="fc" id="L243">            for (int column = 0;</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                    column &lt; coefficients.columns();</span>
+<span class="fc" id="L245">                    column++) {</span>
+<span class="fc" id="L246">                sum = sum.add(coefficients.get(row, column)</span>
+<span class="fc" id="L247">                    .multiply(candidate.get(column)));</span>
+            }
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            if (!sum.equals(rightHandSide.get(row))) {</span>
+<span class="fc" id="L250">                return false;</span>
+            }
+        }
+<span class="fc" id="L253">        return true;</span>
+    }
+
+    private static boolean satisfiesHomogeneous(
+        ExactMatrix coefficients,
+        ExactVector candidate
+    ) {
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (int row = 0; row &lt; coefficients.rowCount(); row++) {</span>
+<span class="fc" id="L261">            Rational sum = Rational.ZERO;</span>
+<span class="fc" id="L262">            for (int column = 0;</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">                    column &lt; coefficients.columns();</span>
+<span class="fc" id="L264">                    column++) {</span>
+<span class="fc" id="L265">                sum = sum.add(coefficients.get(row, column)</span>
+<span class="fc" id="L266">                    .multiply(candidate.get(column)));</span>
+            }
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            if (!sum.isZero()) {</span>
+<span class="nc" id="L269">                return false;</span>
+            }
+        }
+<span class="fc" id="L272">        return true;</span>
+    }
+
+    private static List&lt;String&gt; normalizedVariables(List&lt;String&gt; values) {
+<span class="fc" id="L276">        Objects.requireNonNull(values, &quot;variables&quot;);</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L278">            throw new IllegalArgumentException(&quot;variables must not be empty&quot;);</span>
+        }
+<span class="fc" id="L280">        Set&lt;String&gt; unique = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L281">        List&lt;String&gt; retained = new ArrayList&lt;&gt;(values.size());</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="pc bpc" id="L283" title="2 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L284">                throw new IllegalArgumentException(</span>
+                    &quot;variable names must not be blank&quot;);
+            }
+<span class="fc" id="L287">            String normalized = value.trim();</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">            if (!unique.add(normalized)) {</span>
+<span class="nc" id="L289">                throw new IllegalArgumentException(</span>
+                    &quot;variable names must be unique&quot;);
+            }
+<span class="fc" id="L292">            retained.add(normalized);</span>
+<span class="fc" id="L293">        }</span>
+<span class="fc" id="L294">        return List.copyOf(retained);</span>
+    }
+
+    private static List&lt;Integer&gt; integerList(
+        List&lt;Integer&gt; values,
+        String field
+    ) {
+<span class="fc" id="L301">        Objects.requireNonNull(values, field);</span>
+<span class="fc" id="L302">        List&lt;Integer&gt; retained = values.stream()</span>
+<span class="fc" id="L303">            .map(value -&gt; Objects.requireNonNull(value, field + &quot; entry&quot;))</span>
+<span class="fc" id="L304">            .toList();</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(retained).size() != retained.size()) {</span>
+<span class="nc" id="L306">            throw new IllegalArgumentException(field + &quot; entries must be unique&quot;);</span>
+        }
+<span class="fc" id="L308">        return retained;</span>
+    }
+
+    private static void validatePivots(
+        List&lt;Pivot&gt; pivots,
+        int rowCount,
+        int columnCount
+    ) {
+<span class="fc" id="L316">        int previousColumn = -1;</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        for (int index = 0; index &lt; pivots.size(); index++) {</span>
+<span class="fc" id="L318">            Pivot pivot = Objects.requireNonNull(pivots.get(index), &quot;pivot&quot;);</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">            if (pivot.row() != index</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">                    || pivot.row() &gt;= rowCount</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">                    || pivot.column() &gt;= columnCount</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                    || pivot.column() &lt;= previousColumn) {</span>
+<span class="nc" id="L323">                throw new IllegalArgumentException(</span>
+                    &quot;coefficient pivots must be ordered RREF pivots&quot;);
+            }
+<span class="fc" id="L326">            previousColumn = pivot.column();</span>
+        }
+<span class="fc" id="L328">    }</span>
+
+    private static void validateComplement(
+        List&lt;Pivot&gt; pivots,
+        List&lt;Integer&gt; freeColumns,
+        int columnCount
+    ) {
+<span class="fc" id="L335">        Set&lt;Integer&gt; pivotColumns = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L336">        pivots.forEach(pivot -&gt; pivotColumns.add(pivot.column()));</span>
+<span class="fc" id="L337">        List&lt;Integer&gt; expectedFree = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        for (int column = 0; column &lt; columnCount; column++) {</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">            if (!pivotColumns.contains(column)) {</span>
+<span class="fc" id="L340">                expectedFree.add(column);</span>
+            }
+        }
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        if (!expectedFree.equals(freeColumns)) {</span>
+<span class="nc" id="L344">            throw new IllegalArgumentException(</span>
+                &quot;free columns must exactly complement pivot columns&quot;);
+        }
+<span class="fc" id="L347">    }</span>
+
+    private static void validateIndices(
+        List&lt;Integer&gt; indices,
+        int upperExclusive,
+        String field
+    ) {
+<span class="fc" id="L354">        int previous = -1;</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        for (int index : indices) {</span>
+<span class="pc bpc" id="L356" title="3 of 6 branches missed.">            if (index &lt; 0 || index &gt;= upperExclusive || index &lt;= previous) {</span>
+<span class="nc" id="L357">                throw new IllegalArgumentException(</span>
+                    field + &quot; entries must be ordered valid indices&quot;);
+            }
+<span class="fc" id="L360">            previous = index;</span>
+<span class="fc" id="L361">        }</span>
+<span class="fc" id="L362">    }</span>
+
+    private static void requireDimension(
+        ExactVector vector,
+        int dimension,
+        String field
+    ) {
+<span class="fc" id="L369">        Objects.requireNonNull(vector, field);</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (vector.dimension() != dimension) {</span>
+<span class="nc" id="L371">            throw new IllegalArgumentException(</span>
+                field + &quot; vector dimension disagrees with variables&quot;);
+        }
+<span class="fc" id="L374">    }</span>
+
+    private static void validateCapabilities(
+        CapabilityFrontier frontier,
+        SolutionClassification classification
+    ) {
+<span class="fc" id="L380">        Set&lt;String&gt; after = Set.copyOf(frontier.applicableAfter());</span>
+<span class="fc" id="L381">        require(after, CAPABILITY_EXACT_LINEAR_SYSTEM);</span>
+<span class="fc" id="L382">        require(after, CAPABILITY_RANK_CLASSIFICATION);</span>
+<span class="fc" id="L383">        require(after, CAPABILITY_EXACT_RREF);</span>
+<span class="fc" id="L384">        require(after, CAPABILITY_ROW_OPERATION_REPLAY);</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        boolean consistent = classification != SolutionClassification.INCONSISTENT;</span>
+<span class="fc" id="L386">        requirePresence(</span>
+            after,
+            CAPABILITY_AFFINE_SOLUTION_SPACE,
+            consistent);
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        requirePresence(</span>
+            after,
+            CAPABILITY_UNIQUE_SOLUTION,
+            classification == SolutionClassification.UNIQUE);
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        requirePresence(</span>
+            after,
+            CAPABILITY_PARAMETRIC_SOLUTION,
+            classification == SolutionClassification.UNDERDETERMINED);
+<span class="fc bfc" id="L398" title="All 2 branches covered.">        requirePresence(</span>
+            after,
+            CAPABILITY_INCONSISTENCY_WITNESS,
+            classification == SolutionClassification.INCONSISTENT);
+<span class="fc" id="L402">    }</span>
+
+    private static void require(Set&lt;String&gt; capabilities, String capability) {
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">        if (!capabilities.contains(capability)) {</span>
+<span class="nc" id="L406">            throw new IllegalArgumentException(</span>
+                &quot;missing required capability: &quot; + capability);
+        }
+<span class="fc" id="L409">    }</span>
+
+    private static void requirePresence(
+        Set&lt;String&gt; capabilities,
+        String capability,
+        boolean required
+    ) {
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">        if (capabilities.contains(capability) != required) {</span>
+<span class="nc" id="L417">            throw new IllegalArgumentException(</span>
+                &quot;capability disagrees with reduction: &quot; + capability);
+        }
+<span class="fc" id="L420">    }</span>
+
+    public record Pivot(int row, int column) {
+<span class="fc" id="L423">        public Pivot {</span>
+<span class="pc bpc" id="L424" title="2 of 4 branches missed.">            if (row &lt; 0 || column &lt; 0) {</span>
+<span class="nc" id="L425">                throw new IllegalArgumentException(</span>
+                    &quot;pivot indices must not be negative&quot;);
+            }
+<span class="fc" id="L428">        }</span>
+    }
+
+<span class="fc" id="L431">    public enum RowOperationKind {</span>
+<span class="fc" id="L432">        SWAP_ROWS,</span>
+<span class="fc" id="L433">        SCALE_ROW,</span>
+<span class="fc" id="L434">        ADD_ROW_MULTIPLE</span>
+    }
+
+    /**
+     * One invertible elementary row operation. For {@code ADD_ROW_MULTIPLE},
+     * the operation is {@code target += multiplier * source}.
+     */
+    public record RowOperation(
+        RowOperationKind kind,
+        int targetRow,
+        int sourceRow,
+        Rational multiplier
+    ) {
+<span class="fc" id="L447">        public RowOperation {</span>
+<span class="fc" id="L448">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L449">            multiplier = Objects.requireNonNull(multiplier, &quot;multiplier&quot;);</span>
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">            if (targetRow &lt; 0) {</span>
+<span class="nc" id="L451">                throw new IllegalArgumentException(</span>
+                    &quot;targetRow must not be negative&quot;);
+            }
+<span class="pc bpc" id="L454" title="1 of 4 branches missed.">            switch (kind) {</span>
+                case SWAP_ROWS -&gt; {
+<span class="pc bpc" id="L456" title="2 of 4 branches missed.">                    if (sourceRow &lt; 0</span>
+                            || sourceRow == targetRow
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">                            || !multiplier.isOne()) {</span>
+<span class="nc" id="L459">                        throw new IllegalArgumentException(</span>
+                            &quot;row swap requires two rows and multiplier one&quot;);
+                    }
+                }
+                case SCALE_ROW -&gt; {
+<span class="pc bpc" id="L464" title="2 of 4 branches missed.">                    if (sourceRow != -1 || multiplier.isZero()) {</span>
+<span class="nc" id="L465">                        throw new IllegalArgumentException(</span>
+                            &quot;row scaling requires a non-zero multiplier&quot;);
+                    }
+                }
+                case ADD_ROW_MULTIPLE -&gt; {
+<span class="pc bpc" id="L470" title="2 of 4 branches missed.">                    if (sourceRow &lt; 0</span>
+                            || sourceRow == targetRow
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">                            || multiplier.isZero()) {</span>
+<span class="nc" id="L473">                        throw new IllegalArgumentException(</span>
+                            &quot;row addition requires distinct rows and non-zero multiplier&quot;);
+                    }
+                }
+            }
+<span class="fc" id="L478">        }</span>
+
+        public static RowOperation swap(int firstRow, int secondRow) {
+<span class="fc" id="L481">            return new RowOperation(</span>
+                RowOperationKind.SWAP_ROWS,
+                firstRow,
+                secondRow,
+                Rational.ONE);
+        }
+
+        public static RowOperation scale(int row, Rational multiplier) {
+<span class="fc" id="L489">            return new RowOperation(</span>
+                RowOperationKind.SCALE_ROW,
+                row,
+                -1,
+                multiplier);
+        }
+
+        public static RowOperation addMultiple(
+            int targetRow,
+            int sourceRow,
+            Rational multiplier
+        ) {
+<span class="fc" id="L501">            return new RowOperation(</span>
+                RowOperationKind.ADD_ROW_MULTIPLE,
+                targetRow,
+                sourceRow,
+                multiplier);
+        }
+
+        public void requireRowsWithin(int rowCount) {
+<span class="pc bpc" id="L509" title="2 of 6 branches missed.">            if (targetRow &gt;= rowCount</span>
+                    || (sourceRow &gt;= 0 &amp;&amp; sourceRow &gt;= rowCount)) {
+<span class="nc" id="L511">                throw new IllegalArgumentException(</span>
+                    &quot;row operation index exceeds matrix rows&quot;);
+            }
+<span class="fc" id="L514">        }</span>
+
+        public String canonicalForm() {
+<span class="fc bfc" id="L517" title="All 3 branches covered.">            return switch (kind) {</span>
+<span class="fc" id="L518">                case SWAP_ROWS -&gt; &quot;swap(&quot; + targetRow + &quot;,&quot; + sourceRow + &quot;)&quot;;</span>
+<span class="fc" id="L519">                case SCALE_ROW -&gt; &quot;scale(&quot; + targetRow + &quot;,&quot; + multiplier + &quot;)&quot;;</span>
+<span class="fc" id="L520">                case ADD_ROW_MULTIPLE -&gt; &quot;add(&quot; + targetRow + &quot;,&quot;</span>
+                    + sourceRow + &quot;,&quot; + multiplier + &quot;)&quot;;
+            };
+        }
+    }
+
+    /**
+     * Explicit capability delta caused by the RREF representation.
+     */
+    public record CapabilityFrontier(
+        List&lt;String&gt; applicableBefore,
+        List&lt;String&gt; applicableAfter,
+        List&lt;String&gt; newlyUnlocked,
+        List&lt;String&gt; lostOrConditional
+    ) {
+<span class="fc" id="L535">        public CapabilityFrontier {</span>
+<span class="fc" id="L536">            List&lt;String&gt; normalizedBefore = distinctTexts(</span>
+                applicableBefore,
+                &quot;applicableBefore&quot;);
+<span class="fc" id="L539">            List&lt;String&gt; normalizedAfter = distinctTexts(</span>
+                applicableAfter,
+                &quot;applicableAfter&quot;);
+<span class="fc" id="L542">            List&lt;String&gt; normalizedNew = distinctTexts(</span>
+                newlyUnlocked,
+                &quot;newlyUnlocked&quot;);
+<span class="fc" id="L545">            List&lt;String&gt; normalizedLost = distinctTexts(</span>
+                lostOrConditional,
+                &quot;lostOrConditional&quot;);
+
+<span class="fc" id="L549">            Set&lt;String&gt; before = new LinkedHashSet&lt;&gt;(normalizedBefore);</span>
+<span class="fc" id="L550">            Set&lt;String&gt; after = new LinkedHashSet&lt;&gt;(normalizedAfter);</span>
+<span class="fc" id="L551">            List&lt;String&gt; expectedNew = normalizedAfter.stream()</span>
+<span class="fc bfc" id="L552" title="All 2 branches covered.">                .filter(capability -&gt; !before.contains(capability))</span>
+<span class="fc" id="L553">                .toList();</span>
+<span class="fc" id="L554">            List&lt;String&gt; expectedLost = normalizedBefore.stream()</span>
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">                .filter(capability -&gt; !after.contains(capability))</span>
+<span class="fc" id="L556">                .toList();</span>
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">            if (!expectedNew.equals(normalizedNew)</span>
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">                    || !expectedLost.equals(normalizedLost)) {</span>
+<span class="nc" id="L559">                throw new IllegalArgumentException(</span>
+                    &quot;capability frontier lists must be exact ordered differences&quot;);
+            }
+
+<span class="fc" id="L563">            applicableBefore = normalizedBefore;</span>
+<span class="fc" id="L564">            applicableAfter = normalizedAfter;</span>
+<span class="fc" id="L565">            newlyUnlocked = normalizedNew;</span>
+<span class="fc" id="L566">            lostOrConditional = normalizedLost;</span>
+<span class="fc" id="L567">        }</span>
+
+        private static List&lt;String&gt; distinctTexts(
+            List&lt;String&gt; values,
+            String field
+        ) {
+<span class="fc" id="L573">            Objects.requireNonNull(values, field);</span>
+<span class="fc" id="L574">            List&lt;String&gt; retained = values.stream().map(value -&gt; {</span>
+<span class="pc bpc" id="L575" title="2 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L576">                    throw new IllegalArgumentException(</span>
+                        field + &quot; entries must not be blank&quot;);
+                }
+<span class="fc" id="L579">                return value.trim();</span>
+<span class="fc" id="L580">            }).toList();</span>
+<span class="pc bpc" id="L581" title="1 of 2 branches missed.">            if (new HashSet&lt;&gt;(retained).size() != retained.size()) {</span>
+<span class="nc" id="L582">                throw new IllegalArgumentException(</span>
+                    field + &quot; entries must be distinct&quot;);
+            }
+<span class="fc" id="L585">            return retained;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
