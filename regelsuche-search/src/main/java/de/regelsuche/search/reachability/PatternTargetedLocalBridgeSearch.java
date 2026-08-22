@@ -1,6 +1,5 @@
 package de.regelsuche.search.reachability;
 
-import de.regelsuche.assumption.Assumption;
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
@@ -35,8 +34,14 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * Bounded local search whose only goal is concrete applicability of one visible
- * pattern rule. It receives no desired result expression.
+ * Bounded local breadth-first search whose only terminal objective is concrete
+ * applicability of one visible declarative principal rule.
+ *
+ * <p>The search receives no result expression. Direct matching is checked
+ * before formation. If it fails, only the explicitly frozen preparation-rule
+ * inventory is explored. A bridge is accepted only after the retained
+ * terminal AST fully matches the declared pattern and the concrete principal
+ * rule replays to the retained result.</p>
  */
 public final class PatternTargetedLocalBridgeSearch {
     public static final String SEARCH_ID =
@@ -44,16 +49,28 @@ public final class PatternTargetedLocalBridgeSearch {
     public static final String CERTIFICATE_SCHEMA =
         "regelsuche.pattern-targeted-local-bridge-certificate/v1";
 
+    private static final Comparator<Transformation> TRANSFORMATION_ORDER =
+        Comparator.comparing(Transformation::transformedExpression)
+            .thenComparing(Transformation::rule)
+            .thenComparing(Transformation::applicationKey)
+            .thenComparing(value -> String.join(
+                "\u0001", value.assumptions()))
+            .thenComparing(value -> String.join(
+                "\u0001", value.primitiveRuleIds()));
+
     private static final Comparator<Candidate> CANDIDATE_ORDER =
         Comparator.comparingInt((Candidate value) ->
                 value.analysis().matched() ? 0 : 1)
-            .thenComparing(Comparator.comparingInt((Candidate value) ->
-                value.analysis().matchedPatternNodes()).reversed())
-            .thenComparing(Comparator.comparingInt((Candidate value) ->
-                value.analysis().bindings().size()).reversed())
-            .thenComparingInt(value ->
-                value.analysis().residualObligations().size())
-            .thenComparingInt(value -> residualLowerBound(value.analysis()))
+            .thenComparing(Comparator.comparingInt(
+                (Candidate value) -> value.analysis()
+                    .matchedPatternNodes()).reversed())
+            .thenComparing(Comparator.comparingInt(
+                (Candidate value) -> value.analysis()
+                    .bindings().size()).reversed())
+            .thenComparingInt(value -> value.analysis()
+                .residualObligations().size())
+            .thenComparingInt(value -> residualLowerBound(
+                value.analysis()))
             .thenComparingInt(Candidate::astGrowth)
             .thenComparingInt(Candidate::primitivePathWork)
             .thenComparing(Candidate::structuralFingerprint)
@@ -65,12 +82,11 @@ public final class PatternTargetedLocalBridgeSearch {
     private final List<RewriteRule> preparationRules;
     private final AstRewriteTransformationEngine preparationEngine;
     private final String repositoryRevision;
-    private final String principalFingerprint;
+    private final String principalRuleFingerprint;
     private final String preparationInventoryFingerprint;
     private final Budget budget;
-    private final PatternMatchAnalyzer matchAnalyzer =
-        new PatternMatchAnalyzer();
     private final ExpressionParser parser = new ExpressionParser();
+    private final PatternMatchAnalyzer analyzer = new PatternMatchAnalyzer();
 
     public PatternTargetedLocalBridgeSearch(
         PatternRewriteRule principalRule,
@@ -84,14 +100,24 @@ public final class PatternTargetedLocalBridgeSearch {
             preparationRules, principalRule.id());
         this.repositoryRevision = requireRevision(repositoryRevision);
         this.budget = Objects.requireNonNull(budget, "budget");
-        this.principalFingerprint = RuleInventoryFingerprint
-            .ruleContentHash(principalRule);
-        this.preparationInventoryFingerprint = RuleInventoryFingerprint
-            .contentHash(this.preparationRules);
+        this.principalRuleFingerprint =
+            RuleInventoryFingerprint.ruleContentHash(principalRule);
+        this.preparationInventoryFingerprint =
+            RuleInventoryFingerprint.contentHash(this.preparationRules);
         this.preparationEngine = new AstRewriteTransformationEngine(
             this.preparationRules,
             Integer.MAX_VALUE,
-            Integer.MAX_VALUE);
+            engineCandidateObservationLimit(this.budget));
+    }
+
+    private static int engineCandidateObservationLimit(Budget budget) {
+        int tighterLimit = Math.min(
+            budget.maxSuccessorsPerState(),
+            budget.maxGeneratedTransitions());
+        if (tighterLimit == Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return Math.max(1, tighterLimit + 1);
     }
 
     /** Runs target-free formation for one local AST subtree. */
@@ -99,62 +125,97 @@ public final class PatternTargetedLocalBridgeSearch {
         String sourceExpression,
         AssumptionSignature initialAssumptions
     ) {
+        String source = normalize(sourceExpression, "sourceExpression");
+        AssumptionSignature assumptions = normalized(initialAssumptions);
         try {
-            return new Run(
-                normalize(sourceExpression, "sourceExpression"),
-                normalized(initialAssumptions)).execute();
+            return new SearchRun(source, assumptions).execute();
         } catch (RuntimeException exception) {
             return new Attempt(
                 Status.TECHNICAL_FAILURE,
                 Optional.empty(),
-                AnalysisSnapshot.inconclusive("TECHNICAL_FAILURE"),
+                AnalysisSnapshot.unavailable(),
                 Work.empty(),
                 Set.of(),
                 "TECHNICAL_FAILURE",
-                exception.getClass().getName() + ": "
+                exception.getClass().getSimpleName() + ": "
                     + Objects.toString(exception.getMessage(), ""));
         }
     }
 
-    /** Replays all retained preparation steps and the concrete principal rule. */
+    /** Independently replays a retained preparation/principal certificate. */
     public Verification verify(Bridge bridge) {
         if (bridge == null) {
             return new Verification(false, "BRIDGE_MISSING");
         }
         try {
-            if (!bridge.configurationMatches(
-                    repositoryRevision,
-                    principalRule.id(),
-                    principalFingerprint,
-                    preparationInventoryFingerprint,
-                    budget)) {
+            if (!SEARCH_ID.equals(bridge.searchId())
+                    || !CERTIFICATE_SCHEMA.equals(
+                        bridge.certificateSchema())
+                    || !repositoryRevision.equals(
+                        bridge.repositoryRevision())
+                    || !principalRule.id().equals(
+                        bridge.principalRuleId())
+                    || !principalRuleFingerprint.equals(
+                        bridge.principalRuleFingerprint())
+                    || !preparationInventoryFingerprint.equals(
+                        bridge.preparationInventoryFingerprint())
+                    || !budget.equals(bridge.budget())) {
                 return new Verification(
                     false, "CONFIGURATION_IDENTITY_MISMATCH");
             }
-            String current = bridge.sourceExpression();
-            AssumptionSignature assumptions = bridge.sourceAssumptions();
+            String current = normalize(
+                bridge.sourceExpression(), "bridge source");
+            AssumptionSignature assumptions = normalized(
+                bridge.sourceAssumptions());
+            AstRewriteTransformationEngine replayEngine =
+                new AstRewriteTransformationEngine(
+                    preparationRules,
+                    Integer.MAX_VALUE,
+                    engineCandidateObservationLimit(budget));
             for (Step retained : bridge.preparationSteps()) {
                 if (!current.equals(retained.expressionBefore())) {
                     return new Verification(
                         false, "PREPARATION_PATH_DISCONNECTED");
                 }
-                Transformation replay = replayPreparation(current, retained);
-                if (replay == null) {
+                Optional<Transformation> replay = replayEngine
+                    .transform(current).stream()
+                    .filter(value -> retained.ruleId().equals(
+                        value.rule()))
+                    .filter(value -> retained.applicationKey().equals(
+                        value.applicationKey()))
+                    .filter(value -> retained.expressionAfter().equals(
+                        normalize(value.transformedExpression(),
+                            "replayed expression")))
+                    .filter(value -> retained.emittedAssumptions().equals(
+                        value.assumptions()))
+                    .filter(value -> retained.primitiveRuleIds().equals(
+                        value.primitiveRuleIds()))
+                    .findFirst();
+                if (replay.isEmpty()) {
                     return new Verification(
                         false, "PREPARATION_REPLAY_FAILED");
                 }
+                Transformation transformation = replay.orElseThrow();
+                if (!transformation
+                        .equivalencePreservingByConstruction()) {
+                    return new Verification(
+                        false, "UNSAFE_PREPARATION_REPLAY");
+                }
+                assumptions = merge(
+                    assumptions, transformation.assumptions());
                 current = normalize(
-                    replay.transformedExpression(), "replayed expression");
-                assumptions = merge(assumptions, replay.assumptions());
+                    transformation.transformedExpression(),
+                    "replayed expression");
             }
             if (!current.equals(bridge.terminalExpression())
-                    || !assumptions.equals(bridge.terminalAssumptions())) {
+                    || !assumptions.equals(
+                        bridge.terminalAssumptions())) {
                 return new Verification(false, "TERMINAL_STATE_MISMATCH");
             }
-            PatternMatchAnalyzer.Analysis terminalAnalysis =
-                analyzePattern(parser.parseTerm(current));
-            if (!terminalAnalysis.matched()
-                    || !AnalysisSnapshot.from(terminalAnalysis).equals(
+            PatternMatchAnalyzer.Analysis terminal = analyzePattern(
+                parser.parseTerm(current));
+            if (!terminal.matched()
+                    || !AnalysisSnapshot.from(terminal).equals(
                         bridge.terminalAnalysis())) {
                 return new Verification(false, "TERMINAL_MATCH_MISMATCH");
             }
@@ -163,44 +224,29 @@ public final class PatternTargetedLocalBridgeSearch {
                     || !principal.equals(bridge.principalStep())) {
                 return new Verification(false, "PRINCIPAL_REPLAY_FAILED");
             }
+            AssumptionSignature resultAssumptions = merge(
+                assumptions, principal.emittedAssumptions());
             if (!principal.expressionAfter().equals(
                     bridge.resultExpression())
-                    || !merge(assumptions, principal.emittedAssumptions())
-                        .equals(bridge.resultAssumptions())) {
+                    || !resultAssumptions.equals(
+                        bridge.resultAssumptions())) {
                 return new Verification(false, "RESULT_STATE_MISMATCH");
             }
-            return certificateHash(bridge.withCertificateHash(""))
-                .equals(bridge.certificateHash())
+            Bridge unsigned = bridge.withCertificateHash("");
+            return certificateHash(unsigned).equals(
+                    bridge.certificateHash())
                 ? new Verification(true, "VERIFIED")
                 : new Verification(false, "CERTIFICATE_HASH_MISMATCH");
         } catch (RuntimeException exception) {
             return new Verification(
                 false,
-                "VERIFICATION_FAILURE_"
+                "VERIFICATION_FAILURE:"
                     + exception.getClass().getSimpleName());
         }
     }
 
-    private Transformation replayPreparation(
-        String expression,
-        Step retained
-    ) {
-        return preparationEngine.transform(expression).stream()
-            .filter(value -> retained.ruleId().equals(value.rule()))
-            .filter(value -> retained.applicationKey().equals(
-                value.applicationKey()))
-            .filter(value -> retained.expressionAfter().equals(normalize(
-                value.transformedExpression(), "transformedExpression")))
-            .filter(value -> retained.emittedAssumptions().equals(
-                value.assumptions()))
-            .filter(value -> retained.primitiveRuleIds().equals(
-                value.primitiveRuleIds()))
-            .findFirst()
-            .orElse(null);
-    }
-
     private PatternMatchAnalyzer.Analysis analyzePattern(Expr expression) {
-        return matchAnalyzer.analyze(
+        return analyzer.analyze(
             principalRule.source(),
             expression,
             principalRule.recognitionProfile(),
@@ -212,47 +258,52 @@ public final class PatternTargetedLocalBridgeSearch {
     }
 
     private PrincipalStep replayPrincipal(String expression) {
-        Expr parsed = parser.parseTerm(expression);
-        if (!principalRule.matches(parsed)) {
-            return null;
-        }
-        Expr result = principalRule.apply(parsed);
-        if (result.equals(parsed)) {
-            return null;
-        }
-        List<String> assumptions = principalRule.assumptions(parsed).stream()
-            .map(Assumption::expression)
-            .toList();
-        return new PrincipalStep(
-            expression,
-            ExpressionFormatter.format(result),
-            principalRule.id(),
-            assumptions,
-            "principal:" + principalFingerprint + ":"
-                + structuralFingerprint(parsed));
+        AstRewriteTransformationEngine engine =
+            new AstRewriteTransformationEngine(
+                List.of(principalRule),
+                Integer.MAX_VALUE,
+                1);
+        return engine.transform(expression).stream()
+            .filter(value -> principalRule.id().equals(value.rule()))
+            .filter(value -> expression.equals(
+                normalize(expression, "principal input")))
+            .map(value -> new PrincipalStep(
+                expression,
+                normalize(value.transformedExpression(),
+                    "principal result"),
+                value.rule(),
+                value.assumptions(),
+                value.applicationKey(),
+                value.primitiveRuleIds()))
+            .findFirst()
+            .orElse(null);
     }
 
     private Bridge bridge(
         Node source,
         Node terminal,
-        Map<String, Node> states,
+        Map<String, Node> nodes,
         PrincipalStep principal,
         Work work
     ) {
-        ArrayDeque<Step> reverse = new ArrayDeque<>();
+        ArrayDeque<Step> path = new ArrayDeque<>();
         Node current = terminal;
         while (current.parentKey() != null) {
-            reverse.addFirst(current.incomingStep());
-            current = Objects.requireNonNull(
-                states.get(current.parentKey()),
-                "preparation parent state");
+            path.addFirst(current.incomingStep());
+            current = nodes.get(current.parentKey());
+            if (current == null) {
+                throw new IllegalStateException(
+                    "preparation parent chain is incomplete");
+            }
         }
-        Bridge unsigned = new Bridge(
+        AssumptionSignature resultAssumptions = merge(
+            terminal.assumptions(), principal.emittedAssumptions());
+        Bridge provisional = new Bridge(
             SEARCH_ID,
             CERTIFICATE_SCHEMA,
             repositoryRevision,
             principalRule.id(),
-            principalFingerprint,
+            principalRuleFingerprint,
             preparationInventoryFingerprint,
             budget,
             source.expression(),
@@ -260,22 +311,22 @@ public final class PatternTargetedLocalBridgeSearch {
             terminal.expression(),
             terminal.assumptions(),
             principal.expressionAfter(),
-            merge(terminal.assumptions(),
-                principal.emittedAssumptions()),
+            resultAssumptions,
             AnalysisSnapshot.from(source.analysis()),
             AnalysisSnapshot.from(terminal.analysis()),
-            List.copyOf(reverse),
+            List.copyOf(path),
             principal,
             work,
             "");
-        return unsigned.withCertificateHash(certificateHash(unsigned));
+        return provisional.withCertificateHash(
+            certificateHash(provisional));
     }
 
-    private final class Run {
+    private final class SearchRun {
         private final String sourceExpression;
         private final AssumptionSignature initialAssumptions;
-        private final Map<String, Node> states = new LinkedHashMap<>();
         private final ArrayDeque<Node> frontier = new ArrayDeque<>();
+        private final Map<String, Node> states = new LinkedHashMap<>();
         private final Set<String> limits = new LinkedHashSet<>();
         private int expandedStates;
         private int generatedTransitions;
@@ -284,7 +335,7 @@ public final class PatternTargetedLocalBridgeSearch {
         private int analyzedCandidates;
         private int maxFrontierSize = 1;
 
-        private Run(
+        private SearchRun(
             String sourceExpression,
             AssumptionSignature initialAssumptions
         ) {
@@ -797,37 +848,33 @@ public final class PatternTargetedLocalBridgeSearch {
         int maxPatternBranches
     ) {
         public Budget {
-            if (maxDepth < 0 || maxVisitedStates < 1
+            if (maxDepth < 0
+                    || maxVisitedStates < 1
                     || maxGeneratedTransitions < 0
                     || maxPrimitiveSteps < 0
                     || maxExpressionNodes < 1
                     || maxSuccessorsPerState < 1
-                    || maxMatchResults < 1 || maxMatchSteps < 1
+                    || maxMatchResults < 1
+                    || maxMatchSteps < 1
                     || maxPatternBranches < 1) {
                 throw new IllegalArgumentException(
-                    "bridge-search limits are invalid");
+                    "bridge search limits are invalid");
             }
         }
 
-        public static Budget defaults() {
-            return new Budget(
-                4, 256, 2_048, 8, 256, 128,
-                32, 5_000, 2_500);
-        }
-
-        String identity() {
+        public String identity() {
             return maxDepth + ":" + maxVisitedStates + ":"
-                + maxGeneratedTransitions + ":" + maxPrimitiveSteps
-                + ":" + maxExpressionNodes + ":"
-                + maxSuccessorsPerState + ":" + maxMatchResults
-                + ":" + maxMatchSteps + ":" + maxPatternBranches;
+                + maxGeneratedTransitions + ":" + maxPrimitiveSteps + ":"
+                + maxExpressionNodes + ":" + maxSuccessorsPerState + ":"
+                + maxMatchResults + ":" + maxMatchSteps + ":"
+                + maxPatternBranches;
         }
     }
 
     public record AnalysisSnapshot(
         PatternMatchAnalyzer.Status status,
         Map<String, String> bindings,
-        int residualCount,
+        int residualObligations,
         int matchedPatternNodes,
         int totalPatternNodes,
         String detailCode
@@ -835,41 +882,45 @@ public final class PatternTargetedLocalBridgeSearch {
         public AnalysisSnapshot {
             status = Objects.requireNonNull(status, "status");
             bindings = Collections.unmodifiableMap(new LinkedHashMap<>(
-                new TreeMap<>(Objects.requireNonNull(
-                    bindings, "bindings"))));
-            if (residualCount < 0 || matchedPatternNodes < 0
+                new TreeMap<>(Objects.requireNonNull(bindings, "bindings"))));
+            if (residualObligations < 0
+                    || matchedPatternNodes < 0
                     || totalPatternNodes < 0
-                    || matchedPatternNodes > totalPatternNodes
-                    || detailCode == null || detailCode.isBlank()) {
+                    || matchedPatternNodes > totalPatternNodes) {
                 throw new IllegalArgumentException(
-                    "analysis snapshot is invalid");
+                    "analysis counters are invalid");
+            }
+            if (detailCode == null || detailCode.isBlank()) {
+                throw new IllegalArgumentException(
+                    "detailCode must not be blank");
             }
         }
 
         static AnalysisSnapshot from(
             PatternMatchAnalyzer.Analysis analysis
         ) {
-            Map<String, String> bindings = new TreeMap<>();
+            Map<String, String> formatted = new TreeMap<>();
             analysis.bindings().forEach((name, expression) ->
-                bindings.put(name, ExpressionFormatter.format(expression)));
+                formatted.put(name,
+                    ExpressionFormatter.format(expression)));
             return new AnalysisSnapshot(
                 analysis.status(),
-                bindings,
+                formatted,
                 analysis.residualObligations().size(),
                 analysis.matchedPatternNodes(),
                 analysis.totalPatternNodes(),
                 analysis.detailCode());
         }
 
-        static AnalysisSnapshot inconclusive(String detailCode) {
+        static AnalysisSnapshot unavailable() {
             return new AnalysisSnapshot(
                 PatternMatchAnalyzer.Status.INCONCLUSIVE,
-                Map.of(), 0, 0, 0, detailCode);
+                Map.of(), 0, 0, 0, "TECHNICAL_FAILURE");
         }
 
         String descriptor() {
-            return status.name() + ":" + bindings + ":"
-                + residualCount + ":" + matchedPatternNodes + ":"
+            return status + ":" + bindings + ":"
+                + residualObligations + ":" + matchedPatternNodes + ":"
                 + totalPatternNodes + ":" + detailCode;
         }
     }
@@ -884,29 +935,30 @@ public final class PatternTargetedLocalBridgeSearch {
     ) {
         public Step {
             expressionBefore = normalize(
-                expressionBefore, "expressionBefore");
+                expressionBefore, "step expressionBefore");
             expressionAfter = normalize(
-                expressionAfter, "expressionAfter");
+                expressionAfter, "step expressionAfter");
             if (ruleId == null || ruleId.isBlank()
                     || applicationKey == null
                     || applicationKey.isBlank()) {
                 throw new IllegalArgumentException(
-                    "step rule and application key must not be blank");
+                    "step rule/application identities must not be blank");
             }
             emittedAssumptions = AssumptionSignature.ofExpressions(
                 emittedAssumptions).normalizedAssumptions();
-            primitiveRuleIds = List.copyOf(Objects.requireNonNull(
-                primitiveRuleIds, "primitiveRuleIds"));
+            primitiveRuleIds = List.copyOf(
+                Objects.requireNonNull(
+                    primitiveRuleIds, "primitiveRuleIds"));
             if (primitiveRuleIds.isEmpty()) {
                 throw new IllegalArgumentException(
-                    "primitive lineage must not be empty");
+                    "step primitive lineage must not be empty");
             }
         }
 
         String descriptor() {
-            return expressionBefore + "\n" + expressionAfter + "\n"
-                + ruleId + "\n" + emittedAssumptions + "\n"
-                + applicationKey + "\n" + primitiveRuleIds;
+            return expressionBefore + ":" + expressionAfter + ":"
+                + ruleId + ":" + emittedAssumptions + ":"
+                + applicationKey + ":" + primitiveRuleIds;
         }
     }
 
@@ -915,27 +967,35 @@ public final class PatternTargetedLocalBridgeSearch {
         String expressionAfter,
         String ruleId,
         List<String> emittedAssumptions,
-        String applicationKey
+        String applicationKey,
+        List<String> primitiveRuleIds
     ) {
         public PrincipalStep {
             expressionBefore = normalize(
-                expressionBefore, "principal.expressionBefore");
+                expressionBefore, "principal expressionBefore");
             expressionAfter = normalize(
-                expressionAfter, "principal.expressionAfter");
+                expressionAfter, "principal expressionAfter");
             if (ruleId == null || ruleId.isBlank()
                     || applicationKey == null
                     || applicationKey.isBlank()) {
                 throw new IllegalArgumentException(
-                    "principal rule and application key must not be blank");
+                    "principal identities must not be blank");
             }
             emittedAssumptions = AssumptionSignature.ofExpressions(
                 emittedAssumptions).normalizedAssumptions();
+            primitiveRuleIds = List.copyOf(
+                Objects.requireNonNull(
+                    primitiveRuleIds, "primitiveRuleIds"));
+            if (!primitiveRuleIds.equals(List.of(ruleId))) {
+                throw new IllegalArgumentException(
+                    "principal lineage must contain exactly its rule ID");
+            }
         }
 
         String descriptor() {
-            return expressionBefore + "\n" + expressionAfter + "\n"
-                + ruleId + "\n" + emittedAssumptions + "\n"
-                + applicationKey;
+            return expressionBefore + ":" + expressionAfter + ":"
+                + ruleId + ":" + emittedAssumptions + ":"
+                + applicationKey + ":" + primitiveRuleIds;
         }
     }
 
@@ -949,13 +1009,16 @@ public final class PatternTargetedLocalBridgeSearch {
         int maxFrontierSize
     ) {
         public Work {
-            if (expandedStates < 0 || generatedTransitions < 0
-                    || discoveredStates < 1 || retainedTransitions < 0
+            if (expandedStates < 0
+                    || generatedTransitions < 0
+                    || discoveredStates < 1
+                    || retainedTransitions < 0
                     || duplicateTransitions < 0
-                    || analyzedCandidates < 0 || maxFrontierSize < 1
+                    || analyzedCandidates < 0
+                    || maxFrontierSize < 1
                     || discoveredStates != retainedTransitions + 1) {
                 throw new IllegalArgumentException(
-                    "bridge-search work ledger is invalid");
+                    "bridge work ledger is invalid");
             }
         }
 
@@ -996,15 +1059,19 @@ public final class PatternTargetedLocalBridgeSearch {
             if (!SEARCH_ID.equals(searchId)
                     || !CERTIFICATE_SCHEMA.equals(certificateSchema)) {
                 throw new IllegalArgumentException(
-                    "unexpected bridge evidence schema");
+                    "unexpected bridge schema identity");
             }
             repositoryRevision = requireRevision(repositoryRevision);
+            if (principalRuleId == null
+                    || principalRuleId.isBlank()) {
+                throw new IllegalArgumentException(
+                    "principalRuleId must not be blank");
+            }
             principalRuleFingerprint = requireHash(
-                principalRuleFingerprint,
-                "principalRuleFingerprint");
+                principalRuleFingerprint, "principal rule fingerprint");
             preparationInventoryFingerprint = requireHash(
                 preparationInventoryFingerprint,
-                "preparationInventoryFingerprint");
+                "preparation inventory fingerprint");
             budget = Objects.requireNonNull(budget, "budget");
             sourceExpression = normalize(
                 sourceExpression, "sourceExpression");
@@ -1019,40 +1086,26 @@ public final class PatternTargetedLocalBridgeSearch {
                 initialAnalysis, "initialAnalysis");
             terminalAnalysis = Objects.requireNonNull(
                 terminalAnalysis, "terminalAnalysis");
-            preparationSteps = List.copyOf(Objects.requireNonNull(
-                preparationSteps, "preparationSteps"));
+            preparationSteps = List.copyOf(
+                Objects.requireNonNull(
+                    preparationSteps, "preparationSteps"));
             principalStep = Objects.requireNonNull(
                 principalStep, "principalStep");
             work = Objects.requireNonNull(work, "work");
-            if (principalRuleId == null || principalRuleId.isBlank()
-                    || preparationSteps.isEmpty()
-                    || terminalAnalysis.status()
-                        == PatternMatchAnalyzer.Status.RESIDUAL
+            if (preparationSteps.isEmpty()
+                    || !principalRuleId.equals(principalStep.ruleId())
                     || terminalAnalysis.status()
                         == PatternMatchAnalyzer.Status.NOT_MATCHED
                     || terminalAnalysis.status()
+                        == PatternMatchAnalyzer.Status.RESIDUAL
+                    || terminalAnalysis.status()
                         == PatternMatchAnalyzer.Status.INCONCLUSIVE) {
                 throw new IllegalArgumentException(
-                    "prepared bridge evidence is incomplete");
+                    "prepared bridge requires a path and full terminal match");
             }
             if (!certificateHash.isEmpty()) {
-                requireHash(certificateHash, "certificateHash");
+                requireHash(certificateHash, "certificate hash");
             }
-        }
-
-        boolean configurationMatches(
-            String revision,
-            String ruleId,
-            String ruleFingerprint,
-            String inventoryFingerprint,
-            Budget expectedBudget
-        ) {
-            return repositoryRevision.equals(revision)
-                && principalRuleId.equals(ruleId)
-                && principalRuleFingerprint.equals(ruleFingerprint)
-                && preparationInventoryFingerprint.equals(
-                    inventoryFingerprint)
-                && budget.equals(expectedBudget);
         }
 
         Bridge withCertificateHash(String value) {
@@ -1069,8 +1122,8 @@ public final class PatternTargetedLocalBridgeSearch {
 
         public List<String> primitiveRuleIds() {
             List<String> result = new ArrayList<>();
-            preparationSteps.forEach(step ->
-                result.addAll(step.primitiveRuleIds()));
+            preparationSteps.forEach(value ->
+                result.addAll(value.primitiveRuleIds()));
             result.add(principalRuleId);
             return List.copyOf(result);
         }
@@ -1094,18 +1147,26 @@ public final class PatternTargetedLocalBridgeSearch {
             reachedLimits = Collections.unmodifiableSet(
                 new LinkedHashSet<>(Objects.requireNonNull(
                     reachedLimits, "reachedLimits")));
-            if ((status == Status.PREPARED) != bridge.isPresent()
-                    || status == Status.BUDGET_INCONCLUSIVE
-                        && reachedLimits.isEmpty()
-                    || detailCode == null || detailCode.isBlank()
-                    || status == Status.TECHNICAL_FAILURE
-                        && (technicalDetail == null
-                            || technicalDetail.isBlank())) {
+            if (detailCode == null || detailCode.isBlank()) {
                 throw new IllegalArgumentException(
-                    "attempt evidence is inconsistent");
+                    "detailCode must not be blank");
             }
             technicalDetail = technicalDetail == null
                 ? "" : technicalDetail.trim();
+            if ((status == Status.PREPARED) != bridge.isPresent()) {
+                throw new IllegalArgumentException(
+                    "only PREPARED may retain a bridge");
+            }
+            if (status == Status.BUDGET_INCONCLUSIVE
+                    && reachedLimits.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "inconclusive result requires a reached limit");
+            }
+            if (status == Status.TECHNICAL_FAILURE
+                    && technicalDetail.isBlank()) {
+                throw new IllegalArgumentException(
+                    "technical failure requires detail");
+            }
         }
     }
 
