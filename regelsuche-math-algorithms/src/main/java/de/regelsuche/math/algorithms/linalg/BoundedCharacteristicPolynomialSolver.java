@@ -252,8 +252,8 @@ public final class BoundedCharacteristicPolynomialSolver {
         String contentHash
     ) {
         public Certificate {
-            if (schema == null || schema.isBlank()
-                    || solverId == null || solverId.isBlank()
+            if (!CERTIFICATE_SCHEMA.equals(schema)
+                    || !SOLVER_ID.equals(solverId)
                     || sourceHash == null
                     || !sourceHash.matches("[0-9a-f]{64}")
                     || eigenvalueParameter == null

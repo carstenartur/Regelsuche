@@ -424,14 +424,18 @@ public final class SymbolicLinearSystemRepresentationBridge implements
         String contentHash
     ) {
         public Certificate {
-            if (schema == null || schema.isBlank()
-                    || bridgeId == null || bridgeId.isBlank()
+            if (!CERTIFICATE_SCHEMA.equals(schema)
+                    || !BRIDGE_ID.equals(bridgeId)
                     || contentHash == null
                     || !contentHash.matches("[0-9a-f]{64}")) {
                 throw new IllegalArgumentException(
                     "certificate identities are invalid");
             }
             relation = Objects.requireNonNull(relation, "relation");
+            if (relation != RELATION) {
+                throw new IllegalArgumentException(
+                    "certificate relation is invalid");
+            }
             sourceEquations = textList(sourceEquations, "sourceEquations");
             unknownOrder = textList(unknownOrder, "unknownOrder");
             int unknownCount = unknownOrder.size();
