@@ -1,16 +1,25 @@
 package de.regelsuche.search.reachability;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.knowledge.RuleDescriptor;
 import de.regelsuche.knowledge.RuleInventoryFingerprint;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.Transformation;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,12 +32,11 @@ import java.util.Set;
  * One deterministic policy boundary for direct and bounded prepared
  * applicability of several explicitly schema-bearing rules.
  *
- * <p>The coordinator does not infer schemas. A principal must be a
- * {@link PatternRewriteRule} or an explicit schema-backed subtype. Direct
- * concrete replay remains the first stage. The bounded local bridge search is
- * invoked only when that principal does not already apply. Every positive
- * candidate is materialized from the concrete principal implementation and a
- * prepared candidate additionally requires independent bridge verification.</p>
+ * <p>The coordinator does not infer schemas. Direct concrete replay remains
+ * the first stage. The bounded local bridge search is invoked only when the
+ * corresponding executor does not already apply. Every positive candidate is
+ * materialized from that concrete executor and a prepared candidate
+ * additionally requires independent bridge verification.</p>
  *
  * <p>This first coordinator unifies rule eligibility, deterministic ordering,
  * replay, evidence and aggregate work. Its v1 implementation still delegates
@@ -38,10 +46,14 @@ import java.util.Set;
 public final class RulePreparationCoordinator {
     public static final String COORDINATOR_ID =
         "regelsuche.safe-rule-preparation-coordinator/v1";
+    private static final String SCHEMA_INVENTORY_REVISION =
+        "regelsuche.applicability-schema-inventory/v1";
+    private static final PatternExpr INTERNAL_RESULT_PLACEHOLDER =
+        PatternExpr.var("COORDINATOR_INTERNAL_RESULT");
 
-    private final List<PatternRewriteRule> principalRules;
+    private final List<RewriteApplicabilitySchema> principalSchemas;
     private final List<RewriteRule> preparationRules;
-    private final Map<String, PatternTargetedLocalBridgeSearch> searches;
+    private final Map<String, PrincipalRuntime> runtimes;
     private final String repositoryRevision;
     private final String principalInventoryFingerprint;
     private final String preparationInventoryFingerprint;
@@ -49,36 +61,39 @@ public final class RulePreparationCoordinator {
     private final ExpressionParser parser = new ExpressionParser();
 
     public RulePreparationCoordinator(
-        List<? extends PatternRewriteRule> principalRules,
+        List<RewriteApplicabilitySchema> principalSchemas,
         List<? extends RewriteRule> preparationRules,
         String repositoryRevision,
         PatternTargetedLocalBridgeSearch.Budget bridgeBudget
     ) {
-        this.principalRules = validatePrincipalRules(principalRules);
+        this.principalSchemas = validatePrincipalSchemas(principalSchemas);
         this.preparationRules = validatePreparationRules(preparationRules);
         this.repositoryRevision = requireRevision(repositoryRevision);
         this.bridgeBudget = Objects.requireNonNull(
             bridgeBudget, "bridgeBudget");
         this.principalInventoryFingerprint =
-            RuleInventoryFingerprint.contentHash(this.principalRules);
+            schemaInventoryFingerprint(this.principalSchemas);
         this.preparationInventoryFingerprint =
             RuleInventoryFingerprint.contentHash(this.preparationRules);
-        Map<String, PatternTargetedLocalBridgeSearch> indexed =
-            new LinkedHashMap<>();
-        for (PatternRewriteRule principal : this.principalRules) {
+        Map<String, PrincipalRuntime> indexed = new LinkedHashMap<>();
+        for (RewriteApplicabilitySchema schema : this.principalSchemas) {
+            PatternRewriteRule adapter = new CoordinatorPatternAdapter(schema);
             indexed.put(
-                principal.id(),
-                new PatternTargetedLocalBridgeSearch(
-                    principal,
-                    this.preparationRules,
-                    this.repositoryRevision,
-                    this.bridgeBudget));
+                schema.ruleId(),
+                new PrincipalRuntime(
+                    schema,
+                    adapter,
+                    new PatternTargetedLocalBridgeSearch(
+                        adapter,
+                        this.preparationRules,
+                        this.repositoryRevision,
+                        this.bridgeBudget)));
         }
-        this.searches = Collections.unmodifiableMap(indexed);
+        this.runtimes = Collections.unmodifiableMap(indexed);
     }
 
-    public List<PatternRewriteRule> principalRules() {
-        return principalRules;
+    public List<RewriteApplicabilitySchema> principalSchemas() {
+        return principalSchemas;
     }
 
     public String principalInventoryFingerprint() {
@@ -97,14 +112,12 @@ public final class RulePreparationCoordinator {
         String source = normalize(sourceExpression);
         AssumptionSignature assumptions = normalized(initialAssumptions);
         List<Outcome> outcomes = new ArrayList<>();
-        for (PatternRewriteRule principal : principalRules) {
-            PatternTargetedLocalBridgeSearch search =
-                searches.get(principal.id());
+        for (RewriteApplicabilitySchema schema : principalSchemas) {
+            PrincipalRuntime runtime = runtimes.get(schema.ruleId());
             PatternTargetedLocalBridgeSearch.Attempt attempt =
-                search.analyze(source, assumptions);
+                runtime.search().analyze(source, assumptions);
             outcomes.add(outcome(
-                principal,
-                search,
+                runtime,
                 source,
                 assumptions,
                 attempt));
@@ -146,8 +159,7 @@ public final class RulePreparationCoordinator {
     }
 
     private Outcome outcome(
-        PatternRewriteRule principal,
-        PatternTargetedLocalBridgeSearch search,
+        PrincipalRuntime runtime,
         String source,
         AssumptionSignature sourceAssumptions,
         PatternTargetedLocalBridgeSearch.Attempt attempt
@@ -161,7 +173,7 @@ public final class RulePreparationCoordinator {
                 == PatternTargetedLocalBridgeSearch.Status
                     .DIRECT_MATCH_AVAILABLE) {
             candidate = directCandidate(
-                principal, source, sourceAssumptions);
+                runtime.adapter(), source, sourceAssumptions);
             replayVerified = candidate.isPresent();
             if (candidate.isEmpty()) {
                 status = PatternTargetedLocalBridgeSearch.Status
@@ -173,11 +185,11 @@ public final class RulePreparationCoordinator {
             PatternTargetedLocalBridgeSearch.Bridge bridge =
                 attempt.bridge().orElseThrow();
             PatternTargetedLocalBridgeSearch.Verification verification =
-                search.verify(bridge);
+                runtime.search().verify(bridge);
             replayVerified = verification.valid();
             if (replayVerified) {
                 candidate = Optional.of(preparedCandidate(
-                    principal, bridge));
+                    runtime.schema().executor(), bridge));
             } else {
                 status = PatternTargetedLocalBridgeSearch.Status
                     .INVALID_CERTIFICATE;
@@ -185,9 +197,15 @@ public final class RulePreparationCoordinator {
             }
         }
 
+        String certificateHash = status
+                == PatternTargetedLocalBridgeSearch.Status.PREPARED
+            ? attempt.bridge().map(
+                PatternTargetedLocalBridgeSearch.Bridge::certificateHash)
+                .orElseThrow()
+            : "";
         return new Outcome(
-            principal.id(),
-            RuleInventoryFingerprint.ruleContentHash(principal),
+            runtime.schema().ruleId(),
+            runtime.schema().contentHash(),
             status,
             candidate,
             replayVerified,
@@ -195,44 +213,42 @@ public final class RulePreparationCoordinator {
             attempt.work(),
             attempt.reachedLimits(),
             detailCode,
-            attempt.bridge().map(
-                PatternTargetedLocalBridgeSearch.Bridge::certificateHash)
-                .orElse(""));
+            certificateHash);
     }
 
     private Optional<Transformation> directCandidate(
-        PatternRewriteRule principal,
+        PatternRewriteRule adapter,
         String source,
         AssumptionSignature sourceAssumptions
     ) {
         List<Transformation> generated =
             new AstRewriteTransformationEngine(
-                List.of(principal),
+                List.of(adapter),
                 Integer.MAX_VALUE,
                 1)
                 .transform(source);
         return generated.stream()
-            .filter(value -> principal.id().equals(value.rule()))
+            .filter(value -> adapter.id().equals(value.rule()))
             .findFirst()
             .map(value -> withCumulativeAssumptions(
                 value, sourceAssumptions));
     }
 
     private static Transformation preparedCandidate(
-        PatternRewriteRule principal,
+        RewriteRule executor,
         PatternTargetedLocalBridgeSearch.Bridge bridge
     ) {
         return new Transformation(
-            principal.id(),
+            executor.id(),
             bridge.resultExpression(),
-            principal.kind(),
-            principal.mayIncreaseComplexity(),
-            principal.estimatedCostDelta(),
-            principal.isEquivalencePreservingByConstruction(),
+            executor.kind(),
+            executor.mayIncreaseComplexity(),
+            executor.estimatedCostDelta(),
+            executor.isEquivalencePreservingByConstruction(),
             "coordinated-preparation:" + bridge.certificateHash(),
             bridge.resultAssumptions().normalizedAssumptions(),
-            principal.descriptor().packId(),
-            principal.descriptor().license(),
+            executor.descriptor().packId(),
+            executor.descriptor().license(),
             bridge.primitiveRuleIds());
     }
 
@@ -275,42 +291,52 @@ public final class RulePreparationCoordinator {
             supplied.normalizedAssumptions());
     }
 
-    private static List<PatternRewriteRule> validatePrincipalRules(
-        List<? extends PatternRewriteRule> supplied
+    private static List<RewriteApplicabilitySchema> validatePrincipalSchemas(
+        List<RewriteApplicabilitySchema> supplied
     ) {
-        Objects.requireNonNull(supplied, "principalRules");
+        Objects.requireNonNull(supplied, "principalSchemas");
         if (supplied.isEmpty()) {
             throw new IllegalArgumentException(
-                "at least one principal rule is required");
+                "at least one principal schema is required");
         }
-        Map<String, PatternRewriteRule> indexed = new LinkedHashMap<>();
-        for (PatternRewriteRule rule : supplied) {
-            PatternRewriteRule checked = Objects.requireNonNull(
-                rule, "principal rule");
-            if (!checked.isEquivalencePreservingByConstruction()) {
+        Map<String, RewriteApplicabilitySchema> byRule =
+            new LinkedHashMap<>();
+        Set<String> schemaIds = new LinkedHashSet<>();
+        for (RewriteApplicabilitySchema schema : supplied) {
+            RewriteApplicabilitySchema checked = Objects.requireNonNull(
+                schema, "principal schema");
+            RewriteRule executor = checked.executor();
+            if (!executor.isEquivalencePreservingByConstruction()) {
                 throw new IllegalArgumentException(
                     "principal rules must preserve equivalence: "
-                        + checked.id());
+                        + executor.id());
             }
-            if (!checked.descriptor().eligibleForRegistration()) {
+            if (!executor.descriptor().eligibleForRegistration()) {
                 throw new IllegalArgumentException(
                     "principal rule is not review-qualified: "
-                        + checked.id());
+                        + executor.id());
             }
-            if (checked.descriptor().external()
+            if (executor.descriptor().external()
                     && !"low".equalsIgnoreCase(
-                        checked.descriptor().riskLevel())) {
+                        executor.descriptor().riskLevel())) {
                 throw new IllegalArgumentException(
                     "safe coordinator v1 accepts only low-risk external rules: "
-                        + checked.id());
+                        + executor.id());
             }
-            if (indexed.put(checked.id(), checked) != null) {
+            if (!schemaIds.add(checked.schemaId())) {
                 throw new IllegalArgumentException(
-                    "duplicate principal rule ID: " + checked.id());
+                    "duplicate applicability schema ID: "
+                        + checked.schemaId());
+            }
+            if (byRule.put(checked.ruleId(), checked) != null) {
+                throw new IllegalArgumentException(
+                    "duplicate principal rule ID: " + checked.ruleId());
             }
         }
-        return indexed.values().stream()
-            .sorted(Comparator.comparing(PatternRewriteRule::id))
+        return byRule.values().stream()
+            .sorted(Comparator
+                .comparing(RewriteApplicabilitySchema::ruleId)
+                .thenComparing(RewriteApplicabilitySchema::schemaId))
             .toList();
     }
 
@@ -337,12 +363,117 @@ public final class RulePreparationCoordinator {
             .toList();
     }
 
+    private static String schemaInventoryFingerprint(
+        List<RewriteApplicabilitySchema> schemas
+    ) {
+        StringBuilder descriptor = new StringBuilder();
+        append(descriptor, SCHEMA_INVENTORY_REVISION);
+        append(descriptor, Integer.toString(schemas.size()));
+        schemas.stream()
+            .map(RewriteApplicabilitySchema::contentHash)
+            .sorted()
+            .forEach(value -> append(descriptor, value));
+        return sha256(descriptor.toString());
+    }
+
     private static String requireRevision(String revision) {
         if (revision == null || !revision.matches("[0-9a-f]{40}")) {
             throw new IllegalArgumentException(
                 "repositoryRevision must be a lowercase commit SHA");
         }
         return revision;
+    }
+
+    private static RuleDescriptor adapterDescriptor(
+        RewriteApplicabilitySchema schema
+    ) {
+        RuleDescriptor source = schema.executor().descriptor();
+        return new RuleDescriptor(
+            source.ruleId(),
+            source.packId(),
+            source.originProject(),
+            source.license(),
+            source.sourceVersion(),
+            source.sourceReference()
+                + "; applicabilitySchema=" + schema.schemaId()
+                + "; applicabilitySchemaHash=" + schema.contentHash()
+                + "; executorClass="
+                + schema.executor().getClass().getName(),
+            source.derivationType(),
+            source.status(),
+            source.riskLevel(),
+            source.categories(),
+            source.searchEffects(),
+            source.validationExamples(),
+            source.counterExamples());
+    }
+
+    private static void append(StringBuilder target, String value) {
+        target.append(value.length()).append(':').append(value);
+    }
+
+    private static String sha256(String value) {
+        try {
+            return "sha256:" + HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
+    private record PrincipalRuntime(
+        RewriteApplicabilitySchema schema,
+        PatternRewriteRule adapter,
+        PatternTargetedLocalBridgeSearch search
+    ) {
+        private PrincipalRuntime {
+            schema = Objects.requireNonNull(schema, "schema");
+            adapter = Objects.requireNonNull(adapter, "adapter");
+            search = Objects.requireNonNull(search, "search");
+        }
+    }
+
+    /** Private bridge-only adapter; it is never exposed as a registrable rule. */
+    private static final class CoordinatorPatternAdapter
+            extends PatternRewriteRule {
+        private final RewriteRule executor;
+
+        private CoordinatorPatternAdapter(
+            RewriteApplicabilitySchema schema
+        ) {
+            super(
+                schema.ruleId(),
+                schema.pattern(),
+                INTERNAL_RESULT_PLACEHOLDER,
+                schema.executor().kind(),
+                schema.executor().mayIncreaseComplexity(),
+                schema.executor().estimatedCostDelta(),
+                schema.executor().isEquivalencePreservingByConstruction(),
+                adapterDescriptor(schema),
+                schema.recognitionProfile());
+            this.executor = schema.executor();
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+            return executor.matches(subtree);
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+            return executor.apply(subtree);
+        }
+
+        @Override
+        public List<Assumption> assumptions(Expr subtree) {
+            return executor.assumptions(subtree);
+        }
+
+        @Override
+        public boolean mayEmitAssumptions() {
+            return executor.mayEmitAssumptions();
+        }
     }
 
     public record Outcome(
