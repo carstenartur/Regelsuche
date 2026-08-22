@@ -23,6 +23,8 @@ class DirectScalarEliminationSolverTest {
     private final ExpressionParser parser = new ExpressionParser();
     private final DirectScalarEliminationSolver solver =
         new DirectScalarEliminationSolver();
+    private final LinearSystemRepresentationBridge representationBridge =
+        new LinearSystemRepresentationBridge();
 
     @Test
     void solvesUniqueSystemWithoutConstructingMatrixRepresentation() {
@@ -121,6 +123,85 @@ class DirectScalarEliminationSolverTest {
         assertEquals(
             List.of(Rational.of(2), Rational.of(3)),
             result.consequence().orElseThrow()
+                .particularSolution().orElseThrow().values());
+    }
+
+    @Test
+    void powerSemanticsMatchExactRepresentationRoute() {
+        Source variableZero = source("x ^ 0 = 1", List.of("x"));
+        assertEquals(
+            Status.NONLINEAR,
+            solver.solve(variableZero, new Budget(20_000)).status());
+        assertEquals(
+            de.regelsuche.representation.RepresentationBridge.Status.NONLINEAR,
+            representationBridge.analyze(
+                variableZero.equations(),
+                new Budget(20_000)).status());
+
+        Source zeroZero = source("0 ^ 0 * x = 1", List.of("x"));
+        assertEquals(
+            Status.DOMAIN_UNSUPPORTED,
+            solver.solve(zeroZero, new Budget(20_000)).status());
+        assertEquals(
+            de.regelsuche.representation.RepresentationBridge.Status
+                .DOMAIN_UNSUPPORTED,
+            representationBridge.analyze(
+                zeroZero.equations(),
+                new Budget(20_000)).status());
+
+        Source zeroNegative = source(
+            "0 ^ (0 - 1) * x = 1",
+            List.of("x"));
+        assertEquals(
+            Status.DOMAIN_UNSUPPORTED,
+            solver.solve(zeroNegative, new Budget(20_000)).status());
+        assertEquals(
+            de.regelsuche.representation.RepresentationBridge.Status
+                .DOMAIN_UNSUPPORTED,
+            representationBridge.analyze(
+                zeroNegative.equations(),
+                new Budget(20_000)).status());
+
+        Source negativeConstant = source(
+            "2 ^ (0 - 2) * x = 1",
+            List.of("x"));
+        Result direct = solver.solve(negativeConstant, new Budget(20_000));
+        var represented = representationBridge.analyze(
+            negativeConstant.equations(),
+            new Budget(20_000));
+        assertEquals(Status.SOLVED, direct.status());
+        assertEquals(
+            de.regelsuche.representation.RepresentationBridge.Status.REPRESENTED,
+            represented.status());
+        assertEquals(
+            List.of(Rational.of(4)),
+            direct.consequence().orElseThrow()
+                .particularSolution().orElseThrow().values());
+        assertEquals(
+            Rational.ONE.divide(Rational.of(4)),
+            represented.representation().orElseThrow()
+                .coefficients().get(0, 0));
+        assertTrue(solver.verify(negativeConstant, direct));
+        assertTrue(representationBridge.verify(
+            negativeConstant.equations(),
+            represented));
+
+        Source identityExponent = source(
+            "x ^ (1 + 0) = 2",
+            List.of("x"));
+        Result identityDirect = solver.solve(
+            identityExponent,
+            new Budget(20_000));
+        var identityRepresented = representationBridge.analyze(
+            identityExponent.equations(),
+            new Budget(20_000));
+        assertEquals(Status.SOLVED, identityDirect.status());
+        assertEquals(
+            de.regelsuche.representation.RepresentationBridge.Status.REPRESENTED,
+            identityRepresented.status());
+        assertEquals(
+            List.of(Rational.of(2)),
+            identityDirect.consequence().orElseThrow()
                 .particularSolution().orElseThrow().values());
     }
 
