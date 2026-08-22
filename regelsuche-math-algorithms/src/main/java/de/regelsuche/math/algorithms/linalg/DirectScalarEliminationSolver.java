@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Exact equation-level substitution/elimination baseline for matched-work
@@ -49,6 +50,7 @@ public final class DirectScalarEliminationSolver {
         Objects.requireNonNull(budget, "budget");
         WorkCounter work = new WorkCounter(budget.maxWorkUnits());
         try {
+            validateDeclaredVariables(source, work);
             List<ScalarEquation> original = extract(source, work);
             List<ScalarEquation> reduced = mutableCopy(original);
             List<EquationOperation> operations = new ArrayList<>();
@@ -129,6 +131,48 @@ public final class DirectScalarEliminationSolver {
         } catch (RuntimeException exception) {
             return false;
         }
+    }
+
+    private static void validateDeclaredVariables(
+        Source source,
+        WorkCounter work
+    ) {
+        Set<String> discovered = new TreeSet<>();
+        for (Equation equation : source.equations()) {
+            collectVariables(equation.left(), discovered, work);
+            collectVariables(equation.right(), discovered, work);
+        }
+        if (!List.copyOf(discovered).equals(source.variables())) {
+            throw new UnsupportedExpression(
+                "DECLARED_VARIABLE_ORDER_OR_SET_MISMATCH");
+        }
+    }
+
+    private static void collectVariables(
+        Expr expression,
+        Set<String> target,
+        WorkCounter work
+    ) {
+        work.consume(Stage.SOURCE_ANALYSIS);
+        if (expression instanceof VariableExpr variable) {
+            target.add(variable.name());
+            return;
+        }
+        if (expression instanceof NumberExpr) {
+            return;
+        }
+        if (expression instanceof BinaryExpr binary) {
+            collectVariables(binary.left(), target, work);
+            collectVariables(binary.right(), target, work);
+            return;
+        }
+        if (expression instanceof FunctionExpr function) {
+            for (Expr argument : function.arguments()) {
+                collectVariables(argument, target, work);
+            }
+            return;
+        }
+        throw new UnsupportedExpression("UNKNOWN_EXPRESSION_NODE");
     }
 
     private static List<ScalarEquation> extract(
