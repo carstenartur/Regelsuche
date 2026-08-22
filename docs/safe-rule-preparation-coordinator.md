@@ -1,0 +1,125 @@
+# Safe rule-preparation coordinator
+
+Issue #708 requires the specialized preparation paths and the bounded local
+bridge fallback to converge behind one product-facing policy boundary. This
+tranche introduces the first coordinator revision:
+
+```text
+regelsuche.safe-rule-preparation-coordinator/v1
+```
+
+## Purpose
+
+The coordinator receives a finite set of visible principal rules, one finite
+preparation inventory, an exact repository revision and one bounded bridge
+budget. For every principal it performs the same staged decision:
+
+```text
+concrete direct replay
+  -> bounded pattern-targeted preparation
+  -> concrete principal replay
+  -> independent bridge verification
+```
+
+A desired result expression, benchmark answer, family label or post-hoc score
+is never supplied. The principal's applicability schema is the only local
+search objective.
+
+## Explicit schemas for algorithmic rules
+
+A declarative `PatternRewriteRule` already exposes its source pattern. An
+algorithmic Java rule previously had no equivalent preparation boundary.
+`SchemaBackedRewriteRule` now attaches an explicit applicability pattern and
+recognition profile while retaining the original rule as the only concrete
+executor.
+
+The schema may guide partial matching and residual analysis, but it cannot emit
+a result by itself. A positive candidate is accepted only when the wrapped Java
+rule matches and applies to the exact retained terminal AST. The schema ID,
+pattern, delegate implementation class, rule metadata and repository revision
+are bound into retained identities.
+
+This avoids both unsafe inference and duplicate implementations:
+
+- no schema is guessed from a class name, rule ID, example or benchmark;
+- no declarative target substitutes for the algorithmic implementation;
+- a stale or overly broad schema fails when concrete replay disagrees;
+- wrapping a schema-backed rule a second time is rejected.
+
+## Safe v1 eligibility
+
+The coordinator rejects:
+
+- an empty or duplicate principal inventory;
+- principal or preparation rules that do not declare equivalence preservation;
+- principal rules whose review status is not registration-eligible;
+- external principal rules above risk level `low`;
+- invalid repository revisions or bridge budgets.
+
+The low-risk boundary is deliberately conservative. Logarithm, root, power,
+inequality and operator rules with incomplete typed guards remain outside this
+safe profile even if a syntactic pattern exists.
+
+## Retained outcome
+
+Every principal receives one deterministic outcome containing:
+
+- rule ID and content fingerprint;
+- direct, prepared, complete-no-bridge, inconclusive or failure status;
+- concrete candidate when positive;
+- cumulative assumptions;
+- complete primitive rule lineage;
+- initial match analysis;
+- bounded search work and reached limits;
+- bridge certificate identity for prepared candidates;
+- concrete replay verification status.
+
+The complete evaluation additionally retains principal and preparation
+inventory fingerprints plus aggregate work. `verify(...)` recomputes the whole
+evaluation and every prepared bridge under the same frozen configuration.
+
+## Current implementation boundary
+
+This revision centralizes eligibility, stage order, deterministic rule order,
+replay, evidence and reporting. Internally it still delegates one bounded bridge
+session per principal. A future shared multi-principal frontier may remove
+repeated preparation work, but only as an optimization that preserves the same
+candidate, assumption, primitive-lineage and certificate outcomes.
+
+The earlier specialized exact solvers for polynomial quotient, AC exposure,
+common monomials, exact squares and common denominators are not removed by this
+tranche. Adapting those solvers to one common registry is the next coordinator
+slice.
+
+## Three-family SymPy amplification matrix
+
+The retained experiment is advanced from one Pythagorean rule to three
+unchanged low-risk imported SymPy rules:
+
+```text
+sympy.trig.pythagorean
+sympy.poly.factor.diff_squares
+sympy.rational.partial_fraction.telescoping
+```
+
+All three share the same preparation inventory containing only
+`ast_cancel_division_factor`. Eleven frozen cases cover:
+
+- four direct applications;
+- four additional prepared applications;
+- three conclusive near misses;
+- trigonometric, polynomial and rational rule families;
+- one- and two-step preparation;
+- retained non-zero assumptions;
+- rejection of different-argument, wrong-operator and wrong-step controls.
+
+Generate the deterministic JSON and Markdown evidence with:
+
+```bash
+./gradlew :regelsuche-experiments:symPyRuleAmplification
+```
+
+The experiment measures amplification of declared applicability. It does not
+claim that Regelsuche is generally stronger or faster than SymPy, that the
+three rules are complete for their domains, or that preparation is always
+beneficial.
