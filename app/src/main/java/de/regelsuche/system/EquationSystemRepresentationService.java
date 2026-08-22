@@ -72,6 +72,10 @@ public final class EquationSystemRepresentationService {
         }
         List<Equation> equations = parser.parse(
             new InputRequest(InputType.SYSTEM, input)).equations();
+        if (equations.isEmpty()) {
+            throw new IllegalArgumentException(
+                "equation-system input must contain at least one equation");
+        }
         RepresentationBridge.Result<ExactLinearSystem,
             LinearSystemRepresentationBridge.Certificate> representation =
                 representationBridge.analyze(
