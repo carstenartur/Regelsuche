@@ -51,6 +51,8 @@ def historicalEqualWorkSearchComparisonReportDirectory = layout.buildDirectory.d
     'reports/historical-rediscovery-equal-work-search-comparison')
 def historicalRewriteArchitectureDecisionReportDirectory = layout.buildDirectory.dir(
     'reports/historical-rewrite-architecture-decision')
+def representationMatchedWorkReportDirectory = layout.buildDirectory.dir(
+    'reports/representation-matched-work')
 def historicalRediscoveryOutputArgument =
     historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
 def historicalRewriteArchitectureDecisionInputs = [
@@ -141,11 +143,41 @@ def generateHistoricalRewriteArchitectureDecision = tasks.register(
     }
 }
 
+def generateRepresentationMatchedWorkReport = tasks.register(
+    'generateRepresentationMatchedWorkReport', JavaExec) {
+    group = 'verification'
+    description = 'Executes the frozen exact representation-versus-direct matched-work experiment.'
+    dependsOn tasks.named('classes')
+    timeout = java.time.Duration.ofMinutes(1)
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.RepresentationMatchedWorkExperiment'
+    argumentProviders.add({
+        [representationMatchedWorkReportDirectory.get().asFile.absolutePath]
+    } as CommandLineArgumentProvider)
+    inputs.property(
+        'configurationId',
+        'representation-rref-v1-vs-direct-scalar-elimination-v1')
+    inputs.property('totalBudgetPerRoute', 200000)
+    outputs.dir(representationMatchedWorkReportDirectory)
+    doLast {
+        def json = representationMatchedWorkReportDirectory.get()
+            .file('matched-work-report.json').asFile
+        def markdown = representationMatchedWorkReportDirectory.get()
+            .file('matched-work-report.md').asFile
+        if (!json.isFile() || !markdown.isFile()) {
+            throw new GradleException(
+                'Missing representation matched-work report artifacts')
+        }
+    }
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
     dependsOn generateHistoricalRewriteArchitectureDecision
+    dependsOn generateRepresentationMatchedWorkReport
 }
 
 rootProject.tasks.named('check') {
     dependsOn generateHistoricalRewriteArchitectureDecision
+    dependsOn generateRepresentationMatchedWorkReport
 }
