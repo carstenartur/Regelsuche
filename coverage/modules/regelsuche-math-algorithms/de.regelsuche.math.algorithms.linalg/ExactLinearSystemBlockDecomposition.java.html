@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactLinearSystemBlockDecomposition.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">ExactLinearSystemBlockDecomposition.java</span></div><h1>ExactLinearSystemBlockDecomposition.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.RowOrigin;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Deterministic partition of equation rows and variable columns into independent
+ * connected components of the exact coefficient matrix.
+ *
+ * &lt;p&gt;Every source row and source column occurs in exactly one component. A
+ * component with rows and columns is a coupled subsystem; a column-only
+ * component is a free coordinate; a row-only component is a constant
+ * constraint. Cross-component coefficients are certified zero by the producer.&lt;/p&gt;
+ */
+public record ExactLinearSystemBlockDecomposition(
+    int sourceRowCount,
+    int sourceColumnCount,
+    List&lt;Component&gt; components,
+    List&lt;Integer&gt; rowPermutation,
+    List&lt;Integer&gt; columnPermutation,
+    List&lt;String&gt; unlockedCapabilities
+) {
+    public static final String CAPABILITY_INDEPENDENT_SUBSYSTEMS =
+        &quot;INDEPENDENT_LINEAR_SUBSYSTEMS&quot;;
+    public static final String CAPABILITY_FREE_VARIABLE_COMPONENTS =
+        &quot;FREE_VARIABLE_COMPONENTS&quot;;
+    public static final String CAPABILITY_CONSTANT_CONSTRAINT_COMPONENTS =
+        &quot;CONSTANT_CONSTRAINT_COMPONENTS&quot;;
+    public static final String CAPABILITY_INCONSISTENCY_LOCALIZATION =
+        &quot;INCONSISTENCY_LOCALIZATION&quot;;
+
+<span class="fc" id="L36">    public ExactLinearSystemBlockDecomposition {</span>
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">        if (sourceRowCount &lt; 1 || sourceColumnCount &lt; 1) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(</span>
+                &quot;source dimensions must be positive&quot;);
+        }
+<span class="fc" id="L41">        components = List.copyOf(Objects.requireNonNull(</span>
+            components,
+            &quot;components&quot;));
+<span class="fc" id="L44">        rowPermutation = indexPermutation(</span>
+            rowPermutation,
+            sourceRowCount,
+            &quot;rowPermutation&quot;);
+<span class="fc" id="L48">        columnPermutation = indexPermutation(</span>
+            columnPermutation,
+            sourceColumnCount,
+            &quot;columnPermutation&quot;);
+<span class="fc" id="L52">        unlockedCapabilities = textSet(</span>
+            unlockedCapabilities,
+            &quot;unlockedCapabilities&quot;);
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (components.size() &lt; 2) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(</span>
+                &quot;a decomposition requires at least two components&quot;);
+        }
+
+<span class="fc" id="L60">        boolean[] seenRows = new boolean[sourceRowCount];</span>
+<span class="fc" id="L61">        boolean[] seenColumns = new boolean[sourceColumnCount];</span>
+<span class="fc" id="L62">        List&lt;Integer&gt; expectedRows = new ArrayList&lt;&gt;(sourceRowCount);</span>
+<span class="fc" id="L63">        List&lt;Integer&gt; expectedColumns = new ArrayList&lt;&gt;(sourceColumnCount);</span>
+<span class="fc" id="L64">        boolean hasFreeVariables = false;</span>
+<span class="fc" id="L65">        boolean hasConstantConstraints = false;</span>
+<span class="fc" id="L66">        boolean hasContradiction = false;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (Component component : components) {</span>
+<span class="fc" id="L68">            Objects.requireNonNull(component, &quot;component&quot;);</span>
+<span class="fc" id="L69">            expectedRows.addAll(component.sourceRowIndices());</span>
+<span class="fc" id="L70">            expectedColumns.addAll(component.sourceColumnIndices());</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            for (int row : component.sourceRowIndices()) {</span>
+<span class="pc bpc" id="L72" title="3 of 6 branches missed.">                if (row &lt; 0 || row &gt;= sourceRowCount || seenRows[row]) {</span>
+<span class="nc" id="L73">                    throw new IllegalArgumentException(</span>
+                        &quot;component row partition is invalid: &quot; + row);
+                }
+<span class="fc" id="L76">                seenRows[row] = true;</span>
+<span class="fc" id="L77">            }</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            for (int column : component.sourceColumnIndices()) {</span>
+<span class="pc bpc" id="L79" title="3 of 6 branches missed.">                if (column &lt; 0</span>
+                        || column &gt;= sourceColumnCount
+                        || seenColumns[column]) {
+<span class="nc" id="L82">                    throw new IllegalArgumentException(</span>
+                        &quot;component column partition is invalid: &quot; + column);
+                }
+<span class="fc" id="L85">                seenColumns[column] = true;</span>
+<span class="fc" id="L86">            }</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            hasFreeVariables |= component.kind()</span>
+                == ComponentKind.FREE_VARIABLES;
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            hasConstantConstraints |= component.kind()</span>
+                == ComponentKind.CONSTANT_CONSTRAINTS;
+<span class="fc" id="L91">            hasContradiction |= component.contradictoryConstantConstraint();</span>
+<span class="fc" id="L92">        }</span>
+<span class="fc" id="L93">        requireComplete(seenRows, &quot;row&quot;);</span>
+<span class="fc" id="L94">        requireComplete(seenColumns, &quot;column&quot;);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (!expectedRows.equals(rowPermutation)</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                || !expectedColumns.equals(columnPermutation)) {</span>
+<span class="fc" id="L97">            throw new IllegalArgumentException(</span>
+                &quot;permutations must follow deterministic component order&quot;);
+        }
+<span class="fc" id="L100">        requireCapability(</span>
+            unlockedCapabilities,
+            CAPABILITY_INDEPENDENT_SUBSYSTEMS,
+            true);
+<span class="fc" id="L104">        requireCapability(</span>
+            unlockedCapabilities,
+            CAPABILITY_FREE_VARIABLE_COMPONENTS,
+            hasFreeVariables);
+<span class="fc" id="L108">        requireCapability(</span>
+            unlockedCapabilities,
+            CAPABILITY_CONSTANT_CONSTRAINT_COMPONENTS,
+            hasConstantConstraints);
+<span class="fc" id="L112">        requireCapability(</span>
+            unlockedCapabilities,
+            CAPABILITY_INCONSISTENCY_LOCALIZATION,
+            hasContradiction);
+<span class="fc" id="L116">    }</span>
+
+    public boolean hasFreeVariableComponents() {
+<span class="fc" id="L119">        return components.stream()</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            .anyMatch(component -&gt; component.kind()</span>
+                == ComponentKind.FREE_VARIABLES);
+    }
+
+    public boolean hasConstantConstraintComponents() {
+<span class="fc" id="L125">        return components.stream()</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            .anyMatch(component -&gt; component.kind()</span>
+                == ComponentKind.CONSTANT_CONSTRAINTS);
+    }
+
+    public boolean hasContradictoryConstantConstraint() {
+<span class="fc" id="L131">        return components.stream()</span>
+<span class="fc" id="L132">            .anyMatch(Component::contradictoryConstantConstraint);</span>
+    }
+
+    private static List&lt;Integer&gt; indexPermutation(
+        List&lt;Integer&gt; values,
+        int size,
+        String field
+    ) {
+<span class="fc" id="L140">        Objects.requireNonNull(values, field);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (values.size() != size) {</span>
+<span class="nc" id="L142">            throw new IllegalArgumentException(</span>
+                field + &quot; must contain every index exactly once&quot;);
+        }
+<span class="fc" id="L145">        boolean[] seen = new boolean[size];</span>
+<span class="fc" id="L146">        List&lt;Integer&gt; retained = new ArrayList&lt;&gt;(size);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (Integer value : values) {</span>
+<span class="pc bpc" id="L148" title="4 of 8 branches missed.">            if (value == null || value &lt; 0 || value &gt;= size || seen[value]) {</span>
+<span class="nc" id="L149">                throw new IllegalArgumentException(</span>
+                    field + &quot; contains an invalid index: &quot; + value);
+            }
+<span class="fc" id="L152">            seen[value] = true;</span>
+<span class="fc" id="L153">            retained.add(value);</span>
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">        return List.copyOf(retained);</span>
+    }
+
+    private static List&lt;String&gt; textSet(
+        List&lt;String&gt; values,
+        String field
+    ) {
+<span class="fc" id="L162">        Objects.requireNonNull(values, field);</span>
+<span class="fc" id="L163">        List&lt;String&gt; retained = new ArrayList&lt;&gt;(values.size());</span>
+<span class="fc" id="L164">        Set&lt;String&gt; unique = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="pc bpc" id="L166" title="2 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L167">                throw new IllegalArgumentException(</span>
+                    field + &quot; entries must not be blank&quot;);
+            }
+<span class="fc" id="L170">            String normalized = value.trim();</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (!unique.add(normalized)) {</span>
+<span class="nc" id="L172">                throw new IllegalArgumentException(</span>
+                    field + &quot; entries must be unique&quot;);
+            }
+<span class="fc" id="L175">            retained.add(normalized);</span>
+<span class="fc" id="L176">        }</span>
+<span class="fc" id="L177">        return List.copyOf(retained);</span>
+    }
+
+    private static void requireComplete(boolean[] seen, String kind) {
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        for (int index = 0; index &lt; seen.length; index++) {</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">            if (!seen[index]) {</span>
+<span class="nc" id="L183">                throw new IllegalArgumentException(</span>
+                    &quot;component partition omits &quot; + kind + &quot; &quot; + index);
+            }
+        }
+<span class="fc" id="L187">    }</span>
+
+    private static void requireCapability(
+        List&lt;String&gt; capabilities,
+        String capability,
+        boolean required
+    ) {
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (capabilities.contains(capability) != required) {</span>
+<span class="nc" id="L195">            throw new IllegalArgumentException(</span>
+                &quot;capability does not match component structure: &quot;
+                    + capability);
+        }
+<span class="fc" id="L199">    }</span>
+
+<span class="fc" id="L201">    public enum ComponentKind {</span>
+<span class="fc" id="L202">        COUPLED_SUBSYSTEM,</span>
+<span class="fc" id="L203">        FREE_VARIABLES,</span>
+<span class="fc" id="L204">        CONSTANT_CONSTRAINTS</span>
+    }
+
+    public record Component(
+        String id,
+        List&lt;Integer&gt; sourceRowIndices,
+        List&lt;Integer&gt; sourceColumnIndices,
+        List&lt;String&gt; variableNames,
+        List&lt;RowOrigin&gt; rowOrigins,
+        boolean contradictoryConstantConstraint
+    ) {
+<span class="fc" id="L215">        public Component {</span>
+<span class="pc bpc" id="L216" title="2 of 4 branches missed.">            if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L217">                throw new IllegalArgumentException(&quot;component id is required&quot;);</span>
+            }
+<span class="fc" id="L219">            id = id.trim();</span>
+<span class="fc" id="L220">            sourceRowIndices = sortedUniqueIndices(</span>
+                sourceRowIndices,
+                &quot;sourceRowIndices&quot;);
+<span class="fc" id="L223">            sourceColumnIndices = sortedUniqueIndices(</span>
+                sourceColumnIndices,
+                &quot;sourceColumnIndices&quot;);
+<span class="fc" id="L226">            variableNames = textSet(variableNames, &quot;variableNames&quot;);</span>
+<span class="fc" id="L227">            rowOrigins = List.copyOf(Objects.requireNonNull(</span>
+                rowOrigins,
+                &quot;rowOrigins&quot;));
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            if (sourceRowIndices.isEmpty()</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                    &amp;&amp; sourceColumnIndices.isEmpty()) {</span>
+<span class="nc" id="L232">                throw new IllegalArgumentException(</span>
+                    &quot;component must contain a row or column&quot;);
+            }
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            if (variableNames.size() != sourceColumnIndices.size()</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                    || rowOrigins.size() != sourceRowIndices.size()) {</span>
+<span class="nc" id="L237">                throw new IllegalArgumentException(</span>
+                    &quot;component labels and index counts disagree&quot;);
+            }
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            for (int index = 0; index &lt; rowOrigins.size(); index++) {</span>
+<span class="fc" id="L241">                if (rowOrigins.get(index).sourceIndex()</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">                        != sourceRowIndices.get(index)) {</span>
+<span class="nc" id="L243">                    throw new IllegalArgumentException(</span>
+                        &quot;row origin does not match source row index&quot;);
+                }
+            }
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (contradictoryConstantConstraint</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                    &amp;&amp; (!sourceColumnIndices.isEmpty()</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                        || sourceRowIndices.isEmpty())) {</span>
+<span class="nc" id="L250">                throw new IllegalArgumentException(</span>
+                    &quot;only a row-only component may be contradictory&quot;);
+            }
+<span class="fc" id="L253">        }</span>
+
+        public ComponentKind kind() {
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            if (sourceRowIndices.isEmpty()) {</span>
+<span class="fc" id="L257">                return ComponentKind.FREE_VARIABLES;</span>
+            }
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            if (sourceColumnIndices.isEmpty()) {</span>
+<span class="fc" id="L260">                return ComponentKind.CONSTANT_CONSTRAINTS;</span>
+            }
+<span class="fc" id="L262">            return ComponentKind.COUPLED_SUBSYSTEM;</span>
+        }
+
+        private static List&lt;Integer&gt; sortedUniqueIndices(
+            List&lt;Integer&gt; values,
+            String field
+        ) {
+<span class="fc" id="L269">            Objects.requireNonNull(values, field);</span>
+<span class="fc" id="L270">            List&lt;Integer&gt; retained = new ArrayList&lt;&gt;(values.size());</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            for (Integer value : values) {</span>
+<span class="pc bpc" id="L272" title="2 of 4 branches missed.">                if (value == null || value &lt; 0) {</span>
+<span class="nc" id="L273">                    throw new IllegalArgumentException(</span>
+                        field + &quot; contains invalid indices&quot;);
+                }
+<span class="fc" id="L276">                retained.add(value);</span>
+<span class="fc" id="L277">            }</span>
+<span class="fc" id="L278">            retained.sort(Integer::compareTo);</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">            for (int index = 1; index &lt; retained.size(); index++) {</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">                if (retained.get(index - 1).equals(retained.get(index))) {</span>
+<span class="nc" id="L281">                    throw new IllegalArgumentException(</span>
+                        field + &quot; contains duplicate indices&quot;);
+                }
+            }
+<span class="fc" id="L285">            return List.copyOf(retained);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

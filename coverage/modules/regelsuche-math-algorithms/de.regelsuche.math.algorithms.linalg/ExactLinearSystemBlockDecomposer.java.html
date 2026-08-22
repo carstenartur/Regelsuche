@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactLinearSystemBlockDecomposer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">ExactLinearSystemBlockDecomposer.java</span></div><h1>ExactLinearSystemBlockDecomposer.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.RowOrigin;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystemBlockDecomposition.Component;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystemBlockDecomposition.ComponentKind;
+import de.regelsuche.representation.RepresentationBridge;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Exposes independent subsystems as connected components of the exact
+ * row-variable incidence graph.
+ *
+ * &lt;p&gt;A non-zero coefficient connects one source equation row with one variable
+ * column. Distinct connected components can be solved independently because all
+ * cross-component coefficients are exactly zero. Zero columns remain explicit
+ * free-variable components; zero rows remain explicit constant constraints.&lt;/p&gt;
+ */
+<span class="fc" id="L28">public final class ExactLinearSystemBlockDecomposer implements</span>
+        RepresentationBridge&lt;ExactLinearSystem,
+            ExactLinearSystemBlockDecomposition,
+            ExactLinearSystemBlockDecomposer.Certificate&gt; {
+
+    public static final String DECOMPOSER_ID =
+        &quot;exact-linear-system-block-decomposition/v1&quot;;
+    public static final String CERTIFICATE_SCHEMA =
+        &quot;regelsuche.exact-linear-system-block-certificate/v1&quot;;
+<span class="fc" id="L37">    private static final Relation RELATION =</span>
+        Relation.SOLUTION_SET_EQUIVALENCE;
+
+    @Override
+    public Result&lt;ExactLinearSystemBlockDecomposition, Certificate&gt; analyze(
+        ExactLinearSystem source,
+        Budget budget
+    ) {
+<span class="fc" id="L45">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L46">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L47">        WorkCounter work = new WorkCounter(budget.maxWorkUnits());</span>
+        try {
+<span class="fc" id="L49">            Adjacency adjacency = adjacency(source, work);</span>
+<span class="fc" id="L50">            List&lt;DraftComponent&gt; drafts = connectedComponents(</span>
+                adjacency,
+                work);
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            if (drafts.size() &lt; 2) {</span>
+<span class="fc" id="L54">                return Result.withoutRepresentation(</span>
+                    Status.NOT_APPLICABLE,
+<span class="fc" id="L56">                    work.ledger(),</span>
+                    &quot;COEFFICIENT_INCIDENCE_GRAPH_IS_CONNECTED&quot;);
+            }
+
+<span class="fc" id="L60">            List&lt;Component&gt; components = materialize(source, drafts, work);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (!crossComponentCoefficientsAreZero(</span>
+                    source,
+                    components,
+                    work)) {
+<span class="nc" id="L65">                return Result.withoutRepresentation(</span>
+                    Status.INVALID_CERTIFICATE,
+<span class="nc" id="L67">                    work.ledger(),</span>
+                    &quot;NON_ZERO_CROSS_COMPONENT_COEFFICIENT&quot;);
+            }
+
+<span class="fc" id="L71">            List&lt;Integer&gt; rowPermutation = components.stream()</span>
+<span class="fc" id="L72">                .flatMap(component -&gt; component.sourceRowIndices().stream())</span>
+<span class="fc" id="L73">                .toList();</span>
+<span class="fc" id="L74">            List&lt;Integer&gt; columnPermutation = components.stream()</span>
+<span class="fc" id="L75">                .flatMap(component -&gt; component.sourceColumnIndices().stream())</span>
+<span class="fc" id="L76">                .toList();</span>
+<span class="fc" id="L77">            List&lt;String&gt; capabilities = capabilities(components);</span>
+<span class="fc" id="L78">            ExactLinearSystemBlockDecomposition decomposition =</span>
+                new ExactLinearSystemBlockDecomposition(
+<span class="fc" id="L80">                    source.equationCount(),</span>
+<span class="fc" id="L81">                    source.variableCount(),</span>
+                    components,
+                    rowPermutation,
+                    columnPermutation,
+                    capabilities);
+<span class="fc" id="L86">            Certificate certificate = certificate(source, decomposition);</span>
+<span class="fc" id="L87">            return Result.represented(</span>
+                decomposition,
+                certificate,
+                RELATION,
+<span class="fc" id="L91">                work.ledger(),</span>
+                &quot;INDEPENDENT_EXACT_LINEAR_BLOCKS_EXPOSED&quot;);
+<span class="fc" id="L93">        } catch (BudgetExceeded exception) {</span>
+<span class="fc" id="L94">            return Result.withoutRepresentation(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L96">                work.ledger(),</span>
+                &quot;BLOCK_DECOMPOSITION_WORK_BUDGET_EXHAUSTED&quot;);
+        }
+    }
+
+    @Override
+    public boolean verify(
+        ExactLinearSystem source,
+        Result&lt;ExactLinearSystemBlockDecomposition, Certificate&gt; result
+    ) {
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">        if (source == null</span>
+                || result == null
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                || result.status() != Status.REPRESENTED</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                || result.relation().orElse(null) != RELATION) {</span>
+<span class="nc" id="L110">            return false;</span>
+        }
+        try {
+            Result&lt;ExactLinearSystemBlockDecomposition, Certificate&gt;
+<span class="fc" id="L114">                recomputed = analyze(</span>
+                    source,
+<span class="fc" id="L116">                    new Budget(result.work().configuredWorkUnits()));</span>
+<span class="fc" id="L117">            return recomputed.equals(result);</span>
+<span class="nc" id="L118">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L119">            return false;</span>
+        }
+    }
+
+    private static Adjacency adjacency(
+        ExactLinearSystem source,
+        WorkCounter work
+    ) {
+<span class="fc" id="L127">        List&lt;List&lt;Integer&gt;&gt; rowToColumns = emptyAdjacency(</span>
+<span class="fc" id="L128">            source.equationCount());</span>
+<span class="fc" id="L129">        List&lt;List&lt;Integer&gt;&gt; columnToRows = emptyAdjacency(</span>
+<span class="fc" id="L130">            source.variableCount());</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (int row = 0; row &lt; source.equationCount(); row++) {</span>
+<span class="fc" id="L132">            for (int column = 0;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                    column &lt; source.variableCount();</span>
+<span class="fc" id="L134">                    column++) {</span>
+<span class="fc" id="L135">                work.consume();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                if (!source.coefficients().get(row, column).isZero()) {</span>
+<span class="fc" id="L137">                    rowToColumns.get(row).add(column);</span>
+<span class="fc" id="L138">                    columnToRows.get(column).add(row);</span>
+                }
+            }
+        }
+<span class="fc" id="L142">        return new Adjacency(rowToColumns, columnToRows);</span>
+    }
+
+    private static List&lt;List&lt;Integer&gt;&gt; emptyAdjacency(int size) {
+<span class="fc" id="L146">        List&lt;List&lt;Integer&gt;&gt; result = new ArrayList&lt;&gt;(size);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (int index = 0; index &lt; size; index++) {</span>
+<span class="fc" id="L148">            result.add(new ArrayList&lt;&gt;());</span>
+        }
+<span class="fc" id="L150">        return result;</span>
+    }
+
+    private static List&lt;DraftComponent&gt; connectedComponents(
+        Adjacency adjacency,
+        WorkCounter work
+    ) {
+<span class="fc" id="L157">        boolean[] seenRows = new boolean[adjacency.rowToColumns().size()];</span>
+<span class="fc" id="L158">        boolean[] seenColumns = new boolean[</span>
+<span class="fc" id="L159">            adjacency.columnToRows().size()];</span>
+<span class="fc" id="L160">        List&lt;DraftComponent&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        for (int row = 0; row &lt; seenRows.length; row++) {</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (!seenRows[row]) {</span>
+<span class="fc" id="L163">                result.add(walk(</span>
+<span class="fc" id="L164">                    Node.row(row),</span>
+                    adjacency,
+                    seenRows,
+                    seenColumns,
+                    work));
+            }
+        }
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (int column = 0; column &lt; seenColumns.length; column++) {</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (!seenColumns[column]) {</span>
+<span class="fc" id="L173">                result.add(walk(</span>
+<span class="fc" id="L174">                    Node.column(column),</span>
+                    adjacency,
+                    seenRows,
+                    seenColumns,
+                    work));
+            }
+        }
+<span class="fc" id="L181">        return List.copyOf(result);</span>
+    }
+
+    private static DraftComponent walk(
+        Node start,
+        Adjacency adjacency,
+        boolean[] seenRows,
+        boolean[] seenColumns,
+        WorkCounter work
+    ) {
+<span class="fc" id="L191">        List&lt;Integer&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L192">        List&lt;Integer&gt; columns = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L193">        ArrayDeque&lt;Node&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L194">        markSeen(start, seenRows, seenColumns);</span>
+<span class="fc" id="L195">        pending.add(start);</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L197">            Node current = pending.removeFirst();</span>
+<span class="fc" id="L198">            work.consume();</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            if (current.row()) {</span>
+<span class="fc" id="L200">                rows.add(current.index());</span>
+<span class="fc" id="L201">                for (int column : adjacency.rowToColumns()</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">                        .get(current.index())) {</span>
+<span class="fc" id="L203">                    work.consume();</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                    if (!seenColumns[column]) {</span>
+<span class="fc" id="L205">                        seenColumns[column] = true;</span>
+<span class="fc" id="L206">                        pending.addLast(Node.column(column));</span>
+                    }
+<span class="fc" id="L208">                }</span>
+            } else {
+<span class="fc" id="L210">                columns.add(current.index());</span>
+<span class="fc" id="L211">                for (int row : adjacency.columnToRows()</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                        .get(current.index())) {</span>
+<span class="fc" id="L213">                    work.consume();</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                    if (!seenRows[row]) {</span>
+<span class="fc" id="L215">                        seenRows[row] = true;</span>
+<span class="fc" id="L216">                        pending.addLast(Node.row(row));</span>
+                    }
+<span class="fc" id="L218">                }</span>
+            }
+<span class="fc" id="L220">        }</span>
+<span class="fc" id="L221">        rows.sort(Integer::compareTo);</span>
+<span class="fc" id="L222">        columns.sort(Integer::compareTo);</span>
+<span class="fc" id="L223">        return new DraftComponent(rows, columns);</span>
+    }
+
+    private static void markSeen(
+        Node node,
+        boolean[] seenRows,
+        boolean[] seenColumns
+    ) {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (node.row()) {</span>
+<span class="fc" id="L232">            seenRows[node.index()] = true;</span>
+        } else {
+<span class="fc" id="L234">            seenColumns[node.index()] = true;</span>
+        }
+<span class="fc" id="L236">    }</span>
+
+    private static List&lt;Component&gt; materialize(
+        ExactLinearSystem source,
+        List&lt;DraftComponent&gt; drafts,
+        WorkCounter work
+    ) {
+<span class="fc" id="L243">        List&lt;Component&gt; result = new ArrayList&lt;&gt;(drafts.size());</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (int index = 0; index &lt; drafts.size(); index++) {</span>
+<span class="fc" id="L245">            DraftComponent draft = drafts.get(index);</span>
+<span class="fc" id="L246">            List&lt;String&gt; variables = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L247">                draft.columns().size());</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            for (int column : draft.columns()) {</span>
+<span class="fc" id="L249">                work.consume();</span>
+<span class="fc" id="L250">                variables.add(source.variables().get(column));</span>
+<span class="fc" id="L251">            }</span>
+<span class="fc" id="L252">            List&lt;RowOrigin&gt; origins = new ArrayList&lt;&gt;(draft.rows().size());</span>
+<span class="fc" id="L253">            boolean contradictory = false;</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            for (int row : draft.rows()) {</span>
+<span class="fc" id="L255">                work.consume();</span>
+<span class="fc" id="L256">                origins.add(source.rowOrigins().get(row));</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">                if (draft.columns().isEmpty()</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                        &amp;&amp; !source.rightHandSide().get(row).isZero()) {</span>
+<span class="fc" id="L259">                    contradictory = true;</span>
+                }
+<span class="fc" id="L261">            }</span>
+<span class="fc" id="L262">            result.add(new Component(</span>
+                &quot;component-&quot; + index,
+<span class="fc" id="L264">                draft.rows(),</span>
+<span class="fc" id="L265">                draft.columns(),</span>
+                variables,
+                origins,
+                contradictory));
+        }
+<span class="fc" id="L270">        return List.copyOf(result);</span>
+    }
+
+    private static boolean crossComponentCoefficientsAreZero(
+        ExactLinearSystem source,
+        List&lt;Component&gt; components,
+        WorkCounter work
+    ) {
+<span class="fc" id="L278">        int[] rowComponent = new int[source.equationCount()];</span>
+<span class="fc" id="L279">        int[] columnComponent = new int[source.variableCount()];</span>
+<span class="fc" id="L280">        Arrays.fill(rowComponent, -1);</span>
+<span class="fc" id="L281">        Arrays.fill(columnComponent, -1);</span>
+<span class="fc" id="L282">        for (int component = 0;</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">                component &lt; components.size();</span>
+<span class="fc" id="L284">                component++) {</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">            for (int row : components.get(component).sourceRowIndices()) {</span>
+<span class="fc" id="L286">                rowComponent[row] = component;</span>
+<span class="fc" id="L287">            }</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            for (int column : components.get(component)</span>
+<span class="fc" id="L289">                    .sourceColumnIndices()) {</span>
+<span class="fc" id="L290">                columnComponent[column] = component;</span>
+<span class="fc" id="L291">            }</span>
+        }
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        for (int row = 0; row &lt; source.equationCount(); row++) {</span>
+<span class="fc" id="L294">            for (int column = 0;</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">                    column &lt; source.variableCount();</span>
+<span class="fc" id="L296">                    column++) {</span>
+<span class="fc" id="L297">                work.consume();</span>
+<span class="fc" id="L298">                Rational value = source.coefficients().get(row, column);</span>
+<span class="pc bpc" id="L299" title="1 of 4 branches missed.">                if (!value.isZero()</span>
+                        &amp;&amp; rowComponent[row] != columnComponent[column]) {
+<span class="nc" id="L301">                    return false;</span>
+                }
+            }
+        }
+<span class="fc" id="L305">        return true;</span>
+    }
+
+    private static List&lt;String&gt; capabilities(List&lt;Component&gt; components) {
+<span class="fc" id="L309">        Set&lt;String&gt; result = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L310">        result.add(ExactLinearSystemBlockDecomposition</span>
+            .CAPABILITY_INDEPENDENT_SUBSYSTEMS);
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        for (Component component : components) {</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            if (component.kind() == ComponentKind.FREE_VARIABLES) {</span>
+<span class="fc" id="L314">                result.add(ExactLinearSystemBlockDecomposition</span>
+                    .CAPABILITY_FREE_VARIABLE_COMPONENTS);
+<span class="fc bfc" id="L316" title="All 2 branches covered.">            } else if (component.kind()</span>
+                    == ComponentKind.CONSTANT_CONSTRAINTS) {
+<span class="fc" id="L318">                result.add(ExactLinearSystemBlockDecomposition</span>
+                    .CAPABILITY_CONSTANT_CONSTRAINT_COMPONENTS);
+            }
+<span class="fc bfc" id="L321" title="All 2 branches covered.">            if (component.contradictoryConstantConstraint()) {</span>
+<span class="fc" id="L322">                result.add(ExactLinearSystemBlockDecomposition</span>
+                    .CAPABILITY_INCONSISTENCY_LOCALIZATION);
+            }
+<span class="fc" id="L325">        }</span>
+<span class="fc" id="L326">        return List.copyOf(result);</span>
+    }
+
+    private static Certificate certificate(
+        ExactLinearSystem source,
+        ExactLinearSystemBlockDecomposition decomposition
+    ) {
+<span class="fc" id="L333">        String sourceHash = sourceHash(source);</span>
+<span class="fc" id="L334">        List&lt;ComponentWitness&gt; witnesses = decomposition.components().stream()</span>
+<span class="fc" id="L335">            .map(component -&gt; new ComponentWitness(</span>
+<span class="fc" id="L336">                component.id(),</span>
+<span class="fc" id="L337">                component.kind(),</span>
+<span class="fc" id="L338">                component.sourceRowIndices(),</span>
+<span class="fc" id="L339">                component.sourceColumnIndices(),</span>
+<span class="fc" id="L340">                component.contradictoryConstantConstraint()))</span>
+<span class="fc" id="L341">            .toList();</span>
+<span class="fc" id="L342">        StringBuilder payload = new StringBuilder();</span>
+<span class="fc" id="L343">        append(payload, CERTIFICATE_SCHEMA);</span>
+<span class="fc" id="L344">        append(payload, DECOMPOSER_ID);</span>
+<span class="fc" id="L345">        append(payload, RELATION.name());</span>
+<span class="fc" id="L346">        append(payload, sourceHash);</span>
+<span class="fc" id="L347">        append(payload, Integer.toString(decomposition.sourceRowCount()));</span>
+<span class="fc" id="L348">        append(payload, Integer.toString(decomposition.sourceColumnCount()));</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        for (ComponentWitness witness : witnesses) {</span>
+<span class="fc" id="L350">            append(payload, witness.id());</span>
+<span class="fc" id="L351">            append(payload, witness.kind().name());</span>
+<span class="fc" id="L352">            appendIndices(payload, witness.sourceRowIndices());</span>
+<span class="fc" id="L353">            appendIndices(payload, witness.sourceColumnIndices());</span>
+<span class="fc" id="L354">            append(payload, Boolean.toString(</span>
+<span class="fc" id="L355">                witness.contradictoryConstantConstraint()));</span>
+<span class="fc" id="L356">        }</span>
+<span class="fc" id="L357">        appendIndices(payload, decomposition.rowPermutation());</span>
+<span class="fc" id="L358">        appendIndices(payload, decomposition.columnPermutation());</span>
+<span class="fc" id="L359">        decomposition.unlockedCapabilities().forEach(capability -&gt;</span>
+<span class="fc" id="L360">            append(payload, capability));</span>
+<span class="fc" id="L361">        append(payload, &quot;crossComponentCoefficientsAreZero=true&quot;);</span>
+<span class="fc" id="L362">        return new Certificate(</span>
+            CERTIFICATE_SCHEMA,
+            DECOMPOSER_ID,
+            RELATION,
+            sourceHash,
+            witnesses,
+<span class="fc" id="L368">            decomposition.rowPermutation(),</span>
+<span class="fc" id="L369">            decomposition.columnPermutation(),</span>
+<span class="fc" id="L370">            decomposition.unlockedCapabilities(),</span>
+            true,
+<span class="fc" id="L372">            sha256(payload.toString()));</span>
+    }
+
+    private static String sourceHash(ExactLinearSystem source) {
+<span class="fc" id="L376">        StringBuilder payload = new StringBuilder();</span>
+<span class="fc" id="L377">        append(payload, Integer.toString(source.equationCount()));</span>
+<span class="fc" id="L378">        append(payload, Integer.toString(source.variableCount()));</span>
+<span class="fc" id="L379">        source.variables().forEach(variable -&gt; append(payload, variable));</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        for (List&lt;Rational&gt; row : source.coefficients().rows()) {</span>
+<span class="fc" id="L381">            append(payload, Integer.toString(row.size()));</span>
+<span class="fc" id="L382">            row.forEach(value -&gt; append(payload, value.toString()));</span>
+<span class="fc" id="L383">        }</span>
+<span class="fc" id="L384">        source.rightHandSide().values().forEach(value -&gt;</span>
+<span class="fc" id="L385">            append(payload, value.toString()));</span>
+<span class="fc" id="L386">        source.rowOrigins().forEach(origin -&gt; {</span>
+<span class="fc" id="L387">            append(payload, Integer.toString(origin.sourceIndex()));</span>
+<span class="fc" id="L388">            append(payload, origin.sourceEquation());</span>
+<span class="fc" id="L389">        });</span>
+<span class="fc" id="L390">        append(payload, Integer.toString(source.coefficientRank()));</span>
+<span class="fc" id="L391">        append(payload, Integer.toString(source.augmentedRank()));</span>
+<span class="fc" id="L392">        append(payload, source.solutionClassification().name());</span>
+<span class="fc" id="L393">        return sha256(payload.toString());</span>
+    }
+
+    private static void appendIndices(
+        StringBuilder payload,
+        List&lt;Integer&gt; values
+    ) {
+<span class="fc" id="L400">        append(payload, Integer.toString(values.size()));</span>
+<span class="fc" id="L401">        values.forEach(value -&gt; append(payload, Integer.toString(value)));</span>
+<span class="fc" id="L402">    }</span>
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L405">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L406">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L410">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L411">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="fc" id="L412">                    value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L413">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L414">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    public record Certificate(
+        String schema,
+        String decomposerId,
+        Relation relation,
+        String sourceHash,
+        List&lt;ComponentWitness&gt; components,
+        List&lt;Integer&gt; rowPermutation,
+        List&lt;Integer&gt; columnPermutation,
+        List&lt;String&gt; unlockedCapabilities,
+        boolean crossComponentCoefficientsAreZero,
+        String contentHash
+    ) {
+<span class="fc" id="L430">        public Certificate {</span>
+<span class="pc bpc" id="L431" title="3 of 6 branches missed.">            if (schema == null || schema.isBlank()</span>
+<span class="pc bpc" id="L432" title="2 of 4 branches missed.">                    || decomposerId == null || decomposerId.isBlank()</span>
+<span class="pc bpc" id="L433" title="2 of 4 branches missed.">                    || sourceHash == null || sourceHash.isBlank()</span>
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">                    || contentHash == null || contentHash.isBlank()) {</span>
+<span class="nc" id="L435">                throw new IllegalArgumentException(</span>
+                    &quot;certificate identities must not be blank&quot;);
+            }
+<span class="fc" id="L438">            relation = Objects.requireNonNull(relation, &quot;relation&quot;);</span>
+<span class="fc" id="L439">            components = List.copyOf(Objects.requireNonNull(</span>
+                components,
+                &quot;components&quot;));
+<span class="fc" id="L442">            rowPermutation = List.copyOf(Objects.requireNonNull(</span>
+                rowPermutation,
+                &quot;rowPermutation&quot;));
+<span class="fc" id="L445">            columnPermutation = List.copyOf(Objects.requireNonNull(</span>
+                columnPermutation,
+                &quot;columnPermutation&quot;));
+<span class="fc" id="L448">            unlockedCapabilities = List.copyOf(Objects.requireNonNull(</span>
+                unlockedCapabilities,
+                &quot;unlockedCapabilities&quot;));
+<span class="pc bpc" id="L451" title="2 of 4 branches missed.">            if (components.size() &lt; 2</span>
+                    || !crossComponentCoefficientsAreZero) {
+<span class="nc" id="L453">                throw new IllegalArgumentException(</span>
+                    &quot;certificate must describe a verified decomposition&quot;);
+            }
+<span class="fc" id="L456">        }</span>
+    }
+
+    public record ComponentWitness(
+        String id,
+        ComponentKind kind,
+        List&lt;Integer&gt; sourceRowIndices,
+        List&lt;Integer&gt; sourceColumnIndices,
+        boolean contradictoryConstantConstraint
+    ) {
+<span class="fc" id="L466">        public ComponentWitness {</span>
+<span class="pc bpc" id="L467" title="2 of 4 branches missed.">            if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L468">                throw new IllegalArgumentException(&quot;component id is required&quot;);</span>
+            }
+<span class="fc" id="L470">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L471">            sourceRowIndices = List.copyOf(Objects.requireNonNull(</span>
+                sourceRowIndices,
+                &quot;sourceRowIndices&quot;));
+<span class="fc" id="L474">            sourceColumnIndices = List.copyOf(Objects.requireNonNull(</span>
+                sourceColumnIndices,
+                &quot;sourceColumnIndices&quot;));
+<span class="fc" id="L477">        }</span>
+    }
+
+    private record Adjacency(
+        List&lt;List&lt;Integer&gt;&gt; rowToColumns,
+        List&lt;List&lt;Integer&gt;&gt; columnToRows
+    ) {
+<span class="fc" id="L484">        private Adjacency {</span>
+<span class="fc" id="L485">            rowToColumns = immutableNested(rowToColumns);</span>
+<span class="fc" id="L486">            columnToRows = immutableNested(columnToRows);</span>
+<span class="fc" id="L487">        }</span>
+
+        private static List&lt;List&lt;Integer&gt;&gt; immutableNested(
+            List&lt;List&lt;Integer&gt;&gt; values
+        ) {
+<span class="fc" id="L492">            return values.stream().map(List::copyOf).toList();</span>
+        }
+    }
+
+    private record DraftComponent(
+        List&lt;Integer&gt; rows,
+        List&lt;Integer&gt; columns
+    ) {
+<span class="fc" id="L500">        private DraftComponent {</span>
+<span class="fc" id="L501">            rows = List.copyOf(rows);</span>
+<span class="fc" id="L502">            columns = List.copyOf(columns);</span>
+<span class="pc bpc" id="L503" title="1 of 4 branches missed.">            if (rows.isEmpty() &amp;&amp; columns.isEmpty()) {</span>
+<span class="nc" id="L504">                throw new IllegalArgumentException(</span>
+                    &quot;draft component must not be empty&quot;);
+            }
+<span class="fc" id="L507">        }</span>
+    }
+
+    private record Node(boolean row, int index) {
+<span class="fc" id="L511">        private Node {</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">            if (index &lt; 0) {</span>
+<span class="nc" id="L513">                throw new IllegalArgumentException(</span>
+                    &quot;node index must not be negative&quot;);
+            }
+<span class="fc" id="L516">        }</span>
+
+        private static Node row(int index) {
+<span class="fc" id="L519">            return new Node(true, index);</span>
+        }
+
+        private static Node column(int index) {
+<span class="fc" id="L523">            return new Node(false, index);</span>
+        }
+    }
+
+    private static final class WorkCounter {
+        private final int configured;
+        private int consumed;
+
+<span class="fc" id="L531">        private WorkCounter(int configured) {</span>
+<span class="fc" id="L532">            this.configured = configured;</span>
+<span class="fc" id="L533">        }</span>
+
+        private void consume() {
+<span class="fc bfc" id="L536" title="All 2 branches covered.">            if (consumed &gt;= configured) {</span>
+<span class="fc" id="L537">                throw new BudgetExceeded();</span>
+            }
+<span class="fc" id="L539">            consumed++;</span>
+<span class="fc" id="L540">        }</span>
+
+        private WorkLedger ledger() {
+<span class="fc" id="L543">            return WorkLedger.of(configured, consumed);</span>
+        }
+    }
+
+    private static final class BudgetExceeded extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
