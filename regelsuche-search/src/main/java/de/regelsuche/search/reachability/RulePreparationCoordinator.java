@@ -8,8 +8,12 @@ import de.regelsuche.knowledge.RuleInventoryFingerprint;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.EquivalentExpressionProvider;
+import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternMatchAnalyzer;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
 import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.Transformation;
@@ -32,16 +36,11 @@ import java.util.Set;
  * One deterministic policy boundary for direct and bounded prepared
  * applicability of several explicitly schema-bearing rules.
  *
- * <p>The coordinator does not infer schemas. Direct concrete replay remains
- * the first stage. The bounded local bridge search is invoked only when the
- * corresponding executor does not already apply. Every positive candidate is
- * materialized from that concrete executor and a prepared candidate
- * additionally requires independent bridge verification.</p>
- *
- * <p>This first coordinator unifies rule eligibility, deterministic ordering,
- * replay, evidence and aggregate work. Its v1 implementation still delegates
- * one bounded search session per principal; a shared multi-principal frontier
- * is a later optimization and must preserve byte-identical outcomes.</p>
+ * <p>The coordinator does not infer schemas. Concrete replay is attempted
+ * before any schema-directed preparation. Required typed side conditions must
+ * already be available in the cumulative assumption context; unknown guards
+ * never authorize a candidate. Every prepared candidate additionally requires
+ * independent bridge verification.</p>
  */
 public final class RulePreparationCoordinator {
     public static final String COORDINATOR_ID =
@@ -59,6 +58,7 @@ public final class RulePreparationCoordinator {
     private final String preparationInventoryFingerprint;
     private final PatternTargetedLocalBridgeSearch.Budget bridgeBudget;
     private final ExpressionParser parser = new ExpressionParser();
+    private final PatternMatchAnalyzer analyzer = new PatternMatchAnalyzer();
 
     public RulePreparationCoordinator(
         List<RewriteApplicabilitySchema> principalSchemas,
@@ -114,6 +114,16 @@ public final class RulePreparationCoordinator {
         List<Outcome> outcomes = new ArrayList<>();
         for (RewriteApplicabilitySchema schema : principalSchemas) {
             PrincipalRuntime runtime = runtimes.get(schema.ruleId());
+            Optional<Transformation> direct = directCandidate(
+                runtime.adapter(), source, assumptions);
+            if (direct.isPresent()) {
+                outcomes.add(directOutcome(
+                    runtime,
+                    source,
+                    assumptions,
+                    direct.orElseThrow()));
+                continue;
+            }
             PatternTargetedLocalBridgeSearch.Attempt attempt =
                 runtime.search().analyze(source, assumptions);
             outcomes.add(outcome(
@@ -158,6 +168,37 @@ public final class RulePreparationCoordinator {
             : new Verification(false, "EVALUATION_RECOMPUTATION_MISMATCH");
     }
 
+    private Outcome directOutcome(
+        PrincipalRuntime runtime,
+        String source,
+        AssumptionSignature assumptions,
+        Transformation candidate
+    ) {
+        PatternMatchAnalyzer.Analysis analysis = analyzePattern(
+            runtime.schema(), source);
+        GuardCheck guards = checkRequiredAssumptions(
+            runtime.schema(), analysis, assumptions);
+        if (!guards.authorized()) {
+            return rejectedByGuards(
+                runtime,
+                analysis,
+                PatternTargetedLocalBridgeSearch.Work.empty(),
+                Set.of(),
+                guards);
+        }
+        return new Outcome(
+            runtime.schema().ruleId(),
+            runtime.schema().contentHash(),
+            PatternTargetedLocalBridgeSearch.Status.DIRECT_MATCH_AVAILABLE,
+            Optional.of(candidate),
+            true,
+            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(analysis),
+            PatternTargetedLocalBridgeSearch.Work.empty(),
+            Set.of(),
+            "COORDINATOR_DIRECT_REPLAYED",
+            "");
+    }
+
     private Outcome outcome(
         PrincipalRuntime runtime,
         String source,
@@ -172,13 +213,24 @@ public final class RulePreparationCoordinator {
         if (status
                 == PatternTargetedLocalBridgeSearch.Status
                     .DIRECT_MATCH_AVAILABLE) {
-            candidate = directCandidate(
+            Optional<Transformation> replay = directCandidate(
                 runtime.adapter(), source, sourceAssumptions);
-            replayVerified = candidate.isPresent();
-            if (candidate.isEmpty()) {
+            if (replay.isEmpty()) {
                 status = PatternTargetedLocalBridgeSearch.Status
                     .TECHNICAL_FAILURE;
                 detailCode = "COORDINATOR_DIRECT_REPLAY_FAILED";
+            } else {
+                PatternMatchAnalyzer.Analysis analysis = analyzePattern(
+                    runtime.schema(), source);
+                GuardCheck guards = checkRequiredAssumptions(
+                    runtime.schema(), analysis, sourceAssumptions);
+                if (!guards.authorized()) {
+                    status = guards.failureStatus();
+                    detailCode = guards.detailCode();
+                } else {
+                    candidate = replay;
+                    replayVerified = true;
+                }
             }
         } else if (status
                 == PatternTargetedLocalBridgeSearch.Status.PREPARED) {
@@ -186,14 +238,24 @@ public final class RulePreparationCoordinator {
                 attempt.bridge().orElseThrow();
             PatternTargetedLocalBridgeSearch.Verification verification =
                 runtime.search().verify(bridge);
-            replayVerified = verification.valid();
-            if (replayVerified) {
-                candidate = Optional.of(preparedCandidate(
-                    runtime.schema().executor(), bridge));
-            } else {
+            if (!verification.valid()) {
                 status = PatternTargetedLocalBridgeSearch.Status
                     .INVALID_CERTIFICATE;
                 detailCode = verification.detailCode();
+            } else {
+                PatternMatchAnalyzer.Analysis terminal = analyzePattern(
+                    runtime.schema(), bridge.terminalExpression());
+                GuardCheck guards = checkRequiredAssumptions(
+                    runtime.schema(), terminal,
+                    bridge.terminalAssumptions());
+                if (!guards.authorized()) {
+                    status = guards.failureStatus();
+                    detailCode = guards.detailCode();
+                } else {
+                    replayVerified = true;
+                    candidate = Optional.of(preparedCandidate(
+                        runtime.schema().executor(), bridge));
+                }
             }
         }
 
@@ -216,6 +278,26 @@ public final class RulePreparationCoordinator {
             certificateHash);
     }
 
+    private Outcome rejectedByGuards(
+        PrincipalRuntime runtime,
+        PatternMatchAnalyzer.Analysis analysis,
+        PatternTargetedLocalBridgeSearch.Work work,
+        Set<String> reachedLimits,
+        GuardCheck guards
+    ) {
+        return new Outcome(
+            runtime.schema().ruleId(),
+            runtime.schema().contentHash(),
+            guards.failureStatus(),
+            Optional.empty(),
+            false,
+            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(analysis),
+            work,
+            reachedLimits,
+            guards.detailCode(),
+            "");
+    }
+
     private Optional<Transformation> directCandidate(
         PatternRewriteRule adapter,
         String source,
@@ -232,6 +314,56 @@ public final class RulePreparationCoordinator {
             .findFirst()
             .map(value -> withCumulativeAssumptions(
                 value, sourceAssumptions));
+    }
+
+    private PatternMatchAnalyzer.Analysis analyzePattern(
+        RewriteApplicabilitySchema schema,
+        String expression
+    ) {
+        return analyzer.analyze(
+            schema.pattern(),
+            parser.parseTerm(expression),
+            schema.recognitionProfile(),
+            new ExprMatcher.MatchOptions(
+                EquivalentExpressionProvider.identity(),
+                bridgeBudget.maxMatchResults(),
+                bridgeBudget.maxMatchSteps(),
+                bridgeBudget.maxPatternBranches()));
+    }
+
+    private GuardCheck checkRequiredAssumptions(
+        RewriteApplicabilitySchema schema,
+        PatternMatchAnalyzer.Analysis analysis,
+        AssumptionSignature available
+    ) {
+        List<RequiredAssumptionTemplate> templates =
+            schema.requiredAssumptions();
+        if (templates.isEmpty()) {
+            return GuardCheck.authorized("NO_REQUIRED_ASSUMPTIONS");
+        }
+        if (!analysis.matched()) {
+            return GuardCheck.unknown(
+                "REQUIRED_ASSUMPTION_BINDINGS_UNAVAILABLE");
+        }
+        try {
+            Set<String> known = new LinkedHashSet<>(
+                available.normalizedAssumptions());
+            for (RequiredAssumptionTemplate template : templates) {
+                Assumption required = template.instantiate(
+                    analysis.bindings());
+                String normalized = AssumptionSignature.normalizeExpression(
+                    required.expression());
+                if (!known.contains(normalized)) {
+                    return GuardCheck.unknown(
+                        "REQUIRED_ASSUMPTION_UNKNOWN");
+                }
+            }
+            return GuardCheck.authorized(
+                "REQUIRED_ASSUMPTIONS_SATISFIED");
+        } catch (RuntimeException exception) {
+            return GuardCheck.invalid(
+                "REQUIRED_ASSUMPTION_TEMPLATE_INVALID");
+        }
     }
 
     private static Transformation preparedCandidate(
@@ -431,6 +563,41 @@ public final class RulePreparationCoordinator {
             schema = Objects.requireNonNull(schema, "schema");
             adapter = Objects.requireNonNull(adapter, "adapter");
             search = Objects.requireNonNull(search, "search");
+        }
+    }
+
+    private record GuardCheck(
+        boolean authorized,
+        boolean invalid,
+        String detailCode
+    ) {
+        private GuardCheck {
+            if (authorized && invalid) {
+                throw new IllegalArgumentException(
+                    "authorized guard check cannot be invalid");
+            }
+            if (detailCode == null || detailCode.isBlank()) {
+                throw new IllegalArgumentException(
+                    "guard detailCode must not be blank");
+            }
+        }
+
+        static GuardCheck authorized(String detailCode) {
+            return new GuardCheck(true, false, detailCode);
+        }
+
+        static GuardCheck unknown(String detailCode) {
+            return new GuardCheck(false, false, detailCode);
+        }
+
+        static GuardCheck invalid(String detailCode) {
+            return new GuardCheck(false, true, detailCode);
+        }
+
+        PatternTargetedLocalBridgeSearch.Status failureStatus() {
+            return invalid
+                ? PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE
+                : PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED;
         }
     }
 
