@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymPyRuleAmplificationExperiment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">SymPyRuleAmplificationExperiment.java</span></div><h1>SymPyRuleAmplificationExperiment.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.search.reachability.PatternTargetedLocalBridgeSearch;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteRule;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Frozen pilot measuring how many additional inputs one unchanged imported
+ * SymPy rule can handle through bounded local preparation.
+ */
+<span class="fc" id="L21">public final class SymPyRuleAmplificationExperiment {</span>
+    public static final String SCHEMA =
+        &quot;regelsuche.sympy-rule-amplification/v1&quot;;
+    public static final String CONFIGURATION_ID =
+        &quot;sympy-pythagorean-direct-vs-pattern-bridge-v1&quot;;
+    public static final String PRINCIPAL_RULE_ID =
+        &quot;sympy.trig.pythagorean&quot;;
+    public static final String PRINCIPAL_PACK_ID =
+        &quot;sympy-trigonometry&quot;;
+
+<span class="fc" id="L31">    private static final PatternTargetedLocalBridgeSearch.Budget BUDGET =</span>
+        new PatternTargetedLocalBridgeSearch.Budget(
+            3, 128, 1_024, 8, 128, 128,
+            32, 5_000, 2_500);
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        if (args.length != 2) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(</span>
+                &quot;expected repository revision and output directory&quot;);
+        }
+<span class="nc" id="L41">        Report report = new SymPyRuleAmplificationExperiment().run(args[0]);</span>
+<span class="nc" id="L42">        report.write(Path.of(args[1]));</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        if (!report.qualified()) {</span>
+<span class="nc" id="L44">            throw new IllegalStateException(</span>
+                &quot;SymPy rule-amplification pilot did not satisfy its frozen contract&quot;);
+        }
+<span class="nc" id="L47">    }</span>
+
+    public Report run(String repositoryRevision) {
+<span class="fc" id="L50">        PatternRewriteRule principal = principalRule();</span>
+<span class="fc" id="L51">        List&lt;RewriteRule&gt; preparationRules = cancellationRules();</span>
+<span class="fc" id="L52">        AstRewriteTransformationEngine direct =</span>
+<span class="fc" id="L53">            new AstRewriteTransformationEngine(List.of(principal));</span>
+<span class="fc" id="L54">        PatternTargetedLocalBridgeSearch bridgeSearch =</span>
+            new PatternTargetedLocalBridgeSearch(
+                principal,
+                preparationRules,
+                repositoryRevision,
+                BUDGET);
+<span class="fc" id="L60">        List&lt;Row&gt; rows = cases().stream()</span>
+<span class="fc" id="L61">            .map(experimentCase -&gt; evaluate(</span>
+                experimentCase, direct, bridgeSearch))
+<span class="fc" id="L63">            .toList();</span>
+<span class="fc" id="L64">        return new Report(</span>
+            SCHEMA,
+            CONFIGURATION_ID,
+            repositoryRevision,
+<span class="fc" id="L68">            principal.descriptor().sourceVersion(),</span>
+            PRINCIPAL_PACK_ID,
+            PRINCIPAL_RULE_ID,
+            rows);
+    }
+
+    private Row evaluate(
+        ExperimentCase experimentCase,
+        AstRewriteTransformationEngine direct,
+        PatternTargetedLocalBridgeSearch bridgeSearch
+    ) {
+<span class="fc" id="L79">        boolean directApplicable = direct</span>
+<span class="fc" id="L80">            .transform(experimentCase.sourceExpression()).stream()</span>
+<span class="fc" id="L81">            .anyMatch(value -&gt; PRINCIPAL_RULE_ID.equals(value.rule()));</span>
+<span class="fc" id="L82">        PatternTargetedLocalBridgeSearch.Attempt attempt =</span>
+<span class="fc" id="L83">            bridgeSearch.analyze(</span>
+<span class="fc" id="L84">                experimentCase.sourceExpression(),</span>
+<span class="fc" id="L85">                AssumptionSignature.ofExpressions(List.of()));</span>
+<span class="fc" id="L86">        var bridge = attempt.bridge();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        boolean verified = bridge.isEmpty()</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            || bridgeSearch.verify(bridge.orElseThrow()).valid();</span>
+<span class="fc" id="L89">        return new Row(</span>
+<span class="fc" id="L90">            experimentCase.id(),</span>
+<span class="fc" id="L91">            experimentCase.sourceExpression(),</span>
+<span class="fc" id="L92">            experimentCase.expectedStatus(),</span>
+            directApplicable,
+<span class="fc" id="L94">            attempt.status(),</span>
+<span class="fc" id="L95">            bridge.map(</span>
+                PatternTargetedLocalBridgeSearch.Bridge::resultExpression)
+<span class="fc" id="L97">                .orElse(&quot;&quot;),</span>
+<span class="fc" id="L98">            bridge.map(value -&gt; value.preparationSteps().size())</span>
+<span class="fc" id="L99">                .orElse(0),</span>
+<span class="fc" id="L100">            bridge.map(</span>
+                PatternTargetedLocalBridgeSearch.Bridge::primitiveRuleIds)
+<span class="fc" id="L102">                .orElse(List.of()),</span>
+<span class="fc" id="L103">            bridge.map(value -&gt; value.resultAssumptions()</span>
+<span class="fc" id="L104">                .normalizedAssumptions()).orElse(List.of()),</span>
+            verified,
+<span class="fc" id="L106">            attempt.reachedLimits().stream().sorted().toList(),</span>
+<span class="fc" id="L107">            attempt.work().generatedTransitions(),</span>
+<span class="fc" id="L108">            attempt.work().discoveredStates());</span>
+    }
+
+    private PatternRewriteRule principalRule() {
+<span class="fc" id="L112">        return new KnowledgePackRegistry().allPacks().stream()</span>
+<span class="fc" id="L113">            .filter(pack -&gt; PRINCIPAL_PACK_ID.equals(pack.packId()))</span>
+<span class="fc" id="L114">            .flatMap(pack -&gt; pack.rules().stream())</span>
+<span class="fc" id="L115">            .filter(rule -&gt; PRINCIPAL_RULE_ID.equals(rule.id()))</span>
+<span class="fc" id="L116">            .findFirst()</span>
+<span class="pc" id="L117">            .orElseThrow(() -&gt; new IllegalStateException(</span>
+                &quot;missing imported SymPy Pythagorean rule&quot;));
+    }
+
+    private List&lt;RewriteRule&gt; cancellationRules() {
+        List&lt;RewriteRule&gt; rules = AstRewriteTransformationEngine
+<span class="fc" id="L123">            .allBuiltInRules().stream()</span>
+<span class="fc" id="L124">            .filter(rule -&gt; &quot;ast_cancel_division_factor&quot;</span>
+<span class="fc" id="L125">                .equals(rule.id()))</span>
+<span class="fc" id="L126">            .toList();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (rules.size() != 1) {</span>
+<span class="nc" id="L128">            throw new IllegalStateException(</span>
+                &quot;expected exactly one cancellation preparation rule&quot;);
+        }
+<span class="fc" id="L131">        return rules;</span>
+    }
+
+    public static List&lt;ExperimentCase&gt; cases() {
+<span class="fc" id="L135">        return List.of(</span>
+            new ExperimentCase(
+                &quot;direct-canonical&quot;,
+                &quot;sin(x)^2 + cos(x)^2&quot;,
+                PatternTargetedLocalBridgeSearch.Status
+                    .DIRECT_MATCH_AVAILABLE),
+            new ExperimentCase(
+                &quot;direct-ac-reordered&quot;,
+                &quot;cos(x)^2 + sin(x)^2&quot;,
+                PatternTargetedLocalBridgeSearch.Status
+                    .DIRECT_MATCH_AVAILABLE),
+            new ExperimentCase(
+                &quot;one-hidden-cancellation&quot;,
+                &quot;((sin(x) * a) / a)^2 + cos(x)^2&quot;,
+                PatternTargetedLocalBridgeSearch.Status.PREPARED),
+            new ExperimentCase(
+                &quot;two-hidden-cancellations&quot;,
+                &quot;((sin(x) * a) / a)^2 + ((cos(x) * b) / b)^2&quot;,
+                PatternTargetedLocalBridgeSearch.Status.PREPARED),
+            new ExperimentCase(
+                &quot;different-argument-near-miss&quot;,
+                &quot;((sin(x) * a) / a)^2 + ((cos(y) * b) / b)^2&quot;,
+                PatternTargetedLocalBridgeSearch.Status
+                    .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE));
+    }
+
+    public record ExperimentCase(
+        String id,
+        String sourceExpression,
+        PatternTargetedLocalBridgeSearch.Status expectedStatus
+    ) {
+<span class="fc" id="L166">        public ExperimentCase {</span>
+<span class="fc" id="L167">            text(id, &quot;case id&quot;);</span>
+<span class="fc" id="L168">            text(sourceExpression, &quot;source expression&quot;);</span>
+<span class="fc" id="L169">            Objects.requireNonNull(expectedStatus, &quot;expectedStatus&quot;);</span>
+<span class="fc" id="L170">        }</span>
+    }
+
+    public record Row(
+        String caseId,
+        String sourceExpression,
+        PatternTargetedLocalBridgeSearch.Status expectedStatus,
+        boolean directApplicable,
+        PatternTargetedLocalBridgeSearch.Status bridgeStatus,
+        String resultExpression,
+        int preparationDepth,
+        List&lt;String&gt; primitiveRuleIds,
+        List&lt;String&gt; assumptions,
+        boolean independentlyVerified,
+        List&lt;String&gt; reachedLimits,
+        int generatedTransitions,
+        int discoveredStates
+    ) {
+<span class="fc" id="L188">        public Row {</span>
+<span class="fc" id="L189">            text(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L190">            text(sourceExpression, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L191">            Objects.requireNonNull(expectedStatus, &quot;expectedStatus&quot;);</span>
+<span class="fc" id="L192">            Objects.requireNonNull(bridgeStatus, &quot;bridgeStatus&quot;);</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">            resultExpression = resultExpression == null</span>
+<span class="pc" id="L194">                ? &quot;&quot; : resultExpression;</span>
+<span class="fc" id="L195">            primitiveRuleIds = List.copyOf(primitiveRuleIds);</span>
+<span class="fc" id="L196">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L197">            reachedLimits = List.copyOf(reachedLimits);</span>
+<span class="pc bpc" id="L198" title="3 of 6 branches missed.">            if (preparationDepth &lt; 0 || generatedTransitions &lt; 0</span>
+                    || discoveredStates &lt; 1) {
+<span class="nc" id="L200">                throw new IllegalArgumentException(</span>
+                    &quot;row work values must not be negative&quot;);
+            }
+<span class="fc" id="L203">        }</span>
+
+        boolean qualifies() {
+<span class="pc bpc" id="L206" title="3 of 8 branches missed.">            return bridgeStatus == expectedStatus</span>
+                &amp;&amp; independentlyVerified
+                &amp;&amp; (bridgeStatus
+                    != PatternTargetedLocalBridgeSearch.Status.PREPARED
+                    || !directApplicable
+<span class="pc bpc" id="L211" title="2 of 6 branches missed.">                        &amp;&amp; &quot;1&quot;.equals(resultExpression)</span>
+                        &amp;&amp; preparationDepth &gt; 0)
+                &amp;&amp; (bridgeStatus
+                    != PatternTargetedLocalBridgeSearch.Status
+                        .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                    || resultExpression.isEmpty()</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                        &amp;&amp; reachedLimits.isEmpty());</span>
+        }
+    }
+
+    public record Report(
+        String schema,
+        String configurationId,
+        String repositoryRevision,
+        String sourceVersion,
+        String principalPackId,
+        String principalRuleId,
+        List&lt;Row&gt; rows
+    ) {
+<span class="fc" id="L230">        public Report {</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L232" title="2 of 4 branches missed.">                    || !CONFIGURATION_ID.equals(configurationId)</span>
+                    || repositoryRevision == null
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">                    || !repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L235">                throw new IllegalArgumentException(</span>
+                    &quot;report identity is invalid&quot;);
+            }
+<span class="fc" id="L238">            text(sourceVersion, &quot;sourceVersion&quot;);</span>
+<span class="fc" id="L239">            text(principalPackId, &quot;principalPackId&quot;);</span>
+<span class="fc" id="L240">            text(principalRuleId, &quot;principalRuleId&quot;);</span>
+<span class="fc" id="L241">            rows = List.copyOf(rows);</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            if (rows.size() != cases().size()) {</span>
+<span class="nc" id="L243">                throw new IllegalArgumentException(</span>
+                    &quot;report must contain the complete frozen case matrix&quot;);
+            }
+<span class="fc" id="L246">        }</span>
+
+        public boolean qualified() {
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">            return rows.stream().allMatch(Row::qualifies)</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                &amp;&amp; directApplications() == 2</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                &amp;&amp; preparedApplications() == 2</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                &amp;&amp; conclusiveNearMisses() == 1;</span>
+        }
+
+        public long directApplications() {
+<span class="fc" id="L256">            return rows.stream().filter(Row::directApplicable).count();</span>
+        }
+
+        public long preparedApplications() {
+<span class="fc" id="L260">            return rows.stream()</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                .filter(row -&gt; row.bridgeStatus()</span>
+                    == PatternTargetedLocalBridgeSearch.Status.PREPARED)
+<span class="fc" id="L263">                .count();</span>
+        }
+
+        public long conclusiveNearMisses() {
+<span class="fc" id="L267">            return rows.stream()</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">                .filter(row -&gt; row.bridgeStatus()</span>
+                    == PatternTargetedLocalBridgeSearch.Status
+                        .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE)
+<span class="fc" id="L271">                .count();</span>
+        }
+
+        public long amplificationGain() {
+<span class="fc" id="L275">            return preparedApplications();</span>
+        }
+
+        public void write(Path outputDirectory) throws IOException {
+<span class="fc" id="L279">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L280">            Files.writeString(</span>
+<span class="fc" id="L281">                outputDirectory.resolve(&quot;sympy-rule-amplification.json&quot;),</span>
+<span class="fc" id="L282">                toJson(),</span>
+                StandardCharsets.UTF_8);
+<span class="fc" id="L284">            Files.writeString(</span>
+<span class="fc" id="L285">                outputDirectory.resolve(&quot;sympy-rule-amplification.md&quot;),</span>
+<span class="fc" id="L286">                toMarkdown(),</span>
+                StandardCharsets.UTF_8);
+<span class="fc" id="L288">        }</span>
+
+        public String toJson() {
+<span class="fc" id="L291">            StringBuilder value = new StringBuilder();</span>
+<span class="fc" id="L292">            value.append(&quot;{\n&quot;)</span>
+<span class="fc" id="L293">                .append(&quot;  \&quot;schema\&quot;: \&quot;&quot;).append(json(schema))</span>
+<span class="fc" id="L294">                .append(&quot;\&quot;,\n  \&quot;configurationId\&quot;: \&quot;&quot;)</span>
+<span class="fc" id="L295">                .append(json(configurationId))</span>
+<span class="fc" id="L296">                .append(&quot;\&quot;,\n  \&quot;repositoryRevision\&quot;: \&quot;&quot;)</span>
+<span class="fc" id="L297">                .append(repositoryRevision)</span>
+<span class="fc" id="L298">                .append(&quot;\&quot;,\n  \&quot;sourceVersion\&quot;: \&quot;&quot;)</span>
+<span class="fc" id="L299">                .append(json(sourceVersion))</span>
+<span class="fc" id="L300">                .append(&quot;\&quot;,\n  \&quot;principalPackId\&quot;: \&quot;&quot;)</span>
+<span class="fc" id="L301">                .append(json(principalPackId))</span>
+<span class="fc" id="L302">                .append(&quot;\&quot;,\n  \&quot;principalRuleId\&quot;: \&quot;&quot;)</span>
+<span class="fc" id="L303">                .append(json(principalRuleId))</span>
+<span class="fc" id="L304">                .append(&quot;\&quot;,\n  \&quot;qualified\&quot;: &quot;)</span>
+<span class="fc" id="L305">                .append(qualified())</span>
+<span class="fc" id="L306">                .append(&quot;,\n  \&quot;directApplications\&quot;: &quot;)</span>
+<span class="fc" id="L307">                .append(directApplications())</span>
+<span class="fc" id="L308">                .append(&quot;,\n  \&quot;preparedApplications\&quot;: &quot;)</span>
+<span class="fc" id="L309">                .append(preparedApplications())</span>
+<span class="fc" id="L310">                .append(&quot;,\n  \&quot;amplificationGain\&quot;: &quot;)</span>
+<span class="fc" id="L311">                .append(amplificationGain())</span>
+<span class="fc" id="L312">                .append(&quot;,\n  \&quot;rows\&quot;: [\n&quot;);</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            for (int index = 0; index &lt; rows.size(); index++) {</span>
+<span class="fc" id="L314">                Row row = rows.get(index);</span>
+<span class="fc" id="L315">                value.append(&quot;    {\&quot;caseId\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L316">                    .append(json(row.caseId()))</span>
+<span class="fc" id="L317">                    .append(&quot;\&quot;,\&quot;sourceExpression\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L318">                    .append(json(row.sourceExpression()))</span>
+<span class="fc" id="L319">                    .append(&quot;\&quot;,\&quot;directApplicable\&quot;:&quot;)</span>
+<span class="fc" id="L320">                    .append(row.directApplicable())</span>
+<span class="fc" id="L321">                    .append(&quot;,\&quot;bridgeStatus\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L322">                    .append(row.bridgeStatus())</span>
+<span class="fc" id="L323">                    .append(&quot;\&quot;,\&quot;resultExpression\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L324">                    .append(json(row.resultExpression()))</span>
+<span class="fc" id="L325">                    .append(&quot;\&quot;,\&quot;preparationDepth\&quot;:&quot;)</span>
+<span class="fc" id="L326">                    .append(row.preparationDepth())</span>
+<span class="fc" id="L327">                    .append(&quot;,\&quot;primitiveRuleIds\&quot;:&quot;)</span>
+<span class="fc" id="L328">                    .append(jsonList(row.primitiveRuleIds()))</span>
+<span class="fc" id="L329">                    .append(&quot;,\&quot;assumptions\&quot;:&quot;)</span>
+<span class="fc" id="L330">                    .append(jsonList(row.assumptions()))</span>
+<span class="fc" id="L331">                    .append(&quot;,\&quot;independentlyVerified\&quot;:&quot;)</span>
+<span class="fc" id="L332">                    .append(row.independentlyVerified())</span>
+<span class="fc" id="L333">                    .append(&quot;,\&quot;reachedLimits\&quot;:&quot;)</span>
+<span class="fc" id="L334">                    .append(jsonList(row.reachedLimits()))</span>
+<span class="fc" id="L335">                    .append(&quot;}&quot;)</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">                    .append(index + 1 == rows.size() ? &quot;\n&quot; : &quot;,\n&quot;);</span>
+            }
+<span class="fc" id="L338">            return value.append(&quot;  ]\n}\n&quot;).toString();</span>
+        }
+
+        public String toMarkdown() {
+<span class="fc" id="L342">            StringBuilder value = new StringBuilder(</span>
+                &quot;# SymPy rule amplification pilot\n\n&quot;)
+<span class="fc" id="L344">                .append(&quot;Principal rule: `&quot;).append(principalRuleId)</span>
+<span class="fc" id="L345">                .append(&quot;` from `&quot;).append(principalPackId)</span>
+<span class="fc" id="L346">                .append(&quot;` (SymPy &quot;).append(sourceVersion)</span>
+<span class="fc" id="L347">                .append(&quot;).\n\n&quot;)</span>
+<span class="fc" id="L348">                .append(&quot;| Case | Direct | Bridge status | Prep depth | Result |\n&quot;)</span>
+<span class="fc" id="L349">                .append(&quot;|---|---:|---|---:|---|\n&quot;);</span>
+<span class="fc" id="L350">            rows.forEach(row -&gt; value.append(&quot;| `&quot;)</span>
+<span class="fc" id="L351">                .append(row.caseId()).append(&quot;` | &quot;)</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">                .append(row.directApplicable() ? &quot;yes&quot; : &quot;no&quot;)</span>
+<span class="fc" id="L353">                .append(&quot; | `&quot;).append(row.bridgeStatus())</span>
+<span class="fc" id="L354">                .append(&quot;` | &quot;).append(row.preparationDepth())</span>
+<span class="fc" id="L355">                .append(&quot; | `&quot;).append(row.resultExpression())</span>
+<span class="fc" id="L356">                .append(&quot;` |\n&quot;));</span>
+<span class="fc" id="L357">            return value.append(&quot;\nAdditional prepared applications: **&quot;)</span>
+<span class="fc" id="L358">                .append(amplificationGain())</span>
+<span class="fc" id="L359">                .append(&quot;**. Qualified: **&quot;)</span>
+<span class="fc" id="L360">                .append(qualified()).append(&quot;**.\n\n&quot;)</span>
+<span class="fc" id="L361">                .append(&quot;This is bounded evidence for one unchanged imported rule, one frozen cancellation inventory and five declared cases. It is not a general SymPy performance or completeness claim.\n&quot;)</span>
+<span class="fc" id="L362">                .toString();</span>
+        }
+    }
+
+    private static String jsonList(List&lt;String&gt; values) {
+<span class="fc" id="L367">        List&lt;String&gt; escaped = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L368">        values.forEach(value -&gt; escaped.add(&quot;\&quot;&quot; + json(value) + &quot;\&quot;&quot;));</span>
+<span class="fc" id="L369">        return &quot;[&quot; + String.join(&quot;,&quot;, escaped) + &quot;]&quot;;</span>
+    }
+
+    static String json(String value) {
+<span class="fc" id="L373">        return value.replace(&quot;\\&quot;, &quot;\\\\&quot;)</span>
+<span class="fc" id="L374">            .replace(&quot;\&quot;&quot;, &quot;\\\&quot;&quot;)</span>
+<span class="fc" id="L375">            .replace(&quot;\n&quot;, &quot;\\n&quot;)</span>
+<span class="fc" id="L376">            .replace(&quot;\r&quot;, &quot;\\r&quot;)</span>
+<span class="fc" id="L377">            .replace(&quot;\t&quot;, &quot;\\t&quot;);</span>
+    }
+
+    private static void text(String value, String field) {
+<span class="pc bpc" id="L381" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L382">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L384">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
