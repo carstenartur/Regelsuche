@@ -103,7 +103,24 @@ class EquationSystemRepresentationServiceTest {
         EquationSystemRepresentationService service =
             new EquationSystemRepresentationService();
 
-        assertThrows(IllegalArgumentException.class,
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
             () -> service.analyze("  "));
+        assertEquals(
+            "equation-system input must not be blank",
+            exception.getMessage());
+    }
+
+    @Test
+    void separatorOnlyInputIsRejectedImmediatelyAndClearly() {
+        EquationSystemRepresentationService service =
+            new EquationSystemRepresentationService();
+
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> service.analyze(";\n;"));
+        assertEquals(
+            "equation-system input must contain at least one equation",
+            exception.getMessage());
     }
 }
