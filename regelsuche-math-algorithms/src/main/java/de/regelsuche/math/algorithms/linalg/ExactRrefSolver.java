@@ -607,10 +607,10 @@ public final class ExactRrefSolver {
         String contentHash
     ) {
         public Certificate {
-            if (schema == null || schema.isBlank()
-                    || solverId == null || solverId.isBlank()
+            if (!CERTIFICATE_SCHEMA.equals(schema)
+                    || !SOLVER_ID.equals(solverId)
                     || sourceSystemHash == null
-                    || sourceSystemHash.isBlank()
+                    || !sourceSystemHash.matches("[0-9a-f]{64}")
                     || contentHash == null
                     || !contentHash.matches("[0-9a-f]{64}")) {
                 throw new IllegalArgumentException(
