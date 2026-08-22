@@ -1,22 +1,16 @@
 package de.regelsuche.transform;
 
 import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import java.util.List;
 import java.util.Objects;
 
-/**
- * Explicit, content-addressed applicability contract for one concrete rewrite
- * executor.
- *
- * <p>The pattern and recognition profile describe when preparation should aim
- * to make the executor applicable. They are not a second rewrite
- * implementation and contain no target expression. A positive application is
- * authorized only by concrete replay through {@link #executor()}.</p>
- */
+/** Explicit applicability contract for one concrete rewrite executor. */
 public record RewriteApplicabilitySchema(
     String schemaId,
     RewriteRule executor,
     PatternExpr pattern,
-    RecognitionProfile recognitionProfile
+    RecognitionProfile recognitionProfile,
+    List<RequiredAssumptionTemplate> requiredAssumptions
 ) {
     public RewriteApplicabilitySchema {
         if (schemaId == null || schemaId.isBlank()) {
@@ -29,6 +23,21 @@ public record RewriteApplicabilitySchema(
         recognitionProfile = recognitionProfile == null
             ? RecognitionProfile.exact()
             : recognitionProfile;
+        requiredAssumptions = List.copyOf(Objects.requireNonNull(
+            requiredAssumptions, "requiredAssumptions"));
+        if (requiredAssumptions.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException(
+                "requiredAssumptions must not contain null");
+        }
+    }
+
+    public RewriteApplicabilitySchema(
+        String schemaId,
+        RewriteRule executor,
+        PatternExpr pattern,
+        RecognitionProfile recognitionProfile
+    ) {
+        this(schemaId, executor, pattern, recognitionProfile, List.of());
     }
 
     public static RewriteApplicabilitySchema fromPatternRule(
@@ -39,7 +48,21 @@ public record RewriteApplicabilitySchema(
             "pattern-rule-source/v1:" + checked.id(),
             checked,
             checked.source(),
-            checked.recognitionProfile());
+            checked.recognitionProfile(),
+            List.of());
+    }
+
+    public static RewriteApplicabilitySchema fromPatternRule(
+        PatternRewriteRule rule,
+        List<RequiredAssumptionTemplate> requiredAssumptions
+    ) {
+        PatternRewriteRule checked = Objects.requireNonNull(rule, "rule");
+        return new RewriteApplicabilitySchema(
+            "pattern-rule-source-with-conditions/v1:" + checked.id(),
+            checked,
+            checked.source(),
+            checked.recognitionProfile(),
+            requiredAssumptions);
     }
 
     public String ruleId() {
@@ -51,6 +74,7 @@ public record RewriteApplicabilitySchema(
             schemaId,
             executor,
             pattern,
-            recognitionProfile);
+            recognitionProfile,
+            requiredAssumptions);
     }
 }
