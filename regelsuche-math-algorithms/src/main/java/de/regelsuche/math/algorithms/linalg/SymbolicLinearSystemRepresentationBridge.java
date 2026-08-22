@@ -15,7 +15,6 @@ import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialVecto
 import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.RowOrigin;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.representation.RepresentationBridge;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
