@@ -8,7 +8,6 @@ import de.regelsuche.ast.Equation;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.math.algorithms.equivalence.Polynomial;
-import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.linalg.BoundedCharacteristicPolynomialSolver.Certificate;
 import de.regelsuche.math.algorithms.linalg.BoundedCharacteristicPolynomialSolver.CharacteristicPolynomial;
 import de.regelsuche.math.algorithms.linalg.BoundedCharacteristicPolynomialSolver.Result;
@@ -16,7 +15,6 @@ import de.regelsuche.math.algorithms.linalg.BoundedCharacteristicPolynomialSolve
 import de.regelsuche.math.algorithms.linalg.EigenproblemRepresentation.ModelDomain;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.representation.RepresentationBridge.Budget;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -125,7 +123,9 @@ class BoundedCharacteristicPolynomialSolverTest {
 
     @Test
     void exactZeroEntriesDoNotCreateSpuriousTerms() {
-        EigenproblemRepresentation eigen = diagonalThreeByThree();
+        EigenproblemRepresentation eigen = diagonal(
+            List.of("a", "b", "c"),
+            List.of("x", "y", "z"));
 
         Polynomial result = solver.solve(
             eigen,
@@ -140,12 +140,46 @@ class BoundedCharacteristicPolynomialSolverTest {
         assertEquals(expected, result);
     }
 
-    private EigenproblemRepresentation diagonalThreeByThree() {
-        String expression = String.join("; ",
-            "a*x = lambda*x",
-            "b*y = lambda*y",
-            "c*z = lambda*z");
-        return eigen(expression, List.of("x", "y", "z"));
+    @Test
+    void exactZeroCofactorsAvoidDenseFactorialWork() {
+        EigenproblemRepresentation eigen = diagonal(
+            List.of("a", "b", "c", "d", "e"),
+            List.of("u", "v", "w", "x", "y"));
+
+        Result result = solver.solve(
+            eigen,
+            new BoundedCharacteristicPolynomialSolver.Budget(100));
+
+        assertEquals(Status.SOLVED, result.status());
+        assertTrue(result.work().consumedWorkUnits() < 100);
+        Polynomial lambda = Polynomial.variable("lambda");
+        Polynomial expected = Polynomial.variable("a").subtract(lambda)
+            .multiply(Polynomial.variable("b").subtract(lambda))
+            .multiply(Polynomial.variable("c").subtract(lambda))
+            .multiply(Polynomial.variable("d").subtract(lambda))
+            .multiply(Polynomial.variable("e").subtract(lambda));
+        assertEquals(
+            expected,
+            result.characteristicPolynomial().orElseThrow().polynomial());
+    }
+
+    private EigenproblemRepresentation diagonal(
+        List<String> diagonalEntries,
+        List<String> unknowns
+    ) {
+        if (diagonalEntries.size() != unknowns.size()) {
+            throw new IllegalArgumentException(
+                "diagonal and unknown dimensions must agree");
+        }
+        List<String> equations = new java.util.ArrayList<>();
+        for (int index = 0; index < diagonalEntries.size(); index++) {
+            equations.add(diagonalEntries.get(index)
+                + "*"
+                + unknowns.get(index)
+                + " = lambda*"
+                + unknowns.get(index));
+        }
+        return eigen(String.join("; ", equations), unknowns);
     }
 
     private EigenproblemRepresentation eigen(
