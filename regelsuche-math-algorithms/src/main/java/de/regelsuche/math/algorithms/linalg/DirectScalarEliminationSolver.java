@@ -42,6 +42,7 @@ public final class DirectScalarEliminationSolver {
         "direct-scalar-substitution-elimination/v1";
     public static final String CERTIFICATE_SCHEMA =
         "regelsuche.direct-scalar-elimination-certificate/v1";
+    private static final int MAX_ABSOLUTE_CONSTANT_EXPONENT = 20;
 
     public Result solve(Source source, Budget budget) {
         Objects.requireNonNull(source, "source");
@@ -190,28 +191,17 @@ public final class DirectScalarEliminationSolver {
         }
 
         if (binary.operator() == BinaryOperator.POW) {
-            int exponent = integerExponent(binary.right(), work);
             AffineForm base = affine(
                 binary.left(),
                 variableOrder,
                 variables,
                 work);
-            if (exponent == 0) {
-                return AffineForm.constant(Rational.ONE);
-            }
-            if (exponent == 1) {
-                return base;
-            }
-            if (!base.isConstant()) {
-                throw new NonlinearExpression(
-                    "NONLINEAR_POWER_IN_DIRECT_SCALAR_SYSTEM");
-            }
-            Rational value = Rational.ONE;
-            for (int index = 0; index < exponent; index++) {
-                work.consume(Stage.SOURCE_ANALYSIS);
-                value = value.multiply(base.constant());
-            }
-            return AffineForm.constant(value);
+            AffineForm exponent = affine(
+                binary.right(),
+                variableOrder,
+                variables,
+                work);
+            return power(base, exponent, work);
         }
 
         AffineForm left = affine(
@@ -234,21 +224,66 @@ public final class DirectScalarEliminationSolver {
         };
     }
 
-    private static int integerExponent(Expr expression, WorkCounter work) {
-        work.consume(Stage.SOURCE_ANALYSIS);
-        if (!(expression instanceof NumberExpr number)
-                || !Double.isFinite(number.value())) {
-            throw new UnsupportedExpression(
-                "NON_LITERAL_DIRECT_AFFINE_EXPONENT");
+    private static AffineForm power(
+        AffineForm base,
+        AffineForm exponent,
+        WorkCounter work
+    ) {
+        if (!exponent.isConstant()
+                || !exponent.constant().denominator().equals(
+                    java.math.BigInteger.ONE)) {
+            throw new NonlinearExpression(
+                "NON_CONSTANT_OR_NON_INTEGER_DIRECT_EXPONENT");
         }
-        int exponent = (int) number.value();
-        if (Math.abs(number.value() - exponent) > 1e-9
-                || exponent < 0
-                || exponent > 20) {
+        java.math.BigInteger exactExponent =
+            exponent.constant().numerator();
+        if (exactExponent.abs().compareTo(java.math.BigInteger.valueOf(
+                MAX_ABSOLUTE_CONSTANT_EXPONENT)) > 0) {
             throw new UnsupportedExpression(
                 "EXPONENT_OUTSIDE_DIRECT_AFFINE_FRAGMENT");
         }
-        return exponent;
+        int exponentValue = exactExponent.intValueExact();
+        if (exponentValue == 1) {
+            return base;
+        }
+        if (!base.isConstant()) {
+            throw new NonlinearExpression(
+                "NONLINEAR_POWER_IN_DIRECT_SCALAR_SYSTEM");
+        }
+        if (base.constant().isZero() && exponentValue <= 0) {
+            throw new UnsupportedExpression("UNDEFINED_ZERO_POWER");
+        }
+        return AffineForm.constant(pow(base.constant(), exponentValue, work));
+    }
+
+    private static Rational pow(
+        Rational base,
+        int exponent,
+        WorkCounter work
+    ) {
+        if (exponent == 0) {
+            return Rational.ONE;
+        }
+        boolean reciprocal = exponent < 0;
+        int remaining = Math.abs(exponent);
+        Rational result = Rational.ONE;
+        Rational factor = base;
+        while (remaining > 0) {
+            if ((remaining & 1) == 1) {
+                work.consume(Stage.SOURCE_ANALYSIS);
+                result = result.multiply(factor);
+            }
+            remaining >>>= 1;
+            if (remaining > 0) {
+                work.consume(Stage.SOURCE_ANALYSIS);
+                factor = factor.multiply(factor);
+            }
+        }
+        if (!reciprocal) {
+            return result;
+        }
+        work.consume(Stage.SOURCE_ANALYSIS);
+        return Rational.ONE.divide(result);
     }
 
     private static AffineForm add(
