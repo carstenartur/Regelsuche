@@ -17,9 +17,10 @@ import de.regelsuche.knowledge.SearchEffect;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
-import de.regelsuche.transform.SchemaBackedRewriteRule;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +35,7 @@ class RulePreparationCoordinatorTest {
         PatternRewriteRule differenceOfSquares = imported(
             "sympy-polynomial", "sympy.poly.factor.diff_squares");
         RulePreparationCoordinator coordinator = coordinator(
-            List.of(pythagorean, differenceOfSquares),
+            List.of(schema(pythagorean), schema(differenceOfSquares)),
             cancellationRules());
 
         RulePreparationCoordinator.Evaluation first = coordinator.analyze(
@@ -72,10 +73,12 @@ class RulePreparationCoordinatorTest {
 
     @Test
     void explicitSchemaMakesAnAlgorithmicRulePreparablyApplicable() {
-        SchemaBackedRewriteRule principal = new SchemaBackedRewriteRule(
-            "algorithmic-z-applicability/v1",
-            new AlgorithmicZRule(),
-            PatternExpr.variable("z"));
+        RewriteApplicabilitySchema principal =
+            new RewriteApplicabilitySchema(
+                "algorithmic-z-applicability/v1",
+                new AlgorithmicZRule(),
+                PatternExpr.variable("z"),
+                RecognitionProfile.exact());
         PatternRewriteRule preparation = new PatternRewriteRule(
             "a-to-z",
             PatternExpr.variable("a"),
@@ -103,8 +106,8 @@ class RulePreparationCoordinatorTest {
     @Test
     void directApplicationsRemainTheFirstStage() {
         RulePreparationCoordinator coordinator = coordinator(
-            List.of(imported(
-                "sympy-trigonometry", "sympy.trig.pythagorean")),
+            List.of(schema(imported(
+                "sympy-trigonometry", "sympy.trig.pythagorean"))),
             cancellationRules());
 
         RulePreparationCoordinator.Evaluation evaluation =
@@ -142,9 +145,9 @@ class RulePreparationCoordinatorTest {
                 List.of()));
 
         assertThrows(IllegalArgumentException.class,
-            () -> coordinator(List.of(mediumRisk), List.of()));
-        PatternRewriteRule pythagorean = imported(
-            "sympy-trigonometry", "sympy.trig.pythagorean");
+            () -> coordinator(List.of(schema(mediumRisk)), List.of()));
+        RewriteApplicabilitySchema pythagorean = schema(imported(
+            "sympy-trigonometry", "sympy.trig.pythagorean"));
         assertThrows(IllegalArgumentException.class,
             () -> coordinator(
                 List.of(pythagorean, pythagorean),
@@ -152,16 +155,22 @@ class RulePreparationCoordinatorTest {
     }
 
     private static RulePreparationCoordinator coordinator(
-        List<? extends PatternRewriteRule> principals,
+        List<RewriteApplicabilitySchema> schemas,
         List<? extends RewriteRule> preparationRules
     ) {
         return new RulePreparationCoordinator(
-            principals,
+            schemas,
             preparationRules,
             REVISION,
             new PatternTargetedLocalBridgeSearch.Budget(
                 3, 128, 1_024, 8, 128, 128,
                 32, 5_000, 2_500));
+    }
+
+    private static RewriteApplicabilitySchema schema(
+        PatternRewriteRule rule
+    ) {
+        return RewriteApplicabilitySchema.fromPatternRule(rule);
     }
 
     private static PatternRewriteRule imported(
