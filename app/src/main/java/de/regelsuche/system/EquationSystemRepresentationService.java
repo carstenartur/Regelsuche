@@ -156,7 +156,8 @@ public final class EquationSystemRepresentationService {
                 + representation.relation().orElseThrow());
             lines.add("A = " + renderMatrix(system));
             lines.add("x = " + renderVariableVector(system.variables()));
-            lines.add("b = " + renderVector(system.rightHandSide().values()));
+            lines.add("b = " + renderColumnVector(
+                system.rightHandSide().values()));
             lines.add("Classification: " + system.solutionClassification());
             lines.add("rank(A) = " + system.coefficientRank());
             lines.add("rank([A|b]) = " + system.augmentedRank());
@@ -200,7 +201,7 @@ public final class EquationSystemRepresentationService {
 
         private static String renderMatrix(ExactLinearSystem system) {
             return system.coefficients().rows().stream()
-                .map(Analysis::renderVector)
+                .map(Analysis::renderRow)
                 .collect(java.util.stream.Collectors.joining(
                     ", ",
                     "[",
@@ -211,13 +212,17 @@ public final class EquationSystemRepresentationService {
             return "[" + String.join(", ", variables) + "]^T";
         }
 
-        private static String renderVector(List<Rational> values) {
+        private static String renderColumnVector(List<Rational> values) {
+            return renderRow(values) + "^T";
+        }
+
+        private static String renderRow(List<Rational> values) {
             return values.stream()
                 .map(Rational::toString)
                 .collect(java.util.stream.Collectors.joining(
                     ", ",
                     "[",
-                    "]^T"));
+                    "]"));
         }
 
         private static String renderWork(
