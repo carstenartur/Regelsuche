@@ -10,7 +10,7 @@ regelsuche.safe-rule-preparation-coordinator/v1
 
 ## Purpose
 
-The coordinator receives a finite set of visible principal rules, one finite
+The coordinator receives a finite set of visible principal schemas, one finite
 preparation inventory, an exact repository revision and one bounded bridge
 budget. For every principal it performs the same staged decision:
 
@@ -29,28 +29,40 @@ search objective.
 
 A declarative `PatternRewriteRule` already exposes its source pattern. An
 algorithmic Java rule previously had no equivalent preparation boundary.
-`SchemaBackedRewriteRule` now attaches an explicit applicability pattern and
-recognition profile while retaining the original rule as the only concrete
-executor.
+`RewriteApplicabilitySchema` now keeps four things separate:
 
-The schema may guide partial matching and residual analysis, but it cannot emit
-a result by itself. A positive candidate is accepted only when the wrapped Java
-rule matches and applies to the exact retained terminal AST. The schema ID,
-pattern, delegate implementation class, rule metadata and repository revision
-are bound into retained identities.
+```text
+schema identity
+applicability pattern
+recognition profile
+concrete RewriteRule executor
+```
+
+The schema deliberately contains no rewrite target. It may guide partial
+matching and residual analysis, but it cannot emit a result by itself. A
+positive candidate is accepted only when the concrete executor matches and
+applies to the exact retained terminal AST. Schema ID, pattern, recognition
+profile, executor identity and repository revision are content-bound.
+
+The existing bridge implementation still requires a `PatternRewriteRule`.
+Therefore the coordinator constructs a private adapter for the duration of one
+coordinator instance. That adapter delegates every concrete match, application
+and assumption to the real executor and is never returned, registered as a
+knowledge-pack rule or exposed to the e-graph. In particular, no invented
+declarative target can leak into another execution engine.
 
 This avoids both unsafe inference and duplicate implementations:
 
 - no schema is guessed from a class name, rule ID, example or benchmark;
-- no declarative target substitutes for the algorithmic implementation;
+- no declarative target substitutes for an algorithmic implementation;
 - a stale or overly broad schema fails when concrete replay disagrees;
-- wrapping a schema-backed rule a second time is rejected.
+- the schema and the executor receive distinct, explicit identities.
 
 ## Safe v1 eligibility
 
 The coordinator rejects:
 
-- an empty or duplicate principal inventory;
+- an empty, duplicate or inconsistently identified schema inventory;
 - principal or preparation rules that do not declare equivalence preservation;
 - principal rules whose review status is not registration-eligible;
 - external principal rules above risk level `low`;
@@ -67,7 +79,7 @@ safe profile even if a syntactic pattern exists.
 
 Every principal receives one deterministic outcome containing:
 
-- rule ID and content fingerprint;
+- rule ID and applicability-schema fingerprint;
 - direct, prepared, complete-no-bridge, inconclusive or failure status;
 - concrete candidate when positive;
 - cumulative assumptions;
@@ -77,7 +89,7 @@ Every principal receives one deterministic outcome containing:
 - bridge certificate identity for prepared candidates;
 - concrete replay verification status.
 
-The complete evaluation additionally retains principal and preparation
+The complete evaluation additionally retains principal-schema and preparation
 inventory fingerprints plus aggregate work. `verify(...)` recomputes the whole
 evaluation and every prepared bridge under the same frozen configuration.
 
