@@ -6,6 +6,7 @@ import de.regelsuche.search.reachability.PatternTargetedLocalBridgeSearch;
 import de.regelsuche.search.reachability.RulePreparationCoordinator;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.Transformation;
 import java.io.IOException;
@@ -55,10 +56,13 @@ public final class SymPyRuleAmplificationExperiment {
 
     public Report run(String repositoryRevision) {
         List<PatternRewriteRule> principals = principals();
+        List<RewriteApplicabilitySchema> schemas = principals.stream()
+            .map(RewriteApplicabilitySchema::fromPatternRule)
+            .toList();
         List<RewriteRule> preparationRules = cancellationRules();
         RulePreparationCoordinator coordinator =
             new RulePreparationCoordinator(
-                principals,
+                schemas,
                 preparationRules,
                 repositoryRevision,
                 BUDGET);
