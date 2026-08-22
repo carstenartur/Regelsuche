@@ -1,7 +1,6 @@
 package de.regelsuche.math.algorithms.linalg;
 
 import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Equation;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
@@ -63,16 +62,8 @@ public final class LinearSystemRepresentationBridge implements
                 "EMPTY_EQUATION_SYSTEM");
         }
 
-        List<AffineForm> normalizedRows = new ArrayList<>(equations.size());
-        Set<String> variables = new TreeSet<>();
         try {
-            for (Equation equation : equations) {
-                AffineForm left = affine(equation.left(), work);
-                AffineForm right = affine(equation.right(), work);
-                AffineForm normalized = left.subtract(right);
-                normalizedRows.add(normalized);
-                variables.addAll(normalized.coefficients().keySet());
-            }
+            Set<String> variables = collectVariables(equations, work);
             if (variables.isEmpty()) {
                 return withoutRepresentation(
                     Status.NOT_APPLICABLE,
@@ -80,6 +71,7 @@ public final class LinearSystemRepresentationBridge implements
                     "SYSTEM_CONTAINS_NO_VARIABLES");
             }
 
+            List<AffineForm> normalizedRows = normalize(equations, work);
             List<String> variableOrder = List.copyOf(variables);
             List<List<Rational>> coefficientRows = new ArrayList<>(
                 normalizedRows.size());
@@ -109,12 +101,10 @@ public final class LinearSystemRepresentationBridge implements
             int augmentedRank = rank(
                 augmentedRows(coefficientRows, rightHandSide),
                 work);
-            SolutionClassification classification =
-                augmentedRank > coefficientRank
-                    ? SolutionClassification.INCONSISTENT
-                    : coefficientRank == variableOrder.size()
-                        ? SolutionClassification.UNIQUE
-                        : SolutionClassification.UNDERDETERMINED;
+            SolutionClassification classification = classify(
+                coefficientRank,
+                augmentedRank,
+                variableOrder.size());
             ExactLinearSystem represented = new ExactLinearSystem(
                 coefficients,
                 variableOrder,
@@ -124,10 +114,7 @@ public final class LinearSystemRepresentationBridge implements
                 augmentedRank,
                 classification);
 
-            if (!roundTripMatches(
-                    normalizedRows,
-                    represented,
-                    work)) {
+            if (!roundTripMatches(normalizedRows, represented, work)) {
                 return withoutRepresentation(
                     Status.INVALID_CERTIFICATE,
                     work,
@@ -178,6 +165,58 @@ public final class LinearSystemRepresentationBridge implements
         } catch (RuntimeException exception) {
             return false;
         }
+    }
+
+    private static Set<String> collectVariables(
+        List<Equation> equations,
+        WorkCounter work
+    ) {
+        Set<String> result = new TreeSet<>();
+        for (Equation equation : equations) {
+            collectVariables(equation.left(), result, work);
+            collectVariables(equation.right(), result, work);
+        }
+        return result;
+    }
+
+    private static void collectVariables(
+        Expr expression,
+        Set<String> target,
+        WorkCounter work
+    ) {
+        work.consume();
+        if (expression instanceof VariableExpr variable) {
+            target.add(variable.name());
+            return;
+        }
+        if (expression instanceof NumberExpr) {
+            return;
+        }
+        if (expression instanceof BinaryExpr binary) {
+            collectVariables(binary.left(), target, work);
+            collectVariables(binary.right(), target, work);
+            return;
+        }
+        if (expression instanceof FunctionExpr function) {
+            for (Expr argument : function.arguments()) {
+                collectVariables(argument, target, work);
+            }
+            return;
+        }
+        throw new UnsupportedExpression("UNKNOWN_EXPRESSION_NODE");
+    }
+
+    private static List<AffineForm> normalize(
+        List<Equation> equations,
+        WorkCounter work
+    ) {
+        List<AffineForm> result = new ArrayList<>(equations.size());
+        for (Equation equation : equations) {
+            AffineForm left = affine(equation.left(), work);
+            AffineForm right = affine(equation.right(), work);
+            result.add(left.subtract(right));
+        }
+        return result;
     }
 
     private static Result<ExactLinearSystem, Certificate>
@@ -294,6 +333,19 @@ public final class LinearSystemRepresentationBridge implements
             }
         }
         return reciprocal ? Rational.ONE.divide(result) : result;
+    }
+
+    private static SolutionClassification classify(
+        int coefficientRank,
+        int augmentedRank,
+        int variableCount
+    ) {
+        if (augmentedRank > coefficientRank) {
+            return SolutionClassification.INCONSISTENT;
+        }
+        return coefficientRank == variableCount
+            ? SolutionClassification.UNIQUE
+            : SolutionClassification.UNDERDETERMINED;
     }
 
     private static List<List<Rational>> augmentedRows(
@@ -413,10 +465,14 @@ public final class LinearSystemRepresentationBridge implements
         appendToken(payload, CERTIFICATE_SCHEMA);
         appendToken(payload, BRIDGE_ID);
         appendToken(payload, RELATION.name());
+        appendToken(payload, Integer.toString(represented.equationCount()));
+        appendToken(payload, Integer.toString(represented.variableCount()));
         sourceEquations.forEach(value -> appendToken(payload, value));
         represented.variables().forEach(value -> appendToken(payload, value));
-        coefficientRows.forEach(row -> row.forEach(value ->
-            appendToken(payload, value)));
+        for (List<String> row : coefficientRows) {
+            appendToken(payload, Integer.toString(row.size()));
+            row.forEach(value -> appendToken(payload, value));
+        }
         rhs.forEach(value -> appendToken(payload, value));
         appendToken(payload, Integer.toString(represented.coefficientRank()));
         appendToken(payload, Integer.toString(represented.augmentedRank()));
@@ -432,6 +488,8 @@ public final class LinearSystemRepresentationBridge implements
             represented.variables(),
             coefficientRows,
             rhs,
+            represented.equationCount(),
+            represented.variableCount(),
             represented.coefficientRank(),
             represented.augmentedRank(),
             represented.solutionClassification(),
@@ -439,9 +497,7 @@ public final class LinearSystemRepresentationBridge implements
     }
 
     private static String formatEquation(Equation equation) {
-        return ExpressionFormatter.format(equation.left())
-            + " = "
-            + ExpressionFormatter.format(equation.right());
+        return ExpressionFormatter.format(equation);
     }
 
     private static void appendToken(StringBuilder target, String value) {
@@ -466,6 +522,8 @@ public final class LinearSystemRepresentationBridge implements
         List<String> variableOrder,
         List<List<String>> coefficientRows,
         List<String> rightHandSide,
+        int rowCount,
+        int columnCount,
         int coefficientRank,
         int augmentedRank,
         SolutionClassification solutionClassification,
@@ -488,12 +546,33 @@ public final class LinearSystemRepresentationBridge implements
             solutionClassification = Objects.requireNonNull(
                 solutionClassification,
                 "solutionClassification");
-            if (coefficientRank < 0
-                    || augmentedRank < coefficientRank
-                    || coefficientRows.size() != sourceEquations.size()
-                    || rightHandSide.size() != sourceEquations.size()) {
+            if (rowCount < 1
+                    || columnCount < 1
+                    || sourceEquations.size() != rowCount
+                    || coefficientRows.size() != rowCount
+                    || rightHandSide.size() != rowCount
+                    || variableOrder.size() != columnCount
+                    || coefficientRows.stream()
+                        .anyMatch(row -> row.size() != columnCount)) {
                 throw new IllegalArgumentException(
-                    "certificate matrix and rank fields are inconsistent");
+                    "certificate matrix dimensions are inconsistent");
+            }
+            int maximumCoefficientRank = Math.min(rowCount, columnCount);
+            int maximumAugmentedRank = Math.min(rowCount, columnCount + 1);
+            if (coefficientRank < 0
+                    || coefficientRank > maximumCoefficientRank
+                    || augmentedRank < coefficientRank
+                    || augmentedRank > maximumAugmentedRank) {
+                throw new IllegalArgumentException(
+                    "certificate ranks are inconsistent");
+            }
+            SolutionClassification expected = classify(
+                coefficientRank,
+                augmentedRank,
+                columnCount);
+            if (solutionClassification != expected) {
+                throw new IllegalArgumentException(
+                    "certificate classification is inconsistent");
             }
         }
 
@@ -541,9 +620,10 @@ public final class LinearSystemRepresentationBridge implements
                     coefficient,
                     "coefficient");
                 if (!exact.isZero()) {
-                    normalized.put(variable, exact);
+                    normalized.merge(variable, exact, Rational::add);
                 }
             });
+            normalized.entrySet().removeIf(entry -> entry.getValue().isZero());
             coefficients = Map.copyOf(normalized);
         }
 
