@@ -21,7 +21,7 @@ class SymPyRuleAmplificationExperimentTest {
         SymPyRuleAmplificationExperiment.Report report =
             new SymPyRuleAmplificationExperiment().run(REVISION);
 
-        assertTrue(report.qualified());
+        assertTrue(report.qualified(), report.toJson());
         assertEquals(3, report.principals().size());
         assertEquals(11, report.rows().size());
         assertEquals(4, report.directApplications());
@@ -126,7 +126,7 @@ class SymPyRuleAmplificationExperimentTest {
             "sympy-rule-amplification.md")));
         String json = Files.readString(directory.resolve(
             "sympy-rule-amplification.json"));
-        assertTrue(json.contains("\"qualified\": true"));
+        assertTrue(json.contains("\"qualified\": true"), json);
         assertTrue(json.contains("\"amplifiedRuleFamilies\": 3"));
         assertTrue(json.contains("\"sourceAssumptions\""));
         assertTrue(first.toMarkdown().contains(
