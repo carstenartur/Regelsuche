@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BoundedCharacteristicPolynomialSolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">BoundedCharacteristicPolynomialSolver.java</span></div><h1>BoundedCharacteristicPolynomialSolver.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import de.regelsuche.representation.RepresentationBridge.WorkLedger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Exact bounded determinant solver for the shifted operator {@code A-lambda I}.
+ *
+ * &lt;p&gt;The initial implementation uses deterministic Laplace expansion. It is
+ * intentionally dimension-bounded and work-accounted rather than pretending to
+ * be a scalable general determinant backend. Exact-zero cofactors are inspected
+ * but skipped before minor construction and recursion, so sparse and diagonal
+ * systems consume work proportional to their actual expansion tree rather than
+ * the dense worst case. The result makes the eigenproblem consequence
+ * {@code det(A-lambda I)=0} executable instead of leaving it as a structure
+ * label.&lt;/p&gt;
+ */
+public final class BoundedCharacteristicPolynomialSolver {
+    public static final String SOLVER_ID =
+        &quot;bounded-characteristic-polynomial/laplace/v1&quot;;
+    public static final String CERTIFICATE_SCHEMA =
+        &quot;regelsuche.characteristic-polynomial-certificate/v1&quot;;
+    public static final int DEFAULT_MAX_DIMENSION = 5;
+
+    private final int maxDimension;
+
+    public BoundedCharacteristicPolynomialSolver() {
+<span class="fc" id="L37">        this(DEFAULT_MAX_DIMENSION);</span>
+<span class="fc" id="L38">    }</span>
+
+<span class="fc" id="L40">    public BoundedCharacteristicPolynomialSolver(int maxDimension) {</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (maxDimension &lt; 1) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(</span>
+                &quot;maxDimension must be positive&quot;);
+        }
+<span class="fc" id="L45">        this.maxDimension = maxDimension;</span>
+<span class="fc" id="L46">    }</span>
+
+    public Result solve(EigenproblemRepresentation source, Budget budget) {
+<span class="fc" id="L49">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L50">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L51">        WorkCounter work = new WorkCounter(budget.maxWorkUnits());</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (source.dimension() &gt; maxDimension) {</span>
+<span class="fc" id="L53">            return Result.withoutPolynomial(</span>
+                Status.DIMENSION_UNSUPPORTED,
+<span class="fc" id="L55">                work.ledger(),</span>
+                &quot;EIGENPROBLEM_DIMENSION_EXCEEDS_BOUND&quot;);
+        }
+        try {
+<span class="fc" id="L59">            Polynomial polynomial = determinant(</span>
+<span class="fc" id="L60">                source.shiftedOperator(),</span>
+                work);
+<span class="fc" id="L62">            Certificate certificate = certificate(source, polynomial);</span>
+<span class="fc" id="L63">            return Result.solved(</span>
+                new CharacteristicPolynomial(
+<span class="fc" id="L65">                    source.eigenvalueParameter(),</span>
+                    polynomial,
+<span class="fc" id="L67">                    polynomial.toCanonicalString() + &quot; = 0&quot;),</span>
+                certificate,
+<span class="fc" id="L69">                work.ledger());</span>
+<span class="fc" id="L70">        } catch (BudgetExceeded exception) {</span>
+<span class="fc" id="L71">            return Result.withoutPolynomial(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L73">                work.ledger(),</span>
+                &quot;CHARACTERISTIC_POLYNOMIAL_WORK_BUDGET_EXHAUSTED&quot;);
+        }
+    }
+
+    public boolean verify(EigenproblemRepresentation source, Result result) {
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">        if (source == null</span>
+                || result == null
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                || result.status() != Status.SOLVED) {</span>
+<span class="nc" id="L82">            return false;</span>
+        }
+        try {
+<span class="fc" id="L85">            return solve(</span>
+                source,
+<span class="fc" id="L87">                new Budget(result.work().configuredWorkUnits()))</span>
+<span class="fc" id="L88">                .equals(result);</span>
+<span class="nc" id="L89">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L90">            return false;</span>
+        }
+    }
+
+    private static Polynomial determinant(
+        PolynomialMatrix matrix,
+        WorkCounter work
+    ) {
+<span class="fc" id="L98">        int dimension = matrix.rows();</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (dimension != matrix.columns()) {</span>
+<span class="nc" id="L100">            throw new IllegalArgumentException(</span>
+                &quot;determinant requires a square matrix&quot;);
+        }
+<span class="fc" id="L103">        work.consume();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (dimension == 1) {</span>
+<span class="fc" id="L105">            return matrix.get(0, 0);</span>
+        }
+<span class="fc" id="L107">        Polynomial result = Polynomial.zero();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (int column = 0; column &lt; dimension; column++) {</span>
+<span class="fc" id="L109">            work.consume();</span>
+<span class="fc" id="L110">            Polynomial cofactor = matrix.get(0, column);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (cofactor.isZero()) {</span>
+<span class="fc" id="L112">                continue;</span>
+            }
+<span class="fc" id="L114">            Polynomial term = cofactor.multiply(</span>
+<span class="fc" id="L115">                determinant(minor(matrix, 0, column, work), work));</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if ((column &amp; 1) == 1) {</span>
+<span class="fc" id="L117">                term = term.multiply(Rational.NEGATIVE_ONE);</span>
+            }
+<span class="fc" id="L119">            result = result.add(term);</span>
+        }
+<span class="fc" id="L121">        return result;</span>
+    }
+
+    private static PolynomialMatrix minor(
+        PolynomialMatrix matrix,
+        int removedRow,
+        int removedColumn,
+        WorkCounter work
+    ) {
+<span class="fc" id="L130">        List&lt;List&lt;Polynomial&gt;&gt; rows = new ArrayList&lt;&gt;(matrix.rows() - 1);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (int row = 0; row &lt; matrix.rows(); row++) {</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (row == removedRow) {</span>
+<span class="fc" id="L133">                continue;</span>
+            }
+<span class="fc" id="L135">            List&lt;Polynomial&gt; retained = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L136">                matrix.columns() - 1);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            for (int column = 0; column &lt; matrix.columns(); column++) {</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                if (column == removedColumn) {</span>
+<span class="fc" id="L139">                    continue;</span>
+                }
+<span class="fc" id="L141">                work.consume();</span>
+<span class="fc" id="L142">                retained.add(matrix.get(row, column));</span>
+            }
+<span class="fc" id="L144">            rows.add(List.copyOf(retained));</span>
+        }
+<span class="fc" id="L146">        return new PolynomialMatrix(rows);</span>
+    }
+
+    private static Certificate certificate(
+        EigenproblemRepresentation source,
+        Polynomial polynomial
+    ) {
+<span class="fc" id="L153">        String sourceHash = sourceHash(source);</span>
+<span class="fc" id="L154">        String canonical = polynomial.toCanonicalString();</span>
+<span class="fc" id="L155">        String payload = String.join(&quot;\n&quot;,</span>
+            &quot;schema=&quot; + CERTIFICATE_SCHEMA,
+            &quot;solver=&quot; + SOLVER_ID,
+            &quot;source=&quot; + sourceHash,
+<span class="fc" id="L159">            &quot;dimension=&quot; + source.dimension(),</span>
+<span class="fc" id="L160">            &quot;eigenvalue=&quot; + source.eigenvalueParameter(),</span>
+            &quot;polynomial=&quot; + canonical,
+            &quot;equation=&quot; + canonical + &quot; = 0&quot;);
+<span class="fc" id="L163">        return new Certificate(</span>
+            CERTIFICATE_SCHEMA,
+            SOLVER_ID,
+            sourceHash,
+<span class="fc" id="L167">            source.dimension(),</span>
+<span class="fc" id="L168">            source.eigenvalueParameter(),</span>
+            canonical,
+            canonical + &quot; = 0&quot;,
+<span class="fc" id="L171">            sha256(payload));</span>
+    }
+
+    private static String sourceHash(EigenproblemRepresentation source) {
+<span class="fc" id="L175">        StringBuilder payload = new StringBuilder();</span>
+<span class="fc" id="L176">        append(payload, Integer.toString(source.dimension()));</span>
+<span class="fc" id="L177">        append(payload, source.eigenvalueParameter());</span>
+<span class="fc" id="L178">        source.vectorCoordinates().forEach(value -&gt; append(payload, value));</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (List&lt;Polynomial&gt; row : source.shiftedOperator().entries()) {</span>
+<span class="fc" id="L180">            append(payload, Integer.toString(row.size()));</span>
+<span class="fc" id="L181">            row.stream().map(Polynomial::toCanonicalString)</span>
+<span class="fc" id="L182">                .forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L183">        }</span>
+<span class="fc" id="L184">        source.requiredAssumptions().forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L185">        return sha256(payload.toString());</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L189">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L190">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L194">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L195">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="fc" id="L196">                    value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L197">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L198">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L202">    public enum Status {</span>
+<span class="fc" id="L203">        SOLVED,</span>
+<span class="fc" id="L204">        DIMENSION_UNSUPPORTED,</span>
+<span class="fc" id="L205">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L206">        INVALID_CERTIFICATE</span>
+    }
+
+    public record Budget(int maxWorkUnits) {
+<span class="fc" id="L210">        public static final Budget DEFAULT = new Budget(100_000);</span>
+
+<span class="fc" id="L212">        public Budget {</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            if (maxWorkUnits &lt; 0) {</span>
+<span class="nc" id="L214">                throw new IllegalArgumentException(</span>
+                    &quot;maxWorkUnits must not be negative&quot;);
+            }
+<span class="fc" id="L217">        }</span>
+    }
+
+    public record CharacteristicPolynomial(
+        String eigenvalueParameter,
+        Polynomial polynomial,
+        String singularityEquation
+    ) {
+<span class="fc" id="L225">        public CharacteristicPolynomial {</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">            if (eigenvalueParameter == null</span>
+<span class="pc bpc" id="L227" title="2 of 4 branches missed.">                    || eigenvalueParameter.isBlank()</span>
+                    || singularityEquation == null
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">                    || singularityEquation.isBlank()) {</span>
+<span class="nc" id="L230">                throw new IllegalArgumentException(</span>
+                    &quot;characteristic polynomial text fields are required&quot;);
+            }
+<span class="fc" id="L233">            eigenvalueParameter = eigenvalueParameter.trim();</span>
+<span class="fc" id="L234">            polynomial = Objects.requireNonNull(polynomial, &quot;polynomial&quot;);</span>
+<span class="fc" id="L235">            singularityEquation = singularityEquation.trim();</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">            if (!singularityEquation.equals(</span>
+<span class="fc" id="L237">                    polynomial.toCanonicalString() + &quot; = 0&quot;)) {</span>
+<span class="nc" id="L238">                throw new IllegalArgumentException(</span>
+                    &quot;singularity equation must match polynomial&quot;);
+            }
+<span class="fc" id="L241">        }</span>
+    }
+
+    public record Certificate(
+        String schema,
+        String solverId,
+        String sourceHash,
+        int dimension,
+        String eigenvalueParameter,
+        String canonicalPolynomial,
+        String singularityEquation,
+        String contentHash
+    ) {
+<span class="fc" id="L254">        public Certificate {</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (!CERTIFICATE_SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L256" title="1 of 4 branches missed.">                    || !SOLVER_ID.equals(solverId)</span>
+                    || sourceHash == null
+<span class="pc bpc" id="L258" title="1 of 4 branches missed.">                    || !sourceHash.matches(&quot;[0-9a-f]{64}&quot;)</span>
+                    || eigenvalueParameter == null
+<span class="pc bpc" id="L260" title="2 of 4 branches missed.">                    || eigenvalueParameter.isBlank()</span>
+                    || canonicalPolynomial == null
+<span class="pc bpc" id="L262" title="2 of 4 branches missed.">                    || canonicalPolynomial.isBlank()</span>
+                    || singularityEquation == null
+<span class="pc bpc" id="L264" title="2 of 4 branches missed.">                    || singularityEquation.isBlank()</span>
+                    || contentHash == null
+<span class="pc bpc" id="L266" title="1 of 4 branches missed.">                    || !contentHash.matches(&quot;[0-9a-f]{64}&quot;)</span>
+                    || dimension &lt; 1) {
+<span class="fc" id="L268">                throw new IllegalArgumentException(</span>
+                    &quot;certificate fields are invalid&quot;);
+            }
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">            if (!singularityEquation.equals(</span>
+                    canonicalPolynomial + &quot; = 0&quot;)) {
+<span class="nc" id="L273">                throw new IllegalArgumentException(</span>
+                    &quot;certificate equation and polynomial disagree&quot;);
+            }
+<span class="fc" id="L276">        }</span>
+    }
+
+    public record Result(
+        Status status,
+        Optional&lt;CharacteristicPolynomial&gt; characteristicPolynomial,
+        Optional&lt;Certificate&gt; certificate,
+        WorkLedger work,
+        String detailCode
+    ) {
+<span class="fc" id="L286">        public Result {</span>
+<span class="fc" id="L287">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L288">            characteristicPolynomial = Objects.requireNonNull(</span>
+                characteristicPolynomial,
+                &quot;characteristicPolynomial&quot;);
+<span class="fc" id="L291">            certificate = Objects.requireNonNull(certificate, &quot;certificate&quot;);</span>
+<span class="fc" id="L292">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L293" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L294">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L297">            detailCode = detailCode.trim();</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            boolean payload = characteristicPolynomial.isPresent()</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">                &amp;&amp; certificate.isPresent();</span>
+<span class="pc bpc" id="L300" title="1 of 4 branches missed.">            if ((status == Status.SOLVED) != payload</span>
+<span class="fc" id="L301">                    || characteristicPolynomial.isPresent()</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">                        != certificate.isPresent()) {</span>
+<span class="nc" id="L303">                throw new IllegalArgumentException(</span>
+                    &quot;only SOLVED results may retain complete payloads&quot;);
+            }
+<span class="fc" id="L306">        }</span>
+
+        private static Result solved(
+            CharacteristicPolynomial polynomial,
+            Certificate certificate,
+            WorkLedger work
+        ) {
+<span class="fc" id="L313">            return new Result(</span>
+                Status.SOLVED,
+<span class="fc" id="L315">                Optional.of(polynomial),</span>
+<span class="fc" id="L316">                Optional.of(certificate),</span>
+                work,
+                &quot;CHARACTERISTIC_POLYNOMIAL_COMPUTED&quot;);
+        }
+
+        private static Result withoutPolynomial(
+            Status status,
+            WorkLedger work,
+            String detailCode
+        ) {
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            if (status == Status.SOLVED) {</span>
+<span class="nc" id="L327">                throw new IllegalArgumentException(</span>
+                    &quot;solved result requires polynomial payload&quot;);
+            }
+<span class="fc" id="L330">            return new Result(</span>
+                status,
+<span class="fc" id="L332">                Optional.empty(),</span>
+<span class="fc" id="L333">                Optional.empty(),</span>
+                work,
+                detailCode);
+        }
+    }
+
+    private static final class WorkCounter {
+        private final int configured;
+        private int consumed;
+
+<span class="fc" id="L343">        private WorkCounter(int configured) {</span>
+<span class="fc" id="L344">            this.configured = configured;</span>
+<span class="fc" id="L345">        }</span>
+
+        private void consume() {
+<span class="fc bfc" id="L348" title="All 2 branches covered.">            if (consumed &gt;= configured) {</span>
+<span class="fc" id="L349">                throw new BudgetExceeded();</span>
+            }
+<span class="fc" id="L351">            consumed++;</span>
+<span class="fc" id="L352">        }</span>
+
+        private WorkLedger ledger() {
+<span class="fc" id="L355">            return WorkLedger.of(configured, consumed);</span>
+        }
+    }
+
+    private static final class BudgetExceeded extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

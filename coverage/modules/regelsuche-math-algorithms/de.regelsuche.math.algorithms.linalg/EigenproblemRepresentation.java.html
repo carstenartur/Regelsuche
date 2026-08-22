@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EigenproblemRepresentation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">EigenproblemRepresentation.java</span></div><h1>EigenproblemRepresentation.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Exact finite-dimensional representation of {@code A*v=lambda*v}.
+ *
+ * &lt;p&gt;The mathematical eigenproblem and a possible physical interpretation are
+ * retained separately. A quantum interpretation can appear only when the source
+ * request declared a quantum model domain; symbol names such as {@code H} or
+ * {@code psi} have no interpretive authority. Operator properties remain
+ * explicitly declared metadata until a separate proof or validation stage
+ * confirms them.&lt;/p&gt;
+ */
+public record EigenproblemRepresentation(
+    PolynomialMatrix operator,
+    PolynomialMatrix shiftedOperator,
+    List&lt;String&gt; vectorCoordinates,
+    String eigenvalueParameter,
+    List&lt;String&gt; scalarParameters,
+    List&lt;String&gt; requiredAssumptions,
+    ModelInterpretation modelInterpretation,
+    Set&lt;OperatorProperty&gt; declaredOperatorProperties,
+    List&lt;String&gt; unlockedCapabilities
+) {
+    public static final String CAPABILITY_EIGENPROBLEM_RECOGNIZED =
+        &quot;EIGENVALUE_PROBLEM_RECOGNIZED&quot;;
+    public static final String CAPABILITY_CHARACTERISTIC_POLYNOMIAL =
+        &quot;CHARACTERISTIC_POLYNOMIAL_AVAILABLE&quot;;
+    public static final String CAPABILITY_SINGULAR_SHIFTED_OPERATOR =
+        &quot;SINGULAR_SHIFTED_OPERATOR_CONDITION&quot;;
+    public static final String CAPABILITY_QUANTUM_OPERATOR_MODEL =
+        &quot;DECLARED_QUANTUM_OPERATOR_MODEL_INTERPRETATION&quot;;
+    public static final String CAPABILITY_HERMITIAN_SPECTRAL_MODEL =
+        &quot;DECLARED_HERMITIAN_SPECTRAL_MODEL&quot;;
+
+<span class="fc" id="L41">    public EigenproblemRepresentation {</span>
+<span class="fc" id="L42">        operator = Objects.requireNonNull(operator, &quot;operator&quot;);</span>
+<span class="fc" id="L43">        shiftedOperator = Objects.requireNonNull(</span>
+            shiftedOperator,
+            &quot;shiftedOperator&quot;);
+<span class="fc" id="L46">        vectorCoordinates = names(</span>
+            vectorCoordinates,
+            &quot;vectorCoordinates&quot;,
+            false);
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (eigenvalueParameter == null</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                || eigenvalueParameter.isBlank()) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(</span>
+                &quot;eigenvalueParameter must not be blank&quot;);
+        }
+<span class="fc" id="L55">        eigenvalueParameter = eigenvalueParameter.trim();</span>
+<span class="fc" id="L56">        scalarParameters = names(</span>
+            scalarParameters,
+            &quot;scalarParameters&quot;,
+            true);
+<span class="fc" id="L60">        requiredAssumptions = uniqueTexts(</span>
+            requiredAssumptions,
+            &quot;requiredAssumptions&quot;,
+            false);
+<span class="fc" id="L64">        modelInterpretation = Objects.requireNonNull(</span>
+            modelInterpretation,
+            &quot;modelInterpretation&quot;);
+<span class="fc" id="L67">        declaredOperatorProperties = Set.copyOf(Objects.requireNonNull(</span>
+            declaredOperatorProperties,
+            &quot;declaredOperatorProperties&quot;));
+<span class="fc" id="L70">        unlockedCapabilities = uniqueTexts(</span>
+            unlockedCapabilities,
+            &quot;unlockedCapabilities&quot;,
+            false);
+
+<span class="fc" id="L75">        int dimension = vectorCoordinates.size();</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (operator.rows() != dimension</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                || operator.columns() != dimension</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                || shiftedOperator.rows() != dimension</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                || shiftedOperator.columns() != dimension) {</span>
+<span class="nc" id="L80">            throw new IllegalArgumentException(</span>
+                &quot;operator dimensions must match vector coordinates&quot;);
+        }
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (vectorCoordinates.contains(eigenvalueParameter)) {</span>
+<span class="nc" id="L84">            throw new IllegalArgumentException(</span>
+                &quot;eigenvalue parameter cannot be a vector coordinate&quot;);
+        }
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!scalarParameters.contains(eigenvalueParameter)) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(</span>
+                &quot;eigenvalue parameter must be retained as scalar parameter&quot;);
+        }
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (!requiredAssumptions.contains(&quot;vector != 0&quot;)) {</span>
+<span class="nc" id="L92">            throw new IllegalArgumentException(</span>
+                &quot;eigenproblem requires a non-zero-vector assumption&quot;);
+        }
+<span class="fc" id="L95">        requireCapability(</span>
+            unlockedCapabilities,
+            CAPABILITY_EIGENPROBLEM_RECOGNIZED,
+            true);
+<span class="fc" id="L99">        requireCapability(</span>
+            unlockedCapabilities,
+            CAPABILITY_CHARACTERISTIC_POLYNOMIAL,
+            true);
+<span class="fc" id="L103">        requireCapability(</span>
+            unlockedCapabilities,
+            CAPABILITY_SINGULAR_SHIFTED_OPERATOR,
+            true);
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        boolean quantum = modelInterpretation != ModelInterpretation.NONE;</span>
+<span class="fc" id="L108">        requireCapability(</span>
+            unlockedCapabilities,
+            CAPABILITY_QUANTUM_OPERATOR_MODEL,
+            quantum);
+<span class="fc" id="L112">        boolean hermitian = declaredOperatorProperties.contains(</span>
+            OperatorProperty.HERMITIAN);
+<span class="fc bfc" id="L114" title="All 4 branches covered.">        requireCapability(</span>
+            unlockedCapabilities,
+            CAPABILITY_HERMITIAN_SPECTRAL_MODEL,
+            quantum &amp;&amp; hermitian);
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">        if (modelInterpretation</span>
+                == ModelInterpretation.DECLARED_HERMITIAN_QUANTUM_OBSERVABLE
+                &amp;&amp; !hermitian) {
+<span class="nc" id="L121">            throw new IllegalArgumentException(</span>
+                &quot;Hermitian interpretation requires declared Hermiticity&quot;);
+        }
+<span class="pc bpc" id="L124" title="1 of 4 branches missed.">        if (modelInterpretation</span>
+                == ModelInterpretation.DECLARED_QUANTUM_OPERATOR
+                &amp;&amp; hermitian) {
+<span class="nc" id="L127">            throw new IllegalArgumentException(</span>
+                &quot;declared Hermitian operator needs the stronger interpretation&quot;);
+        }
+<span class="fc" id="L130">    }</span>
+
+    public int dimension() {
+<span class="fc" id="L133">        return vectorCoordinates.size();</span>
+    }
+
+    private static void requireCapability(
+        List&lt;String&gt; capabilities,
+        String capability,
+        boolean required
+    ) {
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (capabilities.contains(capability) != required) {</span>
+<span class="nc" id="L142">            throw new IllegalArgumentException(</span>
+                &quot;capability disagrees with eigenproblem evidence: &quot;
+                    + capability);
+        }
+<span class="fc" id="L146">    }</span>
+
+    private static List&lt;String&gt; names(
+        List&lt;String&gt; values,
+        String field,
+        boolean allowEmpty
+    ) {
+<span class="fc" id="L153">        return uniqueTexts(values, field, allowEmpty);</span>
+    }
+
+    private static List&lt;String&gt; uniqueTexts(
+        List&lt;String&gt; values,
+        String field,
+        boolean allowEmpty
+    ) {
+<span class="fc" id="L161">        List&lt;String&gt; retained = texts(values, field, allowEmpty);</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(retained).size() != retained.size()) {</span>
+<span class="nc" id="L163">            throw new IllegalArgumentException(</span>
+                field + &quot; entries must be unique&quot;);
+        }
+<span class="fc" id="L166">        return retained;</span>
+    }
+
+    private static List&lt;String&gt; texts(
+        List&lt;String&gt; values,
+        String field,
+        boolean allowEmpty
+    ) {
+<span class="fc" id="L174">        Objects.requireNonNull(values, field);</span>
+<span class="pc bpc" id="L175" title="1 of 4 branches missed.">        if (!allowEmpty &amp;&amp; values.isEmpty()) {</span>
+<span class="nc" id="L176">            throw new IllegalArgumentException(field + &quot; must not be empty&quot;);</span>
+        }
+<span class="fc" id="L178">        return values.stream().map(value -&gt; {</span>
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L180">                throw new IllegalArgumentException(</span>
+                    field + &quot; entries must not be blank&quot;);
+            }
+<span class="fc" id="L183">            return value.trim();</span>
+<span class="fc" id="L184">        }).toList();</span>
+    }
+
+<span class="fc" id="L187">    public enum ModelDomain {</span>
+<span class="fc" id="L188">        GENERIC_LINEAR_ALGEBRA,</span>
+<span class="fc" id="L189">        FINITE_DIMENSIONAL_QUANTUM</span>
+    }
+
+<span class="fc" id="L192">    public enum ModelInterpretation {</span>
+<span class="fc" id="L193">        NONE,</span>
+<span class="fc" id="L194">        DECLARED_QUANTUM_OPERATOR,</span>
+<span class="fc" id="L195">        DECLARED_HERMITIAN_QUANTUM_OBSERVABLE</span>
+    }
+
+<span class="fc" id="L198">    public enum OperatorProperty {</span>
+<span class="fc" id="L199">        HERMITIAN,</span>
+<span class="fc" id="L200">        UNITARY,</span>
+<span class="fc" id="L201">        NORMAL</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

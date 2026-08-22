@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymbolicLinearSystem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">SymbolicLinearSystem.java</span></div><h1>SymbolicLinearSystem.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * A system that is linear in an explicitly declared vector of unknowns while
+ * permitting exact polynomial expressions in the remaining scalar parameters.
+ *
+ * &lt;p&gt;This is deliberately different from {@link ExactLinearSystem}: the latter
+ * has rational coefficients and can compute exact ranks immediately, while this
+ * value retains symbolic scalar coefficients such as {@code a-lambda}. The
+ * explicit unknown order prevents variables from being guessed by name.&lt;/p&gt;
+ */
+public record SymbolicLinearSystem(
+    PolynomialMatrix coefficients,
+    List&lt;String&gt; unknowns,
+    PolynomialVector rightHandSide,
+    List&lt;String&gt; scalarParameters,
+    List&lt;RowOrigin&gt; rowOrigins
+) {
+<span class="fc" id="L28">    public SymbolicLinearSystem {</span>
+<span class="fc" id="L29">        coefficients = Objects.requireNonNull(coefficients, &quot;coefficients&quot;);</span>
+<span class="fc" id="L30">        rightHandSide = Objects.requireNonNull(</span>
+            rightHandSide,
+            &quot;rightHandSide&quot;);
+<span class="fc" id="L33">        unknowns = orderedDistinctNames(unknowns, &quot;unknowns&quot;, false);</span>
+<span class="fc" id="L34">        scalarParameters = sortedDistinctNames(</span>
+            scalarParameters,
+            &quot;scalarParameters&quot;,
+            true);
+<span class="fc" id="L38">        rowOrigins = List.copyOf(Objects.requireNonNull(</span>
+            rowOrigins,
+            &quot;rowOrigins&quot;));
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (coefficients.columns() != unknowns.size()) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(</span>
+                &quot;coefficient columns and declared unknowns disagree&quot;);
+        }
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (coefficients.rows() != rightHandSide.dimension()</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">                || coefficients.rows() != rowOrigins.size()) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(</span>
+                &quot;coefficient rows, RHS and row origins disagree&quot;);
+        }
+<span class="fc" id="L50">        Set&lt;String&gt; overlap = new HashSet&lt;&gt;(unknowns);</span>
+<span class="fc" id="L51">        overlap.retainAll(scalarParameters);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (!overlap.isEmpty()) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(</span>
+                &quot;unknowns and scalar parameters must be disjoint: &quot;
+                    + overlap);
+        }
+<span class="fc" id="L57">        Set&lt;String&gt; actualParameters = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L58">        coefficients.entries().forEach(row -&gt; row.forEach(polynomial -&gt;</span>
+<span class="fc" id="L59">            actualParameters.addAll(polynomial.variables())));</span>
+<span class="fc" id="L60">        rightHandSide.values().forEach(polynomial -&gt;</span>
+<span class="fc" id="L61">            actualParameters.addAll(polynomial.variables()));</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (!actualParameters.equals(new TreeSet&lt;&gt;(scalarParameters))) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(</span>
+                &quot;scalar parameter list does not match symbolic coefficients: &quot;
+                    + actualParameters);
+        }
+<span class="fc" id="L67">    }</span>
+
+    public int equationCount() {
+<span class="fc" id="L70">        return coefficients.rows();</span>
+    }
+
+    public int unknownCount() {
+<span class="fc" id="L74">        return coefficients.columns();</span>
+    }
+
+    public boolean homogeneous() {
+<span class="fc" id="L78">        return rightHandSide.values().stream().allMatch(Polynomial::isZero);</span>
+    }
+
+    private static List&lt;String&gt; orderedDistinctNames(
+        List&lt;String&gt; names,
+        String field,
+        boolean allowEmpty
+    ) {
+<span class="fc" id="L86">        Objects.requireNonNull(names, field);</span>
+<span class="pc bpc" id="L87" title="1 of 4 branches missed.">        if (!allowEmpty &amp;&amp; names.isEmpty()) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(field + &quot; must not be empty&quot;);</span>
+        }
+<span class="fc" id="L90">        Set&lt;String&gt; unique = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (String name : names) {</span>
+<span class="pc bpc" id="L92" title="2 of 4 branches missed.">            if (name == null || name.isBlank()) {</span>
+<span class="nc" id="L93">                throw new IllegalArgumentException(</span>
+                    field + &quot; entries must not be blank&quot;);
+            }
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (!unique.add(name.trim())) {</span>
+<span class="nc" id="L97">                throw new IllegalArgumentException(</span>
+                    field + &quot; entries must be unique&quot;);
+            }
+<span class="fc" id="L100">        }</span>
+<span class="fc" id="L101">        return List.copyOf(unique);</span>
+    }
+
+    private static List&lt;String&gt; sortedDistinctNames(
+        List&lt;String&gt; names,
+        String field,
+        boolean allowEmpty
+    ) {
+<span class="fc" id="L109">        List&lt;String&gt; retained = orderedDistinctNames(</span>
+            names,
+            field,
+            allowEmpty);
+<span class="fc" id="L113">        return retained.stream().sorted().toList();</span>
+    }
+
+    public record PolynomialMatrix(List&lt;List&lt;Polynomial&gt;&gt; entries) {
+<span class="fc" id="L117">        public PolynomialMatrix {</span>
+<span class="fc" id="L118">            Objects.requireNonNull(entries, &quot;entries&quot;);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            if (entries.isEmpty()) {</span>
+<span class="nc" id="L120">                throw new IllegalArgumentException(</span>
+                    &quot;matrix must contain at least one row&quot;);
+            }
+<span class="fc" id="L123">            List&lt;List&lt;Polynomial&gt;&gt; retained = new ArrayList&lt;&gt;(entries.size());</span>
+<span class="fc" id="L124">            int columns = -1;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            for (List&lt;Polynomial&gt; row : entries) {</span>
+<span class="fc" id="L126">                Objects.requireNonNull(row, &quot;matrix row&quot;);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                if (columns &lt; 0) {</span>
+<span class="fc" id="L128">                    columns = row.size();</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                    if (columns == 0) {</span>
+<span class="nc" id="L130">                        throw new IllegalArgumentException(</span>
+                            &quot;matrix must contain at least one column&quot;);
+                    }
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                } else if (row.size() != columns) {</span>
+<span class="nc" id="L134">                    throw new IllegalArgumentException(</span>
+                        &quot;matrix rows must have equal length&quot;);
+                }
+<span class="fc" id="L137">                retained.add(row.stream()</span>
+<span class="fc" id="L138">                    .map(value -&gt; Objects.requireNonNull(</span>
+                        value,
+                        &quot;matrix entry&quot;))
+<span class="fc" id="L141">                    .toList());</span>
+<span class="fc" id="L142">            }</span>
+<span class="fc" id="L143">            entries = List.copyOf(retained);</span>
+<span class="fc" id="L144">        }</span>
+
+        public int rows() {
+<span class="fc" id="L147">            return entries.size();</span>
+        }
+
+        public int columns() {
+<span class="fc" id="L151">            return entries.getFirst().size();</span>
+        }
+
+        public Polynomial get(int row, int column) {
+<span class="fc" id="L155">            return entries.get(row).get(column);</span>
+        }
+    }
+
+    public record PolynomialVector(List&lt;Polynomial&gt; values) {
+<span class="fc" id="L160">        public PolynomialVector {</span>
+<span class="fc" id="L161">            Objects.requireNonNull(values, &quot;values&quot;);</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (values.isEmpty()) {</span>
+<span class="nc" id="L163">                throw new IllegalArgumentException(</span>
+                    &quot;vector must contain at least one entry&quot;);
+            }
+<span class="fc" id="L166">            values = values.stream()</span>
+<span class="fc" id="L167">                .map(value -&gt; Objects.requireNonNull(value, &quot;vector entry&quot;))</span>
+<span class="fc" id="L168">                .toList();</span>
+<span class="fc" id="L169">        }</span>
+
+        public int dimension() {
+<span class="fc" id="L172">            return values.size();</span>
+        }
+
+        public Polynomial get(int index) {
+<span class="fc" id="L176">            return values.get(index);</span>
+        }
+    }
+
+    public record RowOrigin(int sourceIndex, String sourceEquation) {
+<span class="fc" id="L181">        public RowOrigin {</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">            if (sourceIndex &lt; 0) {</span>
+<span class="nc" id="L183">                throw new IllegalArgumentException(</span>
+                    &quot;sourceIndex must not be negative&quot;);
+            }
+<span class="pc bpc" id="L186" title="2 of 4 branches missed.">            if (sourceEquation == null || sourceEquation.isBlank()) {</span>
+<span class="nc" id="L187">                throw new IllegalArgumentException(</span>
+                    &quot;sourceEquation must not be blank&quot;);
+            }
+<span class="fc" id="L190">            sourceEquation = sourceEquation.trim();</span>
+<span class="fc" id="L191">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,553 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymbolicLinearSystemRepresentationBridge.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">SymbolicLinearSystemRepresentationBridge.java</span></div><h1>SymbolicLinearSystemRepresentationBridge.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.math.algorithms.equivalence.Monomial;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialVector;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.RowOrigin;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.representation.RepresentationBridge;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Exact polynomial bridge for systems linear in explicitly declared unknowns.
+ *
+ * &lt;p&gt;Symbols not declared as unknown coordinates remain scalar parameters. For
+ * example, declaring {@code [x,y]} makes {@code a*x+b*y=lambda*x} linear with
+ * coefficient {@code a-lambda} for {@code x}; no variable role is inferred from
+ * spelling. This provides the typed boundary required before eigenproblem or
+ * quantum-compatible structure recognition.&lt;/p&gt;
+ */
+<span class="fc" id="L40">public final class SymbolicLinearSystemRepresentationBridge implements</span>
+        RepresentationBridge&lt;
+            SymbolicLinearSystemRepresentationBridge.Source,
+            SymbolicLinearSystem,
+            SymbolicLinearSystemRepresentationBridge.Certificate&gt; {
+
+    public static final String BRIDGE_ID =
+        &quot;declared-unknown-symbolic-linear-system/v1&quot;;
+    public static final String CERTIFICATE_SCHEMA =
+        &quot;regelsuche.symbolic-linear-system-certificate/v1&quot;;
+<span class="fc" id="L50">    private static final Relation RELATION =</span>
+        Relation.SOLUTION_SET_EQUIVALENCE;
+    private static final int MAX_EXPONENT = 20;
+
+    @Override
+    public Result&lt;SymbolicLinearSystem, Certificate&gt; analyze(
+        Source source,
+        Budget budget
+    ) {
+<span class="fc" id="L59">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L60">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L61">        WorkCounter work = new WorkCounter(budget.maxWorkUnits());</span>
+        try {
+<span class="fc" id="L63">            Set&lt;String&gt; unknownSet = Set.copyOf(source.unknowns());</span>
+<span class="fc" id="L64">            List&lt;Polynomial&gt; normalizedRows = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L65">                source.equations().size());</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            for (Equation equation : source.equations()) {</span>
+<span class="fc" id="L67">                Polynomial left = polynomial(equation.left(), work);</span>
+<span class="fc" id="L68">                Polynomial right = polynomial(equation.right(), work);</span>
+<span class="fc" id="L69">                normalizedRows.add(left.subtract(right));</span>
+<span class="fc" id="L70">            }</span>
+
+<span class="fc" id="L72">            List&lt;List&lt;Polynomial&gt;&gt; coefficientRows = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L73">                normalizedRows.size());</span>
+<span class="fc" id="L74">            List&lt;Polynomial&gt; rightHandSide = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L75">                normalizedRows.size());</span>
+<span class="fc" id="L76">            List&lt;RowOrigin&gt; rowOrigins = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L77">                normalizedRows.size());</span>
+<span class="fc" id="L78">            Set&lt;String&gt; scalarParameters = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L79">            for (int rowIndex = 0;</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                    rowIndex &lt; normalizedRows.size();</span>
+<span class="fc" id="L81">                    rowIndex++) {</span>
+<span class="fc" id="L82">                LinearRow row = splitLinear(</span>
+<span class="fc" id="L83">                    normalizedRows.get(rowIndex),</span>
+<span class="fc" id="L84">                    source.unknowns(),</span>
+                    unknownSet,
+                    work);
+<span class="fc" id="L87">                coefficientRows.add(row.coefficients());</span>
+<span class="fc" id="L88">                rightHandSide.add(row.rightHandSide());</span>
+<span class="fc" id="L89">                row.coefficients().forEach(coefficient -&gt;</span>
+<span class="fc" id="L90">                    scalarParameters.addAll(coefficient.variables()));</span>
+<span class="fc" id="L91">                scalarParameters.addAll(row.rightHandSide().variables());</span>
+<span class="fc" id="L92">                rowOrigins.add(new RowOrigin(</span>
+                    rowIndex,
+<span class="fc" id="L94">                    ExpressionFormatter.format(</span>
+<span class="fc" id="L95">                        source.equations().get(rowIndex))));</span>
+            }
+
+<span class="fc" id="L98">            SymbolicLinearSystem represented = new SymbolicLinearSystem(</span>
+                new PolynomialMatrix(coefficientRows),
+<span class="fc" id="L100">                source.unknowns(),</span>
+                new PolynomialVector(rightHandSide),
+<span class="fc" id="L102">                List.copyOf(scalarParameters),</span>
+                rowOrigins);
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            if (!roundTripMatches(normalizedRows, represented, work)) {</span>
+<span class="nc" id="L105">                return Result.withoutRepresentation(</span>
+                    Status.INVALID_CERTIFICATE,
+<span class="nc" id="L107">                    work.ledger(),</span>
+                    &quot;SYMBOLIC_LINEAR_ROUND_TRIP_MISMATCH&quot;);
+            }
+<span class="fc" id="L110">            Certificate certificate = certificate(source, represented);</span>
+<span class="fc" id="L111">            return Result.represented(</span>
+                represented,
+                certificate,
+                RELATION,
+<span class="fc" id="L115">                work.ledger(),</span>
+                &quot;DECLARED_UNKNOWNS_REPRESENTED_SYMBOLICALLY&quot;);
+<span class="fc" id="L117">        } catch (BudgetExceeded exception) {</span>
+<span class="fc" id="L118">            return Result.withoutRepresentation(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L120">                work.ledger(),</span>
+                &quot;SYMBOLIC_LINEAR_WORK_BUDGET_EXHAUSTED&quot;);
+<span class="fc" id="L122">        } catch (NonlinearExpression exception) {</span>
+<span class="fc" id="L123">            return Result.withoutRepresentation(</span>
+                Status.NONLINEAR,
+<span class="fc" id="L125">                work.ledger(),</span>
+<span class="fc" id="L126">                exception.detailCode());</span>
+<span class="fc" id="L127">        } catch (UnsupportedExpression exception) {</span>
+<span class="fc" id="L128">            return Result.withoutRepresentation(</span>
+                Status.DOMAIN_UNSUPPORTED,
+<span class="fc" id="L130">                work.ledger(),</span>
+<span class="fc" id="L131">                exception.detailCode());</span>
+        }
+    }
+
+    @Override
+    public boolean verify(
+        Source source,
+        Result&lt;SymbolicLinearSystem, Certificate&gt; result
+    ) {
+<span class="pc bpc" id="L140" title="2 of 4 branches missed.">        if (source == null</span>
+                || result == null
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                || result.status() != Status.REPRESENTED</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                || result.relation().orElse(null) != RELATION) {</span>
+<span class="nc" id="L144">            return false;</span>
+        }
+        try {
+<span class="fc" id="L147">            return analyze(</span>
+                source,
+<span class="fc" id="L149">                new Budget(result.work().configuredWorkUnits()))</span>
+<span class="fc" id="L150">                .equals(result);</span>
+<span class="nc" id="L151">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L152">            return false;</span>
+        }
+    }
+
+    private static Polynomial polynomial(
+        Expr expression,
+        WorkCounter work
+    ) {
+<span class="fc" id="L160">        work.consume();</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (!Double.isFinite(number.value())) {</span>
+<span class="nc" id="L163">                throw new UnsupportedExpression(&quot;NON_FINITE_NUMBER&quot;);</span>
+            }
+<span class="fc" id="L165">            return Polynomial.constant(Rational.fromDouble(number.value()));</span>
+        }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L168">            return Polynomial.variable(variable.name());</span>
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (expression instanceof FunctionExpr) {</span>
+<span class="fc" id="L171">            throw new UnsupportedExpression(</span>
+                &quot;FUNCTION_OUTSIDE_SYMBOLIC_POLYNOMIAL_FRAGMENT&quot;);
+        }
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="nc" id="L175">            throw new UnsupportedExpression(&quot;UNKNOWN_EXPRESSION_NODE&quot;);</span>
+        }
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc" id="L178">            Polynomial base = polynomial(binary.left(), work);</span>
+<span class="fc" id="L179">            return base.pow(integerExponent(binary.right(), work));</span>
+        }
+<span class="fc" id="L181">        Polynomial left = polynomial(binary.left(), work);</span>
+<span class="fc" id="L182">        Polynomial right = polynomial(binary.right(), work);</span>
+<span class="pc bpc" id="L183" title="3 of 5 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L184">            case ADD -&gt; left.add(right);</span>
+<span class="nc" id="L185">            case SUB -&gt; left.subtract(right);</span>
+<span class="fc" id="L186">            case MUL -&gt; left.multiply(right);</span>
+<span class="nc" id="L187">            case DIV -&gt; divideByConstant(left, right);</span>
+<span class="nc" id="L188">            case POW -&gt; throw new IllegalStateException(</span>
+                &quot;power handled before binary recursion&quot;);
+        };
+    }
+
+    private static Polynomial divideByConstant(
+        Polynomial numerator,
+        Polynomial denominator
+    ) {
+<span class="fc" id="L197">        Optional&lt;Rational&gt; constant = constantValue(denominator);</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (constant.isEmpty()) {</span>
+<span class="fc" id="L199">            throw new UnsupportedExpression(</span>
+                &quot;SYMBOLIC_OR_NON_CONSTANT_DENOMINATOR&quot;);
+        }
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (constant.orElseThrow().isZero()) {</span>
+<span class="nc" id="L203">            throw new UnsupportedExpression(&quot;EXPLICIT_DIVISION_BY_ZERO&quot;);</span>
+        }
+<span class="nc" id="L205">        return numerator.multiply(</span>
+<span class="nc" id="L206">            Rational.ONE.divide(constant.orElseThrow()));</span>
+    }
+
+    private static Optional&lt;Rational&gt; constantValue(Polynomial polynomial) {
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (polynomial.isZero()) {</span>
+<span class="nc" id="L211">            return Optional.of(Rational.ZERO);</span>
+        }
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (polynomial.terms().size() != 1) {</span>
+<span class="nc" id="L214">            return Optional.empty();</span>
+        }
+<span class="fc" id="L216">        Map.Entry&lt;Monomial, Rational&gt; entry = polynomial.terms()</span>
+<span class="fc" id="L217">            .entrySet()</span>
+<span class="fc" id="L218">            .iterator()</span>
+<span class="fc" id="L219">            .next();</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        return entry.getKey().powers().isEmpty()</span>
+<span class="nc" id="L221">            ? Optional.of(entry.getValue())</span>
+<span class="fc" id="L222">            : Optional.empty();</span>
+    }
+
+    private static int integerExponent(Expr expression, WorkCounter work) {
+<span class="fc" id="L226">        work.consume();</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (!(expression instanceof NumberExpr number)</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                || !Double.isFinite(number.value())) {</span>
+<span class="nc" id="L229">            throw new UnsupportedExpression(</span>
+                &quot;NON_LITERAL_SYMBOLIC_POLYNOMIAL_EXPONENT&quot;);
+        }
+<span class="fc" id="L232">        double value = number.value();</span>
+<span class="fc" id="L233">        int exponent = (int) value;</span>
+<span class="pc bpc" id="L234" title="3 of 6 branches missed.">        if (Math.abs(value - exponent) &gt; 1e-9</span>
+                || exponent &lt; 0
+                || exponent &gt; MAX_EXPONENT) {
+<span class="nc" id="L237">            throw new UnsupportedExpression(</span>
+                &quot;EXPONENT_OUTSIDE_SYMBOLIC_POLYNOMIAL_FRAGMENT&quot;);
+        }
+<span class="fc" id="L240">        return exponent;</span>
+    }
+
+    private static LinearRow splitLinear(
+        Polynomial polynomial,
+        List&lt;String&gt; unknowns,
+        Set&lt;String&gt; unknownSet,
+        WorkCounter work
+    ) {
+<span class="fc" id="L249">        Map&lt;String, Polynomial&gt; coefficients = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L250">        unknowns.forEach(unknown -&gt;</span>
+<span class="fc" id="L251">            coefficients.put(unknown, Polynomial.zero()));</span>
+<span class="fc" id="L252">        Polynomial constant = Polynomial.zero();</span>
+        for (Map.Entry&lt;Monomial, Rational&gt; term
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                : polynomial.terms().entrySet()) {</span>
+<span class="fc" id="L255">            work.consume();</span>
+<span class="fc" id="L256">            Monomial monomial = term.getKey();</span>
+<span class="fc" id="L257">            int unknownDegree = 0;</span>
+<span class="fc" id="L258">            String selectedUnknown = null;</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            for (String unknown : unknownSet) {</span>
+<span class="fc" id="L260">                work.consume();</span>
+<span class="fc" id="L261">                int exponent = monomial.exponentOf(unknown);</span>
+<span class="fc" id="L262">                unknownDegree = Math.addExact(unknownDegree, exponent);</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">                if (exponent &gt; 0) {</span>
+<span class="fc" id="L264">                    selectedUnknown = unknown;</span>
+                }
+<span class="fc" id="L266">            }</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            if (unknownDegree == 0) {</span>
+<span class="fc" id="L268">                constant = constant.add(Polynomial.term(</span>
+                    monomial,
+<span class="fc" id="L270">                    term.getValue()));</span>
+<span class="fc" id="L271">                continue;</span>
+            }
+<span class="pc bpc" id="L273" title="1 of 4 branches missed.">            if (unknownDegree != 1 || selectedUnknown == null) {</span>
+<span class="fc" id="L274">                throw new NonlinearExpression(</span>
+                    &quot;NONLINEAR_IN_DECLARED_UNKNOWNS&quot;);
+            }
+<span class="fc" id="L277">            Monomial parameterMonomial = monomial.without(selectedUnknown);</span>
+<span class="fc" id="L278">            Polynomial coefficientTerm = Polynomial.term(</span>
+                parameterMonomial,
+<span class="fc" id="L280">                term.getValue());</span>
+<span class="fc" id="L281">            coefficients.put(</span>
+                selectedUnknown,
+<span class="fc" id="L283">                coefficients.get(selectedUnknown).add(coefficientTerm));</span>
+<span class="fc" id="L284">        }</span>
+<span class="fc" id="L285">        List&lt;Polynomial&gt; orderedCoefficients = unknowns.stream()</span>
+<span class="fc" id="L286">            .map(coefficients::get)</span>
+<span class="fc" id="L287">            .toList();</span>
+<span class="fc" id="L288">        return new LinearRow(</span>
+            orderedCoefficients,
+<span class="fc" id="L290">            constant.multiply(Rational.NEGATIVE_ONE));</span>
+    }
+
+    private static boolean roundTripMatches(
+        List&lt;Polynomial&gt; normalizedRows,
+        SymbolicLinearSystem represented,
+        WorkCounter work
+    ) {
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        for (int row = 0; row &lt; represented.equationCount(); row++) {</span>
+<span class="fc" id="L299">            Polynomial reconstructed = Polynomial.zero();</span>
+<span class="fc" id="L300">            for (int column = 0;</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                    column &lt; represented.unknownCount();</span>
+<span class="fc" id="L302">                    column++) {</span>
+<span class="fc" id="L303">                work.consume();</span>
+<span class="fc" id="L304">                reconstructed = reconstructed.add(</span>
+<span class="fc" id="L305">                    represented.coefficients().get(row, column)</span>
+<span class="fc" id="L306">                        .multiply(Polynomial.variable(</span>
+<span class="fc" id="L307">                            represented.unknowns().get(column))));</span>
+            }
+<span class="fc" id="L309">            reconstructed = reconstructed.subtract(</span>
+<span class="fc" id="L310">                represented.rightHandSide().get(row));</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">            if (!reconstructed.equals(normalizedRows.get(row))) {</span>
+<span class="nc" id="L312">                return false;</span>
+            }
+        }
+<span class="fc" id="L315">        return true;</span>
+    }
+
+    private static Certificate certificate(
+        Source source,
+        SymbolicLinearSystem represented
+    ) {
+<span class="fc" id="L322">        List&lt;String&gt; sourceEquations = source.equations().stream()</span>
+<span class="fc" id="L323">            .map(ExpressionFormatter::format)</span>
+<span class="fc" id="L324">            .toList();</span>
+<span class="fc" id="L325">        List&lt;List&lt;String&gt;&gt; coefficientRows = represented.coefficients()</span>
+<span class="fc" id="L326">            .entries()</span>
+<span class="fc" id="L327">            .stream()</span>
+<span class="fc" id="L328">            .map(row -&gt; row.stream()</span>
+<span class="fc" id="L329">                .map(Polynomial::toCanonicalString)</span>
+<span class="fc" id="L330">                .toList())</span>
+<span class="fc" id="L331">            .toList();</span>
+<span class="fc" id="L332">        List&lt;String&gt; rightHandSide = represented.rightHandSide()</span>
+<span class="fc" id="L333">            .values()</span>
+<span class="fc" id="L334">            .stream()</span>
+<span class="fc" id="L335">            .map(Polynomial::toCanonicalString)</span>
+<span class="fc" id="L336">            .toList();</span>
+<span class="fc" id="L337">        StringBuilder payload = new StringBuilder();</span>
+<span class="fc" id="L338">        append(payload, CERTIFICATE_SCHEMA);</span>
+<span class="fc" id="L339">        append(payload, BRIDGE_ID);</span>
+<span class="fc" id="L340">        append(payload, RELATION.name());</span>
+<span class="fc" id="L341">        append(payload, Integer.toString(sourceEquations.size()));</span>
+<span class="fc" id="L342">        sourceEquations.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L343">        append(payload, Integer.toString(represented.unknowns().size()));</span>
+<span class="fc" id="L344">        represented.unknowns().forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L345">        append(payload, Integer.toString(</span>
+<span class="fc" id="L346">            represented.scalarParameters().size()));</span>
+<span class="fc" id="L347">        represented.scalarParameters().forEach(value -&gt; append(payload, value));</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        for (List&lt;String&gt; row : coefficientRows) {</span>
+<span class="fc" id="L349">            append(payload, Integer.toString(row.size()));</span>
+<span class="fc" id="L350">            row.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L351">        }</span>
+<span class="fc" id="L352">        rightHandSide.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L353">        return new Certificate(</span>
+            CERTIFICATE_SCHEMA,
+            BRIDGE_ID,
+            RELATION,
+            sourceEquations,
+<span class="fc" id="L358">            represented.unknowns(),</span>
+<span class="fc" id="L359">            represented.scalarParameters(),</span>
+            coefficientRows,
+            rightHandSide,
+<span class="fc" id="L362">            sha256(payload.toString()));</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L366">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L367">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L371">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L372">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="fc" id="L373">                    value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L374">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L375">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    public record Source(
+        List&lt;Equation&gt; equations,
+        List&lt;String&gt; unknowns
+    ) {
+<span class="fc" id="L383">        public Source {</span>
+<span class="fc" id="L384">            equations = List.copyOf(Objects.requireNonNull(</span>
+                equations,
+                &quot;equations&quot;));
+<span class="fc" id="L387">            unknowns = validatedUnknowns(unknowns);</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">            if (equations.isEmpty()) {</span>
+<span class="fc" id="L389">                throw new IllegalArgumentException(</span>
+                    &quot;symbolic system requires at least one equation&quot;);
+            }
+<span class="fc" id="L392">        }</span>
+
+        private static List&lt;String&gt; validatedUnknowns(List&lt;String&gt; values) {
+<span class="fc" id="L395">            Objects.requireNonNull(values, &quot;unknowns&quot;);</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            if (values.isEmpty()) {</span>
+<span class="fc" id="L397">                throw new IllegalArgumentException(</span>
+                    &quot;at least one unknown must be declared&quot;);
+            }
+<span class="fc" id="L400">            Set&lt;String&gt; unique = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">            for (String value : values) {</span>
+<span class="pc bpc" id="L402" title="2 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L403">                    throw new IllegalArgumentException(</span>
+                        &quot;unknown names must not be blank&quot;);
+                }
+<span class="fc bfc" id="L406" title="All 2 branches covered.">                if (!unique.add(value.trim())) {</span>
+<span class="fc" id="L407">                    throw new IllegalArgumentException(</span>
+                        &quot;unknown names must be unique&quot;);
+                }
+<span class="fc" id="L410">            }</span>
+<span class="fc" id="L411">            return List.copyOf(unique);</span>
+        }
+    }
+
+    public record Certificate(
+        String schema,
+        String bridgeId,
+        Relation relation,
+        List&lt;String&gt; sourceEquations,
+        List&lt;String&gt; unknownOrder,
+        List&lt;String&gt; scalarParameters,
+        List&lt;List&lt;String&gt;&gt; coefficientRows,
+        List&lt;String&gt; rightHandSide,
+        String contentHash
+    ) {
+<span class="fc" id="L426">        public Certificate {</span>
+<span class="fc bfc" id="L427" title="All 2 branches covered.">            if (!CERTIFICATE_SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L428" title="1 of 4 branches missed.">                    || !BRIDGE_ID.equals(bridgeId)</span>
+                    || contentHash == null
+<span class="fc bfc" id="L430" title="All 2 branches covered.">                    || !contentHash.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
+<span class="fc" id="L431">                throw new IllegalArgumentException(</span>
+                    &quot;certificate identities are invalid&quot;);
+            }
+<span class="fc" id="L434">            relation = Objects.requireNonNull(relation, &quot;relation&quot;);</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">            if (relation != RELATION) {</span>
+<span class="fc" id="L436">                throw new IllegalArgumentException(</span>
+                    &quot;certificate relation is invalid&quot;);
+            }
+<span class="fc" id="L439">            sourceEquations = textList(sourceEquations, &quot;sourceEquations&quot;);</span>
+<span class="fc" id="L440">            unknownOrder = textList(unknownOrder, &quot;unknownOrder&quot;);</span>
+<span class="fc" id="L441">            int unknownCount = unknownOrder.size();</span>
+<span class="fc" id="L442">            scalarParameters = textListAllowEmpty(</span>
+                scalarParameters,
+                &quot;scalarParameters&quot;);
+<span class="fc" id="L445">            coefficientRows = matrixText(coefficientRows);</span>
+<span class="fc" id="L446">            rightHandSide = textList(rightHandSide, &quot;rightHandSide&quot;);</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">            if (sourceEquations.size() != coefficientRows.size()</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">                    || sourceEquations.size() != rightHandSide.size()</span>
+<span class="fc" id="L449">                    || coefficientRows.stream()</span>
+<span class="pc bpc" id="L450" title="2 of 4 branches missed.">                        .anyMatch(row -&gt; row.size() != unknownCount)) {</span>
+<span class="nc" id="L451">                throw new IllegalArgumentException(</span>
+                    &quot;certificate dimensions are inconsistent&quot;);
+            }
+<span class="fc" id="L454">        }</span>
+
+        private static List&lt;String&gt; textList(
+            List&lt;String&gt; values,
+            String field
+        ) {
+<span class="fc" id="L460">            List&lt;String&gt; retained = textListAllowEmpty(values, field);</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">            if (retained.isEmpty()) {</span>
+<span class="nc" id="L462">                throw new IllegalArgumentException(field + &quot; must not be empty&quot;);</span>
+            }
+<span class="fc" id="L464">            return retained;</span>
+        }
+
+        private static List&lt;String&gt; textListAllowEmpty(
+            List&lt;String&gt; values,
+            String field
+        ) {
+<span class="fc" id="L471">            Objects.requireNonNull(values, field);</span>
+<span class="fc" id="L472">            return values.stream().map(value -&gt; {</span>
+<span class="pc bpc" id="L473" title="2 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L474">                    throw new IllegalArgumentException(</span>
+                        field + &quot; entries must not be blank&quot;);
+                }
+<span class="fc" id="L477">                return value;</span>
+<span class="fc" id="L478">            }).toList();</span>
+        }
+
+        private static List&lt;List&lt;String&gt;&gt; matrixText(
+            List&lt;List&lt;String&gt;&gt; rows
+        ) {
+<span class="fc" id="L484">            Objects.requireNonNull(rows, &quot;coefficientRows&quot;);</span>
+<span class="fc" id="L485">            return rows.stream()</span>
+<span class="fc" id="L486">                .map(row -&gt; textList(row, &quot;coefficient row&quot;))</span>
+<span class="fc" id="L487">                .toList();</span>
+        }
+    }
+
+    private record LinearRow(
+        List&lt;Polynomial&gt; coefficients,
+        Polynomial rightHandSide
+    ) {
+<span class="fc" id="L495">        private LinearRow {</span>
+<span class="fc" id="L496">            coefficients = List.copyOf(coefficients);</span>
+<span class="fc" id="L497">            rightHandSide = Objects.requireNonNull(</span>
+                rightHandSide,
+                &quot;rightHandSide&quot;);
+<span class="fc" id="L500">        }</span>
+    }
+
+    private static final class WorkCounter {
+        private final int configured;
+        private int consumed;
+
+<span class="fc" id="L507">        private WorkCounter(int configured) {</span>
+<span class="fc" id="L508">            this.configured = configured;</span>
+<span class="fc" id="L509">        }</span>
+
+        private void consume() {
+<span class="fc bfc" id="L512" title="All 2 branches covered.">            if (consumed &gt;= configured) {</span>
+<span class="fc" id="L513">                throw new BudgetExceeded();</span>
+            }
+<span class="fc" id="L515">            consumed++;</span>
+<span class="fc" id="L516">        }</span>
+
+        private WorkLedger ledger() {
+<span class="fc" id="L519">            return WorkLedger.of(configured, consumed);</span>
+        }
+    }
+
+    private static final class BudgetExceeded extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+    private static final class NonlinearExpression extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final String detailCode;
+
+<span class="fc" id="L531">        private NonlinearExpression(String detailCode) {</span>
+<span class="fc" id="L532">            this.detailCode = detailCode;</span>
+<span class="fc" id="L533">        }</span>
+
+        private String detailCode() {
+<span class="fc" id="L536">            return detailCode;</span>
+        }
+    }
+
+    private static final class UnsupportedExpression extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final String detailCode;
+
+<span class="fc" id="L544">        private UnsupportedExpression(String detailCode) {</span>
+<span class="fc" id="L545">            this.detailCode = detailCode;</span>
+<span class="fc" id="L546">        }</span>
+
+        private String detailCode() {
+<span class="fc" id="L549">            return detailCode;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

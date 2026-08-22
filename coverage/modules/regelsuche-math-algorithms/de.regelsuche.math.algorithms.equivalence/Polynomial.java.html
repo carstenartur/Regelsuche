@@ -187,8 +187,8 @@ public final class Polynomial {
     }
 
     public Polynomial multiply(Rational scalar) {
-<span class="pc bpc" id="L190" title="2 of 4 branches missed.">        if (scalar.isZero() || isZero()) {</span>
-<span class="nc" id="L191">            return ZERO;</span>
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">        if (scalar.isZero() || isZero()) {</span>
+<span class="fc" id="L191">            return ZERO;</span>
         }
 <span class="fc bfc" id="L193" title="All 2 branches covered.">        if (scalar.isOne()) {</span>
 <span class="fc" id="L194">            return this;</span>
