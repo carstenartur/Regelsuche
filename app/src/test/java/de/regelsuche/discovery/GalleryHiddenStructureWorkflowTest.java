@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.example.SeedExpression;
 import de.regelsuche.persistence.PersistenceConfig;
+import de.regelsuche.transform.PolynomialDecompositionSynthesisOperator;
 import de.regelsuche.validation.DiscoveryEvidenceKind;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,12 +41,16 @@ class GalleryHiddenStructureWorkflowTest {
             var row = run.report().rows().getFirst();
             assertTrue(markdown.contains("Generated Discovery Gallery"));
             assertTrue(markdown.contains("Sophie-Germain discovery replay"));
-            assertTrue(markdown.contains("hypothesis_difference_of_squares_preparation"));
-            assertTrue(markdown.contains("ast_square_difference_factor"));
+            assertTrue(markdown.contains(
+                PolynomialDecompositionSynthesisOperator.RULE_ID));
+            assertTrue(markdown.contains(
+                "exact semantic polynomial coefficient synthesis"));
             assertTrue(row.evidence().contains(DiscoveryEvidenceKind.FACTORED));
             assertTrue(row.evidence().contains(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED));
-            assertTrue(row.rulePath().contains("hypothesis_difference_of_squares_preparation"));
-            assertTrue(row.rulePath().contains("ast_square_difference_factor"));
+            assertTrue(row.rulePath().contains(
+                PolynomialDecompositionSynthesisOperator.RULE_ID));
+            assertFalse(row.rulePath().contains(
+                "hypothesis_difference_of_squares_preparation"));
         }
     }
 
