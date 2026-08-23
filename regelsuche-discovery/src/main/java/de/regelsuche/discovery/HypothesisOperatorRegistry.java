@@ -3,6 +3,7 @@ package de.regelsuche.discovery;
 import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.PolynomialStructureSynthesisOperator;
 import de.regelsuche.transform.RationalizationHypothesisOperator;
 import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
 import java.util.List;
@@ -15,12 +16,20 @@ public final class HypothesisOperatorRegistry {
     public HypothesisOperatorRegistry() {
         this(List.of(
             new HypothesisOperatorDescriptor(
-                DifferenceOfSquaresPreparationOperator.RULE_ID,
-                "difference-of-squares",
-                "factorization-bridge",
-                DifferenceOfSquaresPreparationOperator::new,
+                PolynomialStructureSynthesisOperator.RULE_ID,
+                "polynomial-structure-synthesis",
+                "polynomial-decomposition",
+                PolynomialStructureSynthesisOperator::new,
                 true,
-                List.of("sophie-germain", "bridge", "factorization")
+                List.of("polynomial", "factorization", "decomposition", "semantic-view")
+            ),
+            new HypothesisOperatorDescriptor(
+                DifferenceOfSquaresPreparationOperator.RULE_ID,
+                "legacy-difference-of-squares",
+                "legacy-factorization-bridge",
+                DifferenceOfSquaresPreparationOperator::new,
+                false,
+                List.of("legacy", "diagnostic-control", "factorization")
             ),
             new HypothesisOperatorDescriptor(
                 ConservativeCompleteSquareHypothesisOperator.RULE_ID,
