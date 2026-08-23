@@ -2,7 +2,6 @@ package de.regelsuche.search.reachability;
 
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.assumption.AssumptionSignature;
-import de.regelsuche.knowledge.RuleInventoryFingerprint;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
@@ -33,12 +32,11 @@ import java.util.Set;
  * and the bounded pattern-targeted local bridge fallback.
  *
  * <p>The exact registry is attempted only after concrete direct replay and
- * before the generic local search. Every exact candidate was already verified
- * and replayed by its specialized engine; this coordinator additionally binds
- * it to the principal schema, cumulative assumptions and a reproducible
- * registry certificate. Guarded exact candidates are accepted only when their
- * schema bindings and required assumptions are available. Otherwise the
- * existing local bridge remains the fail-closed fallback.</p>
+ * before the generic local search. An exact stage is eligible only for its
+ * explicitly registered native principal. Guarded schemas remain on the local
+ * bridge path until an exact specialist exposes terminal matcher bindings.
+ * Every technical exception becomes a retained fail-closed outcome rather than
+ * being reinterpreted as ordinary non-applicability.</p>
  */
 public final class UnifiedRulePreparationCoordinator {
     public static final String COORDINATOR_ID =
@@ -133,11 +131,30 @@ public final class UnifiedRulePreparationCoordinator {
         List<RulePreparationCoordinator.Outcome> outcomes = new ArrayList<>();
         for (RewriteApplicabilitySchema schema : principalSchemas) {
             PrincipalRuntime runtime = runtimes.get(schema.ruleId());
-            PatternMatchAnalyzer.Analysis initial = analyzePattern(
-                schema, source);
+            PatternMatchAnalyzer.Analysis initial;
+            try {
+                initial = analyzePattern(schema, source);
+            } catch (RuntimeException exception) {
+                outcomes.add(technicalOutcome(
+                    runtime,
+                    fallbackAnalysis(schema, source),
+                    PatternTargetedLocalBridgeSearch.Work.empty(),
+                    "UNIFIED_MATCH_ANALYSIS_TECHNICAL_FAILURE"));
+                continue;
+            }
 
-            Optional<Transformation> direct = directCandidate(
-                schema.executor(), source, assumptions);
+            Optional<Transformation> direct;
+            try {
+                direct = directCandidate(
+                    schema.executor(), source, assumptions);
+            } catch (RuntimeException exception) {
+                outcomes.add(technicalOutcome(
+                    runtime,
+                    initial,
+                    PatternTargetedLocalBridgeSearch.Work.empty(),
+                    "UNIFIED_DIRECT_REPLAY_TECHNICAL_FAILURE"));
+                continue;
+            }
             if (direct.isPresent()) {
                 GuardCheck guards = checkRequiredAssumptions(
                     schema, initial, assumptions);
@@ -147,17 +164,37 @@ public final class UnifiedRulePreparationCoordinator {
                 continue;
             }
 
-            Optional<ExactCandidate> exact = exactCandidate(
-                runtime, source, assumptions, initial);
-            if (exact.isPresent()) {
-                outcomes.add(exactOutcome(
-                    runtime, initial, exact.orElseThrow()));
-                continue;
+            if (runtime.exactRegistry().supportsPrincipal(schema.ruleId())
+                    && schema.requiredAssumptions().isEmpty()) {
+                Optional<ExactCandidate> exact;
+                try {
+                    exact = exactCandidate(runtime, source, assumptions);
+                } catch (RuntimeException exception) {
+                    outcomes.add(technicalOutcome(
+                        runtime,
+                        initial,
+                        PatternTargetedLocalBridgeSearch.Work.empty(),
+                        "UNIFIED_EXACT_REGISTRY_TECHNICAL_FAILURE"));
+                    continue;
+                }
+                if (exact.isPresent()) {
+                    outcomes.add(exactOutcome(
+                        runtime, initial, exact.orElseThrow()));
+                    continue;
+                }
             }
 
-            RulePreparationCoordinator.Evaluation local =
-                runtime.localCoordinator().analyze(source, assumptions);
-            outcomes.add(local.outcome(schema.ruleId()).orElseThrow());
+            try {
+                RulePreparationCoordinator.Evaluation local =
+                    runtime.localCoordinator().analyze(source, assumptions);
+                outcomes.add(local.outcome(schema.ruleId()).orElseThrow());
+            } catch (RuntimeException exception) {
+                outcomes.add(technicalOutcome(
+                    runtime,
+                    initial,
+                    PatternTargetedLocalBridgeSearch.Work.empty(),
+                    "UNIFIED_LOCAL_BRIDGE_TECHNICAL_FAILURE"));
+            }
         }
 
         return new Evaluation(
@@ -252,25 +289,32 @@ public final class UnifiedRulePreparationCoordinator {
             "");
     }
 
+    private RulePreparationCoordinator.Outcome technicalOutcome(
+        PrincipalRuntime runtime,
+        PatternMatchAnalyzer.Analysis initial,
+        PatternTargetedLocalBridgeSearch.Work work,
+        String detailCode
+    ) {
+        return new RulePreparationCoordinator.Outcome(
+            runtime.schema().ruleId(),
+            runtime.schema().contentHash(),
+            PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
+            Optional.empty(),
+            false,
+            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(initial),
+            work,
+            Set.of(),
+            detailCode,
+            "");
+    }
+
     private Optional<ExactCandidate> exactCandidate(
         PrincipalRuntime runtime,
         String source,
-        AssumptionSignature assumptions,
-        PatternMatchAnalyzer.Analysis initial
+        AssumptionSignature assumptions
     ) {
-        SafePreparationEngineRegistry.Execution execution;
-        try {
-            execution = runtime.exactRegistry().transform(source);
-        } catch (RuntimeException exception) {
-            return Optional.empty();
-        }
-
-        GuardCheck guards = checkRequiredAssumptions(
-            runtime.schema(), initial, assumptions);
-        if (!guards.authorized()) {
-            return Optional.empty();
-        }
-
+        SafePreparationEngineRegistry.Execution execution =
+            runtime.exactRegistry().transform(source);
         List<Transformation> prepared = execution.preparedTransformations();
         Optional<Transformation> selected = prepared.stream()
             .filter(value -> runtime.schema().ruleId().equals(value.rule()))
@@ -308,20 +352,16 @@ public final class UnifiedRulePreparationCoordinator {
         String source,
         AssumptionSignature assumptions
     ) {
-        try {
-            return new AstRewriteTransformationEngine(
-                    List.of(executor),
-                    Integer.MAX_VALUE,
-                    1)
-                .transform(source)
-                .stream()
-                .filter(value -> executor.id().equals(value.rule()))
-                .findFirst()
-                .map(value -> withCumulativeAssumptions(
-                    value, assumptions));
-        } catch (RuntimeException exception) {
-            return Optional.empty();
-        }
+        return new AstRewriteTransformationEngine(
+                List.of(executor),
+                Integer.MAX_VALUE,
+                1)
+            .transform(source)
+            .stream()
+            .filter(value -> executor.id().equals(value.rule()))
+            .findFirst()
+            .map(value -> withCumulativeAssumptions(
+                value, assumptions));
     }
 
     private PatternMatchAnalyzer.Analysis analyzePattern(
@@ -337,6 +377,22 @@ public final class UnifiedRulePreparationCoordinator {
                 bridgeBudget.maxMatchResults(),
                 bridgeBudget.maxMatchSteps(),
                 bridgeBudget.maxPatternBranches()));
+    }
+
+    private PatternMatchAnalyzer.Analysis fallbackAnalysis(
+        RewriteApplicabilitySchema schema,
+        String source
+    ) {
+        try {
+            return new PatternMatchAnalyzer().analyze(
+                schema.pattern(),
+                parser.parseTerm(source),
+                de.regelsuche.transform.RecognitionProfile.exact());
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException(
+                "source normalization succeeded but fallback analysis failed",
+                exception);
+        }
     }
 
     private GuardCheck checkRequiredAssumptions(
@@ -473,7 +529,7 @@ public final class UnifiedRulePreparationCoordinator {
         return sha256(descriptor.toString());
     }
 
-    private static String exactCertificateHash(
+    private String exactCertificateHash(
         PrincipalRuntime runtime,
         String source,
         AssumptionSignature assumptions,
@@ -481,6 +537,7 @@ public final class UnifiedRulePreparationCoordinator {
     ) {
         StringBuilder descriptor = new StringBuilder();
         append(descriptor, COORDINATOR_ID);
+        append(descriptor, repositoryRevision);
         append(descriptor,
             runtime.exactRegistry().registryFingerprint());
         append(descriptor, runtime.schema().contentHash());
