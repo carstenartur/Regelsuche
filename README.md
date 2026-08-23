@@ -111,6 +111,58 @@ für unendlich viele konkrete Ausdrücke stehen.
   Containerläufe und unabhängige Verifier machen Konfiguration und Ergebnis
   überprüfbar.
 
+## Regelgerichtete Vorbereitung fast passender Ausdrücke
+
+Eine Regel wird nicht mehr allein deshalb verworfen, weil ihr linkes Muster den
+aktuellen AST nicht unmittelbar trifft. Der sichere Vorbereitungskoordinator
+verwendet eine feste Reihenfolge:
+
+```text
+konkrete direkte Regelanwendung
+  -> typisierte Guard-Prüfung
+  -> begrenzte, mustergerichtete Vorbereitung
+  -> erneute konkrete Regelanwendung
+  -> unabhängige Verifikation
+```
+
+Direkte Ausführung bleibt damit der billigste und maßgebliche Pfad. Erst wenn
+der konkrete Executor nicht anwendbar ist, darf eine explizite
+`RewriteApplicabilitySchema` eine begrenzte Suche auf eine passende
+Darstellung lenken. Das Schema enthält kein gewünschtes Ergebnis und keinen
+deklarativen Ersatz für eine algorithmische Java-Regel. Jede erfolgreiche
+Vorbereitung muss am retained End-AST nochmals durch die wirkliche Regel
+abgespielt werden.
+
+Die Vorbereitung darf nur freigegebene, äquivalenzerhaltende Schritte nutzen.
+Sie behält insbesondere:
+
+- Ausgangs-, Zwischen- und Ergebnis-AST;
+- Regel- und Inventar-Fingerprints;
+- partielle Bindungen und Restbedingungen;
+- typisierte Voraussetzungen und kumulierte Annahmen;
+- vollständige primitive Regellinie;
+- verbrauchte und verbleibende Arbeitsbudgets;
+- ein unabhängig erneut prüfbares Zertifikat.
+
+Unbekannte Voraussetzungen autorisieren keinen Zug. Beispielsweise wird die
+Teleskopidentität für `1/(n*(n+1))` nur unter den gebundenen Bedingungen
+`n != 0` und `n + 1 != 0` ausgeführt. Vorbereitungsschritte wie Kürzungen
+können weitere Bedingungen wie `a != 0` ergänzen; sie dürfen die
+Voraussetzungen der Hauptregel weder erfinden noch verlieren.
+
+Dasselbe Prinzip ist für selbst gelernte Pattern-Regeln geeignet, sobald deren
+Muster, Guards, Provenienz und Äquivalenzevidence eingefroren und durch die
+Promotion-Gates qualifiziert wurden. Rohe evolutionär erzeugte Regeln bleiben
+bewusst ausgeschlossen, solange sie keine belastbare Äquivalenzerhaltung
+nachweisen. Gelernte `RewriteProgram`s aus Sequenzen, Alternativen und
+Wiederholungen benötigen zusätzlich ein programmspezifisches
+Anwendbarkeits- und Replay-Schema; sie werden nicht künstlich als einzelne
+Pattern-Regel behandelt.
+
+Die vollständige Architektur, Guard-Semantik, Experimentmatrix und Grenze für
+gelernte Regeln beschreibt der
+[Sichere Regelvorbereitungs-Koordinator](docs/safe-rule-preparation-coordinator.md).
+
 ## Aktueller Stand
 
 Der gegenwärtige Stand ist bewusst zweigeteilt:
@@ -221,6 +273,7 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
   [Demo Gallery](docs/demo-gallery.md)
 - **Forschung und Evidenz:** [Discovery-Status](docs/discovery-status.md),
   [Discovery Evidence](docs/discovery-evidence-v1.md),
+  [Sicherer Regelvorbereitungs-Koordinator](docs/safe-rule-preparation-coordinator.md),
   [Benchmarks](docs/discovery-benchmarks.md),
   [Scientific Reproducibility](docs/scientific-reproducibility.md)
 - **Entwicklung:** [Architektur](docs/architecture.md),

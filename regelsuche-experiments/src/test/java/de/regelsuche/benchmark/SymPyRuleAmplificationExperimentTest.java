@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.search.reachability.PatternTargetedLocalBridgeSearch;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -15,28 +18,112 @@ class SymPyRuleAmplificationExperimentTest {
         "0123456789abcdef0123456789abcdef01234567";
 
     @Test
-    void retainsTwoAdditionalApplicationsAndOneNearMiss() {
+    void retainsFourAdditionalApplicationsAcrossThreeFamilies() {
         SymPyRuleAmplificationExperiment.Report report =
             new SymPyRuleAmplificationExperiment().run(REVISION);
 
-        assertTrue(report.qualified());
-        assertEquals(5, report.rows().size());
-        assertEquals(2, report.directApplications());
-        assertEquals(2, report.preparedApplications());
-        assertEquals(2, report.amplificationGain());
-        assertEquals(1, report.conclusiveNearMisses());
+        assertTrue(report.qualified(), report.toJson());
+        assertEquals(3, report.principals().size());
+        assertEquals(11, report.rows().size());
+        assertEquals(4, report.directApplications());
+        assertEquals(4, report.preparedApplications());
+        assertEquals(4, report.amplificationGain());
+        assertEquals(3, report.amplifiedRuleFamilies());
+        assertEquals(3, report.conclusiveNearMisses());
+        assertEquals(
+            Set.of(
+                SymPyRuleAmplificationExperiment.PYTHAGOREAN_RULE_ID,
+                SymPyRuleAmplificationExperiment
+                    .DIFFERENCE_OF_SQUARES_RULE_ID,
+                SymPyRuleAmplificationExperiment.TELESCOPING_RULE_ID),
+            report.principals().stream()
+                .map(SymPyRuleAmplificationExperiment
+                    .PrincipalDescriptor::ruleId)
+                .collect(Collectors.toSet()));
+        assertTrue(report.principals().stream()
+            .allMatch(value -> "low".equals(value.riskLevel())));
+    }
+
+    @Test
+    void squareDifferenceRequiresCancellationToExposeItsPowers() {
+        SymPyRuleAmplificationExperiment.Report report =
+            new SymPyRuleAmplificationExperiment().run(REVISION);
+        SymPyRuleAmplificationExperiment.Row row = report.rows().stream()
+            .filter(value -> value.caseId().equals(
+                "difference-squares-two-hidden-cancellations"))
+            .findFirst()
+            .orElseThrow();
+
+        assertEquals(
+            PatternTargetedLocalBridgeSearch.Status.PREPARED,
+            row.coordinatorStatus(),
+            report.toJson());
+        assertEquals(2, row.preparationDepth());
+        assertEquals("(x - y) * (x + y)", row.resultExpression());
+        assertEquals(
+            List.of(
+                "ast_cancel_division_factor",
+                "ast_cancel_division_factor",
+                SymPyRuleAmplificationExperiment
+                    .DIFFERENCE_OF_SQUARES_RULE_ID),
+            row.primitiveRuleIds());
+        assertEquals(List.of("a != 0", "b != 0"),
+            row.resultAssumptions());
+    }
+
+    @Test
+    void everyPositiveAndNearMissRetainsItsExpectedEvidence() {
+        SymPyRuleAmplificationExperiment.Report report =
+            new SymPyRuleAmplificationExperiment().run(REVISION);
+
         assertTrue(report.rows().stream()
-            .filter(row -> row.bridgeStatus()
+            .filter(row -> row.coordinatorStatus()
                 == PatternTargetedLocalBridgeSearch.Status.PREPARED)
-            .allMatch(row -> !row.directApplicable()
-                && row.independentlyVerified()
-                && "1".equals(row.resultExpression())
-                && row.preparationDepth() > 0));
+            .allMatch(row -> row.coordinatorVerified()
+                && row.principalReplayVerified()
+                && row.preparationDepth() > 0
+                && row.resultAssumptions().equals(
+                    row.requiredResultAssumptions())
+                && row.primitiveRuleIds().getLast()
+                    .equals(row.principalRuleId())
+                && row.unexpectedApplicableRuleIds().isEmpty()));
         assertTrue(report.rows().stream()
+            .filter(row -> row.coordinatorStatus()
+                == PatternTargetedLocalBridgeSearch.Status
+                    .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE)
+            .allMatch(row -> row.coordinatorVerified()
+                && !row.principalReplayVerified()
+                && row.reachedLimits().isEmpty()
+                && row.resultExpression().isEmpty()
+                && row.resultAssumptions().isEmpty()
+                && row.primitiveRuleIds().isEmpty()
+                && row.unexpectedApplicableRuleIds().isEmpty()));
+    }
+
+    @Test
+    void rationalCasesRetainDeclaredDenominatorAssumptions() {
+        SymPyRuleAmplificationExperiment.Report report =
+            new SymPyRuleAmplificationExperiment().run(REVISION);
+
+        assertTrue(report.rows().stream()
+            .filter(row -> row.principalRuleId().equals(
+                SymPyRuleAmplificationExperiment.TELESCOPING_RULE_ID))
+            .allMatch(row -> row.sourceAssumptions().contains("n != 0")));
+        SymPyRuleAmplificationExperiment.Row direct = report.rows().stream()
+            .filter(row -> row.caseId().equals("telescoping-direct"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(
+            Set.of("n != 0", "n + 1 != 0"),
+            Set.copyOf(direct.resultAssumptions()));
+        SymPyRuleAmplificationExperiment.Row prepared = report.rows().stream()
             .filter(row -> row.caseId().equals(
-                "different-argument-near-miss"))
-            .allMatch(row -> row.reachedLimits().isEmpty()
-                && row.resultExpression().isEmpty()));
+                "telescoping-two-hidden-cancellations"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(
+            Set.of("a != 0", "b != 0", "n != 0", "n + 1 != 0"),
+            Set.copyOf(prepared.resultAssumptions()));
     }
 
     @Test
@@ -65,9 +152,13 @@ class SymPyRuleAmplificationExperimentTest {
             "sympy-rule-amplification.json")));
         assertTrue(Files.isRegularFile(directory.resolve(
             "sympy-rule-amplification.md")));
-        assertTrue(Files.readString(directory.resolve(
-            "sympy-rule-amplification.json"))
-            .contains("\"qualified\": true"));
+        String json = Files.readString(directory.resolve(
+            "sympy-rule-amplification.json"));
+        assertTrue(json.contains("\"qualified\": true"), json);
+        assertTrue(json.contains("\"amplifiedRuleFamilies\": 3"));
+        assertTrue(json.contains("\"sourceAssumptions\""));
+        assertTrue(first.toMarkdown().contains(
+            "three unchanged low-risk imported rules"));
         assertTrue(first.toMarkdown().contains(
             "not a general SymPy performance"));
     }

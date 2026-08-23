@@ -3,34 +3,42 @@ package de.regelsuche.benchmark;
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.knowledge.KnowledgePackRegistry;
 import de.regelsuche.search.reachability.PatternTargetedLocalBridgeSearch;
+import de.regelsuche.search.reachability.RulePreparationCoordinator;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
- * Frozen pilot measuring how many additional inputs one unchanged imported
- * SymPy rule can handle through bounded local preparation.
+ * Frozen multi-family pilot measuring additional applicability of unchanged
+ * imported SymPy rules through one safe preparation coordinator.
  */
 public final class SymPyRuleAmplificationExperiment {
     public static final String SCHEMA =
-        "regelsuche.sympy-rule-amplification/v1";
+        "regelsuche.sympy-rule-amplification/v2";
     public static final String CONFIGURATION_ID =
-        "sympy-pythagorean-direct-vs-pattern-bridge-v1";
-    public static final String PRINCIPAL_RULE_ID =
+        "sympy-three-family-safe-preparation-matrix-v2";
+
+    public static final String PYTHAGOREAN_RULE_ID =
         "sympy.trig.pythagorean";
-    public static final String PRINCIPAL_PACK_ID =
-        "sympy-trigonometry";
+    public static final String DIFFERENCE_OF_SQUARES_RULE_ID =
+        "sympy.poly.factor.diff_squares";
+    public static final String TELESCOPING_RULE_ID =
+        "sympy.rational.partial_fraction.telescoping";
 
     private static final PatternTargetedLocalBridgeSearch.Budget BUDGET =
         new PatternTargetedLocalBridgeSearch.Budget(
-            3, 128, 1_024, 8, 128, 128,
+            3, 128, 1_024, 8, 160, 128,
             32, 5_000, 2_500);
 
     public static void main(String[] args) throws IOException {
@@ -42,80 +50,108 @@ public final class SymPyRuleAmplificationExperiment {
         report.write(Path.of(args[1]));
         if (!report.qualified()) {
             throw new IllegalStateException(
-                "SymPy rule-amplification pilot did not satisfy its frozen contract");
+                "SymPy rule-amplification matrix did not satisfy its frozen contract");
         }
     }
 
     public Report run(String repositoryRevision) {
-        PatternRewriteRule principal = principalRule();
+        List<PatternRewriteRule> principals = principals();
+        List<RewriteApplicabilitySchema> schemas = principals.stream()
+            .map(RewriteApplicabilitySchema::fromPatternRule)
+            .toList();
         List<RewriteRule> preparationRules = cancellationRules();
-        AstRewriteTransformationEngine direct =
-            new AstRewriteTransformationEngine(List.of(principal));
-        PatternTargetedLocalBridgeSearch bridgeSearch =
-            new PatternTargetedLocalBridgeSearch(
-                principal,
+        RulePreparationCoordinator coordinator =
+            new RulePreparationCoordinator(
+                schemas,
                 preparationRules,
                 repositoryRevision,
                 BUDGET);
         List<Row> rows = cases().stream()
             .map(experimentCase -> evaluate(
-                experimentCase, direct, bridgeSearch))
+                experimentCase, coordinator))
+            .toList();
+        List<PrincipalDescriptor> descriptors = principals.stream()
+            .map(rule -> new PrincipalDescriptor(
+                rule.id(),
+                rule.descriptor().packId(),
+                rule.descriptor().originProject(),
+                rule.descriptor().sourceVersion(),
+                rule.descriptor().riskLevel()))
             .toList();
         return new Report(
             SCHEMA,
             CONFIGURATION_ID,
             repositoryRevision,
-            principal.descriptor().sourceVersion(),
-            PRINCIPAL_PACK_ID,
-            PRINCIPAL_RULE_ID,
+            RulePreparationCoordinator.COORDINATOR_ID,
+            coordinator.principalInventoryFingerprint(),
+            coordinator.preparationInventoryFingerprint(),
+            descriptors,
             rows);
     }
 
     private Row evaluate(
         ExperimentCase experimentCase,
-        AstRewriteTransformationEngine direct,
-        PatternTargetedLocalBridgeSearch bridgeSearch
+        RulePreparationCoordinator coordinator
     ) {
-        boolean directApplicable = direct
-            .transform(experimentCase.sourceExpression()).stream()
-            .anyMatch(value -> PRINCIPAL_RULE_ID.equals(value.rule()));
-        PatternTargetedLocalBridgeSearch.Attempt attempt =
-            bridgeSearch.analyze(
+        RulePreparationCoordinator.Evaluation evaluation =
+            coordinator.analyze(
                 experimentCase.sourceExpression(),
-                AssumptionSignature.ofExpressions(List.of()));
-        var bridge = attempt.bridge();
-        boolean verified = bridge.isEmpty()
-            || bridgeSearch.verify(bridge.orElseThrow()).valid();
+                AssumptionSignature.ofExpressions(
+                    experimentCase.sourceAssumptions()));
+        RulePreparationCoordinator.Outcome selected = evaluation
+            .outcome(experimentCase.principalRuleId())
+            .orElseThrow(() -> new IllegalStateException(
+                "missing principal outcome: "
+                    + experimentCase.principalRuleId()));
+        List<String> unexpectedApplicableRuleIds = evaluation.outcomes()
+            .stream()
+            .filter(RulePreparationCoordinator.Outcome::positive)
+            .map(RulePreparationCoordinator.Outcome::ruleId)
+            .filter(ruleId -> !ruleId.equals(
+                experimentCase.principalRuleId()))
+            .toList();
+        Transformation candidate = selected.candidate().orElse(null);
+        int preparationDepth = selected.prepared()
+            ? candidate.primitiveStepCount() - 1
+            : 0;
         return new Row(
             experimentCase.id(),
+            experimentCase.principalRuleId(),
             experimentCase.sourceExpression(),
+            experimentCase.sourceAssumptions(),
             experimentCase.expectedStatus(),
-            directApplicable,
-            attempt.status(),
-            bridge.map(
-                PatternTargetedLocalBridgeSearch.Bridge::resultExpression)
-                .orElse(""),
-            bridge.map(value -> value.preparationSteps().size())
-                .orElse(0),
-            bridge.map(
-                PatternTargetedLocalBridgeSearch.Bridge::primitiveRuleIds)
-                .orElse(List.of()),
-            bridge.map(value -> value.resultAssumptions()
-                .normalizedAssumptions()).orElse(List.of()),
-            verified,
-            attempt.reachedLimits().stream().sorted().toList(),
-            attempt.work().generatedTransitions(),
-            attempt.work().discoveredStates());
+            selected.status(),
+            candidate == null ? "" : candidate.transformedExpression(),
+            preparationDepth,
+            candidate == null ? List.of() : candidate.primitiveRuleIds(),
+            candidate == null ? List.of() : candidate.assumptions(),
+            experimentCase.requiredResultAssumptions(),
+            unexpectedApplicableRuleIds,
+            coordinator.verify(evaluation).valid(),
+            selected.replayVerified(),
+            selected.reachedLimits().stream().sorted().toList(),
+            evaluation.aggregateWork().generatedTransitions(),
+            evaluation.aggregateWork().discoveredStates());
     }
 
-    private PatternRewriteRule principalRule() {
+    private List<PatternRewriteRule> principals() {
+        return List.of(
+            principal("sympy-trigonometry", PYTHAGOREAN_RULE_ID),
+            principal("sympy-polynomial", DIFFERENCE_OF_SQUARES_RULE_ID),
+            principal("sympy-rational", TELESCOPING_RULE_ID));
+    }
+
+    private PatternRewriteRule principal(
+        String packId,
+        String ruleId
+    ) {
         return new KnowledgePackRegistry().allPacks().stream()
-            .filter(pack -> PRINCIPAL_PACK_ID.equals(pack.packId()))
+            .filter(pack -> packId.equals(pack.packId()))
             .flatMap(pack -> pack.rules().stream())
-            .filter(rule -> PRINCIPAL_RULE_ID.equals(rule.id()))
+            .filter(rule -> ruleId.equals(rule.id()))
             .findFirst()
             .orElseThrow(() -> new IllegalStateException(
-                "missing imported SymPy Pythagorean rule"));
+                "missing imported SymPy rule: " + ruleId));
     }
 
     private List<RewriteRule> cancellationRules() {
@@ -134,66 +170,165 @@ public final class SymPyRuleAmplificationExperiment {
     public static List<ExperimentCase> cases() {
         return List.of(
             new ExperimentCase(
-                "direct-canonical",
+                "pythagorean-direct-canonical",
+                PYTHAGOREAN_RULE_ID,
                 "sin(x)^2 + cos(x)^2",
+                List.of(),
                 PatternTargetedLocalBridgeSearch.Status
-                    .DIRECT_MATCH_AVAILABLE),
+                    .DIRECT_MATCH_AVAILABLE,
+                List.of()),
             new ExperimentCase(
-                "direct-ac-reordered",
+                "pythagorean-direct-ac-reordered",
+                PYTHAGOREAN_RULE_ID,
                 "cos(x)^2 + sin(x)^2",
+                List.of(),
                 PatternTargetedLocalBridgeSearch.Status
-                    .DIRECT_MATCH_AVAILABLE),
+                    .DIRECT_MATCH_AVAILABLE,
+                List.of()),
             new ExperimentCase(
-                "one-hidden-cancellation",
+                "pythagorean-one-hidden-cancellation",
+                PYTHAGOREAN_RULE_ID,
                 "((sin(x) * a) / a)^2 + cos(x)^2",
-                PatternTargetedLocalBridgeSearch.Status.PREPARED),
+                List.of(),
+                PatternTargetedLocalBridgeSearch.Status.PREPARED,
+                List.of("a != 0")),
             new ExperimentCase(
-                "two-hidden-cancellations",
+                "pythagorean-two-hidden-cancellations",
+                PYTHAGOREAN_RULE_ID,
                 "((sin(x) * a) / a)^2 + ((cos(x) * b) / b)^2",
-                PatternTargetedLocalBridgeSearch.Status.PREPARED),
+                List.of(),
+                PatternTargetedLocalBridgeSearch.Status.PREPARED,
+                List.of("a != 0", "b != 0")),
             new ExperimentCase(
-                "different-argument-near-miss",
+                "pythagorean-different-argument-near-miss",
+                PYTHAGOREAN_RULE_ID,
                 "((sin(x) * a) / a)^2 + ((cos(y) * b) / b)^2",
+                List.of(),
                 PatternTargetedLocalBridgeSearch.Status
-                    .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE));
+                    .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE,
+                List.of()),
+            new ExperimentCase(
+                "difference-squares-direct",
+                DIFFERENCE_OF_SQUARES_RULE_ID,
+                "x^2 - y^2",
+                List.of(),
+                PatternTargetedLocalBridgeSearch.Status
+                    .DIRECT_MATCH_AVAILABLE,
+                List.of()),
+            new ExperimentCase(
+                "difference-squares-two-hidden-cancellations",
+                DIFFERENCE_OF_SQUARES_RULE_ID,
+                "((x^2 * a) / a) - ((y^2 * b) / b)",
+                List.of(),
+                PatternTargetedLocalBridgeSearch.Status.PREPARED,
+                List.of("a != 0", "b != 0")),
+            new ExperimentCase(
+                "difference-squares-sum-near-miss",
+                DIFFERENCE_OF_SQUARES_RULE_ID,
+                "x^2 + y^2",
+                List.of(),
+                PatternTargetedLocalBridgeSearch.Status
+                    .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE,
+                List.of()),
+            new ExperimentCase(
+                "telescoping-direct",
+                TELESCOPING_RULE_ID,
+                "1 / (n * (n + 1))",
+                List.of("n != 0", "n + 1 != 0"),
+                PatternTargetedLocalBridgeSearch.Status
+                    .DIRECT_MATCH_AVAILABLE,
+                List.of("n != 0", "n + 1 != 0")),
+            new ExperimentCase(
+                "telescoping-two-hidden-cancellations",
+                TELESCOPING_RULE_ID,
+                "1 / (((n * a) / a) * (((n + 1) * b) / b))",
+                List.of("n != 0", "n + 1 != 0"),
+                PatternTargetedLocalBridgeSearch.Status.PREPARED,
+                List.of(
+                    "a != 0", "b != 0",
+                    "n != 0", "n + 1 != 0")),
+            new ExperimentCase(
+                "telescoping-step-two-near-miss",
+                TELESCOPING_RULE_ID,
+                "1 / (n * (n + 2))",
+                List.of("n != 0", "n + 2 != 0"),
+                PatternTargetedLocalBridgeSearch.Status
+                    .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE,
+                List.of()));
     }
 
     public record ExperimentCase(
         String id,
+        String principalRuleId,
         String sourceExpression,
-        PatternTargetedLocalBridgeSearch.Status expectedStatus
+        List<String> sourceAssumptions,
+        PatternTargetedLocalBridgeSearch.Status expectedStatus,
+        List<String> requiredResultAssumptions
     ) {
         public ExperimentCase {
             text(id, "case id");
+            text(principalRuleId, "principal rule ID");
             text(sourceExpression, "source expression");
+            sourceAssumptions = AssumptionSignature.ofExpressions(
+                sourceAssumptions).normalizedAssumptions();
             Objects.requireNonNull(expectedStatus, "expectedStatus");
+            requiredResultAssumptions = AssumptionSignature.ofExpressions(
+                requiredResultAssumptions).normalizedAssumptions();
+        }
+    }
+
+    public record PrincipalDescriptor(
+        String ruleId,
+        String packId,
+        String originProject,
+        String sourceVersion,
+        String riskLevel
+    ) {
+        public PrincipalDescriptor {
+            text(ruleId, "ruleId");
+            text(packId, "packId");
+            text(originProject, "originProject");
+            text(sourceVersion, "sourceVersion");
+            text(riskLevel, "riskLevel");
         }
     }
 
     public record Row(
         String caseId,
+        String principalRuleId,
         String sourceExpression,
+        List<String> sourceAssumptions,
         PatternTargetedLocalBridgeSearch.Status expectedStatus,
-        boolean directApplicable,
-        PatternTargetedLocalBridgeSearch.Status bridgeStatus,
+        PatternTargetedLocalBridgeSearch.Status coordinatorStatus,
         String resultExpression,
         int preparationDepth,
         List<String> primitiveRuleIds,
-        List<String> assumptions,
-        boolean independentlyVerified,
+        List<String> resultAssumptions,
+        List<String> requiredResultAssumptions,
+        List<String> unexpectedApplicableRuleIds,
+        boolean coordinatorVerified,
+        boolean principalReplayVerified,
         List<String> reachedLimits,
-        int generatedTransitions,
-        int discoveredStates
+        long generatedTransitions,
+        long discoveredStates
     ) {
         public Row {
             text(caseId, "caseId");
+            text(principalRuleId, "principalRuleId");
             text(sourceExpression, "sourceExpression");
+            sourceAssumptions = AssumptionSignature.ofExpressions(
+                sourceAssumptions).normalizedAssumptions();
             Objects.requireNonNull(expectedStatus, "expectedStatus");
-            Objects.requireNonNull(bridgeStatus, "bridgeStatus");
+            Objects.requireNonNull(coordinatorStatus, "coordinatorStatus");
             resultExpression = resultExpression == null
                 ? "" : resultExpression;
             primitiveRuleIds = List.copyOf(primitiveRuleIds);
-            assumptions = List.copyOf(assumptions);
+            resultAssumptions = AssumptionSignature.ofExpressions(
+                resultAssumptions).normalizedAssumptions();
+            requiredResultAssumptions = AssumptionSignature.ofExpressions(
+                requiredResultAssumptions).normalizedAssumptions();
+            unexpectedApplicableRuleIds = List.copyOf(
+                unexpectedApplicableRuleIds);
             reachedLimits = List.copyOf(reachedLimits);
             if (preparationDepth < 0 || generatedTransitions < 0
                     || discoveredStates < 1) {
@@ -203,18 +338,38 @@ public final class SymPyRuleAmplificationExperiment {
         }
 
         boolean qualifies() {
-            return bridgeStatus == expectedStatus
-                && independentlyVerified
-                && (bridgeStatus
-                    != PatternTargetedLocalBridgeSearch.Status.PREPARED
-                    || !directApplicable
-                        && "1".equals(resultExpression)
-                        && preparationDepth > 0)
-                && (bridgeStatus
-                    != PatternTargetedLocalBridgeSearch.Status
+            boolean positive = coordinatorStatus
+                    == PatternTargetedLocalBridgeSearch.Status
+                        .DIRECT_MATCH_AVAILABLE
+                || coordinatorStatus
+                    == PatternTargetedLocalBridgeSearch.Status.PREPARED;
+            boolean statusAndReplay = coordinatorStatus == expectedStatus
+                && coordinatorVerified
+                && unexpectedApplicableRuleIds.isEmpty();
+            if (!statusAndReplay) {
+                return false;
+            }
+            if (positive) {
+                return principalReplayVerified
+                    && !resultExpression.isEmpty()
+                    && !primitiveRuleIds.isEmpty()
+                    && principalRuleId.equals(
+                        primitiveRuleIds.getLast())
+                    && resultAssumptions.equals(
+                        requiredResultAssumptions)
+                    && (coordinatorStatus
+                        == PatternTargetedLocalBridgeSearch.Status
+                            .DIRECT_MATCH_AVAILABLE
+                        ? preparationDepth == 0
+                        : preparationDepth > 0);
+            }
+            return coordinatorStatus
+                    == PatternTargetedLocalBridgeSearch.Status
                         .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE
-                    || resultExpression.isEmpty()
-                        && reachedLimits.isEmpty());
+                && resultExpression.isEmpty()
+                && primitiveRuleIds.isEmpty()
+                && resultAssumptions.isEmpty()
+                && reachedLimits.isEmpty();
         }
     }
 
@@ -222,52 +377,80 @@ public final class SymPyRuleAmplificationExperiment {
         String schema,
         String configurationId,
         String repositoryRevision,
-        String sourceVersion,
-        String principalPackId,
-        String principalRuleId,
+        String coordinatorId,
+        String principalInventoryFingerprint,
+        String preparationInventoryFingerprint,
+        List<PrincipalDescriptor> principals,
         List<Row> rows
     ) {
         public Report {
             if (!SCHEMA.equals(schema)
                     || !CONFIGURATION_ID.equals(configurationId)
                     || repositoryRevision == null
-                    || !repositoryRevision.matches("[0-9a-f]{40}")) {
+                    || !repositoryRevision.matches("[0-9a-f]{40}")
+                    || !RulePreparationCoordinator.COORDINATOR_ID.equals(
+                        coordinatorId)
+                    || principalInventoryFingerprint == null
+                    || !principalInventoryFingerprint.matches(
+                        "sha256:[0-9a-f]{64}")
+                    || preparationInventoryFingerprint == null
+                    || !preparationInventoryFingerprint.matches(
+                        "sha256:[0-9a-f]{64}")) {
                 throw new IllegalArgumentException(
                     "report identity is invalid");
             }
-            text(sourceVersion, "sourceVersion");
-            text(principalPackId, "principalPackId");
-            text(principalRuleId, "principalRuleId");
+            principals = List.copyOf(principals);
             rows = List.copyOf(rows);
-            if (rows.size() != cases().size()) {
+            if (principals.size() != 3
+                    || rows.size() != cases().size()) {
                 throw new IllegalArgumentException(
-                    "report must contain the complete frozen case matrix");
+                    "report must contain the complete frozen matrix");
+            }
+            Set<String> principalIds = new LinkedHashSet<>();
+            principals.forEach(value -> principalIds.add(value.ruleId()));
+            if (principalIds.size() != principals.size()) {
+                throw new IllegalArgumentException(
+                    "principal descriptors must be unique");
             }
         }
 
         public boolean qualified() {
             return rows.stream().allMatch(Row::qualifies)
-                && directApplications() == 2
-                && preparedApplications() == 2
-                && conclusiveNearMisses() == 1;
+                && directApplications() == 4
+                && preparedApplications() == 4
+                && conclusiveNearMisses() == 3
+                && amplifiedRuleFamilies() == 3;
         }
 
         public long directApplications() {
-            return rows.stream().filter(Row::directApplicable).count();
+            return rows.stream()
+                .filter(row -> row.coordinatorStatus()
+                    == PatternTargetedLocalBridgeSearch.Status
+                        .DIRECT_MATCH_AVAILABLE)
+                .count();
         }
 
         public long preparedApplications() {
             return rows.stream()
-                .filter(row -> row.bridgeStatus()
+                .filter(row -> row.coordinatorStatus()
                     == PatternTargetedLocalBridgeSearch.Status.PREPARED)
                 .count();
         }
 
         public long conclusiveNearMisses() {
             return rows.stream()
-                .filter(row -> row.bridgeStatus()
+                .filter(row -> row.coordinatorStatus()
                     == PatternTargetedLocalBridgeSearch.Status
                         .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE)
+                .count();
+        }
+
+        public long amplifiedRuleFamilies() {
+            return rows.stream()
+                .filter(row -> row.coordinatorStatus()
+                    == PatternTargetedLocalBridgeSearch.Status.PREPARED)
+                .map(Row::principalRuleId)
+                .distinct()
                 .count();
         }
 
@@ -295,12 +478,12 @@ public final class SymPyRuleAmplificationExperiment {
                 .append(json(configurationId))
                 .append("\",\n  \"repositoryRevision\": \"")
                 .append(repositoryRevision)
-                .append("\",\n  \"sourceVersion\": \"")
-                .append(json(sourceVersion))
-                .append("\",\n  \"principalPackId\": \"")
-                .append(json(principalPackId))
-                .append("\",\n  \"principalRuleId\": \"")
-                .append(json(principalRuleId))
+                .append("\",\n  \"coordinatorId\": \"")
+                .append(json(coordinatorId))
+                .append("\",\n  \"principalInventoryFingerprint\": \"")
+                .append(principalInventoryFingerprint)
+                .append("\",\n  \"preparationInventoryFingerprint\": \"")
+                .append(preparationInventoryFingerprint)
                 .append("\",\n  \"qualified\": ")
                 .append(qualified())
                 .append(",\n  \"directApplications\": ")
@@ -309,56 +492,95 @@ public final class SymPyRuleAmplificationExperiment {
                 .append(preparedApplications())
                 .append(",\n  \"amplificationGain\": ")
                 .append(amplificationGain())
-                .append(",\n  \"rows\": [\n");
+                .append(",\n  \"amplifiedRuleFamilies\": ")
+                .append(amplifiedRuleFamilies())
+                .append(",\n  \"principals\": [\n");
+            for (int index = 0; index < principals.size(); index++) {
+                PrincipalDescriptor principal = principals.get(index);
+                value.append("    {\"ruleId\":\"")
+                    .append(json(principal.ruleId()))
+                    .append("\",\"packId\":\"")
+                    .append(json(principal.packId()))
+                    .append("\",\"originProject\":\"")
+                    .append(json(principal.originProject()))
+                    .append("\",\"sourceVersion\":\"")
+                    .append(json(principal.sourceVersion()))
+                    .append("\",\"riskLevel\":\"")
+                    .append(json(principal.riskLevel()))
+                    .append("\"}")
+                    .append(index + 1 == principals.size()
+                        ? "\n" : ",\n");
+            }
+            value.append("  ],\n  \"rows\": [\n");
             for (int index = 0; index < rows.size(); index++) {
                 Row row = rows.get(index);
                 value.append("    {\"caseId\":\"")
                     .append(json(row.caseId()))
+                    .append("\",\"principalRuleId\":\"")
+                    .append(json(row.principalRuleId()))
                     .append("\",\"sourceExpression\":\"")
                     .append(json(row.sourceExpression()))
-                    .append("\",\"directApplicable\":")
-                    .append(row.directApplicable())
-                    .append(",\"bridgeStatus\":\"")
-                    .append(row.bridgeStatus())
+                    .append("\",\"sourceAssumptions\":")
+                    .append(jsonList(row.sourceAssumptions()))
+                    .append(",\"expectedStatus\":\"")
+                    .append(row.expectedStatus())
+                    .append("\",\"coordinatorStatus\":\"")
+                    .append(row.coordinatorStatus())
                     .append("\",\"resultExpression\":\"")
                     .append(json(row.resultExpression()))
                     .append("\",\"preparationDepth\":")
                     .append(row.preparationDepth())
                     .append(",\"primitiveRuleIds\":")
                     .append(jsonList(row.primitiveRuleIds()))
-                    .append(",\"assumptions\":")
-                    .append(jsonList(row.assumptions()))
-                    .append(",\"independentlyVerified\":")
-                    .append(row.independentlyVerified())
+                    .append(",\"resultAssumptions\":")
+                    .append(jsonList(row.resultAssumptions()))
+                    .append(",\"requiredResultAssumptions\":")
+                    .append(jsonList(row.requiredResultAssumptions()))
+                    .append(",\"unexpectedApplicableRuleIds\":")
+                    .append(jsonList(row.unexpectedApplicableRuleIds()))
+                    .append(",\"coordinatorVerified\":")
+                    .append(row.coordinatorVerified())
+                    .append(",\"principalReplayVerified\":")
+                    .append(row.principalReplayVerified())
                     .append(",\"reachedLimits\":")
                     .append(jsonList(row.reachedLimits()))
+                    .append(",\"generatedTransitions\":")
+                    .append(row.generatedTransitions())
+                    .append(",\"discoveredStates\":")
+                    .append(row.discoveredStates())
                     .append("}")
-                    .append(index + 1 == rows.size() ? "\n" : ",\n");
+                    .append(index + 1 == rows.size()
+                        ? "\n" : ",\n");
             }
             return value.append("  ]\n}\n").toString();
         }
 
         public String toMarkdown() {
             StringBuilder value = new StringBuilder(
-                "# SymPy rule amplification pilot\n\n")
-                .append("Principal rule: `").append(principalRuleId)
-                .append("` from `").append(principalPackId)
-                .append("` (SymPy ").append(sourceVersion)
-                .append(").\n\n")
-                .append("| Case | Direct | Bridge status | Prep depth | Result |\n")
-                .append("|---|---:|---|---:|---|\n");
-            rows.forEach(row -> value.append("| `")
-                .append(row.caseId()).append("` | ")
-                .append(row.directApplicable() ? "yes" : "no")
-                .append(" | `").append(row.bridgeStatus())
-                .append("` | ").append(row.preparationDepth())
-                .append(" | `").append(row.resultExpression())
-                .append("` |\n"));
-            return value.append("\nAdditional prepared applications: **")
+                "# SymPy rule amplification matrix\n\n")
+                .append("Coordinator: `").append(coordinatorId)
+                .append("`. Principals: **").append(principals.size())
+                .append("**; prepared additions: **")
                 .append(amplificationGain())
-                .append("**. Qualified: **")
+                .append("** across **").append(amplifiedRuleFamilies())
+                .append("** mathematical families.\n\n")
+                .append("| Case | Principal | Status | Prep depth | Result |\n")
+                .append("|---|---|---|---:|---|\n");
+            rows.forEach(row -> value.append("| `")
+                .append(row.caseId()).append("` | `")
+                .append(row.principalRuleId()).append("` | `")
+                .append(row.coordinatorStatus()).append("` | ")
+                .append(row.preparationDepth()).append(" | `")
+                .append(row.resultExpression()).append("` |\n"));
+            return value.append("\nDirect applications: **")
+                .append(directApplications())
+                .append("**; prepared applications: **")
+                .append(preparedApplications())
+                .append("**; conclusive near misses: **")
+                .append(conclusiveNearMisses())
+                .append("**; qualified: **")
                 .append(qualified()).append("**.\n\n")
-                .append("This is bounded evidence for one unchanged imported rule, one frozen cancellation inventory and five declared cases. It is not a general SymPy performance or completeness claim.\n")
+                .append("Rational rows bind their denominator assumptions as explicit input evidence. This is bounded evidence for three unchanged low-risk imported rules, one frozen cancellation inventory and eleven declared cases. It is not a general SymPy performance, completeness or superiority claim.\n")
                 .toString();
         }
     }
@@ -379,7 +601,8 @@ public final class SymPyRuleAmplificationExperiment {
 
     private static void text(String value, String field) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
+            throw new IllegalArgumentException(
+                field + " must not be blank");
         }
     }
 }
