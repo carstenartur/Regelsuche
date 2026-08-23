@@ -114,19 +114,29 @@ Vor der Veröffentlichung werden alle Issues geprüft, die im Intervall durch
 Closing-Referenzen oder Erwähnungen in PRs, Commits und Reviews berührt wurden.
 Übergeordnete Sammel-Issues der ausgelieferten Arbeit gehören ebenfalls dazu.
 
-Ein Issue erscheint nur dann unter **Abgeschlossene Issues**, wenn alle
-verbindlichen Akzeptanzkriterien erfüllt sind, Implementierung und Nachweise
-vorliegen, ein Abschlusskommentar die maßgeblichen PRs nennt und der
-GitHub-Schließungsgrund `completed` lautet. Teilweise erfüllte Sammel-Issues
-bleiben offen; ein Audit-Kommentar nennt ausgelieferte Teilpakete und echte
-Restarbeiten. `not planned`, Duplikat- und Ersetzt-Klassifikationen sind keine
-ausgelieferten Merkmale.
+Ein Issue erscheint nur dann unter **Abgeschlossene Issues**, wenn sein Body auf
+den tatsächlich ausgelieferten Umfang begrenzt ist, Implementierung und
+Nachweise vorliegen, ein Abschlusskommentar die maßgeblichen PRs nennt und der
+GitHub-Schließungsgrund `completed` lautet.
+
+Ist ein Sammel-Issue nur teilweise umgesetzt, wird es vor dem Release nicht als
+offener Teilfortschritt in die Release Notes aufgenommen. Stattdessen gilt:
+
+1. Titel und Body werden auf den nachweislich ausgelieferten Umfang reduziert.
+2. Jede echte Restarbeit wird in ein oder mehrere klar abgegrenzte offene
+   Nachfolge-Issues übertragen oder einem bereits passenden Nachfolger
+   zugeordnet.
+3. Der Abschlusskommentar nennt die ausgelieferten PRs und die Nachfolger.
+4. Das reduzierte Liefer-Issue wird mit Grund `completed` geschlossen.
+
+Offene Issues erscheinen weder als abgeschlossen noch als teilweise
+Release-Bestandteil. `not planned`, Duplikat- und Ersetzt-Klassifikationen sind
+keine ausgelieferten Merkmale.
 
 Die versionierte Datei `docs/releases/X.Y.Z.md` trennt mindestens:
 
 - benutzersichtbare Fähigkeiten;
-- abgeschlossene Issues;
-- Teilfortschritte offener Sammel-Issues;
+- ausschließlich mit `completed` geschlossene Liefer-Issues;
 - technische Änderungen aus demselben Tag-Intervall;
 - Kompatibilität und bekannte Einschränkungen;
 - Reproduktionsbefehle und Artefakte;
@@ -139,11 +149,11 @@ SHA-256 in `RELEASE-MANIFEST.txt` und vergleicht den danach von GitHub
 zurückgelieferten Body mit der Quelldatei.
 
 Vor dem echten Release werden beide Tags und Commit-SHAs, die im Intervall als
-`completed` geschlossenen Issues, ausgeschlossene Verwaltungsentscheidungen,
-berührte offene Issues samt aktualisiertem Status, die PR-Liste und die
-geprüfte Release-Notes-Fassung festgehalten. Nach GitHub- und
-Zenodo-Publikation wird kontrolliert, dass keine offenen Sammel-Issues als
-vollständig erledigt und keine PRs außerhalb des Intervalls dargestellt werden.
+`completed` geschlossenen Liefer-Issues, deren Abschlusskommentare und
+Nachfolgezuordnungen, ausgeschlossene Verwaltungsentscheidungen, die PR-Liste
+und die geprüfte Release-Notes-Fassung festgehalten. Nach GitHub- und
+Zenodo-Publikation wird kontrolliert, dass kein offenes Issue als ausgeliefert
+und keine PR außerhalb des Intervalls dargestellt wird.
 
 ## Verpflichtender Trockenlauf
 
