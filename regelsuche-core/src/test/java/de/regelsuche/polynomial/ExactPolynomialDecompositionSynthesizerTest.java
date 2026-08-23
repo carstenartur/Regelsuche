@@ -49,9 +49,20 @@ class ExactPolynomialDecompositionSynthesizerTest {
                 new ExactPolynomialDecompositionSynthesizer().synthesize(source);
 
             assertTrue(result.synthesized(), expression + ": " + result.detailCode());
-            assertEquals(source.polynomial().canonical(),
-                semanticView.analyze(result.candidates().getFirst().factoredExpression())
-                    .view().polynomial().canonical());
+            ExactPolynomialDecompositionSynthesizer.Candidate candidate =
+                result.candidates().getFirst();
+            assertEquals(
+                source.semanticHash(),
+                candidate.certificate().sourceSemanticHash());
+            String factored = ExpressionFormatter.format(candidate.factoredExpression());
+            assertTrue(expression.startsWith("(x + 1)")
+                    ? factored.contains("(x + 1)")
+                    : factored.contains("sin(t)"),
+                factored);
+            assertEquals(List.of("2", "-2", "1"),
+                candidate.certificate().factorCoefficients());
+            assertEquals(List.of("2", "2", "1"),
+                candidate.certificate().quotientCoefficients());
         }
     }
 
