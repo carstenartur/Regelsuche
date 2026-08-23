@@ -16,43 +16,50 @@ import java.util.Objects;
  *
  * <p>The individual preparation engines remain responsible for their own
  * certificates and concrete principal replay. This registry freezes their
- * order and exposes one deterministic execution boundary that can be consumed
- * by the multi-principal preparation coordinator.</p>
+ * order, native principal IDs and implementation identities behind one
+ * deterministic execution boundary.</p>
  */
 public final class SafePreparationEngineRegistry {
     public static final String REGISTRY_ID =
         "regelsuche.safe-exact-preparation-registry/v1";
+    public static final String ANY_PRINCIPAL = "*";
 
     private static final List<Stage> STAGES = List.of(
         new Stage(
             "direct-ast-rewrite",
             StageKind.DIRECT,
             "",
+            ANY_PRINCIPAL,
             AstRewriteTransformationEngine.class.getName()),
         new Stage(
             "exact-polynomial-quotient",
             StageKind.EXACT_PREPARATION,
             RulePreparationPlanner.PLANNER_ID,
+            RulePreparationPlanner.PRINCIPAL_RULE_ID,
             RulePreparationTransformationEngine.class.getName()),
         new Stage(
             "ac-factor-exposure",
             StageKind.EXACT_PREPARATION,
             AcNormalizationPreparationSolver.SOLVER_ID,
+            AcNormalizationPreparationSolver.PRINCIPAL_RULE_ID,
             AcNormalizationPreparationTransformationEngine.class.getName()),
         new Stage(
             "common-monomial-factor",
             StageKind.EXACT_PREPARATION,
             MonomialCommonFactorPreparationSolver.SOLVER_ID,
+            MonomialCommonFactorPreparationSolver.PRINCIPAL_RULE_ID,
             MonomialCommonFactorPreparationTransformationEngine.class.getName()),
         new Stage(
             "perfect-square-exposure",
             StageKind.EXACT_PREPARATION,
             PerfectSquareStructurePreparationSolver.SOLVER_ID,
+            PerfectSquareStructurePreparationSolver.PRINCIPAL_RULE_ID,
             PerfectSquareStructurePreparationTransformationEngine.class.getName()),
         new Stage(
             "common-denominator",
             StageKind.EXACT_PREPARATION,
             RationalCommonDenominatorPreparationSolver.SOLVER_ID,
+            RationalCommonDenominatorPreparationSolver.PRINCIPAL_RULE_ID,
             RationalCommonDenominatorPreparationTransformationEngine.class.getName()));
 
     private SafePreparationEngineRegistry() {
@@ -94,6 +101,11 @@ public final class SafePreparationEngineRegistry {
         Map<String, RewriteRule> byId = new LinkedHashMap<>();
         for (RewriteRule rule : supplied) {
             RewriteRule checked = Objects.requireNonNull(rule, "rule");
+            if (!checked.isEquivalencePreservingByConstruction()) {
+                throw new IllegalArgumentException(
+                    "exact preparation registry accepts only equivalence-preserving rules: "
+                        + checked.id());
+            }
             if (byId.put(checked.id(), checked) != null) {
                 throw new IllegalArgumentException(
                     "duplicate visible rule ID: " + checked.id());
@@ -114,6 +126,7 @@ public final class SafePreparationEngineRegistry {
             append(descriptor, stage.stageId());
             append(descriptor, stage.kind().name());
             append(descriptor, stage.solverId());
+            append(descriptor, stage.principalRuleId());
             append(descriptor, stage.engineClassName());
         }
         return sha256(descriptor.toString());
@@ -142,12 +155,15 @@ public final class SafePreparationEngineRegistry {
         String stageId,
         StageKind kind,
         String solverId,
+        String principalRuleId,
         String engineClassName
     ) {
         public Stage {
             if (stageId == null || stageId.isBlank()
                     || kind == null
                     || solverId == null
+                    || principalRuleId == null
+                    || principalRuleId.isBlank()
                     || engineClassName == null
                     || engineClassName.isBlank()) {
                 throw new IllegalArgumentException(
@@ -158,6 +174,16 @@ public final class SafePreparationEngineRegistry {
                 throw new IllegalArgumentException(
                     "exact preparation stages require a solver ID");
             }
+            if (kind == StageKind.DIRECT
+                    && !ANY_PRINCIPAL.equals(principalRuleId)) {
+                throw new IllegalArgumentException(
+                    "direct stage must support every principal");
+            }
+        }
+
+        public boolean supports(String ruleId) {
+            return ANY_PRINCIPAL.equals(principalRuleId)
+                || principalRuleId.equals(ruleId);
         }
     }
 
@@ -199,6 +225,16 @@ public final class SafePreparationEngineRegistry {
 
         public String registryFingerprint() {
             return registryFingerprint;
+        }
+
+        /** True only when a registered exact specialist owns this principal. */
+        public boolean supportsPrincipal(String ruleId) {
+            if (ruleId == null || ruleId.isBlank()) {
+                return false;
+            }
+            return stages.stream()
+                .filter(stage -> stage.kind() == StageKind.EXACT_PREPARATION)
+                .anyMatch(stage -> stage.supports(ruleId));
         }
 
         public Execution transform(String sourceExpression) {
