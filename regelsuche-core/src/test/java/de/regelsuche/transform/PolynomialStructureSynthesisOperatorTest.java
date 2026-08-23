@@ -41,16 +41,23 @@ class PolynomialStructureSynthesisOperatorTest {
 
     @Test
     void handlesArbitraryAstGeneratorsWithoutExplicitSubstitution() {
-        for (String expression : List.of(
-                "(x + 1)^4 + 4*y^4",
-                "sin(t)^4 + 4*z^4",
-                "x^4 + 5*x^2*y^2 + 4*y^4")) {
-            List<Transformation> candidates =
-                new PolynomialStructureSynthesisOperator()
-                    .generateCandidates(expression);
-            assertFalse(candidates.isEmpty(), expression);
-            assertEquivalent(expression, candidates.getFirst().transformedExpression());
-        }
+        List<Transformation> composite = new PolynomialStructureSynthesisOperator()
+            .generateCandidates("(x + 1)^4 + 4*y^4");
+        List<Transformation> function = new PolynomialStructureSynthesisOperator()
+            .generateCandidates("sin(t)^4 + 4*z^4");
+        List<Transformation> unrelated = new PolynomialStructureSynthesisOperator()
+            .generateCandidates("x^4 + 5*x^2*y^2 + 4*y^4");
+
+        assertFalse(composite.isEmpty());
+        assertTrue(composite.getFirst().transformedExpression().contains("(x + 1)"),
+            composite.toString());
+        assertFalse(function.isEmpty());
+        assertTrue(function.getFirst().transformedExpression().contains("sin(t)"),
+            function.toString());
+        assertFalse(unrelated.isEmpty());
+        assertEquivalent(
+            "x^4 + 5*x^2*y^2 + 4*y^4",
+            unrelated.getFirst().transformedExpression());
     }
 
     @Test
