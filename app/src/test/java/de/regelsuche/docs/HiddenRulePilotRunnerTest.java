@@ -52,21 +52,33 @@ class HiddenRulePilotRunnerTest {
     }
 
     @Test
-    void rediscoversSophieGermainFromGenericPolynomialSynthesis() {
+    void recognizesTheorySubsumedSophieGermainWithoutPromotingARedundantMacro() {
         PilotCase pilotCase = caseById("case-002");
         CaseReport report = HiddenRulePilotTestEvidence.caseReport("case-002");
         RuntimeResult runtime = report.runtime();
+        HiddenRulePilotEvaluator.Evaluation evaluation = report.evaluation();
 
         assertEquals(RuntimeStatus.CANDIDATE_FROZEN, runtime.status(), runtime.toString());
         assertTrue(runtime.primitiveRuleIds().contains(
             PolynomialStructureSynthesisOperator.RULE_ID), runtime.toString());
         assertTrue(runtime.validationEvidence().passed(), runtime.validationEvidence().toString());
         assertTrue(runtime.holdouts().allPassed(), runtime.holdouts().toString());
-        assertTrue(runtime.holdouts().materialAblations() >= 1, runtime.holdouts().toString());
+        assertEquals(0, runtime.holdouts().materialAblations(),
+            "the generic theory procedure already reaches every positive holdout in one step");
         assertTrue(partition.audit(pilotCase.task()).passed(),
             partition.audit(pilotCase.task()).collisions().toString());
 
-        assertRediscovered(report.evaluation());
+        assertTrue(evaluation.leakageViolations().isEmpty(), evaluation.toString());
+        assertTrue(evaluation.candidateRelation() == CandidateRelation.EXACT
+            || evaluation.candidateRelation() == CandidateRelation.ALPHA_EQUIVALENT
+            || evaluation.candidateRelation() == CandidateRelation.SEMANTICALLY_EQUIVALENT,
+            evaluation.toString());
+        assertTrue(evaluation.validationPassed(), evaluation.toString());
+        assertFalse(evaluation.materialAblation(), evaluation.toString());
+        assertFalse(evaluation.pilotAccepted(),
+            "a formula macro that adds no benefit over the theory procedure must not be promoted");
+        assertTrue(evaluation.blockers().contains(
+            "paired ablation showed no material benefit"), evaluation.blockers().toString());
     }
 
     @Test
