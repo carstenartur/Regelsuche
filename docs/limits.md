@@ -14,7 +14,7 @@ Theorem-Prover oder eine produktionsfertige Mehrnutzerplattform positioniert.
 
 ## Unterstützte mathematische Grundlage
 
-### Ausdrücke und Regeln
+### Ausdrücke, Regeln und Vorbereitung
 
 Unterstützt werden strukturierte AST-Ausdrücke mit Zahlen, Variablen, Summen,
 Produkten, Potenzen und ausgewählten Funktionsformen. Transformationen werden
@@ -26,10 +26,23 @@ Regeln können:
 - Annahmen und Nebenbedingungen emittieren;
 - Herkunft, Tier, Pack und Lizenzinformationen tragen;
 - als Kernel-, First-Party-, Regeldatei- oder Plugin-Beitrag aktiviert werden;
-- in Pfaden, Makros und begrenzten `RewriteProgram`s komponiert werden.
+- in Pfaden, Makros und begrenzten `RewriteProgram`s komponiert werden;
+- ein explizites Applicability-Schema für regelgerichtete Vorbereitung tragen.
 
 Ein content-addressed Inventar bindet den tatsächlich aktiven Regelbestand an
 einen Lauf.
+
+Fast passende Regeln können über zwei begrenzte Schichten vorbereitet werden:
+
+- native Exact-Spezialisten für Polynomquotienten, AC-Faktorexposition,
+  gemeinsame Monomfaktoren, perfekte Quadrate und gemeinsame Nenner;
+- eine bounded pattern-targeted local bridge über ein eingefrorenes Inventar
+  äquivalenzbewahrender Vorbereitungsregeln.
+
+Jeder native Spezialist ist an seine ausdrücklich registrierte Principal-ID
+gebunden. Ein ähnlich aussehendes importiertes oder gelerntes Pattern erbt
+keinen fremden Solververtrag. Der Unified Coordinator ist implementiert, aber
+noch nicht als allgemeines Workbench-/CLI-Defaultprofil qualifiziert.
 
 ### Algebra
 
@@ -43,9 +56,15 @@ Default-Inventar des aktuellen targetfreien Vergleichs behält deshalb bewusst
 den kubischen Verlustfall. Implementierte Fähigkeit und gemessene
 Standardkonfiguration werden nicht nachträglich vermischt.
 
-### Weitere Domänen
+### Gleichungssysteme, Matrizen und weitere Domänen
 
-Es existieren begrenzte Regel- und Darstellungsunterstützung für:
+Für affine skalare Gleichungssysteme existiert ein exakter Objektpfad über
+`A*x=b`, unabhängige Matrixblöcke, RREF und eindeutige, parametrisierte oder
+inkonsistente Lösungsklassifikation. Symbolische Systeme können bei expliziten
+Variablen- und Modellrollen als Eigenproblem erkannt werden. Namen allein
+erzeugen keine physikalische Interpretation.
+
+Daneben existieren begrenzte Regel- und Darstellungsunterstützung für:
 
 - Gleichungen und Ungleichungen;
 - grundlegende Analysis;
@@ -55,14 +74,22 @@ Es existieren begrenzte Regel- und Darstellungsunterstützung für:
   Discovery-Domäne.
 
 Diese Unterstützung ist domänenspezifisch und ersetzt keine vollständige
-Symbolikbibliothek für Analysis, Trigonometrie, Matrizen oder nichtkommutative
-Algebra.
+Symbolikbibliothek für Analysis, Trigonometrie, Matrizen, Operatoralgebra oder
+nichtkommutative Algebra. Typisierte Repräsentationsbrücken nehmen noch nicht
+direkt am Unified Preparation Coordinator teil.
 
 ## Annahmen und Definitionsbereiche
 
-Regeln können Nichtnullheit, Positivität, Nichtnegativität und andere
-Voraussetzungen explizit modellieren. Retained Pfade und entsprechende
-Benchmarkfälle prüfen emittierte Nebenbedingungen gegen den Fallvertrag.
+Regeln können Nichtnullheit, Positivität, Nichtnegativität und weitere
+Voraussetzungen explizit modellieren. Applicability-Schemata binden typisierte
+Required-Assumption-Templates; fehlende oder unbekannte Guards autorisieren
+keinen Kandidaten.
+
+Der allgemeine lokale Bridge-Pfad prüft Ausgangs- und durch verifizierte
+Vorbereitungsschritte erzeugte Annahmen gemeinsam. Native Exact-Spezialisten
+besitzen eigene fragmentbezogene Annahmen- und Zertifikatsverträge. Guarded
+fremde Principal-Schemata verwenden den nativen Exact-Pfad noch nicht, solange
+die Spezialisten keine terminalen Matcher-Bindungen exponieren.
 
 Nicht unterstützt ist eine universelle, vollständige Annahmenlogik für alle
 Ausdrucksarten und externen Backends. Insbesondere können externe Systeme nicht
@@ -72,9 +99,10 @@ Simplifier-Outputs bleibt im aktuellen Vergleich ein Coverage Gap.
 
 ## Suche und Equality Saturation
 
-Unterstützt werden mehrere begrenzte Suchstrategien und Equality Saturation.
-Alle produktiven Profile besitzen harte Grenzen für Tiefe, Zustände,
-Kandidaten, Zeit oder Arbeit.
+Unterstützt werden mehrere begrenzte Suchstrategien, ein vollständiger
+begrenzter Reachability-Oracle für endliche Closures, regelgerichtete lokale
+Bridges und Equality Saturation. Alle produktiven Profile besitzen harte
+Grenzen für Tiefe, Zustände, Kandidaten, Zeit oder Arbeit.
 
 Nicht unterstützt sind:
 
@@ -84,25 +112,47 @@ Nicht unterstützt sind:
 - ein universelles Vergleichsscore über unterschiedliche Informationsregime;
 - vollständige exakte Nebenbedingungsprovenienz für jeden Equality-Saturation-
   Vergleichsfall;
+- eine gemeinsame Multi-Principal-Frontier und eine einzige geteilte
+  AST-/Value-Traversierung für alle Vorbereitungspfade;
 - Serialisierung jedes beliebigen internen Frontier- oder MCTS-Zustands zur
   bytegenauen Fortsetzung.
 
 Checkpoints können definierte fachliche Zustände binden; sie sind kein
 allgemeiner JVM-Snapshot.
 
-## Discovery und Lernen
+## Discovery, Lernen und Promotion
 
 Regelsuche kann aus targetfreien Suchbeobachtungen Kandidaten bilden,
 verallgemeinern und durch getrennte Evidence-Stufen führen. Eine qualifizierte
 interne autonome Referenz-Campaign und eine separate Mehrdomänenqualifikation
 liegen vor.
 
-Daraus folgt nicht:
+Rohe evolutionäre `CompiledGenomeRule`s sind ausführbar, bleiben aber bewusst
+nicht äquivalenzbewahrend. Ein enger Promotionsmechanismus ist implementiert:
+assumption-free gelernte Patternidentitäten können in einem begrenzten
+kommutativen Polynomfragment exakt bewiesen und als neue
+`PatternRewriteRule`-Identität mit Applicability-Schema und Promotion-Receipt
+ausgegeben werden.
+
+Diese Implementierung hat klare Grenzen:
+
+- die referenzierten Validation-, Counterexample-, Holdout- und Leakage-Hashes
+  werden gebunden, aber vom v1-Promoter nicht geladen oder semantisch geprüft;
+- bedingte gelernte Regeln sind nicht unterstützt;
+- Funktionen, Division und nicht exakte Koeffizienten liegen außerhalb des
+  aktuellen Proof-Fragments;
+- gelernte `RewriteProgram`s benötigen einen eigenen programmbasierten
+  Applicability-/Replay-Vertrag;
+- kein realer Produktions- oder Flagship-Kandidat wurde dadurch qualifiziert.
+
+Daher bleibt der öffentliche Capability-Status `PROMOTION` `NOT_EVALUATED`.
+Aus der vorhandenen Discovery- oder Promotionsmechanik folgt außerdem nicht:
 
 - externe mathematische Neuheit;
 - fachliche Interessantheit;
-- formaler Beweis des retained Produktionskandidaten;
-- automatische Promotion in einen autoritativen Regelbestand;
+- formaler Beweis eines retained Produktionskandidaten außerhalb des eng
+  unterstützten Fragments;
+- automatische Aufnahme in einen autoritativen öffentlichen Regelbestand;
 - Public Evidence oder Veröffentlichung.
 
 Das stärkere Flagship-Experiment zur erlernten proof-carrying
@@ -140,7 +190,9 @@ abgeleitet. Folgende Grenzen gelten:
 - ein Lean-Artefakt mit offenen Platzhaltern autorisiert keinen formalen Status;
 - numerische Relationssuche oder heuristische Symbolic Regression erzeugt
   Hypothesen, keine Proofs;
-- unterschiedliche Solver-Certificate-Stärken bleiben sichtbar.
+- unterschiedliche Solver-Certificate-Stärken bleiben sichtbar;
+- der exakte Polynom-Pattern-Verifier beweist nur sein ausdrücklich begrenztes
+  kommutatives Fragment und keine beliebigen mathematischen Regeln.
 
 ## Vergleichende Benchmarks
 
@@ -153,6 +205,10 @@ Im aktuellen targetfreien Simplification-Track erreicht Regelsuche mit dem
 Default-Inventar sechs von sieben gepinnten Referenzformen, SymPy sieben von
 sieben. Der Track bleibt als negatives Ergebnis retained. Siehe
 [Comparative Discovery Benchmarks](discovery-benchmarks.md).
+
+Die getrennte SymPy-Amplifikationsmatrix zeigt vier zusätzliche lokal
+vorbereitete Anwendungen über drei Regelfamilien. Sie ist ein begrenzter
+Applicability-Nachweis und keine allgemeine Leistungsrangfolge.
 
 Wandzeit und Durchsatz sind umgebungsabhängige Engineering-Metriken. Die
 kanonische mathematische Arbeitsbilanz verwendet getrennte Work-Zähler und
@@ -236,6 +292,8 @@ Diese reale Prüfung ist noch nicht abgeschlossen; das Profil bleibt `BLOCKED`.
 ## Siehe auch
 
 - [Discovery- und Forschungsstand](discovery-status.md)
+- [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md)
+- [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md)
 - [Architektur](architecture.md)
 - [Comparative Discovery Benchmarks](discovery-benchmarks.md)
 - [Proof Bridge](proof-bridge.md)
