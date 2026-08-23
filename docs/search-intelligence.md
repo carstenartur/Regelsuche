@@ -2,7 +2,8 @@
 
 This page is the entry point for the mechanisms that make Regelsuche's search
 selective and diagnosable: profiles, goals, transposition memory, structural
-diversity, bounded reachability and universal patterns.
+diversity, rule-directed preparation, bounded reachability and universal
+patterns.
 
 For roadmap and historical context see
 [`search-intelligence-roadmap.md`](search-intelligence-roadmap.md). This page
@@ -52,6 +53,34 @@ structure:
 No target identity is inspected. The profile is a bounded
 MAP-Elites-style control for scalar-fitness valleys, not a claim to implement
 the complete MAP-Elites algorithm.
+
+## Rule-directed preparation
+
+The preparation layer diagnoses and bridges expressions that are close to a
+visible rule without directly matching it. `UnifiedRulePreparationCoordinator`
+uses the following policy order:
+
+```text
+concrete direct executor replay
+  -> typed guards
+  -> native exact preparation specialist
+  -> bounded pattern-targeted local bridge
+  -> concrete replay and independent verification
+```
+
+`SafePreparationEngineRegistry` binds the existing exact specialists to their
+execution order and native principal rule IDs. A similar imported or learned
+pattern does not inherit another rule's specialist contract. The local bridge
+uses an explicitly frozen equivalence-preserving preparation inventory and
+retains every primitive step, assumption and work limit.
+
+Technical exceptions become retained `TECHNICAL_FAILURE` outcomes. The unified
+policy is implemented and characterized, but has not yet been selected as the
+general Workbench/CLI default profile. Full contracts and limitations are in:
+
+- [`safe-rule-preparation-coordinator.md`](safe-rule-preparation-coordinator.md);
+- [`rule-directed-preparation-planning.md`](rule-directed-preparation-planning.md);
+- [`learned-pattern-rule-promotion.md`](learned-pattern-rule-promotion.md).
 
 ## Bounded reachability and historical atlas
 
@@ -209,7 +238,8 @@ combinations and age. The leading entries are exposed through:
 | Suchgedächtnis → *Universelle Muster* | supporting best path and promotion context |
 
 High-universality states are macro-rule promotion targets. Promotion rules are
-documented in [`macro-rules.md`](macro-rules.md).
+documented in [`macro-rules.md`](macro-rules.md). This heuristic macro context
+is distinct from the exact learned-pattern promotion mechanism.
 
 ## Related docs
 
