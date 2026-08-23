@@ -11,6 +11,9 @@ import org.junit.jupiter.api.Test;
 
 /** Guards the fail-closed publication semantics of the platform release workflow. */
 class MavenReleaseWorkflowContractTest {
+    private static final String OPENAPI_PATH =
+        "app/src/main/resources/web/openapi/openapi.json";
+
     @Test
     void releaseUsesCuratedNotesAndTheCompleteProductGate()
             throws IOException {
@@ -37,6 +40,10 @@ class MavenReleaseWorkflowContractTest {
             "release manifest must bind the curated notes bytes"
         );
         assertTrue(
+            workflow.contains("openapi_sha256=$(sha256sum " + OPENAPI_PATH),
+            "release manifest must bind the public OpenAPI bytes"
+        );
+        assertTrue(
             workflow.contains("--notes-file \"docs/releases/${VERSION}.md\""),
             "GitHub Release body must come from the curated notes file"
         );
@@ -47,6 +54,15 @@ class MavenReleaseWorkflowContractTest {
         assertFalse(
             workflow.contains("--generate-notes"),
             "automatically generated notes would bypass the audited semantic interval"
+        );
+
+        long openApiReferences = workflow.lines()
+            .filter(line -> line.contains(OPENAPI_PATH))
+            .count();
+        assertTrue(
+            openApiReferences >= 3,
+            "OpenAPI must be staged for the release commit, hashed in the manifest "
+                + "and included in the next-development PR"
         );
 
         int notesValidation = workflow.indexOf(
@@ -79,12 +95,12 @@ class MavenReleaseWorkflowContractTest {
             .findFirst()
             .orElseThrow();
         String openApi = Files.readString(
-            root.resolve("app/src/main/resources/web/openapi/openapi.json"),
+            root.resolve(OPENAPI_PATH),
             StandardCharsets.UTF_8
         );
 
         assertTrue(
-            script.contains("OPENAPI_PATH = ROOT / 'app/src/main/resources/web/openapi/openapi.json'"),
+            script.contains("OPENAPI_PATH = ROOT / '" + OPENAPI_PATH + "'"),
             "the coordinated metadata helper must own the embedded OpenAPI document"
         );
         assertTrue(
