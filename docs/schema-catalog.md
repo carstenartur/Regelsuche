@@ -66,6 +66,7 @@ beschrieben. Die semantische Grenze des neuen Promotion-Receipts steht unter
 | --- | --- |
 | [`regelsuche-historical-rediscovery-corpus-v1`](schemas/regelsuche-historical-rediscovery-corpus-v1.schema.json) | Eingefrorener Korpus für Reachability-, Richtungs- und Suchpolitikdiagnosen mit Negativkontrollen |
 | [`regelsuche-generational-rule-mining-campaign-v1`](schemas/regelsuche-generational-rule-mining-campaign-v1.schema.json) | Generationengetrennte, exact-gated Schatteninventare mit Kandidatenentscheidungen und kumulativem Reachability-Vergleich |
+| [`regelsuche-generational-rule-mining-reachability-audit-v1`](schemas/regelsuche-generational-rule-mining-reachability-audit-v1.schema.json) | Strenger Vergleich des Vorgängerinventars mit der nächsten gelernten Generation unter identischem Tiefenbudget und tatsächlicher Regelwiederverwendung |
 | [`regelsuche-comparative-benchmark-v1`](schemas/regelsuche-comparative-benchmark-v1.schema.json) | Track-spezifische Vergleiche unter Informationsparität |
 | [`regelsuche-candidate-independent-benchmark-run-v1`](schemas/regelsuche-candidate-independent-benchmark-run-v1.schema.json) | Kandidatenunabhängiger Benchmarklauf |
 | [`regelsuche-discovery-cost-ledger-v1`](schemas/regelsuche-discovery-cost-ledger-v1.schema.json) | Vollständige Discovery- und Qualifikationskosten |
