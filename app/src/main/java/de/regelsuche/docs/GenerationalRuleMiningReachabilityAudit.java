@@ -412,7 +412,7 @@ public final class GenerationalRuleMiningReachabilityAudit {
         }
 
         private static void writeRuleGenerations(
-            JsonWriter.ArrayWriter array,
+            JsonWriter array,
             Map<Integer, Set<String>> ruleIdsByGeneration
         ) {
             ruleIdsByGeneration.entrySet().stream()
