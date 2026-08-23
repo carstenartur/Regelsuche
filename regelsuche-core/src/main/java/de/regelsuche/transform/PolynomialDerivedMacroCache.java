@@ -113,7 +113,6 @@ public final class PolynomialDerivedMacroCache {
         append(material, classification.derivedExpression());
         append(material, classification.theoryMethodId());
         append(material, classification.certificateHash());
-        append(material, classification.applicationKey());
         return sha256(material.toString());
     }
 
