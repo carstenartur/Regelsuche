@@ -311,6 +311,23 @@ jobs:
           python3 .github/scripts/update-release-metadata.py \
             "$DEVELOPMENT_VERSION" --check
 
+      - name: Validate curated release notes
+        if: steps.release-state.outputs.publication_required == 'true'
+        env:
+          VERSION: ${{ steps.release-state.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          NOTES="docs/releases/${VERSION}.md"
+          if [[ ! -s "$NOTES" ]]; then
+            echo "::error::Missing curated release notes: ${NOTES}"
+            exit 1
+          fi
+          if [[ "$(head -n 1 "$NOTES" | tr -d '\r')" != "# Regelsuche ${VERSION}" ]]; then
+            echo "::error::Curated release notes must start with '# Regelsuche ${VERSION}'"
+            exit 1
+          fi
+          git diff --check -- "$NOTES"
+
       - name: Set up JDK 25
         if: steps.release-state.outputs.publication_required == 'true'
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
@@ -357,13 +374,13 @@ jobs:
             --stacktrace \
             2>&1 | tee build/logs/release-ci-check.log
 
-      - name: Verify the complete Maven product reactor
+      - name: Verify the complete Maven product and Docker contract
         if: >-
           steps.release-state.outputs.publication_required == 'true'
           && steps.release-state.outputs.skip_tests != 'true'
         run: |
           set -euo pipefail
-          mvn --batch-mode --no-transfer-progress test
+          mvn --batch-mode --no-transfer-progress -Pfull verify
 
       - name: Run emergency assembly-only verification
         if: >-
@@ -477,9 +494,10 @@ jobs:
           JAR="app/target/regelsuche-${VERSION}.jar"
           TAR="app/target/regelsuche-${VERSION}.tar"
           ZIP="app/target/regelsuche-${VERSION}.zip"
-          for file in "$JAR" "$TAR" "$ZIP"; do
+          NOTES="docs/releases/${VERSION}.md"
+          for file in "$JAR" "$TAR" "$ZIP" "$NOTES"; do
             if [[ ! -s "$file" ]]; then
-              echo "::error::Missing Maven release artifact: $file"
+              echo "::error::Missing release input: $file"
               exit 1
             fi
           done
@@ -499,6 +517,8 @@ jobs:
             echo "build_system=maven"
             echo "source_main_commit=${SOURCE_COMMIT}"
             echo "release_commit=$(git rev-parse HEAD)"
+            echo "release_notes_file=${NOTES}"
+            echo "release_notes_sha256=$(sha256sum "$NOTES" | awk '{print $1}')"
             echo "release_properties_sha256=$(sha256sum release.properties | awk '{print $1}')"
             echo "root_pom_sha256=$(sha256sum pom.xml | awk '{print $1}')"
           } > release-artifacts/RELEASE-MANIFEST.txt
@@ -578,7 +598,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --title "Regelsuche ${VERSION}" \
-            --generate-notes \
+            --notes-file "docs/releases/${VERSION}.md" \
             release-artifacts/*
 
       - name: Verify published GitHub Release
@@ -617,6 +637,16 @@ jobs:
             printf '%s\n' "$EXPECTED"
             echo 'Actual:'
             printf '%s\n' "$ACTUAL"
+            exit 1
+          fi
+
+          EXPECTED_NOTES=$(cat "docs/releases/${VERSION}.md")
+          ACTUAL_NOTES=$(gh release view "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json body \
+            --jq '.body')
+          if [[ "$ACTUAL_NOTES" != "$EXPECTED_NOTES" ]]; then
+            echo "::error::Published release body differs from docs/releases/${VERSION}.md"
             exit 1
           fi
 
@@ -711,6 +741,7 @@ jobs:
             echo "| Publication required | ${{ steps.release-state.outputs.publication_required }} |";
             echo "| Next development version | ${{ steps.release-state.outputs.next_version }} |";
             echo "| Maintenance branch | ${{ steps.release-state.outputs.maintenance_branch }} |";
+            echo "| Curated notes | docs/releases/${{ steps.release-state.outputs.release_version }}.md |";
             echo "| Dry run | ${{ steps.release-state.outputs.dry_run }} |";
             echo "| Tests skipped | ${{ steps.release-state.outputs.skip_tests }} |";
             echo "| GitHub Release | ${{ steps.published-release.outputs.release_url }} |";
