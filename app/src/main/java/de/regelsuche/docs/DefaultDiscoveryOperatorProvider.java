@@ -6,6 +6,7 @@ import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.ExpLogInverseOperator;
 import de.regelsuche.transform.FactorCandidateOperator;
 import de.regelsuche.transform.LogProductAssumptionOperator;
+import de.regelsuche.transform.PolynomialStructureSynthesisOperator;
 import de.regelsuche.transform.PowerRootAssumptionRules;
 import de.regelsuche.transform.RationalDiscoveryToolkitOperator;
 import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
@@ -32,11 +33,19 @@ final class DefaultDiscoveryOperatorProvider implements DiscoveryOperatorProvide
                         CompleteSquareBridgeOperator::new,
                         List.of(CompleteSquareBridgeOperator.RULE_ID)),
                 new DiscoveryOperatorDefinition(
+                        "polynomial_structure_synthesis",
+                        PolynomialStructureSynthesisOperator::new,
+                        List.of(PolynomialStructureSynthesisOperator.RULE_ID)),
+                new DiscoveryOperatorDefinition(
                         "sophie_germain_bridge",
-                        DifferenceOfSquaresPreparationOperator::new,
-                        List.of(DifferenceOfSquaresPreparationOperator.RULE_ID)),
+                        PolynomialStructureSynthesisOperator::new,
+                        List.of(PolynomialStructureSynthesisOperator.RULE_ID)),
                 new DiscoveryOperatorDefinition(
                         "hidden_structure_bridge",
+                        PolynomialStructureSynthesisOperator::new,
+                        List.of(PolynomialStructureSynthesisOperator.RULE_ID)),
+                new DiscoveryOperatorDefinition(
+                        "legacy_difference_of_squares_bridge",
                         DifferenceOfSquaresPreparationOperator::new,
                         List.of(DifferenceOfSquaresPreparationOperator.RULE_ID)),
                 new DiscoveryOperatorDefinition(
