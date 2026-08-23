@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-generational-rule-mining-reachability-audit-v1.schema.json",
+  "title": "Regelsuche generational rule-mining reachability audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "campaignId",
+    "repositoryRevision",
+    "claimBoundary",
+    "generationBoundary",
+    "reuse",
+    "subject",
+    "decision",
+    "previousInventory",
+    "accumulatedInventory"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.generational-rule-mining-reachability-audit/v1"
+    },
+    "campaignId": { "type": "string", "minLength": 1 },
+    "repositoryRevision": { "type": "string", "minLength": 1 },
+    "claimBoundary": { "type": "string", "minLength": 1 },
+    "generationBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "previousGeneration",
+        "accumulatedGeneration",
+        "maximumSearchDepth"
+      ],
+      "properties": {
+        "previousGeneration": { "type": "integer", "minimum": 0 },
+        "accumulatedGeneration": { "type": "integer", "minimum": 1 },
+        "maximumSearchDepth": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "reuse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation1ReusedGeneration0",
+        "generation2ReusedGeneration1"
+      ],
+      "properties": {
+        "generation1ReusedGeneration0": { "type": "boolean" },
+        "generation2ReusedGeneration1": { "type": "boolean" }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputFingerprint", "targetFingerprint"],
+      "properties": {
+        "inputFingerprint": { "$ref": "#/$defs/sha256" },
+        "targetFingerprint": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accumulatedPathUsesGeneration2",
+        "newlyReachableByGeneration2",
+        "passed"
+      ],
+      "properties": {
+        "accumulatedPathUsesGeneration2": { "type": "boolean" },
+        "newlyReachableByGeneration2": { "type": "boolean" },
+        "passed": { "type": "boolean" }
+      }
+    },
+    "previousInventory": { "$ref": "#/$defs/inventory" },
+    "accumulatedInventory": { "$ref": "#/$defs/inventory" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exploredStates",
+        "expandedStates",
+        "generatedTransformations",
+        "enqueuedStates",
+        "duplicatePrunes",
+        "transpositionPrunes",
+        "depthPrunes",
+        "candidateBudgetPrunes"
+      ],
+      "properties": {
+        "exploredStates": { "type": "integer", "minimum": 0 },
+        "expandedStates": { "type": "integer", "minimum": 0 },
+        "generatedTransformations": { "type": "integer", "minimum": 0 },
+        "enqueuedStates": { "type": "integer", "minimum": 0 },
+        "duplicatePrunes": { "type": "integer", "minimum": 0 },
+        "transpositionPrunes": { "type": "integer", "minimum": 0 },
+        "depthPrunes": { "type": "integer", "minimum": 0 },
+        "candidateBudgetPrunes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reached", "status", "metrics", "path", "appliedRuleIds"],
+      "properties": {
+        "reached": { "type": "boolean" },
+        "status": { "type": "string", "minLength": 1 },
+        "metrics": { "$ref": "#/$defs/metrics" },
+        "path": { "$ref": "#/$defs/stringArray" },
+        "appliedRuleIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "ruleGeneration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generation", "ruleIds"],
+      "properties": {
+        "generation": { "type": "integer", "minimum": 0 },
+        "ruleIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ruleGenerations", "search"],
+      "properties": {
+        "ruleGenerations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ruleGeneration" }
+        },
+        "search": { "$ref": "#/$defs/search" }
+      }
+    }
+  }
+}
