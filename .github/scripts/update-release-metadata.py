@@ -18,6 +18,10 @@ ORCID_URL = 'https://orcid.org/' + ORCID_ID
 POM_VERSION_PATTERN = re.compile(
     r'(<artifactId>regelsuche-parent</artifactId>\s*<version>)([^<]+)(</version>)'
 )
+OPENAPI_VERSION_PATTERN = re.compile(
+    r'^(\s*"version"\s*:\s*")[^"]*(".*)$',
+    flags=re.MULTILINE,
+)
 
 
 def set_cff_key(text: str, key: str, value: str) -> str:
@@ -110,9 +114,22 @@ def update_openapi(version: str) -> None:
     data = read_json(OPENAPI_PATH)
     info = data.get('info')
     if not isinstance(info, dict):
-        raise RuntimeError(f'{OPENAPI_PATH.relative_to(ROOT)} has no object-valued info field')
-    info['version'] = version
-    write_json(OPENAPI_PATH, data)
+        raise RuntimeError(
+            f'{OPENAPI_PATH.relative_to(ROOT)} has no object-valued info field'
+        )
+
+    text = OPENAPI_PATH.read_text(encoding='utf-8')
+    updated, replacements = OPENAPI_VERSION_PATTERN.subn(
+        rf'\g<1>{version}\g<2>',
+        text,
+        count=1,
+    )
+    if replacements != 1:
+        raise RuntimeError(
+            f'{OPENAPI_PATH.relative_to(ROOT)} does not expose exactly one '
+            'leading info.version line'
+        )
+    OPENAPI_PATH.write_text(updated, encoding='utf-8')
 
 
 def update_release_properties(version: str) -> None:
@@ -246,7 +263,10 @@ def validate_version_alignment(version: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('version', help='Version to write to or verify in release metadata')
+    parser.add_argument(
+        'version',
+        help='Version to write to or verify in release metadata',
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--release', action='store_true')
     mode.add_argument('--check', action='store_true')
