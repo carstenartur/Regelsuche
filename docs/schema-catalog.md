@@ -52,11 +52,13 @@ fachlich gruppierten Einstieg; der vollständige Bestand liegt unter
 | [`regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-v1`](schemas/regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-v1.schema.json) | TRAIN-Checkpoint, der Resume an dieselbe Population-Execution-Identität bindet |
 | [`regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact-v1`](schemas/regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact-v1.schema.json) | Process-independent Manifest-last-Checkpoint, der nested TRAIN-State an Execution Plan und Protocol bindet |
 | [`regelsuche-evolution-rewrite-program-train-diagnostics-v1`](schemas/regelsuche-evolution-rewrite-program-train-diagnostics-v1.schema.json) | Content-addressed TRAIN-only Proposal-, Mutationstyp-, Alpha-Struktur- und Lineage-Diagnostik für versionierte Scheduler |
+| [`regelsuche-learned-pattern-rule-promotion-receipt-v1`](schemas/regelsuche-learned-pattern-rule-promotion-receipt-v1.schema.json) | Receipt der engen assumption-free Polynom-Pattern-Promotion; Evidence-Hashes sind gebundene Referenzen und noch keine unabhängig verifizierte Promotionsevidence |
 
 Weitere Flagship-Verträge für Freeze, Reveal, Baselines und Work Accounting
 liegen ebenfalls im Schema-Verzeichnis und sind in
 [Flagship Freeze Execution](evolution-rewrite-program-flagship-freeze-execution.md)
-beschrieben.
+beschrieben. Die semantische Grenze des neuen Promotion-Receipts steht unter
+[Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md).
 
 ## Benchmarks, Kosten und Reproduktion
 
