@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.PolynomialStructureSynthesisOperator;
 import de.regelsuche.transform.RationalizationHypothesisOperator;
 import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
 import de.regelsuche.transform.Transformation;
@@ -20,11 +21,19 @@ class HypothesisOperatorRegistryTest {
 
         List<String> ids = registry.all().stream().map(HypothesisOperatorDescriptor::id).toList();
 
+        assertTrue(ids.contains(PolynomialStructureSynthesisOperator.RULE_ID));
         assertTrue(ids.contains(DifferenceOfSquaresPreparationOperator.RULE_ID));
         assertTrue(ids.contains(ConservativeCompleteSquareHypothesisOperator.RULE_ID));
         assertTrue(ids.contains(TelescopingFractionHypothesisOperator.RULE_ID));
         assertTrue(ids.contains(RationalizationHypothesisOperator.RULE_ID));
         assertEquals(ids.size(), new HashSet<>(ids).size());
+        assertEquals("polynomial-structure-synthesis",
+            registry.byId(PolynomialStructureSynthesisOperator.RULE_ID)
+                .orElseThrow().displayName());
+        assertTrue(registry.byId(PolynomialStructureSynthesisOperator.RULE_ID)
+            .orElseThrow().defaultEnabled());
+        assertFalse(registry.byId(DifferenceOfSquaresPreparationOperator.RULE_ID)
+            .orElseThrow().defaultEnabled());
         assertEquals("complete-square", registry.byId(ConservativeCompleteSquareHypothesisOperator.RULE_ID).orElseThrow().displayName());
         assertEquals("telescoping-fraction", registry.byId(TelescopingFractionHypothesisOperator.RULE_ID).orElseThrow().displayName());
         assertEquals("rationalization", registry.byId(RationalizationHypothesisOperator.RULE_ID).orElseThrow().displayName());
