@@ -386,6 +386,38 @@ public final class PolynomialSemanticView {
                 BigInteger.ZERO);
         }
 
+        /**
+         * Homogenizes a one-atom polynomial by introducing the structural unit
+         * atom. A term {@code A^k} becomes {@code A^k * 1^(n-k)}. This is a
+         * general projective transformation, not a stored identity.
+         */
+        public Polynomial homogenizeWithUnitAtom(int totalDegree) {
+            if (atoms.size() != 1 || totalDegree < degree) {
+                throw new IllegalArgumentException(
+                    "unit homogenization requires one atom and sufficient degree");
+            }
+            Atom unit = new Atom(
+                "structural-unit:1",
+                "1",
+                new NumberExpr(1));
+            TreeMap<Monomial, BigInteger> homogenized = new TreeMap<>();
+            coefficients.forEach((monomial, coefficient) -> {
+                int atomDegree = monomial.exponents().getFirst();
+                homogenized.put(
+                    new Monomial(List.of(
+                        atomDegree,
+                        totalDegree - atomDegree)),
+                    coefficient);
+            });
+            return new Polynomial(
+                viewId,
+                List.of(atoms.getFirst(), unit),
+                homogenized,
+                totalDegree,
+                true,
+                visitedNodes);
+        }
+
         public boolean isHomogeneousOfDegree(int expectedDegree) {
             return homogeneous && degree == expectedDegree;
         }
