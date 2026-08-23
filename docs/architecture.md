@@ -36,7 +36,9 @@ autoritative Verifikationsvertrag liegt im Checkout.
 ### 1. Mathematische Grundlage
 
 - `regelsuche-core` — AST, Parser, kanonische Ausdrucksidentität, atomare
-  Transformationen, exakte Vorbereitungsspezialisten und deren Registry.
+  Transformationen, exakte Vorbereitungsspezialisten und deren Registry sowie
+  semantische Views und exakte Syntheseoperatoren für begrenzte
+  Polynomdarstellungen.
 - `regelsuche-egraph` — Equality-Saturation-Strukturen auf Basis des Core.
 - `regelsuche-search` — Suchprobleme, Strategien, Scoring, Budgets,
   Frontier-/Transposition-Memory und die Koordinatoren für direkte, exakte und
@@ -52,8 +54,8 @@ GitHub-spezifischen Abhängigkeiten benötigen.
 ### 2. Fachliche Capabilities
 
 - `regelsuche-learning` — Mining, Anti-Unification, Kandidaten- und
-  Rewrite-Program-Lernen sowie die enge Promotion exakt bewiesener
-  assumption-free Polynom-Pattern.
+  Rewrite-Program-Lernen, generationengetrennte Schatteninventare sowie die
+  enge Promotion exakt bewiesener assumption-free Polynom-Pattern.
 - `regelsuche-discovery` — domänenneutrale Discovery-Verträge und
   Lifecycle-Handoffs.
 - `regelsuche-experiments` — Experiment-, Benchmark- und Corpus-Primitiven.
@@ -177,6 +179,37 @@ programmbasierte Applicability-/Replay-Grenze.
 Details:
 [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md).
 
+## Generationengetrennte Schatteninventare
+
+Regelbildung und Regelverwendung sind im experimentellen Lernpfad nicht dieselbe
+Operation. Jede Generation arbeitet gegen eine eingefrorene Inventarrevision:
+
+```mermaid
+flowchart LR
+    i0[Inventar I_n eingefroren] --> search[Targetfreie Suchläufe]
+    search --> freeze[Kandidatenmenge einfrieren]
+    freeze --> qualify[Validation / Counterexamples / Holdouts / Leakage / Exact Proof]
+    qualify --> accepted[Akzeptierte Regeln]
+    accepted --> i1[Neues Schatteninventar I_n+1]
+```
+
+Architekturregeln:
+
+- Eine in Generation `n` gebildete Regel darf frühestens in Generation `n+1`
+  ausgeführt werden.
+- Inventar, Aufgaben, Budgets, Regelquellen und Berichtsrevision sind vor jeder
+  Generation eingefroren und content-addressed.
+- Akzeptierte und verworfene Kandidaten bleiben einschließlich terminaler Gründe
+  und Work Accounting erhalten.
+- Ein positives kumulatives Ergebnis muss die tatsächlich verwendete
+  Regelgeneration im Replay nachweisen; bloße Inventaranwesenheit genügt nicht.
+- Die Kampagne verändert ausschließlich ein experimentelles Schatteninventar.
+  Produktionsinventar und Capability-Status werden nicht implizit mutiert.
+
+Damit verhindert die Architektur same-generation feedback und eine
+nachträgliche Vermischung von Such- und Qualifikationswissen. Der Mechanismus
+ist in [Generational Rule Mining](generational-rule-mining.md) dokumentiert.
+
 ## Repräsentationsbrücken
 
 Nicht jede mathematische Verbesserung ist ein skalares AST-Rewrite. Exakte
@@ -198,6 +231,44 @@ einen einzelnen Ausdrucksstring abgeflacht.
 Die direkte Teilnahme dieser typisierten Objektbrücken am Unified Preparation
 Coordinator bleibt eine offene Integrationsgrenze.
 
+## Semantische Darstellungs- und Syntheseoperatoren
+
+Eine semantische View ist weder bloße Formatierung noch automatisch ein
+Beweis. Sie interpretiert einen vollständigen AST unter einer ausdrücklich
+begrenzten Theorie und kann dadurch einen spezialisierten exakten Operator
+anwendbar machen:
+
+```mermaid
+flowchart LR
+    ast[AST-Teilbaum] --> view[PolynomialSemanticView]
+    view --> atoms[Strukturelle Atome + exakte Koeffizienten]
+    atoms --> constraints[Begrenzte Koeffizientenbedingungen]
+    constraints --> synthesis[Exact Synthesis Operator]
+    synthesis --> certificate[Ergebnis-AST + content-addressed Certificate]
+    certificate --> verify[Unabhängige Polynomidentitätsprüfung]
+```
+
+Der aktuelle `PolynomialDecompositionSynthesisOperator` behandelt vollständige
+AST-Teilbäume wie `x + 1` oder `sin(t)` als strukturelle Atome und löst eine
+begrenzte ganzzahlige quadratisch-mal-quadratische Zerlegung für binäre
+homogene Quartiken. Univariate Quartiken werden über eine explizite strukturelle
+Einheit homogenisiert.
+
+Wesentliche Grenzen:
+
+- Atome sind occurrence- und strukturgebunden; eine ähnliche Darstellung wird
+  nicht stillschweigend gleichgesetzt.
+- Der Syntheseoperator ist ein deklarierter Theorieoperator mit eigener
+  Budget-, Domain- und Zertifikatsidentität, keine nachträglich benannte
+  Spezialregel.
+- Jede positive Zerlegung wird exakt rekonstruiert und unabhängig verifiziert.
+- Nicht unterstützte Grade, Koeffizientenbereiche oder ausgeschöpfte Budgets
+  bleiben explizite Nicht-Erfolge.
+- Das Verfahren ist keine vollständige multivariate Faktorisierung.
+
+Details stehen in
+[Polynomial Decomposition Synthesis](polynomial-decomposition-synthesis.md).
+
 ## Regel- und Erweiterungsmodell
 
 Regeln werden nach Herkunft und Vertrauensgrenze unterschieden:
@@ -212,7 +283,9 @@ Regeln werden nach Herkunft und Vertrauensgrenze unterschieden:
 
 Ein content-addressed Regelinventar bindet das tatsächlich aktive Profil. Damit
 lassen sich Ablationen durchführen, ohne Ergebnisse nachträglich durch ein
-verändertes Inventar umzudeuten. Details:
+verändertes Inventar umzudeuten. Semantische Syntheseoperatoren besitzen eine
+eigene Theorie- und Budgetidentität und werden nicht als unmarkierte Kernelregel
+in das Inventar hineingerechnet. Details:
 [Regel-Tiers und Ablation](rule-tiers.md) und
 [Erweiterungssystem](extension-system.md).
 
@@ -256,6 +329,8 @@ Vollständigkeit und Hashes.
 | Direct vs. Preparation | Direkter konkreter Executor wird vor jedem schema-gesteuerten Vorbereitungsversuch ausgeführt |
 | Exact-Spezialist vs. fremde Regel | Nur die registrierte native Principal-ID erhält den jeweiligen Solververtrag |
 | Rohe Lernregel vs. Promotion | Ausführbarkeit oder Fitness autorisiert keine Äquivalenz; Promotion erzeugt eine neue Identität nach eigenem Nachweis |
+| Generation `n` vs. `n+1` | Neu gebildete Regeln werden erst nach vollständigem Generationsabschluss im nächsten eingefrorenen Schatteninventar aktiv |
+| Semantische View vs. mathematischer Claim | Repräsentationserkennung autorisiert nur den gebundenen Theorieoperator; Ergebnis und Relation werden separat verifiziert |
 | Search vs. Validation | Validatoren beurteilen Outputs; sie erzeugen nicht den zu bewertenden Kandidaten |
 | TRAIN vs. VALIDATION | VALIDATION darf Konfigurationen auswählen, aber keine TRAIN-Fitness erzeugen |
 | VALIDATION vs. FINAL TEST | FINAL TEST wird erst nach eingefrorener Auswahl genau einmal geöffnet |

@@ -104,6 +104,13 @@ für unendlich viele konkrete Ausdrücke stehen.
 - **Kandidaten bilden und falsifizieren:** Targetfreie Suchbeobachtungen können
   zu parametrisierten Hypothesen verdichtet und gegen Holdouts sowie
   Counterexamples geprüft werden.
+- **Gelernte Regeln generationenweise prüfen und wiederverwenden:** Akzeptierte
+  experimentelle Regeln werden erst nach Abschluss einer Generation in ein
+  eingefrorenes Schatteninventar der nächsten Generation übernommen. Gleichzeitiges
+  Lernen und Nutzen innerhalb derselben Generation ist ausgeschlossen.
+- **Mathematische Darstellungen synthetisieren:** Semantische Views können
+  vollständige AST-Teilbäume als strukturelle Atome interpretieren und daraus
+  unter exakten, begrenzten Koeffizientenbedingungen neue Zerlegungen erzeugen.
 - **Beweisobligationen erzeugen:** Proof-Backends erhalten versionierte
   Obligationen. Ein formaler Status wird nur aus tatsächlich bestätigter
   Proof-Evidence abgeleitet.
@@ -193,6 +200,53 @@ Diese typisierten Repräsentationsbrücken bleiben von skalaren AST-Rewrites
 getrennt. Ihre direkte Teilnahme am Unified Preparation Coordinator ist noch
 eine offene Integrationsstufe.
 
+## Generationenbasiertes, proof-gated Regelmining
+
+Die experimentelle Lernkampagne trennt Regelbildung und Regelverwendung durch
+harte Generationsbarrieren:
+
+```text
+eingefrorenes Inventar I_n
+  -> targetfreie Suchbeobachtungen
+  -> Kandidaten-Freeze
+  -> Validation, Counterexamples, Holdouts, Leakage-Audit und Exact Proof
+  -> akzeptiertes Schatteninventar I_(n+1)
+```
+
+Eine Regel darf erst von der folgenden Generation genutzt werden. Jede
+Schatteninventar-Revision ist content-addressed; verworfene Kandidaten und ihre
+terminalen Gründe bleiben erhalten. Ein kumulativer Audit vergleicht unter
+demselben maximalen Suchdepth `0+1` mit `0+1+2` und verlangt bei dem positiven
+Kontrollfall die tatsächliche Verwendung einer Regel aus Generation 2.
+
+Dieser Mechanismus verändert weder das normale Produktionsinventar noch den
+öffentlichen Capability-Status. `PROMOTION` bleibt `NOT_EVALUATED`; gezeigt ist
+eine begrenzte, intern verifizierte Wiederverwendung im experimentellen
+Schatteninventar, keine autonome mathematische Neuheit.
+
+Details: [Generational Rule Mining](docs/generational-rule-mining.md).
+
+## Semantische Polynomzerlegung
+
+`PolynomialSemanticView` interpretiert vollständige AST-Teilbäume wie `x + 1`
+oder `sin(t)` als strukturelle Polynom-Atome. Der
+`PolynomialDecompositionSynthesisOperator` löst anschließend exakt die
+Koeffizientenbedingungen für eine begrenzte quadratisch-mal-quadratische
+Zerlegung binärer homogener Quartiken. Univariate Quartiken werden über eine
+explizite strukturelle Einheit homogenisiert.
+
+Dadurch werden der historische Sophie-Germain-Fall, weitere unabhängige
+Quartikfamilien und unterstützte AST-Substitutionen durch dasselbe allgemeine
+Verfahren erreicht. Der alte benannte Spezial-Bridge bleibt nur als
+deaktivierter historischer Kontrollpfad erhalten.
+
+Die gegenwärtige Domäne ist absichtlich eng: ganzzahlige binäre homogene
+Quartiken sowie begrenzte univariate Quartiken mit struktureller Einheit und
+ganzzahligen quadratischen Faktoren. Das ist keine vollständige multivariate
+Polynomfaktorisierung.
+
+Details: [Polynomial Decomposition Synthesis](docs/polynomial-decomposition-synthesis.md).
+
 ## Aktueller Stand
 
 Der gegenwärtige Stand ist bewusst mehrstufig:
@@ -207,7 +261,13 @@ Der gegenwärtige Stand ist bewusst mehrstufig:
 4. Ein enger Promotionsmechanismus für exakt bewiesene gelernte
    Polynom-Pattern ist implementiert. Der öffentliche Capability-Claim
    `PROMOTION` bleibt dennoch `NOT_EVALUATED`.
-5. Das stärkere Flagship-Experiment zur proof-carrying Selbstverbesserung ist
+5. Eine generationengetrennte Kampagne demonstriert proof-gated Regelbildung
+   und kumulative Wiederverwendung in content-addressed Schatteninventaren,
+   ohne das Produktionsinventar zu verändern.
+6. Die allgemeine semantische Polynomzerlegung ersetzt für den unterstützten
+   Quartikbereich den benannten Sophie-Germain-Spezialweg, bleibt aber bewusst
+   auf einen exakt definierten begrenzten Bereich beschränkt.
+7. Das stärkere Flagship-Experiment zur proof-carrying Selbstverbesserung ist
    technisch vorbereitet, aber noch nicht mit realem VALIDATION- und
    FINAL-TEST-Material ausgeführt.
 
@@ -227,6 +287,11 @@ Makrowiederverwendung; sie sind keine Behauptung externer mathematischer Neuheit
 |---|---:|---:|---:|---|
 | Complete square | yes | yes | yes | [regelsuche.discovery-evidence/v1#sha256:217d5ca4dff3dba588f16d8451195a883378956a795259936317d3d35e8ce273](docs/generated/discovery/complete-square/evidence.json) |
 | Sophie-Germain | yes | yes | yes | [regelsuche.discovery-evidence/v1#sha256:ad5a70e80124c9154f03c870b1f1b6d26fe482463eeb991d805f14eef38a1f31](docs/generated/discovery/sophie-germain/evidence.json) |
+
+`Sophie-Germain` bezeichnet hier die eingefrorene historische Szenario- und
+Evidence-Identität. Neue allgemeine Discovery-Profile verwenden für den
+unterstützten Quartikbereich den semantischen Syntheseoperator; der frühere
+benannte Bridge bleibt nur zur Reproduktion und Ablation erhalten.
 
 Die [Discovery Gallery](docs/demo-gallery.md) ordnet beide Beispiele visuell ein.
 Sie zeigt ausschließlich aus Tests beziehungsweise Evidence-Generatoren
@@ -313,6 +378,8 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
   [Discovery Evidence](docs/discovery-evidence-v1.md),
   [Sicherer Regelvorbereitungskoordinator](docs/safe-rule-preparation-coordinator.md),
   [Promotion gelernter Pattern-Regeln](docs/learned-pattern-rule-promotion.md),
+  [Generational Rule Mining](docs/generational-rule-mining.md),
+  [Polynomial Decomposition Synthesis](docs/polynomial-decomposition-synthesis.md),
   [Benchmarks](docs/discovery-benchmarks.md),
   [Scientific Reproducibility](docs/scientific-reproducibility.md)
 - **Entwicklung:** [Architektur](docs/architecture.md),

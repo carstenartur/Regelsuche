@@ -41,12 +41,19 @@ Hidden-Structure-Funde trennen `DiscoveryResultKind` (Suchzustand) von Evidence:
 | 3 | `TRANSFORMED` | Replay erreicht ein transformiertes Ziel |
 | Evidence | `FACTORED`, `SIMPLIFIED`, `MACRO_LEARNED`, `MACRO_REUSED`, `EQUIVALENCE_VALIDATED` | zusätzliche Fähigkeiten/Belege, nicht Suchzustand |
 
-Die aktuelle Infrastruktur unterstützt Sophie-Germain-Bridges und konservative
-quadratische Ergänzung (`ConservativeCompleteSquareHypothesisOperator`). Alle Gallery- und
-Report-Einträge werden aus echten Replay-/Suchartefakten erzeugt; statische
-Diagramme oder erfundene Pfade sind nicht Teil des Flows.
+Die eingefrorene Gallery- und Replay-Evidence unterstützt weiterhin das
+historische Sophie-Germain-Bridge-Szenario sowie konservative quadratische
+Ergänzung (`ConservativeCompleteSquareHypothesisOperator`). Diese Artefakte
+bleiben unverändert reproduzierbar. In aktuellen allgemeinen Discovery-Profilen
+ist dagegen `PolynomialDecompositionSynthesisOperator` der standardmäßig
+aktivierte Faktorisierungsoperator; der frühere
+`DifferenceOfSquaresPreparationOperator` ist nur noch ein deaktivierter
+historischer Kontrollpfad. Alle Gallery- und Report-Einträge werden aus echten
+Replay-/Suchartefakten erzeugt; statische Diagramme oder erfundene Pfade sind
+nicht Teil des Flows.
 
-Hidden-Structure-Funde werden anschließend in drei Stufen behandelt:
+Der historische Makro-Lernpfad behandelt Hidden-Structure-Funde anschließend in
+drei Stufen:
 
 1. **Konkretes Replay:** Ein Suchlauf findet und speichert einen realen Pfad, z. B.
    `x^4 + 4 → … → (x^2 - 2*x + 2) * (x^2 + 2*x + 2)`.
@@ -66,6 +73,13 @@ Hidden-Structure-Funde werden anschließend in drei Stufen behandelt:
    `(x+1)^4 + 4*z^4` mit `A = x + 1`, `B = z` wiederverwendet werden. Es gibt
    keine hart codierte Sophie-Germain-Rewrite-Regel.
 
+Dieser Pfad erklärt die retained historische Makro-Evidence. Die aktuelle
+allgemeine Polynomzerlegung benötigt keine benannte Sophie-Germain-Brücke und
+konstruiert unterstützte Quartikzerlegungen aus exakten
+Koeffizientenbedingungen. Sie ist unter
+[Polynomial Decomposition Synthesis](polynomial-decomposition-synthesis.md)
+dokumentiert.
+
 Aktuelles Matching ist strukturell mit vorhandener Normalisierung. Formen wie
 `(x^2)^2 + 4` können daher nach `ast_power_of_power` als `x^4 + 4` vom Makro
 erfasst werden. Algebraisch äquivalente, aber strukturell verdeckte Formen wie
@@ -74,13 +88,15 @@ erfasst werden. Algebraisch äquivalente, aber strukturell verdeckte Formen wie
 generiert; vor Discovery-, Makro- oder Gallery-Erfolg ist Validierung
 verpflichtend.
 
-## Parametric Sophie-Germain learning
+## Parametric Sophie-Germain learning als historischer Evidence-Pfad
 
-The Sophie-Germain macro is discovered from an actual replay of
+The retained Sophie-Germain macro is discovered from an actual replay of
 `x^4 + 4*y^4` and generalized to `A^4 + 4*B^4`. Promotion validates generated
 substitutions for the independent placeholders before the macro is enabled. The
 same learned rule can then be reused on `(x+1)^4 + 4*z^4` by binding
 `A = x + 1` and `B = z`; no hardcoded Sophie-Germain rewrite rule is installed.
+This remains a frozen reproduction path and is not the default factorization
+operator of current general discovery profiles.
 
 Defaults (per Konstruktor konfigurierbar):
 
@@ -256,8 +272,11 @@ Liefert alle Makroregel-Kandidaten als `IdentityReportDto`:
 
 ### `POST /api/identities/{id}/promote`
 
-Speichert die Makroregel als `ReusableRule` im `RuleInventoryRepository`.
-Liefert die neu vergebene Regel-Id zurück.
+Speichert die Makroregel im konfigurierten `RuleInventoryRepository` und liefert
+die neu vergebene Regel-ID zurück. Das ist eine lokale Produktoperation des
+jeweiligen Repositorys, keine autoritative Produktionsfreigabe und kein
+wissenschaftlicher Promotionsclaim. Der öffentliche Capability-Status
+`PROMOTION` bleibt bis zu einer getrennten Qualification `NOT_EVALUATED`.
 
 ## Evidence-grade MacroLearningPipeline
 
@@ -351,8 +370,12 @@ Makro-Lernen, Validierung generierter Instanzen und Promotion. Die benannten
 `HypothesisOperatorDescriptor`s mit stabiler ID, Display-Name, Familie, Factory,
 Default-Enablement und Tags. Die aktuelle Reihenfolge ist deterministisch:
 
-1. `hypothesis_difference_of_squares_preparation`
-2. `hypothesis_complete_square_preparation`
+1. `hypothesis_polynomial_decomposition_synthesis` — standardmäßig aktiviert;
+2. `hypothesis_difference_of_squares_preparation` — deaktivierter historischer
+   Kontrollpfad;
+3. `hypothesis_complete_square_preparation` — standardmäßig aktiviert;
+4. `hypothesis_telescoping_fraction` — standardmäßig aktiviert;
+5. `hypothesis_rationalize_denominator` — standardmäßig aktiviert.
 
 `DiscoveryEngineFactory` komponiert Engines immer in der Reihenfolge
 **base rewrite → hypothesis operators → learned macro moves**. Dadurch muss der
@@ -374,3 +397,8 @@ Neue Hypothesenoperatoren werden so ergänzt:
 square-completion Operator emittiert nur Kandidaten mit Rest `0` oder negativem
 perfekten Quadrat. Er erhebt keinen Anspruch, alle gültigen quadratischen
 Ergänzungen abzudecken, z. B. nicht jede Form wie `x^2 + 6*x + 6`.
+
+Generationengetrennte Regelbildung und kumulative Wiederverwendung sind ein
+separater experimenteller Campaign-Vertrag. Sie ändern weder diese Registry
+noch das Produktionsinventar während einer Generation. Details:
+[Generational Rule Mining](generational-rule-mining.md).
