@@ -1,125 +1,192 @@
-# Evolutionary search genome foundation
+# Evolutionäre Suche und gelernte Regelprogramme
 
-Issue #220 is intentionally split into reviewable stages. This foundation stage
-makes evolved operator programs and search-policy candidates explicit,
-replayable, executable and reject-by-default. It does **not** claim that an
-evolution campaign has already produced a validated mathematical discovery.
+**Implementierungsstand: 23. August 2026**
 
-## Versioned contracts
+Regelsuche modelliert evolutionäre Kandidaten als explizite, replayfähige
+`EvolutionGenome`s. Kandidaten können ausgeführt, mutiert, in Populationen
+bewertet und reproduzierbar gespeichert werden. Evolution allein verleiht
+jedoch weder mathematische Gültigkeit noch Produktionsvertrauen.
 
-The implementation lives in `regelsuche-learning` under
+## Versionierte Grundlage
+
+Die Implementierung liegt in `regelsuche-learning` unter
 `de.regelsuche.evolution`.
 
-- `EvolutionGenome` is the canonical v1 candidate envelope.
-- `EvolutionGenomeCodec` performs strict JSON replay. Unknown properties,
-  unsupported enum values and hash mismatches fail closed.
-- `EvolutionGenomeValidator` produces a canonical preflight report with named
-  blockers.
-- `EvolutionGenomeCompiler` converts an accepted genome into normal
-  `RewriteRule` instances. Compiled candidates deliberately return
-  `isEquivalencePreservingByConstruction() == false`; evolution cannot grant
-  proof status.
-- `DeterministicGenomeMutator` enumerates bounded mutations from a pinned seed
-  and retains every accepted or rejected attempt in a canonical lineage batch.
+- `EvolutionGenome` ist der kanonische Kandidatenumschlag.
+- `EvolutionGenomeCodec` führt striktes JSON-Replay aus.
+- `EvolutionGenomeValidator` erzeugt einen content-addressed Preflight mit
+  benannten Blockern.
+- `EvolutionGenomeCompiler` erzeugt ausführbare `RewriteRule`-Objekte.
+- `DeterministicGenomeMutator` enumeriert begrenzte, reproduzierbare
+  Mutationenvorschläge.
+- Population-, Scheduler-, Checkpoint- und TRAIN-Diagnostikverträge binden die
+  tatsächliche Ausführungssemantik.
 
-The retained schemas are:
+Die wichtigsten JSON-Verträge sind im
+[Schema-Katalog](schema-catalog.md) unter „Evolution und Flagship-Experiment“
+verzeichnet.
 
-- `docs/schemas/regelsuche-evolution-genome-v1.schema.json`
-- `docs/schemas/regelsuche-evolution-preflight-v1.schema.json`
-- `docs/schemas/regelsuche-evolution-mutation-batch-v1.schema.json`
+## Identität und Provenienz
 
-## Identity and provenance
+Ein Genome besitzt zwei unterschiedliche Identitäten:
 
-A genome has two hashes with different purposes.
+- `contentHash` bindet den vollständigen Payload einschließlich TRAIN-Scope und
+  Seed-Lineage;
+- `alphaStructuralHash` abstrahiert von Platzhalternamen, Gene-IDs und
+  Trainingsprovenienz, behält aber die ausführbare Struktur und Policy.
 
-`contentHash` binds the complete canonical payload, including TRAIN partition
-hashes and seed lineage. `alphaStructuralHash` ignores placeholder names, gene
-IDs and training provenance while retaining executable structure, ranking
-features, safety policy, resource budgets and capabilities. Population code can
-therefore suppress alpha-equivalent candidates without losing reproducible
-provenance.
+Abgeleitete Kandidaten referenzieren ihre Eltern. Mutationsbatches behalten
+Proposal-Reihenfolge, Mutationstyp, Child-Hashes und sämtliche Preflight-
+Blocker. Dadurch kann strukturelle Vielfalt gemessen werden, ohne die konkrete
+Herkunft zu verlieren.
 
-Every derived candidate records the parent `contentHash` in
-`seedGenomeHashes`. Mutation batches additionally retain the pinned seed,
-proposal order, mutation kind, child hashes and all preflight blockers.
+## Informationsgrenze
 
-## Information boundary
+Genome-Formation ist auf `TRAIN` beschränkt. Der `TrainingScope` bindet Corpus-,
+Familien-, Signatur- und Feature-Schema-Hashes. Das Genome besitzt keine Felder
+für versteckte Referenzformen, VALIDATION-/FINAL-TEST-Ergebnisse oder post-hoc
+Reviewlabels.
 
-Genome formation is restricted to a `TrainingScope` whose only legal split is
-`TRAIN`. The scope binds hashes for the corpus, family partition, signature
-partition and feature schema. The v1 genome has no fields for hidden targets,
-TEST labels, expected answers or post-hoc discovery outcomes.
+Diese Typgrenze ist notwendig, aber nicht hinreichend. Campaign- und
+Evaluation-Runner müssen weiterhin belegen, dass ihre Adapter keine späteren
+Splits in Formation, Mutation, Fitness oder Survivor-Auswahl einspeisen.
 
-This type-level boundary is necessary but not sufficient for the complete
-issue. The campaign runner still has to prove that its input adapters only
-supply TRAIN material and that VALIDATION/TEST evaluators remain separate.
+## Harte Preflight-Blocker
 
-## Hard preflight blockers
+`EvolutionGenomeValidator` lehnt vor jeder Fitnessbewertung unter anderem ab:
 
-Preflight rejection occurs before fitness evaluation. In particular, the gate
-rejects:
+- unparsebare Pattern und ungebundene Platzhalter;
+- Identitätsregeln, strukturelle Duplikate und Rewrite-Zyklen;
+- Verletzungen von AST-, Wachstum-, Anwendung- oder Programmlimits;
+- deaktivierte Cycle-, Growth-, Applicability-, Duplicate- oder
+  Determinismus-Guards;
+- targetgerichtete Features in Open-Target-Genomen;
+- widersprüchliche Fitnessrichtungen;
+- fehlende Validation-, Counterexample-, Proof- oder Holdout-Obligationen;
+- unbekannte Annahmentypen;
+- Annahmenentfernung ohne Discharge-Certificate.
 
-- unparsable patterns and unbound target or assumption placeholders;
-- identity rewrites, alpha-duplicate rules and rewrite cycles of any length;
-- AST, per-step growth, application and program-length budget violations;
-- disabled cycle, growth, applicability, duplicate or deterministic-ordering
-  guards;
-- target-directed features in open-target genomes and fitness weights whose
-  sign contradicts their declared direction;
-- missing semantic validation, counterexample, proof/certificate or holdout
-  obligations;
-- unsupported or unknown assumption kinds;
-- alpha-equivalent mutations, missing parent lineage and mutation-shape drift;
-- assumption removal without an explicit discharge certificate. The v1
-  mutator enumerates removal attempts, but the gate rejects them until a later
-  certificate contract exists.
+Diese Blocker können nicht durch einen höheren Fitnesswert kompensiert werden.
 
-These are blockers, not soft penalties. Search cannot trade them against a
-higher provisional fitness score.
-
-## Bounded deterministic mutations
-
-The v1 mutator supports:
-
-- placeholder generalization and specialization;
-- exact pattern-program composition;
-- assumption addition and attempted removal;
-- rewrite reversal where the parent gene marks it reversible;
-- ranking-feature addition and removal.
-
-Proposals are generated from canonical input order, sorted by a stable proposal
-key and rotated by a deterministic 64-bit seed mixer. `MutationLimits` bounds
-both evaluated proposals and accepted children. Accepted children must be
-structurally unique and pass the normal preflight gate.
-
-## Replay and execution
+## Rohe Ausführung bleibt untrusted
 
 ```java
-EvolutionGenome genome = new EvolutionGenomeCodec().read(path);
-EvolutionGenomeValidator.ValidationReport preflight =
-    new EvolutionGenomeValidator().validate(genome);
-if (!preflight.accepted()) {
-    throw new IllegalArgumentException(preflight.blockerCodes().toString());
-}
 EvolutionGenomeCompiler.CompiledProgram program =
     new EvolutionGenomeCompiler().compile(genome);
 ```
 
-The compiler exposes ordinary `RewriteRule` objects and instantiates symbolic
-assumption templates from concrete pattern bindings. Search integration must
-still enforce the compiled program's recorded budgets and route every retained
-candidate through the existing semantic validation, counterexample, proof,
-novelty and promotion gates.
+Die daraus erzeugten `CompiledGenomeRule`s sind ausführbar, deklarieren aber
+weiterhin:
 
-## Remaining stages for issue #220
+```java
+isEquivalencePreservingByConstruction() == false
+```
 
-The foundation does not close #220. Follow-up slices still need to add:
+Das ist eine bewusste Trust-Grenze. Suche und Experimente können rohe
+Kandidaten testen, aber der sichere Regelkoordinator und das autoritative
+Regelinventar dürfen sie nicht als bewiesene Regeln behandeln.
 
-1. deterministic populations and islands with structural-diversity metrics;
-2. a TRAIN-only fitness evaluator with explicit component and penalty records;
-3. frozen family and structural-signature TRAIN/VALIDATION/TEST splits;
-4. campaign checkpoints, resume/replay and resource-budget accounting;
-5. promotion adapters that can only invoke existing validation, proof, novelty
-   and release gates;
-6. bounded benchmark campaigns comparing evolved candidates with non-evolved
-   baselines and publishing negative as well as positive results.
+## Implementierter enger Promotionsadapter
+
+`LearnedPatternRulePromoter` implementiert den ersten fail-closed Übergang zu
+einer neuen, registration-eligible `PatternRewriteRule`.
+
+Promotion v1 verlangt:
+
+1. ein akzeptiertes Genome ohne Preflight-Blocker;
+2. ein konkretes assumption-free `RewriteGene`;
+3. einen exakten Identitätsnachweis durch
+   `ExactPolynomialPatternIdentityVerifier`;
+4. gebundene Identitäten für Semantic Validation, Counterexample Search,
+   Holdout, Leakage-Audit und Repository-Revision;
+5. ein content-addressed Promotion-Receipt;
+6. eine neue Regel- und Applicability-Schema-Identität.
+
+Der exakte Verifier unterstützt ausschließlich ein begrenztes kommutatives
+Polynomfragment mit ganzzahligen Koeffizienten, Addition, Subtraktion,
+Multiplikation und begrenzten nichtnegativen ganzzahligen Potenzen. Division,
+Funktionen, bedingte Regeln und nicht exakte Koeffizienten bleiben
+`UNSUPPORTED`.
+
+Die referenzierten Validation-, Counterexample-, Holdout- und Leakage-Hashes
+werden im v1-Promoter **gebunden, aber nicht von ihm geladen oder semantisch
+verifiziert**. Diese Prüfung bleibt Aufgabe des übergeordneten Qualification-
+und Release-Lifecycles.
+
+Nach Promotion kann die Regel dieselbe Vorbereitungsinfrastruktur wie eine
+handgeschriebene Pattern-Regel verwenden. Der Testfall zeigt eine promoted
+Differenz-von-Quadraten-Regel, die zunächst eine gewöhnliche Kürzung verwendet:
+
+```text
+((x^2 * a) / a) - y^2
+  -> x^2 - y^2            unter a != 0
+  -> (x - y) * (x + y)
+```
+
+Die vollständige Grenze steht unter
+[Promotion exakt bewiesener gelernter Pattern-Regeln](learned-pattern-rule-promotion.md).
+
+## Was diese Promotion nicht bedeutet
+
+Der implementierte Adapter ist ein Mechanismus, kein ausgeführter
+Produktionsclaim:
+
+- `PROMOTION` bleibt im Capability-Status `NOT_EVALUATED`;
+- kein realer Flagship-VALIDATION- oder FINAL-TEST-Kandidat wurde dadurch
+  ausgewählt;
+- die gebundenen Evidence-Root-Hashes sind noch kein Ersatz für deren
+  unabhängige semantische Prüfung;
+- externe Neuheit und fachliche Interessantheit werden nicht abgeleitet;
+- bedingte Regeln und komplette `RewriteProgram`s werden nicht promoviert.
+
+Ein `RewriteProgram` kann `Choice`, `Sequence`, `Repeat`, `Require` und
+Priorisierung enthalten. Es besitzt deshalb nicht notwendig ein einziges
+linkes Pattern. Dafür ist ein programmbasierter Applicability-/Replay-Vertrag
+mit vollständiger primitiver Lineage erforderlich.
+
+## Populationen, Mutationen und Checkpoints
+
+Die vorhandene evolutionäre Infrastruktur umfasst inzwischen:
+
+- deterministische Populationen und begrenzte Mutationspläne;
+- versionierte Proposal-Scheduler einschließlich stratifizierter Mutationstypen;
+- TRAIN-only Fitness und Diagnostik;
+- content-addressed retained Runs;
+- execution-bound Checkpoints mit Resume-Prüfung;
+- separate TRAIN-/VALIDATION-/FINAL-TEST-Verträge für das Flagship-Experiment.
+
+Diese Infrastruktur belegt Reproduzierbarkeit und Policy-Bindung. Sie belegt
+noch keine erfolgreiche held-out Selbstverbesserung.
+
+## Prüfung aus dem Checkout
+
+```bash
+./gradlew :regelsuche-learning:test
+
+./gradlew :regelsuche-learning:test \
+  --tests de.regelsuche.evolution.LearnedPatternRulePromoterTest
+
+./gradlew --no-configuration-cache ciCheck
+```
+
+## Noch offene Schritte
+
+- reale, getrennte VALIDATION- und FINAL-TEST-Fälle erzeugen und versiegeln;
+- den Flagship-TRAIN-Lauf unter eingefrorenem Vertrag ausführen;
+- ausschließlich über VALIDATION auswählen;
+- FINAL TEST genau einmal konsumieren;
+- bedingte Regeln mit typisierten Annahmen und Discharge-Evidence promovieren;
+- programmbasierte Applicability-/Replay-Schemata für gelernte
+  `RewriteProgram`s entwickeln;
+- Evidence-Root-Artefakte im Promotionsadapter oder im übergeordneten Gate
+  tatsächlich laden und semantisch verifizieren;
+- positive wie negative Ergebnisse vollständig retainen.
+
+## Siehe auch
+
+- [Flagship Freeze Execution](evolution-rewrite-program-flagship-freeze-execution.md)
+- [Evolution Study Contracts](evolution-study-contracts.md)
+- [Deterministische TRAIN-Populationen](evolution-population-engine.md)
+- [Reale TRAIN-Suchfitness](evolution-train-fitness.md)
+- [Rewrite-Program-Mutationen](evolution-rewrite-program-mutations.md)
+- [Discovery- und Forschungsstand](discovery-status.md)
