@@ -567,7 +567,7 @@ public final class GenerationalRuleMiningCampaign {
         }
 
         static InventoryState empty(String repositoryRevision) {
-            String root = inventoryHash(
+            String root = GenerationalRuleMiningCampaign.inventoryHash(
                 repositoryRevision,
                 "sha256:" + "0".repeat(64),
                 List.of());
@@ -612,7 +612,7 @@ public final class GenerationalRuleMiningCampaign {
             allRules.sort(Comparator.comparing(ActivatedRule::candidateHash));
             List<DynamicPatternOperator> allOperators = new ArrayList<>(operators);
             allOperators.addAll(addedOperators);
-            String nextHash = inventoryHash(
+            String nextHash = GenerationalRuleMiningCampaign.inventoryHash(
                 repositoryRevision,
                 inventoryHash,
                 additions);
