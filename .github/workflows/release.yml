@@ -425,6 +425,7 @@ jobs:
             .zenodo.json \
             codemeta.json \
             release.properties \
+            app/src/main/resources/web/openapi/openapi.json \
             pom.xml \
             */pom.xml
           git diff --cached --check
@@ -520,6 +521,7 @@ jobs:
             echo "release_notes_file=${NOTES}"
             echo "release_notes_sha256=$(sha256sum "$NOTES" | awk '{print $1}')"
             echo "release_properties_sha256=$(sha256sum release.properties | awk '{print $1}')"
+            echo "openapi_sha256=$(sha256sum app/src/main/resources/web/openapi/openapi.json | awk '{print $1}')"
             echo "root_pom_sha256=$(sha256sum pom.xml | awk '{print $1}')"
           } > release-artifacts/RELEASE-MANIFEST.txt
           (
@@ -714,6 +716,7 @@ jobs:
             - update CITATION.md
             - update .zenodo.json
             - update codemeta.json
+            - update embedded OpenAPI info.version
             - update the Maven reactor and every module POM
             - remove release-only date metadata from the development snapshot
           add-paths: |
@@ -722,6 +725,7 @@ jobs:
             .zenodo.json
             codemeta.json
             release.properties
+            app/src/main/resources/web/openapi/openapi.json
             pom.xml
             */pom.xml
 
