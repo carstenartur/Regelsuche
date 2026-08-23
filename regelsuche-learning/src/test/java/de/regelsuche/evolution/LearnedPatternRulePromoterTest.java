@@ -176,6 +176,24 @@ class LearnedPatternRulePromoterTest {
         assertFalse(result.proved());
     }
 
+    @Test
+    void powerExponentNodesCountAgainstTheVisitedNodeBudget() {
+        ExactPolynomialPatternIdentityVerifier verifier =
+            new ExactPolynomialPatternIdentityVerifier(
+                new ExactPolynomialPatternIdentityVerifier.Budget(
+                    2, 16, 64, 4, 4, 64));
+        PatternExpr square = EvolutionGenomeCompiler.parsePattern("?A^2");
+
+        ExactPolynomialPatternIdentityVerifier.Verification result =
+            verifier.verify(square, square);
+
+        assertEquals(
+            ExactPolynomialPatternIdentityVerifier.Status.BUDGET_EXCEEDED,
+            result.status());
+        assertEquals("MAX_VISITED_NODES_EXCEEDED", result.detailCode());
+        assertFalse(result.proved());
+    }
+
     private static EvolutionGenome genome() {
         return genomeWithGene(new EvolutionGenome.RewriteGene(
             "difference-squares",
