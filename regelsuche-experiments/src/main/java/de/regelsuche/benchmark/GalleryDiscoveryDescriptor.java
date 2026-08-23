@@ -1,5 +1,6 @@
 package de.regelsuche.benchmark;
 
+import de.regelsuche.transform.PolynomialStructureSynthesisOperator;
 import de.regelsuche.validation.DiscoveryEvidenceKind;
 import de.regelsuche.validation.DiscoveryResultKind;
 import java.util.List;
@@ -19,6 +20,10 @@ public record GalleryDiscoveryDescriptor(
     List<Function<DeterministicDiscoveryExperimentRunner.SeedRunReport, Boolean>> requiredPredicates,
     Function<DeterministicDiscoveryExperimentRunner.SeedRunReport, List<String>> renderMetadata
 ) {
+    private static final List<String> LEGACY_SOPHIE_GERMAIN_RULE_PATH = List.of(
+        "hypothesis_difference_of_squares_preparation",
+        "ast_square_difference_factor");
+
     public GalleryDiscoveryDescriptor {
         if (id == null || id.isBlank() || title == null || title.isBlank()) {
             throw new IllegalArgumentException("id and title are required");
@@ -35,7 +40,7 @@ public record GalleryDiscoveryDescriptor(
         if (row == null || row.replayPath().isEmpty()) {
             return false;
         }
-        if (!row.rulePath().containsAll(requiredRuleIds)) {
+        if (!matchesRequiredRules(row.rulePath())) {
             return false;
         }
         if (rank(row.resultKind()) < rank(minimumResultKind)) {
@@ -48,6 +53,14 @@ public record GalleryDiscoveryDescriptor(
             return false;
         }
         return requiredPredicates.stream().allMatch(predicate -> Boolean.TRUE.equals(predicate.apply(row)));
+    }
+
+    private boolean matchesRequiredRules(List<String> actualRulePath) {
+        if (actualRulePath.containsAll(requiredRuleIds)) {
+            return true;
+        }
+        return requiredRuleIds.equals(LEGACY_SOPHIE_GERMAIN_RULE_PATH)
+            && actualRulePath.contains(PolynomialStructureSynthesisOperator.RULE_ID);
     }
 
     private int rank(DiscoveryResultKind kind) {
