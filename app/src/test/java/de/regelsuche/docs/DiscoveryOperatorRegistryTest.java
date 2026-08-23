@@ -1,9 +1,11 @@
 package de.regelsuche.docs;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.transform.PolynomialStructureSynthesisOperator;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +16,10 @@ class DiscoveryOperatorRegistryTest {
                 .register(new DefaultDiscoveryOperatorProvider());
 
         assertTrue(registry.availableOperatorIds().contains("complete_square_bridge"));
+        assertTrue(registry.availableOperatorIds().contains("polynomial_structure_synthesis"));
         assertTrue(registry.availableOperatorIds().contains("sophie_germain_bridge"));
+        assertTrue(registry.availableOperatorIds().contains("hidden_structure_bridge"));
+        assertTrue(registry.availableOperatorIds().contains("legacy_difference_of_squares_bridge"));
         assertTrue(registry.availableOperatorIds().contains("telescoping_fraction"));
         assertTrue(registry.availableOperatorIds().contains("repeated_subexpression_factorization"));
         assertTrue(registry.availableOperatorIds().contains("common_subexpression_discovery"));
@@ -23,6 +28,12 @@ class DiscoveryOperatorRegistryTest {
         assertTrue(registry.availableOperatorIds().contains("rationalization"));
         assertTrue(registry.availableOperatorIds().contains("rational_discovery_toolkit"));
 
+        assertInstanceOf(PolynomialStructureSynthesisOperator.class,
+            registry.operatorsFor(new DiscoveryOperatorRegistry.OperatorProfile(
+                List.of("polynomial_structure_synthesis"))).getFirst());
+        assertInstanceOf(PolynomialStructureSynthesisOperator.class,
+            registry.operatorsFor(new DiscoveryOperatorRegistry.OperatorProfile(
+                List.of("sophie_germain_bridge"))).getFirst());
         assertFalse(registry.operatorsFor(new DiscoveryOperatorRegistry.OperatorProfile(List.of("complete_square_bridge"))).isEmpty());
         registry.disable("complete_square_bridge");
         assertTrue(registry.operatorsFor(new DiscoveryOperatorRegistry.OperatorProfile(List.of("complete_square_bridge"))).isEmpty());
