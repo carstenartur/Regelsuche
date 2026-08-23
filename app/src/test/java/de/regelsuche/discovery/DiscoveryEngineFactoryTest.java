@@ -1,13 +1,12 @@
 package de.regelsuche.discovery;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.GoalAwareMacroMoveSelector;
 import de.regelsuche.mining.RuleStatus;
-import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.PolynomialDecompositionSynthesisOperator;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.CandidateProofStatus;
@@ -16,6 +15,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class DiscoveryEngineFactoryTest {
+    private static final String SUBJECT = "x^4 + 4*y^4";
+
     private final DiscoveryEngineFactory factory = new DiscoveryEngineFactory();
     private final TransformationEngine emptyBase = expression -> List.of();
 
@@ -25,21 +26,22 @@ class DiscoveryEngineFactoryTest {
             emptyBase,
             DiscoveryOptions.forProfile(DiscoveryProfile.PURE_REWRITE),
             macroSelector()
-        ).transform("x^4 + 4");
+        ).transform(SUBJECT);
 
         assertTrue(transformations.stream().noneMatch(this::isHypothesis));
         assertTrue(transformations.stream().noneMatch(this::isMacro));
     }
 
     @Test
-    void hypothesisOnlyEmitsHypothesisCandidatesButNoMacroRuleIds() {
+    void hypothesisOnlyEmitsGeneralSynthesisCandidatesButNoMacroRuleIds() {
         List<Transformation> transformations = factory.create(
             emptyBase,
             DiscoveryOptions.forProfile(DiscoveryProfile.HYPOTHESIS_ONLY),
             macroSelector()
-        ).transform("x^4 + 4");
+        ).transform(SUBJECT);
 
-        assertTrue(transformations.stream().anyMatch(t -> t.rule().equals(DifferenceOfSquaresPreparationOperator.RULE_ID)));
+        assertTrue(transformations.stream().anyMatch(t -> t.rule().equals(
+            PolynomialDecompositionSynthesisOperator.RULE_ID)));
         assertTrue(transformations.stream().noneMatch(this::isMacro));
     }
 
@@ -49,7 +51,7 @@ class DiscoveryEngineFactoryTest {
             emptyBase,
             DiscoveryOptions.forProfile(DiscoveryProfile.MACRO_REUSE_ONLY),
             macroSelector()
-        ).transform("x^4 + 4");
+        ).transform(SUBJECT);
 
         assertTrue(transformations.stream().anyMatch(this::isMacro));
         assertTrue(transformations.stream().noneMatch(this::isHypothesis));
@@ -59,9 +61,10 @@ class DiscoveryEngineFactoryTest {
     void hypothesisAndMacroReuseCanEmitBothHypothesisAndMacroRules() {
         List<Transformation> transformations = factory.create(
             emptyBase,
-            DiscoveryOptions.forProfile(DiscoveryProfile.HYPOTHESIS_AND_MACRO_REUSE),
+            DiscoveryOptions.forProfile(
+                DiscoveryProfile.HYPOTHESIS_AND_MACRO_REUSE),
             macroSelector()
-        ).transform("x^4 + 4");
+        ).transform(SUBJECT);
 
         assertTrue(transformations.stream().anyMatch(this::isHypothesis));
         assertTrue(transformations.stream().anyMatch(this::isMacro));
@@ -71,9 +74,10 @@ class DiscoveryEngineFactoryTest {
     void hypothesisAndMacroReuseWithNullMacroSelectorBehavesLikeHypothesisOnly() {
         List<Transformation> transformations = factory.create(
             emptyBase,
-            DiscoveryOptions.forProfile(DiscoveryProfile.HYPOTHESIS_AND_MACRO_REUSE),
+            DiscoveryOptions.forProfile(
+                DiscoveryProfile.HYPOTHESIS_AND_MACRO_REUSE),
             null
-        ).transform("x^4 + 4");
+        ).transform(SUBJECT);
 
         assertTrue(transformations.stream().anyMatch(this::isHypothesis));
         assertTrue(transformations.stream().noneMatch(this::isMacro));
@@ -88,11 +92,13 @@ class DiscoveryEngineFactoryTest {
     }
 
     private GoalAwareMacroMoveSelector macroSelector() {
-        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
+        InMemoryRuleInventoryRepository inventory =
+            new InMemoryRuleInventoryRepository();
         ReusableRule macro = new ReusableRule(
             "sophie_macro",
-            "x ^ 4 + 4",
-            "(x ^ 2 + 2 - 2 * x) * (x ^ 2 + 2 + 2 * x)",
+            "x ^ 4 + 4 * y ^ 4",
+            "(x ^ 2 - 2 * x * y + 2 * y ^ 2)"
+                + " * (x ^ 2 + 2 * x * y + 2 * y ^ 2)",
             List.of(),
             CandidateProofStatus.VALIDATED_BY_EXAMPLES,
             RuleStatus.NEW,
@@ -108,6 +114,10 @@ class DiscoveryEngineFactoryTest {
         );
         inventory.save(macro);
         inventory.setEnabled(macro.id(), true);
-        return new GoalAwareMacroMoveSelector(inventory, 0.0, -1000.0, 1);
+        return new GoalAwareMacroMoveSelector(
+            inventory,
+            0.0,
+            -1000.0,
+            1);
     }
 }
