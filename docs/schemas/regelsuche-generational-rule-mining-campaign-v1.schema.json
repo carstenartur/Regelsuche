@@ -19,7 +19,10 @@
       "const": "regelsuche.generational-rule-mining-campaign/v1"
     },
     "campaignId": { "type": "string", "minLength": 1 },
-    "repositoryRevision": { "type": "string", "minLength": 1 },
+    "repositoryRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
     "claimBoundary": { "type": "string", "minLength": 1 },
     "summary": { "$ref": "#/$defs/summary" },
     "generations": {
