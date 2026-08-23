@@ -31,12 +31,14 @@ canonical semantic value matches one of the exact generated candidates.
 
 The result has one of four statuses:
 
-| Status | Meaning |
-| --- | --- |
-| `THEORY_SUBSUMED` | The bounded theory generated an exact matching decomposition. |
-| `NOT_SUBSUMED` | No matching candidate was generated inside the declared supported bound. |
-| `UNSUPPORTED` | The expression lies outside the supported exact theory fragment or cannot be parsed safely. |
-| `BUDGET_INCONCLUSIVE` | Candidate or synthesis work was exhausted; no negative mathematical conclusion is authorized. |
+- `THEORY_SUBSUMED`: the bounded theory generated an exact matching
+  decomposition.
+- `NOT_SUBSUMED`: no matching candidate was generated inside the declared
+  supported bound.
+- `UNSUPPORTED`: the expression lies outside the supported exact theory
+  fragment or cannot be parsed safely.
+- `BUDGET_INCONCLUSIVE`: candidate or synthesis work was exhausted; no
+  negative mathematical conclusion is authorized.
 
 A positive classification retains:
 
@@ -63,8 +65,11 @@ A cache entry is keyed by the exact theory-derived macro identity:
 - canonical source expression;
 - deterministic generated expression;
 - theory method;
-- certificate hash;
-- application key.
+- certificate hash.
+
+The runtime application key is intentionally not part of the macro identity.
+Different replays of the same exact theory result therefore share one capacity
+slot while retaining their work and provenance separately.
 
 The cache API does not accept independent left and right patterns. Those values
 come directly from the positive classification, preventing a certificate for
@@ -75,6 +80,7 @@ theory on that generalized pattern itself.
 Repeated observations of the same macro occupy one capacity slot. Distinct
 content-addressed lineage records retain:
 
+- the exact theory application key and consumed configuration work;
 - primitive rule IDs supplied by the producing path;
 - source path, generation or other provenance identifiers.
 
