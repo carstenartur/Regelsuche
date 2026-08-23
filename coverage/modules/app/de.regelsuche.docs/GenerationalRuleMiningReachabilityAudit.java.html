@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GenerationalRuleMiningReachabilityAudit.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">GenerationalRuleMiningReachabilityAudit.java</span></div><h1>GenerationalRuleMiningReachabilityAudit.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.docs.GenerationalRuleMiningCampaign.ActivatedRule;
+import de.regelsuche.docs.GenerationalRuleMiningCampaign.CampaignReport;
+import de.regelsuche.docs.GenerationalRuleMiningCampaign.GenerationReport;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.DynamicOperatorCompiler;
+import de.regelsuche.mining.DynamicPatternOperator;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalMetrics;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.OccurrenceAwareAstRewriteTransformationEngine;
+import de.regelsuche.transform.TransformationEngine;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Independently audits that a later mining generation contributes reachability
+ * which the preceding accumulated shadow inventory does not have under the same
+ * deliberately tight search-depth budget.
+ *
+ * &lt;p&gt;The campaign's ordinary report compares its empty and accumulated shadow
+ * inventories. This audit is stricter: it recompiles the retained exact rules,
+ * compares generations {@code 0+1} with generations {@code 0+1+2}, and requires
+ * the successful path to use a generation-2 rule. It also checks the retained
+ * campaign paths for actual generation-0 to generation-1 and generation-1 to
+ * generation-2 rule reuse.&lt;/p&gt;
+ */
+<span class="fc" id="L52">public final class GenerationalRuleMiningReachabilityAudit {</span>
+    public static final String SCHEMA =
+        &quot;regelsuche.generational-rule-mining-reachability-audit/v1&quot;;
+
+    private static final int PREVIOUS_GENERATION = 1;
+    private static final int ACCUMULATED_GENERATION = 2;
+<span class="fc" id="L58">    private static final SearchHeuristic AUDIT_HEURISTIC =</span>
+        new SearchHeuristic(2, 1_200, 1, 32, 1_200, 1_200);
+
+<span class="fc" id="L61">    private final DynamicOperatorCompiler compiler = new DynamicOperatorCompiler();</span>
+<span class="fc" id="L62">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L63">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+<span class="fc" id="L65">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+
+    public AuditReport audit(CampaignReport campaign) {
+<span class="fc" id="L68">        Objects.requireNonNull(campaign, &quot;campaign&quot;);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (campaign.generations().size() &lt; 3) {</span>
+<span class="nc" id="L70">            throw new IllegalArgumentException(</span>
+                &quot;cumulative audit requires at least three generations&quot;);
+        }
+
+<span class="fc" id="L74">        GenerationReport generation0 = generation(campaign, 0);</span>
+<span class="fc" id="L75">        GenerationReport generation1 = generation(campaign, 1);</span>
+<span class="fc" id="L76">        GenerationReport generation2 = generation(campaign, 2);</span>
+
+<span class="fc" id="L78">        Set&lt;String&gt; generation0RuleIds = ruleIds(generation0.activatedRules());</span>
+<span class="fc" id="L79">        Set&lt;String&gt; generation1RuleIds = ruleIds(generation1.activatedRules());</span>
+<span class="fc" id="L80">        boolean generation1ReusedGeneration0 = generationUsesAny(</span>
+            generation1,
+            generation0RuleIds);
+<span class="fc" id="L83">        boolean generation2ReusedGeneration1 = generationUsesAny(</span>
+            generation2,
+            generation1RuleIds);
+
+<span class="fc" id="L87">        List&lt;ActivatedRule&gt; previousRules = campaign.finalRules().stream()</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            .filter(rule -&gt; rule.generation() &lt;= PREVIOUS_GENERATION)</span>
+<span class="fc" id="L89">            .sorted(Comparator.comparing(ActivatedRule::candidateHash))</span>
+<span class="fc" id="L90">            .toList();</span>
+<span class="fc" id="L91">        List&lt;ActivatedRule&gt; accumulatedRules = campaign.finalRules().stream()</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            .filter(rule -&gt; rule.generation() &lt;= ACCUMULATED_GENERATION)</span>
+<span class="fc" id="L93">            .sorted(Comparator.comparing(ActivatedRule::candidateHash))</span>
+<span class="fc" id="L94">            .toList();</span>
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">        if (previousRules.isEmpty() || accumulatedRules.size() &lt;= previousRules.size()) {</span>
+<span class="nc" id="L96">            throw new IllegalArgumentException(</span>
+                &quot;campaign does not contain a later accumulated rule generation&quot;);
+        }
+
+<span class="fc" id="L100">        CompiledInventory previous = compileInventory(</span>
+            campaign,
+            PREVIOUS_GENERATION,
+            previousRules);
+<span class="fc" id="L104">        CompiledInventory accumulated = compileInventory(</span>
+            campaign,
+            ACCUMULATED_GENERATION,
+            accumulatedRules);
+
+<span class="fc" id="L109">        String input = repeatWrap(&quot;x&quot;, 3);</span>
+<span class="fc" id="L110">        String target = &quot;x&quot;;</span>
+<span class="fc" id="L111">        SearchOutcome previousOutcome = search(previous.engine(), input, target);</span>
+<span class="fc" id="L112">        SearchOutcome accumulatedOutcome = search(accumulated.engine(), input, target);</span>
+<span class="fc" id="L113">        Set&lt;String&gt; generation2AuditRuleIds = accumulated.ruleIdsByGeneration()</span>
+<span class="fc" id="L114">            .getOrDefault(ACCUMULATED_GENERATION, Set.of());</span>
+<span class="fc" id="L115">        boolean accumulatedPathUsesGeneration2 = intersects(</span>
+<span class="fc" id="L116">            accumulatedOutcome.appliedRuleIds(),</span>
+            generation2AuditRuleIds);
+<span class="fc" id="L118">        boolean newlyReachableByGeneration2 =</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            !previousOutcome.reached()</span>
+<span class="pc bpc" id="L120" title="2 of 4 branches missed.">                &amp;&amp; accumulatedOutcome.reached()</span>
+                &amp;&amp; accumulatedPathUsesGeneration2;
+
+<span class="fc" id="L123">        return new AuditReport(</span>
+            SCHEMA,
+<span class="fc" id="L125">            campaign.campaignId(),</span>
+<span class="fc" id="L126">            campaign.repositoryRevision(),</span>
+            PREVIOUS_GENERATION,
+            ACCUMULATED_GENERATION,
+<span class="fc" id="L129">            AUDIT_HEURISTIC.maxDepth(),</span>
+<span class="fc" id="L130">            sha256(input),</span>
+<span class="fc" id="L131">            sha256(target),</span>
+            generation1ReusedGeneration0,
+            generation2ReusedGeneration1,
+            accumulatedPathUsesGeneration2,
+            newlyReachableByGeneration2,
+<span class="fc" id="L136">            previous.ruleIdsByGeneration(),</span>
+<span class="fc" id="L137">            accumulated.ruleIdsByGeneration(),</span>
+            previousOutcome,
+            accumulatedOutcome,
+            &quot;Development audit only: cumulative shadow reachability is not production promotion or external mathematical novelty.&quot;);
+    }
+
+    public Path write(Path output, AuditReport report) {
+<span class="fc" id="L144">        Objects.requireNonNull(output, &quot;output&quot;);</span>
+<span class="fc" id="L145">        Objects.requireNonNull(report, &quot;report&quot;);</span>
+        try {
+<span class="fc" id="L147">            Path normalized = output.toAbsolutePath().normalize();</span>
+<span class="fc" id="L148">            Path parent = normalized.getParent();</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L150">                Files.createDirectories(parent);</span>
+            }
+<span class="fc" id="L152">            Files.writeString(normalized, report.toJson(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L153">            return output;</span>
+<span class="nc" id="L154">        } catch (IOException exception) {</span>
+<span class="nc" id="L155">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private CompiledInventory compileInventory(
+        CampaignReport campaign,
+        int maximumGeneration,
+        List&lt;ActivatedRule&gt; rules
+    ) {
+<span class="fc" id="L164">        List&lt;CompiledRule&gt; compiled = rules.stream()</span>
+<span class="fc" id="L165">            .map(rule -&gt; compileRule(campaign, maximumGeneration, rule))</span>
+<span class="fc" id="L166">            .toList();</span>
+<span class="fc" id="L167">        List&lt;HypothesisOperator&gt; operators = compiled.stream()</span>
+<span class="fc" id="L168">            .map(CompiledRule::operator)</span>
+<span class="fc" id="L169">            .map(operator -&gt; (HypothesisOperator) operator)</span>
+<span class="fc" id="L170">            .toList();</span>
+<span class="fc" id="L171">        TransformationEngine base =</span>
+<span class="fc" id="L172">            new OccurrenceAwareAstRewriteTransformationEngine(List.of());</span>
+<span class="fc" id="L173">        TransformationEngine engine = new HypothesisTransformationEngine(</span>
+            base,
+            operators,
+<span class="fc" id="L176">            Math.max(16, operators.size() * 8));</span>
+<span class="fc" id="L177">        Map&lt;Integer, Set&lt;String&gt;&gt; byGeneration = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L178">        compiled.stream()</span>
+<span class="fc" id="L179">            .sorted(Comparator</span>
+<span class="fc" id="L180">                .comparingInt((CompiledRule rule) -&gt; rule.source().generation())</span>
+<span class="fc" id="L181">                .thenComparing(rule -&gt; rule.source().candidateHash()))</span>
+<span class="fc" id="L182">            .forEach(rule -&gt; byGeneration.computeIfAbsent(</span>
+<span class="fc" id="L183">                rule.source().generation(),</span>
+<span class="fc" id="L184">                ignored -&gt; new java.util.LinkedHashSet&lt;&gt;()).add(</span>
+<span class="fc" id="L185">                    rule.operator().ruleId()));</span>
+<span class="fc" id="L186">        Map&lt;Integer, Set&lt;String&gt;&gt; immutable = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L187">        byGeneration.forEach((generation, ids) -&gt;</span>
+<span class="fc" id="L188">            immutable.put(generation, Set.copyOf(ids)));</span>
+<span class="fc" id="L189">        return new CompiledInventory(engine, Map.copyOf(immutable));</span>
+    }
+
+    private CompiledRule compileRule(
+        CampaignReport campaign,
+        int maximumGeneration,
+        ActivatedRule rule
+    ) {
+<span class="fc" id="L197">        String suffix = rule.candidateHash().substring(&quot;sha256:&quot;.length(), 20);</span>
+<span class="fc" id="L198">        DynamicOperatorCompiler.CompilationResult result = compiler.compile(</span>
+            &quot;cumulative-audit-g&quot; + maximumGeneration + &quot;-&quot; + suffix,
+<span class="fc" id="L200">            generation(campaign, maximumGeneration).outputInventoryHash(),</span>
+<span class="fc" id="L201">            rule.leftPattern(),</span>
+<span class="fc" id="L202">            rule.rightPattern());</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (!result.isSuccess()) {</span>
+<span class="nc" id="L204">            throw new IllegalStateException(</span>
+                &quot;retained exact rule could not be recompiled: &quot;
+<span class="nc" id="L206">                    + rule.candidateHash() + &quot;: &quot; + result.rejectionReason());</span>
+        }
+<span class="fc" id="L208">        return new CompiledRule(rule, result.operator().orElseThrow());</span>
+    }
+
+    private SearchOutcome search(
+        TransformationEngine engine,
+        String input,
+        String target
+    ) {
+<span class="fc" id="L216">        SearchProblem problem = new SearchProblem(</span>
+            input,
+            engine,
+            scorer,
+            canonicalizer,
+<span class="fc" id="L221">            AUDIT_HEURISTIC).withTarget(syntaxTarget(target));</span>
+<span class="fc" id="L222">        GoalSearchResult result = new BestFirstSearchStrategy()</span>
+<span class="fc" id="L223">            .searchWithDiagnostics(problem);</span>
+<span class="fc" id="L224">        SearchState reached = result.reachedState();</span>
+<span class="fc" id="L225">        return new SearchOutcome(</span>
+<span class="fc" id="L226">            result.reached(),</span>
+<span class="fc" id="L227">            result.status().name(),</span>
+<span class="fc" id="L228">            result.metrics(),</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            reached == null ? List.of() : reached.path(),</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            reached == null ? List.of() : reached.appliedRuleIds());</span>
+    }
+
+    private SearchTarget syntaxTarget(String expression) {
+<span class="fc" id="L234">        return SearchTarget.syntaxExact(</span>
+<span class="fc" id="L235">            ExpressionFormatter.format(parser.parseTerm(expression)));</span>
+    }
+
+    private static GenerationReport generation(
+        CampaignReport campaign,
+        int number
+    ) {
+<span class="fc" id="L242">        return campaign.generations().stream()</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            .filter(generation -&gt; generation.generation() == number)</span>
+<span class="fc" id="L244">            .findFirst()</span>
+<span class="pc" id="L245">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                &quot;missing generation &quot; + number));
+    }
+
+    private static boolean generationUsesAny(
+        GenerationReport generation,
+        Set&lt;String&gt; previousRuleIds
+    ) {
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (previousRuleIds.isEmpty()) {</span>
+<span class="nc" id="L254">            return false;</span>
+        }
+<span class="fc" id="L256">        return generation.tasks().stream()</span>
+<span class="fc" id="L257">            .anyMatch(task -&gt; intersects(task.appliedRuleIds(), previousRuleIds));</span>
+    }
+
+    private static Set&lt;String&gt; ruleIds(List&lt;ActivatedRule&gt; rules) {
+<span class="fc" id="L261">        return rules.stream()</span>
+<span class="fc" id="L262">            .map(ActivatedRule::operatorRuleId)</span>
+<span class="fc" id="L263">            .collect(java.util.stream.Collectors.toUnmodifiableSet());</span>
+    }
+
+    private static boolean intersects(
+        List&lt;String&gt; appliedRuleIds,
+        Set&lt;String&gt; expectedRuleIds
+    ) {
+<span class="pc bpc" id="L270" title="2 of 4 branches missed.">        if (appliedRuleIds.isEmpty() || expectedRuleIds.isEmpty()) {</span>
+<span class="nc" id="L271">            return false;</span>
+        }
+<span class="fc" id="L273">        Set&lt;String&gt; intersection = new HashSet&lt;&gt;(appliedRuleIds);</span>
+<span class="fc" id="L274">        intersection.retainAll(expectedRuleIds);</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">        return !intersection.isEmpty();</span>
+    }
+
+    private static String repeatWrap(String expression, int count) {
+<span class="fc" id="L279">        String result = expression;</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L281">            result = &quot;(((&quot; + result + &quot;) + 0) * 1) * 1 + 0&quot;;</span>
+        }
+<span class="fc" id="L283">        return result;</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L288">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L289">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L290">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L291">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L292">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L296">    private record CompiledRule(</span>
+        ActivatedRule source,
+        DynamicPatternOperator operator
+    ) {
+    }
+
+<span class="fc" id="L302">    private record CompiledInventory(</span>
+        TransformationEngine engine,
+        Map&lt;Integer, Set&lt;String&gt;&gt; ruleIdsByGeneration
+    ) {
+    }
+
+    public record SearchOutcome(
+        boolean reached,
+        String status,
+        GoalMetrics metrics,
+        List&lt;String&gt; path,
+        List&lt;String&gt; appliedRuleIds
+    ) {
+<span class="fc" id="L315">        public SearchOutcome {</span>
+<span class="fc" id="L316">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L317">            Objects.requireNonNull(metrics, &quot;metrics&quot;);</span>
+<span class="fc" id="L318">            path = List.copyOf(path);</span>
+<span class="fc" id="L319">            appliedRuleIds = List.copyOf(appliedRuleIds);</span>
+<span class="fc" id="L320">        }</span>
+    }
+
+    public record AuditReport(
+        String schema,
+        String campaignId,
+        String repositoryRevision,
+        int previousGeneration,
+        int accumulatedGeneration,
+        int maximumSearchDepth,
+        String inputFingerprint,
+        String targetFingerprint,
+        boolean generation1ReusedGeneration0,
+        boolean generation2ReusedGeneration1,
+        boolean accumulatedPathUsesGeneration2,
+        boolean newlyReachableByGeneration2,
+        Map&lt;Integer, Set&lt;String&gt;&gt; previousRuleIdsByGeneration,
+        Map&lt;Integer, Set&lt;String&gt;&gt; accumulatedRuleIdsByGeneration,
+        SearchOutcome previousOutcome,
+        SearchOutcome accumulatedOutcome,
+        String claimBoundary
+    ) {
+<span class="fc" id="L342">        public AuditReport {</span>
+<span class="fc" id="L343">            Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L344">            Objects.requireNonNull(campaignId, &quot;campaignId&quot;);</span>
+<span class="fc" id="L345">            Objects.requireNonNull(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L346">            Objects.requireNonNull(inputFingerprint, &quot;inputFingerprint&quot;);</span>
+<span class="fc" id="L347">            Objects.requireNonNull(targetFingerprint, &quot;targetFingerprint&quot;);</span>
+<span class="fc" id="L348">            previousRuleIdsByGeneration = immutableMap(previousRuleIdsByGeneration);</span>
+<span class="fc" id="L349">            accumulatedRuleIdsByGeneration = immutableMap(</span>
+                accumulatedRuleIdsByGeneration);
+<span class="fc" id="L351">            Objects.requireNonNull(previousOutcome, &quot;previousOutcome&quot;);</span>
+<span class="fc" id="L352">            Objects.requireNonNull(accumulatedOutcome, &quot;accumulatedOutcome&quot;);</span>
+<span class="fc" id="L353">            Objects.requireNonNull(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="fc" id="L354">        }</span>
+
+        public boolean passed() {
+<span class="pc bpc" id="L357" title="4 of 8 branches missed.">            return generation1ReusedGeneration0</span>
+                &amp;&amp; generation2ReusedGeneration1
+                &amp;&amp; accumulatedPathUsesGeneration2
+                &amp;&amp; newlyReachableByGeneration2;
+        }
+
+        public String toJson() {
+<span class="fc" id="L364">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L365">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L366">                .property(&quot;campaignId&quot;, campaignId)</span>
+<span class="fc" id="L367">                .property(&quot;repositoryRevision&quot;, repositoryRevision)</span>
+<span class="fc" id="L368">                .property(&quot;claimBoundary&quot;, claimBoundary)</span>
+<span class="fc" id="L369">                .object(&quot;generationBoundary&quot;, object -&gt; object</span>
+<span class="fc" id="L370">                    .property(&quot;previousGeneration&quot;, previousGeneration)</span>
+<span class="fc" id="L371">                    .property(&quot;accumulatedGeneration&quot;, accumulatedGeneration)</span>
+<span class="fc" id="L372">                    .property(&quot;maximumSearchDepth&quot;, maximumSearchDepth))</span>
+<span class="fc" id="L373">                .object(&quot;reuse&quot;, object -&gt; object</span>
+<span class="fc" id="L374">                    .property(&quot;generation1ReusedGeneration0&quot;,</span>
+                        generation1ReusedGeneration0)
+<span class="fc" id="L376">                    .property(&quot;generation2ReusedGeneration1&quot;,</span>
+                        generation2ReusedGeneration1))
+<span class="fc" id="L378">                .object(&quot;subject&quot;, object -&gt; object</span>
+<span class="fc" id="L379">                    .property(&quot;inputFingerprint&quot;, inputFingerprint)</span>
+<span class="fc" id="L380">                    .property(&quot;targetFingerprint&quot;, targetFingerprint))</span>
+<span class="fc" id="L381">                .object(&quot;decision&quot;, object -&gt; object</span>
+<span class="fc" id="L382">                    .property(&quot;accumulatedPathUsesGeneration2&quot;,</span>
+                        accumulatedPathUsesGeneration2)
+<span class="fc" id="L384">                    .property(&quot;newlyReachableByGeneration2&quot;,</span>
+                        newlyReachableByGeneration2)
+<span class="fc" id="L386">                    .property(&quot;passed&quot;, passed()))</span>
+<span class="fc" id="L387">                .object(&quot;previousInventory&quot;, object -&gt; object</span>
+<span class="fc" id="L388">                    .array(&quot;ruleGenerations&quot;, array -&gt;</span>
+<span class="fc" id="L389">                        writeRuleGenerations(array, previousRuleIdsByGeneration))</span>
+<span class="fc" id="L390">                    .object(&quot;search&quot;, search -&gt;</span>
+<span class="fc" id="L391">                        writeSearchOutcome(search, previousOutcome)))</span>
+<span class="fc" id="L392">                .object(&quot;accumulatedInventory&quot;, object -&gt; object</span>
+<span class="fc" id="L393">                    .array(&quot;ruleGenerations&quot;, array -&gt;</span>
+<span class="fc" id="L394">                        writeRuleGenerations(array, accumulatedRuleIdsByGeneration))</span>
+<span class="fc" id="L395">                    .object(&quot;search&quot;, search -&gt;</span>
+<span class="fc" id="L396">                        writeSearchOutcome(search, accumulatedOutcome)))</span>
+<span class="fc" id="L397">                .endObject()</span>
+<span class="fc" id="L398">                .toString();</span>
+        }
+
+        private static Map&lt;Integer, Set&lt;String&gt;&gt; immutableMap(
+            Map&lt;Integer, Set&lt;String&gt;&gt; input
+        ) {
+<span class="fc" id="L404">            Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L405">            Map&lt;Integer, Set&lt;String&gt;&gt; copy = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L406">            input.entrySet().stream()</span>
+<span class="fc" id="L407">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L408">                .forEach(entry -&gt; copy.put(</span>
+<span class="fc" id="L409">                    entry.getKey(),</span>
+<span class="fc" id="L410">                    Set.copyOf(entry.getValue())));</span>
+<span class="fc" id="L411">            return Map.copyOf(copy);</span>
+        }
+
+        private static void writeRuleGenerations(
+            JsonWriter array,
+            Map&lt;Integer, Set&lt;String&gt;&gt; ruleIdsByGeneration
+        ) {
+<span class="fc" id="L418">            ruleIdsByGeneration.entrySet().stream()</span>
+<span class="fc" id="L419">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L420">                .forEach(entry -&gt; array.objectValue(object -&gt; object</span>
+<span class="fc" id="L421">                    .property(&quot;generation&quot;, entry.getKey())</span>
+<span class="fc" id="L422">                    .stringArray(&quot;ruleIds&quot;, entry.getValue().stream()</span>
+<span class="fc" id="L423">                        .sorted()</span>
+<span class="fc" id="L424">                        .toList())));</span>
+<span class="fc" id="L425">        }</span>
+
+        private static void writeSearchOutcome(
+            JsonWriter json,
+            SearchOutcome outcome
+        ) {
+<span class="fc" id="L431">            json.property(&quot;reached&quot;, outcome.reached())</span>
+<span class="fc" id="L432">                .property(&quot;status&quot;, outcome.status())</span>
+<span class="fc" id="L433">                .object(&quot;metrics&quot;, metrics -&gt; metrics</span>
+<span class="fc" id="L434">                    .property(&quot;exploredStates&quot;, outcome.metrics().exploredStates())</span>
+<span class="fc" id="L435">                    .property(&quot;expandedStates&quot;, outcome.metrics().expandedStates())</span>
+<span class="fc" id="L436">                    .property(&quot;generatedTransformations&quot;,</span>
+<span class="fc" id="L437">                        outcome.metrics().generatedTransformations())</span>
+<span class="fc" id="L438">                    .property(&quot;enqueuedStates&quot;, outcome.metrics().enqueuedStates())</span>
+<span class="fc" id="L439">                    .property(&quot;duplicatePrunes&quot;, outcome.metrics().duplicatePrunes())</span>
+<span class="fc" id="L440">                    .property(&quot;transpositionPrunes&quot;,</span>
+<span class="fc" id="L441">                        outcome.metrics().transpositionPrunes())</span>
+<span class="fc" id="L442">                    .property(&quot;depthPrunes&quot;, outcome.metrics().depthPrunes())</span>
+<span class="fc" id="L443">                    .property(&quot;candidateBudgetPrunes&quot;,</span>
+<span class="fc" id="L444">                        outcome.metrics().candidateBudgetPrunes()))</span>
+<span class="fc" id="L445">                .stringArray(&quot;path&quot;, outcome.path())</span>
+<span class="fc" id="L446">                .stringArray(&quot;appliedRuleIds&quot;, outcome.appliedRuleIds());</span>
+<span class="fc" id="L447">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

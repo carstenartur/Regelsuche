@@ -13,6 +13,7 @@ sind bewusst von Handbüchern und Architekturtexten getrennt.
 | einen vollständigen Anwendungsfall nachvollziehen | [User Workflows](user-workflows.md) und [Demo Gallery](demo-gallery.md) |
 | verstehen, wie fast passende Regeln vorbereitet werden | [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md) und [Rule-directed Preparation Planning](rule-directed-preparation-planning.md) |
 | die Grenze für selbst gelernte Regeln verstehen | [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md) und [Evolutionäre Suche](evolutionary-search.md) |
+| einen generationenbasierten Mining-Lauf reproduzieren | [Generationenbasiertes Regelmining](generational-rule-mining.md) |
 | den aktuellen Forschungsstand verstehen | [Discovery- und Forschungsstand](discovery-status.md) |
 | Claims und Evidence korrekt einordnen | [Capability-Status](generated/capability-status.md), [Glossar](glossary.md) und [Release Readiness](release-readiness.md) |
 | die Architektur verstehen oder Code ändern | [Architektur](architecture.md) und [Developer Guide](developer-guide.md) |
@@ -83,6 +84,9 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
   Spezialsolver, Partial Matching, Work Accounting und Aktivierungsgrenzen.
 - [Promotion exakt bewiesener gelernter Pattern-Regeln](learned-pattern-rule-promotion.md) —
   enger Polynom-Promotionspfad und seine Claim-Grenzen.
+- [Generationenbasiertes Regelmining](generational-rule-mining.md) —
+  generationsgetrennte Schatteninventare, exakte Kandidatenprüfung und
+  kumulative Wiederverwendung gelernter Transformationen.
 - [Evolutionäre Suche und gelernte Regelprogramme](evolutionary-search.md)
 - [Discovery Engine](discovery-engine.md)
 - [Discovery Evidence v1](discovery-evidence-v1.md)

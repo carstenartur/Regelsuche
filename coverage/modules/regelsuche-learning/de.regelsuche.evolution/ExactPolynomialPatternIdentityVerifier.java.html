@@ -92,9 +92,9 @@ public final class ExactPolynomialPatternIdentityVerifier {
 <span class="fc" id="L92">                Polynomial.variable(&quot;placeholder:&quot; + placeholder.name()),</span>
                 work);
         }
-<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (expression instanceof PatternExpr.LiteralVariable variable) {</span>
-<span class="nc" id="L96">            return checked(</span>
-<span class="nc" id="L97">                Polynomial.variable(&quot;literal:&quot; + variable.name()),</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (expression instanceof PatternExpr.LiteralVariable variable) {</span>
+<span class="fc" id="L96">            return checked(</span>
+<span class="fc" id="L97">                Polynomial.variable(&quot;literal:&quot; + variable.name()),</span>
                 work);
         }
 <span class="fc bfc" id="L100" title="All 2 branches covered.">        if (expression instanceof PatternExpr.LiteralNumber number) {</span>
@@ -113,8 +113,8 @@ public final class ExactPolynomialPatternIdentityVerifier {
 <span class="fc" id="L113">            int exponent = exponent(operation.right(), work);</span>
 <span class="fc" id="L114">            return power(base, exponent, work);</span>
         }
-<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (operation.operator() == BinaryOperator.DIV) {</span>
-<span class="nc" id="L117">            throw unsupported(&quot;DIVISION_NOT_IN_POLYNOMIAL_FRAGMENT&quot;);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (operation.operator() == BinaryOperator.DIV) {</span>
+<span class="fc" id="L117">            throw unsupported(&quot;DIVISION_NOT_IN_POLYNOMIAL_FRAGMENT&quot;);</span>
         }
 <span class="fc" id="L119">        Polynomial left = polynomial(operation.left(), work);</span>
 <span class="fc" id="L120">        Polynomial right = polynomial(operation.right(), work);</span>
@@ -352,8 +352,8 @@ public final class ExactPolynomialPatternIdentityVerifier {
 <span class="fc" id="L352">        }</span>
 
         static Polynomial constant(BigInteger value) {
-<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            return value.signum() == 0</span>
-<span class="nc" id="L356">                ? new Polynomial(Map.of())</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">            return value.signum() == 0</span>
+<span class="fc" id="L356">                ? new Polynomial(Map.of())</span>
 <span class="fc" id="L357">                : new Polynomial(Map.of(Monomial.ONE, value));</span>
         }
 

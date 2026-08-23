@@ -1,0 +1,975 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GenerationalRuleMiningCampaign.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">GenerationalRuleMiningCampaign.java</span></div><h1>GenerationalRuleMiningCampaign.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.docs.HiddenRulePilotRunner.CandidateSnapshot;
+import de.regelsuche.docs.HiddenRulePilotRunner.NegativeHoldout;
+import de.regelsuche.docs.HiddenRulePilotRunner.PositiveHoldout;
+import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeResult;
+import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
+import de.regelsuche.evolution.ExactPolynomialPatternIdentityVerifier;
+import de.regelsuche.evolution.ExactPolynomialPatternVerificationService;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.DynamicOperatorCompiler;
+import de.regelsuche.mining.DynamicPatternOperator;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalMetrics;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.OccurrenceAwareAstRewriteTransformationEngine;
+import de.regelsuche.transform.TransformationEngine;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Executes a proof-gated, generation-separated rule-mining development campaign.
+ *
+ * &lt;p&gt;Every generation runs against one frozen input inventory. Candidates become
+ * eligible only after search, candidate validation, counterexample search,
+ * positive and negative holdouts, an empty-assumption check, exact polynomial
+ * identity verification and executable compilation. Eligible operators are
+ * activated only after every task of that generation has finished. This blocks
+ * same-generation self-confirmation and makes every inventory revision
+ * content-addressed and reversible.&lt;/p&gt;
+ *
+ * &lt;p&gt;The activated rules remain an experimental shadow inventory. This campaign
+ * does not write to the default production inventory and does not upgrade the
+ * public {@code PROMOTION} capability status.&lt;/p&gt;
+ */
+<span class="fc" id="L59">public final class GenerationalRuleMiningCampaign {</span>
+    public static final String SCHEMA =
+        &quot;regelsuche.generational-rule-mining-campaign/v1&quot;;
+    public static final String CAMPAIGN_ID =
+        &quot;historical-rediscovery-generation-0&quot;;
+
+<span class="fc" id="L65">    private static final SearchHeuristic COMPOSITION_HEURISTIC =</span>
+        new SearchHeuristic(12, 1_200, 1, 32, 1_200, 1_200);
+
+<span class="fc" id="L68">    private final HiddenRulePilotRunner runner = new HiddenRulePilotRunner();</span>
+<span class="fc" id="L69">    private final ExactPolynomialPatternVerificationService exactVerifier =</span>
+        new ExactPolynomialPatternVerificationService();
+<span class="fc" id="L71">    private final DynamicOperatorCompiler compiler = new DynamicOperatorCompiler();</span>
+<span class="fc" id="L72">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L73">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+<span class="fc" id="L75">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+
+    public CampaignReport run(String repositoryRevision) {
+<span class="fc" id="L78">        requireText(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L79">        InventoryState initial = InventoryState.empty(repositoryRevision);</span>
+
+<span class="fc" id="L81">        GenerationExecution seed = executeGeneration(</span>
+            0,
+            &quot;seed-path-mining&quot;,
+            &quot;CASE_LOCAL_FROZEN_PRIMITIVES&quot;,
+            initial,
+<span class="fc" id="L86">            HiddenRulePilotRuntimeCatalog.tasks());</span>
+
+<span class="fc" id="L88">        GenerationExecution firstComposition = executeGeneration(</span>
+            1,
+            &quot;first-learned-composition&quot;,
+            &quot;PREVIOUS_EXACT_SHADOW_INVENTORY&quot;,
+<span class="fc" id="L92">            seed.outputInventory(),</span>
+<span class="fc" id="L93">            List.of(compositionTask(</span>
+                &quot;generation-001-composition&quot;,
+<span class="fc" id="L95">                seed.outputInventory(),</span>
+                1)));
+
+<span class="fc" id="L98">        GenerationExecution secondComposition = executeGeneration(</span>
+            2,
+            &quot;second-learned-composition&quot;,
+            &quot;PREVIOUS_EXACT_SHADOW_INVENTORY&quot;,
+<span class="fc" id="L102">            firstComposition.outputInventory(),</span>
+<span class="fc" id="L103">            List.of(compositionTask(</span>
+                &quot;generation-002-composition&quot;,
+<span class="fc" id="L105">                firstComposition.outputInventory(),</span>
+                2)));
+
+<span class="fc" id="L108">        InventoryState finalInventory = secondComposition.outputInventory();</span>
+<span class="fc" id="L109">        ReachabilityComparison reachability = compareReachability(</span>
+            initial,
+            finalInventory,
+<span class="fc" id="L112">            repeatWrap(&quot;x&quot;, 3),</span>
+            &quot;x&quot;);
+
+<span class="fc" id="L115">        return new CampaignReport(</span>
+            SCHEMA,
+            CAMPAIGN_ID,
+            repositoryRevision,
+<span class="fc" id="L119">            initial.inventoryHash(),</span>
+<span class="fc" id="L120">            finalInventory.inventoryHash(),</span>
+<span class="fc" id="L121">            List.of(</span>
+<span class="fc" id="L122">                seed.report(),</span>
+<span class="fc" id="L123">                firstComposition.report(),</span>
+<span class="fc" id="L124">                secondComposition.report()),</span>
+<span class="fc" id="L125">            finalInventory.rules(),</span>
+            reachability,
+            &quot;Development evidence only: exact shadow activation is not production promotion.&quot;);
+    }
+
+    public Path write(Path output, CampaignReport report) {
+<span class="fc" id="L131">        Objects.requireNonNull(output, &quot;output&quot;);</span>
+<span class="fc" id="L132">        Objects.requireNonNull(report, &quot;report&quot;);</span>
+        try {
+<span class="fc" id="L134">            Path normalized = output.toAbsolutePath().normalize();</span>
+<span class="fc" id="L135">            Path parent = normalized.getParent();</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L137">                Files.createDirectories(parent);</span>
+            }
+<span class="fc" id="L139">            Files.writeString(normalized, report.toJson(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L140">            return output;</span>
+<span class="nc" id="L141">        } catch (IOException exception) {</span>
+<span class="nc" id="L142">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private GenerationExecution executeGeneration(
+        int generation,
+        String name,
+        String executionSurface,
+        InventoryState inputInventory,
+        List&lt;RuntimeTask&gt; tasks
+    ) {
+<span class="fc" id="L153">        Objects.requireNonNull(inputInventory, &quot;inputInventory&quot;);</span>
+<span class="fc" id="L154">        List&lt;EvaluatedTask&gt; evaluated = tasks.stream()</span>
+<span class="fc" id="L155">            .sorted(Comparator.comparing(RuntimeTask::opaqueCaseId))</span>
+<span class="fc" id="L156">            .map(task -&gt; evaluateTask(generation, inputInventory, task))</span>
+<span class="fc" id="L157">            .toList();</span>
+
+<span class="fc" id="L159">        InventoryState outputInventory = inputInventory.activate(</span>
+            generation,
+<span class="fc" id="L161">            evaluated.stream()</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                .filter(value -&gt; value.operator() != null)</span>
+<span class="fc" id="L163">                .map(value -&gt; new PendingActivation(</span>
+<span class="fc" id="L164">                    value.report().assessment(),</span>
+<span class="fc" id="L165">                    value.operator()))</span>
+<span class="fc" id="L166">                .toList());</span>
+<span class="fc" id="L167">        assertNoSameGenerationFeedback(evaluated, outputInventory, inputInventory);</span>
+
+<span class="fc" id="L169">        List&lt;ActivatedRule&gt; additions = outputInventory.rules().stream()</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            .filter(rule -&gt; rule.generation() == generation)</span>
+<span class="fc" id="L171">            .toList();</span>
+<span class="fc" id="L172">        GenerationReport report = new GenerationReport(</span>
+            generation,
+            name,
+            executionSurface,
+<span class="fc" id="L176">            inputInventory.inventoryHash(),</span>
+<span class="fc" id="L177">            outputInventory.inventoryHash(),</span>
+            true,
+<span class="fc" id="L179">            evaluated.stream().map(EvaluatedTask::report).toList(),</span>
+            additions);
+<span class="fc" id="L181">        return new GenerationExecution(report, outputInventory);</span>
+    }
+
+    private EvaluatedTask evaluateTask(
+        int generation,
+        InventoryState inputInventory,
+        RuntimeTask task
+    ) {
+<span class="fc" id="L189">        RuntimeResult runtime = runner.run(task);</span>
+<span class="fc" id="L190">        CandidateEvaluation candidate = evaluateCandidate(</span>
+            generation,
+<span class="fc" id="L192">            inputInventory.inventoryHash(),</span>
+            runtime);
+<span class="fc" id="L194">        TaskReport report = new TaskReport(</span>
+<span class="fc" id="L195">            task.opaqueCaseId(),</span>
+<span class="fc" id="L196">            sha256(task.observableInput()),</span>
+<span class="fc" id="L197">            runtime.status().name(),</span>
+<span class="fc" id="L198">            runtime.searchStatus().name(),</span>
+<span class="fc" id="L199">            runtime.path(),</span>
+<span class="fc" id="L200">            runtime.primitiveRuleIds(),</span>
+<span class="fc" id="L201">            runtime.assumptions(),</span>
+<span class="fc" id="L202">            runtime.searchMetrics(),</span>
+<span class="fc" id="L203">            runtime.validationEvidence().passed(),</span>
+<span class="fc" id="L204">            runtime.holdouts().allPassed(),</span>
+<span class="fc" id="L205">            runtime.holdouts().materialAblations(),</span>
+<span class="fc" id="L206">            runtime.failureReason(),</span>
+<span class="fc" id="L207">            candidate.assessment());</span>
+<span class="fc" id="L208">        return new EvaluatedTask(report, candidate.operator());</span>
+    }
+
+    private CandidateEvaluation evaluateCandidate(
+        int generation,
+        String inputInventoryHash,
+        RuntimeResult runtime
+    ) {
+<span class="fc" id="L216">        CandidateSnapshot candidate = runtime.candidate();</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (candidate == null) {</span>
+<span class="nc" id="L218">            return CandidateEvaluation.rejected(</span>
+                CandidateStatus.NO_CANDIDATE,
+                &quot;runtime produced no candidate&quot;);
+        }
+<span class="fc" id="L222">        String candidateHash = candidateHash(candidate);</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        if (!runtime.frozen()) {</span>
+<span class="nc" id="L224">            return CandidateEvaluation.rejected(</span>
+                candidate,
+                candidateHash,
+                CandidateStatus.RUNTIME_NOT_FROZEN,
+<span class="nc" id="L228">                runtime.failureReason());</span>
+        }
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        if (!runtime.validationEvidence().passed()) {</span>
+<span class="nc" id="L231">            return CandidateEvaluation.rejected(</span>
+                candidate,
+                candidateHash,
+                CandidateStatus.VALIDATION_REJECTED,
+                &quot;validation or counterexample evidence did not pass&quot;);
+        }
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        if (!runtime.holdouts().allPassed()) {</span>
+<span class="nc" id="L238">            return CandidateEvaluation.rejected(</span>
+                candidate,
+                candidateHash,
+                CandidateStatus.HOLDOUT_REJECTED,
+                &quot;positive or negative holdout failed&quot;);
+        }
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (!candidate.assumptions().isEmpty()) {</span>
+<span class="nc" id="L245">            return CandidateEvaluation.rejected(</span>
+                candidate,
+                candidateHash,
+                CandidateStatus.ASSUMPTIONS_UNSUPPORTED,
+                &quot;v1 shadow activation requires an assumption-free candidate&quot;);
+        }
+
+        ExactPolynomialPatternIdentityVerifier.Verification proof;
+        try {
+<span class="fc" id="L254">            proof = exactVerifier.verify(</span>
+<span class="fc" id="L255">                candidate.leftPattern(),</span>
+<span class="fc" id="L256">                candidate.rightPattern());</span>
+<span class="nc" id="L257">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L258">            return CandidateEvaluation.rejected(</span>
+                candidate,
+                candidateHash,
+                CandidateStatus.EXACT_VERIFICATION_FAILED,
+<span class="nc" id="L262">                safeMessage(exception));</span>
+<span class="fc" id="L263">        }</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (!proof.proved()) {</span>
+<span class="fc" id="L265">            return CandidateEvaluation.rejected(</span>
+                candidate,
+                candidateHash,
+                CandidateStatus.EXACT_NOT_PROVED,
+<span class="fc" id="L269">                proof.status().name() + &quot;:&quot; + proof.detailCode(),</span>
+                proof);
+        }
+
+<span class="fc" id="L273">        String hypothesisId = &quot;generation-&quot; + generation + &quot;-&quot;</span>
+<span class="fc" id="L274">            + runtime.opaqueCaseId() + &quot;-&quot; + shortHash(candidateHash);</span>
+<span class="fc" id="L275">        DynamicOperatorCompiler.CompilationResult compilation = compiler.compile(</span>
+            hypothesisId,
+            inputInventoryHash,
+<span class="fc" id="L278">            candidate.leftPattern(),</span>
+<span class="fc" id="L279">            candidate.rightPattern());</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (!compilation.isSuccess()) {</span>
+<span class="nc" id="L281">            return CandidateEvaluation.rejected(</span>
+                candidate,
+                candidateHash,
+                CandidateStatus.COMPILATION_REJECTED,
+<span class="nc" id="L285">                compilation.rejectionReason(),</span>
+                proof);
+        }
+<span class="fc" id="L288">        DynamicPatternOperator operator = compilation.operator().orElseThrow();</span>
+<span class="fc" id="L289">        CandidateAssessment assessment = new CandidateAssessment(</span>
+            CandidateStatus.EXACT_SHADOW_ELIGIBLE,
+            candidateHash,
+<span class="fc" id="L292">            candidate.leftPattern(),</span>
+<span class="fc" id="L293">            candidate.rightPattern(),</span>
+<span class="fc" id="L294">            candidate.assumptions(),</span>
+<span class="fc" id="L295">            proof.status().name(),</span>
+<span class="fc" id="L296">            proof.detailCode(),</span>
+<span class="fc" id="L297">            proof.proofHash(),</span>
+<span class="fc" id="L298">            operator.ruleId(),</span>
+<span class="fc" id="L299">            operator.provenanceHash(),</span>
+            &quot;eligible after generation barrier&quot;);
+<span class="fc" id="L301">        return new CandidateEvaluation(assessment, operator);</span>
+    }
+
+    private RuntimeTask compositionTask(
+        String id,
+        InventoryState inventory,
+        int nesting
+    ) {
+<span class="fc" id="L309">        return new RuntimeTask(</span>
+            id,
+<span class="fc" id="L311">            repeatWrap(&quot;x&quot;, nesting),</span>
+<span class="fc" id="L312">            syntaxTarget(&quot;x&quot;),</span>
+<span class="fc" id="L313">            inventory.engine(),</span>
+            COMPOSITION_HEURISTIC,
+<span class="fc" id="L315">            List.of(</span>
+                new PositiveHoldout(
+                    id + &quot;-positive-1&quot;,
+<span class="fc" id="L318">                    repeatWrap(&quot;y + z&quot;, nesting),</span>
+                    &quot;y + z&quot;),
+                new PositiveHoldout(
+                    id + &quot;-positive-2&quot;,
+<span class="fc" id="L322">                    repeatWrap(&quot;sin(t)&quot;, nesting),</span>
+                    &quot;sin(t)&quot;)),
+<span class="fc" id="L324">            List.of(</span>
+                new NegativeHoldout(
+                    id + &quot;-negative-1&quot;,
+<span class="fc" id="L327">                    brokenOuterAdd(&quot;x&quot;, nesting)),</span>
+                new NegativeHoldout(
+                    id + &quot;-negative-2&quot;,
+<span class="fc" id="L330">                    brokenOuterMultiplier(&quot;x&quot;, nesting))));</span>
+    }
+
+    private ReachabilityComparison compareReachability(
+        InventoryState baselineInventory,
+        InventoryState accumulatedInventory,
+        String input,
+        String target
+    ) {
+<span class="fc" id="L339">        GoalSearchResult baseline = search(</span>
+<span class="fc" id="L340">            baselineInventory.engine(), input, target);</span>
+<span class="fc" id="L341">        GoalSearchResult accumulated = search(</span>
+<span class="fc" id="L342">            accumulatedInventory.engine(), input, target);</span>
+<span class="fc" id="L343">        SearchState reached = accumulated.reachedState();</span>
+<span class="fc" id="L344">        return new ReachabilityComparison(</span>
+<span class="fc" id="L345">            sha256(input),</span>
+<span class="fc" id="L346">            sha256(target),</span>
+<span class="fc" id="L347">            baselineInventory.inventoryHash(),</span>
+<span class="fc" id="L348">            accumulatedInventory.inventoryHash(),</span>
+<span class="fc" id="L349">            baseline.reached(),</span>
+<span class="fc" id="L350">            baseline.status().name(),</span>
+<span class="fc" id="L351">            baseline.metrics().exploredStates(),</span>
+<span class="fc" id="L352">            accumulated.reached(),</span>
+<span class="fc" id="L353">            accumulated.status().name(),</span>
+<span class="fc" id="L354">            accumulated.metrics().exploredStates(),</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            reached == null ? List.of() : reached.path(),</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            reached == null ? List.of() : reached.appliedRuleIds(),</span>
+<span class="pc bpc" id="L357" title="2 of 4 branches missed.">            accumulated.reached() &amp;&amp; !baseline.reached());</span>
+    }
+
+    private GoalSearchResult search(
+        TransformationEngine engine,
+        String input,
+        String target
+    ) {
+<span class="fc" id="L365">        SearchProblem problem = new SearchProblem(</span>
+            input,
+            engine,
+            scorer,
+            canonicalizer,
+<span class="fc" id="L370">            COMPOSITION_HEURISTIC).withTarget(syntaxTarget(target));</span>
+<span class="fc" id="L371">        return new BestFirstSearchStrategy().searchWithDiagnostics(problem);</span>
+    }
+
+    private SearchTarget syntaxTarget(String expression) {
+<span class="fc" id="L375">        return SearchTarget.syntaxExact(</span>
+<span class="fc" id="L376">            ExpressionFormatter.format(parser.parseTerm(expression)));</span>
+    }
+
+    private static String repeatWrap(String expression, int count) {
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        if (count &lt; 1) {</span>
+<span class="nc" id="L381">            throw new IllegalArgumentException(&quot;count must be positive&quot;);</span>
+        }
+<span class="fc" id="L383">        String result = expression;</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L385">            result = wrap(result);</span>
+        }
+<span class="fc" id="L387">        return result;</span>
+    }
+
+    private static String wrap(String expression) {
+<span class="fc" id="L391">        return &quot;(((&quot; + expression + &quot;) + 0) * 1) * 1 + 0&quot;;</span>
+    }
+
+    private static String brokenOuterAdd(String expression, int nesting) {
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        String inner = nesting == 1</span>
+<span class="fc" id="L396">            ? expression</span>
+<span class="fc" id="L397">            : repeatWrap(expression, nesting - 1);</span>
+<span class="fc" id="L398">        return &quot;(((&quot; + inner + &quot;) + 0) * 1) * 1 + 1&quot;;</span>
+    }
+
+    private static String brokenOuterMultiplier(String expression, int nesting) {
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        String inner = nesting == 1</span>
+<span class="fc" id="L403">            ? expression</span>
+<span class="fc" id="L404">            : repeatWrap(expression, nesting - 1);</span>
+<span class="fc" id="L405">        return &quot;(((&quot; + inner + &quot;) + 0) * 2) * 1 + 0&quot;;</span>
+    }
+
+    private static void assertNoSameGenerationFeedback(
+        List&lt;EvaluatedTask&gt; evaluated,
+        InventoryState output,
+        InventoryState input
+    ) {
+<span class="fc" id="L413">        Set&lt;String&gt; inputRuleIds = input.rules().stream()</span>
+<span class="fc" id="L414">            .map(ActivatedRule::operatorRuleId)</span>
+<span class="fc" id="L415">            .collect(java.util.stream.Collectors.toSet());</span>
+<span class="fc" id="L416">        Set&lt;String&gt; newRuleIds = output.rules().stream()</span>
+<span class="fc" id="L417">            .map(ActivatedRule::operatorRuleId)</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">            .filter(ruleId -&gt; !inputRuleIds.contains(ruleId))</span>
+<span class="fc" id="L419">            .collect(java.util.stream.Collectors.toSet());</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        for (EvaluatedTask task : evaluated) {</span>
+<span class="fc" id="L421">            Set&lt;String&gt; intersection = new HashSet&lt;&gt;(task.report().appliedRuleIds());</span>
+<span class="fc" id="L422">            intersection.retainAll(newRuleIds);</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">            if (!intersection.isEmpty()) {</span>
+<span class="nc" id="L424">                throw new IllegalStateException(</span>
+                    &quot;same-generation candidate feedback detected: &quot; + intersection);
+            }
+<span class="fc" id="L427">        }</span>
+<span class="fc" id="L428">    }</span>
+
+    private static String candidateHash(CandidateSnapshot candidate) {
+<span class="fc" id="L431">        StringBuilder value = new StringBuilder();</span>
+<span class="fc" id="L432">        append(value, candidate.leftPattern());</span>
+<span class="fc" id="L433">        append(value, candidate.rightPattern());</span>
+<span class="fc" id="L434">        candidate.assumptions().stream().sorted()</span>
+<span class="pc" id="L435">            .forEach(assumption -&gt; append(value, assumption));</span>
+<span class="fc" id="L436">        append(value, candidate.dynamicRuleId());</span>
+<span class="fc" id="L437">        append(value, candidate.provenanceHash());</span>
+<span class="fc" id="L438">        return sha256(value.toString());</span>
+    }
+
+    private static String inventoryHash(
+        String repositoryRevision,
+        String previousHash,
+        List&lt;ActivatedRule&gt; rules
+    ) {
+<span class="fc" id="L446">        StringBuilder value = new StringBuilder();</span>
+<span class="fc" id="L447">        append(value, &quot;regelsuche.exact-shadow-inventory/v1&quot;);</span>
+<span class="fc" id="L448">        append(value, repositoryRevision);</span>
+<span class="fc" id="L449">        append(value, previousHash);</span>
+<span class="fc" id="L450">        rules.stream()</span>
+<span class="fc" id="L451">            .sorted(Comparator.comparing(ActivatedRule::candidateHash))</span>
+<span class="fc" id="L452">            .forEach(rule -&gt; append(value, rule.canonicalMaterial()));</span>
+<span class="fc" id="L453">        return sha256(value.toString());</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">        String safe = value == null ? &quot;&quot; : value;</span>
+<span class="fc" id="L458">        target.append(safe.length()).append(':').append(safe);</span>
+<span class="fc" id="L459">    }</span>
+
+    private static String shortHash(String hash) {
+<span class="fc" id="L462">        return hash.substring(&quot;sha256:&quot;.length(), &quot;sha256:&quot;.length() + 12);</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L467">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L468">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L469">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L470">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L471">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static String safeMessage(RuntimeException exception) {
+<span class="nc bnc" id="L476" title="All 2 branches missed.">        return exception.getMessage() == null</span>
+<span class="nc" id="L477">            ? exception.getClass().getSimpleName()</span>
+<span class="nc" id="L478">            : exception.getMessage();</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L482" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L483">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L485">    }</span>
+
+<span class="fc" id="L487">    private record GenerationExecution(</span>
+        GenerationReport report,
+        InventoryState outputInventory
+    ) {
+    }
+
+<span class="fc" id="L493">    private record EvaluatedTask(</span>
+        TaskReport report,
+        DynamicPatternOperator operator
+    ) {
+    }
+
+<span class="fc" id="L499">    private record CandidateEvaluation(</span>
+        CandidateAssessment assessment,
+        DynamicPatternOperator operator
+    ) {
+        static CandidateEvaluation rejected(
+            CandidateStatus status,
+            String reason
+        ) {
+<span class="nc" id="L507">            return new CandidateEvaluation(</span>
+<span class="nc" id="L508">                CandidateAssessment.rejected(status, reason),</span>
+                null);
+        }
+
+        static CandidateEvaluation rejected(
+            CandidateSnapshot candidate,
+            String candidateHash,
+            CandidateStatus status,
+            String reason
+        ) {
+<span class="nc" id="L518">            return rejected(</span>
+                candidate,
+                candidateHash,
+                status,
+                reason,
+                null);
+        }
+
+        static CandidateEvaluation rejected(
+            CandidateSnapshot candidate,
+            String candidateHash,
+            CandidateStatus status,
+            String reason,
+            ExactPolynomialPatternIdentityVerifier.Verification proof
+        ) {
+<span class="fc" id="L533">            return new CandidateEvaluation(</span>
+                new CandidateAssessment(
+                    status,
+                    candidateHash,
+<span class="fc" id="L537">                    candidate.leftPattern(),</span>
+<span class="fc" id="L538">                    candidate.rightPattern(),</span>
+<span class="fc" id="L539">                    candidate.assumptions(),</span>
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">                    proof == null ? &quot;NOT_EVALUATED&quot; : proof.status().name(),</span>
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">                    proof == null ? &quot;&quot; : proof.detailCode(),</span>
+<span class="pc bpc" id="L542" title="1 of 2 branches missed.">                    proof == null ? &quot;&quot; : proof.proofHash(),</span>
+                    &quot;&quot;,
+                    &quot;&quot;,
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">                    reason == null ? &quot;&quot; : reason),</span>
+                null);
+        }
+    }
+
+<span class="fc" id="L550">    private record PendingActivation(</span>
+        CandidateAssessment assessment,
+        DynamicPatternOperator operator
+    ) {
+    }
+
+    private record InventoryState(
+        String repositoryRevision,
+        String inventoryHash,
+        List&lt;ActivatedRule&gt; rules,
+        List&lt;DynamicPatternOperator&gt; operators
+    ) {
+<span class="fc" id="L562">        InventoryState {</span>
+<span class="fc" id="L563">            requireText(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L564">            requireText(inventoryHash, &quot;inventoryHash&quot;);</span>
+<span class="fc" id="L565">            rules = List.copyOf(rules);</span>
+<span class="fc" id="L566">            operators = List.copyOf(operators);</span>
+<span class="fc" id="L567">        }</span>
+
+        static InventoryState empty(String repositoryRevision) {
+<span class="fc" id="L570">            String root = GenerationalRuleMiningCampaign.inventoryHash(</span>
+                repositoryRevision,
+<span class="fc" id="L572">                &quot;sha256:&quot; + &quot;0&quot;.repeat(64),</span>
+<span class="fc" id="L573">                List.of());</span>
+<span class="fc" id="L574">            return new InventoryState(</span>
+                repositoryRevision,
+                root,
+<span class="fc" id="L577">                List.of(),</span>
+<span class="fc" id="L578">                List.of());</span>
+        }
+
+        InventoryState activate(
+            int generation,
+            List&lt;PendingActivation&gt; pending
+        ) {
+<span class="fc" id="L585">            Set&lt;String&gt; known = rules.stream()</span>
+<span class="fc" id="L586">                .map(ActivatedRule::candidateHash)</span>
+<span class="fc" id="L587">                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L588">            List&lt;ActivatedRule&gt; additions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L589">            List&lt;DynamicPatternOperator&gt; addedOperators = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L590">            pending.stream()</span>
+<span class="fc" id="L591">                .sorted(Comparator.comparing(value -&gt;</span>
+<span class="fc" id="L592">                    value.assessment().candidateHash()))</span>
+<span class="fc" id="L593">                .forEach(value -&gt; {</span>
+<span class="fc" id="L594">                    CandidateAssessment assessment = value.assessment();</span>
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">                    if (known.add(assessment.candidateHash())) {</span>
+<span class="fc" id="L596">                        additions.add(new ActivatedRule(</span>
+                            generation,
+<span class="fc" id="L598">                            assessment.candidateHash(),</span>
+<span class="fc" id="L599">                            assessment.leftPattern(),</span>
+<span class="fc" id="L600">                            assessment.rightPattern(),</span>
+<span class="fc" id="L601">                            assessment.proofHash(),</span>
+<span class="fc" id="L602">                            assessment.operatorRuleId(),</span>
+<span class="fc" id="L603">                            assessment.operatorProvenanceHash()));</span>
+<span class="fc" id="L604">                        addedOperators.add(value.operator());</span>
+                    }
+<span class="fc" id="L606">                });</span>
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">            if (additions.isEmpty()) {</span>
+<span class="nc" id="L608">                return this;</span>
+            }
+<span class="fc" id="L610">            List&lt;ActivatedRule&gt; allRules = new ArrayList&lt;&gt;(rules);</span>
+<span class="fc" id="L611">            allRules.addAll(additions);</span>
+<span class="fc" id="L612">            allRules.sort(Comparator.comparing(ActivatedRule::candidateHash));</span>
+<span class="fc" id="L613">            List&lt;DynamicPatternOperator&gt; allOperators = new ArrayList&lt;&gt;(operators);</span>
+<span class="fc" id="L614">            allOperators.addAll(addedOperators);</span>
+<span class="fc" id="L615">            String nextHash = GenerationalRuleMiningCampaign.inventoryHash(</span>
+                repositoryRevision,
+                inventoryHash,
+                additions);
+<span class="fc" id="L619">            return new InventoryState(</span>
+                repositoryRevision,
+                nextHash,
+                allRules,
+                allOperators);
+        }
+
+        TransformationEngine engine() {
+<span class="fc" id="L627">            TransformationEngine base =</span>
+<span class="fc" id="L628">                new OccurrenceAwareAstRewriteTransformationEngine(List.of());</span>
+<span class="fc" id="L629">            List&lt;HypothesisOperator&gt; active = operators.stream()</span>
+<span class="fc" id="L630">                .map(operator -&gt; (HypothesisOperator) operator)</span>
+<span class="fc" id="L631">                .toList();</span>
+<span class="fc" id="L632">            return new HypothesisTransformationEngine(</span>
+                base,
+                active,
+<span class="fc" id="L635">                Math.max(16, active.size() * 8));</span>
+        }
+    }
+
+<span class="fc" id="L639">    public enum CandidateStatus {</span>
+<span class="fc" id="L640">        NO_CANDIDATE,</span>
+<span class="fc" id="L641">        RUNTIME_NOT_FROZEN,</span>
+<span class="fc" id="L642">        VALIDATION_REJECTED,</span>
+<span class="fc" id="L643">        HOLDOUT_REJECTED,</span>
+<span class="fc" id="L644">        ASSUMPTIONS_UNSUPPORTED,</span>
+<span class="fc" id="L645">        EXACT_VERIFICATION_FAILED,</span>
+<span class="fc" id="L646">        EXACT_NOT_PROVED,</span>
+<span class="fc" id="L647">        COMPILATION_REJECTED,</span>
+<span class="fc" id="L648">        EXACT_SHADOW_ELIGIBLE</span>
+    }
+
+    public record CandidateAssessment(
+        CandidateStatus status,
+        String candidateHash,
+        String leftPattern,
+        String rightPattern,
+        List&lt;String&gt; assumptions,
+        String exactProofStatus,
+        String exactProofDetail,
+        String proofHash,
+        String operatorRuleId,
+        String operatorProvenanceHash,
+        String reason
+    ) {
+<span class="fc" id="L664">        public CandidateAssessment {</span>
+<span class="fc" id="L665">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L666" title="1 of 2 branches missed.">            candidateHash = candidateHash == null ? &quot;&quot; : candidateHash;</span>
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">            leftPattern = leftPattern == null ? &quot;&quot; : leftPattern;</span>
+<span class="pc bpc" id="L668" title="1 of 2 branches missed.">            rightPattern = rightPattern == null ? &quot;&quot; : rightPattern;</span>
+<span class="pc bpc" id="L669" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">            exactProofStatus = exactProofStatus == null ? &quot;NOT_EVALUATED&quot; : exactProofStatus;</span>
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">            exactProofDetail = exactProofDetail == null ? &quot;&quot; : exactProofDetail;</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">            proofHash = proofHash == null ? &quot;&quot; : proofHash;</span>
+<span class="pc bpc" id="L673" title="1 of 2 branches missed.">            operatorRuleId = operatorRuleId == null ? &quot;&quot; : operatorRuleId;</span>
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">            operatorProvenanceHash = operatorProvenanceHash == null</span>
+<span class="nc" id="L675">                ? &quot;&quot;</span>
+<span class="fc" id="L676">                : operatorProvenanceHash;</span>
+<span class="pc bpc" id="L677" title="1 of 2 branches missed.">            reason = reason == null ? &quot;&quot; : reason;</span>
+<span class="fc" id="L678">        }</span>
+
+        static CandidateAssessment rejected(
+            CandidateStatus status,
+            String reason
+        ) {
+<span class="nc" id="L684">            return new CandidateAssessment(</span>
+                status,
+                &quot;&quot;,
+                &quot;&quot;,
+                &quot;&quot;,
+<span class="nc" id="L689">                List.of(),</span>
+                &quot;NOT_EVALUATED&quot;,
+                &quot;&quot;,
+                &quot;&quot;,
+                &quot;&quot;,
+                &quot;&quot;,
+                reason);
+        }
+
+        public boolean eligible() {
+<span class="fc bfc" id="L699" title="All 2 branches covered.">            return status == CandidateStatus.EXACT_SHADOW_ELIGIBLE;</span>
+        }
+    }
+
+    public record ActivatedRule(
+        int generation,
+        String candidateHash,
+        String leftPattern,
+        String rightPattern,
+        String proofHash,
+        String operatorRuleId,
+        String operatorProvenanceHash
+    ) {
+<span class="fc" id="L712">        public ActivatedRule {</span>
+<span class="pc bpc" id="L713" title="1 of 2 branches missed.">            if (generation &lt; 0) {</span>
+<span class="nc" id="L714">                throw new IllegalArgumentException(&quot;generation must not be negative&quot;);</span>
+            }
+<span class="fc" id="L716">            requireText(candidateHash, &quot;candidateHash&quot;);</span>
+<span class="fc" id="L717">            requireText(leftPattern, &quot;leftPattern&quot;);</span>
+<span class="fc" id="L718">            requireText(rightPattern, &quot;rightPattern&quot;);</span>
+<span class="fc" id="L719">            requireText(proofHash, &quot;proofHash&quot;);</span>
+<span class="fc" id="L720">            requireText(operatorRuleId, &quot;operatorRuleId&quot;);</span>
+<span class="fc" id="L721">            requireText(operatorProvenanceHash, &quot;operatorProvenanceHash&quot;);</span>
+<span class="fc" id="L722">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L725">            return generation + &quot;|&quot; + candidateHash + &quot;|&quot; + leftPattern + &quot;|&quot;</span>
+                + rightPattern + &quot;|&quot; + proofHash + &quot;|&quot; + operatorRuleId + &quot;|&quot;
+                + operatorProvenanceHash;
+        }
+    }
+
+    public record TaskReport(
+        String taskId,
+        String taskFingerprint,
+        String runtimeStatus,
+        String searchStatus,
+        List&lt;String&gt; path,
+        List&lt;String&gt; appliedRuleIds,
+        List&lt;String&gt; assumptions,
+        GoalMetrics metrics,
+        boolean validationPassed,
+        boolean holdoutsPassed,
+        long materialAblations,
+        String failureReason,
+        CandidateAssessment assessment
+    ) {
+<span class="fc" id="L746">        public TaskReport {</span>
+<span class="fc" id="L747">            requireText(taskId, &quot;taskId&quot;);</span>
+<span class="fc" id="L748">            requireText(taskFingerprint, &quot;taskFingerprint&quot;);</span>
+<span class="fc" id="L749">            path = List.copyOf(path);</span>
+<span class="fc" id="L750">            appliedRuleIds = List.copyOf(appliedRuleIds);</span>
+<span class="fc" id="L751">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L752">            Objects.requireNonNull(metrics, &quot;metrics&quot;);</span>
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">            failureReason = failureReason == null ? &quot;&quot; : failureReason;</span>
+<span class="fc" id="L754">            Objects.requireNonNull(assessment, &quot;assessment&quot;);</span>
+<span class="fc" id="L755">        }</span>
+
+        public boolean reached() {
+<span class="pc bpc" id="L758" title="1 of 2 branches missed.">            return path.size() &gt; 1;</span>
+        }
+    }
+
+    public record GenerationReport(
+        int generation,
+        String name,
+        String executionSurface,
+        String inputInventoryHash,
+        String outputInventoryHash,
+        boolean sameGenerationFeedbackBlocked,
+        List&lt;TaskReport&gt; tasks,
+        List&lt;ActivatedRule&gt; activatedRules
+    ) {
+<span class="fc" id="L772">        public GenerationReport {</span>
+<span class="pc bpc" id="L773" title="1 of 2 branches missed.">            if (generation &lt; 0) {</span>
+<span class="nc" id="L774">                throw new IllegalArgumentException(&quot;generation must not be negative&quot;);</span>
+            }
+<span class="fc" id="L776">            requireText(name, &quot;name&quot;);</span>
+<span class="fc" id="L777">            requireText(executionSurface, &quot;executionSurface&quot;);</span>
+<span class="fc" id="L778">            requireText(inputInventoryHash, &quot;inputInventoryHash&quot;);</span>
+<span class="fc" id="L779">            requireText(outputInventoryHash, &quot;outputInventoryHash&quot;);</span>
+<span class="fc" id="L780">            tasks = List.copyOf(tasks);</span>
+<span class="fc" id="L781">            activatedRules = List.copyOf(activatedRules);</span>
+<span class="fc" id="L782">        }</span>
+
+        public int eligibleCandidates() {
+<span class="fc" id="L785">            return (int) tasks.stream()</span>
+<span class="fc" id="L786">                .filter(task -&gt; task.assessment().eligible())</span>
+<span class="fc" id="L787">                .count();</span>
+        }
+    }
+
+    public record ReachabilityComparison(
+        String inputFingerprint,
+        String targetFingerprint,
+        String baselineInventoryHash,
+        String accumulatedInventoryHash,
+        boolean baselineReached,
+        String baselineStatus,
+        int baselineExploredStates,
+        boolean accumulatedReached,
+        String accumulatedStatus,
+        int accumulatedExploredStates,
+        List&lt;String&gt; accumulatedPath,
+        List&lt;String&gt; accumulatedRuleIds,
+        boolean newlyReachableUnderBudget
+    ) {
+<span class="fc" id="L806">        public ReachabilityComparison {</span>
+<span class="fc" id="L807">            accumulatedPath = List.copyOf(accumulatedPath);</span>
+<span class="fc" id="L808">            accumulatedRuleIds = List.copyOf(accumulatedRuleIds);</span>
+<span class="fc" id="L809">        }</span>
+    }
+
+    public record CampaignReport(
+        String schema,
+        String campaignId,
+        String repositoryRevision,
+        String initialInventoryHash,
+        String finalInventoryHash,
+        List&lt;GenerationReport&gt; generations,
+        List&lt;ActivatedRule&gt; finalRules,
+        ReachabilityComparison reachability,
+        String claimBoundary
+    ) {
+<span class="fc" id="L823">        public CampaignReport {</span>
+<span class="fc" id="L824">            requireText(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L825">            requireText(campaignId, &quot;campaignId&quot;);</span>
+<span class="fc" id="L826">            requireText(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L827">            requireText(initialInventoryHash, &quot;initialInventoryHash&quot;);</span>
+<span class="fc" id="L828">            requireText(finalInventoryHash, &quot;finalInventoryHash&quot;);</span>
+<span class="fc" id="L829">            generations = List.copyOf(generations);</span>
+<span class="fc" id="L830">            finalRules = List.copyOf(finalRules);</span>
+<span class="fc" id="L831">            Objects.requireNonNull(reachability, &quot;reachability&quot;);</span>
+<span class="fc" id="L832">            requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="fc" id="L833">        }</span>
+
+        public int totalTasks() {
+<span class="fc" id="L836">            return generations.stream().mapToInt(value -&gt; value.tasks().size()).sum();</span>
+        }
+
+        public int totalActivatedRules() {
+<span class="fc" id="L840">            return finalRules.size();</span>
+        }
+
+        public String toJson() {
+<span class="fc" id="L844">            JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L845">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L846">                .property(&quot;campaignId&quot;, campaignId)</span>
+<span class="fc" id="L847">                .property(&quot;repositoryRevision&quot;, repositoryRevision)</span>
+<span class="fc" id="L848">                .property(&quot;claimBoundary&quot;, claimBoundary)</span>
+<span class="fc" id="L849">                .object(&quot;summary&quot;, summary -&gt; summary</span>
+<span class="fc" id="L850">                    .property(&quot;generations&quot;, generations.size())</span>
+<span class="fc" id="L851">                    .property(&quot;tasks&quot;, totalTasks())</span>
+<span class="fc" id="L852">                    .property(&quot;activatedRules&quot;, totalActivatedRules())</span>
+<span class="fc" id="L853">                    .property(&quot;initialInventoryHash&quot;, initialInventoryHash)</span>
+<span class="fc" id="L854">                    .property(&quot;finalInventoryHash&quot;, finalInventoryHash)</span>
+<span class="fc" id="L855">                    .property(&quot;newlyReachableUnderBudget&quot;,</span>
+<span class="fc" id="L856">                        reachability.newlyReachableUnderBudget()))</span>
+<span class="fc" id="L857">                .array(&quot;generations&quot;, array -&gt; generations.forEach(generation -&gt;</span>
+<span class="fc" id="L858">                    array.objectValue(object -&gt; writeGeneration(object, generation))))</span>
+<span class="fc" id="L859">                .array(&quot;finalInventory&quot;, array -&gt; finalRules.forEach(rule -&gt;</span>
+<span class="fc" id="L860">                    array.objectValue(object -&gt; writeActivatedRule(object, rule))))</span>
+<span class="fc" id="L861">                .object(&quot;reachability&quot;, object -&gt; writeReachability(object, reachability))</span>
+<span class="fc" id="L862">                .endObject();</span>
+<span class="fc" id="L863">            return json.toString();</span>
+        }
+
+        private static void writeGeneration(
+            JsonWriter json,
+            GenerationReport generation
+        ) {
+<span class="fc" id="L870">            json.property(&quot;generation&quot;, generation.generation())</span>
+<span class="fc" id="L871">                .property(&quot;name&quot;, generation.name())</span>
+<span class="fc" id="L872">                .property(&quot;executionSurface&quot;, generation.executionSurface())</span>
+<span class="fc" id="L873">                .property(&quot;inputInventoryHash&quot;, generation.inputInventoryHash())</span>
+<span class="fc" id="L874">                .property(&quot;outputInventoryHash&quot;, generation.outputInventoryHash())</span>
+<span class="fc" id="L875">                .property(&quot;sameGenerationFeedbackBlocked&quot;,</span>
+<span class="fc" id="L876">                    generation.sameGenerationFeedbackBlocked())</span>
+<span class="fc" id="L877">                .property(&quot;tasks&quot;, generation.tasks().size())</span>
+<span class="fc" id="L878">                .property(&quot;eligibleCandidates&quot;, generation.eligibleCandidates())</span>
+<span class="fc" id="L879">                .property(&quot;activatedRules&quot;, generation.activatedRules().size())</span>
+<span class="fc" id="L880">                .array(&quot;taskResults&quot;, array -&gt; generation.tasks().forEach(task -&gt;</span>
+<span class="fc" id="L881">                    array.objectValue(object -&gt; writeTask(object, task))))</span>
+<span class="fc" id="L882">                .array(&quot;inventoryAdditions&quot;, array -&gt;</span>
+<span class="fc" id="L883">                    generation.activatedRules().forEach(rule -&gt;</span>
+<span class="fc" id="L884">                        array.objectValue(object -&gt; writeActivatedRule(object, rule))));</span>
+<span class="fc" id="L885">        }</span>
+
+        private static void writeTask(JsonWriter json, TaskReport task) {
+<span class="fc" id="L888">            json.property(&quot;taskId&quot;, task.taskId())</span>
+<span class="fc" id="L889">                .property(&quot;taskFingerprint&quot;, task.taskFingerprint())</span>
+<span class="fc" id="L890">                .property(&quot;runtimeStatus&quot;, task.runtimeStatus())</span>
+<span class="fc" id="L891">                .property(&quot;searchStatus&quot;, task.searchStatus())</span>
+<span class="fc" id="L892">                .property(&quot;reached&quot;, task.reached())</span>
+<span class="fc" id="L893">                .property(&quot;validationPassed&quot;, task.validationPassed())</span>
+<span class="fc" id="L894">                .property(&quot;holdoutsPassed&quot;, task.holdoutsPassed())</span>
+<span class="fc" id="L895">                .property(&quot;materialAblations&quot;, task.materialAblations())</span>
+<span class="fc" id="L896">                .property(&quot;failureReason&quot;, task.failureReason())</span>
+<span class="fc" id="L897">                .stringArray(&quot;path&quot;, task.path())</span>
+<span class="fc" id="L898">                .stringArray(&quot;appliedRuleIds&quot;, task.appliedRuleIds())</span>
+<span class="fc" id="L899">                .stringArray(&quot;assumptions&quot;, task.assumptions())</span>
+<span class="fc" id="L900">                .object(&quot;metrics&quot;, metrics -&gt; writeMetrics(metrics, task.metrics()))</span>
+<span class="fc" id="L901">                .object(&quot;candidate&quot;, candidate -&gt;</span>
+<span class="fc" id="L902">                    writeAssessment(candidate, task.assessment()));</span>
+<span class="fc" id="L903">        }</span>
+
+        private static void writeMetrics(JsonWriter json, GoalMetrics metrics) {
+<span class="fc" id="L906">            json.property(&quot;exploredStates&quot;, metrics.exploredStates())</span>
+<span class="fc" id="L907">                .property(&quot;expandedStates&quot;, metrics.expandedStates())</span>
+<span class="fc" id="L908">                .property(&quot;generatedTransformations&quot;, metrics.generatedTransformations())</span>
+<span class="fc" id="L909">                .property(&quot;enqueuedStates&quot;, metrics.enqueuedStates())</span>
+<span class="fc" id="L910">                .property(&quot;duplicatePrunes&quot;, metrics.duplicatePrunes())</span>
+<span class="fc" id="L911">                .property(&quot;transpositionPrunes&quot;, metrics.transpositionPrunes())</span>
+<span class="fc" id="L912">                .property(&quot;depthPrunes&quot;, metrics.depthPrunes())</span>
+<span class="fc" id="L913">                .property(&quot;candidateBudgetPrunes&quot;, metrics.candidateBudgetPrunes());</span>
+<span class="fc" id="L914">        }</span>
+
+        private static void writeAssessment(
+            JsonWriter json,
+            CandidateAssessment assessment
+        ) {
+<span class="fc" id="L920">            json.property(&quot;status&quot;, assessment.status().name())</span>
+<span class="fc" id="L921">                .property(&quot;eligible&quot;, assessment.eligible())</span>
+<span class="fc" id="L922">                .property(&quot;candidateHash&quot;, assessment.candidateHash())</span>
+<span class="fc" id="L923">                .property(&quot;leftPattern&quot;, assessment.leftPattern())</span>
+<span class="fc" id="L924">                .property(&quot;rightPattern&quot;, assessment.rightPattern())</span>
+<span class="fc" id="L925">                .stringArray(&quot;assumptions&quot;, assessment.assumptions())</span>
+<span class="fc" id="L926">                .property(&quot;exactProofStatus&quot;, assessment.exactProofStatus())</span>
+<span class="fc" id="L927">                .property(&quot;exactProofDetail&quot;, assessment.exactProofDetail())</span>
+<span class="fc" id="L928">                .property(&quot;proofHash&quot;, assessment.proofHash())</span>
+<span class="fc" id="L929">                .property(&quot;operatorRuleId&quot;, assessment.operatorRuleId())</span>
+<span class="fc" id="L930">                .property(&quot;operatorProvenanceHash&quot;,</span>
+<span class="fc" id="L931">                    assessment.operatorProvenanceHash())</span>
+<span class="fc" id="L932">                .property(&quot;reason&quot;, assessment.reason());</span>
+<span class="fc" id="L933">        }</span>
+
+        private static void writeActivatedRule(
+            JsonWriter json,
+            ActivatedRule rule
+        ) {
+<span class="fc" id="L939">            json.property(&quot;generation&quot;, rule.generation())</span>
+<span class="fc" id="L940">                .property(&quot;candidateHash&quot;, rule.candidateHash())</span>
+<span class="fc" id="L941">                .property(&quot;leftPattern&quot;, rule.leftPattern())</span>
+<span class="fc" id="L942">                .property(&quot;rightPattern&quot;, rule.rightPattern())</span>
+<span class="fc" id="L943">                .property(&quot;proofHash&quot;, rule.proofHash())</span>
+<span class="fc" id="L944">                .property(&quot;operatorRuleId&quot;, rule.operatorRuleId())</span>
+<span class="fc" id="L945">                .property(&quot;operatorProvenanceHash&quot;,</span>
+<span class="fc" id="L946">                    rule.operatorProvenanceHash());</span>
+<span class="fc" id="L947">        }</span>
+
+        private static void writeReachability(
+            JsonWriter json,
+            ReachabilityComparison reachability
+        ) {
+<span class="fc" id="L953">            json.property(&quot;inputFingerprint&quot;, reachability.inputFingerprint())</span>
+<span class="fc" id="L954">                .property(&quot;targetFingerprint&quot;, reachability.targetFingerprint())</span>
+<span class="fc" id="L955">                .property(&quot;baselineInventoryHash&quot;,</span>
+<span class="fc" id="L956">                    reachability.baselineInventoryHash())</span>
+<span class="fc" id="L957">                .property(&quot;accumulatedInventoryHash&quot;,</span>
+<span class="fc" id="L958">                    reachability.accumulatedInventoryHash())</span>
+<span class="fc" id="L959">                .property(&quot;baselineReached&quot;, reachability.baselineReached())</span>
+<span class="fc" id="L960">                .property(&quot;baselineStatus&quot;, reachability.baselineStatus())</span>
+<span class="fc" id="L961">                .property(&quot;baselineExploredStates&quot;,</span>
+<span class="fc" id="L962">                    reachability.baselineExploredStates())</span>
+<span class="fc" id="L963">                .property(&quot;accumulatedReached&quot;, reachability.accumulatedReached())</span>
+<span class="fc" id="L964">                .property(&quot;accumulatedStatus&quot;, reachability.accumulatedStatus())</span>
+<span class="fc" id="L965">                .property(&quot;accumulatedExploredStates&quot;,</span>
+<span class="fc" id="L966">                    reachability.accumulatedExploredStates())</span>
+<span class="fc" id="L967">                .property(&quot;newlyReachableUnderBudget&quot;,</span>
+<span class="fc" id="L968">                    reachability.newlyReachableUnderBudget())</span>
+<span class="fc" id="L969">                .stringArray(&quot;accumulatedPath&quot;, reachability.accumulatedPath())</span>
+<span class="fc" id="L970">                .stringArray(&quot;accumulatedRuleIds&quot;,</span>
+<span class="fc" id="L971">                    reachability.accumulatedRuleIds());</span>
+<span class="fc" id="L972">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

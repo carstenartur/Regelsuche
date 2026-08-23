@@ -69,8 +69,8 @@ public final class EvolutionGenomeCompiler {
 <span class="fc" id="L69">                ? Long.toString((long) value)</span>
 <span class="nc" id="L70">                : Double.toString(value);</span>
         }
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (expression instanceof PatternExpr.LiteralVariable variable) {</span>
-<span class="nc" id="L73">            return variable.name();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (expression instanceof PatternExpr.LiteralVariable variable) {</span>
+<span class="fc" id="L73">            return variable.name();</span>
         }
 <span class="fc bfc" id="L75" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation) {</span>
 <span class="fc" id="L76">            return &quot;(&quot; + renderPattern(operation.left())</span>
@@ -283,12 +283,12 @@ public final class EvolutionGenomeCompiler {
                 }
 <span class="fc" id="L284">                return PatternExpr.var(name);</span>
             }
-<span class="pc bpc" id="L286" title="3 of 4 branches missed.">            if (peekDigit() || peek('.')) {</span>
+<span class="pc bpc" id="L286" title="1 of 4 branches missed.">            if (peekDigit() || peek('.')) {</span>
 <span class="fc" id="L287">                return PatternExpr.num(readNumber());</span>
             }
-<span class="nc" id="L289">            String identifier = readIdentifier();</span>
-<span class="nc bnc" id="L290" title="All 2 branches missed.">            if (!identifier.isEmpty()) {</span>
-<span class="nc bnc" id="L291" title="All 2 branches missed.">                if (peek('(')) {</span>
+<span class="fc" id="L289">            String identifier = readIdentifier();</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            if (!identifier.isEmpty()) {</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">                if (peek('(')) {</span>
 <span class="nc" id="L292">                    consume();</span>
 <span class="nc" id="L293">                    List&lt;PatternExpr&gt; arguments = new ArrayList&lt;&gt;();</span>
 <span class="nc bnc" id="L294" title="All 2 branches missed.">                    if (!peek(')')) {</span>
@@ -301,7 +301,7 @@ public final class EvolutionGenomeCompiler {
                         identifier,
 <span class="nc" id="L302">                        arguments.toArray(PatternExpr[]::new));</span>
                 }
-<span class="nc" id="L304">                return PatternExpr.variable(identifier);</span>
+<span class="fc" id="L304">                return PatternExpr.variable(identifier);</span>
             }
 <span class="nc" id="L306">            throw error(&quot;Expected expression&quot;);</span>
         }
@@ -372,7 +372,7 @@ public final class EvolutionGenomeCompiler {
         }
 
         private boolean peekDigit() {
-<span class="pc bpc" id="L375" title="2 of 4 branches missed.">            return !isAtEnd() &amp;&amp; Character.isDigit(input.charAt(position));</span>
+<span class="pc bpc" id="L375" title="1 of 4 branches missed.">            return !isAtEnd() &amp;&amp; Character.isDigit(input.charAt(position));</span>
         }
 
         private boolean isAtEnd() {
