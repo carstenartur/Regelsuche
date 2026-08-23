@@ -7,7 +7,7 @@ import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.GoalAwareMacroMoveSelector;
 import de.regelsuche.mining.RuleStatus;
-import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
+import de.regelsuche.transform.PolynomialStructureSynthesisOperator;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.CandidateProofStatus;
@@ -32,14 +32,17 @@ class DiscoveryEngineFactoryTest {
     }
 
     @Test
-    void hypothesisOnlyEmitsHypothesisCandidatesButNoMacroRuleIds() {
+    void hypothesisOnlyEmitsGenericTheoryCandidatesButNoMacroRuleIds() {
         List<Transformation> transformations = factory.create(
             emptyBase,
             DiscoveryOptions.forProfile(DiscoveryProfile.HYPOTHESIS_ONLY),
             macroSelector()
         ).transform("x^4 + 4");
 
-        assertTrue(transformations.stream().anyMatch(t -> t.rule().equals(DifferenceOfSquaresPreparationOperator.RULE_ID)));
+        assertTrue(transformations.stream().anyMatch(t -> t.rule().equals(
+            PolynomialStructureSynthesisOperator.RULE_ID)));
+        assertTrue(transformations.stream().noneMatch(t -> t.rule().equals(
+            "hypothesis_difference_of_squares_preparation")));
         assertTrue(transformations.stream().noneMatch(this::isMacro));
     }
 

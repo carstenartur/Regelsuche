@@ -12,8 +12,8 @@ import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeResult;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeStatus;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.PolynomialStructureSynthesisOperator;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.Transformation;
@@ -52,16 +52,14 @@ class HiddenRulePilotRunnerTest {
     }
 
     @Test
-    void rediscoversSophieGermainAsASecondFamilyFromBridgeAndFactorPrimitives() {
+    void rediscoversSophieGermainFromGenericPolynomialSynthesis() {
         PilotCase pilotCase = caseById("case-002");
         CaseReport report = HiddenRulePilotTestEvidence.caseReport("case-002");
         RuntimeResult runtime = report.runtime();
 
         assertEquals(RuntimeStatus.CANDIDATE_FROZEN, runtime.status(), runtime.toString());
         assertTrue(runtime.primitiveRuleIds().contains(
-            DifferenceOfSquaresPreparationOperator.RULE_ID), runtime.toString());
-        assertTrue(runtime.primitiveRuleIds().contains("ast_square_difference_factor"),
-            runtime.toString());
+            PolynomialStructureSynthesisOperator.RULE_ID), runtime.toString());
         assertTrue(runtime.validationEvidence().passed(), runtime.validationEvidence().toString());
         assertTrue(runtime.holdouts().allPassed(), runtime.holdouts().toString());
         assertTrue(runtime.holdouts().materialAblations() >= 1, runtime.holdouts().toString());
