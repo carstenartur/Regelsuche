@@ -9,6 +9,7 @@ import de.regelsuche.docs.GenerationalRuleMiningCampaign.CampaignReport;
 import de.regelsuche.docs.GenerationalRuleMiningCampaign.CandidateStatus;
 import de.regelsuche.docs.GenerationalRuleMiningCampaign.GenerationReport;
 import de.regelsuche.docs.GenerationalRuleMiningReachabilityAudit.AuditReport;
+import de.regelsuche.evolution.ExactPolynomialPatternVerificationService;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 class GenerationalRuleMiningCampaignTest {
-    private static final String REPOSITORY_REVISION = "a".repeat(40);
+    private static final String REPOSITORY_REVISION = repositoryRevision();
 
     @Test
     @Timeout(240)
@@ -45,6 +46,7 @@ class GenerationalRuleMiningCampaignTest {
         audit.write(auditOutput, auditReport);
 
         assertEquals(GenerationalRuleMiningCampaign.SCHEMA, report.schema());
+        assertEquals(REPOSITORY_REVISION, report.repositoryRevision());
         assertEquals(3, report.generations().size());
         assertTrue(report.totalTasks() >= 7);
         assertTrue(report.totalActivatedRules() >= 4, report.finalRules().toString());
@@ -64,6 +66,15 @@ class GenerationalRuleMiningCampaignTest {
         assertTrue(report.generations().stream()
             .allMatch(GenerationReport::sameGenerationFeedbackBlocked));
 
+        ExactPolynomialPatternVerificationService independentVerifier =
+            new ExactPolynomialPatternVerificationService();
+        for (ActivatedRule rule : report.finalRules()) {
+            var proof = independentVerifier.verify(
+                rule.leftPattern(),
+                rule.rightPattern());
+            assertTrue(proof.proved(), rule.toString());
+            assertEquals(rule.proofHash(), proof.proofHash(), rule.toString());
+        }
         assertTrue(report.finalRules().stream()
             .allMatch(rule -> rule.proofHash().matches("sha256:[0-9a-f]{64}")));
         assertTrue(report.finalRules().stream()
@@ -86,6 +97,7 @@ class GenerationalRuleMiningCampaignTest {
         assertEquals(
             GenerationalRuleMiningReachabilityAudit.SCHEMA,
             auditReport.schema());
+        assertEquals(REPOSITORY_REVISION, auditReport.repositoryRevision());
         assertTrue(auditReport.generation1ReusedGeneration0(),
             auditReport.toString());
         assertTrue(auditReport.generation2ReusedGeneration1(),
@@ -115,5 +127,19 @@ class GenerationalRuleMiningCampaignTest {
             "\"schema\":\"regelsuche.generational-rule-mining-reachability-audit/v1\""));
         assertTrue(auditJson.contains("\"passed\":true"));
         assertFalse(json.contains("FORMALLY_PROVED"));
+    }
+
+    private static String repositoryRevision() {
+        String authorityRevision = System.getenv(
+            "REGELSUCHE_AUTHORITY_GITHUB_SHA");
+        if (authorityRevision == null || authorityRevision.isBlank()) {
+            return "a".repeat(40);
+        }
+        String normalized = authorityRevision.trim().toLowerCase();
+        if (!normalized.matches("[0-9a-f]{40}")) {
+            throw new IllegalStateException(
+                "REGELSUCHE_AUTHORITY_GITHUB_SHA must be a 40-digit Git SHA");
+        }
+        return normalized;
     }
 }
