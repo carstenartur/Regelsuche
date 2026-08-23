@@ -58,15 +58,46 @@ mit dem Inventar aus Generation 1 ausgeführt. Ein erfolgreicher Kandidat ist
 damit nicht lediglich ein erneut benanntes Seed-Makro, sondern beruht auf der
 Wiederverwendung bereits gelernter Transformationen.
 
-Nach der dritten Generation vergleicht der Lauf ein leeres Schatteninventar
-mit dem akkumulierten Inventar auf einer noch tiefer verschachtelten,
-vorher nicht zur Kandidatenbildung verwendeten Darstellung. Das kanonische
-Artefakt unterscheidet ausdrücklich:
+Der allgemeine Kampagnenbericht vergleicht zusätzlich ein leeres
+Schatteninventar mit dem akkumulierten Inventar auf einer tiefer verschachtelten,
+vorher nicht zur Kandidatenbildung verwendeten Darstellung. Er enthält:
 
 - `baselineReached`;
 - `accumulatedReached`;
 - `newlyReachableUnderBudget`;
 - tatsächlich verwendete Regel-IDs und den gefundenen Pfad.
+
+## Strenger kumulativer Reachability-Audit
+
+Der Vergleich „leer gegen vollständig gelernt“ reicht nicht aus, um eine
+Verbesserung **zwischen** späteren Generationen zu belegen. Deshalb führt
+`GenerationalRuleMiningReachabilityAudit` einen getrennten, strengeren Replay
+durch:
+
+```text
+Inventar aus Generation 0 + 1
+  gegen
+Inventar aus Generation 0 + 1 + 2
+```
+
+Beide Seiten erhalten dieselbe, absichtlich enge maximale Suchtiefe `2` und
+dieselbe dreifach verschachtelte, nicht zur Kandidatenbildung verwendete
+Darstellung. Der Audit gilt nur dann als bestanden, wenn alle Bedingungen
+zugleich erfüllt sind:
+
+1. Generation 1 hat in ihrem retained Suchpfad mindestens eine Regel aus
+   Generation 0 verwendet.
+2. Generation 2 hat mindestens eine Regel aus Generation 1 verwendet.
+3. Das Inventar bis Generation 1 erreicht den Audit-Endpunkt unter Tiefe `2`
+   nicht.
+4. Das Inventar bis Generation 2 erreicht ihn unter genau demselben Budget.
+5. Der erfolgreiche Audit-Pfad verwendet tatsächlich eine neu kompilierte Regel
+   aus Generation 2.
+
+Damit wird nicht nur gezeigt, dass irgendein gelerntes Seed-Makro nützlich ist.
+Der Audit prüft ausdrücklich, ob eine spätere gelernte Komposition die
+budgetierte Erreichbarkeit gegenüber dem bereits gelernten Vorgängerinventar
+erweitert.
 
 ## Aktivierungskriterien
 
@@ -106,7 +137,7 @@ Inventarwurzel.
 
 ## Reproduktion
 
-Der fokussierte Lauf einschließlich Report-Erzeugung wird durch den Test
+Der fokussierte Lauf einschließlich beider Reportartefakte wird durch den Test
 reproduziert:
 
 ```bash
@@ -114,10 +145,11 @@ reproduziert:
   --tests de.regelsuche.docs.GenerationalRuleMiningCampaignTest
 ```
 
-Das kanonische Ergebnis liegt anschließend unter:
+Die kanonischen Ergebnisse liegen anschließend unter:
 
 ```text
 app/build/reports/generational-rule-mining/campaign.json
+app/build/reports/generational-rule-mining/cumulative-reachability-audit.json
 ```
 
 Der öffentliche String-Adapter für den exakten Patternnachweis besitzt einen
@@ -136,12 +168,13 @@ Der vollständige Repositoryvertrag bleibt:
 
 ## Aussagegrenze
 
-Ein positiver Lauf belegt nur:
+Ein positiver kumulativer Audit belegt nur:
 
 > Unter dem eingefrorenen Aufgaben-, Regel-, Verifikations- und Suchbudget kann
 > Regelsuche exakt geprüfte gelernte Pattern-Regeln generationenweise
-> wiederverwenden und dadurch eine im leeren Schatteninventar nicht erreichte
-> Darstellung innerhalb desselben Budgets erreichen.
+> wiederverwenden, und eine spätere Generation kann eine Darstellung erreichen,
+> die das bereits gelernte Vorgängerinventar unter demselben Tiefenbudget nicht
+> erreicht.
 
 Er belegt keine externe mathematische Neuheit, keine allgemeine Überlegenheit,
 keine formale Beweisabdeckung außerhalb des exakten Polynomfragments und keine
