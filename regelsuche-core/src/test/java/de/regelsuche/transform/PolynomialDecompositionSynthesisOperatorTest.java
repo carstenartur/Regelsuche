@@ -51,6 +51,21 @@ class PolynomialDecompositionSynthesisOperatorTest {
     }
 
     @Test
+    void homogenizesUnivariateQuarticsWithTheStructuralUnitAtom() {
+        PolynomialDecompositionSynthesisOperator.SynthesisReport report =
+            operator.synthesize("x^4 + 4");
+
+        assertTrue(report.generated(), report.detailCode());
+        assertTrue(report.candidates().stream().anyMatch(candidate ->
+            factorPair(candidate,
+                List.of(1, -2, 2),
+                List.of(1, 2, 2))));
+        assertTrue(report.candidates().stream().anyMatch(candidate ->
+            candidate.transformedExpression().contains("x ^ 2")
+                && !candidate.transformedExpression().contains("1 ^ 2")));
+    }
+
+    @Test
     void synthesizesOtherQuarticFamiliesWithoutNamedIdentityRules() {
         PolynomialDecompositionSynthesisOperator.SynthesisReport even =
             operator.synthesize("x^4 + 5*x^2*y^2 + 4*y^4");
