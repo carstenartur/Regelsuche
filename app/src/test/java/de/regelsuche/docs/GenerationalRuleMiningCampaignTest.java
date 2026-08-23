@@ -34,6 +34,16 @@ class GenerationalRuleMiningCampaignTest {
             "campaign.json");
         campaign.write(output, report);
 
+        ExactPolynomialPatternVerificationService independentVerifier =
+            new ExactPolynomialPatternVerificationService();
+        for (ActivatedRule rule : report.finalRules()) {
+            var proof = independentVerifier.verify(
+                rule.leftPattern(),
+                rule.rightPattern());
+            assertTrue(proof.proved(), rule.toString());
+            assertEquals(rule.proofHash(), proof.proofHash(), rule.toString());
+        }
+
         GenerationalRuleMiningReachabilityAudit audit =
             new GenerationalRuleMiningReachabilityAudit();
         AuditReport auditReport = audit.audit(report);
@@ -66,15 +76,6 @@ class GenerationalRuleMiningCampaignTest {
         assertTrue(report.generations().stream()
             .allMatch(GenerationReport::sameGenerationFeedbackBlocked));
 
-        ExactPolynomialPatternVerificationService independentVerifier =
-            new ExactPolynomialPatternVerificationService();
-        for (ActivatedRule rule : report.finalRules()) {
-            var proof = independentVerifier.verify(
-                rule.leftPattern(),
-                rule.rightPattern());
-            assertTrue(proof.proved(), rule.toString());
-            assertEquals(rule.proofHash(), proof.proofHash(), rule.toString());
-        }
         assertTrue(report.finalRules().stream()
             .allMatch(rule -> rule.proofHash().matches("sha256:[0-9a-f]{64}")));
         assertTrue(report.finalRules().stream()
