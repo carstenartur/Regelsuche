@@ -88,13 +88,19 @@ public final class ExactPolynomialPatternIdentityVerifier {
     private Polynomial polynomial(PatternExpr expression, Work work) {
         work.visit(budget);
         if (expression instanceof PatternExpr.Placeholder placeholder) {
-            return Polynomial.variable("placeholder:" + placeholder.name());
+            return checked(
+                Polynomial.variable("placeholder:" + placeholder.name()),
+                work);
         }
         if (expression instanceof PatternExpr.LiteralVariable variable) {
-            return Polynomial.variable("literal:" + variable.name());
+            return checked(
+                Polynomial.variable("literal:" + variable.name()),
+                work);
         }
         if (expression instanceof PatternExpr.LiteralNumber number) {
-            return Polynomial.constant(exactInteger(number.value()));
+            return checked(
+                Polynomial.constant(exactInteger(number.value())),
+                work);
         }
         if (expression instanceof PatternExpr.Function function) {
             throw unsupported("FUNCTION_NOT_IN_POLYNOMIAL_FRAGMENT_"
