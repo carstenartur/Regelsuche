@@ -45,6 +45,8 @@ class GalleryHiddenStructureWorkflowTest {
                 PolynomialDecompositionSynthesisOperator.RULE_ID));
             assertTrue(markdown.contains(
                 "exact semantic polynomial coefficient synthesis"));
+            assertTrue(row.summary().contains(
+                "exact semantic polynomial coefficient synthesis"));
             assertTrue(row.evidence().contains(DiscoveryEvidenceKind.FACTORED));
             assertTrue(row.evidence().contains(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED));
             assertTrue(row.rulePath().contains(
