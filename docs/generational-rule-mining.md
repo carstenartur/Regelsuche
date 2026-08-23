@@ -114,6 +114,11 @@ erfüllt sind:
    Polynomnormalformen.
 8. `DynamicOperatorCompiler` kann einen ausführbaren Operator erzeugen.
 
+Vor dem kumulativen Audit werden sämtliche retained Quell-/Zielpattern außerdem
+nochmals unabhängig durch denselben content-addressed Exact-Verifier geführt.
+Der neu berechnete Proof-Hash muss bytegenau dem im Schatteninventar gebundenen
+Proof-Hash entsprechen.
+
 Nicht unterstützte Divisionen, Funktionen, Bedingungen, Budgetüberschreitungen,
 fehlgeschlagene Holdouts und technische Fehler bleiben mit einem eigenen
 Terminalstatus im Bericht sichtbar. Sie werden nicht stillschweigend verworfen.
@@ -137,8 +142,21 @@ Inventarwurzel.
 
 ## Reproduktion
 
-Der fokussierte Lauf einschließlich beider Reportartefakte wird durch den Test
-reproduziert:
+Der empfohlene checkout-lokale Einstieg bindet die aktuelle Git-Revision,
+führt den fokussierten Kampagnentest aus und prüft anschließend beide erzeugten
+JSON-Artefakte:
+
+```bash
+bash scripts/run-generational-rule-mining-verification.sh
+```
+
+Das Skript setzt `REGELSUCHE_AUTHORITY_GITHUB_SHA` standardmäßig auf
+`git rev-parse HEAD`. In GitHub Actions wird dieselbe Variable vom Workflow auf
+den geprüften Commit gesetzt. Kampagnenbericht und Audit müssen exakt diese
+40-stellige Revision enthalten; ein abweichendes oder syntaktisch ungültiges
+Commitment beendet den Lauf fehlersicher.
+
+Der zugrunde liegende fokussierte Test kann auch direkt ausgeführt werden:
 
 ```bash
 ./gradlew :app:test \
