@@ -118,6 +118,9 @@ public final class PolynomialDecompositionSynthesisOperator
         }
         PolynomialSemanticView.Polynomial polynomial =
             analysis.polynomial();
+        if (polynomial.atoms().size() == 1 && polynomial.degree() <= 4) {
+            polynomial = polynomial.homogenizeWithUnitAtom(4);
+        }
         if (polynomial.atoms().size() != 2
                 || !polynomial.isHomogeneousOfDegree(4)
                 || polynomial.coefficient(4, 0).signum() == 0
@@ -296,16 +299,13 @@ public final class PolynomialDecompositionSynthesisOperator
         List<SignedTerm> terms = List.of(
             new SignedTerm(
                 quadratic.a(),
-                squared(first.expression())),
+                squaredAtom(first)),
             new SignedTerm(
                 quadratic.b(),
-                new BinaryExpr(
-                    first.expression(),
-                    BinaryOperator.MUL,
-                    second.expression())),
+                multipliedAtoms(first, second)),
             new SignedTerm(
                 quadratic.c(),
-                squared(second.expression())));
+                squaredAtom(second)));
         Expr result = null;
         for (SignedTerm term : terms) {
             if (term.coefficient().signum() == 0) {
@@ -336,11 +336,34 @@ public final class PolynomialDecompositionSynthesisOperator
         return result;
     }
 
-    private Expr squared(Expr expression) {
+    private Expr squaredAtom(PolynomialSemanticView.Atom atom) {
+        if (isStructuralUnit(atom)) {
+            return new NumberExpr(1);
+        }
         return new BinaryExpr(
-            expression,
+            atom.expression(),
             BinaryOperator.POW,
             new NumberExpr(2));
+    }
+
+    private Expr multipliedAtoms(
+        PolynomialSemanticView.Atom first,
+        PolynomialSemanticView.Atom second
+    ) {
+        if (isStructuralUnit(first)) {
+            return second.expression();
+        }
+        if (isStructuralUnit(second)) {
+            return first.expression();
+        }
+        return new BinaryExpr(
+            first.expression(),
+            BinaryOperator.MUL,
+            second.expression());
+    }
+
+    private boolean isStructuralUnit(PolynomialSemanticView.Atom atom) {
+        return atom.key().equals("structural-unit:1");
     }
 
     private Expr scaled(BigInteger coefficient, Expr expression) {
