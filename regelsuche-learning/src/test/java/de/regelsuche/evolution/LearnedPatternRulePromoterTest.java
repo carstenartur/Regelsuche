@@ -2,6 +2,7 @@ package de.regelsuche.evolution;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -124,6 +125,36 @@ class LearnedPatternRulePromoterTest {
             ExactPolynomialPatternIdentityVerifier.Status.UNSUPPORTED,
             result.status());
         assertFalse(result.proved());
+    }
+
+    @Test
+    void exactProofHashBindsTheSubjectAndVerifierBudget() {
+        PatternExpr a = PatternExpr.var("A");
+        PatternExpr b = PatternExpr.var("B");
+        PatternExpr source = EvolutionGenomeCompiler.parsePattern(
+            "?A^2-?B^2");
+        PatternExpr target = EvolutionGenomeCompiler.parsePattern(
+            "(?A-?B)*(?A+?B)");
+        ExactPolynomialPatternIdentityVerifier.Verification first =
+            new ExactPolynomialPatternIdentityVerifier().verify(
+                source, target);
+        ExactPolynomialPatternIdentityVerifier.Verification second =
+            new ExactPolynomialPatternIdentityVerifier(
+                new ExactPolynomialPatternIdentityVerifier.Budget(
+                    512, 256, 4_096, 32, 12, 256))
+                .verify(source, target);
+        ExactPolynomialPatternIdentityVerifier.Verification otherSubject =
+            new ExactPolynomialPatternIdentityVerifier().verify(
+                EvolutionGenomeCompiler.parsePattern("?A^2+2*?A*?B+?B^2"),
+                EvolutionGenomeCompiler.parsePattern("(?A+?B)^2"));
+
+        assertTrue(first.proved());
+        assertTrue(second.proved());
+        assertTrue(otherSubject.proved());
+        assertNotEquals(first.proofHash(), second.proofHash());
+        assertNotEquals(first.proofHash(), otherSubject.proofHash());
+        assertEquals("?A", EvolutionGenomeCompiler.renderPattern(a));
+        assertEquals("?B", EvolutionGenomeCompiler.renderPattern(b));
     }
 
     private static EvolutionGenome genome() {
