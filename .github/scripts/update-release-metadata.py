@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 
 ROOT = Path.cwd()
+OPENAPI_PATH = ROOT / 'app/src/main/resources/web/openapi/openapi.json'
 ZENODO_RELEASE_DATE_KEY = 'publication' + '_date'
 CODEMETA_RELEASE_DATE_KEY = 'date' + 'Published'
 ORCID_ID = '0009-0005-1047-6381'
@@ -103,6 +104,15 @@ def update_codemeta(version: str, release_day: str | None) -> None:
     else:
         data.pop(CODEMETA_RELEASE_DATE_KEY, None)
     write_json(path, data)
+
+
+def update_openapi(version: str) -> None:
+    data = read_json(OPENAPI_PATH)
+    info = data.get('info')
+    if not isinstance(info, dict):
+        raise RuntimeError(f'{OPENAPI_PATH.relative_to(ROOT)} has no object-valued info field')
+    info['version'] = version
+    write_json(OPENAPI_PATH, data)
 
 
 def update_release_properties(version: str) -> None:
@@ -207,6 +217,15 @@ def validate_version_alignment(version: str) -> None:
                 f'expected {version!r}'
             )
 
+    openapi = read_json(OPENAPI_PATH)
+    info = openapi.get('info')
+    actual_openapi = info.get('version') if isinstance(info, dict) else None
+    if actual_openapi != version:
+        errors.append(
+            f'{OPENAPI_PATH.relative_to(ROOT)} declares info.version '
+            f'{actual_openapi!r}, expected {version!r}'
+        )
+
     for path in pom_paths():
         actual = declared_pom_version(path)
         if actual != version:
@@ -221,7 +240,7 @@ def validate_version_alignment(version: str) -> None:
         )
     print(
         f'Release metadata alignment valid for {version}: '
-        f'{len(pom_paths())} Maven POMs checked'
+        f'{len(pom_paths())} Maven POMs and OpenAPI checked'
     )
 
 
@@ -241,6 +260,7 @@ def main() -> None:
     update_citation(args.version, release_day)
     update_zenodo(args.version, release_day)
     update_codemeta(args.version, release_day)
+    update_openapi(args.version)
     update_release_properties(args.version)
     update_citation_md(args.version, release_day)
     update_maven_versions(args.version)
