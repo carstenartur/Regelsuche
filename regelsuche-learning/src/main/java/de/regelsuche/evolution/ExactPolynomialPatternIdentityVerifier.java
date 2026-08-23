@@ -8,7 +8,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,6 +45,8 @@ public final class ExactPolynomialPatternIdentityVerifier {
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(target, "target");
         Work work = new Work();
+        String sourcePattern = EvolutionGenomeCompiler.renderPattern(source);
+        String targetPattern = EvolutionGenomeCompiler.renderPattern(target);
         String sourceCanonical = "";
         String targetCanonical = "";
         Status status;
@@ -72,6 +73,9 @@ public final class ExactPolynomialPatternIdentityVerifier {
         Verification provisional = new Verification(
             VERIFIER_ID,
             status,
+            budget,
+            sourcePattern,
+            targetPattern,
             sourceCanonical,
             targetCanonical,
             work.visitedNodes,
@@ -189,6 +193,9 @@ public final class ExactPolynomialPatternIdentityVerifier {
         StringBuilder descriptor = new StringBuilder();
         append(descriptor, value.verifierId());
         append(descriptor, value.status().name());
+        append(descriptor, value.budget().canonicalMaterial());
+        append(descriptor, value.sourcePattern());
+        append(descriptor, value.targetPattern());
         append(descriptor, value.sourceCanonical());
         append(descriptor, value.targetCanonical());
         append(descriptor, Integer.toString(value.visitedNodes()));
@@ -240,11 +247,23 @@ public final class ExactPolynomialPatternIdentityVerifier {
                     "polynomial verification budget is invalid");
             }
         }
+
+        String canonicalMaterial() {
+            return maxVisitedNodes + ":"
+                + maxTerms + ":"
+                + maxGeneratedTerms + ":"
+                + maxTotalDegree + ":"
+                + maxExponent + ":"
+                + maxCoefficientBits;
+        }
     }
 
     public record Verification(
         String verifierId,
         Status status,
+        Budget budget,
+        String sourcePattern,
+        String targetPattern,
         String sourceCanonical,
         String targetCanonical,
         int visitedNodes,
@@ -255,6 +274,11 @@ public final class ExactPolynomialPatternIdentityVerifier {
         public Verification {
             if (!VERIFIER_ID.equals(verifierId)
                     || status == null
+                    || budget == null
+                    || sourcePattern == null
+                    || sourcePattern.isBlank()
+                    || targetPattern == null
+                    || targetPattern.isBlank()
                     || sourceCanonical == null
                     || targetCanonical == null
                     || visitedNodes < 0
@@ -280,6 +304,9 @@ public final class ExactPolynomialPatternIdentityVerifier {
             return new Verification(
                 verifierId,
                 status,
+                budget,
+                sourcePattern,
+                targetPattern,
                 sourceCanonical,
                 targetCanonical,
                 visitedNodes,
