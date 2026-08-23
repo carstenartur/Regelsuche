@@ -110,7 +110,7 @@ public final class ExactPolynomialPatternIdentityVerifier {
             (PatternExpr.Operation) expression;
         if (operation.operator() == BinaryOperator.POW) {
             Polynomial base = polynomial(operation.left(), work);
-            int exponent = exponent(operation.right());
+            int exponent = exponent(operation.right(), work);
             return power(base, exponent, work);
         }
         if (operation.operator() == BinaryOperator.DIV) {
@@ -163,7 +163,8 @@ public final class ExactPolynomialPatternIdentityVerifier {
         return value;
     }
 
-    private int exponent(PatternExpr value) {
+    private int exponent(PatternExpr value, Work work) {
+        work.visit(budget);
         if (!(value instanceof PatternExpr.LiteralNumber number)) {
             throw unsupported("POWER_EXPONENT_MUST_BE_LITERAL_INTEGER");
         }
