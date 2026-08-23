@@ -8,6 +8,7 @@ import de.regelsuche.docs.GenerationalRuleMiningCampaign.ActivatedRule;
 import de.regelsuche.docs.GenerationalRuleMiningCampaign.CampaignReport;
 import de.regelsuche.docs.GenerationalRuleMiningCampaign.CandidateStatus;
 import de.regelsuche.docs.GenerationalRuleMiningCampaign.GenerationReport;
+import de.regelsuche.docs.GenerationalRuleMiningReachabilityAudit.AuditReport;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,6 +32,17 @@ class GenerationalRuleMiningCampaignTest {
             "generational-rule-mining",
             "campaign.json");
         campaign.write(output, report);
+
+        GenerationalRuleMiningReachabilityAudit audit =
+            new GenerationalRuleMiningReachabilityAudit();
+        AuditReport auditReport = audit.audit(report);
+        String auditJson = auditReport.toJson();
+        Path auditOutput = Path.of(
+            "build",
+            "reports",
+            "generational-rule-mining",
+            "cumulative-reachability-audit.json");
+        audit.write(auditOutput, auditReport);
 
         assertEquals(GenerationalRuleMiningCampaign.SCHEMA, report.schema());
         assertEquals(3, report.generations().size());
@@ -71,13 +83,37 @@ class GenerationalRuleMiningCampaignTest {
         assertTrue(report.reachability().accumulatedRuleIds().stream()
             .anyMatch(ruleId -> ruleId.startsWith("dynamic_hypothesis_")));
 
+        assertEquals(
+            GenerationalRuleMiningReachabilityAudit.SCHEMA,
+            auditReport.schema());
+        assertTrue(auditReport.generation1ReusedGeneration0(),
+            auditReport.toString());
+        assertTrue(auditReport.generation2ReusedGeneration1(),
+            auditReport.toString());
+        assertFalse(auditReport.previousOutcome().reached(),
+            auditReport.previousOutcome().toString());
+        assertTrue(auditReport.accumulatedOutcome().reached(),
+            auditReport.accumulatedOutcome().toString());
+        assertTrue(auditReport.accumulatedPathUsesGeneration2(),
+            auditReport.toString());
+        assertTrue(auditReport.newlyReachableByGeneration2(),
+            auditReport.toString());
+        assertTrue(auditReport.passed(), auditReport.toString());
+
         assertEquals(json, report.toJson());
         assertTrue(Files.isRegularFile(output));
         assertEquals(json, Files.readString(output, StandardCharsets.UTF_8));
+        assertTrue(Files.isRegularFile(auditOutput));
+        assertEquals(
+            auditJson,
+            Files.readString(auditOutput, StandardCharsets.UTF_8));
         assertTrue(json.contains(
             "\"schema\":\"regelsuche.generational-rule-mining-campaign/v1\""));
         assertTrue(json.contains("\"sameGenerationFeedbackBlocked\":true"));
         assertTrue(json.contains("\"newlyReachableUnderBudget\":true"));
+        assertTrue(auditJson.contains(
+            "\"schema\":\"regelsuche.generational-rule-mining-reachability-audit/v1\""));
+        assertTrue(auditJson.contains("\"passed\":true"));
         assertFalse(json.contains("FORMALLY_PROVED"));
     }
 }
