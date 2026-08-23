@@ -24,11 +24,17 @@ Seit dem Stand vom 21. August sind zusätzliche Kernfähigkeiten implementiert:
   RREF und Lösungsklassifikation;
 - symbolische Eigenproblem-Erkennung bei expliziten Rollen;
 - ein enger Promotionsmechanismus für exakt bewiesene assumption-free
-  gelernte Polynom-Pattern.
+  gelernte Polynom-Pattern;
+- generationengetrenntes, proof-gated Regelmining mit eingefrorenen
+  Schatteninventaren und nachgewiesener kumulativer Wiederverwendung;
+- eine allgemeine exakte Polynomzerlegungssynthese für einen begrenzten
+  Quartikbereich auf Basis semantischer AST-Atome.
 
-Diese Implementierungen erweitern den Mechanismus und die diagnostische
-Reichweite. Sie qualifizieren weder automatisch das Produktdefaultprofil noch
-den öffentlichen Claim `PROMOTION`.
+Diese Implementierungen erweitern Mechanismus, mathematische Reichweite und
+diagnostische Evidenz. Sie qualifizieren weder automatisch das
+Produktdefaultprofil noch den öffentlichen Claim `PROMOTION`. Die
+Generationskampagne verändert ausschließlich experimentelle Schatteninventare;
+der Syntheseoperator ist keine vollständige Polynomfaktorisierung.
 
 Das stärkere Flagship-Ziel — ein aus primitiven Operationen erlerntes,
 interpretierbares `RewriteProgram`, das auf einem genau einmal verwendeten
@@ -46,6 +52,8 @@ anschließenden TRAIN-/VALIDATION-/FINAL-TEST-Ergebnisse fehlen noch.
 | Symbolische Eigenprobleme | Explizite Rollen können ein Eigenproblem und charakteristisches Polynom freischalten | Namen allein erzeugen keine Physik- oder Quanteninterpretation |
 | Regelvorbereitung | Direkter Replay, native Exact-Registry, lokale Pattern-Bridges, Guards und Zertifikate sind implementiert | Noch kein allgemeines Workbench-/CLI-Defaultprofil und keine globale Vollständigkeit |
 | Enge Lernregel-Promotion | Assumption-free Polynom-Pattern können nach exaktem Identitätsnachweis eine neue Regelidentität erhalten | Evidence-Roots werden in v1 nur gebunden; `PROMOTION` bleibt `NOT_EVALUATED` |
+| Generationenbasiertes Regelmining | Drei eingefrorene Generationen, proof-gated Akzeptanz, Inventar-Hashkette und kumulativer Reuse-Audit sind implementiert | Nur experimentelle Schatteninventare; keine same-generation Nutzung und keine Produktionspromotion |
+| Polynomzerlegungssynthese | Semantische AST-Atome und exakte Koeffizientenbedingungen erzeugen zertifizierte quadratisch-mal-quadratische Quartikzerlegungen | Begrenzte binäre homogene und homogenisierte univariate Quartiken; keine vollständige multivariate Faktorisierung |
 | Autonome Referenz-Campaign | Für den eng definierten internen Claim qualifiziert und reproduzierbar gebunden | Keine externe mathematische Neuheit |
 | Mehrdomänen-Discovery | Expression Rewrite und endliche Differenzen sind getrennt qualifiziert | Kein universeller domänenunabhängiger Discovery-Nachweis |
 | Targetfreie Simplification | Acht getrennte Konfigurationen; primär Regelsuche 6/7 gegenüber SymPy `simplify` 7/7 | Negatives Portfolio-Ergebnis; keine allgemeine Rangfolge oder nachträgliche Best-of-Auswahl |
@@ -198,6 +206,50 @@ v1-Promoter noch nicht geladen oder semantisch verifiziert; nur ihre Identitäte
 werden gebunden. Daher ist dies ein implementierter Mechanismus, keine
 qualifizierte Produktionspromotion.
 
+### Generationenbasiertes Regelmining
+
+Die Campaign führt Seed-, erste und zweite Lernregelgeneration strikt getrennt
+aus. Jede Generation erhält ein eingefrorenes Inventar und darf die während
+ihres eigenen Laufs gebildeten Kandidaten noch nicht verwenden. Erst nach
+Validation, Counterexample Search, positiven und negativen Holdouts,
+Leakage-Prüfung, exakter Identitätsverifikation und ausführbarer Kompilation
+entsteht die nächste content-addressed Schatteninventar-Revision.
+
+Ein strenger kumulativer Audit vergleicht `0+1` mit `0+1+2` unter demselben
+maximalen Suchdepth. Der positive Kontrollfall muss dabei im retained Pfad eine
+Regel aus Generation 2 tatsächlich verwenden. Rejected candidates, terminale
+Gründe, Generationsbarrieren und Inventar-Hashkette bleiben deterministisch
+reproduzierbar.
+
+Das belegt einen begrenzten Mechanismus zur kumulativen Wiederverwendung
+proof-gated experimenteller Regeln. Es belegt weder Produktionstauglichkeit,
+autonome externe Neuheit noch den öffentlichen Claim `PROMOTION`. Vollständige
+Abgrenzung und Reproduktion:
+[Generational Rule Mining](generational-rule-mining.md).
+
+### Semantische Polynomzerlegungssynthese
+
+`PolynomialSemanticView` interpretiert vollständige AST-Teilbäume wie `x + 1`
+oder `sin(t)` als strukturelle Polynom-Atome. Der
+`PolynomialDecompositionSynthesisOperator` löst anschließend exakt die
+Koeffizientenbedingungen der begrenzten Form
+
+```text
+(a*A^2 + b*A*B + c*B^2) * (d*A^2 + e*A*B + f*B^2)
+```
+
+für ganzzahlige binäre homogene Quartiken. Begrenzte univariate Quartiken werden
+über eine explizite strukturelle Einheit homogenisiert. Ergebnis,
+Koeffizientenbelegung, Domain, Budget und Rekonstruktionsprüfung werden in einem
+content-addressed Zertifikat gebunden.
+
+Dasselbe Verfahren deckt den historischen Sophie-Germain-Fall, andere
+Quartikfamilien und unterstützte AST-Substitutionen ab. Der frühere benannte
+Spezial-Bridge bleibt nur als deaktivierter historischer Kontrollpfad erhalten.
+Die aktuelle Domäne ist keine vollständige multivariate Faktorisierung.
+Vollständige Abgrenzung und Reproduktion:
+[Polynomial Decomposition Synthesis](polynomial-decomposition-synthesis.md).
+
 ## Aktuelle vergleichende Benchmarks
 
 ### Targetfreie Simplification
@@ -270,7 +322,9 @@ Ein positives Ergebnis darf nur folgende begrenzte Aussage stützen:
   Kollisionskontrollen;
 - öffentlicher Freeze-Assembler mit `FROZEN_NOT_RUN`-Semantik;
 - Regel-Tiers, Profile, content-addressed Regelinventar und Ablationsfähigkeit;
-- enger exakter Pattern-Promotionsadapter als getrennte Mechanik.
+- enger exakter Pattern-Promotionsadapter als getrennte Mechanik;
+- generationengetrennte Schatteninventare als vorab charakterisierter
+  Mechanismus, jedoch nicht als Ersatz für das reale Flagship-Protokoll.
 
 ### Noch fehlende irreversible Schritte
 
@@ -302,12 +356,18 @@ Regelsuche unterscheidet mindestens:
    projektintern neue Hypothese.
 4. **Autonomous Campaign Qualification:** Ein autonom erzeugter Kandidat besteht
    die eingefrorene interne Qualifikation und Reproduktion.
-5. **Mechanische Pattern-Promotion:** Eine vorliegende assumption-free
+5. **Bounded Semantic Synthesis:** Ein allgemeiner, exakt begrenzter
+   Theorieoperator konstruiert eine zertifizierte Darstellung oder Zerlegung;
+   dies ist weder Vollständigkeit noch externe Neuheit.
+6. **Proof-gated Generational Reuse:** Exakt qualifizierte Regeln einer
+   abgeschlossenen Generation verbessern einen späteren Schatteninventar-Lauf;
+   dies ist noch keine Produktionspromotion.
+7. **Mechanische Pattern-Promotion:** Eine vorliegende assumption-free
    Polynomidentität erhält nach exaktem Proof eine neue Regelidentität; dies ist
    noch kein ausgeführter öffentlicher Promotionsclaim.
-6. **Flagship Held-out Improvement:** Ein erlerntes Strategieprogramm verbessert
+8. **Flagship Held-out Improvement:** Ein erlerntes Strategieprogramm verbessert
    einen genau einmal verwendeten FINAL TEST.
-7. **Externally Novel Mathematics:** Literatur-, Datenbank- und unabhängige
+9. **Externally Novel Mathematics:** Literatur-, Datenbank- und unabhängige
    fachliche Prüfung stützen eine externe Neuheitsentscheidung.
 
 Keine Stufe impliziert automatisch die nächste. Wahrheit, Projekt-Neuheit,
@@ -335,6 +395,16 @@ Fokussierte Vorbereitung und Promotion:
   --tests de.regelsuche.evolution.LearnedPatternRulePromoterTest
 ```
 
+Generationenbasiertes Regelmining und Polynomzerlegungssynthese:
+
+```bash
+./gradlew :app:test \
+  --tests de.regelsuche.docs.GenerationalRuleMiningCampaignTest
+
+./gradlew :app:test \
+  --tests de.regelsuche.docs.PolynomialDecompositionDiscoveryIntegrationTest
+```
+
 Qualifizierte autonome Referenz-Campaign:
 
 ```bash
@@ -356,15 +426,17 @@ Unabhängiges Reproduktionspaket und Claim-Grenzen:
    über das Produktdefault entscheiden;
 2. gemeinsame Multi-Principal-Traversierung und typisierte
    Repräsentationsbrücken integrieren;
-3. reale Evidence-Root-Artefakte im Promotions-/Qualification-Lifecycle laden
+3. die semantische Synthese auf weitere ausdrücklich preregistrierte
+   Darstellungsfamilien ausweiten, ohne den aktuellen Quartik-Claim umzudeuten;
+4. reale Evidence-Root-Artefakte im Promotions-/Qualification-Lifecycle laden
    und semantisch prüfen;
-4. reales Flagship-`FROZEN_NOT_RUN`-Receipt erzeugen und #533 abschließen;
-5. TRAIN-Populationen, VALIDATION-Auswahl und genau einmaligen FINAL TEST für
+5. reales Flagship-`FROZEN_NOT_RUN`-Receipt erzeugen und #533 abschließen;
+6. TRAIN-Populationen, VALIDATION-Auswahl und genau einmaligen FINAL TEST für
    #521 ausführen;
-6. information-paritäre Baselines und Ablationen aus #235 vervollständigen;
-7. Performance-Optimierungen nur bei Evidence- und Work-Accounting-Parität
+7. information-paritäre Baselines und Ablationen aus #235 vervollständigen;
+8. Performance-Optimierungen nur bei Evidence- und Work-Accounting-Parität
    aktivieren;
-8. externe Interestingness- und Novelty-Prüfungen als getrennte reale Studien
+9. externe Interestingness- und Novelty-Prüfungen als getrennte reale Studien
    durchführen.
 
 ## Verbindliche Grenzen
@@ -373,6 +445,10 @@ Unabhängiges Reproduktionspaket und Claim-Grenzen:
   bewertenden Kandidaten.
 - Target-, Referenz-, Familien-, VALIDATION-, FINAL-TEST- und Review-
   Informationen dürfen nicht in eine frühere Formation einfließen.
+- Eine Generation darf ihre eigenen neu gebildeten Regeln nicht während
+  desselben Laufs aktivieren.
+- Semantische Repräsentationserkennung ist kein Beweis; jeder autorisierende
+  Synthese- oder Brückenschritt besitzt eine eigene Verifikation.
 - Konfigurierte, ausgeführte, übersprungene und verbleibende Arbeit wird
   vollständig bilanziert.
 - Fehlende Evidence führt zu `BLOCKED` oder `NOT_EVALUATED`, niemals zu einem
