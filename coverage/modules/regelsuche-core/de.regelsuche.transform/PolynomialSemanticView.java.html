@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialSemanticView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">PolynomialSemanticView.java</span></div><h1>PolynomialSemanticView.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/**
+ * Converts a bounded expression fragment into an exact commutative polynomial
+ * over structural AST atoms.
+ *
+ * &lt;p&gt;An atom is not limited to a variable name. A complete subtree such as
+ * {@code x + 1} or {@code sin(t)} can be one indeterminate. Consequently one
+ * semantic polynomial covers infinitely many concrete substitutions without
+ * learning a separate rule for every substituted expression.&lt;/p&gt;
+ */
+public final class PolynomialSemanticView {
+    public static final String VIEW_ID =
+        &quot;regelsuche.polynomial-semantic-view/v1&quot;;
+
+<span class="fc" id="L35">    private final ExpressionParser parser = new ExpressionParser();</span>
+    private final Budget budget;
+
+    public PolynomialSemanticView() {
+<span class="fc" id="L39">        this(Budget.DEFAULT);</span>
+<span class="fc" id="L40">    }</span>
+
+<span class="fc" id="L42">    public PolynomialSemanticView(Budget budget) {</span>
+<span class="fc" id="L43">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L44">    }</span>
+
+    public Analysis analyze(String expression) {
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L48">            return Analysis.failure(Status.PARSE_ERROR, &quot;EXPRESSION_BLANK&quot;);</span>
+        }
+<span class="fc" id="L50">        Work work = new Work();</span>
+        try {
+<span class="fc" id="L52">            Expr root = parser.parse(new InputRequest(InputType.TERM, expression))</span>
+<span class="fc" id="L53">                .terms().getFirst();</span>
+<span class="fc" id="L54">            List&lt;RawTerm&gt; rawTerms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L55">            collectAddends(root, BigInteger.ONE, rawTerms, work);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">            if (rawTerms.size() &gt; budget.maxTerms()) {</span>
+<span class="nc" id="L57">                throw new BudgetExceeded(&quot;MAX_TERMS_EXCEEDED&quot;);</span>
+            }
+
+<span class="fc" id="L60">            List&lt;RawTerm&gt; effectiveTerms = rawTerms.stream()</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                .filter(term -&gt; term.coefficient().signum() != 0)</span>
+<span class="fc" id="L62">                .toList();</span>
+<span class="fc" id="L63">            Map&lt;String, Expr&gt; atomExpressions = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L64">            effectiveTerms.forEach(term -&gt; term.atoms().forEach((key, atom) -&gt;</span>
+<span class="fc" id="L65">                atomExpressions.putIfAbsent(key, atom.expression())));</span>
+<span class="fc" id="L66">            List&lt;String&gt; atomKeys = atomExpressions.keySet().stream()</span>
+<span class="fc" id="L67">                .sorted()</span>
+<span class="fc" id="L68">                .toList();</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (atomKeys.size() &gt; budget.maxAtoms()) {</span>
+<span class="nc" id="L70">                throw new BudgetExceeded(&quot;MAX_ATOMS_EXCEEDED&quot;);</span>
+            }
+
+<span class="fc" id="L73">            List&lt;Atom&gt; atoms = atomKeys.stream()</span>
+<span class="fc" id="L74">                .map(key -&gt; new Atom(</span>
+                    key,
+<span class="fc" id="L76">                    ExpressionFormatter.format(atomExpressions.get(key)),</span>
+<span class="fc" id="L77">                    atomExpressions.get(key)))</span>
+<span class="fc" id="L78">                .toList();</span>
+<span class="fc" id="L79">            Map&lt;String, Integer&gt; atomIndexes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            for (int index = 0; index &lt; atomKeys.size(); index++) {</span>
+<span class="fc" id="L81">                atomIndexes.put(atomKeys.get(index), index);</span>
+            }
+
+<span class="fc" id="L84">            TreeMap&lt;Monomial, BigInteger&gt; coefficients = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            for (RawTerm raw : effectiveTerms) {</span>
+<span class="fc" id="L86">                List&lt;Integer&gt; exponents = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L87">                    Collections.nCopies(atomKeys.size(), 0));</span>
+<span class="fc" id="L88">                raw.atoms().forEach((key, atom) -&gt; {</span>
+<span class="fc" id="L89">                    int index = atomIndexes.get(key);</span>
+<span class="fc" id="L90">                    exponents.set(index, atom.exponent());</span>
+<span class="fc" id="L91">                });</span>
+<span class="fc" id="L92">                Monomial monomial = new Monomial(exponents);</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                if (monomial.totalDegree() &gt; budget.maxDegree()) {</span>
+<span class="nc" id="L94">                    throw new BudgetExceeded(&quot;MAX_DEGREE_EXCEEDED&quot;);</span>
+                }
+<span class="fc" id="L96">                coefficients.merge(</span>
+                    monomial,
+<span class="fc" id="L98">                    raw.coefficient(),</span>
+                    BigInteger::add);
+<span class="fc" id="L100">            }</span>
+<span class="fc" id="L101">            coefficients.entrySet().removeIf(entry -&gt;</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">                entry.getValue().signum() == 0);</span>
+
+<span class="fc" id="L104">            int degree = coefficients.keySet().stream()</span>
+<span class="fc" id="L105">                .mapToInt(Monomial::totalDegree)</span>
+<span class="fc" id="L106">                .max()</span>
+<span class="fc" id="L107">                .orElse(0);</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            boolean homogeneous = coefficients.isEmpty()</span>
+<span class="fc" id="L109">                || coefficients.keySet().stream()</span>
+<span class="fc" id="L110">                    .mapToInt(Monomial::totalDegree)</span>
+<span class="fc" id="L111">                    .distinct()</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                    .count() == 1;</span>
+<span class="fc" id="L113">            Polynomial polynomial = new Polynomial(</span>
+                VIEW_ID,
+                atoms,
+                coefficients,
+                degree,
+                homogeneous,
+<span class="fc" id="L119">                work.visitedNodes());</span>
+<span class="fc" id="L120">            return new Analysis(</span>
+                Status.SUPPORTED,
+                &quot;EXACT_INTEGER_POLYNOMIAL&quot;,
+                polynomial);
+<span class="nc" id="L124">        } catch (BudgetExceeded exception) {</span>
+<span class="nc" id="L125">            return Analysis.failure(Status.BUDGET_EXCEEDED, exception.getMessage());</span>
+<span class="fc" id="L126">        } catch (UnsupportedExpression exception) {</span>
+<span class="fc" id="L127">            return Analysis.failure(Status.UNSUPPORTED, exception.getMessage());</span>
+<span class="nc" id="L128">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L129">            return Analysis.failure(Status.PARSE_ERROR, safeMessage(exception));</span>
+        }
+    }
+
+    private void collectAddends(
+        Expr expression,
+        BigInteger sign,
+        List&lt;RawTerm&gt; terms,
+        Work work
+    ) {
+<span class="fc" id="L139">        work.visit(budget);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                &amp;&amp; binary.operator() == BinaryOperator.ADD) {</span>
+<span class="fc" id="L142">            collectAddends(binary.left(), sign, terms, work);</span>
+<span class="fc" id="L143">            collectAddends(binary.right(), sign, terms, work);</span>
+<span class="fc" id="L144">            return;</span>
+        }
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                &amp;&amp; binary.operator() == BinaryOperator.SUB) {</span>
+<span class="nc" id="L148">            collectAddends(binary.left(), sign, terms, work);</span>
+<span class="nc" id="L149">            collectAddends(binary.right(), sign.negate(), terms, work);</span>
+<span class="nc" id="L150">            return;</span>
+        }
+<span class="fc" id="L152">        MutableTerm term = new MutableTerm(sign);</span>
+<span class="fc" id="L153">        collectProduct(expression, term, work);</span>
+<span class="fc" id="L154">        terms.add(term.freeze());</span>
+<span class="fc" id="L155">    }</span>
+
+    private void collectProduct(
+        Expr expression,
+        MutableTerm term,
+        Work work
+    ) {
+<span class="fc" id="L162">        work.visit(budget);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L165">            collectProduct(binary.left(), term, work);</span>
+<span class="fc" id="L166">            collectProduct(binary.right(), term, work);</span>
+<span class="fc" id="L167">            return;</span>
+        }
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                &amp;&amp; binary.operator() == BinaryOperator.DIV) {</span>
+<span class="fc" id="L171">            throw unsupported(&quot;DIVISION_NOT_IN_INTEGER_POLYNOMIAL_VIEW&quot;);</span>
+        }
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L174">            term.multiply(exactInteger(number.value()));</span>
+<span class="fc" id="L175">            return;</span>
+        }
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                &amp;&amp; binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc" id="L179">            int exponent = exactExponent(binary.right());</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            if (binary.left() instanceof NumberExpr number) {</span>
+<span class="nc" id="L181">                term.multiply(exactInteger(number.value()).pow(exponent));</span>
+<span class="nc" id="L182">                return;</span>
+            }
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            if (exponent &gt; budget.maxDegree()) {</span>
+<span class="nc" id="L185">                throw new BudgetExceeded(&quot;MAX_DEGREE_EXCEEDED&quot;);</span>
+            }
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (exponent &gt; 0) {</span>
+<span class="fc" id="L188">                term.addAtom(binary.left(), exponent);</span>
+            }
+<span class="fc" id="L190">            return;</span>
+        }
+<span class="nc" id="L192">        term.addAtom(expression, 1);</span>
+<span class="nc" id="L193">    }</span>
+
+    private int exactExponent(Expr expression) {
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if (!(expression instanceof NumberExpr number)) {</span>
+<span class="nc" id="L197">            throw unsupported(&quot;POWER_EXPONENT_MUST_BE_NONNEGATIVE_INTEGER&quot;);</span>
+        }
+<span class="fc" id="L199">        BigInteger integer = exactInteger(number.value());</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (integer.signum() &lt; 0</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                || integer.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) &gt; 0) {</span>
+<span class="nc" id="L202">            throw unsupported(&quot;POWER_EXPONENT_OUTSIDE_SUPPORTED_RANGE&quot;);</span>
+        }
+<span class="fc" id="L204">        return integer.intValueExact();</span>
+    }
+
+    private static BigInteger exactInteger(double value) {
+<span class="pc bpc" id="L208" title="2 of 4 branches missed.">        if (!Double.isFinite(value) || value != Math.rint(value)) {</span>
+<span class="nc" id="L209">            throw unsupported(&quot;COEFFICIENT_MUST_BE_EXACT_INTEGER&quot;);</span>
+        }
+        try {
+<span class="fc" id="L212">            return BigDecimal.valueOf(value).toBigIntegerExact();</span>
+<span class="nc" id="L213">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L214">            throw unsupported(&quot;COEFFICIENT_OUTSIDE_EXACT_INTEGER_RANGE&quot;);</span>
+        }
+    }
+
+    private static String atomKey(Expr expression) {
+<span class="fc" id="L219">        return ExpressionFormatter.format(expression);</span>
+    }
+
+    private static UnsupportedExpression unsupported(String detailCode) {
+<span class="fc" id="L223">        return new UnsupportedExpression(detailCode);</span>
+    }
+
+    private static String safeMessage(RuntimeException exception) {
+<span class="nc" id="L227">        String message = exception.getMessage();</span>
+<span class="nc bnc" id="L228" title="All 4 branches missed.">        return message == null || message.isBlank()</span>
+<span class="nc" id="L229">            ? exception.getClass().getSimpleName()</span>
+<span class="nc" id="L230">            : message;</span>
+    }
+
+<span class="fc" id="L233">    public enum Status {</span>
+<span class="fc" id="L234">        SUPPORTED,</span>
+<span class="fc" id="L235">        PARSE_ERROR,</span>
+<span class="fc" id="L236">        UNSUPPORTED,</span>
+<span class="fc" id="L237">        BUDGET_EXCEEDED</span>
+    }
+
+    public record Budget(
+        int maxAtoms,
+        int maxDegree,
+        int maxTerms,
+        int maxVisitedNodes
+    ) {
+<span class="fc" id="L246">        public static final Budget DEFAULT = new Budget(4, 12, 64, 512);</span>
+
+<span class="fc" id="L248">        public Budget {</span>
+<span class="pc bpc" id="L249" title="4 of 8 branches missed.">            if (maxAtoms &lt; 1 || maxDegree &lt; 0</span>
+                    || maxTerms &lt; 1 || maxVisitedNodes &lt; 1) {
+<span class="nc" id="L251">                throw new IllegalArgumentException(</span>
+                    &quot;polynomial semantic-view budget is invalid&quot;);
+            }
+<span class="fc" id="L254">        }</span>
+    }
+
+    public record Analysis(
+        Status status,
+        String detailCode,
+        Polynomial polynomial
+    ) {
+<span class="fc" id="L262">        public Analysis {</span>
+<span class="fc" id="L263">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L264" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L265">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="pc bpc" id="L268" title="1 of 4 branches missed.">            if (status == Status.SUPPORTED &amp;&amp; polynomial == null) {</span>
+<span class="nc" id="L269">                throw new IllegalArgumentException(</span>
+                    &quot;supported analysis requires a polynomial&quot;);
+            }
+<span class="pc bpc" id="L272" title="1 of 4 branches missed.">            if (status != Status.SUPPORTED &amp;&amp; polynomial != null) {</span>
+<span class="nc" id="L273">                throw new IllegalArgumentException(</span>
+                    &quot;failed analysis must not expose a polynomial&quot;);
+            }
+<span class="fc" id="L276">        }</span>
+
+        static Analysis failure(Status status, String detailCode) {
+<span class="fc" id="L279">            return new Analysis(status, detailCode, null);</span>
+        }
+
+        public boolean supported() {
+<span class="fc bfc" id="L283" title="All 2 branches covered.">            return status == Status.SUPPORTED;</span>
+        }
+    }
+
+    public record Atom(
+        String key,
+        String display,
+        Expr expression
+    ) {
+<span class="fc" id="L292">        public Atom {</span>
+<span class="pc bpc" id="L293" title="3 of 6 branches missed.">            if (key == null || key.isBlank()</span>
+<span class="pc bpc" id="L294" title="2 of 4 branches missed.">                    || display == null || display.isBlank()</span>
+                    || expression == null) {
+<span class="nc" id="L296">                throw new IllegalArgumentException(</span>
+                    &quot;polynomial atom is invalid&quot;);
+            }
+<span class="fc" id="L299">        }</span>
+    }
+
+    public record Monomial(List&lt;Integer&gt; exponents)
+            implements Comparable&lt;Monomial&gt; {
+<span class="fc" id="L304">        public Monomial {</span>
+<span class="fc" id="L305">            exponents = List.copyOf(exponents);</span>
+<span class="pc bpc" id="L306" title="3 of 6 branches missed.">            if (exponents.stream().anyMatch(value -&gt; value == null || value &lt; 0)) {</span>
+<span class="nc" id="L307">                throw new IllegalArgumentException(</span>
+                    &quot;monomial exponents must be nonnegative&quot;);
+            }
+<span class="fc" id="L310">        }</span>
+
+        public int totalDegree() {
+<span class="fc" id="L313">            return exponents.stream().mapToInt(Integer::intValue).sum();</span>
+        }
+
+        @Override
+        public int compareTo(Monomial other) {
+<span class="fc" id="L318">            int degreeComparison = Integer.compare(</span>
+<span class="fc" id="L319">                other.totalDegree(),</span>
+<span class="fc" id="L320">                totalDegree());</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">            if (degreeComparison != 0) {</span>
+<span class="fc" id="L322">                return degreeComparison;</span>
+            }
+<span class="fc" id="L324">            int length = Math.max(exponents.size(), other.exponents.size());</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            for (int index = 0; index &lt; length; index++) {</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                int left = index &lt; exponents.size() ? exponents.get(index) : 0;</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                int right = index &lt; other.exponents.size()</span>
+<span class="fc" id="L328">                    ? other.exponents.get(index)</span>
+<span class="pc" id="L329">                    : 0;</span>
+<span class="fc" id="L330">                int comparison = Integer.compare(right, left);</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">                if (comparison != 0) {</span>
+<span class="fc" id="L332">                    return comparison;</span>
+                }
+            }
+<span class="fc" id="L335">            return Integer.compare(exponents.size(), other.exponents.size());</span>
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L339">            return exponents.stream()</span>
+<span class="fc" id="L340">                .map(String::valueOf)</span>
+<span class="fc" id="L341">                .collect(java.util.stream.Collectors.joining(&quot;,&quot;));</span>
+        }
+    }
+
+    public record Polynomial(
+        String viewId,
+        List&lt;Atom&gt; atoms,
+        Map&lt;Monomial, BigInteger&gt; coefficients,
+        int degree,
+        boolean homogeneous,
+        int visitedNodes
+    ) {
+<span class="fc" id="L353">        public Polynomial {</span>
+<span class="pc bpc" id="L354" title="3 of 6 branches missed.">            if (!VIEW_ID.equals(viewId)</span>
+                    || degree &lt; 0
+                    || visitedNodes &lt; 0) {
+<span class="nc" id="L357">                throw new IllegalArgumentException(</span>
+                    &quot;polynomial semantic view is invalid&quot;);
+            }
+<span class="fc" id="L360">            atoms = List.copyOf(atoms);</span>
+<span class="fc" id="L361">            int atomCount = atoms.size();</span>
+<span class="fc" id="L362">            TreeMap&lt;Monomial, BigInteger&gt; sorted = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L363">            coefficients.forEach((monomial, coefficient) -&gt; {</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">                if (coefficient.signum() != 0) {</span>
+<span class="fc" id="L365">                    sorted.put(monomial, coefficient);</span>
+                }
+<span class="fc" id="L367">            });</span>
+<span class="fc" id="L368">            coefficients = Collections.unmodifiableMap(sorted);</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            if (coefficients.keySet().stream().anyMatch(monomial -&gt;</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">                    monomial.exponents().size() != atomCount)) {</span>
+<span class="nc" id="L371">                throw new IllegalArgumentException(</span>
+                    &quot;monomial arity must equal atom count&quot;);
+            }
+<span class="fc" id="L374">        }</span>
+
+        public BigInteger coefficient(int... exponents) {
+<span class="fc" id="L377">            List&lt;Integer&gt; values = java.util.Arrays.stream(exponents)</span>
+<span class="fc" id="L378">                .boxed()</span>
+<span class="fc" id="L379">                .toList();</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">            if (values.size() != atoms.size()) {</span>
+<span class="nc" id="L381">                throw new IllegalArgumentException(</span>
+                    &quot;coefficient query arity must equal atom count&quot;);
+            }
+<span class="fc" id="L384">            return coefficients.getOrDefault(</span>
+                new Monomial(values),
+                BigInteger.ZERO);
+        }
+
+        /**
+         * Homogenizes a one-atom polynomial by introducing the structural unit
+         * atom. A term {@code A^k} becomes {@code A^k * 1^(n-k)}. This is a
+         * general projective transformation, not a stored identity.
+         */
+        public Polynomial homogenizeWithUnitAtom(int totalDegree) {
+<span class="pc bpc" id="L395" title="2 of 4 branches missed.">            if (atoms.size() != 1 || totalDegree &lt; degree) {</span>
+<span class="nc" id="L396">                throw new IllegalArgumentException(</span>
+                    &quot;unit homogenization requires one atom and sufficient degree&quot;);
+            }
+<span class="fc" id="L399">            Atom unit = new Atom(</span>
+                &quot;structural-unit:1&quot;,
+                &quot;1&quot;,
+                new NumberExpr(1));
+<span class="fc" id="L403">            TreeMap&lt;Monomial, BigInteger&gt; homogenized = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L404">            coefficients.forEach((monomial, coefficient) -&gt; {</span>
+<span class="fc" id="L405">                int atomDegree = monomial.exponents().getFirst();</span>
+<span class="fc" id="L406">                homogenized.put(</span>
+<span class="fc" id="L407">                    new Monomial(List.of(</span>
+<span class="fc" id="L408">                        atomDegree,</span>
+<span class="fc" id="L409">                        totalDegree - atomDegree)),</span>
+                    coefficient);
+<span class="fc" id="L411">            });</span>
+<span class="fc" id="L412">            return new Polynomial(</span>
+                viewId,
+<span class="fc" id="L414">                List.of(atoms.getFirst(), unit),</span>
+                homogenized,
+                totalDegree,
+                true,
+                visitedNodes);
+        }
+
+        public boolean isHomogeneousOfDegree(int expectedDegree) {
+<span class="pc bpc" id="L422" title="1 of 4 branches missed.">            return homogeneous &amp;&amp; degree == expectedDegree;</span>
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L426">            StringBuilder result = new StringBuilder(viewId);</span>
+<span class="fc" id="L427">            atoms.forEach(atom -&gt; append(result, atom.display()));</span>
+<span class="fc" id="L428">            coefficients.forEach((monomial, coefficient) -&gt; {</span>
+<span class="fc" id="L429">                append(result, monomial.canonicalMaterial());</span>
+<span class="fc" id="L430">                append(result, coefficient.toString());</span>
+<span class="fc" id="L431">            });</span>
+<span class="fc" id="L432">            return result.toString();</span>
+        }
+
+        private static void append(StringBuilder target, String value) {
+<span class="fc" id="L436">            target.append('|').append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L437">        }</span>
+    }
+
+    private static final class MutableTerm {
+        private BigInteger coefficient;
+<span class="fc" id="L442">        private final Map&lt;String, MutableAtom&gt; atoms = new LinkedHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L444">        private MutableTerm(BigInteger coefficient) {</span>
+<span class="fc" id="L445">            this.coefficient = coefficient;</span>
+<span class="fc" id="L446">        }</span>
+
+        private void multiply(BigInteger value) {
+<span class="fc" id="L449">            coefficient = coefficient.multiply(value);</span>
+<span class="fc" id="L450">        }</span>
+
+        private void addAtom(Expr expression, int exponent) {
+<span class="fc" id="L453">            String key = atomKey(expression);</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            atoms.compute(key, (ignored, current) -&gt; current == null</span>
+<span class="fc" id="L455">                ? new MutableAtom(expression, exponent)</span>
+<span class="nc" id="L456">                : new MutableAtom(</span>
+<span class="nc" id="L457">                    current.expression(),</span>
+<span class="nc" id="L458">                    Math.addExact(current.exponent(), exponent)));</span>
+<span class="fc" id="L459">        }</span>
+
+        private RawTerm freeze() {
+<span class="fc" id="L462">            Map&lt;String, RawAtom&gt; frozen = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L463">            atoms.entrySet().stream()</span>
+<span class="fc" id="L464">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L465">                .forEach(entry -&gt; frozen.put(</span>
+<span class="fc" id="L466">                    entry.getKey(),</span>
+                    new RawAtom(
+<span class="fc" id="L468">                        entry.getValue().expression(),</span>
+<span class="fc" id="L469">                        entry.getValue().exponent())));</span>
+<span class="fc" id="L470">            return new RawTerm(</span>
+                coefficient,
+<span class="fc" id="L472">                Collections.unmodifiableMap(frozen));</span>
+        }
+    }
+
+<span class="fc" id="L476">    private record MutableAtom(Expr expression, int exponent) {</span>
+    }
+
+<span class="fc" id="L479">    private record RawAtom(Expr expression, int exponent) {</span>
+    }
+
+<span class="fc" id="L482">    private record RawTerm(</span>
+        BigInteger coefficient,
+        Map&lt;String, RawAtom&gt; atoms
+    ) {
+    }
+
+    private static final class Work {
+        private int visitedNodes;
+
+        private void visit(Budget budget) {
+<span class="fc" id="L492">            visitedNodes++;</span>
+<span class="pc bpc" id="L493" title="1 of 2 branches missed.">            if (visitedNodes &gt; budget.maxVisitedNodes()) {</span>
+<span class="nc" id="L494">                throw new BudgetExceeded(&quot;MAX_VISITED_NODES_EXCEEDED&quot;);</span>
+            }
+<span class="fc" id="L496">        }</span>
+
+        private int visitedNodes() {
+<span class="fc" id="L499">            return visitedNodes;</span>
+        }
+    }
+
+    private static final class UnsupportedExpression
+            extends RuntimeException {
+        private UnsupportedExpression(String detailCode) {
+<span class="fc" id="L506">            super(detailCode);</span>
+<span class="fc" id="L507">        }</span>
+    }
+
+    private static final class BudgetExceeded
+            extends RuntimeException {
+        private BudgetExceeded(String detailCode) {
+<span class="nc" id="L513">            super(detailCode);</span>
+<span class="nc" id="L514">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

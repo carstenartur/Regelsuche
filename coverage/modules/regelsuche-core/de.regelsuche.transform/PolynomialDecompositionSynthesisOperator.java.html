@@ -1,0 +1,661 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialDecompositionSynthesisOperator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">PolynomialDecompositionSynthesisOperator.java</span></div><h1>PolynomialDecompositionSynthesisOperator.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionFormatter;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Synthesizes exact quadratic-by-quadratic decompositions of bounded binary
+ * homogeneous quartics by solving their coefficient constraints.
+ *
+ * &lt;p&gt;This operator does not store Sophie-Germain or any other concrete
+ * identity. It first obtains a semantic polynomial over two arbitrary AST atoms
+ * and then solves the general ansatz&lt;/p&gt;
+ *
+ * &lt;pre&gt;
+ * (a A^2 + b A B + c B^2) (d A^2 + e A B + f B^2).
+ * &lt;/pre&gt;
+ *
+ * &lt;p&gt;The resulting coefficient equations cover infinitely many concrete
+ * substitutions for {@code A} and {@code B}. Every emitted candidate carries a
+ * content-addressed certificate over the semantic source and the solved exact
+ * integer coefficients.&lt;/p&gt;
+ */
+public final class PolynomialDecompositionSynthesisOperator
+        implements HypothesisOperator {
+    public static final String RULE_ID =
+        &quot;hypothesis_polynomial_decomposition_synthesis&quot;;
+    public static final String METHOD_ID =
+        &quot;regelsuche.binary-quartic-quadratic-decomposition/v1&quot;;
+
+    private static final String PACK_ID = &quot;core-polynomial-synthesis&quot;;
+    private static final String LICENSE = &quot;PROJECT&quot;;
+    private static final int DEFAULT_MAX_CANDIDATES = 6;
+    private static final int DEFAULT_MAX_COEFFICIENT_ABS = 32;
+    private static final int DEFAULT_MAX_FACTOR_CONFIGURATIONS = 4_096;
+
+    private final PolynomialSemanticView semanticView;
+    private final int maxCandidates;
+    private final int maxCoefficientAbs;
+    private final int maxFactorConfigurations;
+
+    public PolynomialDecompositionSynthesisOperator() {
+<span class="fc" id="L57">        this(DEFAULT_MAX_CANDIDATES);</span>
+<span class="fc" id="L58">    }</span>
+
+    public PolynomialDecompositionSynthesisOperator(int maxCandidates) {
+<span class="fc" id="L61">        this(</span>
+            new PolynomialSemanticView(
+                new PolynomialSemanticView.Budget(2, 4, 16, 256)),
+            maxCandidates,
+            DEFAULT_MAX_COEFFICIENT_ABS,
+            DEFAULT_MAX_FACTOR_CONFIGURATIONS);
+<span class="fc" id="L67">    }</span>
+
+    PolynomialDecompositionSynthesisOperator(
+        PolynomialSemanticView semanticView,
+        int maxCandidates,
+        int maxCoefficientAbs,
+        int maxFactorConfigurations
+<span class="fc" id="L74">    ) {</span>
+<span class="fc" id="L75">        this.semanticView = Objects.requireNonNull(</span>
+            semanticView,
+            &quot;semanticView&quot;);
+<span class="fc" id="L78">        this.maxCandidates = Math.max(0, maxCandidates);</span>
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">        if (maxCoefficientAbs &lt; 1 || maxFactorConfigurations &lt; 1) {</span>
+<span class="nc" id="L80">            throw new IllegalArgumentException(</span>
+                &quot;decomposition synthesis budget is invalid&quot;);
+        }
+<span class="fc" id="L83">        this.maxCoefficientAbs = maxCoefficientAbs;</span>
+<span class="fc" id="L84">        this.maxFactorConfigurations = maxFactorConfigurations;</span>
+<span class="fc" id="L85">    }</span>
+
+    @Override
+    public List&lt;Transformation&gt; generateCandidates(String expression) {
+<span class="fc" id="L89">        SynthesisReport report = synthesize(expression);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (report.status() != Status.GENERATED) {</span>
+<span class="nc" id="L91">            return List.of();</span>
+        }
+<span class="fc" id="L93">        return report.candidates().stream()</span>
+<span class="fc" id="L94">            .limit(maxCandidates)</span>
+<span class="fc" id="L95">            .map(candidate -&gt; new Transformation(</span>
+                RULE_ID,
+<span class="fc" id="L97">                candidate.transformedExpression(),</span>
+                RewriteKind.FACTOR,
+                true,
+                -2,
+                true,
+<span class="fc" id="L102">                candidate.applicationKey(),</span>
+<span class="fc" id="L103">                List.of(),</span>
+                PACK_ID,
+                LICENSE))
+<span class="fc" id="L106">            .toList();</span>
+    }
+
+    public SynthesisReport synthesize(String expression) {
+<span class="fc" id="L110">        PolynomialSemanticView.Analysis analysis =</span>
+<span class="fc" id="L111">            semanticView.analyze(expression);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (!analysis.supported()) {</span>
+<span class="fc" id="L113">            return SynthesisReport.failure(</span>
+<span class="fc" id="L114">                statusFor(analysis.status()),</span>
+<span class="fc" id="L115">                analysis.detailCode(),</span>
+<span class="fc" id="L116">                analysis.status(),</span>
+                0);
+        }
+<span class="fc" id="L119">        PolynomialSemanticView.Polynomial polynomial =</span>
+<span class="fc" id="L120">            analysis.polynomial();</span>
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">        if (polynomial.atoms().size() == 1 &amp;&amp; polynomial.degree() &lt;= 4) {</span>
+<span class="fc" id="L122">            polynomial = polynomial.homogenizeWithUnitAtom(4);</span>
+        }
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (polynomial.atoms().size() != 2</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                || !polynomial.isHomogeneousOfDegree(4)</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                || polynomial.coefficient(4, 0).signum() == 0</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                || polynomial.coefficient(0, 4).signum() == 0) {</span>
+<span class="fc" id="L128">            return SynthesisReport.failure(</span>
+                Status.NOT_BINARY_HOMOGENEOUS_QUARTIC,
+                &quot;REQUIRES_TWO_ATOMS_AND_NONZERO_EXTREME_QUARTIC_TERMS&quot;,
+<span class="fc" id="L131">                analysis.status(),</span>
+                0);
+        }
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (maxCandidates == 0) {</span>
+<span class="nc" id="L135">            return SynthesisReport.failure(</span>
+                Status.CANDIDATE_BUDGET_ZERO,
+                &quot;MAX_CANDIDATES_IS_ZERO&quot;,
+<span class="nc" id="L138">                analysis.status(),</span>
+                0);
+        }
+
+<span class="fc" id="L142">        Coefficients target = new Coefficients(</span>
+<span class="fc" id="L143">            polynomial.coefficient(4, 0),</span>
+<span class="fc" id="L144">            polynomial.coefficient(3, 1),</span>
+<span class="fc" id="L145">            polynomial.coefficient(2, 2),</span>
+<span class="fc" id="L146">            polynomial.coefficient(1, 3),</span>
+<span class="fc" id="L147">            polynomial.coefficient(0, 4));</span>
+<span class="fc" id="L148">        Work work = new Work();</span>
+<span class="fc" id="L149">        Map&lt;String, Candidate&gt; candidates = new LinkedHashMap&lt;&gt;();</span>
+        try {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            for (BigInteger a : divisors(target.c40())) {</span>
+<span class="fc" id="L152">                BigInteger d = target.c40().divide(a);</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                if (!withinBound(d)) {</span>
+<span class="nc" id="L154">                    continue;</span>
+                }
+<span class="fc bfc" id="L156" title="All 2 branches covered.">                for (BigInteger c : divisors(target.c04())) {</span>
+<span class="fc" id="L157">                    work.consider(maxFactorConfigurations);</span>
+<span class="fc" id="L158">                    BigInteger f = target.c04().divide(c);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                    if (!withinBound(f)) {</span>
+<span class="nc" id="L160">                        continue;</span>
+                    }
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                    for (MiddlePair middle : solveMiddle(</span>
+                            a,
+                            d,
+                            c,
+                            f,
+                            target)) {
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                        if (!withinBound(middle.b())</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                                || !withinBound(middle.e())) {</span>
+<span class="nc" id="L170">                            continue;</span>
+                        }
+<span class="fc" id="L172">                        BigInteger reconstructedMiddle = a.multiply(f)</span>
+<span class="fc" id="L173">                            .add(middle.b().multiply(middle.e()))</span>
+<span class="fc" id="L174">                            .add(c.multiply(d));</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">                        if (!reconstructedMiddle.equals(target.c22())) {</span>
+<span class="fc" id="L176">                            continue;</span>
+                        }
+<span class="fc" id="L178">                        FactorPair pair = FactorPair.canonical(</span>
+<span class="fc" id="L179">                            new Quadratic(a, middle.b(), c),</span>
+<span class="fc" id="L180">                            new Quadratic(d, middle.e(), f));</span>
+<span class="fc" id="L181">                        Candidate candidate = candidate(</span>
+                            polynomial,
+                            target,
+                            pair,
+<span class="fc" id="L185">                            work.consideredConfigurations());</span>
+<span class="fc" id="L186">                        candidates.putIfAbsent(</span>
+<span class="fc" id="L187">                            candidate.certificateHash(),</span>
+                            candidate);
+<span class="fc" id="L189">                    }</span>
+<span class="fc" id="L190">                }</span>
+<span class="fc" id="L191">            }</span>
+<span class="nc" id="L192">        } catch (BudgetExceeded exception) {</span>
+<span class="nc" id="L193">            return SynthesisReport.failure(</span>
+                Status.BUDGET_EXCEEDED,
+<span class="nc" id="L195">                exception.getMessage(),</span>
+<span class="nc" id="L196">                analysis.status(),</span>
+<span class="nc" id="L197">                work.consideredConfigurations());</span>
+<span class="fc" id="L198">        }</span>
+
+<span class="fc" id="L200">        List&lt;Candidate&gt; ordered = candidates.values().stream()</span>
+<span class="fc" id="L201">            .sorted(Comparator</span>
+<span class="fc" id="L202">                .comparing(Candidate::factorMaterial)</span>
+<span class="fc" id="L203">                .thenComparing(Candidate::transformedExpression))</span>
+<span class="fc" id="L204">            .limit(maxCandidates)</span>
+<span class="fc" id="L205">            .toList();</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (ordered.isEmpty()) {</span>
+<span class="fc" id="L207">            return SynthesisReport.failure(</span>
+                Status.NO_INTEGER_QUADRATIC_FACTORIZATION,
+                &quot;NO_BOUNDED_INTEGER_COEFFICIENT_SOLUTION&quot;,
+<span class="fc" id="L210">                analysis.status(),</span>
+<span class="fc" id="L211">                work.consideredConfigurations());</span>
+        }
+<span class="fc" id="L213">        return new SynthesisReport(</span>
+            Status.GENERATED,
+            &quot;EXACT_COEFFICIENT_CONSTRAINTS_SOLVED&quot;,
+<span class="fc" id="L216">            analysis.status(),</span>
+<span class="fc" id="L217">            polynomial.canonicalMaterial(),</span>
+<span class="fc" id="L218">            work.consideredConfigurations(),</span>
+            ordered);
+    }
+
+    private List&lt;MiddlePair&gt; solveMiddle(
+        BigInteger a,
+        BigInteger d,
+        BigInteger c,
+        BigInteger f,
+        Coefficients target
+    ) {
+<span class="fc" id="L229">        BigInteger determinant = d.multiply(c).subtract(a.multiply(f));</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (determinant.signum() != 0) {</span>
+<span class="fc" id="L231">            BigInteger bNumerator = target.c31().multiply(c)</span>
+<span class="fc" id="L232">                .subtract(a.multiply(target.c13()));</span>
+<span class="fc" id="L233">            BigInteger eNumerator = d.multiply(target.c13())</span>
+<span class="fc" id="L234">                .subtract(f.multiply(target.c31()));</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            if (!isDivisible(bNumerator, determinant)</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                    || !isDivisible(eNumerator, determinant)) {</span>
+<span class="nc" id="L237">                return List.of();</span>
+            }
+<span class="fc" id="L239">            return List.of(new MiddlePair(</span>
+<span class="fc" id="L240">                bNumerator.divide(determinant),</span>
+<span class="fc" id="L241">                eNumerator.divide(determinant)));</span>
+        }
+
+<span class="fc" id="L244">        List&lt;MiddlePair&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L245">        for (int value = -maxCoefficientAbs;</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">                value &lt;= maxCoefficientAbs;</span>
+<span class="fc" id="L247">                value++) {</span>
+<span class="fc" id="L248">            BigInteger b = BigInteger.valueOf(value);</span>
+<span class="fc" id="L249">            BigInteger eNumerator =</span>
+<span class="fc" id="L250">                target.c31().subtract(d.multiply(b));</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            if (!isDivisible(eNumerator, a)) {</span>
+<span class="nc" id="L252">                continue;</span>
+            }
+<span class="fc" id="L254">            BigInteger e = eNumerator.divide(a);</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            if (f.multiply(b).add(c.multiply(e)).equals(target.c13())) {</span>
+<span class="fc" id="L256">                result.add(new MiddlePair(b, e));</span>
+            }
+        }
+<span class="fc" id="L259">        return List.copyOf(result);</span>
+    }
+
+    private Candidate candidate(
+        PolynomialSemanticView.Polynomial polynomial,
+        Coefficients target,
+        FactorPair pair,
+        int consideredConfigurations
+    ) {
+<span class="fc" id="L268">        PolynomialSemanticView.Atom first = polynomial.atoms().get(0);</span>
+<span class="fc" id="L269">        PolynomialSemanticView.Atom second = polynomial.atoms().get(1);</span>
+<span class="fc" id="L270">        Expr left = quadraticExpression(pair.left(), first, second);</span>
+<span class="fc" id="L271">        Expr right = quadraticExpression(pair.right(), first, second);</span>
+<span class="fc" id="L272">        String transformed = ExpressionFormatter.format(</span>
+            new BinaryExpr(left, BinaryOperator.MUL, right));
+<span class="fc" id="L274">        String factorMaterial = pair.canonicalMaterial();</span>
+<span class="fc" id="L275">        String certificateHash = sha256(</span>
+<span class="fc" id="L276">            certificateMaterial(</span>
+                polynomial,
+                target,
+                pair,
+                transformed));
+<span class="fc" id="L281">        String applicationKey = RULE_ID</span>
+            + &quot;|method=&quot; + METHOD_ID
+            + &quot;|certificate=&quot; + certificateHash
+            + &quot;|work=&quot; + consideredConfigurations;
+<span class="fc" id="L285">        return new Candidate(</span>
+            transformed,
+<span class="fc" id="L287">            pair.left().coefficients(),</span>
+<span class="fc" id="L288">            pair.right().coefficients(),</span>
+            factorMaterial,
+            certificateHash,
+            applicationKey);
+    }
+
+    private Expr quadraticExpression(
+        Quadratic quadratic,
+        PolynomialSemanticView.Atom first,
+        PolynomialSemanticView.Atom second
+    ) {
+<span class="fc" id="L299">        List&lt;SignedTerm&gt; terms = List.of(</span>
+            new SignedTerm(
+<span class="fc" id="L301">                quadratic.a(),</span>
+<span class="fc" id="L302">                squaredAtom(first)),</span>
+            new SignedTerm(
+<span class="fc" id="L304">                quadratic.b(),</span>
+<span class="fc" id="L305">                multipliedAtoms(first, second)),</span>
+            new SignedTerm(
+<span class="fc" id="L307">                quadratic.c(),</span>
+<span class="fc" id="L308">                squaredAtom(second)));</span>
+<span class="fc" id="L309">        Expr result = null;</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        for (SignedTerm term : terms) {</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            if (term.coefficient().signum() == 0) {</span>
+<span class="fc" id="L312">                continue;</span>
+            }
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            if (result == null) {</span>
+<span class="fc" id="L315">                result = scaled(</span>
+<span class="fc" id="L316">                    term.coefficient(),</span>
+<span class="fc" id="L317">                    term.expression());</span>
+<span class="fc" id="L318">                continue;</span>
+            }
+<span class="fc bfc" id="L320" title="All 2 branches covered.">            if (term.coefficient().signum() &gt; 0) {</span>
+<span class="fc" id="L321">                result = new BinaryExpr(</span>
+                    result,
+                    BinaryOperator.ADD,
+<span class="fc" id="L324">                    scaled(term.coefficient(), term.expression()));</span>
+            } else {
+<span class="fc" id="L326">                result = new BinaryExpr(</span>
+                    result,
+                    BinaryOperator.SUB,
+<span class="fc" id="L329">                    scaled(term.coefficient().abs(), term.expression()));</span>
+            }
+<span class="fc" id="L331">        }</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L333">            throw new IllegalStateException(</span>
+                &quot;quadratic factor must not be zero&quot;);
+        }
+<span class="fc" id="L336">        return result;</span>
+    }
+
+    private Expr squaredAtom(PolynomialSemanticView.Atom atom) {
+<span class="fc bfc" id="L340" title="All 2 branches covered.">        if (isStructuralUnit(atom)) {</span>
+<span class="fc" id="L341">            return new NumberExpr(1);</span>
+        }
+<span class="fc" id="L343">        return new BinaryExpr(</span>
+<span class="fc" id="L344">            atom.expression(),</span>
+            BinaryOperator.POW,
+            new NumberExpr(2));
+    }
+
+    private Expr multipliedAtoms(
+        PolynomialSemanticView.Atom first,
+        PolynomialSemanticView.Atom second
+    ) {
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">        if (isStructuralUnit(first)) {</span>
+<span class="nc" id="L354">            return second.expression();</span>
+        }
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        if (isStructuralUnit(second)) {</span>
+<span class="fc" id="L357">            return first.expression();</span>
+        }
+<span class="fc" id="L359">        return new BinaryExpr(</span>
+<span class="fc" id="L360">            first.expression(),</span>
+            BinaryOperator.MUL,
+<span class="fc" id="L362">            second.expression());</span>
+    }
+
+    private boolean isStructuralUnit(PolynomialSemanticView.Atom atom) {
+<span class="fc" id="L366">        return atom.key().equals(&quot;structural-unit:1&quot;);</span>
+    }
+
+    private Expr scaled(BigInteger coefficient, Expr expression) {
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        if (coefficient.equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L371">            return expression;</span>
+        }
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">        if (coefficient.equals(BigInteger.ONE.negate())) {</span>
+<span class="nc" id="L374">            return new BinaryExpr(</span>
+                new NumberExpr(-1),
+                BinaryOperator.MUL,
+                expression);
+        }
+<span class="fc" id="L379">        return new BinaryExpr(</span>
+<span class="fc" id="L380">            new NumberExpr(coefficient.intValueExact()),</span>
+            BinaryOperator.MUL,
+            expression);
+    }
+
+    private List&lt;BigInteger&gt; divisors(BigInteger value) {
+<span class="fc" id="L386">        BigInteger absolute = value.abs();</span>
+<span class="fc" id="L387">        List&lt;BigInteger&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L388">        for (int divisor = 1;</span>
+                divisor &lt;= maxCoefficientAbs
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">                    &amp;&amp; BigInteger.valueOf(divisor)</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">                        .compareTo(absolute) &lt;= 0;</span>
+<span class="fc" id="L392">                divisor++) {</span>
+<span class="fc" id="L393">            BigInteger candidate = BigInteger.valueOf(divisor);</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">            if (absolute.mod(candidate).signum() == 0) {</span>
+<span class="fc" id="L395">                result.add(candidate);</span>
+<span class="fc" id="L396">                result.add(candidate.negate());</span>
+            }
+        }
+<span class="fc" id="L399">        return result.stream().distinct().sorted().toList();</span>
+    }
+
+    private boolean withinBound(BigInteger value) {
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        return value.abs().compareTo(</span>
+<span class="fc" id="L404">            BigInteger.valueOf(maxCoefficientAbs)) &lt;= 0;</span>
+    }
+
+    private static boolean isDivisible(
+        BigInteger numerator,
+        BigInteger denominator
+    ) {
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">        return denominator.signum() != 0</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">            &amp;&amp; numerator.remainder(denominator).signum() == 0;</span>
+    }
+
+    private static Status statusFor(
+        PolynomialSemanticView.Status status
+    ) {
+<span class="pc bpc" id="L418" title="3 of 4 branches missed.">        return switch (status) {</span>
+<span class="nc" id="L419">            case PARSE_ERROR -&gt; Status.PARSE_ERROR;</span>
+<span class="fc" id="L420">            case UNSUPPORTED -&gt; Status.UNSUPPORTED_SEMANTIC_VIEW;</span>
+<span class="nc" id="L421">            case BUDGET_EXCEEDED -&gt; Status.BUDGET_EXCEEDED;</span>
+<span class="nc" id="L422">            case SUPPORTED -&gt; throw new IllegalArgumentException(</span>
+                &quot;supported semantic view has no failure status&quot;);
+        };
+    }
+
+    private static String certificateMaterial(
+        PolynomialSemanticView.Polynomial polynomial,
+        Coefficients target,
+        FactorPair pair,
+        String transformed
+    ) {
+<span class="fc" id="L433">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L434">            .property(&quot;schema&quot;, METHOD_ID)</span>
+<span class="fc" id="L435">            .property(&quot;semanticView&quot;, polynomial.viewId())</span>
+<span class="fc" id="L436">            .property(&quot;source&quot;, polynomial.canonicalMaterial())</span>
+<span class="fc" id="L437">            .stringArray(&quot;targetCoefficients&quot;, target.values().stream()</span>
+<span class="fc" id="L438">                .map(BigInteger::toString)</span>
+<span class="fc" id="L439">                .toList())</span>
+<span class="fc" id="L440">            .stringArray(&quot;leftFactor&quot;, pair.left().coefficients().stream()</span>
+<span class="fc" id="L441">                .map(BigInteger::toString)</span>
+<span class="fc" id="L442">                .toList())</span>
+<span class="fc" id="L443">            .stringArray(&quot;rightFactor&quot;, pair.right().coefficients().stream()</span>
+<span class="fc" id="L444">                .map(BigInteger::toString)</span>
+<span class="fc" id="L445">                .toList())</span>
+<span class="fc" id="L446">            .property(&quot;transformedExpression&quot;, transformed)</span>
+<span class="fc" id="L447">            .endObject()</span>
+<span class="fc" id="L448">            .toString();</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L453">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L454">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L455">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L456">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L457">            throw new IllegalStateException(</span>
+                &quot;SHA-256 unavailable&quot;,
+                exception);
+        }
+    }
+
+<span class="fc" id="L463">    public enum Status {</span>
+<span class="fc" id="L464">        GENERATED,</span>
+<span class="fc" id="L465">        PARSE_ERROR,</span>
+<span class="fc" id="L466">        UNSUPPORTED_SEMANTIC_VIEW,</span>
+<span class="fc" id="L467">        NOT_BINARY_HOMOGENEOUS_QUARTIC,</span>
+<span class="fc" id="L468">        NO_INTEGER_QUADRATIC_FACTORIZATION,</span>
+<span class="fc" id="L469">        CANDIDATE_BUDGET_ZERO,</span>
+<span class="fc" id="L470">        BUDGET_EXCEEDED</span>
+    }
+
+    public record SynthesisReport(
+        Status status,
+        String detailCode,
+        PolynomialSemanticView.Status semanticStatus,
+        String sourcePolynomialMaterial,
+        int consideredConfigurations,
+        List&lt;Candidate&gt; candidates
+    ) {
+<span class="fc" id="L481">        public SynthesisReport {</span>
+<span class="fc" id="L482">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L483" title="5 of 10 branches missed.">            if (detailCode == null || detailCode.isBlank()</span>
+                    || semanticStatus == null
+                    || sourcePolynomialMaterial == null
+                    || consideredConfigurations &lt; 0) {
+<span class="nc" id="L487">                throw new IllegalArgumentException(</span>
+                    &quot;decomposition synthesis report is invalid&quot;);
+            }
+<span class="fc" id="L490">            candidates = List.copyOf(candidates);</span>
+<span class="pc bpc" id="L491" title="1 of 4 branches missed.">            if (status == Status.GENERATED &amp;&amp; candidates.isEmpty()) {</span>
+<span class="nc" id="L492">                throw new IllegalArgumentException(</span>
+                    &quot;generated report requires candidates&quot;);
+            }
+<span class="pc bpc" id="L495" title="1 of 4 branches missed.">            if (status != Status.GENERATED &amp;&amp; !candidates.isEmpty()) {</span>
+<span class="nc" id="L496">                throw new IllegalArgumentException(</span>
+                    &quot;failed report must not expose candidates&quot;);
+            }
+<span class="fc" id="L499">        }</span>
+
+        static SynthesisReport failure(
+            Status status,
+            String detailCode,
+            PolynomialSemanticView.Status semanticStatus,
+            int consideredConfigurations
+        ) {
+<span class="fc" id="L507">            return new SynthesisReport(</span>
+                status,
+                detailCode,
+                semanticStatus,
+                &quot;&quot;,
+                consideredConfigurations,
+<span class="fc" id="L513">                List.of());</span>
+        }
+
+        public boolean generated() {
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">            return status == Status.GENERATED;</span>
+        }
+    }
+
+    public record Candidate(
+        String transformedExpression,
+        List&lt;BigInteger&gt; leftCoefficients,
+        List&lt;BigInteger&gt; rightCoefficients,
+        String factorMaterial,
+        String certificateHash,
+        String applicationKey
+    ) {
+<span class="fc" id="L529">        public Candidate {</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">            if (transformedExpression == null</span>
+<span class="pc bpc" id="L531" title="2 of 4 branches missed.">                    || transformedExpression.isBlank()</span>
+                    || factorMaterial == null
+<span class="pc bpc" id="L533" title="2 of 4 branches missed.">                    || factorMaterial.isBlank()</span>
+                    || certificateHash == null
+<span class="pc bpc" id="L535" title="2 of 4 branches missed.">                    || !certificateHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)</span>
+                    || applicationKey == null
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">                    || applicationKey.isBlank()) {</span>
+<span class="nc" id="L538">                throw new IllegalArgumentException(</span>
+                    &quot;decomposition candidate is invalid&quot;);
+            }
+<span class="fc" id="L541">            leftCoefficients = List.copyOf(leftCoefficients);</span>
+<span class="fc" id="L542">            rightCoefficients = List.copyOf(rightCoefficients);</span>
+<span class="pc bpc" id="L543" title="1 of 2 branches missed.">            if (leftCoefficients.size() != 3</span>
+<span class="pc bpc" id="L544" title="1 of 2 branches missed.">                    || rightCoefficients.size() != 3) {</span>
+<span class="nc" id="L545">                throw new IllegalArgumentException(</span>
+                    &quot;quadratic factors require three coefficients&quot;);
+            }
+<span class="fc" id="L548">        }</span>
+    }
+
+<span class="fc" id="L551">    private record Coefficients(</span>
+        BigInteger c40,
+        BigInteger c31,
+        BigInteger c22,
+        BigInteger c13,
+        BigInteger c04
+    ) {
+        private List&lt;BigInteger&gt; values() {
+<span class="fc" id="L559">            return List.of(c40, c31, c22, c13, c04);</span>
+        }
+    }
+
+<span class="fc" id="L563">    private record MiddlePair(BigInteger b, BigInteger e) {</span>
+    }
+
+<span class="fc" id="L566">    private record SignedTerm(</span>
+        BigInteger coefficient,
+        Expr expression
+    ) {
+    }
+
+    private record Quadratic(
+        BigInteger a,
+        BigInteger b,
+        BigInteger c
+    ) {
+<span class="fc" id="L577">        private Quadratic {</span>
+<span class="fc" id="L578">            Objects.requireNonNull(a, &quot;a&quot;);</span>
+<span class="fc" id="L579">            Objects.requireNonNull(b, &quot;b&quot;);</span>
+<span class="fc" id="L580">            Objects.requireNonNull(c, &quot;c&quot;);</span>
+<span class="fc" id="L581">        }</span>
+
+        private List&lt;BigInteger&gt; coefficients() {
+<span class="fc" id="L584">            return List.of(a, b, c);</span>
+        }
+
+        private Quadratic negate() {
+<span class="fc" id="L588">            return new Quadratic(a.negate(), b.negate(), c.negate());</span>
+        }
+
+        private int firstNonzeroSign() {
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">            for (BigInteger value : coefficients()) {</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">                if (value.signum() != 0) {</span>
+<span class="fc" id="L594">                    return value.signum();</span>
+                }
+<span class="nc" id="L596">            }</span>
+<span class="nc" id="L597">            return 0;</span>
+        }
+
+        private String canonicalMaterial() {
+<span class="fc" id="L601">            return coefficients().stream()</span>
+<span class="fc" id="L602">                .map(BigInteger::toString)</span>
+<span class="fc" id="L603">                .collect(java.util.stream.Collectors.joining(&quot;,&quot;));</span>
+        }
+    }
+
+<span class="fc" id="L607">    private record FactorPair(Quadratic left, Quadratic right) {</span>
+        private static FactorPair canonical(
+            Quadratic left,
+            Quadratic right
+        ) {
+<span class="fc" id="L612">            FactorPair normalized = normalizeSign(</span>
+                new FactorPair(left, right));
+<span class="fc bfc" id="L614" title="All 2 branches covered.">            if (normalized.left().canonicalMaterial().compareTo(</span>
+<span class="fc" id="L615">                    normalized.right().canonicalMaterial()) &gt; 0) {</span>
+<span class="fc" id="L616">                normalized = new FactorPair(</span>
+<span class="fc" id="L617">                    normalized.right(),</span>
+<span class="fc" id="L618">                    normalized.left());</span>
+<span class="fc" id="L619">                normalized = normalizeSign(normalized);</span>
+            }
+<span class="fc" id="L621">            return normalized;</span>
+        }
+
+        private static FactorPair normalizeSign(FactorPair pair) {
+<span class="fc bfc" id="L625" title="All 2 branches covered.">            return pair.left().firstNonzeroSign() &lt; 0</span>
+<span class="fc" id="L626">                ? new FactorPair(</span>
+<span class="fc" id="L627">                    pair.left().negate(),</span>
+<span class="fc" id="L628">                    pair.right().negate())</span>
+<span class="fc" id="L629">                : pair;</span>
+        }
+
+        private String canonicalMaterial() {
+<span class="fc" id="L633">            return left.canonicalMaterial()</span>
+<span class="fc" id="L634">                + &quot;|&quot; + right.canonicalMaterial();</span>
+        }
+    }
+
+    private static final class Work {
+        private int consideredConfigurations;
+
+        private void consider(int maximum) {
+<span class="fc" id="L642">            consideredConfigurations++;</span>
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">            if (consideredConfigurations &gt; maximum) {</span>
+<span class="nc" id="L644">                throw new BudgetExceeded(</span>
+                    &quot;MAX_FACTOR_CONFIGURATIONS_EXCEEDED&quot;);
+            }
+<span class="fc" id="L647">        }</span>
+
+        private int consideredConfigurations() {
+<span class="fc" id="L650">            return consideredConfigurations;</span>
+        }
+    }
+
+    private static final class BudgetExceeded
+            extends RuntimeException {
+        private BudgetExceeded(String detailCode) {
+<span class="nc" id="L657">            super(detailCode);</span>
+<span class="nc" id="L658">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -3,6 +3,7 @@
 import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.PolynomialDecompositionSynthesisOperator;
 import de.regelsuche.transform.RationalizationHypothesisOperator;
 import de.regelsuche.transform.TelescopingFractionHypothesisOperator;
 import java.util.List;
@@ -13,14 +14,30 @@ public final class HypothesisOperatorRegistry {
     private final List&lt;HypothesisOperatorDescriptor&gt; descriptors;
 
     public HypothesisOperatorRegistry() {
-<span class="fc" id="L16">        this(List.of(</span>
+<span class="fc" id="L17">        this(List.of(</span>
+            new HypothesisOperatorDescriptor(
+                PolynomialDecompositionSynthesisOperator.RULE_ID,
+                &quot;polynomial-decomposition-synthesis&quot;,
+                &quot;factorization-synthesis&quot;,
+                PolynomialDecompositionSynthesisOperator::new,
+                true,
+<span class="fc" id="L24">                List.of(</span>
+                    &quot;polynomial&quot;,
+                    &quot;decomposition&quot;,
+                    &quot;factorization&quot;,
+                    &quot;coefficient-solving&quot;)
+            ),
             new HypothesisOperatorDescriptor(
                 DifferenceOfSquaresPreparationOperator.RULE_ID,
-                &quot;difference-of-squares&quot;,
-                &quot;factorization-bridge&quot;,
+                &quot;difference-of-squares-bridge-control&quot;,
+                &quot;historical-factorization-bridge&quot;,
                 DifferenceOfSquaresPreparationOperator::new,
-                true,
-<span class="fc" id="L23">                List.of(&quot;sophie-germain&quot;, &quot;bridge&quot;, &quot;factorization&quot;)</span>
+                false,
+<span class="fc" id="L36">                List.of(</span>
+                    &quot;historical-control&quot;,
+                    &quot;sophie-germain&quot;,
+                    &quot;bridge&quot;,
+                    &quot;factorization&quot;)
             ),
             new HypothesisOperatorDescriptor(
                 ConservativeCompleteSquareHypothesisOperator.RULE_ID,
@@ -28,7 +45,7 @@ public final class HypothesisOperatorRegistry {
                 &quot;quadratic-bridge&quot;,
                 ConservativeCompleteSquareHypothesisOperator::new,
                 true,
-<span class="fc" id="L31">                List.of(&quot;conservative&quot;, &quot;quadratic&quot;, &quot;bridge&quot;)</span>
+<span class="fc" id="L48">                List.of(&quot;conservative&quot;, &quot;quadratic&quot;, &quot;bridge&quot;)</span>
             ),
             new HypothesisOperatorDescriptor(
                 TelescopingFractionHypothesisOperator.RULE_ID,
@@ -36,7 +53,7 @@ public final class HypothesisOperatorRegistry {
                 &quot;fraction-decomposition&quot;,
                 TelescopingFractionHypothesisOperator::new,
                 true,
-<span class="fc" id="L39">                List.of(&quot;telescoping&quot;, &quot;fraction&quot;, &quot;decomposition&quot;)</span>
+<span class="fc" id="L56">                List.of(&quot;telescoping&quot;, &quot;fraction&quot;, &quot;decomposition&quot;)</span>
             ),
             new HypothesisOperatorDescriptor(
                 RationalizationHypothesisOperator.RULE_ID,
@@ -44,52 +61,52 @@ public final class HypothesisOperatorRegistry {
                 &quot;radical-conjugate&quot;,
                 RationalizationHypothesisOperator::new,
                 true,
-<span class="fc" id="L47">                List.of(&quot;rationalization&quot;, &quot;radical&quot;, &quot;conjugate&quot;)</span>
+<span class="fc" id="L64">                List.of(&quot;rationalization&quot;, &quot;radical&quot;, &quot;conjugate&quot;)</span>
             )
         ));
-<span class="fc" id="L50">    }</span>
+<span class="fc" id="L67">    }</span>
 
-<span class="fc" id="L52">    public HypothesisOperatorRegistry(List&lt;HypothesisOperatorDescriptor&gt; descriptors) {</span>
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        this.descriptors = descriptors == null ? List.of() : List.copyOf(descriptors);</span>
-<span class="fc" id="L54">        long uniqueIds = this.descriptors.stream().map(HypothesisOperatorDescriptor::id).distinct().count();</span>
-<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (uniqueIds != this.descriptors.size()) {</span>
-<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;hypothesis operator ids must be unique&quot;);</span>
+<span class="fc" id="L69">    public HypothesisOperatorRegistry(List&lt;HypothesisOperatorDescriptor&gt; descriptors) {</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        this.descriptors = descriptors == null ? List.of() : List.copyOf(descriptors);</span>
+<span class="fc" id="L71">        long uniqueIds = this.descriptors.stream().map(HypothesisOperatorDescriptor::id).distinct().count();</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (uniqueIds != this.descriptors.size()) {</span>
+<span class="nc" id="L73">            throw new IllegalArgumentException(&quot;hypothesis operator ids must be unique&quot;);</span>
         }
-<span class="fc" id="L58">    }</span>
+<span class="fc" id="L75">    }</span>
 
     public List&lt;HypothesisOperatorDescriptor&gt; all() {
-<span class="fc" id="L61">        return descriptors;</span>
+<span class="fc" id="L78">        return descriptors;</span>
     }
 
     public Optional&lt;HypothesisOperatorDescriptor&gt; byId(String id) {
-<span class="fc" id="L65">        return descriptors.stream().filter(descriptor -&gt; descriptor.id().equals(id)).findFirst();</span>
+<span class="fc" id="L82">        return descriptors.stream().filter(descriptor -&gt; descriptor.id().equals(id)).findFirst();</span>
     }
 
     public List&lt;HypothesisOperatorDescriptor&gt; enabledFor(DiscoveryOptions options) {
-<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        DiscoveryEngineOptions engine = options == null ? DiscoveryEngineOptions.forProfile(DiscoveryProfile.PURE_REWRITE) : options.engine();</span>
-<span class="fc" id="L70">        return enabledFor(engine.profile(), engine);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        DiscoveryEngineOptions engine = options == null ? DiscoveryEngineOptions.forProfile(DiscoveryProfile.PURE_REWRITE) : options.engine();</span>
+<span class="fc" id="L87">        return enabledFor(engine.profile(), engine);</span>
     }
 
     public List&lt;HypothesisOperatorDescriptor&gt; enabledFor(DiscoveryProfile profile, DiscoveryEngineOptions options) {
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        DiscoveryEngineOptions engine = options == null ? DiscoveryEngineOptions.forProfile(profile) : options;</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (!engine.enableHypothesisOperators()) {</span>
-<span class="fc" id="L76">            return List.of();</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        DiscoveryEngineOptions engine = options == null ? DiscoveryEngineOptions.forProfile(profile) : options;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (!engine.enableHypothesisOperators()) {</span>
+<span class="fc" id="L93">            return List.of();</span>
         }
-<span class="fc" id="L78">        return descriptors.stream().filter(HypothesisOperatorDescriptor::defaultEnabled).toList();</span>
+<span class="fc" id="L95">        return descriptors.stream().filter(HypothesisOperatorDescriptor::defaultEnabled).toList();</span>
     }
 
     public List&lt;String&gt; stableIds() {
-<span class="nc" id="L82">        return descriptors.stream().map(HypothesisOperatorDescriptor::id).toList();</span>
+<span class="nc" id="L99">        return descriptors.stream().map(HypothesisOperatorDescriptor::id).toList();</span>
     }
 
     public List&lt;String&gt; selectedStableIds(DiscoveryOptions options) {
-<span class="nc" id="L86">        return enabledFor(options).stream().map(HypothesisOperatorDescriptor::id).toList();</span>
+<span class="fc" id="L103">        return enabledFor(options).stream().map(HypothesisOperatorDescriptor::id).toList();</span>
     }
 
     public List&lt;HypothesisOperator&gt; selectOperators(DiscoveryOptions options) {
-<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        DiscoveryEngineOptions engine = options == null ? DiscoveryEngineOptions.forProfile(DiscoveryProfile.PURE_REWRITE) : options.engine();</span>
-<span class="fc" id="L91">        int maxCandidates = engine.maxHypothesisCandidatesPerOperator();</span>
-<span class="fc" id="L92">        return enabledFor(options).stream().map(descriptor -&gt; descriptor.create(maxCandidates)).toList();</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        DiscoveryEngineOptions engine = options == null ? DiscoveryEngineOptions.forProfile(DiscoveryProfile.PURE_REWRITE) : options.engine();</span>
+<span class="fc" id="L108">        int maxCandidates = engine.maxHypothesisCandidatesPerOperator();</span>
+<span class="fc" id="L109">        return enabledFor(options).stream().map(descriptor -&gt; descriptor.create(maxCandidates)).toList();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

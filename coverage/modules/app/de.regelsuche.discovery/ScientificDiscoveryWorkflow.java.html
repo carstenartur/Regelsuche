@@ -188,7 +188,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
 <span class="fc" id="L188">            .orElse(null);</span>
 <span class="fc" id="L189">        SearchState factoredState = states.stream()</span>
 <span class="fc" id="L190">            .filter(state -&gt; state.appliedRuleIds().stream().anyMatch(this::isHiddenStructureHypothesisRule))</span>
-<span class="fc bfc" id="L191" title="All 2 branches covered.">            .filter(state -&gt; state.appliedRuleIds().contains(&quot;ast_square_difference_factor&quot;)</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            .filter(state -&gt; state.appliedRuleIds().contains(&quot;ast_square_difference_factor&quot;)</span>
 <span class="pc bpc" id="L192" title="1 of 2 branches missed.">                || FactoredProductAstPredicate.containsFactoredProduct(state.expression()))</span>
 <span class="fc" id="L193">            .findFirst()</span>
 <span class="fc" id="L194">            .orElse(null);</span>
@@ -210,7 +210,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         }
 <span class="fc" id="L211">        return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(</span>
 <span class="fc" id="L212">            isDiscovered(resultKind),</span>
-<span class="fc" id="L213">            hiddenStructureSummary(resultKind),</span>
+<span class="fc" id="L213">            hiddenStructureSummary(resultKind, reportedState),</span>
 <span class="fc" id="L214">            hypothesisCandidates.stream().map(Transformation::transformedExpression).toList(),</span>
 <span class="fc" id="L215">            List.of(),</span>
             CounterexampleSearchService.Status.INCONCLUSIVE,
@@ -242,7 +242,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
 <span class="fc" id="L242">           evidence.add(DiscoveryEvidenceKind.EQUIVALENCE_VALIDATED);</span>
         }
 <span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (reportedState.appliedRuleIds().contains(&quot;ast_square_difference_factor&quot;)</span>
-<span class="nc bnc" id="L245" title="All 2 branches missed.">           || FactoredProductAstPredicate.containsFactoredProduct(reportedState.expression())) {</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">           || FactoredProductAstPredicate.containsFactoredProduct(reportedState.expression())) {</span>
 <span class="fc" id="L246">           evidence.add(DiscoveryEvidenceKind.FACTORED);</span>
         }
 <span class="pc bpc" id="L248" title="1 of 2 branches missed.">        return evidence.isEmpty() ? Set.of() : Set.copyOf(evidence);</span>
@@ -425,7 +425,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
 
     private boolean isBridgeState(String expression) {
 <span class="pc bpc" id="L427" title="1 of 2 branches missed.">        return SquareDifferenceAstPredicate.containsSquareDifference(expression)</span>
-<span class="pc bnc" id="L428" title="All 2 branches missed.">            || de.regelsuche.transform.PerfectSquareAstPredicate.containsPerfectSquare(expression);</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">            || de.regelsuche.transform.PerfectSquareAstPredicate.containsPerfectSquare(expression);</span>
     }
 
     private boolean isHiddenStructureHypothesisRule(String ruleId) {
@@ -450,107 +450,114 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
 <span class="nc" id="L450">        return DiscoveryResultKind.NO_CANDIDATE;</span>
     }
 
-    private String hiddenStructureSummary(DiscoveryResultKind resultKind) {
-<span class="pc bpc" id="L454" title="3 of 4 branches missed.">        return switch (resultKind) {</span>
-            case TRANSFORMED -&gt;
-<span class="fc" id="L456">                &quot;hidden-structure reproduced: hypothesis path reached bridge state and factored via ast_square_difference_factor&quot;;</span>
-<span class="nc" id="L457">            case BRIDGE_FOUND -&gt; &quot;hidden-structure incomplete: reached bridge state but did not factor&quot;;</span>
+    private String hiddenStructureSummary(
+        DiscoveryResultKind resultKind,
+        SearchState reportedState
+    ) {
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">        boolean synthesizedFactorization = reportedState != null</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">            &amp;&amp; reportedState.appliedRuleIds().contains(</span>
+                de.regelsuche.transform.PolynomialDecompositionSynthesisOperator.RULE_ID);
+<span class="pc bpc" id="L460" title="3 of 4 branches missed.">        return switch (resultKind) {</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">            case TRANSFORMED -&gt; synthesizedFactorization</span>
+<span class="fc" id="L462">                ? &quot;hidden-structure reproduced: exact semantic polynomial coefficient synthesis produced an equivalent factored representation&quot;</span>
+<span class="nc" id="L463">                : &quot;hidden-structure reproduced: hypothesis path reached bridge state and factored via ast_square_difference_factor&quot;;</span>
+<span class="nc" id="L464">            case BRIDGE_FOUND -&gt; &quot;hidden-structure incomplete: reached bridge state but did not factor&quot;;</span>
             case HYPOTHESIS_ONLY -&gt;
-<span class="nc" id="L459">                &quot;hidden-structure incomplete: hypothesis candidate participated but did not reach a bridge state&quot;;</span>
-<span class="nc" id="L460">            default -&gt; &quot;hidden-structure failed: no hypothesis path found&quot;;</span>
+<span class="nc" id="L466">                &quot;hidden-structure incomplete: hypothesis candidate participated but did not reach a bridge state&quot;;</span>
+<span class="nc" id="L467">            default -&gt; &quot;hidden-structure failed: no hypothesis path found&quot;;</span>
         };
     }
 
     private boolean isDiscovered(DiscoveryResultKind resultKind) {
-<span class="pc bpc" id="L465" title="2 of 4 branches missed.">        return resultKind == DiscoveryResultKind.BRIDGE_FOUND || resultKind == DiscoveryResultKind.TRANSFORMED;</span>
+<span class="pc bpc" id="L472" title="2 of 4 branches missed.">        return resultKind == DiscoveryResultKind.BRIDGE_FOUND || resultKind == DiscoveryResultKind.TRANSFORMED;</span>
     }
 
     private DiscoveredTransformation toDiscovered(String pathId, String root, SearchState state, ExpressionScore before) {
-<span class="fc" id="L469">        List&lt;TransformationStep&gt; steps = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L470">        List&lt;String&gt; path = state.path();</span>
-<span class="fc" id="L471">        List&lt;String&gt; rules = state.appliedRuleIds();</span>
-<span class="fc" id="L472">        List&lt;RewriteKind&gt; kinds = state.appliedRuleKinds();</span>
-<span class="fc bfc" id="L473" title="All 2 branches covered.">        for (int i = 0; i &lt; Math.min(rules.size(), path.size() - 1); i++) {</span>
-<span class="fc" id="L474">            String from = path.get(i);</span>
-<span class="fc" id="L475">            String to = path.get(i + 1);</span>
-<span class="pc bpc" id="L476" title="1 of 2 branches missed.">            steps.add(new TransformationStep(i, from, to, rules.get(i), i &lt; kinds.size() ? kinds.get(i) : RewriteKind.NORMALIZE,</span>
-<span class="fc" id="L477">                scorer.score(from).weightedTotal(), scorer.score(to).weightedTotal(), true, rules.get(i), state.assumptions()));</span>
+<span class="fc" id="L476">        List&lt;TransformationStep&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L477">        List&lt;String&gt; path = state.path();</span>
+<span class="fc" id="L478">        List&lt;String&gt; rules = state.appliedRuleIds();</span>
+<span class="fc" id="L479">        List&lt;RewriteKind&gt; kinds = state.appliedRuleKinds();</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        for (int i = 0; i &lt; Math.min(rules.size(), path.size() - 1); i++) {</span>
+<span class="fc" id="L481">            String from = path.get(i);</span>
+<span class="fc" id="L482">            String to = path.get(i + 1);</span>
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">            steps.add(new TransformationStep(i, from, to, rules.get(i), i &lt; kinds.size() ? kinds.get(i) : RewriteKind.NORMALIZE,</span>
+<span class="fc" id="L484">                scorer.score(from).weightedTotal(), scorer.score(to).weightedTotal(), true, rules.get(i), state.assumptions()));</span>
         }
-<span class="fc" id="L479">        return new DiscoveredTransformation(pathId, root, state.expression(), steps, before, state.score(),</span>
-<span class="fc" id="L480">            before.improvementTo(state.score()), CandidateProofStatus.OBSERVED, FIXED_INSTANT, state.canonicalHash());</span>
+<span class="fc" id="L486">        return new DiscoveredTransformation(pathId, root, state.expression(), steps, before, state.score(),</span>
+<span class="fc" id="L487">            before.improvementTo(state.score()), CandidateProofStatus.OBSERVED, FIXED_INSTANT, state.canonicalHash());</span>
     }
 
     private String stablePathId(String root, SearchState state) {
-<span class="fc" id="L484">        StringBuilder builder = new StringBuilder(root).append('\u0001').append(state.canonicalHash()).append('\u0001');</span>
-<span class="fc" id="L485">        state.path().forEach(step -&gt; builder.append(step).append('\u0002'));</span>
-<span class="fc" id="L486">        state.appliedRuleIds().forEach(rule -&gt; builder.append(rule).append('\u0003'));</span>
-<span class="fc" id="L487">        return &quot;path-&quot; + Long.toHexString(Integer.toUnsignedLong(builder.toString().hashCode()));</span>
+<span class="fc" id="L491">        StringBuilder builder = new StringBuilder(root).append('\u0001').append(state.canonicalHash()).append('\u0001');</span>
+<span class="fc" id="L492">        state.path().forEach(step -&gt; builder.append(step).append('\u0002'));</span>
+<span class="fc" id="L493">        state.appliedRuleIds().forEach(rule -&gt; builder.append(rule).append('\u0003'));</span>
+<span class="fc" id="L494">        return &quot;path-&quot; + Long.toHexString(Integer.toUnsignedLong(builder.toString().hashCode()));</span>
     }
 
     private void persist(String experimentId, DeterministicDiscoveryExperimentRunner.DiscoveryReport report,
         DiscoveryReplayArtifactWriter.ArtifactBundle artifacts, RelationalPersistenceAdapters adapters) {
-<span class="nc bnc" id="L492" title="All 2 branches missed.">        for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {</span>
-<span class="nc" id="L493">            adapters.seeds().save(new SeedExpressionEntity(</span>
-<span class="nc" id="L494">                row.seed().id(), row.seed().expression(), row.seed().category(), row.seed().source(), row.seed().tags(), FIXED_INSTANT));</span>
-<span class="nc bnc" id="L495" title="All 2 branches missed.">            String hypothesisId = row.hypotheses().isEmpty() ? &quot;hyp-&quot; + row.seed().id() : row.hypotheses().getFirst();</span>
-<span class="nc bnc" id="L496" title="All 2 branches missed.">            String target = row.replayPath().isEmpty() ? &quot;&quot; : row.replayPath().getLast();</span>
-<span class="nc" id="L497">            adapters.hypotheses().orElseThrow().save(hypothesisId, new HypothesisCandidate(hypothesisId,</span>
-<span class="nc" id="L498">                row.seed().expression(), target, List.of(&quot;run-&quot; + row.seed().id()),</span>
-<span class="nc" id="L499">                List.of(new HypothesisCandidate.ExpressionPair(row.seed().expression(), target)), row.seed().assumptions(),</span>
-<span class="nc bnc" id="L500" title="All 2 branches missed.">                row.success() ? 1.0 : 0.0,</span>
-<span class="nc bnc" id="L501" title="All 3 branches missed.">                proofStatusFor(row), switch (row.counterexampleSearchStatus()) {</span>
-<span class="nc" id="L502">                    case COUNTEREXAMPLE_FOUND -&gt; Boolean.TRUE;</span>
-<span class="nc" id="L503">                    case NO_COUNTEREXAMPLE_FOUND -&gt; Boolean.FALSE;</span>
-<span class="nc" id="L504">                    case INCONCLUSIVE -&gt; null;</span>
-<span class="nc" id="L505">                }, row.counterexampleSearchStatus(),</span>
-<span class="nc" id="L506">                row.counterexampleAttemptedSources(), row.counterexampleExplanation(),</span>
-<span class="nc" id="L507">                List.of(&quot;scientific-reproduction&quot;), java.util.Map.of(), FIXED_INSTANT));</span>
-<span class="nc" id="L508">            adapters.searchRuns().save(new SearchRunEntity(&quot;run-&quot; + row.seed().id(), row.seed().expression(), target,</span>
-<span class="nc bnc" id="L509" title="All 2 branches missed.">                &quot;scientific-discovery-workflow&quot;, row.success() ? &quot;SUCCEEDED&quot; : &quot;FAILED&quot;, row.replayPath().size(), 0,</span>
-<span class="nc" id="L510">                row.hypotheses(), FIXED_INSTANT, FIXED_INSTANT));</span>
-<span class="nc bnc" id="L511" title="All 2 branches missed.">            for (int i = 0; i &lt; row.counterexamples().size(); i++) {</span>
-<span class="nc" id="L512">                adapters.counterexamples().save(new CounterexampleEntity(&quot;ce-&quot; + row.seed().id() + &quot;-&quot; + i,</span>
-<span class="nc" id="L513">                    hypothesisId, row.seed().expression(), target, row.counterexamples().get(i), row.seed().assumptions(), FIXED_INSTANT));</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">        for (DeterministicDiscoveryExperimentRunner.SeedRunReport row : report.rows()) {</span>
+<span class="nc" id="L500">            adapters.seeds().save(new SeedExpressionEntity(</span>
+<span class="nc" id="L501">                row.seed().id(), row.seed().expression(), row.seed().category(), row.seed().source(), row.seed().tags(), FIXED_INSTANT));</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">            String hypothesisId = row.hypotheses().isEmpty() ? &quot;hyp-&quot; + row.seed().id() : row.hypotheses().getFirst();</span>
+<span class="nc bnc" id="L503" title="All 2 branches missed.">            String target = row.replayPath().isEmpty() ? &quot;&quot; : row.replayPath().getLast();</span>
+<span class="nc" id="L504">            adapters.hypotheses().orElseThrow().save(hypothesisId, new HypothesisCandidate(hypothesisId,</span>
+<span class="nc" id="L505">                row.seed().expression(), target, List.of(&quot;run-&quot; + row.seed().id()),</span>
+<span class="nc" id="L506">                List.of(new HypothesisCandidate.ExpressionPair(row.seed().expression(), target)), row.seed().assumptions(),</span>
+<span class="nc bnc" id="L507" title="All 2 branches missed.">                row.success() ? 1.0 : 0.0,</span>
+<span class="nc bnc" id="L508" title="All 3 branches missed.">                proofStatusFor(row), switch (row.counterexampleSearchStatus()) {</span>
+<span class="nc" id="L509">                    case COUNTEREXAMPLE_FOUND -&gt; Boolean.TRUE;</span>
+<span class="nc" id="L510">                    case NO_COUNTEREXAMPLE_FOUND -&gt; Boolean.FALSE;</span>
+<span class="nc" id="L511">                    case INCONCLUSIVE -&gt; null;</span>
+<span class="nc" id="L512">                }, row.counterexampleSearchStatus(),</span>
+<span class="nc" id="L513">                row.counterexampleAttemptedSources(), row.counterexampleExplanation(),</span>
+<span class="nc" id="L514">                List.of(&quot;scientific-reproduction&quot;), java.util.Map.of(), FIXED_INSTANT));</span>
+<span class="nc" id="L515">            adapters.searchRuns().save(new SearchRunEntity(&quot;run-&quot; + row.seed().id(), row.seed().expression(), target,</span>
+<span class="nc bnc" id="L516" title="All 2 branches missed.">                &quot;scientific-discovery-workflow&quot;, row.success() ? &quot;SUCCEEDED&quot; : &quot;FAILED&quot;, row.replayPath().size(), 0,</span>
+<span class="nc" id="L517">                row.hypotheses(), FIXED_INSTANT, FIXED_INSTANT));</span>
+<span class="nc bnc" id="L518" title="All 2 branches missed.">            for (int i = 0; i &lt; row.counterexamples().size(); i++) {</span>
+<span class="nc" id="L519">                adapters.counterexamples().save(new CounterexampleEntity(&quot;ce-&quot; + row.seed().id() + &quot;-&quot; + i,</span>
+<span class="nc" id="L520">                    hypothesisId, row.seed().expression(), target, row.counterexamples().get(i), row.seed().assumptions(), FIXED_INSTANT));</span>
             }
-<span class="nc" id="L515">            adapters.proofJobs().save(new ProofJobMetadataEntity(&quot;proof-&quot; + row.seed().id(), hypothesisId,</span>
-<span class="nc bnc" id="L516" title="All 2 branches missed.">                &quot;optional-stub-proof-worker&quot;, row.success() ? &quot;COMPLETED&quot; : &quot;SKIPPED&quot;,</span>
-<span class="nc" id="L517">                artifacts.jsonReport().toUri().toString(), FIXED_INSTANT, FIXED_INSTANT));</span>
-<span class="nc" id="L518">        }</span>
-<span class="nc" id="L519">        List&lt;String&gt; runIds = report.rows().stream().map(row -&gt; &quot;run-&quot; + row.seed().id()).toList();</span>
-<span class="nc" id="L520">        adapters.experiments().save(new DiscoveryExperimentEntity(experimentId, &quot;Scientific reproduction run&quot;,</span>
+<span class="nc" id="L522">            adapters.proofJobs().save(new ProofJobMetadataEntity(&quot;proof-&quot; + row.seed().id(), hypothesisId,</span>
+<span class="nc bnc" id="L523" title="All 2 branches missed.">                &quot;optional-stub-proof-worker&quot;, row.success() ? &quot;COMPLETED&quot; : &quot;SKIPPED&quot;,</span>
+<span class="nc" id="L524">                artifacts.jsonReport().toUri().toString(), FIXED_INSTANT, FIXED_INSTANT));</span>
+<span class="nc" id="L525">        }</span>
+<span class="nc" id="L526">        List&lt;String&gt; runIds = report.rows().stream().map(row -&gt; &quot;run-&quot; + row.seed().id()).toList();</span>
+<span class="nc" id="L527">        adapters.experiments().save(new DiscoveryExperimentEntity(experimentId, &quot;Scientific reproduction run&quot;,</span>
             &quot;Seed → Discovery → Replay → Persistence → Report&quot;, &quot;SUCCEEDED&quot;, runIds, FIXED_INSTANT, FIXED_INSTANT));
-<span class="nc" id="L522">        saveArtifact(adapters, experimentId, &quot;json&quot;, artifacts.jsonReport(), report, runIds);</span>
-<span class="nc" id="L523">        saveArtifact(adapters, experimentId, &quot;html&quot;, artifacts.htmlReport(), report, runIds);</span>
-<span class="nc" id="L524">        saveArtifact(adapters, experimentId, &quot;md&quot;, artifacts.markdownReport(), report, runIds);</span>
-<span class="nc" id="L525">        saveArtifact(adapters, experimentId, &quot;replay-json&quot;, artifacts.replayJson(), report, runIds);</span>
-<span class="nc" id="L526">        saveArtifact(adapters, experimentId, &quot;png&quot;, artifacts.screenshotPng(), report, runIds);</span>
-<span class="nc" id="L527">        saveArtifact(adapters, experimentId, &quot;gif&quot;, artifacts.replayGif(), report, runIds);</span>
-<span class="nc" id="L528">    }</span>
+<span class="nc" id="L529">        saveArtifact(adapters, experimentId, &quot;json&quot;, artifacts.jsonReport(), report, runIds);</span>
+<span class="nc" id="L530">        saveArtifact(adapters, experimentId, &quot;html&quot;, artifacts.htmlReport(), report, runIds);</span>
+<span class="nc" id="L531">        saveArtifact(adapters, experimentId, &quot;md&quot;, artifacts.markdownReport(), report, runIds);</span>
+<span class="nc" id="L532">        saveArtifact(adapters, experimentId, &quot;replay-json&quot;, artifacts.replayJson(), report, runIds);</span>
+<span class="nc" id="L533">        saveArtifact(adapters, experimentId, &quot;png&quot;, artifacts.screenshotPng(), report, runIds);</span>
+<span class="nc" id="L534">        saveArtifact(adapters, experimentId, &quot;gif&quot;, artifacts.replayGif(), report, runIds);</span>
+<span class="nc" id="L535">    }</span>
 
     private void saveArtifact(RelationalPersistenceAdapters adapters, String experimentId, String format, Path path,
         DeterministicDiscoveryExperimentRunner.DiscoveryReport report, List&lt;String&gt; runIds) {
-<span class="nc" id="L532">        adapters.reports().save(new ExportReportEntity(&quot;artifact-&quot; + experimentId + &quot;-&quot; + format, experimentId,</span>
-<span class="nc" id="L533">            &quot;Scientific Discovery &quot; + format.toUpperCase(Locale.ROOT) + &quot; artifact&quot;,</span>
-<span class="nc" id="L534">            &quot;artifact=&quot; + path.getFileName() + &quot;; seeds=&quot; + report.metrics().processedSeeds(),</span>
-<span class="nc" id="L535">            &quot;scientific-discovery&quot;, List.of(), format, path.toUri().toString(), runIds, FIXED_INSTANT));</span>
-<span class="nc" id="L536">    }</span>
+<span class="nc" id="L539">        adapters.reports().save(new ExportReportEntity(&quot;artifact-&quot; + experimentId + &quot;-&quot; + format, experimentId,</span>
+<span class="nc" id="L540">            &quot;Scientific Discovery &quot; + format.toUpperCase(Locale.ROOT) + &quot; artifact&quot;,</span>
+<span class="nc" id="L541">            &quot;artifact=&quot; + path.getFileName() + &quot;; seeds=&quot; + report.metrics().processedSeeds(),</span>
+<span class="nc" id="L542">            &quot;scientific-discovery&quot;, List.of(), format, path.toUri().toString(), runIds, FIXED_INSTANT));</span>
+<span class="nc" id="L543">    }</span>
 
     private CandidateProofStatus proofStatusFor(DeterministicDiscoveryExperimentRunner.SeedRunReport row) {
-<span class="nc bnc" id="L539" title="All 3 branches missed.">        return switch (row.counterexampleSearchStatus()) {</span>
-<span class="nc" id="L540">            case COUNTEREXAMPLE_FOUND -&gt; CandidateProofStatus.REJECTED;</span>
-<span class="nc" id="L541">            case INCONCLUSIVE -&gt; CandidateProofStatus.OBSERVED;</span>
-<span class="nc bnc" id="L542" title="All 2 branches missed.">            case NO_COUNTEREXAMPLE_FOUND -&gt; row.success()</span>
-<span class="nc" id="L543">                ? CandidateProofStatus.VALIDATED_BY_EXAMPLES</span>
-<span class="nc" id="L544">                : CandidateProofStatus.OBSERVED;</span>
+<span class="nc bnc" id="L546" title="All 3 branches missed.">        return switch (row.counterexampleSearchStatus()) {</span>
+<span class="nc" id="L547">            case COUNTEREXAMPLE_FOUND -&gt; CandidateProofStatus.REJECTED;</span>
+<span class="nc" id="L548">            case INCONCLUSIVE -&gt; CandidateProofStatus.OBSERVED;</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">            case NO_COUNTEREXAMPLE_FOUND -&gt; row.success()</span>
+<span class="nc" id="L550">                ? CandidateProofStatus.VALIDATED_BY_EXAMPLES</span>
+<span class="nc" id="L551">                : CandidateProofStatus.OBSERVED;</span>
         };
     }
 
     @Override
     public void close() {
-<span class="fc" id="L550">        context.close();</span>
-<span class="fc" id="L551">    }</span>
+<span class="fc" id="L557">        context.close();</span>
+<span class="fc" id="L558">    }</span>
 
-<span class="fc" id="L553">    public record RunResult(DeterministicDiscoveryExperimentRunner.DiscoveryReport report,</span>
+<span class="fc" id="L560">    public record RunResult(DeterministicDiscoveryExperimentRunner.DiscoveryReport report,</span>
         DiscoveryReplayArtifactWriter.ArtifactBundle artifacts, PersistenceContext context) {
     }
 }

@@ -372,7 +372,7 @@ public final class DiscoveryBenchmarkExecutor {
 <span class="fc" id="L372">            ScenarioRule rule = rulesById.get(ruleId);</span>
 <span class="fc bfc" id="L373" title="All 2 branches covered.">            if (scenario.requiredBridgeRules().contains(ruleId)</span>
 <span class="pc bpc" id="L374" title="1 of 2 branches missed.">                    || ruleId.toLowerCase(Locale.ROOT).contains(&quot;bridge&quot;)</span>
-<span class="pc bpc" id="L375" title="2 of 4 branches missed.">                    || operatorRuleIds.contains(ruleId)</span>
+<span class="pc bpc" id="L375" title="1 of 4 branches missed.">                    || operatorRuleIds.contains(ruleId)</span>
 <span class="nc bnc" id="L376" title="All 2 branches missed.">                    || (rule != null &amp;&amp; rule.effects().contains(SearchEffect.BRIDGING))) {</span>
 <span class="fc" id="L377">                bridgeRules.add(ruleId);</span>
             }
