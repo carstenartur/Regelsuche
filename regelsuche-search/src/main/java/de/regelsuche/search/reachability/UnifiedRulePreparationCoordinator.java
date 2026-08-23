@@ -7,6 +7,7 @@ import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.EquivalentExpressionProvider;
 import de.regelsuche.transform.ExprMatcher;
+import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternMatchAnalyzer;
 import de.regelsuche.transform.RequiredAssumptionTemplate;
 import de.regelsuche.transform.RewriteApplicabilitySchema;
@@ -31,12 +32,12 @@ import java.util.Set;
  * Product-facing coordinator for direct replay, exact specialized preparation
  * and the bounded pattern-targeted local bridge fallback.
  *
- * <p>The exact registry is attempted only after concrete direct replay and
- * before the generic local search. An exact stage is eligible only for its
- * explicitly registered native principal. Guarded schemas remain on the local
- * bridge path until an exact specialist exposes terminal matcher bindings.
- * Every technical exception becomes a retained fail-closed outcome rather than
- * being reinterpreted as ordinary non-applicability.</p>
+ * <p>Concrete executor replay is always attempted before applicability-schema
+ * analysis. The exact registry follows only when a registered specialist owns
+ * the principal; the generic local bridge remains the final fallback. Guarded
+ * schemas stay on the local path until an exact specialist exposes terminal
+ * matcher bindings. Technical exceptions become retained fail-closed outcomes
+ * rather than ordinary non-applicability.</p>
  */
 public final class UnifiedRulePreparationCoordinator {
     public static final String COORDINATOR_ID =
@@ -131,17 +132,6 @@ public final class UnifiedRulePreparationCoordinator {
         List<RulePreparationCoordinator.Outcome> outcomes = new ArrayList<>();
         for (RewriteApplicabilitySchema schema : principalSchemas) {
             PrincipalRuntime runtime = runtimes.get(schema.ruleId());
-            PatternMatchAnalyzer.Analysis initial;
-            try {
-                initial = analyzePattern(schema, source);
-            } catch (RuntimeException exception) {
-                outcomes.add(technicalOutcome(
-                    runtime,
-                    fallbackAnalysis(schema, source),
-                    PatternTargetedLocalBridgeSearch.Work.empty(),
-                    "UNIFIED_MATCH_ANALYSIS_TECHNICAL_FAILURE"));
-                continue;
-            }
 
             Optional<Transformation> direct;
             try {
@@ -150,11 +140,14 @@ public final class UnifiedRulePreparationCoordinator {
             } catch (RuntimeException exception) {
                 outcomes.add(technicalOutcome(
                     runtime,
-                    initial,
+                    analysisForEvidence(schema, source),
                     PatternTargetedLocalBridgeSearch.Work.empty(),
                     "UNIFIED_DIRECT_REPLAY_TECHNICAL_FAILURE"));
                 continue;
             }
+
+            PatternMatchAnalyzer.Analysis initial =
+                analysisForEvidence(schema, source);
             if (direct.isPresent()) {
                 GuardCheck guards = checkRequiredAssumptions(
                     schema, initial, assumptions);
@@ -364,35 +357,56 @@ public final class UnifiedRulePreparationCoordinator {
                 value, assumptions));
     }
 
-    private PatternMatchAnalyzer.Analysis analyzePattern(
+    private PatternMatchAnalyzer.Analysis analysisForEvidence(
         RewriteApplicabilitySchema schema,
         String expression
     ) {
-        return analyzer.analyze(
-            schema.pattern(),
-            parser.parseTerm(expression),
-            schema.recognitionProfile(),
-            new ExprMatcher.MatchOptions(
-                EquivalentExpressionProvider.identity(),
-                bridgeBudget.maxMatchResults(),
-                bridgeBudget.maxMatchSteps(),
-                bridgeBudget.maxPatternBranches()));
+        try {
+            return analyzer.analyze(
+                schema.pattern(),
+                parser.parseTerm(expression),
+                schema.recognitionProfile(),
+                new ExprMatcher.MatchOptions(
+                    EquivalentExpressionProvider.identity(),
+                    bridgeBudget.maxMatchResults(),
+                    bridgeBudget.maxMatchSteps(),
+                    bridgeBudget.maxPatternBranches()));
+        } catch (RuntimeException exception) {
+            return technicalAnalysis(schema.pattern());
+        }
     }
 
-    private PatternMatchAnalyzer.Analysis fallbackAnalysis(
-        RewriteApplicabilitySchema schema,
-        String source
+    private static PatternMatchAnalyzer.Analysis technicalAnalysis(
+        PatternExpr pattern
     ) {
-        try {
-            return new PatternMatchAnalyzer().analyze(
-                schema.pattern(),
-                parser.parseTerm(source),
-                de.regelsuche.transform.RecognitionProfile.exact());
-        } catch (RuntimeException exception) {
-            throw new IllegalStateException(
-                "source normalization succeeded but fallback analysis failed",
-                exception);
+        return new PatternMatchAnalyzer.Analysis(
+            PatternMatchAnalyzer.Status.INCONCLUSIVE,
+            List.of(),
+            Map.of(),
+            List.of(),
+            List.of(new ExprMatcher.MatchDiagnostic(
+                "MATCH_ANALYSIS_TECHNICAL_FAILURE",
+                COORDINATOR_ID)),
+            0,
+            0,
+            0,
+            0,
+            patternNodeCount(pattern),
+            "MATCH_ANALYSIS_TECHNICAL_FAILURE");
+    }
+
+    private static int patternNodeCount(PatternExpr pattern) {
+        if (pattern instanceof PatternExpr.Operation operation) {
+            return 1
+                + patternNodeCount(operation.left())
+                + patternNodeCount(operation.right());
         }
+        if (pattern instanceof PatternExpr.Function function) {
+            return 1 + function.arguments().stream()
+                .mapToInt(UnifiedRulePreparationCoordinator::patternNodeCount)
+                .sum();
+        }
+        return 1;
     }
 
     private GuardCheck checkRequiredAssumptions(
