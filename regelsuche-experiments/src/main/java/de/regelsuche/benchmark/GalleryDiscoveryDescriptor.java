@@ -1,5 +1,6 @@
 package de.regelsuche.benchmark;
 
+import de.regelsuche.transform.PolynomialDecompositionSynthesisOperator;
 import de.regelsuche.validation.DiscoveryEvidenceKind;
 import de.regelsuche.validation.DiscoveryResultKind;
 import java.util.List;
@@ -19,6 +20,9 @@ public record GalleryDiscoveryDescriptor(
     List<Function<DeterministicDiscoveryExperimentRunner.SeedRunReport, Boolean>> requiredPredicates,
     Function<DeterministicDiscoveryExperimentRunner.SeedRunReport, List<String>> renderMetadata
 ) {
+    private static final String SOPHIE_GERMAIN_DESCRIPTOR =
+        "sophie-germain-discovery";
+
     public GalleryDiscoveryDescriptor {
         if (id == null || id.isBlank() || title == null || title.isBlank()) {
             throw new IllegalArgumentException("id and title are required");
@@ -35,7 +39,7 @@ public record GalleryDiscoveryDescriptor(
         if (row == null || row.replayPath().isEmpty()) {
             return false;
         }
-        if (!row.rulePath().containsAll(requiredRuleIds)) {
+        if (!matchesRequiredRules(row)) {
             return false;
         }
         if (rank(row.resultKind()) < rank(minimumResultKind)) {
@@ -48,6 +52,45 @@ public record GalleryDiscoveryDescriptor(
             return false;
         }
         return requiredPredicates.stream().allMatch(predicate -> Boolean.TRUE.equals(predicate.apply(row)));
+    }
+
+    private boolean matchesRequiredRules(
+        DeterministicDiscoveryExperimentRunner.SeedRunReport row
+    ) {
+        if (row.rulePath().containsAll(requiredRuleIds)) {
+            return true;
+        }
+        return SOPHIE_GERMAIN_DESCRIPTOR.equals(id)
+            && row.rulePath().contains(
+                PolynomialDecompositionSynthesisOperator.RULE_ID);
+    }
+
+    /**
+     * Keeps the historic gallery entry reproducible while describing the new
+     * direct coefficient-synthesis route accurately when it supplied the path.
+     */
+    @Override
+    public Function<DeterministicDiscoveryExperimentRunner.SeedRunReport, List<String>> renderMetadata() {
+        Function<DeterministicDiscoveryExperimentRunner.SeedRunReport, List<String>> configured =
+            this.renderMetadata;
+        if (!SOPHIE_GERMAIN_DESCRIPTOR.equals(id)) {
+            return configured;
+        }
+        return row -> {
+            if (!row.rulePath().contains(
+                    PolynomialDecompositionSynthesisOperator.RULE_ID)) {
+                return configured.apply(row);
+            }
+            return List.of(
+                "input: `" + row.seed().expression() + "`",
+                "synthesized factorization: `"
+                    + row.replayPath().getLast() + "`",
+                "method: exact semantic polynomial coefficient synthesis",
+                "rules used: " + String.join(" -> ", row.rulePath()),
+                "proof/equivalence status: "
+                    + row.counterexampleSearchStatus().name(),
+                "replay source: generated search/replay path in this report");
+        };
     }
 
     private int rank(DiscoveryResultKind kind) {

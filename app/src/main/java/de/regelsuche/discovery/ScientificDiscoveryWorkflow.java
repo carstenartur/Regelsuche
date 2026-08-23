@@ -210,7 +210,7 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         }
         return new DeterministicDiscoveryExperimentRunner.SeedRunOutcome(
             isDiscovered(resultKind),
-            hiddenStructureSummary(resultKind),
+            hiddenStructureSummary(resultKind, reportedState),
             hypothesisCandidates.stream().map(Transformation::transformedExpression).toList(),
             List.of(),
             CounterexampleSearchService.Status.INCONCLUSIVE,
@@ -450,10 +450,17 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
         return DiscoveryResultKind.NO_CANDIDATE;
     }
 
-    private String hiddenStructureSummary(DiscoveryResultKind resultKind) {
+    private String hiddenStructureSummary(
+        DiscoveryResultKind resultKind,
+        SearchState reportedState
+    ) {
+        boolean synthesizedFactorization = reportedState != null
+            && reportedState.appliedRuleIds().contains(
+                de.regelsuche.transform.PolynomialDecompositionSynthesisOperator.RULE_ID);
         return switch (resultKind) {
-            case TRANSFORMED ->
-                "hidden-structure reproduced: hypothesis path reached bridge state and factored via ast_square_difference_factor";
+            case TRANSFORMED -> synthesizedFactorization
+                ? "hidden-structure reproduced: exact semantic polynomial coefficient synthesis produced an equivalent factored representation"
+                : "hidden-structure reproduced: hypothesis path reached bridge state and factored via ast_square_difference_factor";
             case BRIDGE_FOUND -> "hidden-structure incomplete: reached bridge state but did not factor";
             case HYPOTHESIS_ONLY ->
                 "hidden-structure incomplete: hypothesis candidate participated but did not reach a bridge state";
