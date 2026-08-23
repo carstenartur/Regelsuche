@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleInventoryFingerprint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.knowledge</a> &gt; <span class="el_source">RuleInventoryFingerprint.java</span></div><h1>RuleInventoryFingerprint.java</h1><pre class="source lang-java linenums">package de.regelsuche.knowledge;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
 import de.regelsuche.transform.RewriteRule;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -24,170 +26,246 @@ import java.util.Objects;
 public final class RuleInventoryFingerprint {
     private static final String REVISION =
         &quot;regelsuche.rule-inventory-fingerprint/v2&quot;;
+    private static final String APPLICABILITY_SCHEMA_REVISION =
+        &quot;regelsuche.rewrite-applicability-schema-fingerprint/v2&quot;;
+    private static final String ASSUMPTION_TEMPLATE_REVISION =
+        &quot;regelsuche.required-assumption-template/v1&quot;;
 
     private RuleInventoryFingerprint() {
     }
 
     public static String ruleContentHash(RewriteRule rule) {
-<span class="nc" id="L32">        return sha256(canonicalRule(</span>
-<span class="nc" id="L33">            Objects.requireNonNull(rule, &quot;rule&quot;)));</span>
+<span class="fc" id="L38">        return sha256(canonicalRule(</span>
+<span class="fc" id="L39">            Objects.requireNonNull(rule, &quot;rule&quot;)));</span>
+    }
+
+    /**
+     * Binds one typed assumption template independently of its later concrete
+     * match bindings.
+     */
+    public static String assumptionTemplateContentHash(
+        Assumption.Kind kind,
+        PatternExpr expressionPattern
+    ) {
+<span class="fc" id="L50">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L51">        append(descriptor, ASSUMPTION_TEMPLATE_REVISION);</span>
+<span class="fc" id="L52">        append(descriptor, Objects.requireNonNull(kind, &quot;kind&quot;).name());</span>
+<span class="fc" id="L53">        append(descriptor, canonicalPattern(Objects.requireNonNull(</span>
+            expressionPattern, &quot;expressionPattern&quot;)));
+<span class="fc" id="L55">        return sha256(descriptor.toString());</span>
+    }
+
+    /**
+     * Binds one explicit applicability schema to its concrete executor without
+     * pretending that an algorithmic rule has a declarative target pattern.
+     */
+    public static String applicabilitySchemaContentHash(
+        String schemaId,
+        RewriteRule executor,
+        PatternExpr applicabilityPattern,
+        RecognitionProfile recognitionProfile
+    ) {
+<span class="nc" id="L68">        return applicabilitySchemaContentHash(</span>
+            schemaId,
+            executor,
+            applicabilityPattern,
+            recognitionProfile,
+<span class="nc" id="L73">            List.of());</span>
+    }
+
+    /**
+     * Binds one explicit applicability schema, including every typed
+     * precondition that must already be available before concrete replay.
+     */
+    public static String applicabilitySchemaContentHash(
+        String schemaId,
+        RewriteRule executor,
+        PatternExpr applicabilityPattern,
+        RecognitionProfile recognitionProfile,
+        List&lt;RequiredAssumptionTemplate&gt; requiredAssumptions
+    ) {
+<span class="pc bpc" id="L87" title="2 of 4 branches missed.">        if (schemaId == null || schemaId.isBlank()) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(</span>
+                &quot;schemaId must not be blank&quot;);
+        }
+<span class="fc" id="L91">        RewriteRule checkedExecutor = Objects.requireNonNull(</span>
+            executor, &quot;executor&quot;);
+<span class="fc" id="L93">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L94">        append(descriptor, APPLICABILITY_SCHEMA_REVISION);</span>
+<span class="fc" id="L95">        append(descriptor, schemaId.trim());</span>
+<span class="fc" id="L96">        append(descriptor, ruleContentHash(checkedExecutor));</span>
+<span class="fc" id="L97">        append(descriptor, checkedExecutor.getClass().getName());</span>
+<span class="fc" id="L98">        append(descriptor, canonicalPattern(Objects.requireNonNull(</span>
+            applicabilityPattern, &quot;applicabilityPattern&quot;)));
+<span class="fc" id="L100">        append(descriptor, canonicalRecognition(</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            recognitionProfile == null</span>
+<span class="nc" id="L102">                ? RecognitionProfile.exact()</span>
+<span class="fc" id="L103">                : recognitionProfile));</span>
+<span class="fc" id="L104">        List&lt;String&gt; assumptions = List.copyOf(Objects.requireNonNull(</span>
+<span class="fc" id="L105">            requiredAssumptions, &quot;requiredAssumptions&quot;)).stream()</span>
+<span class="fc" id="L106">            .map(template -&gt; Objects.requireNonNull(</span>
+<span class="fc" id="L107">                template, &quot;required assumption template&quot;).contentHash())</span>
+<span class="fc" id="L108">            .sorted()</span>
+<span class="fc" id="L109">            .toList();</span>
+<span class="fc" id="L110">        appendStrings(descriptor, assumptions);</span>
+<span class="fc" id="L111">        return sha256(descriptor.toString());</span>
     }
 
     public static String contentHash(
         Collection&lt;? extends RewriteRule&gt; rules
     ) {
-<span class="fc" id="L39">        Objects.requireNonNull(rules, &quot;rules&quot;);</span>
-<span class="fc" id="L40">        List&lt;String&gt; descriptors = rules.stream()</span>
-<span class="fc" id="L41">            .map(rule -&gt; canonicalRule(</span>
-<span class="fc" id="L42">                Objects.requireNonNull(rule, &quot;rule&quot;)))</span>
-<span class="fc" id="L43">            .sorted()</span>
-<span class="fc" id="L44">            .toList();</span>
-<span class="fc" id="L45">        StringBuilder inventory = new StringBuilder();</span>
-<span class="fc" id="L46">        append(inventory, REVISION);</span>
-<span class="fc" id="L47">        append(inventory, Integer.toString(descriptors.size()));</span>
-<span class="fc" id="L48">        descriptors.forEach(descriptor -&gt; append(inventory, descriptor));</span>
-<span class="fc" id="L49">        return sha256(inventory.toString());</span>
+<span class="fc" id="L117">        Objects.requireNonNull(rules, &quot;rules&quot;);</span>
+<span class="fc" id="L118">        List&lt;String&gt; descriptors = rules.stream()</span>
+<span class="fc" id="L119">            .map(rule -&gt; canonicalRule(</span>
+<span class="fc" id="L120">                Objects.requireNonNull(rule, &quot;rule&quot;)))</span>
+<span class="fc" id="L121">            .sorted()</span>
+<span class="fc" id="L122">            .toList();</span>
+<span class="fc" id="L123">        StringBuilder inventory = new StringBuilder();</span>
+<span class="fc" id="L124">        append(inventory, REVISION);</span>
+<span class="fc" id="L125">        append(inventory, Integer.toString(descriptors.size()));</span>
+<span class="fc" id="L126">        descriptors.forEach(descriptor -&gt; append(inventory, descriptor));</span>
+<span class="fc" id="L127">        return sha256(inventory.toString());</span>
     }
 
     private static String canonicalRule(RewriteRule rule) {
-<span class="fc" id="L53">        StringBuilder descriptor = new StringBuilder();</span>
-<span class="fc" id="L54">        append(descriptor, rule.id());</span>
-<span class="fc" id="L55">        append(descriptor, rule.getClass().getName());</span>
-<span class="fc" id="L56">        String corePackId = CoreRuleCatalog.packIdForRule(rule.id());</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">        append(descriptor, corePackId == null ? &quot;&quot; : corePackId);</span>
-<span class="fc" id="L58">        append(descriptor, rule.kind().name());</span>
-<span class="fc" id="L59">        append(descriptor, Boolean.toString(rule.mayIncreaseComplexity()));</span>
-<span class="fc" id="L60">        append(descriptor, Integer.toString(rule.estimatedCostDelta()));</span>
-<span class="fc" id="L61">        append(descriptor, Boolean.toString(</span>
-<span class="fc" id="L62">            rule.isEquivalencePreservingByConstruction()));</span>
-<span class="fc" id="L63">        append(descriptor, Boolean.toString(rule.mayEmitAssumptions()));</span>
-<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (rule instanceof PatternRewriteRule patternRule) {</span>
-<span class="fc" id="L65">            append(descriptor, &quot;pattern&quot;);</span>
-<span class="fc" id="L66">            append(descriptor, canonicalPattern(patternRule.source()));</span>
-<span class="fc" id="L67">            append(descriptor, canonicalPattern(patternRule.target()));</span>
-<span class="fc" id="L68">            append(descriptor,</span>
-<span class="fc" id="L69">                canonicalRecognition(patternRule.recognitionProfile()));</span>
+<span class="fc" id="L131">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L132">        append(descriptor, rule.id());</span>
+<span class="fc" id="L133">        append(descriptor, rule.getClass().getName());</span>
+<span class="fc" id="L134">        String corePackId = CoreRuleCatalog.packIdForRule(rule.id());</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        append(descriptor, corePackId == null ? &quot;&quot; : corePackId);</span>
+<span class="fc" id="L136">        append(descriptor, rule.kind().name());</span>
+<span class="fc" id="L137">        append(descriptor, Boolean.toString(rule.mayIncreaseComplexity()));</span>
+<span class="fc" id="L138">        append(descriptor, Integer.toString(rule.estimatedCostDelta()));</span>
+<span class="fc" id="L139">        append(descriptor, Boolean.toString(</span>
+<span class="fc" id="L140">            rule.isEquivalencePreservingByConstruction()));</span>
+<span class="fc" id="L141">        append(descriptor, Boolean.toString(rule.mayEmitAssumptions()));</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (rule instanceof PatternRewriteRule patternRule) {</span>
+<span class="fc" id="L143">            append(descriptor, &quot;pattern&quot;);</span>
+<span class="fc" id="L144">            append(descriptor, canonicalPattern(patternRule.source()));</span>
+<span class="fc" id="L145">            append(descriptor, canonicalPattern(patternRule.target()));</span>
+<span class="fc" id="L146">            append(descriptor,</span>
+<span class="fc" id="L147">                canonicalRecognition(patternRule.recognitionProfile()));</span>
         } else {
-<span class="fc" id="L71">            append(descriptor, &quot;implementation-defined&quot;);</span>
+<span class="fc" id="L149">            append(descriptor, &quot;implementation-defined&quot;);</span>
         }
-<span class="fc" id="L73">        append(descriptor, canonicalDescriptor(rule.descriptor()));</span>
-<span class="fc" id="L74">        return descriptor.toString();</span>
+<span class="fc" id="L151">        append(descriptor, canonicalDescriptor(rule.descriptor()));</span>
+<span class="fc" id="L152">        return descriptor.toString();</span>
     }
 
     private static String canonicalPattern(PatternExpr pattern) {
-<span class="fc" id="L78">        Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
-<span class="fc" id="L79">        StringBuilder descriptor = new StringBuilder();</span>
-<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder placeholder) {</span>
-<span class="fc" id="L81">            append(descriptor, &quot;placeholder&quot;);</span>
-<span class="fc" id="L82">            append(descriptor, placeholder.name());</span>
-<span class="fc bfc" id="L83" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.LiteralNumber number) {</span>
-<span class="fc" id="L84">            append(descriptor, &quot;number&quot;);</span>
-<span class="fc" id="L85">            append(descriptor, Long.toHexString(</span>
-<span class="fc" id="L86">                Double.doubleToLongBits(number.value())));</span>
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        } else if (pattern instanceof PatternExpr.LiteralVariable variable) {</span>
-<span class="nc" id="L88">            append(descriptor, &quot;variable&quot;);</span>
-<span class="nc" id="L89">            append(descriptor, variable.name());</span>
-<span class="fc bfc" id="L90" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.Operation operation) {</span>
-<span class="fc" id="L91">            append(descriptor, &quot;operation&quot;);</span>
-<span class="fc" id="L92">            append(descriptor, operation.operator().name());</span>
-<span class="fc" id="L93">            append(descriptor, canonicalPattern(operation.left()));</span>
-<span class="fc" id="L94">            append(descriptor, canonicalPattern(operation.right()));</span>
-<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        } else if (pattern instanceof PatternExpr.Function function) {</span>
-<span class="fc" id="L96">            append(descriptor, &quot;function&quot;);</span>
-<span class="fc" id="L97">            append(descriptor, function.name());</span>
-<span class="fc" id="L98">            append(descriptor, Integer.toString(function.arguments().size()));</span>
-<span class="fc" id="L99">            function.arguments().forEach(argument -&gt;</span>
-<span class="fc" id="L100">                append(descriptor, canonicalPattern(argument)));</span>
+<span class="fc" id="L156">        Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
+<span class="fc" id="L157">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L159">            append(descriptor, &quot;placeholder&quot;);</span>
+<span class="fc" id="L160">            append(descriptor, placeholder.name());</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.LiteralNumber number) {</span>
+<span class="fc" id="L162">            append(descriptor, &quot;number&quot;);</span>
+<span class="fc" id="L163">            append(descriptor, Long.toHexString(</span>
+<span class="fc" id="L164">                Double.doubleToLongBits(number.value())));</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.LiteralVariable variable) {</span>
+<span class="fc" id="L166">            append(descriptor, &quot;variable&quot;);</span>
+<span class="fc" id="L167">            append(descriptor, variable.name());</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L169">            append(descriptor, &quot;operation&quot;);</span>
+<span class="fc" id="L170">            append(descriptor, operation.operator().name());</span>
+<span class="fc" id="L171">            append(descriptor, canonicalPattern(operation.left()));</span>
+<span class="fc" id="L172">            append(descriptor, canonicalPattern(operation.right()));</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        } else if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L174">            append(descriptor, &quot;function&quot;);</span>
+<span class="fc" id="L175">            append(descriptor, function.name());</span>
+<span class="fc" id="L176">            append(descriptor, Integer.toString(function.arguments().size()));</span>
+<span class="fc" id="L177">            function.arguments().forEach(argument -&gt;</span>
+<span class="fc" id="L178">                append(descriptor, canonicalPattern(argument)));</span>
         } else {
-<span class="nc" id="L102">            throw new IllegalArgumentException(</span>
-<span class="nc" id="L103">                &quot;Unsupported pattern type: &quot; + pattern.getClass().getName());</span>
+<span class="nc" id="L180">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L181">                &quot;Unsupported pattern type: &quot; + pattern.getClass().getName());</span>
         }
-<span class="fc" id="L105">        return descriptor.toString();</span>
+<span class="fc" id="L183">        return descriptor.toString();</span>
     }
 
     private static String canonicalRecognition(
         RecognitionProfile profile
     ) {
-<span class="fc" id="L111">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
-<span class="fc" id="L112">        StringBuilder descriptor = new StringBuilder();</span>
-<span class="fc" id="L113">        appendStrings(descriptor, profile.associativeOperators().stream()</span>
-<span class="fc" id="L114">            .map(Enum::name)</span>
-<span class="fc" id="L115">            .sorted()</span>
-<span class="fc" id="L116">            .toList());</span>
-<span class="fc" id="L117">        appendStrings(descriptor, profile.commutativeOperators().stream()</span>
-<span class="fc" id="L118">            .map(Enum::name)</span>
-<span class="fc" id="L119">            .sorted()</span>
-<span class="fc" id="L120">            .toList());</span>
-<span class="fc" id="L121">        append(descriptor, Boolean.toString(profile.inferAlgebraicBindings()));</span>
-<span class="fc" id="L122">        appendStrings(descriptor, profile.recognitionRuleIds().stream()</span>
-<span class="fc" id="L123">            .sorted()</span>
-<span class="fc" id="L124">            .toList());</span>
-<span class="fc" id="L125">        append(descriptor, Integer.toString(profile.maxEquivalenceDepth()));</span>
-<span class="fc" id="L126">        return descriptor.toString();</span>
+<span class="fc" id="L189">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L190">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L191">        appendStrings(descriptor, profile.associativeOperators().stream()</span>
+<span class="fc" id="L192">            .map(Enum::name)</span>
+<span class="fc" id="L193">            .sorted()</span>
+<span class="fc" id="L194">            .toList());</span>
+<span class="fc" id="L195">        appendStrings(descriptor, profile.commutativeOperators().stream()</span>
+<span class="fc" id="L196">            .map(Enum::name)</span>
+<span class="fc" id="L197">            .sorted()</span>
+<span class="fc" id="L198">            .toList());</span>
+<span class="fc" id="L199">        append(descriptor, Boolean.toString(profile.inferAlgebraicBindings()));</span>
+<span class="fc" id="L200">        appendStrings(descriptor, profile.recognitionRuleIds().stream()</span>
+<span class="fc" id="L201">            .sorted()</span>
+<span class="fc" id="L202">            .toList());</span>
+<span class="fc" id="L203">        append(descriptor, Integer.toString(profile.maxEquivalenceDepth()));</span>
+<span class="fc" id="L204">        return descriptor.toString();</span>
     }
 
     private static String canonicalDescriptor(RuleDescriptor rule) {
-<span class="fc" id="L130">        Objects.requireNonNull(rule, &quot;rule descriptor&quot;);</span>
-<span class="fc" id="L131">        StringBuilder descriptor = new StringBuilder();</span>
-<span class="fc" id="L132">        append(descriptor, rule.ruleId());</span>
-<span class="fc" id="L133">        append(descriptor, rule.packId());</span>
-<span class="fc" id="L134">        append(descriptor, rule.originProject());</span>
-<span class="fc" id="L135">        append(descriptor, rule.license());</span>
-<span class="fc" id="L136">        append(descriptor, rule.sourceVersion());</span>
-<span class="fc" id="L137">        append(descriptor, rule.sourceReference());</span>
-<span class="fc" id="L138">        append(descriptor, rule.derivationType().name());</span>
-<span class="fc" id="L139">        append(descriptor, rule.status().name());</span>
-<span class="fc" id="L140">        append(descriptor, rule.riskLevel());</span>
-<span class="fc" id="L141">        appendStrings(descriptor, rule.categories().stream()</span>
-<span class="fc" id="L142">            .sorted()</span>
-<span class="fc" id="L143">            .toList());</span>
-<span class="fc" id="L144">        appendStrings(descriptor, rule.searchEffects().stream()</span>
-<span class="fc" id="L145">            .map(Enum::name)</span>
-<span class="fc" id="L146">            .sorted()</span>
-<span class="fc" id="L147">            .toList());</span>
-<span class="fc" id="L148">        appendExamples(descriptor, rule.validationExamples());</span>
-<span class="fc" id="L149">        appendExamples(descriptor, rule.counterExamples());</span>
-<span class="fc" id="L150">        return descriptor.toString();</span>
+<span class="fc" id="L208">        Objects.requireNonNull(rule, &quot;rule descriptor&quot;);</span>
+<span class="fc" id="L209">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L210">        append(descriptor, rule.ruleId());</span>
+<span class="fc" id="L211">        append(descriptor, rule.packId());</span>
+<span class="fc" id="L212">        append(descriptor, rule.originProject());</span>
+<span class="fc" id="L213">        append(descriptor, rule.license());</span>
+<span class="fc" id="L214">        append(descriptor, rule.sourceVersion());</span>
+<span class="fc" id="L215">        append(descriptor, rule.sourceReference());</span>
+<span class="fc" id="L216">        append(descriptor, rule.derivationType().name());</span>
+<span class="fc" id="L217">        append(descriptor, rule.status().name());</span>
+<span class="fc" id="L218">        append(descriptor, rule.riskLevel());</span>
+<span class="fc" id="L219">        appendStrings(descriptor, rule.categories().stream()</span>
+<span class="fc" id="L220">            .sorted()</span>
+<span class="fc" id="L221">            .toList());</span>
+<span class="fc" id="L222">        appendStrings(descriptor, rule.searchEffects().stream()</span>
+<span class="fc" id="L223">            .map(Enum::name)</span>
+<span class="fc" id="L224">            .sorted()</span>
+<span class="fc" id="L225">            .toList());</span>
+<span class="fc" id="L226">        appendExamples(descriptor, rule.validationExamples());</span>
+<span class="fc" id="L227">        appendExamples(descriptor, rule.counterExamples());</span>
+<span class="fc" id="L228">        return descriptor.toString();</span>
     }
 
     private static void appendExamples(
         StringBuilder descriptor,
         List&lt;ValidationExample&gt; examples
     ) {
-<span class="fc" id="L157">        List&lt;String&gt; canonical = examples.stream()</span>
-<span class="fc" id="L158">            .map(example -&gt; {</span>
-<span class="fc" id="L159">                StringBuilder value = new StringBuilder();</span>
-<span class="fc" id="L160">                append(value, example.from());</span>
-<span class="fc" id="L161">                append(value, example.to());</span>
-<span class="fc" id="L162">                return value.toString();</span>
+<span class="fc" id="L235">        List&lt;String&gt; canonical = examples.stream()</span>
+<span class="fc" id="L236">            .map(example -&gt; {</span>
+<span class="fc" id="L237">                StringBuilder value = new StringBuilder();</span>
+<span class="fc" id="L238">                append(value, example.from());</span>
+<span class="fc" id="L239">                append(value, example.to());</span>
+<span class="fc" id="L240">                return value.toString();</span>
             })
-<span class="fc" id="L164">            .sorted(Comparator.naturalOrder())</span>
-<span class="fc" id="L165">            .toList();</span>
-<span class="fc" id="L166">        appendStrings(descriptor, canonical);</span>
-<span class="fc" id="L167">    }</span>
+<span class="fc" id="L242">            .sorted(Comparator.naturalOrder())</span>
+<span class="fc" id="L243">            .toList();</span>
+<span class="fc" id="L244">        appendStrings(descriptor, canonical);</span>
+<span class="fc" id="L245">    }</span>
 
     private static void appendStrings(
         StringBuilder descriptor,
         List&lt;String&gt; values
     ) {
-<span class="fc" id="L173">        append(descriptor, Integer.toString(values.size()));</span>
-<span class="fc" id="L174">        values.forEach(value -&gt; append(descriptor, value));</span>
-<span class="fc" id="L175">    }</span>
+<span class="fc" id="L251">        append(descriptor, Integer.toString(values.size()));</span>
+<span class="fc" id="L252">        values.forEach(value -&gt; append(descriptor, value));</span>
+<span class="fc" id="L253">    }</span>
 
     private static void append(StringBuilder descriptor, String value) {
-<span class="fc" id="L178">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
-<span class="fc" id="L179">        Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="fc" id="L180">        descriptor.append(value.length()).append(':').append(value);</span>
-<span class="fc" id="L181">    }</span>
+<span class="fc" id="L256">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
+<span class="fc" id="L257">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L258">        descriptor.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L259">    }</span>
 
     private static String sha256(String value) {
         try {
-<span class="fc" id="L185">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
-<span class="fc" id="L186">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L187">                    .digest(value.getBytes(StandardCharsets.UTF_8))</span>
+<span class="fc" id="L263">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L264">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L265">                    .digest(value.getBytes(StandardCharsets.UTF_8))</span>
             );
-<span class="nc" id="L189">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L190">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+<span class="nc" id="L267">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L268">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
         }
     }
 }

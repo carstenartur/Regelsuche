@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequiredAssumptionTemplate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">RequiredAssumptionTemplate.java</span></div><h1>RequiredAssumptionTemplate.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.parse.ExpressionFormatter;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * One typed side-condition template instantiated from a complete applicability
+ * match.
+ */
+public record RequiredAssumptionTemplate(
+    Assumption.Kind kind,
+    PatternExpr expressionPattern
+) {
+<span class="fc" id="L18">    public RequiredAssumptionTemplate {</span>
+<span class="fc" id="L19">        kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L20">        expressionPattern = Objects.requireNonNull(</span>
+            expressionPattern, &quot;expressionPattern&quot;);
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (!supported(kind)) {</span>
+<span class="nc" id="L23">            throw new IllegalArgumentException(</span>
+                &quot;unsupported applicability assumption kind: &quot; + kind);
+        }
+<span class="fc" id="L26">    }</span>
+
+    public static RequiredAssumptionTemplate nonZero(
+        PatternExpr expressionPattern
+    ) {
+<span class="fc" id="L31">        return new RequiredAssumptionTemplate(</span>
+            Assumption.Kind.NON_ZERO, expressionPattern);
+    }
+
+    public static RequiredAssumptionTemplate positive(
+        PatternExpr expressionPattern
+    ) {
+<span class="nc" id="L38">        return new RequiredAssumptionTemplate(</span>
+            Assumption.Kind.POSITIVE, expressionPattern);
+    }
+
+    public static RequiredAssumptionTemplate nonNegative(
+        PatternExpr expressionPattern
+    ) {
+<span class="nc" id="L45">        return new RequiredAssumptionTemplate(</span>
+            Assumption.Kind.NON_NEGATIVE, expressionPattern);
+    }
+
+    public Assumption instantiate(Map&lt;String, Expr&gt; bindings) {
+<span class="nc" id="L50">        String expression = ExpressionFormatter.format(</span>
+<span class="nc" id="L51">            expressionPattern.instantiate(</span>
+<span class="nc" id="L52">                Objects.requireNonNull(bindings, &quot;bindings&quot;)));</span>
+<span class="nc bnc" id="L53" title="All 9 branches missed.">        return switch (kind) {</span>
+<span class="nc" id="L54">            case NON_ZERO -&gt; Assumption.nonZero(expression);</span>
+<span class="nc" id="L55">            case POSITIVE -&gt; Assumption.positive(expression);</span>
+<span class="nc" id="L56">            case NON_NEGATIVE -&gt; Assumption.nonNegative(expression);</span>
+<span class="nc" id="L57">            case INTEGER -&gt; Assumption.integer(expression);</span>
+<span class="nc" id="L58">            case NATURAL -&gt; Assumption.natural(expression);</span>
+<span class="nc" id="L59">            case INVERTIBLE -&gt; Assumption.invertible(expression);</span>
+<span class="nc" id="L60">            case REAL -&gt; Assumption.real(expression);</span>
+<span class="nc" id="L61">            case RATIONAL -&gt; Assumption.rational(expression);</span>
+<span class="nc" id="L62">            default -&gt; throw new IllegalStateException(</span>
+                &quot;unsupported applicability assumption kind: &quot; + kind);
+        };
+    }
+
+    public String contentHash() {
+<span class="fc" id="L68">        return RuleInventoryFingerprint.assumptionTemplateContentHash(</span>
+            kind, expressionPattern);
+    }
+
+    private static boolean supported(Assumption.Kind kind) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        return switch (kind) {</span>
+            case NON_ZERO, POSITIVE, NON_NEGATIVE, INTEGER, NATURAL,
+<span class="fc" id="L75">                    INVERTIBLE, REAL, RATIONAL -&gt; true;</span>
+<span class="nc" id="L76">            default -&gt; false;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

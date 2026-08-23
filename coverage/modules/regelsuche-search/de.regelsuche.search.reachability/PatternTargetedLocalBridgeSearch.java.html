@@ -376,8 +376,8 @@ public final class PatternTargetedLocalBridgeSearch {
 <span class="fc" id="L376">                candidates.sort(CANDIDATE_ORDER);</span>
 <span class="fc bfc" id="L377" title="All 2 branches covered.">                for (Candidate candidate : candidates) {</span>
 <span class="fc" id="L378">                    Node retained = retain(candidate);</span>
-<span class="pc bpc" id="L379" title="1 of 2 branches missed.">                    if (retained == null) {</span>
-<span class="nc" id="L380">                        continue;</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">                    if (retained == null) {</span>
+<span class="fc" id="L380">                        continue;</span>
                     }
 <span class="fc bfc" id="L382" title="All 2 branches covered.">                    if (retained.analysis().matched()) {</span>
 <span class="fc" id="L383">                        PrincipalStep principal = replayPrincipal(</span>
@@ -519,9 +519,9 @@ public final class PatternTargetedLocalBridgeSearch {
 <span class="fc" id="L519">            String key = stateKey(</span>
 <span class="fc" id="L520">                candidate.structuralFingerprint(),</span>
 <span class="fc" id="L521">                candidate.assumptions());</span>
-<span class="pc bpc" id="L522" title="1 of 2 branches missed.">            if (states.containsKey(key)) {</span>
-<span class="nc" id="L523">                duplicateTransitions++;</span>
-<span class="nc" id="L524">                return null;</span>
+<span class="fc bfc" id="L522" title="All 2 branches covered.">            if (states.containsKey(key)) {</span>
+<span class="fc" id="L523">                duplicateTransitions++;</span>
+<span class="fc" id="L524">                return null;</span>
             }
 <span class="pc bpc" id="L526" title="1 of 2 branches missed.">            if (states.size() &gt;= budget.maxVisitedStates()) {</span>
 <span class="nc" id="L527">                limits.add(&quot;VISITED_STATES&quot;);</span>
@@ -1023,7 +1023,7 @@ public final class PatternTargetedLocalBridgeSearch {
 <span class="fc" id="L1023">        }</span>
 
         static Work empty() {
-<span class="nc" id="L1026">            return new Work(0, 0, 1, 0, 0, 0, 1);</span>
+<span class="fc" id="L1026">            return new Work(0, 0, 1, 0, 0, 0, 1);</span>
         }
 
         String descriptor() {
