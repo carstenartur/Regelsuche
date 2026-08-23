@@ -197,7 +197,7 @@ public final class GenerationalRuleMiningReachabilityAudit {
         String suffix = rule.candidateHash().substring("sha256:".length(), 20);
         DynamicOperatorCompiler.CompilationResult result = compiler.compile(
             "cumulative-audit-g" + maximumGeneration + "-" + suffix,
-            campaign.finalInventoryHash(),
+            generation(campaign, maximumGeneration).outputInventoryHash(),
             rule.leftPattern(),
             rule.rightPattern());
         if (!result.isSuccess()) {
