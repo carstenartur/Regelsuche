@@ -60,4 +60,44 @@ class MavenReleaseWorkflowContractTest {
             "curated notes must be validated before the first publication mutation"
         );
     }
+
+    @Test
+    void releaseMetadataContractIncludesThePublicOpenApiVersion()
+            throws IOException {
+        Path root = MavenPomTestSupport.repositoryRoot();
+        String script = Files.readString(
+            root.resolve(".github/scripts/update-release-metadata.py"),
+            StandardCharsets.UTF_8
+        );
+        String releaseProperties = Files.readString(
+            root.resolve("release.properties"),
+            StandardCharsets.UTF_8
+        );
+        String version = releaseProperties.lines()
+            .filter(line -> line.startsWith("version="))
+            .map(line -> line.substring("version=".length()).trim())
+            .findFirst()
+            .orElseThrow();
+        String openApi = Files.readString(
+            root.resolve("app/src/main/resources/web/openapi/openapi.json"),
+            StandardCharsets.UTF_8
+        );
+
+        assertTrue(
+            script.contains("OPENAPI_PATH = ROOT / 'app/src/main/resources/web/openapi/openapi.json'"),
+            "the coordinated metadata helper must own the embedded OpenAPI document"
+        );
+        assertTrue(
+            script.contains("update_openapi(args.version)"),
+            "release and next-development transitions must update OpenAPI"
+        );
+        assertTrue(
+            script.contains("actual_openapi != version"),
+            "metadata checking must fail closed on OpenAPI version drift"
+        );
+        assertTrue(
+            openApi.contains("\"version\": \"" + version + "\""),
+            "the checked-in OpenAPI version must equal release.properties"
+        );
+    }
 }
