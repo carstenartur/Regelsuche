@@ -7,7 +7,7 @@ expectations:
   - MACRO_LEARNING_REQUIRED
   - MACRO_REUSE_REQUIRED
 enabledOperators:
-  - sophie_germain_bridge
+  - polynomial_structure_synthesis
 enabledRulePacks:
   - sympy-polynomial-basic
 requiredBridgeEffects:
@@ -16,8 +16,7 @@ requiredRuleFamilies:
   - hidden_structure
   - factor
 requiredBridgeRules:
-  - hypothesis_difference_of_squares_preparation
-  - ast_square_difference_factor
+  - hypothesis_polynomial_structure_synthesis
 macroLearning:
   enabled: true
 budgets:
