@@ -82,6 +82,34 @@ general Workbench/CLI default profile. Full contracts and limitations are in:
 - [`rule-directed-preparation-planning.md`](rule-directed-preparation-planning.md);
 - [`learned-pattern-rule-promotion.md`](learned-pattern-rule-promotion.md).
 
+## Semantic hypothesis operators and learning boundaries
+
+`HypothesisOperatorRegistry` is the deterministic source of the hypothesis
+operators selected by the discovery profiles. Its current order and default
+status are:
+
+| Rule ID | Default | Role |
+| --- | ---: | --- |
+| `hypothesis_polynomial_decomposition_synthesis` | yes | exact bounded coefficient synthesis for supported quartics |
+| `hypothesis_difference_of_squares_preparation` | no | historical Sophie-Germain bridge control |
+| `hypothesis_complete_square_preparation` | yes | conservative quadratic bridge |
+| `hypothesis_telescoping_fraction` | yes | conservative adjacent-denominator decomposition |
+| `hypothesis_rationalize_denominator` | yes | conservative conjugate rationalization |
+
+The polynomial synthesis operator first interprets complete AST subtrees as
+structural polynomial atoms and then solves a bounded exact coefficient system.
+It is not a named Sophie-Germain rule, and its certificate does not turn the
+operator into a complete polynomial factorizer. See
+[`polynomial-decomposition-synthesis.md`](polynomial-decomposition-synthesis.md).
+
+Learned rules use a separate trust boundary. A narrow assumption-free
+polynomial pattern can receive an exact identity proof and a new experimental
+rule identity, but raw compiled genomes remain untrusted. Generation-separated
+campaigns freeze the current shadow inventory before candidate formation and
+activate accepted rules only in the next generation. They do not mutate the
+normal production inventory or change `PROMOTION = NOT_EVALUATED`. See
+[`generational-rule-mining.md`](generational-rule-mining.md).
+
 ## Bounded reachability and historical atlas
 
 `BoundedRewriteReachabilityOracle` performs deterministic breadth-first
@@ -106,7 +134,8 @@ Preregistered controls add the generic
 `DifferenceOfSquaresPreparationOperator` for the Sophie-Germain case and one
 curated completing-the-square recognition rule. These controls distinguish a
 missing production edge from representation or matcher failure; they never
-count as autonomous rediscovery.
+count as autonomous rediscovery. Their historical role is unchanged by the
+newer default polynomial synthesis operator.
 
 The source corpus and strict schemas are:
 
@@ -246,6 +275,8 @@ is distinct from the exact learned-pattern promotion mechanism.
 - [`search-strategies.md`](search-strategies.md) — strategy details.
 - [`equality-saturation.md`](equality-saturation.md) — the EGraph layer.
 - [`didactic-ranking.md`](didactic-ranking.md) — `TEACHING_FRIENDLY` ranking.
+- [`generational-rule-mining.md`](generational-rule-mining.md) — frozen learned-rule generations.
+- [`polynomial-decomposition-synthesis.md`](polynomial-decomposition-synthesis.md) — exact bounded semantic synthesis.
 
 ## Equality-saturation runtime metrics
 
