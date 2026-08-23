@@ -145,9 +145,9 @@ Ein positiver Lauf belegt nur:
 
 Er belegt keine externe mathematische Neuheit, keine allgemeine Überlegenheit,
 keine formale Beweisabdeckung außerhalb des exakten Polynomfragments und keine
-Produktionsfreigabe. Die breitere historische Diagnose bleibt im
-[Historical Rediscovery and Reachability Atlas](historical-rediscovery-atlas.md),
-das streng preregistrierte held-out Flagship-Experiment unter Issue #521.
+Produktionsfreigabe. Die breitere historische Diagnose ist unter
+[Search Intelligence](search-intelligence.md) dokumentiert; das streng
+preregistrierte held-out Flagship-Experiment bleibt unter Issue #521 getrennt.
 
 ## Siehe auch
 
