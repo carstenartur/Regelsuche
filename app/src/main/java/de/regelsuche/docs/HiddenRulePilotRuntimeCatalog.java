@@ -8,9 +8,9 @@ import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.OccurrenceAwareAstRewriteTransformationEngine;
+import de.regelsuche.transform.PolynomialStructureSynthesisOperator;
 import de.regelsuche.transform.RewriteRule;
 import java.util.ArrayList;
 import java.util.List;
@@ -173,30 +173,27 @@ public final class HiddenRulePilotRuntimeCatalog {
     }
 
     private static RuntimeTask case002Task() {
-        List<RewriteRule> factorRules = rulesById(Set.of(
-            "ast_square_difference_factor",
-            "ast_canonical_normalize"));
         return new RuntimeTask(
             "case-002",
             "x^4 + 4*y^4",
             syntaxTarget(
-                "(x^2 + 2*y^2 - 2*x*y) * (x^2 + 2*y^2 + 2*x*y)"),
+                "(x^2 - 2*x*y + 2*y^2) * (x^2 + 2*x*y + 2*y^2)"),
             new HypothesisTransformationEngine(
-                new OccurrenceAwareAstRewriteTransformationEngine(factorRules),
-                List.of(new DifferenceOfSquaresPreparationOperator()),
+                new OccurrenceAwareAstRewriteTransformationEngine(List.of()),
+                List.of(new PolynomialStructureSynthesisOperator()),
                 8),
             new SearchHeuristic(5, 320, 1, 12, 320, 320),
             List.of(
                 new PositiveHoldout(
                     "p-003",
                     "(m + 1)^4 + 4*n^4",
-                    "((m + 1)^2 + 2*(m + 1)*n + 2*n^2)"
-                        + " * ((m + 1)^2 - 2*(m + 1)*n + 2*n^2)"),
+                    "((m + 1)^2 - 2*(m + 1)*n + 2*n^2)"
+                        + " * ((m + 1)^2 + 2*(m + 1)*n + 2*n^2)"),
                 new PositiveHoldout(
                     "p-004",
                     "sin(t)^4 + 4*z^4",
-                    "(sin(t)^2 + 2*sin(t)*z + 2*z^2)"
-                        + " * (sin(t)^2 - 2*sin(t)*z + 2*z^2)")),
+                    "(sin(t)^2 - 2*sin(t)*z + 2*z^2)"
+                        + " * (sin(t)^2 + 2*sin(t)*z + 2*z^2)")),
             List.of(
                 new NegativeHoldout("n-003", "x^4 + 3*y^4"),
                 new NegativeHoldout("n-004", "x^4 + 4*y^3")));
