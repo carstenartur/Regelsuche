@@ -14,6 +14,8 @@ class DiscoveryOperatorRegistryTest {
                 .register(new DefaultDiscoveryOperatorProvider());
 
         assertTrue(registry.availableOperatorIds().contains("complete_square_bridge"));
+        assertTrue(registry.availableOperatorIds().contains(
+            "polynomial_decomposition_synthesis"));
         assertTrue(registry.availableOperatorIds().contains("sophie_germain_bridge"));
         assertTrue(registry.availableOperatorIds().contains("telescoping_fraction"));
         assertTrue(registry.availableOperatorIds().contains("repeated_subexpression_factorization"));
