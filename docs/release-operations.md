@@ -8,27 +8,30 @@ Publikation und Nachkontrolle.
 
 ## Maßgebliche Quellen
 
-Der Release-Ablauf besitzt vier zusammengehörige, maschinell geprüfte Quellen:
+Der Release-Ablauf besitzt fünf zusammengehörige, maschinell geprüfte Quellen:
 
 - `release.properties` legt die aktuelle Entwicklungs- oder Release-Version
   fest;
 - der Maven-Reaktor in `pom.xml` und allen Modul-POMs trägt exakt dieselbe
   Projektversion;
+- `app/src/main/resources/web/openapi/openapi.json` veröffentlicht dieselbe
+  Version als `info.version` in der eingebetteten REST-Referenz;
 - `docs/releases/X.Y.Z.md` enthält die kuratierten, fachlich geprüften
   Release Notes der zu veröffentlichenden Version;
 - `.github/workflows/release.yml` implementiert Auflösung, Prüfung,
   Maven-Paketierung und GitHub-spezifische Mutationen.
 
-Die Versionsangaben in `CITATION.cff`, `CITATION.md`, `.zenodo.json` und
-`codemeta.json` müssen ebenfalls übereinstimmen. Der Befehl
+Die Versionsangaben in `CITATION.cff`, `CITATION.md`, `.zenodo.json`,
+`codemeta.json` und OpenAPI müssen ebenfalls übereinstimmen. Der Befehl
 
 ```bash
 python3 .github/scripts/update-release-metadata.py 0.3.0-SNAPSHOT --check
 ```
 
-prüft diese Invariante einschließlich sämtlicher POMs, ohne Dateien zu ändern.
-Die gleiche Hilfsroutine stellt beim Release und beim Wechsel auf die nächste
-Entwicklungsversion alle Quellen gemeinsam um.
+prüft diese Invariante einschließlich sämtlicher POMs und der öffentlichen
+OpenAPI-Metadaten, ohne Dateien zu ändern. Die gleiche Hilfsroutine stellt beim
+Release und beim Wechsel auf die nächste Entwicklungsversion alle Quellen
+gemeinsam um.
 
 Bei `version=0.3.0-SNAPSHOT` ist die zu veröffentlichende Version `0.3.0` und
 der Tag `v0.3.0`. Die Angabe der nächsten Version verändert nicht die zu
@@ -86,8 +89,8 @@ Vor einem Release müssen folgende Bedingungen erfüllt sein:
 1. `main` ist grün.
 2. `ciCheck` und `mvn -Pfull verify` sind erfolgreich.
 3. Beide Befehle hinterlassen den Checkout unverändert.
-4. `release.properties`, sämtliche POMs und die Zitiermetadaten enthalten
-   dieselbe gültige `X.Y.Z-SNAPSHOT`-Version.
+4. `release.properties`, sämtliche POMs, die Zitiermetadaten und
+   OpenAPI-`info.version` enthalten dieselbe gültige `X.Y.Z-SNAPSHOT`-Version.
 5. `docs/releases/X.Y.Z.md` ist nicht leer, beginnt exakt mit
    `# Regelsuche X.Y.Z` und enthält den geprüften Claim-Rahmen.
 6. Es gibt keinen bekannten release-blockierenden Pull Request oder
@@ -240,8 +243,8 @@ Der Workflow:
 
 1. prüft Notes, Metadaten und Checkout erneut vollständig;
 2. führt `ciCheck` und `mvn -Pfull verify` aus;
-3. erzeugt einen lokalen Commit, in dem Release-Metadaten und sämtliche POMs
-   gemeinsam auf `0.3.0` stehen;
+3. erzeugt einen lokalen Commit, in dem Release-Metadaten, OpenAPI und sämtliche
+   POMs gemeinsam auf `0.3.0` stehen;
 4. baut JAR, ZIP und TAR mit Maven;
 5. erzeugt ein Herkunftsmanifest einschließlich Notes-Hash und die
    SHA-256-Summen der fünf Assets;
@@ -298,7 +301,7 @@ Nach dem echten Lauf sind folgende Punkte zu prüfen:
 - `maintenance/0.3.x` zeigt auf denselben getaggten Commit;
 - der Folge-PR enthält ausschließlich `0.4.0-SNAPSHOT` in
   `release.properties`, `CITATION.cff`, `CITATION.md`, `.zenodo.json`,
-  `codemeta.json`, dem Root-POM und allen Modul-POMs;
+  `codemeta.json`, OpenAPI, dem Root-POM und allen Modul-POMs;
 - nach Merge des Folge-PRs ist `main` erneut grün;
 - GitHub und Zenodo zeigen die tatsächlich veröffentlichte Version.
 
