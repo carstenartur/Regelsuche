@@ -27,7 +27,7 @@ public final class PolynomialTheorySubsumptionClassifier {
 
     public PolynomialTheorySubsumptionClassifier() {
         this(
-            new PolynomialDecompositionSynthesisOperator(),
+            new PolynomialDecompositionSynthesisOperator(Integer.MAX_VALUE),
             new ExpressionCanonicalizer(),
             new ExpressionParser());
     }
