@@ -58,6 +58,7 @@ public final class PolynomialDerivedMacroCache {
         }
 
         Lineage lineage = Lineage.create(
+            classification,
             primitiveRuleIds,
             sourceProvenance);
         String id = entryId(classification);
@@ -198,7 +199,9 @@ public final class PolynomialDerivedMacroCache {
     public record Lineage(
         String id,
         List<String> primitiveRuleIds,
-        List<String> sourceProvenance
+        List<String> sourceProvenance,
+        String applicationKey,
+        int consideredConfigurations
     ) {
         public Lineage {
             if (id == null || !id.matches("sha256:[0-9a-f]{64}")) {
@@ -211,9 +214,15 @@ public final class PolynomialDerivedMacroCache {
             sourceProvenance = requireNonBlankList(
                 sourceProvenance,
                 "sourceProvenance");
+            requireText(applicationKey, "applicationKey");
+            if (consideredConfigurations < 0) {
+                throw new IllegalArgumentException(
+                    "consideredConfigurations must not be negative");
+            }
         }
 
         private static Lineage create(
+            PolynomialTheorySubsumptionClassifier.Classification classification,
             List<String> primitiveRuleIds,
             List<String> sourceProvenance
         ) {
@@ -223,8 +232,17 @@ public final class PolynomialDerivedMacroCache {
             List<String> provenance = requireNonBlankList(
                 sourceProvenance,
                 "sourceProvenance");
+            Objects.requireNonNull(classification, "classification");
+            if (!classification.subsumed()) {
+                throw new IllegalArgumentException(
+                    "lineage requires a theory-subsumed classification");
+            }
             StringBuilder material = new StringBuilder();
             append(material, SCHEMA + ".lineage");
+            append(material, classification.applicationKey());
+            append(
+                material,
+                Integer.toString(classification.consideredConfigurations()));
             append(material, Integer.toString(primitives.size()));
             primitives.forEach(value -> append(material, value));
             append(material, Integer.toString(provenance.size()));
@@ -232,7 +250,9 @@ public final class PolynomialDerivedMacroCache {
             return new Lineage(
                 sha256(material.toString()),
                 primitives,
-                provenance);
+                provenance,
+                classification.applicationKey(),
+                classification.consideredConfigurations());
         }
     }
 }
