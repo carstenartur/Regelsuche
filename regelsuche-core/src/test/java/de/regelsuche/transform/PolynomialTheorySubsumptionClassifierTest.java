@@ -158,6 +158,15 @@ class PolynomialTheorySubsumptionClassifierTest {
             List.of("path:sophie-replay", "generation:1"),
             secondLineage.lineages().getFirst().sourceProvenance());
         assertEquals(
+            result.applicationKey(),
+            secondLineage.lineages().getFirst().applicationKey());
+        assertEquals(
+            replay.applicationKey(),
+            secondLineage.lineages().get(1).applicationKey());
+        assertEquals(
+            replay.consideredConfigurations(),
+            secondLineage.lineages().get(1).consideredConfigurations());
+        assertEquals(
             PolynomialDerivedMacroCache.PURPOSE,
             secondLineage.purpose());
     }
