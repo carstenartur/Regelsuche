@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.learned-pattern-rule-promotion-receipt/v1",
+  "title": "Regelsuche learned pattern rule promotion receipt v1",
+  "description": "Identity-bound receipt for the narrow exact-polynomial learned-pattern promotion mechanism. Evidence hash fields are references supplied to the promoter; schema validity alone does not establish that the referenced evidence was independently verified.",
+  "type": "object",
+  "required": [
+    "schema",
+    "promoterId",
+    "genomeHash",
+    "alphaStructuralHash",
+    "geneId",
+    "preflightHash",
+    "semanticValidationHash",
+    "counterexampleSearchHash",
+    "holdoutEvaluationHash",
+    "leakageAuditHash",
+    "repositoryRevision",
+    "proofHash",
+    "promotionMaterialHash",
+    "promotedRuleId",
+    "promotedRuleHash",
+    "applicabilitySchemaHash",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.learned-pattern-rule-promotion-receipt/v1"
+    },
+    "promoterId": {
+      "const": "regelsuche.learned-pattern-rule-promoter/v1"
+    },
+    "genomeHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "alphaStructuralHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "geneId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "preflightHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "semanticValidationHash": {
+      "description": "Identity of caller-supplied semantic-validation evidence. The promoter binds but does not load this artifact.",
+      "$ref": "#/$defs/sha256"
+    },
+    "counterexampleSearchHash": {
+      "description": "Identity of caller-supplied counterexample-search evidence. The promoter binds but does not load this artifact.",
+      "$ref": "#/$defs/sha256"
+    },
+    "holdoutEvaluationHash": {
+      "description": "Identity of caller-supplied holdout evidence. The promoter binds but does not load this artifact.",
+      "$ref": "#/$defs/sha256"
+    },
+    "leakageAuditHash": {
+      "description": "Identity of caller-supplied leakage-audit evidence. The promoter binds but does not load this artifact.",
+      "$ref": "#/$defs/sha256"
+    },
+    "repositoryRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "proofHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "promotionMaterialHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "promotedRuleId": {
+      "type": "string",
+      "pattern": "^learned\\.promoted\\.[0-9a-f]{16}\\.[A-Za-z0-9_-]+$"
+    },
+    "promotedRuleHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "applicabilitySchemaHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

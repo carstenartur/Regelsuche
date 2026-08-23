@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SafePreparationEngineRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">SafePreparationEngineRegistry.java</span></div><h1>SafePreparationEngineRegistry.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Content-addressed registry for the existing exact preparation engine chain.
+ *
+ * &lt;p&gt;The individual preparation engines remain responsible for their own
+ * certificates and concrete principal replay. This registry freezes their
+ * order, native principal IDs and implementation identities behind one
+ * deterministic execution boundary.&lt;/p&gt;
+ */
+public final class SafePreparationEngineRegistry {
+    public static final String REGISTRY_ID =
+        &quot;regelsuche.safe-exact-preparation-registry/v1&quot;;
+    public static final String ANY_PRINCIPAL = &quot;*&quot;;
+
+<span class="fc" id="L27">    private static final List&lt;Stage&gt; STAGES = List.of(</span>
+        new Stage(
+            &quot;direct-ast-rewrite&quot;,
+            StageKind.DIRECT,
+            &quot;&quot;,
+            ANY_PRINCIPAL,
+<span class="fc" id="L33">            AstRewriteTransformationEngine.class.getName()),</span>
+        new Stage(
+            &quot;exact-polynomial-quotient&quot;,
+            StageKind.EXACT_PREPARATION,
+            RulePreparationPlanner.PLANNER_ID,
+            RulePreparationPlanner.PRINCIPAL_RULE_ID,
+<span class="fc" id="L39">            RulePreparationTransformationEngine.class.getName()),</span>
+        new Stage(
+            &quot;ac-factor-exposure&quot;,
+            StageKind.EXACT_PREPARATION,
+            AcNormalizationPreparationSolver.SOLVER_ID,
+            AcNormalizationPreparationSolver.PRINCIPAL_RULE_ID,
+<span class="fc" id="L45">            AcNormalizationPreparationTransformationEngine.class.getName()),</span>
+        new Stage(
+            &quot;common-monomial-factor&quot;,
+            StageKind.EXACT_PREPARATION,
+            MonomialCommonFactorPreparationSolver.SOLVER_ID,
+            MonomialCommonFactorPreparationSolver.PRINCIPAL_RULE_ID,
+<span class="fc" id="L51">            MonomialCommonFactorPreparationTransformationEngine.class.getName()),</span>
+        new Stage(
+            &quot;perfect-square-exposure&quot;,
+            StageKind.EXACT_PREPARATION,
+            PerfectSquareStructurePreparationSolver.SOLVER_ID,
+            PerfectSquareStructurePreparationSolver.PRINCIPAL_RULE_ID,
+<span class="fc" id="L57">            PerfectSquareStructurePreparationTransformationEngine.class.getName()),</span>
+        new Stage(
+            &quot;common-denominator&quot;,
+            StageKind.EXACT_PREPARATION,
+            RationalCommonDenominatorPreparationSolver.SOLVER_ID,
+            RationalCommonDenominatorPreparationSolver.PRINCIPAL_RULE_ID,
+<span class="fc" id="L63">            RationalCommonDenominatorPreparationTransformationEngine.class.getName()));</span>
+
+    private SafePreparationEngineRegistry() {
+    }
+
+    public static List&lt;Stage&gt; stages() {
+<span class="fc" id="L69">        return STAGES;</span>
+    }
+
+    /**
+     * Creates the complete exact preparation chain for one frozen visible rule
+     * inventory. Rule order is retained and included in the registry identity.
+     */
+    public static Registration production(
+        List&lt;? extends RewriteRule&gt; suppliedRules
+    ) {
+<span class="fc" id="L79">        List&lt;RewriteRule&gt; rules = validateRules(suppliedRules);</span>
+<span class="fc" id="L80">        String inventoryFingerprint =</span>
+<span class="fc" id="L81">            RuleInventoryFingerprint.contentHash(rules);</span>
+<span class="fc" id="L82">        String registryFingerprint = fingerprint(rules);</span>
+<span class="fc" id="L83">        TransformationEngine engine =</span>
+            new RationalCommonDenominatorPreparationTransformationEngine(rules);
+<span class="fc" id="L85">        return new Registration(</span>
+            REGISTRY_ID,
+            STAGES,
+            inventoryFingerprint,
+            registryFingerprint,
+            engine);
+    }
+
+    private static List&lt;RewriteRule&gt; validateRules(
+        List&lt;? extends RewriteRule&gt; supplied
+    ) {
+<span class="fc" id="L96">        Objects.requireNonNull(supplied, &quot;rules&quot;);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (supplied.isEmpty()) {</span>
+<span class="nc" id="L98">            throw new IllegalArgumentException(</span>
+                &quot;the exact preparation registry requires visible rules&quot;);
+        }
+<span class="fc" id="L101">        Map&lt;String, RewriteRule&gt; byId = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (RewriteRule rule : supplied) {</span>
+<span class="fc" id="L103">            RewriteRule checked = Objects.requireNonNull(rule, &quot;rule&quot;);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (!checked.isEquivalencePreservingByConstruction()) {</span>
+<span class="fc" id="L105">                throw new IllegalArgumentException(</span>
+                    &quot;exact preparation registry accepts only equivalence-preserving rules: &quot;
+<span class="fc" id="L107">                        + checked.id());</span>
+            }
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (byId.put(checked.id(), checked) != null) {</span>
+<span class="nc" id="L110">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L111">                    &quot;duplicate visible rule ID: &quot; + checked.id());</span>
+            }
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">        return List.copyOf(byId.values());</span>
+    }
+
+    private static String fingerprint(List&lt;RewriteRule&gt; rules) {
+<span class="fc" id="L118">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L119">        append(descriptor, REGISTRY_ID);</span>
+<span class="fc" id="L120">        append(descriptor, Integer.toString(rules.size()));</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
+<span class="fc" id="L122">            append(descriptor, RuleInventoryFingerprint.ruleContentHash(rule));</span>
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        append(descriptor, Integer.toString(STAGES.size()));</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (Stage stage : STAGES) {</span>
+<span class="fc" id="L126">            append(descriptor, stage.stageId());</span>
+<span class="fc" id="L127">            append(descriptor, stage.kind().name());</span>
+<span class="fc" id="L128">            append(descriptor, stage.solverId());</span>
+<span class="fc" id="L129">            append(descriptor, stage.principalRuleId());</span>
+<span class="fc" id="L130">            append(descriptor, stage.engineClassName());</span>
+<span class="fc" id="L131">        }</span>
+<span class="fc" id="L132">        return sha256(descriptor.toString());</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L136">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L137">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L141">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L142">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L143">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L144">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L145">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L149">    public enum StageKind {</span>
+<span class="fc" id="L150">        DIRECT,</span>
+<span class="fc" id="L151">        EXACT_PREPARATION</span>
+    }
+
+    public record Stage(
+        String stageId,
+        StageKind kind,
+        String solverId,
+        String principalRuleId,
+        String engineClassName
+    ) {
+<span class="fc" id="L161">        public Stage {</span>
+<span class="pc bpc" id="L162" title="5 of 10 branches missed.">            if (stageId == null || stageId.isBlank()</span>
+                    || kind == null
+                    || solverId == null
+                    || principalRuleId == null
+<span class="pc bpc" id="L166" title="2 of 4 branches missed.">                    || principalRuleId.isBlank()</span>
+                    || engineClassName == null
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                    || engineClassName.isBlank()) {</span>
+<span class="nc" id="L169">                throw new IllegalArgumentException(</span>
+                    &quot;preparation stage identity is invalid&quot;);
+            }
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (kind == StageKind.EXACT_PREPARATION</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                    &amp;&amp; solverId.isBlank()) {</span>
+<span class="nc" id="L174">                throw new IllegalArgumentException(</span>
+                    &quot;exact preparation stages require a solver ID&quot;);
+            }
+<span class="fc bfc" id="L177" title="All 2 branches covered.">            if (kind == StageKind.DIRECT</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                    &amp;&amp; !ANY_PRINCIPAL.equals(principalRuleId)) {</span>
+<span class="nc" id="L179">                throw new IllegalArgumentException(</span>
+                    &quot;direct stage must support every principal&quot;);
+            }
+<span class="fc" id="L182">        }</span>
+
+        public boolean supports(String ruleId) {
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">            return ANY_PRINCIPAL.equals(principalRuleId)</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                || principalRuleId.equals(ruleId);</span>
+        }
+    }
+
+    public static final class Registration {
+        private final String registryId;
+        private final List&lt;Stage&gt; stages;
+        private final String ruleInventoryFingerprint;
+        private final String registryFingerprint;
+        private final TransformationEngine engine;
+
+        private Registration(
+            String registryId,
+            List&lt;Stage&gt; stages,
+            String ruleInventoryFingerprint,
+            String registryFingerprint,
+            TransformationEngine engine
+<span class="fc" id="L203">        ) {</span>
+<span class="fc" id="L204">            this.registryId = Objects.requireNonNull(</span>
+                registryId, &quot;registryId&quot;);
+<span class="fc" id="L206">            this.stages = List.copyOf(stages);</span>
+<span class="fc" id="L207">            this.ruleInventoryFingerprint = requireHash(</span>
+                ruleInventoryFingerprint, &quot;ruleInventoryFingerprint&quot;);
+<span class="fc" id="L209">            this.registryFingerprint = requireHash(</span>
+                registryFingerprint, &quot;registryFingerprint&quot;);
+<span class="fc" id="L211">            this.engine = Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="fc" id="L212">        }</span>
+
+        public String registryId() {
+<span class="nc" id="L215">            return registryId;</span>
+        }
+
+        public List&lt;Stage&gt; stages() {
+<span class="nc" id="L219">            return stages;</span>
+        }
+
+        public String ruleInventoryFingerprint() {
+<span class="fc" id="L223">            return ruleInventoryFingerprint;</span>
+        }
+
+        public String registryFingerprint() {
+<span class="fc" id="L227">            return registryFingerprint;</span>
+        }
+
+        /** True only when a registered exact specialist owns this principal. */
+        public boolean supportsPrincipal(String ruleId) {
+<span class="pc bpc" id="L232" title="2 of 4 branches missed.">            if (ruleId == null || ruleId.isBlank()) {</span>
+<span class="nc" id="L233">                return false;</span>
+            }
+<span class="fc" id="L235">            return stages.stream()</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                .filter(stage -&gt; stage.kind() == StageKind.EXACT_PREPARATION)</span>
+<span class="fc" id="L237">                .anyMatch(stage -&gt; stage.supports(ruleId));</span>
+        }
+
+        public Execution transform(String sourceExpression) {
+<span class="pc bpc" id="L241" title="2 of 4 branches missed.">            if (sourceExpression == null || sourceExpression.isBlank()) {</span>
+<span class="nc" id="L242">                throw new IllegalArgumentException(</span>
+                    &quot;sourceExpression must not be blank&quot;);
+            }
+<span class="fc" id="L245">            List&lt;Transformation&gt; transformations = List.copyOf(</span>
+<span class="fc" id="L246">                Objects.requireNonNull(</span>
+<span class="fc" id="L247">                    engine.transform(sourceExpression),</span>
+                    &quot;exact preparation engine result&quot;));
+<span class="fc" id="L249">            return new Execution(</span>
+                registryId,
+                registryFingerprint,
+<span class="fc" id="L252">                sourceExpression.trim(),</span>
+                transformations);
+        }
+    }
+
+    public record Execution(
+        String registryId,
+        String registryFingerprint,
+        String sourceExpression,
+        List&lt;Transformation&gt; transformations
+    ) {
+<span class="fc" id="L263">        public Execution {</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            if (!REGISTRY_ID.equals(registryId)) {</span>
+<span class="nc" id="L265">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported exact preparation registry&quot;);
+            }
+<span class="fc" id="L268">            registryFingerprint = requireHash(</span>
+                registryFingerprint, &quot;registryFingerprint&quot;);
+<span class="pc bpc" id="L270" title="2 of 4 branches missed.">            if (sourceExpression == null || sourceExpression.isBlank()) {</span>
+<span class="nc" id="L271">                throw new IllegalArgumentException(</span>
+                    &quot;sourceExpression must not be blank&quot;);
+            }
+<span class="fc" id="L274">            transformations = List.copyOf(</span>
+<span class="fc" id="L275">                Objects.requireNonNull(</span>
+                    transformations, &quot;transformations&quot;));
+<span class="fc" id="L277">        }</span>
+
+        /**
+         * Composite moves emitted by a verified exact preparation stage rather
+         * than by the ordinary direct rewrite pass.
+         */
+        public List&lt;Transformation&gt; preparedTransformations() {
+<span class="fc" id="L284">            List&lt;Transformation&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">            for (Transformation transformation : transformations) {</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">                if (transformation.primitiveStepCount() &gt; 1</span>
+<span class="fc" id="L287">                        &amp;&amp; transformation.applicationKey()</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                            .startsWith(&quot;prepared&quot;)) {</span>
+<span class="fc" id="L289">                    result.add(transformation);</span>
+                }
+<span class="fc" id="L291">            }</span>
+<span class="fc" id="L292">            return List.copyOf(result);</span>
+        }
+    }
+
+    private static String requireHash(String value, String field) {
+<span class="pc bpc" id="L297" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L298">            throw new IllegalArgumentException(</span>
+                field + &quot; must be a SHA-256 identity&quot;);
+        }
+<span class="fc" id="L301">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

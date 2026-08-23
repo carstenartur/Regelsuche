@@ -72,21 +72,21 @@ public final class EvolutionGenomeCompiler {
 <span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (expression instanceof PatternExpr.LiteralVariable variable) {</span>
 <span class="nc" id="L73">            return variable.name();</span>
         }
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (expression instanceof PatternExpr.Operation operation) {</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation) {</span>
 <span class="fc" id="L76">            return &quot;(&quot; + renderPattern(operation.left())</span>
 <span class="fc" id="L77">                + operatorSymbol(operation.operator())</span>
 <span class="fc" id="L78">                + renderPattern(operation.right()) + &quot;)&quot;;</span>
         }
-<span class="nc" id="L80">        PatternExpr.Function function = (PatternExpr.Function) expression;</span>
-<span class="nc" id="L81">        return function.name() + &quot;(&quot; + function.arguments().stream()</span>
-<span class="nc" id="L82">            .map(EvolutionGenomeCompiler::renderPattern)</span>
-<span class="nc" id="L83">            .collect(java.util.stream.Collectors.joining(&quot;,&quot;)) + &quot;)&quot;;</span>
+<span class="fc" id="L80">        PatternExpr.Function function = (PatternExpr.Function) expression;</span>
+<span class="fc" id="L81">        return function.name() + &quot;(&quot; + function.arguments().stream()</span>
+<span class="fc" id="L82">            .map(EvolutionGenomeCompiler::renderPattern)</span>
+<span class="fc" id="L83">            .collect(java.util.stream.Collectors.joining(&quot;,&quot;)) + &quot;)&quot;;</span>
     }
 
     private static String operatorSymbol(BinaryOperator operator) {
-<span class="pc bpc" id="L87" title="1 of 5 branches missed.">        return switch (operator) {</span>
+<span class="fc bfc" id="L87" title="All 5 branches covered.">        return switch (operator) {</span>
 <span class="fc" id="L88">            case ADD -&gt; &quot;+&quot;;</span>
-<span class="nc" id="L89">            case SUB -&gt; &quot;-&quot;;</span>
+<span class="fc" id="L89">            case SUB -&gt; &quot;-&quot;;</span>
 <span class="fc" id="L90">            case MUL -&gt; &quot;*&quot;;</span>
 <span class="fc" id="L91">            case DIV -&gt; &quot;/&quot;;</span>
 <span class="fc" id="L92">            case POW -&gt; &quot;^&quot;;</span>
@@ -224,11 +224,11 @@ public final class EvolutionGenomeCompiler {
 
         private PatternExpr parseExpression() {
 <span class="fc" id="L226">            PatternExpr expression = parseTerm();</span>
-<span class="pc bpc" id="L227" title="1 of 4 branches missed.">            while (peek('+') || peek('-')) {</span>
+<span class="fc bfc" id="L227" title="All 4 branches covered.">            while (peek('+') || peek('-')) {</span>
 <span class="fc" id="L228">                char operator = consume();</span>
 <span class="fc" id="L229">                PatternExpr right = parseTerm();</span>
 <span class="fc" id="L230">                expression = PatternExpr.op(</span>
-<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                    operator == '+' ? BinaryOperator.ADD : BinaryOperator.SUB,</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">                    operator == '+' ? BinaryOperator.ADD : BinaryOperator.SUB,</span>
                     expression,
                     right);
 <span class="fc" id="L234">            }</span>

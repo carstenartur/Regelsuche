@@ -1,0 +1,743 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnifiedRulePreparationCoordinator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">UnifiedRulePreparationCoordinator.java</span></div><h1>UnifiedRulePreparationCoordinator.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.EquivalentExpressionProvider;
+import de.regelsuche.transform.ExprMatcher;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternMatchAnalyzer;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.SafePreparationEngineRegistry;
+import de.regelsuche.transform.Transformation;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Product-facing coordinator for direct replay, exact specialized preparation
+ * and the bounded pattern-targeted local bridge fallback.
+ *
+ * &lt;p&gt;Concrete executor replay is always attempted before applicability-schema
+ * analysis. The exact registry follows only when a registered specialist owns
+ * the principal; the generic local bridge remains the final fallback. Guarded
+ * schemas stay on the local path until an exact specialist exposes terminal
+ * matcher bindings. Technical exceptions become retained fail-closed outcomes
+ * rather than ordinary non-applicability.&lt;/p&gt;
+ */
+public final class UnifiedRulePreparationCoordinator {
+    public static final String COORDINATOR_ID =
+        &quot;regelsuche.unified-safe-rule-preparation-coordinator/v1&quot;;
+    private static final String EXACT_REGISTRY_INVENTORY_REVISION =
+        &quot;regelsuche.unified-exact-registry-inventory/v1&quot;;
+    private static final String COMBINED_PREPARATION_REVISION =
+        &quot;regelsuche.unified-preparation-inventory/v1&quot;;
+
+<span class="fc" id="L50">    private static final Comparator&lt;Transformation&gt; EXACT_CANDIDATE_ORDER =</span>
+<span class="fc" id="L51">        Comparator.comparingInt(Transformation::primitiveStepCount)</span>
+<span class="fc" id="L52">            .thenComparing(Transformation::applicationKey)</span>
+<span class="fc" id="L53">            .thenComparing(Transformation::transformedExpression);</span>
+
+    private final List&lt;RewriteApplicabilitySchema&gt; principalSchemas;
+    private final List&lt;RewriteRule&gt; preparationRules;
+    private final Map&lt;String, PrincipalRuntime&gt; runtimes;
+    private final String repositoryRevision;
+    private final PatternTargetedLocalBridgeSearch.Budget bridgeBudget;
+    private final String principalInventoryFingerprint;
+    private final String preparationInventoryFingerprint;
+    private final String exactRegistryFingerprint;
+<span class="fc" id="L63">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L64">    private final PatternMatchAnalyzer analyzer = new PatternMatchAnalyzer();</span>
+
+    public UnifiedRulePreparationCoordinator(
+        List&lt;RewriteApplicabilitySchema&gt; principalSchemas,
+        List&lt;? extends RewriteRule&gt; preparationRules,
+        String repositoryRevision,
+        PatternTargetedLocalBridgeSearch.Budget bridgeBudget
+<span class="fc" id="L71">    ) {</span>
+<span class="fc" id="L72">        this.repositoryRevision = requireRevision(repositoryRevision);</span>
+<span class="fc" id="L73">        this.bridgeBudget = Objects.requireNonNull(</span>
+            bridgeBudget, &quot;bridgeBudget&quot;);
+
+<span class="fc" id="L76">        RulePreparationCoordinator validation =</span>
+            new RulePreparationCoordinator(
+                principalSchemas,
+                preparationRules,
+                this.repositoryRevision,
+                this.bridgeBudget);
+<span class="fc" id="L82">        this.principalSchemas = validation.principalSchemas();</span>
+<span class="fc" id="L83">        this.preparationRules = validatePreparationRules(preparationRules);</span>
+<span class="fc" id="L84">        this.principalInventoryFingerprint =</span>
+<span class="fc" id="L85">            validation.principalInventoryFingerprint();</span>
+
+<span class="fc" id="L87">        Map&lt;String, PrincipalRuntime&gt; indexed = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (RewriteApplicabilitySchema schema : this.principalSchemas) {</span>
+<span class="fc" id="L89">            SafePreparationEngineRegistry.Registration exact =</span>
+<span class="fc" id="L90">                SafePreparationEngineRegistry.production(</span>
+<span class="fc" id="L91">                    exactVisibleRules(schema, this.preparationRules));</span>
+<span class="fc" id="L92">            RulePreparationCoordinator local =</span>
+                new RulePreparationCoordinator(
+<span class="fc" id="L94">                    List.of(schema),</span>
+                    this.preparationRules,
+                    this.repositoryRevision,
+                    this.bridgeBudget);
+<span class="fc" id="L98">            indexed.put(</span>
+<span class="fc" id="L99">                schema.ruleId(),</span>
+                new PrincipalRuntime(schema, exact, local));
+<span class="fc" id="L101">        }</span>
+<span class="fc" id="L102">        this.runtimes = Map.copyOf(indexed);</span>
+<span class="fc" id="L103">        this.exactRegistryFingerprint =</span>
+<span class="fc" id="L104">            exactRegistryFingerprint(this.principalSchemas, this.runtimes);</span>
+<span class="fc" id="L105">        this.preparationInventoryFingerprint = combinedPreparationFingerprint(</span>
+<span class="fc" id="L106">            validation.preparationInventoryFingerprint(),</span>
+            this.exactRegistryFingerprint);
+<span class="fc" id="L108">    }</span>
+
+    public List&lt;RewriteApplicabilitySchema&gt; principalSchemas() {
+<span class="nc" id="L111">        return principalSchemas;</span>
+    }
+
+    public String principalInventoryFingerprint() {
+<span class="nc" id="L115">        return principalInventoryFingerprint;</span>
+    }
+
+    public String preparationInventoryFingerprint() {
+<span class="fc" id="L119">        return preparationInventoryFingerprint;</span>
+    }
+
+    public String exactRegistryFingerprint() {
+<span class="fc" id="L123">        return exactRegistryFingerprint;</span>
+    }
+
+    public Evaluation analyze(
+        String sourceExpression,
+        AssumptionSignature initialAssumptions
+    ) {
+<span class="fc" id="L130">        String source = normalize(sourceExpression);</span>
+<span class="fc" id="L131">        AssumptionSignature assumptions = normalized(initialAssumptions);</span>
+<span class="fc" id="L132">        List&lt;RulePreparationCoordinator.Outcome&gt; outcomes = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (RewriteApplicabilitySchema schema : principalSchemas) {</span>
+<span class="fc" id="L134">            PrincipalRuntime runtime = runtimes.get(schema.ruleId());</span>
+
+            Optional&lt;Transformation&gt; direct;
+            try {
+<span class="fc" id="L138">                direct = directCandidate(</span>
+<span class="fc" id="L139">                    schema.executor(), source, assumptions);</span>
+<span class="fc" id="L140">            } catch (RuntimeException exception) {</span>
+<span class="fc" id="L141">                outcomes.add(technicalOutcome(</span>
+                    runtime,
+<span class="fc" id="L143">                    analysisForEvidence(schema, source),</span>
+<span class="fc" id="L144">                    PatternTargetedLocalBridgeSearch.Work.empty(),</span>
+                    &quot;UNIFIED_DIRECT_REPLAY_TECHNICAL_FAILURE&quot;));
+<span class="fc" id="L146">                continue;</span>
+<span class="fc" id="L147">            }</span>
+
+<span class="fc" id="L149">            PatternMatchAnalyzer.Analysis initial =</span>
+<span class="fc" id="L150">                analysisForEvidence(schema, source);</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            if (direct.isPresent()) {</span>
+<span class="nc" id="L152">                GuardCheck guards = checkRequiredAssumptions(</span>
+                    schema, initial, assumptions);
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                outcomes.add(guards.authorized()</span>
+<span class="nc" id="L155">                    ? directOutcome(runtime, initial, direct.orElseThrow())</span>
+<span class="nc" id="L156">                    : rejectedByGuards(runtime, initial, guards));</span>
+<span class="nc" id="L157">                continue;</span>
+            }
+
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (runtime.exactRegistry().supportsPrincipal(schema.ruleId())</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                    &amp;&amp; schema.requiredAssumptions().isEmpty()) {</span>
+                Optional&lt;ExactCandidate&gt; exact;
+                try {
+<span class="fc" id="L164">                    exact = exactCandidate(runtime, source, assumptions);</span>
+<span class="nc" id="L165">                } catch (RuntimeException exception) {</span>
+<span class="nc" id="L166">                    outcomes.add(technicalOutcome(</span>
+                        runtime,
+                        initial,
+<span class="nc" id="L169">                        PatternTargetedLocalBridgeSearch.Work.empty(),</span>
+                        &quot;UNIFIED_EXACT_REGISTRY_TECHNICAL_FAILURE&quot;));
+<span class="nc" id="L171">                    continue;</span>
+<span class="fc" id="L172">                }</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                if (exact.isPresent()) {</span>
+<span class="fc" id="L174">                    outcomes.add(exactOutcome(</span>
+<span class="fc" id="L175">                        runtime, initial, exact.orElseThrow()));</span>
+<span class="fc" id="L176">                    continue;</span>
+                }
+            }
+
+            try {
+<span class="fc" id="L181">                RulePreparationCoordinator.Evaluation local =</span>
+<span class="fc" id="L182">                    runtime.localCoordinator().analyze(source, assumptions);</span>
+<span class="fc" id="L183">                outcomes.add(local.outcome(schema.ruleId()).orElseThrow());</span>
+<span class="nc" id="L184">            } catch (RuntimeException exception) {</span>
+<span class="nc" id="L185">                outcomes.add(technicalOutcome(</span>
+                    runtime,
+                    initial,
+<span class="nc" id="L188">                    PatternTargetedLocalBridgeSearch.Work.empty(),</span>
+                    &quot;UNIFIED_LOCAL_BRIDGE_TECHNICAL_FAILURE&quot;));
+<span class="fc" id="L190">            }</span>
+<span class="fc" id="L191">        }</span>
+
+<span class="fc" id="L193">        return new Evaluation(</span>
+            COORDINATOR_ID,
+            repositoryRevision,
+            principalInventoryFingerprint,
+            preparationInventoryFingerprint,
+            exactRegistryFingerprint,
+            bridgeBudget,
+            source,
+            assumptions,
+            outcomes,
+<span class="fc" id="L203">            RulePreparationCoordinator.AggregateWork.from(outcomes));</span>
+    }
+
+    public Verification verify(Evaluation evaluation) {
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (evaluation == null) {</span>
+<span class="nc" id="L208">            return new Verification(false, &quot;EVALUATION_MISSING&quot;);</span>
+        }
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (!COORDINATOR_ID.equals(evaluation.coordinatorId())</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                || !repositoryRevision.equals(</span>
+<span class="fc" id="L212">                    evaluation.repositoryRevision())</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                || !principalInventoryFingerprint.equals(</span>
+<span class="fc" id="L214">                    evaluation.principalInventoryFingerprint())</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                || !preparationInventoryFingerprint.equals(</span>
+<span class="fc" id="L216">                    evaluation.preparationInventoryFingerprint())</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                || !exactRegistryFingerprint.equals(</span>
+<span class="fc" id="L218">                    evaluation.exactRegistryFingerprint())</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                || !bridgeBudget.equals(evaluation.bridgeBudget())) {</span>
+<span class="nc" id="L220">            return new Verification(</span>
+                false, &quot;COORDINATOR_CONFIGURATION_MISMATCH&quot;);
+        }
+<span class="fc" id="L223">        Evaluation recomputed = analyze(</span>
+<span class="fc" id="L224">            evaluation.sourceExpression(),</span>
+<span class="fc" id="L225">            evaluation.sourceAssumptions());</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        return recomputed.equals(evaluation)</span>
+<span class="fc" id="L227">            ? new Verification(true, &quot;VERIFIED&quot;)</span>
+<span class="nc" id="L228">            : new Verification(false, &quot;EVALUATION_RECOMPUTATION_MISMATCH&quot;);</span>
+    }
+
+    private RulePreparationCoordinator.Outcome directOutcome(
+        PrincipalRuntime runtime,
+        PatternMatchAnalyzer.Analysis initial,
+        Transformation candidate
+    ) {
+<span class="nc" id="L236">        return new RulePreparationCoordinator.Outcome(</span>
+<span class="nc" id="L237">            runtime.schema().ruleId(),</span>
+<span class="nc" id="L238">            runtime.schema().contentHash(),</span>
+            PatternTargetedLocalBridgeSearch.Status.DIRECT_MATCH_AVAILABLE,
+<span class="nc" id="L240">            Optional.of(candidate),</span>
+            true,
+<span class="nc" id="L242">            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(initial),</span>
+<span class="nc" id="L243">            PatternTargetedLocalBridgeSearch.Work.empty(),</span>
+<span class="nc" id="L244">            Set.of(),</span>
+            &quot;UNIFIED_DIRECT_REPLAYED&quot;,
+            &quot;&quot;);
+    }
+
+    private RulePreparationCoordinator.Outcome exactOutcome(
+        PrincipalRuntime runtime,
+        PatternMatchAnalyzer.Analysis initial,
+        ExactCandidate exact
+    ) {
+<span class="fc" id="L254">        return new RulePreparationCoordinator.Outcome(</span>
+<span class="fc" id="L255">            runtime.schema().ruleId(),</span>
+<span class="fc" id="L256">            runtime.schema().contentHash(),</span>
+            PatternTargetedLocalBridgeSearch.Status.PREPARED,
+<span class="fc" id="L258">            Optional.of(exact.transformation()),</span>
+            true,
+<span class="fc" id="L260">            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(initial),</span>
+<span class="fc" id="L261">            exact.work(),</span>
+<span class="fc" id="L262">            Set.of(),</span>
+            &quot;EXACT_REGISTRY_PREPARATION_REPLAYED&quot;,
+<span class="fc" id="L264">            exact.certificateHash());</span>
+    }
+
+    private RulePreparationCoordinator.Outcome rejectedByGuards(
+        PrincipalRuntime runtime,
+        PatternMatchAnalyzer.Analysis initial,
+        GuardCheck guards
+    ) {
+<span class="nc" id="L272">        return new RulePreparationCoordinator.Outcome(</span>
+<span class="nc" id="L273">            runtime.schema().ruleId(),</span>
+<span class="nc" id="L274">            runtime.schema().contentHash(),</span>
+<span class="nc" id="L275">            guards.failureStatus(),</span>
+<span class="nc" id="L276">            Optional.empty(),</span>
+            false,
+<span class="nc" id="L278">            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(initial),</span>
+<span class="nc" id="L279">            PatternTargetedLocalBridgeSearch.Work.empty(),</span>
+<span class="nc" id="L280">            Set.of(),</span>
+<span class="nc" id="L281">            guards.detailCode(),</span>
+            &quot;&quot;);
+    }
+
+    private RulePreparationCoordinator.Outcome technicalOutcome(
+        PrincipalRuntime runtime,
+        PatternMatchAnalyzer.Analysis initial,
+        PatternTargetedLocalBridgeSearch.Work work,
+        String detailCode
+    ) {
+<span class="fc" id="L291">        return new RulePreparationCoordinator.Outcome(</span>
+<span class="fc" id="L292">            runtime.schema().ruleId(),</span>
+<span class="fc" id="L293">            runtime.schema().contentHash(),</span>
+            PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
+<span class="fc" id="L295">            Optional.empty(),</span>
+            false,
+<span class="fc" id="L297">            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(initial),</span>
+            work,
+<span class="fc" id="L299">            Set.of(),</span>
+            detailCode,
+            &quot;&quot;);
+    }
+
+    private Optional&lt;ExactCandidate&gt; exactCandidate(
+        PrincipalRuntime runtime,
+        String source,
+        AssumptionSignature assumptions
+    ) {
+<span class="fc" id="L309">        SafePreparationEngineRegistry.Execution execution =</span>
+<span class="fc" id="L310">            runtime.exactRegistry().transform(source);</span>
+<span class="fc" id="L311">        List&lt;Transformation&gt; prepared = execution.preparedTransformations();</span>
+<span class="fc" id="L312">        Optional&lt;Transformation&gt; selected = prepared.stream()</span>
+<span class="fc" id="L313">            .filter(value -&gt; runtime.schema().ruleId().equals(value.rule()))</span>
+<span class="fc" id="L314">            .filter(Transformation::equivalencePreservingByConstruction)</span>
+<span class="fc" id="L315">            .sorted(EXACT_CANDIDATE_ORDER)</span>
+<span class="fc" id="L316">            .findFirst()</span>
+<span class="fc" id="L317">            .map(value -&gt; withCumulativeAssumptions(value, assumptions));</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        if (selected.isEmpty()) {</span>
+<span class="nc" id="L319">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L322">        Transformation candidate = selected.orElseThrow();</span>
+<span class="fc" id="L323">        String certificateHash = exactCertificateHash(</span>
+            runtime,
+            source,
+            assumptions,
+            candidate);
+<span class="fc" id="L328">        int generated = execution.transformations().size();</span>
+<span class="fc" id="L329">        int analyzed = prepared.size();</span>
+<span class="fc" id="L330">        PatternTargetedLocalBridgeSearch.Work work =</span>
+            new PatternTargetedLocalBridgeSearch.Work(
+                1,
+                generated,
+                2,
+                1,
+                0,
+                analyzed,
+<span class="fc" id="L338">                Math.max(1, generated));</span>
+<span class="fc" id="L339">        return Optional.of(new ExactCandidate(</span>
+            candidate, work, certificateHash));
+    }
+
+    private Optional&lt;Transformation&gt; directCandidate(
+        RewriteRule executor,
+        String source,
+        AssumptionSignature assumptions
+    ) {
+<span class="fc" id="L348">        return new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L349">                List.of(executor),</span>
+                Integer.MAX_VALUE,
+                1)
+<span class="fc" id="L352">            .transform(source)</span>
+<span class="fc" id="L353">            .stream()</span>
+<span class="pc" id="L354">            .filter(value -&gt; executor.id().equals(value.rule()))</span>
+<span class="fc" id="L355">            .findFirst()</span>
+<span class="pc" id="L356">            .map(value -&gt; withCumulativeAssumptions(</span>
+                value, assumptions));
+    }
+
+    private PatternMatchAnalyzer.Analysis analysisForEvidence(
+        RewriteApplicabilitySchema schema,
+        String expression
+    ) {
+        try {
+<span class="fc" id="L365">            return analyzer.analyze(</span>
+<span class="fc" id="L366">                schema.pattern(),</span>
+<span class="fc" id="L367">                parser.parseTerm(expression),</span>
+<span class="fc" id="L368">                schema.recognitionProfile(),</span>
+                new ExprMatcher.MatchOptions(
+<span class="fc" id="L370">                    EquivalentExpressionProvider.identity(),</span>
+<span class="fc" id="L371">                    bridgeBudget.maxMatchResults(),</span>
+<span class="fc" id="L372">                    bridgeBudget.maxMatchSteps(),</span>
+<span class="fc" id="L373">                    bridgeBudget.maxPatternBranches()));</span>
+<span class="nc" id="L374">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L375">            return technicalAnalysis(schema.pattern());</span>
+        }
+    }
+
+    private static PatternMatchAnalyzer.Analysis technicalAnalysis(
+        PatternExpr pattern
+    ) {
+<span class="nc" id="L382">        return new PatternMatchAnalyzer.Analysis(</span>
+            PatternMatchAnalyzer.Status.INCONCLUSIVE,
+<span class="nc" id="L384">            List.of(),</span>
+<span class="nc" id="L385">            Map.of(),</span>
+<span class="nc" id="L386">            List.of(),</span>
+<span class="nc" id="L387">            List.of(new ExprMatcher.MatchDiagnostic(</span>
+                &quot;MATCH_ANALYSIS_TECHNICAL_FAILURE&quot;,
+                COORDINATOR_ID)),
+            0,
+            0,
+            0,
+            0,
+<span class="nc" id="L394">            patternNodeCount(pattern),</span>
+            &quot;MATCH_ANALYSIS_TECHNICAL_FAILURE&quot;);
+    }
+
+    private static int patternNodeCount(PatternExpr pattern) {
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="nc" id="L400">            return 1</span>
+<span class="nc" id="L401">                + patternNodeCount(operation.left())</span>
+<span class="nc" id="L402">                + patternNodeCount(operation.right());</span>
+        }
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="nc" id="L405">            return 1 + function.arguments().stream()</span>
+<span class="nc" id="L406">                .mapToInt(UnifiedRulePreparationCoordinator::patternNodeCount)</span>
+<span class="nc" id="L407">                .sum();</span>
+        }
+<span class="nc" id="L409">        return 1;</span>
+    }
+
+    private GuardCheck checkRequiredAssumptions(
+        RewriteApplicabilitySchema schema,
+        PatternMatchAnalyzer.Analysis analysis,
+        AssumptionSignature available
+    ) {
+<span class="nc" id="L417">        List&lt;RequiredAssumptionTemplate&gt; templates =</span>
+<span class="nc" id="L418">            schema.requiredAssumptions();</span>
+<span class="nc bnc" id="L419" title="All 2 branches missed.">        if (templates.isEmpty()) {</span>
+<span class="nc" id="L420">            return GuardCheck.authorized(&quot;NO_REQUIRED_ASSUMPTIONS&quot;);</span>
+        }
+<span class="nc bnc" id="L422" title="All 2 branches missed.">        if (!analysis.matched()) {</span>
+<span class="nc" id="L423">            return GuardCheck.unknown(</span>
+                &quot;REQUIRED_ASSUMPTION_BINDINGS_UNAVAILABLE&quot;);
+        }
+        try {
+<span class="nc" id="L427">            Set&lt;String&gt; known = new LinkedHashSet&lt;&gt;(</span>
+<span class="nc" id="L428">                available.normalizedAssumptions());</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">            for (RequiredAssumptionTemplate template : templates) {</span>
+<span class="nc" id="L430">                Assumption required = template.instantiate(</span>
+<span class="nc" id="L431">                    analysis.bindings());</span>
+<span class="nc" id="L432">                String normalized = AssumptionSignature.normalizeExpression(</span>
+<span class="nc" id="L433">                    required.expression());</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">                if (!known.contains(normalized)) {</span>
+<span class="nc" id="L435">                    return GuardCheck.unknown(</span>
+                        &quot;REQUIRED_ASSUMPTION_UNKNOWN&quot;);
+                }
+<span class="nc" id="L438">            }</span>
+<span class="nc" id="L439">            return GuardCheck.authorized(</span>
+                &quot;REQUIRED_ASSUMPTIONS_SATISFIED&quot;);
+<span class="nc" id="L441">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L442">            return GuardCheck.invalid(</span>
+                &quot;REQUIRED_ASSUMPTION_TEMPLATE_INVALID&quot;);
+        }
+    }
+
+    private static Transformation withCumulativeAssumptions(
+        Transformation transformation,
+        AssumptionSignature sourceAssumptions
+    ) {
+<span class="fc" id="L451">        AssumptionSignature cumulative = AssumptionSignature.merge(</span>
+            sourceAssumptions,
+<span class="fc" id="L453">            AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L454">                transformation.assumptions()));</span>
+<span class="fc" id="L455">        return new Transformation(</span>
+<span class="fc" id="L456">            transformation.rule(),</span>
+<span class="fc" id="L457">            transformation.transformedExpression(),</span>
+<span class="fc" id="L458">            transformation.kind(),</span>
+<span class="fc" id="L459">            transformation.mayIncreaseComplexity(),</span>
+<span class="fc" id="L460">            transformation.estimatedCostDelta(),</span>
+<span class="fc" id="L461">            transformation.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L462">            transformation.applicationKey(),</span>
+<span class="fc" id="L463">            cumulative.normalizedAssumptions(),</span>
+<span class="fc" id="L464">            transformation.packId(),</span>
+<span class="fc" id="L465">            transformation.license(),</span>
+<span class="fc" id="L466">            transformation.primitiveRuleIds());</span>
+    }
+
+    private static List&lt;RewriteRule&gt; exactVisibleRules(
+        RewriteApplicabilitySchema schema,
+        List&lt;RewriteRule&gt; preparationRules
+    ) {
+<span class="fc" id="L473">        Map&lt;String, RewriteRule&gt; rules = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L474">        rules.put(schema.ruleId(), schema.executor());</span>
+<span class="fc bfc" id="L475" title="All 2 branches covered.">        for (RewriteRule rule : preparationRules) {</span>
+<span class="fc" id="L476">            rules.putIfAbsent(rule.id(), rule);</span>
+<span class="fc" id="L477">        }</span>
+<span class="fc" id="L478">        return List.copyOf(rules.values());</span>
+    }
+
+    private static List&lt;RewriteRule&gt; validatePreparationRules(
+        List&lt;? extends RewriteRule&gt; supplied
+    ) {
+<span class="fc" id="L484">        Objects.requireNonNull(supplied, &quot;preparationRules&quot;);</span>
+<span class="fc" id="L485">        Map&lt;String, RewriteRule&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        for (RewriteRule rule : supplied) {</span>
+<span class="fc" id="L487">            RewriteRule checked = Objects.requireNonNull(</span>
+                rule, &quot;preparation rule&quot;);
+<span class="pc bpc" id="L489" title="1 of 2 branches missed.">            if (!checked.isEquivalencePreservingByConstruction()) {</span>
+<span class="nc" id="L490">                throw new IllegalArgumentException(</span>
+                    &quot;preparation rules must preserve equivalence: &quot;
+<span class="nc" id="L492">                        + checked.id());</span>
+            }
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">            if (result.put(checked.id(), checked) != null) {</span>
+<span class="nc" id="L495">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L496">                    &quot;duplicate preparation rule ID: &quot; + checked.id());</span>
+            }
+<span class="fc" id="L498">        }</span>
+<span class="fc" id="L499">        return List.copyOf(result.values());</span>
+    }
+
+    private String normalize(String expression) {
+<span class="pc bpc" id="L503" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L504">            throw new IllegalArgumentException(</span>
+                &quot;sourceExpression must not be blank&quot;);
+        }
+<span class="fc" id="L507">        return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+    }
+
+    private static AssumptionSignature normalized(
+        AssumptionSignature assumptions
+    ) {
+<span class="fc" id="L513">        AssumptionSignature supplied = Objects.requireNonNull(</span>
+            assumptions, &quot;initialAssumptions&quot;);
+<span class="fc" id="L515">        return AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L516">            supplied.normalizedAssumptions());</span>
+    }
+
+    private static String exactRegistryFingerprint(
+        List&lt;RewriteApplicabilitySchema&gt; schemas,
+        Map&lt;String, PrincipalRuntime&gt; runtimes
+    ) {
+<span class="fc" id="L523">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L524">        append(descriptor, EXACT_REGISTRY_INVENTORY_REVISION);</span>
+<span class="fc" id="L525">        append(descriptor, Integer.toString(schemas.size()));</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">        for (RewriteApplicabilitySchema schema : schemas) {</span>
+<span class="fc" id="L527">            PrincipalRuntime runtime = runtimes.get(schema.ruleId());</span>
+<span class="fc" id="L528">            append(descriptor, schema.contentHash());</span>
+<span class="fc" id="L529">            append(descriptor,</span>
+<span class="fc" id="L530">                runtime.exactRegistry().registryFingerprint());</span>
+<span class="fc" id="L531">        }</span>
+<span class="fc" id="L532">        return sha256(descriptor.toString());</span>
+    }
+
+    private static String combinedPreparationFingerprint(
+        String localFingerprint,
+        String exactFingerprint
+    ) {
+<span class="fc" id="L539">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L540">        append(descriptor, COMBINED_PREPARATION_REVISION);</span>
+<span class="fc" id="L541">        append(descriptor, localFingerprint);</span>
+<span class="fc" id="L542">        append(descriptor, exactFingerprint);</span>
+<span class="fc" id="L543">        return sha256(descriptor.toString());</span>
+    }
+
+    private String exactCertificateHash(
+        PrincipalRuntime runtime,
+        String source,
+        AssumptionSignature assumptions,
+        Transformation candidate
+    ) {
+<span class="fc" id="L552">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L553">        append(descriptor, COORDINATOR_ID);</span>
+<span class="fc" id="L554">        append(descriptor, repositoryRevision);</span>
+<span class="fc" id="L555">        append(descriptor,</span>
+<span class="fc" id="L556">            runtime.exactRegistry().registryFingerprint());</span>
+<span class="fc" id="L557">        append(descriptor, runtime.schema().contentHash());</span>
+<span class="fc" id="L558">        append(descriptor, source);</span>
+<span class="fc" id="L559">        append(descriptor, assumptions.fingerprint());</span>
+<span class="fc" id="L560">        append(descriptor, candidate.rule());</span>
+<span class="fc" id="L561">        append(descriptor, candidate.transformedExpression());</span>
+<span class="fc" id="L562">        append(descriptor, candidate.applicationKey());</span>
+<span class="fc" id="L563">        append(descriptor, String.join(&quot;\u0000&quot;, candidate.assumptions()));</span>
+<span class="fc" id="L564">        append(descriptor, String.join(&quot;\u0000&quot;, candidate.primitiveRuleIds()));</span>
+<span class="fc" id="L565">        return sha256(descriptor.toString());</span>
+    }
+
+    private static String requireRevision(String revision) {
+<span class="pc bpc" id="L569" title="2 of 4 branches missed.">        if (revision == null || !revision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L570">            throw new IllegalArgumentException(</span>
+                &quot;repositoryRevision must be a lowercase commit SHA&quot;);
+        }
+<span class="fc" id="L573">        return revision;</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L577">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L578">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L582">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L583">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L584">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L585">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L586">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private record PrincipalRuntime(
+        RewriteApplicabilitySchema schema,
+        SafePreparationEngineRegistry.Registration exactRegistry,
+        RulePreparationCoordinator localCoordinator
+    ) {
+<span class="fc" id="L595">        private PrincipalRuntime {</span>
+<span class="fc" id="L596">            schema = Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L597">            exactRegistry = Objects.requireNonNull(</span>
+                exactRegistry, &quot;exactRegistry&quot;);
+<span class="fc" id="L599">            localCoordinator = Objects.requireNonNull(</span>
+                localCoordinator, &quot;localCoordinator&quot;);
+<span class="fc" id="L601">        }</span>
+    }
+
+    private record ExactCandidate(
+        Transformation transformation,
+        PatternTargetedLocalBridgeSearch.Work work,
+        String certificateHash
+    ) {
+<span class="fc" id="L609">        private ExactCandidate {</span>
+<span class="fc" id="L610">            transformation = Objects.requireNonNull(</span>
+                transformation, &quot;transformation&quot;);
+<span class="fc" id="L612">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">            if (certificateHash == null</span>
+<span class="pc bpc" id="L614" title="1 of 2 branches missed.">                    || !certificateHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L615">                throw new IllegalArgumentException(</span>
+                    &quot;exact candidate certificate is invalid&quot;);
+            }
+<span class="fc" id="L618">        }</span>
+    }
+
+    private record GuardCheck(
+        boolean authorized,
+        boolean invalid,
+        String detailCode
+    ) {
+<span class="nc" id="L626">        private GuardCheck {</span>
+<span class="nc bnc" id="L627" title="All 4 branches missed.">            if (authorized &amp;&amp; invalid) {</span>
+<span class="nc" id="L628">                throw new IllegalArgumentException(</span>
+                    &quot;authorized guard check cannot be invalid&quot;);
+            }
+<span class="nc bnc" id="L631" title="All 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L632">                throw new IllegalArgumentException(</span>
+                    &quot;guard detailCode must not be blank&quot;);
+            }
+<span class="nc" id="L635">        }</span>
+
+        static GuardCheck authorized(String detailCode) {
+<span class="nc" id="L638">            return new GuardCheck(true, false, detailCode);</span>
+        }
+
+        static GuardCheck unknown(String detailCode) {
+<span class="nc" id="L642">            return new GuardCheck(false, false, detailCode);</span>
+        }
+
+        static GuardCheck invalid(String detailCode) {
+<span class="nc" id="L646">            return new GuardCheck(false, true, detailCode);</span>
+        }
+
+        PatternTargetedLocalBridgeSearch.Status failureStatus() {
+<span class="nc bnc" id="L650" title="All 2 branches missed.">            return invalid</span>
+<span class="nc" id="L651">                ? PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE</span>
+<span class="nc" id="L652">                : PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED;</span>
+        }
+    }
+
+    public record Evaluation(
+        String coordinatorId,
+        String repositoryRevision,
+        String principalInventoryFingerprint,
+        String preparationInventoryFingerprint,
+        String exactRegistryFingerprint,
+        PatternTargetedLocalBridgeSearch.Budget bridgeBudget,
+        String sourceExpression,
+        AssumptionSignature sourceAssumptions,
+        List&lt;RulePreparationCoordinator.Outcome&gt; outcomes,
+        RulePreparationCoordinator.AggregateWork aggregateWork
+    ) {
+<span class="fc" id="L668">        public Evaluation {</span>
+<span class="pc bpc" id="L669" title="2 of 4 branches missed.">            if (!COORDINATOR_ID.equals(coordinatorId)</span>
+                    || repositoryRevision == null
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">                    || !repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                    || !hash(principalInventoryFingerprint)</span>
+<span class="pc bpc" id="L673" title="1 of 2 branches missed.">                    || !hash(preparationInventoryFingerprint)</span>
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">                    || !hash(exactRegistryFingerprint)) {</span>
+<span class="nc" id="L675">                throw new IllegalArgumentException(</span>
+                    &quot;unified evaluation identity is invalid&quot;);
+            }
+<span class="fc" id="L678">            bridgeBudget = Objects.requireNonNull(</span>
+                bridgeBudget, &quot;bridgeBudget&quot;);
+<span class="pc bpc" id="L680" title="2 of 4 branches missed.">            if (sourceExpression == null || sourceExpression.isBlank()) {</span>
+<span class="nc" id="L681">                throw new IllegalArgumentException(</span>
+                    &quot;sourceExpression must not be blank&quot;);
+            }
+<span class="fc" id="L684">            sourceAssumptions = normalized(sourceAssumptions);</span>
+<span class="fc" id="L685">            outcomes = List.copyOf(</span>
+<span class="fc" id="L686">                Objects.requireNonNull(outcomes, &quot;outcomes&quot;));</span>
+<span class="pc bpc" id="L687" title="1 of 2 branches missed.">            if (outcomes.isEmpty()) {</span>
+<span class="nc" id="L688">                throw new IllegalArgumentException(</span>
+                    &quot;evaluation requires principal outcomes&quot;);
+            }
+<span class="fc" id="L691">            Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L692" title="All 2 branches covered.">            for (RulePreparationCoordinator.Outcome outcome : outcomes) {</span>
+<span class="pc bpc" id="L693" title="1 of 2 branches missed.">                if (!ids.add(outcome.ruleId())) {</span>
+<span class="nc" id="L694">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L695">                        &quot;duplicate outcome rule ID: &quot; + outcome.ruleId());</span>
+                }
+<span class="fc" id="L697">            }</span>
+<span class="fc" id="L698">            aggregateWork = Objects.requireNonNull(</span>
+                aggregateWork, &quot;aggregateWork&quot;);
+<span class="fc" id="L700">        }</span>
+
+        public Optional&lt;RulePreparationCoordinator.Outcome&gt; outcome(
+            String ruleId
+        ) {
+<span class="fc" id="L705">            return outcomes.stream()</span>
+<span class="fc" id="L706">                .filter(value -&gt; value.ruleId().equals(ruleId))</span>
+<span class="fc" id="L707">                .findFirst();</span>
+        }
+
+        public List&lt;Transformation&gt; candidates() {
+<span class="nc" id="L711">            return outcomes.stream()</span>
+<span class="nc" id="L712">                .flatMap(value -&gt; value.candidate().stream())</span>
+<span class="nc" id="L713">                .toList();</span>
+        }
+
+        public long directApplications() {
+<span class="nc" id="L717">            return outcomes.stream()</span>
+<span class="nc" id="L718">                .filter(RulePreparationCoordinator.Outcome::direct)</span>
+<span class="nc" id="L719">                .count();</span>
+        }
+
+        public long preparedApplications() {
+<span class="nc" id="L723">            return outcomes.stream()</span>
+<span class="nc" id="L724">                .filter(RulePreparationCoordinator.Outcome::prepared)</span>
+<span class="nc" id="L725">                .count();</span>
+        }
+
+        private static boolean hash(String value) {
+<span class="pc bpc" id="L729" title="1 of 2 branches missed.">            return value != null</span>
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">                &amp;&amp; value.matches(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+        }
+    }
+
+    public record Verification(boolean valid, String detailCode) {
+<span class="fc" id="L735">        public Verification {</span>
+<span class="pc bpc" id="L736" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L737">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L740">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

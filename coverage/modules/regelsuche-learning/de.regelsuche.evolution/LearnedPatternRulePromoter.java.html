@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LearnedPatternRulePromoter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">LearnedPatternRulePromoter.java</span></div><h1>LearnedPatternRulePromoter.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.knowledge.DerivationType;
+import de.regelsuche.knowledge.RuleDescriptor;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.knowledge.RuleStatus;
+import de.regelsuche.knowledge.SearchEffect;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteKind;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Fail-closed promotion boundary from a raw evolutionary rewrite gene to a
+ * registration-eligible, exactly proved pattern rule.
+ *
+ * &lt;p&gt;Raw compiled genome rules deliberately remain non-equivalence-preserving.
+ * Promotion creates a new rule identity only after genome preflight, frozen
+ * validation/counterexample/holdout/leakage evidence and an exact symbolic
+ * identity proof all agree. The first revision accepts only assumption-free
+ * polynomial identities; learned programs and conditional rules remain outside
+ * this contract.&lt;/p&gt;
+ */
+public final class LearnedPatternRulePromoter {
+    public static final String PROMOTER_ID =
+        &quot;regelsuche.learned-pattern-rule-promoter/v1&quot;;
+    public static final String RECEIPT_SCHEMA =
+        &quot;regelsuche.learned-pattern-rule-promotion-receipt/v1&quot;;
+
+    private final EvolutionGenomeValidator preflight;
+    private final ExactPolynomialPatternIdentityVerifier verifier;
+
+    public LearnedPatternRulePromoter() {
+<span class="fc" id="L37">        this(</span>
+            new EvolutionGenomeValidator(),
+            new ExactPolynomialPatternIdentityVerifier());
+<span class="fc" id="L40">    }</span>
+
+    public LearnedPatternRulePromoter(
+        EvolutionGenomeValidator preflight,
+        ExactPolynomialPatternIdentityVerifier verifier
+<span class="fc" id="L45">    ) {</span>
+<span class="fc" id="L46">        this.preflight = Objects.requireNonNull(preflight, &quot;preflight&quot;);</span>
+<span class="fc" id="L47">        this.verifier = Objects.requireNonNull(verifier, &quot;verifier&quot;);</span>
+<span class="fc" id="L48">    }</span>
+
+    public Promotion promote(
+        EvolutionGenome genome,
+        String geneId,
+        PromotionEvidence evidence
+    ) {
+<span class="fc" id="L55">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L56">        PromotionEvidence checkedEvidence = Objects.requireNonNull(</span>
+            evidence, &quot;evidence&quot;);
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">        if (geneId == null || geneId.isBlank()) {</span>
+<span class="nc" id="L59">            throw new IllegalArgumentException(&quot;geneId must not be blank&quot;);</span>
+        }
+
+<span class="fc" id="L62">        EvolutionGenomeValidator.ValidationReport report =</span>
+<span class="fc" id="L63">            preflight.validate(genome);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (!report.accepted()) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(</span>
+                &quot;genome preflight rejected promotion: &quot;
+<span class="nc" id="L67">                    + report.blockerCodes());</span>
+        }
+<span class="fc" id="L69">        EvolutionGenome.RewriteGene gene = genome.rewrites().stream()</span>
+<span class="fc" id="L70">            .filter(value -&gt; value.geneId().equals(geneId))</span>
+<span class="fc" id="L71">            .findFirst()</span>
+<span class="pc" id="L72">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                &quot;unknown rewrite gene: &quot; + geneId));
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (!gene.assumptions().isEmpty()) {</span>
+<span class="nc" id="L75">            throw new IllegalArgumentException(</span>
+                &quot;conditional learned rules are unsupported by promotion v1&quot;);
+        }
+
+<span class="fc" id="L79">        PatternExpr source = EvolutionGenomeCompiler.parsePattern(</span>
+<span class="fc" id="L80">            gene.sourcePattern());</span>
+<span class="fc" id="L81">        PatternExpr target = EvolutionGenomeCompiler.parsePattern(</span>
+<span class="fc" id="L82">            gene.targetPattern());</span>
+<span class="fc" id="L83">        ExactPolynomialPatternIdentityVerifier.Verification proof =</span>
+<span class="fc" id="L84">            verifier.verify(source, target);</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (!proof.proved()) {</span>
+<span class="fc" id="L86">            throw new IllegalArgumentException(</span>
+                &quot;learned rule lacks an exact identity proof: &quot;
+<span class="fc" id="L88">                    + proof.detailCode());</span>
+        }
+
+<span class="fc" id="L91">        String promotionMaterialHash = promotionMaterialHash(</span>
+            genome,
+            gene,
+            report,
+            checkedEvidence,
+            proof);
+<span class="fc" id="L97">        String ruleId = promotedRuleId(genome, gene);</span>
+<span class="fc" id="L98">        RuleDescriptor descriptor = descriptor(</span>
+            ruleId,
+            genome,
+            gene,
+            report,
+            checkedEvidence,
+            proof,
+            promotionMaterialHash);
+<span class="fc" id="L106">        PatternRewriteRule rule = new PatternRewriteRule(</span>
+            ruleId,
+            source,
+            target,
+<span class="fc" id="L110">            gene.kind(),</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            gene.maxAstGrowth() &gt; 0,</span>
+<span class="fc" id="L112">            gene.estimatedCostDelta(),</span>
+            true,
+            descriptor,
+<span class="fc" id="L115">            RecognitionProfile.exact());</span>
+<span class="fc" id="L116">        RewriteApplicabilitySchema applicabilitySchema =</span>
+<span class="fc" id="L117">            RewriteApplicabilitySchema.fromPatternRule(rule);</span>
+<span class="fc" id="L118">        PromotionReceipt receipt = PromotionReceipt.create(</span>
+            genome,
+            gene,
+            report,
+            checkedEvidence,
+            proof,
+            promotionMaterialHash,
+            rule,
+            applicabilitySchema);
+<span class="fc" id="L127">        return new Promotion(rule, applicabilitySchema, receipt, proof);</span>
+    }
+
+    private static String promotedRuleId(
+        EvolutionGenome genome,
+        EvolutionGenome.RewriteGene gene
+    ) {
+<span class="fc" id="L134">        String digest = genome.alphaStructuralHash()</span>
+<span class="fc" id="L135">            .substring(&quot;sha256:&quot;.length(), &quot;sha256:&quot;.length() + 16);</span>
+<span class="fc" id="L136">        return &quot;learned.promoted.&quot; + digest + &quot;.&quot; + gene.geneId();</span>
+    }
+
+    private static RuleDescriptor descriptor(
+        String ruleId,
+        EvolutionGenome genome,
+        EvolutionGenome.RewriteGene gene,
+        EvolutionGenomeValidator.ValidationReport report,
+        PromotionEvidence evidence,
+        ExactPolynomialPatternIdentityVerifier.Verification proof,
+        String promotionMaterialHash
+    ) {
+<span class="fc" id="L148">        return new RuleDescriptor(</span>
+            ruleId,
+            &quot;learned-promoted&quot;,
+            &quot;Regelsuche Evolution&quot;,
+            &quot;PROJECT&quot;,
+            RECEIPT_SCHEMA,
+            &quot;promotion=&quot; + promotionMaterialHash
+<span class="fc" id="L155">                + &quot;; genome=&quot; + genome.contentHash()</span>
+<span class="fc" id="L156">                + &quot;; gene=&quot; + gene.geneId()</span>
+<span class="fc" id="L157">                + &quot;; preflight=&quot; + report.contentHash()</span>
+<span class="fc" id="L158">                + &quot;; proof=&quot; + proof.proofHash()</span>
+<span class="fc" id="L159">                + &quot;; validation=&quot; + evidence.semanticValidationHash()</span>
+<span class="fc" id="L160">                + &quot;; holdout=&quot; + evidence.holdoutEvaluationHash(),</span>
+            DerivationType.GENERATED,
+            RuleStatus.VALIDATED,
+            &quot;low&quot;,
+<span class="fc" id="L164">            List.of(&quot;learned&quot;, &quot;promoted&quot;, &quot;exact-polynomial&quot;),</span>
+<span class="fc" id="L165">            List.of(searchEffect(gene.kind())),</span>
+<span class="fc" id="L166">            List.of(),</span>
+<span class="fc" id="L167">            List.of());</span>
+    }
+
+    private static SearchEffect searchEffect(RewriteKind kind) {
+<span class="pc bpc" id="L171" title="3 of 4 branches missed.">        return switch (kind) {</span>
+<span class="nc" id="L172">            case SIMPLIFY -&gt; SearchEffect.SIMPLIFYING;</span>
+<span class="nc" id="L173">            case EXPAND -&gt; SearchEffect.EXPANDING;</span>
+<span class="fc" id="L174">            case FACTOR -&gt; SearchEffect.FACTORIZING;</span>
+<span class="nc" id="L175">            case NORMALIZE -&gt; SearchEffect.NORMALIZING;</span>
+        };
+    }
+
+    private static String promotionMaterialHash(
+        EvolutionGenome genome,
+        EvolutionGenome.RewriteGene gene,
+        EvolutionGenomeValidator.ValidationReport report,
+        PromotionEvidence evidence,
+        ExactPolynomialPatternIdentityVerifier.Verification proof
+    ) {
+<span class="fc" id="L186">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L187">        append(material, PROMOTER_ID);</span>
+<span class="fc" id="L188">        append(material, RECEIPT_SCHEMA);</span>
+<span class="fc" id="L189">        append(material, genome.contentHash());</span>
+<span class="fc" id="L190">        append(material, genome.alphaStructuralHash());</span>
+<span class="fc" id="L191">        append(material, gene.geneId());</span>
+<span class="fc" id="L192">        append(material, gene.sourcePattern());</span>
+<span class="fc" id="L193">        append(material, gene.targetPattern());</span>
+<span class="fc" id="L194">        append(material, gene.kind().name());</span>
+<span class="fc" id="L195">        append(material, Integer.toString(gene.estimatedCostDelta()));</span>
+<span class="fc" id="L196">        append(material, report.contentHash());</span>
+<span class="fc" id="L197">        append(material, evidence.semanticValidationHash());</span>
+<span class="fc" id="L198">        append(material, evidence.counterexampleSearchHash());</span>
+<span class="fc" id="L199">        append(material, evidence.holdoutEvaluationHash());</span>
+<span class="fc" id="L200">        append(material, evidence.leakageAuditHash());</span>
+<span class="fc" id="L201">        append(material, evidence.repositoryRevision());</span>
+<span class="fc" id="L202">        append(material, proof.proofHash());</span>
+<span class="fc" id="L203">        return EvolutionGenome.hash(material.toString());</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L207">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L208">    }</span>
+
+    public record PromotionEvidence(
+        String semanticValidationHash,
+        String counterexampleSearchHash,
+        String holdoutEvaluationHash,
+        String leakageAuditHash,
+        String repositoryRevision
+    ) {
+<span class="fc" id="L217">        public PromotionEvidence {</span>
+<span class="fc" id="L218">            EvolutionGenome.requireSha256(</span>
+                semanticValidationHash, &quot;semanticValidationHash&quot;);
+<span class="fc" id="L220">            EvolutionGenome.requireSha256(</span>
+                counterexampleSearchHash, &quot;counterexampleSearchHash&quot;);
+<span class="fc" id="L222">            EvolutionGenome.requireSha256(</span>
+                holdoutEvaluationHash, &quot;holdoutEvaluationHash&quot;);
+<span class="fc" id="L224">            EvolutionGenome.requireSha256(</span>
+                leakageAuditHash, &quot;leakageAuditHash&quot;);
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">            if (repositoryRevision == null</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">                    || !repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L228">                throw new IllegalArgumentException(</span>
+                    &quot;repositoryRevision must be a lowercase commit SHA&quot;);
+            }
+<span class="fc" id="L231">        }</span>
+    }
+
+    public record Promotion(
+        PatternRewriteRule rule,
+        RewriteApplicabilitySchema applicabilitySchema,
+        PromotionReceipt receipt,
+        ExactPolynomialPatternIdentityVerifier.Verification proof
+    ) {
+<span class="fc" id="L240">        public Promotion {</span>
+<span class="fc" id="L241">            rule = Objects.requireNonNull(rule, &quot;rule&quot;);</span>
+<span class="fc" id="L242">            applicabilitySchema = Objects.requireNonNull(</span>
+                applicabilitySchema, &quot;applicabilitySchema&quot;);
+<span class="fc" id="L244">            receipt = Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc" id="L245">            proof = Objects.requireNonNull(proof, &quot;proof&quot;);</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            if (!proof.proved()</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                    || !rule.isEquivalencePreservingByConstruction()</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                    || !rule.descriptor().eligibleForRegistration()</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                    || !rule.id().equals(applicabilitySchema.ruleId())</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                    || !receipt.promotedRuleHash().equals(</span>
+<span class="fc" id="L251">                        RuleInventoryFingerprint.ruleContentHash(rule))</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                    || !receipt.applicabilitySchemaHash().equals(</span>
+<span class="fc" id="L253">                        applicabilitySchema.contentHash())) {</span>
+<span class="nc" id="L254">                throw new IllegalArgumentException(</span>
+                    &quot;promotion products are inconsistent&quot;);
+            }
+<span class="fc" id="L257">        }</span>
+    }
+
+    public record PromotionReceipt(
+        String schema,
+        String promoterId,
+        String genomeHash,
+        String alphaStructuralHash,
+        String geneId,
+        String preflightHash,
+        String semanticValidationHash,
+        String counterexampleSearchHash,
+        String holdoutEvaluationHash,
+        String leakageAuditHash,
+        String repositoryRevision,
+        String proofHash,
+        String promotionMaterialHash,
+        String promotedRuleId,
+        String promotedRuleHash,
+        String applicabilitySchemaHash,
+        String contentHash
+    ) {
+<span class="fc" id="L279">        public PromotionReceipt {</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">            if (!RECEIPT_SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L281" title="2 of 4 branches missed.">                    || !PROMOTER_ID.equals(promoterId)</span>
+                    || geneId == null
+<span class="pc bpc" id="L283" title="2 of 4 branches missed.">                    || geneId.isBlank()</span>
+                    || promotedRuleId == null
+<span class="pc bpc" id="L285" title="2 of 4 branches missed.">                    || promotedRuleId.isBlank()</span>
+                    || repositoryRevision == null
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                    || !repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L288">                throw new IllegalArgumentException(</span>
+                    &quot;promotion receipt identity is invalid&quot;);
+            }
+<span class="fc" id="L291">            EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
+<span class="fc" id="L292">            EvolutionGenome.requireSha256(</span>
+                alphaStructuralHash, &quot;alphaStructuralHash&quot;);
+<span class="fc" id="L294">            EvolutionGenome.requireSha256(preflightHash, &quot;preflightHash&quot;);</span>
+<span class="fc" id="L295">            EvolutionGenome.requireSha256(</span>
+                semanticValidationHash, &quot;semanticValidationHash&quot;);
+<span class="fc" id="L297">            EvolutionGenome.requireSha256(</span>
+                counterexampleSearchHash, &quot;counterexampleSearchHash&quot;);
+<span class="fc" id="L299">            EvolutionGenome.requireSha256(</span>
+                holdoutEvaluationHash, &quot;holdoutEvaluationHash&quot;);
+<span class="fc" id="L301">            EvolutionGenome.requireSha256(</span>
+                leakageAuditHash, &quot;leakageAuditHash&quot;);
+<span class="fc" id="L303">            EvolutionGenome.requireSha256(proofHash, &quot;proofHash&quot;);</span>
+<span class="fc" id="L304">            EvolutionGenome.requireSha256(</span>
+                promotionMaterialHash, &quot;promotionMaterialHash&quot;);
+<span class="fc" id="L306">            EvolutionGenome.requireSha256(</span>
+                promotedRuleHash, &quot;promotedRuleHash&quot;);
+<span class="fc" id="L308">            EvolutionGenome.requireSha256(</span>
+                applicabilitySchemaHash, &quot;applicabilitySchemaHash&quot;);
+<span class="fc" id="L310">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L311">            String expected = EvolutionGenome.hash(material(</span>
+                schema,
+                promoterId,
+                genomeHash,
+                alphaStructuralHash,
+                geneId,
+                preflightHash,
+                semanticValidationHash,
+                counterexampleSearchHash,
+                holdoutEvaluationHash,
+                leakageAuditHash,
+                repositoryRevision,
+                proofHash,
+                promotionMaterialHash,
+                promotedRuleId,
+                promotedRuleHash,
+                applicabilitySchemaHash));
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L329">                throw new IllegalArgumentException(</span>
+                    &quot;promotion receipt contentHash mismatch&quot;);
+            }
+<span class="fc" id="L332">        }</span>
+
+        private static PromotionReceipt create(
+            EvolutionGenome genome,
+            EvolutionGenome.RewriteGene gene,
+            EvolutionGenomeValidator.ValidationReport report,
+            PromotionEvidence evidence,
+            ExactPolynomialPatternIdentityVerifier.Verification proof,
+            String promotionMaterialHash,
+            PatternRewriteRule rule,
+            RewriteApplicabilitySchema applicabilitySchema
+        ) {
+<span class="fc" id="L344">            String promotedRuleHash =</span>
+<span class="fc" id="L345">                RuleInventoryFingerprint.ruleContentHash(rule);</span>
+<span class="fc" id="L346">            String schemaHash = applicabilitySchema.contentHash();</span>
+<span class="fc" id="L347">            String material = material(</span>
+                RECEIPT_SCHEMA,
+                PROMOTER_ID,
+<span class="fc" id="L350">                genome.contentHash(),</span>
+<span class="fc" id="L351">                genome.alphaStructuralHash(),</span>
+<span class="fc" id="L352">                gene.geneId(),</span>
+<span class="fc" id="L353">                report.contentHash(),</span>
+<span class="fc" id="L354">                evidence.semanticValidationHash(),</span>
+<span class="fc" id="L355">                evidence.counterexampleSearchHash(),</span>
+<span class="fc" id="L356">                evidence.holdoutEvaluationHash(),</span>
+<span class="fc" id="L357">                evidence.leakageAuditHash(),</span>
+<span class="fc" id="L358">                evidence.repositoryRevision(),</span>
+<span class="fc" id="L359">                proof.proofHash(),</span>
+                promotionMaterialHash,
+<span class="fc" id="L361">                rule.id(),</span>
+                promotedRuleHash,
+                schemaHash);
+<span class="fc" id="L364">            return new PromotionReceipt(</span>
+                RECEIPT_SCHEMA,
+                PROMOTER_ID,
+<span class="fc" id="L367">                genome.contentHash(),</span>
+<span class="fc" id="L368">                genome.alphaStructuralHash(),</span>
+<span class="fc" id="L369">                gene.geneId(),</span>
+<span class="fc" id="L370">                report.contentHash(),</span>
+<span class="fc" id="L371">                evidence.semanticValidationHash(),</span>
+<span class="fc" id="L372">                evidence.counterexampleSearchHash(),</span>
+<span class="fc" id="L373">                evidence.holdoutEvaluationHash(),</span>
+<span class="fc" id="L374">                evidence.leakageAuditHash(),</span>
+<span class="fc" id="L375">                evidence.repositoryRevision(),</span>
+<span class="fc" id="L376">                proof.proofHash(),</span>
+                promotionMaterialHash,
+<span class="fc" id="L378">                rule.id(),</span>
+                promotedRuleHash,
+                schemaHash,
+<span class="fc" id="L381">                EvolutionGenome.hash(material));</span>
+        }
+
+        private static String material(
+            String schema,
+            String promoterId,
+            String genomeHash,
+            String alphaStructuralHash,
+            String geneId,
+            String preflightHash,
+            String semanticValidationHash,
+            String counterexampleSearchHash,
+            String holdoutEvaluationHash,
+            String leakageAuditHash,
+            String repositoryRevision,
+            String proofHash,
+            String promotionMaterialHash,
+            String promotedRuleId,
+            String promotedRuleHash,
+            String applicabilitySchemaHash
+        ) {
+<span class="fc" id="L402">            StringBuilder value = new StringBuilder();</span>
+<span class="fc" id="L403">            append(value, schema);</span>
+<span class="fc" id="L404">            append(value, promoterId);</span>
+<span class="fc" id="L405">            append(value, genomeHash);</span>
+<span class="fc" id="L406">            append(value, alphaStructuralHash);</span>
+<span class="fc" id="L407">            append(value, geneId);</span>
+<span class="fc" id="L408">            append(value, preflightHash);</span>
+<span class="fc" id="L409">            append(value, semanticValidationHash);</span>
+<span class="fc" id="L410">            append(value, counterexampleSearchHash);</span>
+<span class="fc" id="L411">            append(value, holdoutEvaluationHash);</span>
+<span class="fc" id="L412">            append(value, leakageAuditHash);</span>
+<span class="fc" id="L413">            append(value, repositoryRevision);</span>
+<span class="fc" id="L414">            append(value, proofHash);</span>
+<span class="fc" id="L415">            append(value, promotionMaterialHash);</span>
+<span class="fc" id="L416">            append(value, promotedRuleId);</span>
+<span class="fc" id="L417">            append(value, promotedRuleHash);</span>
+<span class="fc" id="L418">            append(value, applicabilitySchemaHash);</span>
+<span class="fc" id="L419">            return value.toString();</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L423">            return &quot;{&quot;</span>
+                + &quot;\&quot;schema\&quot;:\&quot;&quot; + schema + &quot;\&quot;,&quot; 
+                + &quot;\&quot;promoterId\&quot;:\&quot;&quot; + promoterId + &quot;\&quot;,&quot; 
+                + &quot;\&quot;genomeHash\&quot;:\&quot;&quot; + genomeHash + &quot;\&quot;,&quot; 
+                + &quot;\&quot;alphaStructuralHash\&quot;:\&quot;&quot;
+                + alphaStructuralHash + &quot;\&quot;,&quot; 
+                + &quot;\&quot;geneId\&quot;:\&quot;&quot; + geneId + &quot;\&quot;,&quot; 
+                + &quot;\&quot;preflightHash\&quot;:\&quot;&quot; + preflightHash + &quot;\&quot;,&quot; 
+                + &quot;\&quot;semanticValidationHash\&quot;:\&quot;&quot;
+                + semanticValidationHash + &quot;\&quot;,&quot; 
+                + &quot;\&quot;counterexampleSearchHash\&quot;:\&quot;&quot;
+                + counterexampleSearchHash + &quot;\&quot;,&quot; 
+                + &quot;\&quot;holdoutEvaluationHash\&quot;:\&quot;&quot;
+                + holdoutEvaluationHash + &quot;\&quot;,&quot; 
+                + &quot;\&quot;leakageAuditHash\&quot;:\&quot;&quot;
+                + leakageAuditHash + &quot;\&quot;,&quot; 
+                + &quot;\&quot;repositoryRevision\&quot;:\&quot;&quot;
+                + repositoryRevision + &quot;\&quot;,&quot; 
+                + &quot;\&quot;proofHash\&quot;:\&quot;&quot; + proofHash + &quot;\&quot;,&quot; 
+                + &quot;\&quot;promotionMaterialHash\&quot;:\&quot;&quot;
+                + promotionMaterialHash + &quot;\&quot;,&quot; 
+                + &quot;\&quot;promotedRuleId\&quot;:\&quot;&quot; + promotedRuleId + &quot;\&quot;,&quot; 
+                + &quot;\&quot;promotedRuleHash\&quot;:\&quot;&quot;
+                + promotedRuleHash + &quot;\&quot;,&quot; 
+                + &quot;\&quot;applicabilitySchemaHash\&quot;:\&quot;&quot;
+                + applicabilitySchemaHash + &quot;\&quot;,&quot; 
+                + &quot;\&quot;contentHash\&quot;:\&quot;&quot; + contentHash + &quot;\&quot;}&quot;;
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

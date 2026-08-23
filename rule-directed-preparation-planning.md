@@ -1,417 +1,219 @@
-# Rule-directed preparation planning
+# Rule-directed Preparation Planning
 
-Issue #708 introduces an opt-in preparation layer between direct AST matching
-and the global search frontier.
+**Implementierungsstand: 23. August 2026**
+
+Rule-directed Preparation bestimmt, ob eine fast passende Regel nach wenigen
+legalen, begrenzten und unabhängig prüfbaren lokalen Schritten anwendbar wird.
+Die Hauptregel bleibt unverändert; Vorbereitung, Annahmen und primitive Lineage
+werden als Teil des tatsächlichen Zuges retained.
 
 ## Motivation
 
-A direct rewrite currently has a binary boundary:
+Eine rein binäre Regelgrenze verwirft strukturell nahe Fälle:
 
 ```text
 rule.matches(subtree) -> apply or discard
 ```
 
-For structurally close rules this throws away useful information. Given the
-cancellation schema
+Die Vorbereitungsschicht analysiert stattdessen die Anwendbarkeitsstruktur der
+sichtbaren Regel. Beim Kürzungsschema
 
 ```text
-(A * B) / A -> B    under A != 0
+(A * B) / A -> B    unter A != 0
 ```
 
-and the input
+kann beispielsweise der Ausdruck
 
 ```text
 (x^3 - 1) / (x - 1)
 ```
 
-a partial match can already bind `A = x - 1`. The remaining obligation is
+die Residualbedingung
 
 ```text
 x^3 - 1 = (x - 1) * B
 ```
 
-The first implementation slice solves only this exact obligation in the
-bounded univariate integer-polynomial fragment. It derives
-`B = x^2 + x + 1`, retains a factorization certificate and then exposes the
-ordinary cancellation rule as the principal step.
+erzeugen. Der exakte Polynomsolver bestimmt `B = x^2 + x + 1`, prüft den
+Rest null und führt danach die gewöhnliche Kürzungsregel konkret aus.
 
-A second preparation solver handles a different case without polynomial
-factorization. If the required divisor already occurs in a multiplication tree
-but is hidden by grouping or operand order, associative/commutative
-normalization can expose it directly. For example:
+## Implementierte Ausführung
+
+Die aktuelle Architektur besitzt drei geordnete Stufen:
 
 ```text
-(b * (a * c)) / a
-  -> prepared as (a * (b * c)) / a
-  -> b * c
+1. konkrete direkte Hauptregel
+2. nativer exakter Vorbereitungsspezialist
+3. bounded pattern-targeted local bridge
 ```
 
-No factor is invented: the solver retains and checks the exact multiset of
-existing factors before the ordinary cancellation implementation is replayed.
+Der `UnifiedRulePreparationCoordinator` orchestriert diese Stufen pro explizit
+sichtbarem `RewriteApplicabilitySchema`. Direkte Ausführung hat Vorrang vor der
+Schemaanalyse. Technische Fehler werden als `TECHNICAL_FAILURE` retained und
+nicht als gewöhnlicher Nichttreffer umgedeutet.
 
-A third solver handles a common monomial that is mathematically present but not
-an identical outer AST factor. In the bounded positive-integer monomial
-fragment it derives, for example:
+### Native Exact-Spezialisten
+
+`SafePreparationEngineRegistry` bindet die vorhandenen Solver an eine feste
+Reihenfolge und an ihre jeweils native Principal-Regel:
+
+| Spezialist | Beispiel | Native Hauptregel |
+| --- | --- | --- |
+| Exakter Polynomquotient | `(x^3-1)/(x-1)` | `ast_cancel_division_factor` |
+| AC-Faktorexposition | `(b*(a*c))/a` | `ast_cancel_division_factor` |
+| Gemeinsamer Monomfaktor | `x^2*y+x*z` | `ast_factor_common_left` |
+| Exakte Quadratexposition | `4*x^4*y^2-9*z^2` | `ast_square_difference_factor` |
+| Gemeinsamer Nenner | `a/b+c/d` | `hypothesis_rational_normalization` |
+
+Jeder Spezialist besitzt einen eigenen mathematischen Fragmentvertrag, ein
+Budget, Work Accounting, konkrete Principal-Wiederholung und ein
+content-addressed Certificate. Die Registry zentralisiert Identität und
+Reihenfolge, ersetzt diese Nachweise aber nicht.
+
+Ein fremdes oder gelerntes Pattern mit ähnlicher Form erbt keinen nativen
+Solververtrag. Nur die explizit registrierte Principal-ID kann eine native
+Exact-Stage verwenden.
+
+### Allgemeiner lokaler Bridge-Fallback
+
+`PatternMatchAnalyzer` liefert strukturierte Ergebnisse für:
 
 ```text
-x^2 * y + x * z
-  -> prepared as x * (x * y) + x * z
-  -> x * (x * y + z)
+EXACT_MATCH
+MATCH_MODULO_THEORY
+RESIDUAL_MATCH
+NO_MATCH
+INCONCLUSIVE
 ```
 
-The greatest common monomial and both exact quotients are retained and
-independently verified before the visible common-factor rule is replayed.
+`PatternTargetedLocalBridgeSearch` untersucht anschließend einen eingefrorenen,
+endlichen Bestand äquivalenzbewahrender Vorbereitungsregeln. Die Suche ist
+zielblind bezüglich des Endergebnisses; ihr lokales Ziel ist ausschließlich die
+Anwendbarkeit der Hauptregel.
 
-A fourth solver exposes exact square structure. For example:
+Sie unterscheidet:
+
+- direkt anwendbar;
+- vorbereitet und konkret wiederholt;
+- vollständige endliche Closure ohne Bridge;
+- Budget-Inconclusive;
+- Unsupported;
+- ungültiges Zertifikat;
+- technischen Fehler.
+
+Ein positiver Pfad enthält jede primitive Vorbereitung und den abschließenden
+Principal-Schritt. Ein Composite Move darf im Frontier als eine Kante behandelt
+werden, sein mathematischer Arbeitsumfang bleibt jedoch vollständig sichtbar.
+
+## Applicability-Schemata und Guards
+
+Ein `RewriteApplicabilitySchema` bindet:
+
+- Schema-ID;
+- Applicability-Pattern;
+- RecognitionProfile;
+- typisierte Required-Assumption-Templates;
+- konkreten Executor.
+
+Das Schema besitzt kein alternatives Zielpattern. Nur der Executor erzeugt den
+Ergebnis-AST.
+
+Nichtnull-, Positivitäts-, Ganzzahligkeits- und weitere unterstützte Guards
+werden aus vollständigen Bindings instanziiert. Fehlende oder unbekannte
+Voraussetzungen autorisieren keinen Kandidaten. Ausgangsannahmen und durch
+verifizierte Vorbereitungen erzeugte Annahmen werden gemeinsam geprüft.
+
+## Retained Evidence
+
+Ein vorbereiteter Zug behält mindestens:
 
 ```text
-4 * x^4 * y^2 - 9 * z^2
-  -> prepared as (2 * x^2 * y)^2 - (3 * z)^2
-  -> (2 * x^2 * y - 3 * z) * (2 * x^2 * y + 3 * z)
+Principal-ID und Inventaridentität
+Original-, Prepared- und Result-Repräsentation
+AST-Position oder mathematische Objektposition
+Matchbindungen und Residualbedingungen
+Solver- oder Bridge-ID
+konkrete primitive Vorbereitungsschritte
+konkreten Principal-Schritt
+Annahmen, Domains und Guard-Ausgang
+Certificate oder unabhängigen Witness
+konfiguriertes und verbrauchtes Work-Budget
+Terminalstatus
+Repository-Revision
 ```
 
-Both monomial roots must be exact under the configured bounds. The existing
-difference-of-squares rule remains the principal transformation.
+Die spezialisierten Solver dokumentieren weitere fragmentbezogene Witnesses:
 
-A fifth solver prepares two rational terms with different denominators. For
-example:
+- [Exakter Polynomquotient und AC-Faktorexposition](#native-exact-spezialisten)
+- [Gemeinsamer Monomfaktor](monomial-common-factor-preparation.md)
+- [Exakte Quadratexposition](perfect-square-structure-preparation.md)
+- [Gemeinsamer Nenner](rational-common-denominator-preparation.md)
+
+## Gelernte Regeln
+
+Eine gelernte Pattern-Regel kann den allgemeinen lokalen Bridge-Fallback nach
+einer eigenständigen Promotion verwenden. Der erste implementierte Adapter
+akzeptiert nur assumption-free Patternidentitäten, die im begrenzten
+kommutativen Polynomfragment exakt bewiesen wurden.
+
+Der charakterisierte Fall zeigt:
 
 ```text
-a / b + c / d
-  -> prepared as (a * d) / (b * d) + (c * b) / (b * d)
-  -> (a * d + c * b) / (b * d)
+promovierte Regel: A^2 - B^2 -> (A-B)*(A+B)
+Eingabe:           ((x^2*a)/a) - y^2
+Vorbereitung:      x^2 - y^2            unter a != 0
+Ergebnis:          (x-y)*(x+y)
 ```
 
-The solver preserves addition or subtraction order, retains the common
-denominator and cross-multiplied numerators, and requires the existing rational
-normalization operator to replay with the exact retained side condition.
+Rohe `CompiledGenomeRule`s bleiben nicht äquivalenzbewahrend und werden vom
+sicheren Koordinator abgelehnt. Details:
+[Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md).
 
-## Information boundary
+## Repräsentationsbrücken
 
-A preparation solver consumes only:
+Skalare Gleichungssysteme können bereits exakt als `A*x=b`, unabhängige
+Matrixblöcke, RREF-Lösungsräume und – bei expliziten Rollen – symbolische
+Eigenprobleme dargestellt werden. Diese typisierten Brücken sind keine
+skalaren AST-Rewrites und bleiben deshalb in einer eigenen
+Repräsentationsschicht.
 
-- the current AST subtree;
-- the visible principal rule or operator ID;
-- its declared mathematical fragment;
-- its local work budget.
+Die direkte Teilnahme solcher Objektbrücken am Unified Coordinator ist noch
+offen. Sie darf nicht dadurch simuliert werden, dass Gleichungssysteme oder
+Operatoren verlustbehaftet in einen einzelnen Ausdrucksstring gepresst werden.
 
-It receives no search target, pinned benchmark reference, hidden family label
-or post-hoc qualification result. If the required principal rule or operator is
-absent from the visible inventory, no prepared application is generated.
+## Aktivierung und historische Evidence
 
-## Opt-in use
+Die neuen Pfade verändern die mechanische Erreichbarkeit. Historische
+Benchmarks behalten deshalb unverändert ihre damaligen Engine-, Regel- und
+Budgetidentitäten.
 
-The exact-polynomial preparation path remains available through:
+Der Unified Coordinator ist implementiert und testbar, aber noch nicht als
+allgemeiner Workbench-/CLI-Standard ausgewählt. Vor der Auswahl von
+`SAFE_PREPARATION_V1` als Produktprofil fehlen noch:
 
-```java
-TransformationEngine engine =
-    new RulePreparationTransformationEngine();
+- eine integrierte matched-work Charakterisierung gegen `DIRECT_V1`;
+- eine geteilte Multi-Principal-Frontier und gemeinsame AST-/Value-Traversierung;
+- eine Produktentscheidung über Default-Profile;
+- die Integration typisierter Repräsentationsbrücken.
+
+## Prüfung aus dem Checkout
+
+```bash
+./gradlew :regelsuche-core:test \
+  --tests de.regelsuche.transform.SafePreparationEngineRegistryTest
+
+./gradlew :regelsuche-search:test \
+  --tests de.regelsuche.search.reachability.UnifiedRulePreparationCoordinatorTest
+
+./gradlew :regelsuche-experiments:symPyRuleAmplification
+
+./gradlew --no-configuration-cache ciCheck
 ```
 
-The AC-normalization engine composes the existing direct and exact-polynomial
-paths and then adds bounded factor exposure:
-
-```java
-TransformationEngine engine =
-    new AcNormalizationPreparationTransformationEngine();
-```
-
-Exact two-term common-monomial synthesis is available through:
-
-```java
-TransformationEngine engine =
-    new MonomialCommonFactorPreparationTransformationEngine();
-```
-
-Exact monomial-square exposure composes all earlier paths:
-
-```java
-TransformationEngine engine =
-    new PerfectSquareStructurePreparationTransformationEngine();
-```
-
-Bounded cross-multiplication for two rational terms is available through:
-
-```java
-TransformationEngine engine =
-    new RationalCommonDenominatorPreparationTransformationEngine();
-```
-
-The engines also support explicit rule selection through their
-`withKnowledgePacks(selection)` factories.
-
-`AstRewriteTransformationEngine` remains unchanged. Historical benchmark
-configurations therefore retain their previous rule inventory and output.
-
-## Retained application evidence
-
-`RulePreparationPlanner.PreparedRuleApplication` records:
-
-- original, prepared and result subtrees;
-- bindings `A` and `B`;
-- the residual exact-factor obligation;
-- the non-zero side condition;
-- preparation and principal primitive rule IDs;
-- solver identity and exact remainder-zero certificate;
-- balanced configured, consumed and remaining solver work.
-
-`AcNormalizationPreparationSolver.PreparedApplication` additionally records:
-
-- the flattened original and prepared factor witnesses;
-- exact structural hashes for every factor, including duplicate factors;
-- the deterministically selected divisor occurrence;
-- the factor-count budget and inspected work;
-- an AC multiset certificate independent of the later cancellation replay.
-
-`MonomialCommonFactorPreparationSolver.PreparedApplication` records:
-
-- the original, prepared and result ASTs;
-- the greatest common monomial and both exact quotient monomials;
-- bindings `A`, `B` and `C` plus the residual factor equations;
-- exact monomial descriptors and a content-addressed certificate;
-- balanced factor work and the two retained primitive IDs.
-
-`PerfectSquareStructurePreparationSolver.PreparedApplication` records:
-
-- the original, prepared and result ASTs;
-- both exact monomial square roots and bindings `A` and `B`;
-- residual square equations, source/root descriptors and a content hash;
-- balanced work and the preparation/principal primitive lineage.
-
-`RationalCommonDenominatorPreparationSolver.PreparedApplication` records:
-
-- original, prepared and result ASTs;
-- original numerators and denominators as bindings `A`, `B`, `C` and `D`;
-- both scaled numerators and the common denominator binding `Q`;
-- the residual denominator obligation and exact non-zero assumption;
-- input/constructed-node work, structure hashes and a content-addressed
-  certificate;
-- preparation and rational-normalization primitive IDs.
-
-The transformation edge keeps every primitive ID, so treating a composed
-operation as one frontier move does not hide its mathematical work.
-
-## AC-normalization preparation
-
-The AC solver is deliberately narrower than a general normalizer. It only
-flattens `MUL` nodes in the numerator of one division. It then asks whether the
-visible divisor is already one of those factors using exact AST equality.
-
-For
-
-```text
-(b * (a * c)) / a
-```
-
-the retained factor sequence is:
-
-```text
-[b, a, c]
-```
-
-The first matching `a` is selected deterministically, the remaining factors
-retain their original relative order, and the prepared numerator is:
-
-```text
-a * (b * c)
-```
-
-The certificate checks that the original and prepared numerators have the same
-multiplicative factor multiset. Only then does the engine replay
-`ast_cancel_division_factor` on the prepared subtree. If replay does not produce
-the expected result and assumptions, the candidate is discarded.
-
-The solver does not:
-
-- distribute through addition or subtraction;
-- invent a unit factor for `a / a`;
-- infer algebraically equivalent but structurally different factors;
-- treat multiplication in an undeclared non-commutative domain as AC;
-- continue after its configured factor limit is exhausted.
-
-A factor-limit hit is `BUDGET_INCONCLUSIVE`, never a proven non-match.
-
-## Exact common-monomial preparation
-
-The monomial solver supports exactly two additive terms built from positive
-exact integer coefficients, variables, positive integer variable powers and
-multiplication. It computes the coefficient GCD and the minimum exponent of
-each shared variable. Exact division yields the two remainders.
-
-For example:
-
-```text
-6 * x^2 * y + 9 * x * z
-  -> (3 * x) * (2 * x * y + 3 * z)
-```
-
-A quotient of one is permitted only when exact division proves it, as in
-`x^2 + x -> x * (x + 1)`. Coefficients outside the exactly representable
-integer range of `NumberExpr`, unsupported syntax and exhausted factor,
-coefficient or exponent limits never become guessed factors.
-
-The prepared AST is retained directly. Formatting and reparsing could erase
-associative multiplication grouping, so the concrete visible
-`ast_factor_common_left` rule must match and apply to that retained AST before a
-candidate is emitted. See
-[`monomial-common-factor-preparation.md`](monomial-common-factor-preparation.md)
-for the complete fragment and certificate contract.
-
-## Exact perfect-square preparation
-
-The square solver accepts a subtraction of two positive exact integer monomials.
-Each coefficient must be a perfect square and every variable exponent must be
-even. It computes both roots exactly, squares them back to the source monomials
-and prepares the syntactic form required by `ast_square_difference_factor`.
-
-It does not reorder subtraction, approximate a root or introduce assumptions.
-The concrete visible principal rule must replay on the retained prepared AST and
-produce the exact expected result. See
-[`perfect-square-structure-preparation.md`](perfect-square-structure-preparation.md)
-for the complete evidence and claim boundary.
-
-## Rational common-denominator preparation
-
-The rational solver accepts addition or subtraction with one division on each
-side. It constructs `B * D` as the common denominator and scales the two
-numerators to `A * D` and `C * B`. Explicit zero denominators are rejected.
-Already equal denominators remain on the cheap direct path.
-
-The prepared expression is independently reconstructed and hashed before the
-existing `hypothesis_rational_normalization` operator is invoked. The candidate
-is emitted only when that operator returns the expected canonical expression
-and exact assumption:
-
-```text
-B * D != 0
-```
-
-This single condition is sufficient for both denominator extensions and the
-final fraction in the declared scalar domain. The solver does not minimize the
-denominator, cancel factors or infer polynomial GCD/LCM information. Input and
-constructed AST work are separately bounded. See
-[`rational-common-denominator-preparation.md`](rational-common-denominator-preparation.md)
-for the complete contract.
-
-## Fail-closed outcomes
-
-The exact-polynomial planner distinguishes:
-
-- `PREPARED`;
-- `DIRECT_MATCH_AVAILABLE`;
-- `NOT_APPLICABLE`;
-- `UNSUPPORTED`;
-- `NO_EXACT_QUOTIENT`;
-- `BUDGET_INCONCLUSIVE`.
-
-The AC, common-monomial, perfect-square and rational common-denominator solvers
-distinguish:
-
-- `PREPARED`;
-- `DIRECT_MATCH_AVAILABLE`;
-- `NOT_APPLICABLE`;
-- `UNSUPPORTED`;
-- `BUDGET_INCONCLUSIVE`;
-- `INVALID_CERTIFICATE`.
-
-Unsupported input, a missing factor, a non-square monomial, an explicit zero
-divisor, exhausted work or a rejected certificate never produces a guessed
-candidate. A prepared application that fails independent verification is
-skipped while direct results and other AST positions remain available.
-
-## Invocation-local memoization
-
-One transformation invocation may contain the same subtree at several AST
-positions. Repeating the same residual solver call at each occurrence adds no
-mathematical information. `RulePreparationTransformationEngine` therefore
-maintains a bounded deterministic cache for the duration of one
-`transformWithEvidence` call.
-
-Each key binds:
-
-- planner revision;
-- principal rule ID;
-- exact recursive AST-structure hash;
-- normalized assumption fingerprint;
-- deterministic rule-inventory fingerprint;
-- preparation-budget identity.
-
-The subtree descriptor records node kinds, operators, child order, variable and
-function names, argument counts and exact floating-point number bits using
-length-prefixed tokens before hashing. It does not rely on pretty-printed text:
-the formatter may intentionally hide associative parentheses. Algebraically
-equivalent or identically formatted but structurally different occurrences may
-require different bindings and retained evidence; they are analyzed
-independently.
-
-Structural hashes are computed once per invocation as a bottom-up Merkle tree.
-Each AST occurrence contributes one node descriptor and refers to its child
-hashes, so fingerprint construction is linear in the number of AST nodes rather
-than repeatedly traversing every subtree.
-
-The standard rule-list constructor uses `RuleInventoryFingerprint`. Pattern
-rules bind their source, target and recognition profile; every rule binds its
-implementation class and public execution metadata. A changed Java body behind
-the same implementation class is not content-addressed by this fingerprint, so
-retained experiments must additionally bind the repository revision. Callers
-that inject a custom direct engine must provide or accept an explicit ID-only
-inventory hash.
-
-Only analyses that consumed residual-solver work are retained. Cheap decisions
-such as “this node is not a division” remain visible in the metrics but cannot
-occupy cache capacity or evict a verified quotient. `BUDGET_INCONCLUSIVE`
-results are also never retained: a budget-limited non-result must not become a
-semantic negative fact.
-
-Prepared applications enter the cache only after independent verification. A
-cache hit therefore reuses already verified formation evidence without
-rerunning the exact quotient proposal or its verification. The visible
-principal rule is still replayed for each concrete AST position before a
-transformation is emitted.
-
-Insertion order and oldest-expensive-entry eviction are deterministic. Cache
-capacity is configurable and may be set to zero for an exact no-cache ablation.
-`transformWithEvidence` returns balanced cache metrics:
-
-```text
-lookups = hits + misses
-retained entries
-oldest expensive-entry evictions
-skipped budget-inconclusive results
-skipped zero-solver-work decisions
-prepared-application verifications
-skipped unverifiable applications
-```
-
-The cache is intentionally invocation-local. It cannot leak candidates between
-experiments with different assumptions, inventories or configuration
-identities, and it requires no invalidation protocol beyond the retained key.
-
-## Experiment identity and ablation
-
-A benchmark or retained experiment that enables preparation must bind at least
-the repository revision, engine and solver IDs, rule-inventory fingerprint,
-normalized assumption fingerprint, each solver budget and any cache-capacity
-policy in its configuration identity. The disabled or capacity-zero variant is
-the required direct ablation for a work-reduction claim.
-
-Preparation and memoization change mechanical reachability and work, not the
-historical rule inventory. They therefore must never be used to rewrite evidence
-from configurations that did not declare these execution policies.
-
-## Current limits
-
-The implemented solvers now cover exact univariate integer-polynomial quotient
-synthesis, existing-factor exposure modulo scalar multiplication AC, exact
-common-factor synthesis for two positive integer monomials, exact
-perfect-square exposure for two such monomials and bounded cross-multiplication
-for two scalar rational terms.
-
-They do not yet provide general partial-pattern obligations, e-class
-representative planning or bounded local pattern-targeted BFS. The exact
-monomial solvers do not establish general polynomial factorization,
-subtraction-aware or rational-coefficient GCD extraction, multiterm
-common-factor synthesis or arbitrary algebraic root extraction. The rational
-solver does not establish denominator minimization, polynomial GCD/LCM
-computation, cancellation or complete rational simplification. Those remaining
-capabilities stay in #708.
+## Siehe auch
+
+- [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md)
+- [Search Intelligence](search-intelligence.md)
+- [Architektur](architecture.md)
+- [Discovery- und Forschungsstand](discovery-status.md)
+- [Unterstützte Grenzen](limits.md)

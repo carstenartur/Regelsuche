@@ -1,0 +1,481 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactPolynomialPatternIdentityVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExactPolynomialPatternIdentityVerifier.java</span></div><h1>ExactPolynomialPatternIdentityVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.transform.PatternExpr;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/**
+ * Exact, bounded polynomial-ring verifier for learned rewrite patterns.
+ *
+ * &lt;p&gt;Placeholders and literal variables are treated as independent commuting
+ * indeterminates. Only integer coefficients and addition, subtraction,
+ * multiplication and bounded non-negative integer powers are accepted. Every
+ * unsupported construct fails closed instead of being sampled numerically.&lt;/p&gt;
+ */
+public final class ExactPolynomialPatternIdentityVerifier {
+    public static final String VERIFIER_ID =
+        &quot;regelsuche.exact-polynomial-pattern-identity/v1&quot;;
+
+    private final Budget budget;
+
+    public ExactPolynomialPatternIdentityVerifier() {
+<span class="fc" id="L33">        this(Budget.DEFAULT);</span>
+<span class="fc" id="L34">    }</span>
+
+<span class="fc" id="L36">    public ExactPolynomialPatternIdentityVerifier(Budget budget) {</span>
+<span class="fc" id="L37">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L38">    }</span>
+
+    public Budget budget() {
+<span class="nc" id="L41">        return budget;</span>
+    }
+
+    public Verification verify(PatternExpr source, PatternExpr target) {
+<span class="fc" id="L45">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L46">        Objects.requireNonNull(target, &quot;target&quot;);</span>
+<span class="fc" id="L47">        Work work = new Work();</span>
+<span class="fc" id="L48">        String sourcePattern = EvolutionGenomeCompiler.renderPattern(source);</span>
+<span class="fc" id="L49">        String targetPattern = EvolutionGenomeCompiler.renderPattern(target);</span>
+<span class="fc" id="L50">        String sourceCanonical = &quot;&quot;;</span>
+<span class="fc" id="L51">        String targetCanonical = &quot;&quot;;</span>
+        Status status;
+        String detailCode;
+        try {
+<span class="fc" id="L55">            Polynomial sourcePolynomial = polynomial(source, work);</span>
+<span class="fc" id="L56">            sourceCanonical = sourcePolynomial.canonical();</span>
+<span class="fc" id="L57">            Polynomial targetPolynomial = polynomial(target, work);</span>
+<span class="fc" id="L58">            targetCanonical = targetPolynomial.canonical();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (sourcePolynomial.equals(targetPolynomial)) {</span>
+<span class="fc" id="L60">                status = Status.PROVED;</span>
+<span class="fc" id="L61">                detailCode = &quot;EXACT_POLYNOMIAL_NORMAL_FORMS_EQUAL&quot;;</span>
+            } else {
+<span class="fc" id="L63">                status = Status.NOT_EQUIVALENT;</span>
+<span class="fc" id="L64">                detailCode = &quot;EXACT_POLYNOMIAL_NORMAL_FORMS_DIFFER&quot;;</span>
+            }
+<span class="fc" id="L66">        } catch (BudgetExceeded exception) {</span>
+<span class="fc" id="L67">            status = Status.BUDGET_EXCEEDED;</span>
+<span class="fc" id="L68">            detailCode = exception.getMessage();</span>
+<span class="fc" id="L69">        } catch (UnsupportedPattern exception) {</span>
+<span class="fc" id="L70">            status = Status.UNSUPPORTED;</span>
+<span class="fc" id="L71">            detailCode = exception.getMessage();</span>
+<span class="fc" id="L72">        }</span>
+<span class="fc" id="L73">        Verification provisional = new Verification(</span>
+            VERIFIER_ID,
+            status,
+            budget,
+            sourcePattern,
+            targetPattern,
+            sourceCanonical,
+            targetCanonical,
+            work.visitedNodes,
+            work.generatedTerms,
+            detailCode,
+            &quot;&quot;);
+<span class="fc" id="L85">        return provisional.withProofHash(proofHash(provisional));</span>
+    }
+
+    private Polynomial polynomial(PatternExpr expression, Work work) {
+<span class="fc" id="L89">        work.visit(budget);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L91">            return checked(</span>
+<span class="fc" id="L92">                Polynomial.variable(&quot;placeholder:&quot; + placeholder.name()),</span>
+                work);
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (expression instanceof PatternExpr.LiteralVariable variable) {</span>
+<span class="nc" id="L96">            return checked(</span>
+<span class="nc" id="L97">                Polynomial.variable(&quot;literal:&quot; + variable.name()),</span>
+                work);
+        }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (expression instanceof PatternExpr.LiteralNumber number) {</span>
+<span class="fc" id="L101">            return checked(</span>
+<span class="fc" id="L102">                Polynomial.constant(exactInteger(number.value())),</span>
+                work);
+        }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L106">            throw unsupported(&quot;FUNCTION_NOT_IN_POLYNOMIAL_FRAGMENT_&quot;</span>
+<span class="fc" id="L107">                + function.name());</span>
+        }
+<span class="fc" id="L109">        PatternExpr.Operation operation =</span>
+            (PatternExpr.Operation) expression;
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (operation.operator() == BinaryOperator.POW) {</span>
+<span class="fc" id="L112">            Polynomial base = polynomial(operation.left(), work);</span>
+<span class="fc" id="L113">            int exponent = exponent(operation.right(), work);</span>
+<span class="fc" id="L114">            return power(base, exponent, work);</span>
+        }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (operation.operator() == BinaryOperator.DIV) {</span>
+<span class="nc" id="L117">            throw unsupported(&quot;DIVISION_NOT_IN_POLYNOMIAL_FRAGMENT&quot;);</span>
+        }
+<span class="fc" id="L119">        Polynomial left = polynomial(operation.left(), work);</span>
+<span class="fc" id="L120">        Polynomial right = polynomial(operation.right(), work);</span>
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">        return switch (operation.operator()) {</span>
+<span class="fc" id="L122">            case ADD -&gt; checked(left.add(right), work);</span>
+<span class="fc" id="L123">            case SUB -&gt; checked(left.subtract(right), work);</span>
+<span class="fc" id="L124">            case MUL -&gt; checked(left.multiply(right), work);</span>
+<span class="nc" id="L125">            case DIV, POW -&gt; throw new IllegalStateException(</span>
+                &quot;operator handled before switch&quot;);
+        };
+    }
+
+    private Polynomial power(Polynomial base, int exponent, Work work) {
+<span class="fc" id="L131">        Polynomial result = Polynomial.constant(BigInteger.ONE);</span>
+<span class="fc" id="L132">        Polynomial factor = base;</span>
+<span class="fc" id="L133">        int remaining = exponent;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if ((remaining &amp; 1) == 1) {</span>
+<span class="fc" id="L136">                result = checked(result.multiply(factor), work);</span>
+            }
+<span class="fc" id="L138">            remaining &gt;&gt;= 1;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if (remaining &gt; 0) {</span>
+<span class="fc" id="L140">                factor = checked(factor.multiply(factor), work);</span>
+            }
+        }
+<span class="fc" id="L143">        return checked(result, work);</span>
+    }
+
+    private Polynomial checked(Polynomial value, Work work) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (value.terms().size() &gt; budget.maxTerms()) {</span>
+<span class="nc" id="L148">            throw budget(&quot;MAX_TERMS_EXCEEDED&quot;);</span>
+        }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, BigInteger&gt; term : value.terms().entrySet()) {</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (term.getKey().degree() &gt; budget.maxTotalDegree()) {</span>
+<span class="fc" id="L152">                throw budget(&quot;MAX_TOTAL_DEGREE_EXCEEDED&quot;);</span>
+            }
+<span class="fc" id="L154">            if (term.getValue().abs().bitLength()</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                    &gt; budget.maxCoefficientBits()) {</span>
+<span class="nc" id="L156">                throw budget(&quot;MAX_COEFFICIENT_BITS_EXCEEDED&quot;);</span>
+            }
+<span class="fc" id="L158">        }</span>
+<span class="fc" id="L159">        work.generatedTerms += value.terms().size();</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (work.generatedTerms &gt; budget.maxGeneratedTerms()) {</span>
+<span class="nc" id="L161">            throw budget(&quot;MAX_GENERATED_TERMS_EXCEEDED&quot;);</span>
+        }
+<span class="fc" id="L163">        return value;</span>
+    }
+
+    private int exponent(PatternExpr value, Work work) {
+<span class="fc" id="L167">        work.visit(budget);</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (!(value instanceof PatternExpr.LiteralNumber number)) {</span>
+<span class="nc" id="L169">            throw unsupported(&quot;POWER_EXPONENT_MUST_BE_LITERAL_INTEGER&quot;);</span>
+        }
+<span class="fc" id="L171">        BigInteger integer = exactInteger(number.value());</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (integer.signum() &lt; 0</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                || integer.compareTo(BigInteger.valueOf(</span>
+<span class="fc" id="L174">                    budget.maxExponent())) &gt; 0) {</span>
+<span class="nc" id="L175">            throw unsupported(&quot;POWER_EXPONENT_OUTSIDE_SUPPORTED_RANGE&quot;);</span>
+        }
+<span class="fc" id="L177">        return integer.intValueExact();</span>
+    }
+
+    private static BigInteger exactInteger(double value) {
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">        if (!Double.isFinite(value) || value != Math.rint(value)) {</span>
+<span class="nc" id="L182">            throw unsupported(&quot;COEFFICIENT_MUST_BE_EXACT_INTEGER&quot;);</span>
+        }
+        try {
+<span class="fc" id="L185">            return BigDecimal.valueOf(value).toBigIntegerExact();</span>
+<span class="nc" id="L186">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L187">            throw unsupported(&quot;COEFFICIENT_OUTSIDE_EXACT_INTEGER_RANGE&quot;);</span>
+        }
+    }
+
+    private static UnsupportedPattern unsupported(String detailCode) {
+<span class="fc" id="L192">        return new UnsupportedPattern(detailCode);</span>
+    }
+
+    private static BudgetExceeded budget(String detailCode) {
+<span class="fc" id="L196">        return new BudgetExceeded(detailCode);</span>
+    }
+
+    private static String proofHash(Verification value) {
+<span class="fc" id="L200">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L201">        append(descriptor, value.verifierId());</span>
+<span class="fc" id="L202">        append(descriptor, value.status().name());</span>
+<span class="fc" id="L203">        append(descriptor, value.budget().canonicalMaterial());</span>
+<span class="fc" id="L204">        append(descriptor, value.sourcePattern());</span>
+<span class="fc" id="L205">        append(descriptor, value.targetPattern());</span>
+<span class="fc" id="L206">        append(descriptor, value.sourceCanonical());</span>
+<span class="fc" id="L207">        append(descriptor, value.targetCanonical());</span>
+<span class="fc" id="L208">        append(descriptor, Integer.toString(value.visitedNodes()));</span>
+<span class="fc" id="L209">        append(descriptor, Integer.toString(value.generatedTerms()));</span>
+<span class="fc" id="L210">        append(descriptor, value.detailCode());</span>
+<span class="fc" id="L211">        return sha256(descriptor.toString());</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L215">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L216">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L220">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L221">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L222">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L223">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L224">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L228">    public enum Status {</span>
+<span class="fc" id="L229">        PROVED,</span>
+<span class="fc" id="L230">        NOT_EQUIVALENT,</span>
+<span class="fc" id="L231">        UNSUPPORTED,</span>
+<span class="fc" id="L232">        BUDGET_EXCEEDED</span>
+    }
+
+    public record Budget(
+        int maxVisitedNodes,
+        int maxTerms,
+        int maxGeneratedTerms,
+        int maxTotalDegree,
+        int maxExponent,
+        int maxCoefficientBits
+    ) {
+<span class="fc" id="L243">        public static final Budget DEFAULT =</span>
+            new Budget(256, 256, 4_096, 32, 12, 256);
+
+<span class="fc" id="L246">        public Budget {</span>
+<span class="pc bpc" id="L247" title="6 of 12 branches missed.">            if (maxVisitedNodes &lt; 1</span>
+                    || maxTerms &lt; 1
+                    || maxGeneratedTerms &lt; 1
+                    || maxTotalDegree &lt; 0
+                    || maxExponent &lt; 0
+                    || maxCoefficientBits &lt; 1) {
+<span class="nc" id="L253">                throw new IllegalArgumentException(</span>
+                    &quot;polynomial verification budget is invalid&quot;);
+            }
+<span class="fc" id="L256">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L259">            return maxVisitedNodes + &quot;:&quot;</span>
+                + maxTerms + &quot;:&quot;
+                + maxGeneratedTerms + &quot;:&quot;
+                + maxTotalDegree + &quot;:&quot;
+                + maxExponent + &quot;:&quot;
+                + maxCoefficientBits;
+        }
+    }
+
+    public record Verification(
+        String verifierId,
+        Status status,
+        Budget budget,
+        String sourcePattern,
+        String targetPattern,
+        String sourceCanonical,
+        String targetCanonical,
+        int visitedNodes,
+        int generatedTerms,
+        String detailCode,
+        String proofHash
+    ) {
+<span class="fc" id="L281">        public Verification {</span>
+<span class="pc bpc" id="L282" title="4 of 8 branches missed.">            if (!VERIFIER_ID.equals(verifierId)</span>
+                    || status == null
+                    || budget == null
+                    || sourcePattern == null
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">                    || sourcePattern.isBlank()</span>
+                    || targetPattern == null
+<span class="pc bpc" id="L288" title="6 of 12 branches missed.">                    || targetPattern.isBlank()</span>
+                    || sourceCanonical == null
+                    || targetCanonical == null
+                    || visitedNodes &lt; 0
+                    || generatedTerms &lt; 0
+                    || detailCode == null
+<span class="pc bpc" id="L294" title="2 of 4 branches missed.">                    || detailCode.isBlank()</span>
+                    || proofHash == null) {
+<span class="nc" id="L296">                throw new IllegalArgumentException(</span>
+                    &quot;polynomial verification identity is invalid&quot;);
+            }
+<span class="fc bfc" id="L299" title="All 2 branches covered.">            if (!proofHash.isEmpty()</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">                    &amp;&amp; !proofHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L301">                throw new IllegalArgumentException(</span>
+                    &quot;proofHash must be empty or SHA-256&quot;);
+            }
+<span class="fc" id="L304">        }</span>
+
+        public boolean proved() {
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            return status == Status.PROVED;</span>
+        }
+
+        private Verification withProofHash(String value) {
+<span class="fc" id="L311">            return new Verification(</span>
+                verifierId,
+                status,
+                budget,
+                sourcePattern,
+                targetPattern,
+                sourceCanonical,
+                targetCanonical,
+                visitedNodes,
+                generatedTerms,
+                detailCode,
+                value);
+        }
+    }
+
+    private static final class Work {
+        private int visitedNodes;
+        private int generatedTerms;
+
+        private void visit(Budget budget) {
+<span class="fc" id="L331">            visitedNodes++;</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">            if (visitedNodes &gt; budget.maxVisitedNodes()) {</span>
+<span class="fc" id="L333">                throw budget(&quot;MAX_VISITED_NODES_EXCEEDED&quot;);</span>
+            }
+<span class="fc" id="L335">        }</span>
+    }
+
+    private record Polynomial(Map&lt;Monomial, BigInteger&gt; terms) {
+<span class="fc" id="L339">        private Polynomial {</span>
+<span class="fc" id="L340">            Map&lt;Monomial, BigInteger&gt; normalized = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">            for (Map.Entry&lt;Monomial, BigInteger&gt; entry : terms.entrySet()) {</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">                if (entry.getValue().signum() != 0) {</span>
+<span class="fc" id="L343">                    normalized.merge(</span>
+<span class="fc" id="L344">                        entry.getKey(),</span>
+<span class="fc" id="L345">                        entry.getValue(),</span>
+                        BigInteger::add);
+                }
+<span class="fc" id="L348">            }</span>
+<span class="fc" id="L349">            normalized.entrySet().removeIf(entry -&gt;</span>
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">                entry.getValue().signum() == 0);</span>
+<span class="fc" id="L351">            terms = Map.copyOf(normalized);</span>
+<span class="fc" id="L352">        }</span>
+
+        static Polynomial constant(BigInteger value) {
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            return value.signum() == 0</span>
+<span class="nc" id="L356">                ? new Polynomial(Map.of())</span>
+<span class="fc" id="L357">                : new Polynomial(Map.of(Monomial.ONE, value));</span>
+        }
+
+        static Polynomial variable(String name) {
+<span class="fc" id="L361">            return new Polynomial(Map.of(</span>
+<span class="fc" id="L362">                new Monomial(List.of(new Power(name, 1))),</span>
+                BigInteger.ONE));
+        }
+
+        Polynomial add(Polynomial other) {
+<span class="fc" id="L367">            return combine(other, BigInteger.ONE);</span>
+        }
+
+        Polynomial subtract(Polynomial other) {
+<span class="fc" id="L371">            return combine(other, BigInteger.ONE.negate());</span>
+        }
+
+        private Polynomial combine(
+            Polynomial other,
+            BigInteger otherScale
+        ) {
+<span class="fc" id="L378">            Map&lt;Monomial, BigInteger&gt; result =</span>
+                new LinkedHashMap&lt;&gt;(terms);
+<span class="fc" id="L380">            other.terms.forEach((monomial, coefficient) -&gt;</span>
+<span class="fc" id="L381">                result.merge(</span>
+                    monomial,
+<span class="fc" id="L383">                    coefficient.multiply(otherScale),</span>
+                    BigInteger::add));
+<span class="fc" id="L385">            return new Polynomial(result);</span>
+        }
+
+        Polynomial multiply(Polynomial other) {
+<span class="fc" id="L389">            Map&lt;Monomial, BigInteger&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">            for (Map.Entry&lt;Monomial, BigInteger&gt; left : terms.entrySet()) {</span>
+                for (Map.Entry&lt;Monomial, BigInteger&gt; right
+<span class="fc bfc" id="L392" title="All 2 branches covered.">                        : other.terms.entrySet()) {</span>
+<span class="fc" id="L393">                    result.merge(</span>
+<span class="fc" id="L394">                        left.getKey().multiply(right.getKey()),</span>
+<span class="fc" id="L395">                        left.getValue().multiply(right.getValue()),</span>
+                        BigInteger::add);
+<span class="fc" id="L397">                }</span>
+<span class="fc" id="L398">            }</span>
+<span class="fc" id="L399">            return new Polynomial(result);</span>
+        }
+
+        String canonical() {
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">            if (terms.isEmpty()) {</span>
+<span class="nc" id="L404">                return &quot;0&quot;;</span>
+            }
+<span class="fc" id="L406">            List&lt;Map.Entry&lt;Monomial, BigInteger&gt;&gt; ordered =</span>
+<span class="fc" id="L407">                new ArrayList&lt;&gt;(terms.entrySet());</span>
+<span class="fc" id="L408">            ordered.sort(Map.Entry.comparingByKey());</span>
+<span class="fc" id="L409">            return ordered.stream()</span>
+<span class="fc" id="L410">                .map(entry -&gt; entry.getValue() + &quot;*&quot; + entry.getKey().canonical())</span>
+<span class="fc" id="L411">                .collect(java.util.stream.Collectors.joining(&quot;+&quot;));</span>
+        }
+    }
+
+    private record Monomial(List&lt;Power&gt; powers)
+            implements Comparable&lt;Monomial&gt; {
+<span class="fc" id="L417">        private static final Monomial ONE = new Monomial(List.of());</span>
+
+<span class="fc" id="L419">        private Monomial {</span>
+<span class="fc" id="L420">            Map&lt;String, Integer&gt; normalized = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            for (Power power : powers) {</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">                if (power.exponent() &gt; 0) {</span>
+<span class="fc" id="L423">                    normalized.merge(</span>
+<span class="fc" id="L424">                        power.variable(),</span>
+<span class="fc" id="L425">                        power.exponent(),</span>
+                        Integer::sum);
+                }
+<span class="fc" id="L428">            }</span>
+<span class="fc" id="L429">            powers = normalized.entrySet().stream()</span>
+<span class="fc" id="L430">                .map(entry -&gt; new Power(entry.getKey(), entry.getValue()))</span>
+<span class="fc" id="L431">                .toList();</span>
+<span class="fc" id="L432">        }</span>
+
+        Monomial multiply(Monomial other) {
+<span class="fc" id="L435">            List&lt;Power&gt; combined = new ArrayList&lt;&gt;(powers);</span>
+<span class="fc" id="L436">            combined.addAll(other.powers);</span>
+<span class="fc" id="L437">            return new Monomial(combined);</span>
+        }
+
+        int degree() {
+<span class="fc" id="L441">            return powers.stream().mapToInt(Power::exponent).sum();</span>
+        }
+
+        String canonical() {
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            return powers.isEmpty()</span>
+<span class="fc" id="L446">                ? &quot;1&quot;</span>
+<span class="fc" id="L447">                : powers.stream()</span>
+<span class="fc" id="L448">                    .map(power -&gt; power.variable() + &quot;^&quot; + power.exponent())</span>
+<span class="fc" id="L449">                    .collect(java.util.stream.Collectors.joining(&quot;*&quot;));</span>
+        }
+
+        @Override
+        public int compareTo(Monomial other) {
+<span class="fc" id="L454">            return canonical().compareTo(other.canonical());</span>
+        }
+    }
+
+    private record Power(String variable, int exponent) {
+<span class="fc" id="L459">        private Power {</span>
+<span class="pc bpc" id="L460" title="3 of 6 branches missed.">            if (variable == null || variable.isBlank() || exponent &lt; 1) {</span>
+<span class="nc" id="L461">                throw new IllegalArgumentException(</span>
+                    &quot;polynomial power is invalid&quot;);
+            }
+<span class="fc" id="L464">        }</span>
+    }
+
+    private static final class UnsupportedPattern
+            extends RuntimeException {
+        private UnsupportedPattern(String message) {
+<span class="fc" id="L470">            super(message);</span>
+<span class="fc" id="L471">        }</span>
+    }
+
+    private static final class BudgetExceeded
+            extends RuntimeException {
+        private BudgetExceeded(String message) {
+<span class="fc" id="L477">            super(message);</span>
+<span class="fc" id="L478">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
