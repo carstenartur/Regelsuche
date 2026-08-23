@@ -157,6 +157,25 @@ class LearnedPatternRulePromoterTest {
         assertEquals("?B", EvolutionGenomeCompiler.renderPattern(b));
     }
 
+    @Test
+    void polynomialLeavesCannotBypassTheDegreeBudget() {
+        ExactPolynomialPatternIdentityVerifier verifier =
+            new ExactPolynomialPatternIdentityVerifier(
+                new ExactPolynomialPatternIdentityVerifier.Budget(
+                    16, 16, 64, 0, 4, 64));
+
+        ExactPolynomialPatternIdentityVerifier.Verification result =
+            verifier.verify(
+                PatternExpr.var("A"),
+                PatternExpr.var("A"));
+
+        assertEquals(
+            ExactPolynomialPatternIdentityVerifier.Status.BUDGET_EXCEEDED,
+            result.status());
+        assertEquals("MAX_TOTAL_DEGREE_EXCEEDED", result.detailCode());
+        assertFalse(result.proved());
+    }
+
     private static EvolutionGenome genome() {
         return genomeWithGene(new EvolutionGenome.RewriteGene(
             "difference-squares",
