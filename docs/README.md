@@ -11,7 +11,8 @@ sind bewusst von Handbüchern und Architekturtexten getrennt.
 | Regelsuche ausprobieren | [Getting Started](getting-started.md) |
 | die Web-Workbench bedienen | [Web-Workbench](web-workbench.md) und [Benutzerhandbuch](web-ui-user-guide.md) |
 | einen vollständigen Anwendungsfall nachvollziehen | [User Workflows](user-workflows.md) und [Demo Gallery](demo-gallery.md) |
-| verstehen, wie fast passende Regeln vorbereitet werden | [Sicherer Regelvorbereitungs-Koordinator](safe-rule-preparation-coordinator.md) |
+| verstehen, wie fast passende Regeln vorbereitet werden | [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md) und [Rule-directed Preparation Planning](rule-directed-preparation-planning.md) |
+| die Grenze für selbst gelernte Regeln verstehen | [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md) und [Evolutionäre Suche](evolutionary-search.md) |
 | den aktuellen Forschungsstand verstehen | [Discovery- und Forschungsstand](discovery-status.md) |
 | Claims und Evidence korrekt einordnen | [Capability-Status](generated/capability-status.md), [Glossar](glossary.md) und [Release Readiness](release-readiness.md) |
 | die Architektur verstehen oder Code ändern | [Architektur](architecture.md) und [Developer Guide](developer-guide.md) |
@@ -70,15 +71,20 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md)
 - [Bekannte Grenzen](limits.md)
 
-### Discovery und Lernen
+### Suche, Vorbereitung, Discovery und Lernen
 
-- [Discovery Engine](discovery-engine.md)
 - [Search Intelligence](search-intelligence.md) — Suchprofile,
   Diversity-Kontrolle, begrenztes Reachability-Orakel und historischer
   Rediscovery-Atlas.
-- [Sicherer Regelvorbereitungs-Koordinator](safe-rule-preparation-coordinator.md)
-  — direkter konkreter Replay, explizite Anwendbarkeitsschemata, typisierte
-  Guards, begrenzte Vorbereitung und die Promotionsgrenze für gelernte Regeln.
+- [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md) —
+  direkte Ausführung, native Exact-Registry, lokale Pattern-Bridges, Guards und
+  Zertifikate.
+- [Rule-directed Preparation Planning](rule-directed-preparation-planning.md) —
+  Spezialsolver, Partial Matching, Work Accounting und Aktivierungsgrenzen.
+- [Promotion exakt bewiesener gelernter Pattern-Regeln](learned-pattern-rule-promotion.md) —
+  enger Polynom-Promotionspfad und seine Claim-Grenzen.
+- [Evolutionäre Suche und gelernte Regelprogramme](evolutionary-search.md)
+- [Discovery Engine](discovery-engine.md)
 - [Discovery Evidence v1](discovery-evidence-v1.md)
 - [Hypothesis Mining](hypothesis-mining.md)
 - [Rule Discovery](rule-discovery.md)
@@ -105,6 +111,7 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 - [Deterministische TRAIN-Populationen](evolution-population-engine.md)
 - [Reale TRAIN-Suchfitness](evolution-train-fitness.md)
 - [Rewrite-Program-Mutationen](evolution-rewrite-program-mutations.md)
+- [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md)
 
 ### Domänen und Solver
 
@@ -121,9 +128,9 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 
 - [Architektur](architecture.md) — Systemkontext, Schichten, Trust-Grenzen und
   zentrale Ausführungsflüsse.
-- [Sicherer Regelvorbereitungs-Koordinator](safe-rule-preparation-coordinator.md)
-  — gemeinsame Policy-Grenze zwischen direkter Regelanwendung, partieller
-  Musteranalyse, Vorbereitung, Guard-Prüfung und verifiziertem Replay.
+- [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md)
+  — gemeinsame Policy-Grenze zwischen direkter Ausführung, nativen
+  Exact-Spezialisten, lokaler Bridge-Suche und verifiziertem Replay.
 - [Modulstruktur](module-structure.md) — exakte Gradle-Module und Paketzuordnung.
 - [Dependency-Regeln](dependency-rules.md) — erlaubte und verbotene
   Abhängigkeitsrichtungen.
