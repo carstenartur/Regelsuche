@@ -114,66 +114,104 @@ für unendlich viele konkrete Ausdrücke stehen.
 ## Regelgerichtete Vorbereitung fast passender Ausdrücke
 
 Eine Regel wird nicht mehr allein deshalb verworfen, weil ihr linkes Muster den
-aktuellen AST nicht unmittelbar trifft. Der sichere Vorbereitungskoordinator
-verwendet eine feste Reihenfolge:
+aktuellen AST nicht unmittelbar trifft. Der produktnahe Unified Coordinator
+verwendet folgende Reihenfolge:
 
 ```text
 konkrete direkte Regelanwendung
   -> typisierte Guard-Prüfung
-  -> begrenzte, mustergerichtete Vorbereitung
+  -> registrierter nativer Exact-Spezialist
+  -> begrenzte, mustergerichtete lokale Bridge-Suche
   -> erneute konkrete Regelanwendung
   -> unabhängige Verifikation
 ```
 
-Direkte Ausführung bleibt damit der billigste und maßgebliche Pfad. Erst wenn
-der konkrete Executor nicht anwendbar ist, darf eine explizite
-`RewriteApplicabilitySchema` eine begrenzte Suche auf eine passende
-Darstellung lenken. Das Schema enthält kein gewünschtes Ergebnis und keinen
-deklarativen Ersatz für eine algorithmische Java-Regel. Jede erfolgreiche
-Vorbereitung muss am retained End-AST nochmals durch die wirkliche Regel
-abgespielt werden.
+Direkte Ausführung bleibt der billigste und maßgebliche Pfad. Erst danach darf
+eine explizite `RewriteApplicabilitySchema` die Vorbereitung lenken. Das Schema
+enthält kein gewünschtes Ergebnis und keinen deklarativen Ersatz für eine
+algorithmische Java-Regel.
 
-Die Vorbereitung darf nur freigegebene, äquivalenzerhaltende Schritte nutzen.
-Sie behält insbesondere:
+Die content-addressed `SafePreparationEngineRegistry` bindet die vorhandenen
+exakten Spezialsolver für Polynomquotienten, AC-Faktorexposition, gemeinsame
+Monomfaktoren, perfekte Quadrate und gemeinsame Nenner an eine feste Reihenfolge
+und an ihre jeweilige native Hauptregel. Ein nur ähnlich aussehendes importiertes
+oder gelerntes Pattern erbt nicht automatisch den Solververtrag einer anderen
+Regel.
+
+Wo kein nativer Spezialist zuständig ist, untersucht der bounded local bridge
+ein eingefrorenes Inventar äquivalenzbewahrender Vorbereitungen. Jede positive
+Anwendung muss am retained End-AST nochmals durch den wirklichen Executor
+abgespielt werden. Die Evidence behält insbesondere:
 
 - Ausgangs-, Zwischen- und Ergebnis-AST;
-- Regel- und Inventar-Fingerprints;
+- Regel-, Schema-, Registry- und Inventar-Fingerprints;
 - partielle Bindungen und Restbedingungen;
 - typisierte Voraussetzungen und kumulierte Annahmen;
 - vollständige primitive Regellinie;
-- verbrauchte und verbleibende Arbeitsbudgets;
+- Work Accounting und erreichte Grenzen;
 - ein unabhängig erneut prüfbares Zertifikat.
 
 Unbekannte Voraussetzungen autorisieren keinen Zug. Beispielsweise wird die
 Teleskopidentität für `1/(n*(n+1))` nur unter den gebundenen Bedingungen
-`n != 0` und `n + 1 != 0` ausgeführt. Vorbereitungsschritte wie Kürzungen
-können weitere Bedingungen wie `a != 0` ergänzen; sie dürfen die
-Voraussetzungen der Hauptregel weder erfinden noch verlieren.
+`n != 0` und `n + 1 != 0` ausgeführt. Technische Exceptions werden als
+`TECHNICAL_FAILURE` retained und nicht als gewöhnlicher Nichttreffer behandelt.
 
-Dasselbe Prinzip ist für selbst gelernte Pattern-Regeln geeignet, sobald deren
-Muster, Guards, Provenienz und Äquivalenzevidence eingefroren und durch die
-Promotion-Gates qualifiziert wurden. Rohe evolutionär erzeugte Regeln bleiben
-bewusst ausgeschlossen, solange sie keine belastbare Äquivalenzerhaltung
-nachweisen. Gelernte `RewriteProgram`s aus Sequenzen, Alternativen und
-Wiederholungen benötigen zusätzlich ein programmspezifisches
-Anwendbarkeits- und Replay-Schema; sie werden nicht künstlich als einzelne
-Pattern-Regel behandelt.
+Eine exakt promovierte gelernte Pattern-Regel kann denselben lokalen
+Vorbereitungspfad nutzen. Der erste implementierte Promotionsadapter akzeptiert
+nur assumption-free Identitäten in einem begrenzten exakten Polynomfragment.
+Rohe evolutionär erzeugte Regeln bleiben dagegen bewusst
+`isEquivalencePreservingByConstruction() == false`. Gelernte
+`RewriteProgram`s aus Sequenzen, Alternativen und Wiederholungen benötigen ein
+eigenes programmbasiertes Applicability-/Replay-Schema.
 
-Die vollständige Architektur, Guard-Semantik, Experimentmatrix und Grenze für
-gelernte Regeln beschreibt der
-[Sichere Regelvorbereitungs-Koordinator](docs/safe-rule-preparation-coordinator.md).
+Details:
+
+- [Sicherer Regelvorbereitungskoordinator](docs/safe-rule-preparation-coordinator.md)
+- [Rule-directed Preparation Planning](docs/rule-directed-preparation-planning.md)
+- [Promotion gelernter Pattern-Regeln](docs/learned-pattern-rule-promotion.md)
+
+## Exakte Repräsentationsbrücken
+
+Gleichungssysteme werden im aktuellen Produktpfad als mathematische Objekte
+behandelt statt nur als lose skalare Gleichungen. Implementiert sind:
+
+```text
+skalare affine Gleichungen
+  -> exaktes A*x=b
+  -> unabhängige Matrixblöcke
+  -> exakte RREF
+  -> eindeutige, parametrisierte oder inkonsistente Lösung
+```
+
+Mit explizit deklarierten Rollen können symbolische Systeme außerdem als
+Eigenproblem erkannt und bis zum charakteristischen Polynom weitergeführt
+werden. Namen wie `H`, `psi` oder `lambda` erzeugen dabei keine physikalische
+Bedeutung; eine Quanteninterpretation benötigt einen ausdrücklichen
+Modellkontext.
+
+Diese typisierten Repräsentationsbrücken bleiben von skalaren AST-Rewrites
+getrennt. Ihre direkte Teilnahme am Unified Preparation Coordinator ist noch
+eine offene Integrationsstufe.
 
 ## Aktueller Stand
 
-Der gegenwärtige Stand ist bewusst zweigeteilt:
+Der gegenwärtige Stand ist bewusst mehrstufig:
 
 1. Die bestehende autonome Discovery- und Mehrdomänen-Evidence ist für ihre
    jeweils eng begrenzten internen Claims qualifiziert.
-2. Das stärkere Flagship-Experiment zur proof-carrying Selbstverbesserung ist
-   technisch vorbereitet, aber noch nicht mit realem VALIDATION- und FINAL-TEST-
-   Material ausgeführt.
+2. Exakte Gleichungssystem-Repräsentation, Blockzerlegung, RREF,
+   Eigenproblem-Erkennung und matched-work Vergleich sind implementiert.
+3. Direkte, native exakte und lokal mustergerichtete Regelvorbereitung sind
+   hinter reproduzierbaren Koordinator- und Registry-Grenzen implementiert,
+   aber noch nicht als allgemeines Workbench-/CLI-Defaultprofil qualifiziert.
+4. Ein enger Promotionsmechanismus für exakt bewiesene gelernte
+   Polynom-Pattern ist implementiert. Der öffentliche Capability-Claim
+   `PROMOTION` bleibt dennoch `NOT_EVALUATED`.
+5. Das stärkere Flagship-Experiment zur proof-carrying Selbstverbesserung ist
+   technisch vorbereitet, aber noch nicht mit realem VALIDATION- und
+   FINAL-TEST-Material ausgeführt.
 
-Der aktuelle targetfreie Simplification-Track erreicht mit dem eingefrorenen
+Der targetfreie Simplification-Track erreicht mit dem eingefrorenen
 Standardinventar sechs von sieben Referenzformen; SymPy erreicht sieben von
 sieben. Dieser Track bleibt deshalb korrekt als **negatives Vergleichsergebnis**
 retained. Die vollständige Fallmatrix, Abgrenzung und Reproduktion stehen unter
@@ -273,7 +311,8 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
   [Demo Gallery](docs/demo-gallery.md)
 - **Forschung und Evidenz:** [Discovery-Status](docs/discovery-status.md),
   [Discovery Evidence](docs/discovery-evidence-v1.md),
-  [Sicherer Regelvorbereitungs-Koordinator](docs/safe-rule-preparation-coordinator.md),
+  [Sicherer Regelvorbereitungskoordinator](docs/safe-rule-preparation-coordinator.md),
+  [Promotion gelernter Pattern-Regeln](docs/learned-pattern-rule-promotion.md),
   [Benchmarks](docs/discovery-benchmarks.md),
   [Scientific Reproducibility](docs/scientific-reproducibility.md)
 - **Entwicklung:** [Architektur](docs/architecture.md),
