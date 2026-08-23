@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-generational-rule-mining-campaign-v1.schema.json",
+  "title": "Regelsuche generational rule-mining campaign v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "campaignId",
+    "repositoryRevision",
+    "claimBoundary",
+    "summary",
+    "generations",
+    "finalInventory",
+    "reachability"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.generational-rule-mining-campaign/v1"
+    },
+    "campaignId": { "type": "string", "minLength": 1 },
+    "repositoryRevision": { "type": "string", "minLength": 1 },
+    "claimBoundary": { "type": "string", "minLength": 1 },
+    "summary": { "$ref": "#/$defs/summary" },
+    "generations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/generation" }
+    },
+    "finalInventory": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/activatedRule" }
+    },
+    "reachability": { "$ref": "#/$defs/reachability" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generations",
+        "tasks",
+        "activatedRules",
+        "initialInventoryHash",
+        "finalInventoryHash",
+        "newlyReachableUnderBudget"
+      ],
+      "properties": {
+        "generations": { "type": "integer", "minimum": 1 },
+        "tasks": { "type": "integer", "minimum": 0 },
+        "activatedRules": { "type": "integer", "minimum": 0 },
+        "initialInventoryHash": { "$ref": "#/$defs/sha256" },
+        "finalInventoryHash": { "$ref": "#/$defs/sha256" },
+        "newlyReachableUnderBudget": { "type": "boolean" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exploredStates",
+        "expandedStates",
+        "generatedTransformations",
+        "enqueuedStates",
+        "duplicatePrunes",
+        "transpositionPrunes",
+        "depthPrunes",
+        "candidateBudgetPrunes"
+      ],
+      "properties": {
+        "exploredStates": { "type": "integer", "minimum": 0 },
+        "expandedStates": { "type": "integer", "minimum": 0 },
+        "generatedTransformations": { "type": "integer", "minimum": 0 },
+        "enqueuedStates": { "type": "integer", "minimum": 0 },
+        "duplicatePrunes": { "type": "integer", "minimum": 0 },
+        "transpositionPrunes": { "type": "integer", "minimum": 0 },
+        "depthPrunes": { "type": "integer", "minimum": 0 },
+        "candidateBudgetPrunes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "eligible",
+        "candidateHash",
+        "leftPattern",
+        "rightPattern",
+        "assumptions",
+        "exactProofStatus",
+        "exactProofDetail",
+        "proofHash",
+        "operatorRuleId",
+        "operatorProvenanceHash",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NO_CANDIDATE",
+            "RUNTIME_NOT_FROZEN",
+            "VALIDATION_REJECTED",
+            "HOLDOUT_REJECTED",
+            "ASSUMPTIONS_UNSUPPORTED",
+            "EXACT_VERIFICATION_FAILED",
+            "EXACT_NOT_PROVED",
+            "COMPILATION_REJECTED",
+            "EXACT_SHADOW_ELIGIBLE"
+          ]
+        },
+        "eligible": { "type": "boolean" },
+        "candidateHash": { "type": "string" },
+        "leftPattern": { "type": "string" },
+        "rightPattern": { "type": "string" },
+        "assumptions": { "$ref": "#/$defs/stringArray" },
+        "exactProofStatus": { "type": "string" },
+        "exactProofDetail": { "type": "string" },
+        "proofHash": { "type": "string" },
+        "operatorRuleId": { "type": "string" },
+        "operatorProvenanceHash": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "taskFingerprint",
+        "runtimeStatus",
+        "searchStatus",
+        "reached",
+        "validationPassed",
+        "holdoutsPassed",
+        "materialAblations",
+        "failureReason",
+        "path",
+        "appliedRuleIds",
+        "assumptions",
+        "metrics",
+        "candidate"
+      ],
+      "properties": {
+        "taskId": { "type": "string", "minLength": 1 },
+        "taskFingerprint": { "$ref": "#/$defs/sha256" },
+        "runtimeStatus": { "type": "string", "minLength": 1 },
+        "searchStatus": { "type": "string", "minLength": 1 },
+        "reached": { "type": "boolean" },
+        "validationPassed": { "type": "boolean" },
+        "holdoutsPassed": { "type": "boolean" },
+        "materialAblations": { "type": "integer", "minimum": 0 },
+        "failureReason": { "type": "string" },
+        "path": { "$ref": "#/$defs/stringArray" },
+        "appliedRuleIds": { "$ref": "#/$defs/stringArray" },
+        "assumptions": { "$ref": "#/$defs/stringArray" },
+        "metrics": { "$ref": "#/$defs/metrics" },
+        "candidate": { "$ref": "#/$defs/candidate" }
+      }
+    },
+    "activatedRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "candidateHash",
+        "leftPattern",
+        "rightPattern",
+        "proofHash",
+        "operatorRuleId",
+        "operatorProvenanceHash"
+      ],
+      "properties": {
+        "generation": { "type": "integer", "minimum": 0 },
+        "candidateHash": { "$ref": "#/$defs/sha256" },
+        "leftPattern": { "type": "string", "minLength": 1 },
+        "rightPattern": { "type": "string", "minLength": 1 },
+        "proofHash": { "$ref": "#/$defs/sha256" },
+        "operatorRuleId": { "type": "string", "minLength": 1 },
+        "operatorProvenanceHash": { "type": "string", "minLength": 1 }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "name",
+        "executionSurface",
+        "inputInventoryHash",
+        "outputInventoryHash",
+        "sameGenerationFeedbackBlocked",
+        "tasks",
+        "eligibleCandidates",
+        "activatedRules",
+        "taskResults",
+        "inventoryAdditions"
+      ],
+      "properties": {
+        "generation": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string", "minLength": 1 },
+        "executionSurface": { "type": "string", "minLength": 1 },
+        "inputInventoryHash": { "$ref": "#/$defs/sha256" },
+        "outputInventoryHash": { "$ref": "#/$defs/sha256" },
+        "sameGenerationFeedbackBlocked": { "const": true },
+        "tasks": { "type": "integer", "minimum": 0 },
+        "eligibleCandidates": { "type": "integer", "minimum": 0 },
+        "activatedRules": { "type": "integer", "minimum": 0 },
+        "taskResults": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/task" }
+        },
+        "inventoryAdditions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/activatedRule" }
+        }
+      }
+    },
+    "reachability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputFingerprint",
+        "targetFingerprint",
+        "baselineInventoryHash",
+        "accumulatedInventoryHash",
+        "baselineReached",
+        "baselineStatus",
+        "baselineExploredStates",
+        "accumulatedReached",
+        "accumulatedStatus",
+        "accumulatedExploredStates",
+        "newlyReachableUnderBudget",
+        "accumulatedPath",
+        "accumulatedRuleIds"
+      ],
+      "properties": {
+        "inputFingerprint": { "$ref": "#/$defs/sha256" },
+        "targetFingerprint": { "$ref": "#/$defs/sha256" },
+        "baselineInventoryHash": { "$ref": "#/$defs/sha256" },
+        "accumulatedInventoryHash": { "$ref": "#/$defs/sha256" },
+        "baselineReached": { "type": "boolean" },
+        "baselineStatus": { "type": "string", "minLength": 1 },
+        "baselineExploredStates": { "type": "integer", "minimum": 0 },
+        "accumulatedReached": { "type": "boolean" },
+        "accumulatedStatus": { "type": "string", "minLength": 1 },
+        "accumulatedExploredStates": { "type": "integer", "minimum": 0 },
+        "newlyReachableUnderBudget": { "type": "boolean" },
+        "accumulatedPath": { "$ref": "#/$defs/stringArray" },
+        "accumulatedRuleIds": { "$ref": "#/$defs/stringArray" }
+      }
+    }
+  }
+}
