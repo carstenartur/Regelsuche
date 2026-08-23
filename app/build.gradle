@@ -186,9 +186,9 @@ dependencies {
     dockerE2eTestImplementation libs.junit.jupiter
     dockerE2eTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     webAssets 'org.webjars.npm:katex:0.17.0'
-    // 3.28.1 is not published as a WebJar on Maven Central; 3.27.0 is the
-    // closest available self-hostable npm WebJar.
-    webAssets 'org.webjars.npm:cytoscape:3.34.0'
+    // Keep this version aligned with app/pom.xml; MavenWebAssetParityContractTest
+    // fails closed if Gradle and Maven drift or packaged output misses the WebJar.
+    webAssets 'org.webjars.npm:cytoscape:3.34.1'
 }
 
 tasks.register('installPlaywrightBrowsers', JavaExec) {
