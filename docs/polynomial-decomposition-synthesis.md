@@ -1,6 +1,6 @@
 # Semantische Polynomansicht und Zerlegungssynthese
 
-**Implementierungsstand: 23. August 2026**
+**Implementierungsstand: 24. August 2026**
 
 Regelsuche soll mathematische Fähigkeit nicht durch einen unbegrenzt wachsenden
 Katalog konkreter Identitäten darstellen. Insbesondere wäre es falsch, für jede
@@ -94,6 +94,40 @@ c40*A^4 + c31*A^3*B + c22*A^2*B^2 + c13*A*B^3 + c04*B^4.
 Der Synthesizer enumeriert nur Teiler der äußeren Koeffizienten und löst das
 verbleibende lineare Gleichungssystem exakt. Ein Kandidat wird nur ausgegeben,
 wenn sämtliche fünf Koeffizientenbedingungen erfüllt sind.
+
+## Typisierte Eingangsgrenze
+
+Die eigentliche Koeffizientensynthese besitzt nun zwei Eingänge:
+
+```java
+synthesize(String expression)
+synthesize(PolynomialSemanticView.Polynomial polynomial)
+```
+
+Der String-Eingang analysiert den Ausdruck und delegiert anschließend an die
+typisierte Variante. Die typisierte Variante arbeitet unmittelbar auf
+AST-Atomen, Exponentenvektoren und `BigInteger`-Koeffizienten. Sie rendert das
+Polynom nicht als Zwischentext und parst es insbesondere nicht erneut über
+`NumberExpr(double)`.
+
+Damit können weitere exakte Darstellungen dieselbe Ganzzahl-Synthese verwenden,
+ohne ihre Information an einer textuellen oder binären Gleitkomma-Grenze zu
+verlieren. Die rationale Pipeline kann beispielsweise
+
+```text
+exakte Quell-Literale
+  -> rationales univariates Polynom
+  -> Nennerbereinigung und primitiver Ganzzahlanteil
+  -> typisierte Ganzzahl-Zerlegungssynthese
+```
+
+ausführen. Die spätere rationale Rückassemblierung bleibt ein eigener,
+überprüfbarer Schritt und wird nicht in den Ganzzahl-Synthesizer hineingemischt.
+
+Ein Test verwendet absichtlich eine nicht parsebare Anzeigeform `<typed-x>` bei
+einem gültigen `VariableExpr("x")`. Die erfolgreiche Synthese und der korrekt
+gerenderte Ergebnis-AST belegen, dass die Anzeigeform nicht als versteckter
+Parserkanal verwendet wird.
 
 ## Beispiele aus derselben Methode
 
