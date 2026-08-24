@@ -17,7 +17,8 @@ numeric AST leaf
 
 The implementation never reads `NumberExpr.value()` to authorize an exact
 coefficient. The `double` leaf remains available only for historical syntax and
-rewrite consumers.
+rewrite consumers. `ExactParsedTerm` indexes occurrences by node identity once,
+so conversion performs O(1) provenance lookup for each visited numeric leaf.
 
 ## Supported fragment
 
