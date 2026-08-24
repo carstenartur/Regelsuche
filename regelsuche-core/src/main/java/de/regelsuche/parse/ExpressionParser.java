@@ -204,8 +204,8 @@ public class ExpressionParser {
                 exception);
         }
         if (!Double.isFinite(legacyValue)
-                || legacyValue == 0.0d
-                    && !evidence.value().orElseThrow().isZero()) {
+                || (legacyValue == 0.0d
+                    && !evidence.value().orElseThrow().isZero())) {
             throw new IllegalArgumentException(
                 "Exact numeric literal cannot be represented safely by the "
                     + "legacy AST at position " + start);
