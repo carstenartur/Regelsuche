@@ -61,8 +61,15 @@ when it:
 - overflows to a non-finite legacy AST value;
 - is exact and non-zero but underflows to legacy `0.0`.
 
-This prevents an exact certificate from being attached to an AST leaf whose
-legacy value would have materially different semantics.
+The declared maximum decimal scale is 256. Its smallest positive decimal,
+`10^-256`, is still non-zero as a `double` and is characterized as a successful
+boundary. Scale 257 is rejected by the exact scalar contract before legacy
+conversion.
+
+Ordinary binary rounding is not presented as exact AST semantics: `0.10` still
+produces the historical `double` leaf, while the companion retains exact `1/10`
+for consumers that explicitly select the exact path. The conversion guard only
+prevents catastrophic class changes such as finite-to-infinite or nonzero-to-zero.
 
 ## Existing parser API
 
@@ -73,10 +80,26 @@ the `ExactParsedTerm` companion; formatting and reparsing the AST cannot restore
 source provenance.
 
 Equation- and system-wide provenance are not yet exposed as aggregate objects.
-Their existing AST APIs remain unchanged. The next integration layer should use
-this term-level boundary to construct an exact univariate rational polynomial,
-bind every coefficient occurrence, and then invoke the rational-content and
-integer-synthesis certificates.
+Their existing AST APIs remain unchanged.
+
+## Integration sequence
+
+The exact rational path is intentionally layered:
+
+1. [Exact rational scalar domain v1](exact-rational-scalar-domain.md) defines
+   canonical values and source-bound parse certificates.
+2. This page defines occurrence-preserving parser provenance beside the legacy
+   AST.
+3. [Exact rational polynomial content v1](exact-rational-polynomial-content.md)
+   clears denominators and extracts a primitive integer polynomial with bounded
+   work and replayable Evidence.
+4. The next layer must extract one exact polynomial from `ExactParsedTerm`, bind
+   every coefficient occurrence, invoke the existing integer synthesis through
+   a typed boundary, and verify rational reassembly before emitting a search
+   edge.
+
+No layer may reconstruct exact coefficients from formatted `double` values or
+silently reinterpret historical search identities.
 
 ## Verification
 
