@@ -54,8 +54,8 @@ zero; only the source token itself receives provenance. An explicit fraction
 such as `1 / 4` remains a division AST and retains exact evidence for both leaf
 lexemes.
 
-The exact scalar limits apply before `Double.parseDouble`. A token is rejected
-when it:
+Inside `parseExactTerm`, the exact scalar limits apply before
+`Double.parseDouble`. A token is rejected when it:
 
 - is outside the versioned exact-rational literal grammar or budgets;
 - starts with a decimal point or has one without a following digit;
@@ -72,18 +72,26 @@ produces the historical `double` leaf, while the companion retains exact `1/10`
 for consumers that explicitly select the exact path. The conversion guard only
 prevents catastrophic class changes such as finite-to-infinite or nonzero-to-zero.
 
-## Existing parser API
+## Existing parser API and hot-path boundary
 
-`parseTerm` delegates to `parseExactTerm` and returns only its ordinary
-expression. Existing callers retain the same AST shape and formatting for
-supported inputs, but the accepted-input contract is intentionally stricter.
-This is a deliberate breaking behavior change: `parseTerm` now fails closed on
-the exact-rational grammar and budgets instead of accepting every spelling that
-`Double.parseDouble` happens to accept. Inputs such as `1.`, leading-dot decimals,
-non-finite values, or literals beyond the declared digit and scale limits are
-rejected consistently; there is no legacy fallback path.
+`parseTerm` and `parseExactTerm` share the expression grammar and produce the
+same ordinary AST for inputs accepted by both methods. They deliberately have
+different evidence responsibilities:
 
-Callers that need exact coefficients must explicitly keep the `ExactParsedTerm`
+- `parseTerm` is the allocation-minimal legacy path used by canonicalization,
+  search, rewriting and E-graph construction. It parses finite `double` leaves
+  but does not invoke `ExactRationalDomain`, allocate exact values, hash
+  certificates or retain literal occurrences.
+- `parseExactTerm` is the explicit exact-input boundary. It enforces the
+  versioned exact-rational grammar and budgets and returns the companion object.
+
+This separation is semantically important as well as performance-critical.
+Legacy callers do not accidentally pay arbitrary-precision and certificate
+costs for every visited search state, while exact consumers cannot obtain a
+certificate without selecting the fail-closed API. A term accepted only by the
+legacy path must never be reinterpreted as exact later.
+
+Callers that need exact coefficients must retain the `ExactParsedTerm`
 companion; formatting and reparsing the AST cannot restore source provenance.
 
 Equation- and system-wide provenance are not yet exposed as aggregate objects.
@@ -100,10 +108,11 @@ The exact rational path is intentionally layered:
 3. [Exact rational polynomial content v1](exact-rational-polynomial-content.md)
    clears denominators and extracts a primitive integer polynomial with bounded
    work and replayable Evidence.
-4. The next layer must extract one exact polynomial from `ExactParsedTerm`, bind
-   every coefficient occurrence, invoke the existing integer synthesis through
-   a typed boundary, and verify rational reassembly before emitting a search
-   edge.
+4. [Exact rational univariate polynomial view v1](exact-rational-univariate-polynomial-view.md)
+   extracts source-bound coefficients without reading legacy `double` values as
+   exact mathematics.
+5. The next layer must invoke the existing integer synthesis through a typed
+   boundary and verify rational reassembly before emitting a search edge.
 
 No layer may reconstruct exact coefficients from formatted `double` values or
 silently reinterpret historical search identities.
@@ -118,7 +127,8 @@ mvn --batch-mode --no-transfer-progress \
   -Dtest=ExpressionParserExactLiteralTest,ExpressionParserTest test
 ```
 
-Full repository contract:
+Full repository contract, including the parser-sensitive canonicalization and
+E-graph JMH ratchets:
 
 ```bash
 mvn --batch-mode --no-transfer-progress -Pfull verify
@@ -127,6 +137,7 @@ mvn --batch-mode --no-transfer-progress -Pfull verify
 ## Claim boundary
 
 This layer preserves and verifies exact numeric source tokens alongside the
-legacy AST. It does not itself extract polynomial coefficients, factor rational
-polynomials, alter search identity, infer exactness for programmatically created
-`NumberExpr` nodes, or authorize a default rational-synthesis profile.
+legacy AST without imposing exact-evidence work on ordinary search parsing. It
+does not itself extract polynomial coefficients, factor rational polynomials,
+alter search identity, infer exactness for programmatically created `NumberExpr`
+nodes, or authorize a default rational-synthesis profile.

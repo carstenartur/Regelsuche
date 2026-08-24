@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.scalar.ExactRationalDomain;
 import de.regelsuche.scalar.ExactRationalEvidenceVerifier;
 import java.math.BigInteger;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,20 @@ class ExpressionParserExactLiteralTest {
         assertEquals(ExactRational.integer(2), integer.exactValue());
 
         assertTrue(parsed.literalFor(new NumberExpr(0.1)).isEmpty());
+    }
+
+    @Test
+    void legacyTermParsingDoesNotPayExactDomainBudgets() {
+        ExpressionParser constrained = new ExpressionParser(
+            new ExactRationalDomain(
+                new ExactRationalDomain.Limits(1, 1, 0)));
+
+        assertEquals(
+            "123",
+            ExpressionFormatter.format(constrained.parseTerm("123")));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> constrained.parseExactTerm("123"));
     }
 
     @Test

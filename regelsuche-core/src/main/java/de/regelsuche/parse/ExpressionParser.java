@@ -46,8 +46,16 @@ public class ExpressionParser {
         return new ParsedInput(List.of(), equations);
     }
 
+    /**
+     * Parses one term through the allocation-minimal legacy AST path.
+     * Exact source certificates are created only by {@link #parseExactTerm}.
+     */
     public Expr parseTerm(String term) {
-        return parseExactTerm(term).expression();
+        String source = Objects.requireNonNull(term, "term");
+        Cursor cursor = Cursor.legacy(source);
+        Expr expr = parseExpression(cursor);
+        requireEnd(cursor);
+        return expr;
     }
 
     /**
@@ -57,14 +65,18 @@ public class ExpressionParser {
      */
     public ExactParsedTerm parseExactTerm(String term) {
         String source = Objects.requireNonNull(term, "term");
-        Cursor cursor = new Cursor(source);
+        Cursor cursor = Cursor.exact(source);
         Expr expr = parseExpression(cursor);
+        requireEnd(cursor);
+        return new ExactParsedTerm(source, expr, cursor.exactLiterals());
+    }
+
+    private static void requireEnd(Cursor cursor) {
         cursor.skipWhitespace();
         if (!cursor.isAtEnd()) {
             throw new IllegalArgumentException(
                 "Unexpected token at position " + cursor.position());
         }
-        return new ExactParsedTerm(source, expr, cursor.exactLiterals());
     }
 
     public Equation parseEquation(String equation) {
@@ -191,6 +203,10 @@ public class ExpressionParser {
 
         int end = cursor.position();
         String sourceLexeme = cursor.slice(start, end);
+        if (!cursor.retainsExactLiterals()) {
+            return new NumberExpr(parseFiniteLegacyValue(sourceLexeme, start));
+        }
+
         ExactRationalParseEvidence evidence =
             exactRationalDomain.parse(sourceLexeme);
         if (!evidence.exact()) {
@@ -199,18 +215,9 @@ public class ExpressionParser {
                     + "position " + start + ": " + evidence.detailCode());
         }
 
-        double legacyValue;
-        try {
-            legacyValue = Double.parseDouble(sourceLexeme);
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException(
-                "Numeric literal is not representable by the legacy AST at "
-                    + "position " + start,
-                exception);
-        }
-        if (!Double.isFinite(legacyValue)
-                || (legacyValue == 0.0d
-                    && !evidence.value().orElseThrow().isZero())) {
+        double legacyValue = parseFiniteLegacyValue(sourceLexeme, start);
+        if (legacyValue == 0.0d
+                && !evidence.value().orElseThrow().isZero()) {
             throw new IllegalArgumentException(
                 "Exact numeric literal cannot be represented safely by the "
                     + "legacy AST at position " + start);
@@ -224,6 +231,27 @@ public class ExpressionParser {
             sourceLexeme,
             evidence);
         return number;
+    }
+
+    private static double parseFiniteLegacyValue(
+        String sourceLexeme,
+        int start
+    ) {
+        double legacyValue;
+        try {
+            legacyValue = Double.parseDouble(sourceLexeme);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(
+                "Numeric literal is not representable by the legacy AST at "
+                    + "position " + start,
+                exception);
+        }
+        if (!Double.isFinite(legacyValue)) {
+            throw new IllegalArgumentException(
+                "Numeric literal is not representable by the legacy AST at "
+                    + "position " + start);
+        }
+        return legacyValue;
     }
 
     private Expr parseVariable(Cursor cursor) {
@@ -257,13 +285,23 @@ public class ExpressionParser {
 
     private static final class Cursor {
         private final String value;
-        private final List<ExactParsedTerm.LiteralOccurrence> exactLiterals =
-            new ArrayList<>();
+        private final List<ExactParsedTerm.LiteralOccurrence> exactLiterals;
         private int position;
 
-        private Cursor(String value) {
+        private Cursor(String value, boolean retainExactLiterals) {
             this.value = value;
+            this.exactLiterals = retainExactLiterals
+                ? new ArrayList<>()
+                : null;
             this.position = 0;
+        }
+
+        private static Cursor legacy(String value) {
+            return new Cursor(value, false);
+        }
+
+        private static Cursor exact(String value) {
+            return new Cursor(value, true);
         }
 
         private int position() {
@@ -319,6 +357,10 @@ public class ExpressionParser {
             return value.substring(from, to);
         }
 
+        private boolean retainsExactLiterals() {
+            return exactLiterals != null;
+        }
+
         private void retainExactLiteral(
             NumberExpr node,
             int startInclusive,
@@ -326,6 +368,10 @@ public class ExpressionParser {
             String sourceLexeme,
             ExactRationalParseEvidence evidence
         ) {
+            if (exactLiterals == null) {
+                throw new IllegalStateException(
+                    "legacy parser path cannot retain exact literals");
+            }
             exactLiterals.add(new ExactParsedTerm.LiteralOccurrence(
                 node,
                 startInclusive,
@@ -335,6 +381,10 @@ public class ExpressionParser {
         }
 
         private List<ExactParsedTerm.LiteralOccurrence> exactLiterals() {
+            if (exactLiterals == null) {
+                throw new IllegalStateException(
+                    "legacy parser path has no exact literals");
+            }
             // ExactParsedTerm performs the single defensive copy at the
             // ownership boundary.
             return exactLiterals;
