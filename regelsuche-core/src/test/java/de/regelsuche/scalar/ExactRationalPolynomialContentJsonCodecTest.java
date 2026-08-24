@@ -33,6 +33,30 @@ class ExactRationalPolynomialContentJsonCodecTest {
     }
 
     @Test
+    void jsonEnvelopeCoversEveryDeclaredV1NumericVector() {
+        int sourceDigits = maximumDecimalDigits(
+            ExactRationalPolynomialContentNormalizer.MAX_COEFFICIENT_BITS);
+        int intermediateDigits = maximumDecimalDigits(
+            ExactRationalPolynomialContentNormalizer.MAX_INTERMEDIATE_BITS);
+        long sourceVectors = (long) ExactRationalPolynomial.MAX_COEFFICIENTS
+            * (2L * sourceDigits + 2L);
+        long normalizedVectors = 2L
+            * ExactRationalPolynomial.MAX_COEFFICIENTS
+            * (intermediateDigits + 1L);
+        long scalarAndStructuralHeadroom =
+            4L * (intermediateDigits + 1L) + 1_000_000L;
+        long required = sourceVectors
+            + normalizedVectors
+            + scalarAndStructuralHeadroom;
+
+        assertTrue(
+            ExactRationalPolynomialContentJsonCodec.MAX_JSON_CHARACTERS
+                >= required,
+            () -> "v1 JSON envelope is smaller than its declared numeric "
+                + "bounds: required=" + required);
+    }
+
+    @Test
     void rejectsStructuralAndSemanticTampering() {
         String json = codec.write(normalizedEvidence());
         String duplicate = json.replaceFirst(
@@ -61,6 +85,13 @@ class ExactRationalPolynomialContentJsonCodecTest {
         assertRejected(scalar);
         assertRejected(work);
         assertRejected(certificate);
+    }
+
+    private static int maximumDecimalDigits(int bits) {
+        return BigInteger.ONE.shiftLeft(bits)
+            .subtract(BigInteger.ONE)
+            .toString()
+            .length();
     }
 
     private void assertRejected(String json) {
