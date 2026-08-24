@@ -116,8 +116,32 @@ public final class PolynomialDecompositionSynthesisOperator
                 analysis.status(),
                 0);
         }
-        PolynomialSemanticView.Polynomial polynomial =
-            analysis.polynomial();
+        return synthesize(
+            analysis.polynomial(),
+            analysis.status());
+    }
+
+    /**
+     * Synthesizes directly from an already validated exact integer polynomial.
+     *
+     * <p>This is the typed integration boundary for upstream semantic views.
+     * It never renders the polynomial to text and never reparses coefficients
+     * through {@code double}. The ordinary string entry point is only a parser
+     * adapter in front of this method.</p>
+     */
+    public SynthesisReport synthesize(
+        PolynomialSemanticView.Polynomial polynomial
+    ) {
+        return synthesize(
+            Objects.requireNonNull(polynomial, "polynomial"),
+            PolynomialSemanticView.Status.SUPPORTED);
+    }
+
+    private SynthesisReport synthesize(
+        PolynomialSemanticView.Polynomial sourcePolynomial,
+        PolynomialSemanticView.Status semanticStatus
+    ) {
+        PolynomialSemanticView.Polynomial polynomial = sourcePolynomial;
         if (polynomial.atoms().size() == 1 && polynomial.degree() <= 4) {
             polynomial = polynomial.homogenizeWithUnitAtom(4);
         }
@@ -128,14 +152,14 @@ public final class PolynomialDecompositionSynthesisOperator
             return SynthesisReport.failure(
                 Status.NOT_BINARY_HOMOGENEOUS_QUARTIC,
                 "REQUIRES_TWO_ATOMS_AND_NONZERO_EXTREME_QUARTIC_TERMS",
-                analysis.status(),
+                semanticStatus,
                 0);
         }
         if (maxCandidates == 0) {
             return SynthesisReport.failure(
                 Status.CANDIDATE_BUDGET_ZERO,
                 "MAX_CANDIDATES_IS_ZERO",
-                analysis.status(),
+                semanticStatus,
                 0);
         }
 
@@ -193,7 +217,7 @@ public final class PolynomialDecompositionSynthesisOperator
             return SynthesisReport.failure(
                 Status.BUDGET_EXCEEDED,
                 exception.getMessage(),
-                analysis.status(),
+                semanticStatus,
                 work.consideredConfigurations());
         }
 
@@ -207,13 +231,13 @@ public final class PolynomialDecompositionSynthesisOperator
             return SynthesisReport.failure(
                 Status.NO_INTEGER_QUADRATIC_FACTORIZATION,
                 "NO_BOUNDED_INTEGER_COEFFICIENT_SOLUTION",
-                analysis.status(),
+                semanticStatus,
                 work.consideredConfigurations());
         }
         return new SynthesisReport(
             Status.GENERATED,
             "EXACT_COEFFICIENT_CONSTRAINTS_SOLVED",
-            analysis.status(),
+            semanticStatus,
             polynomial.canonicalMaterial(),
             work.consideredConfigurations(),
             ordered);
