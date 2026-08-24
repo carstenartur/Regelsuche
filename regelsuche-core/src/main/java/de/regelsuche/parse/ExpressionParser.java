@@ -9,10 +9,25 @@ import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
+import de.regelsuche.scalar.ExactRationalDomain;
+import de.regelsuche.scalar.ExactRationalParseEvidence;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class ExpressionParser {
+    private final ExactRationalDomain exactRationalDomain;
+
+    public ExpressionParser() {
+        this(new ExactRationalDomain());
+    }
+
+    ExpressionParser(ExactRationalDomain exactRationalDomain) {
+        this.exactRationalDomain = Objects.requireNonNull(
+            exactRationalDomain,
+            "exactRationalDomain");
+    }
+
     public ParsedInput parse(InputRequest input) {
         if (input.type() == InputType.TERM) {
             return new ParsedInput(List.of(parseTerm(input.rawInput())), List.of());
@@ -32,24 +47,37 @@ public class ExpressionParser {
     }
 
     public Expr parseTerm(String term) {
-        Cursor cursor = new Cursor(term);
+        return parseExactTerm(term).expression();
+    }
+
+    /**
+     * Parses one term and retains source positions plus exact evidence for each
+     * integer or finite-decimal token. The ordinary AST remains the same
+     * legacy {@link NumberExpr} tree.
+     */
+    public ExactParsedTerm parseExactTerm(String term) {
+        String source = Objects.requireNonNull(term, "term");
+        Cursor cursor = new Cursor(source);
         Expr expr = parseExpression(cursor);
         cursor.skipWhitespace();
         if (!cursor.isAtEnd()) {
-            throw new IllegalArgumentException("Unexpected token at position " + cursor.position());
+            throw new IllegalArgumentException(
+                "Unexpected token at position " + cursor.position());
         }
-        return expr;
+        return new ExactParsedTerm(source, expr, cursor.exactLiterals());
     }
 
     public Equation parseEquation(String equation) {
         int idx = equation.indexOf('=');
         if (idx < 1 || idx == equation.length() - 1) {
-            throw new IllegalArgumentException("Equation must contain exactly one '=' with both sides present");
+            throw new IllegalArgumentException(
+                "Equation must contain exactly one '=' with both sides present");
         }
         String left = equation.substring(0, idx);
         String right = equation.substring(idx + 1);
         if (equation.indexOf('=', idx + 1) >= 0) {
-            throw new IllegalArgumentException("Equation must contain exactly one '='");
+            throw new IllegalArgumentException(
+                "Equation must contain exactly one '='");
         }
         return new Equation(parseTerm(left), parseTerm(right));
     }
@@ -59,9 +87,15 @@ public class ExpressionParser {
         while (true) {
             cursor.skipWhitespace();
             if (cursor.consume('+')) {
-                result = new BinaryExpr(result, BinaryOperator.ADD, parseTermInternal(cursor));
+                result = new BinaryExpr(
+                    result,
+                    BinaryOperator.ADD,
+                    parseTermInternal(cursor));
             } else if (cursor.consume('-')) {
-                result = new BinaryExpr(result, BinaryOperator.SUB, parseTermInternal(cursor));
+                result = new BinaryExpr(
+                    result,
+                    BinaryOperator.SUB,
+                    parseTermInternal(cursor));
             } else {
                 return result;
             }
@@ -73,9 +107,15 @@ public class ExpressionParser {
         while (true) {
             cursor.skipWhitespace();
             if (cursor.consume('*')) {
-                result = new BinaryExpr(result, BinaryOperator.MUL, parseUnary(cursor));
+                result = new BinaryExpr(
+                    result,
+                    BinaryOperator.MUL,
+                    parseUnary(cursor));
             } else if (cursor.consume('/')) {
-                result = new BinaryExpr(result, BinaryOperator.DIV, parseUnary(cursor));
+                result = new BinaryExpr(
+                    result,
+                    BinaryOperator.DIV,
+                    parseUnary(cursor));
             } else {
                 return result;
             }
@@ -85,7 +125,10 @@ public class ExpressionParser {
     private Expr parseUnary(Cursor cursor) {
         cursor.skipWhitespace();
         if (cursor.consume('-')) {
-            return new BinaryExpr(new NumberExpr(0), BinaryOperator.SUB, parseUnary(cursor));
+            return new BinaryExpr(
+                new NumberExpr(0),
+                BinaryOperator.SUB,
+                parseUnary(cursor));
         }
         return parsePower(cursor);
     }
@@ -94,7 +137,10 @@ public class ExpressionParser {
         Expr left = parsePrimary(cursor);
         cursor.skipWhitespace();
         if (cursor.consume('^')) {
-            return new BinaryExpr(left, BinaryOperator.POW, parseUnary(cursor));
+            return new BinaryExpr(
+                left,
+                BinaryOperator.POW,
+                parseUnary(cursor));
         }
         return left;
     }
@@ -105,7 +151,8 @@ public class ExpressionParser {
             Expr inner = parseExpression(cursor);
             cursor.skipWhitespace();
             if (!cursor.consume(')')) {
-                throw new IllegalArgumentException("Missing closing ')' at position " + cursor.position());
+                throw new IllegalArgumentException(
+                    "Missing closing ')' at position " + cursor.position());
             }
             return inner;
         }
@@ -115,7 +162,8 @@ public class ExpressionParser {
         if (cursor.peekLetter()) {
             return parseVariable(cursor);
         }
-        throw new IllegalArgumentException("Unexpected token at position " + cursor.position());
+        throw new IllegalArgumentException(
+            "Unexpected token at position " + cursor.position());
     }
 
     private Expr parseNumber(Cursor cursor) {
@@ -123,13 +171,54 @@ public class ExpressionParser {
         while (cursor.peekDigit()) {
             cursor.advance();
         }
-        if (cursor.peek('.') ) {
+        if (cursor.peek('.')) {
+            int decimalPoint = cursor.position();
             cursor.advance();
+            if (!cursor.peekDigit()) {
+                throw new IllegalArgumentException(
+                    "Decimal point must be followed by a digit at position "
+                        + decimalPoint);
+            }
             while (cursor.peekDigit()) {
                 cursor.advance();
             }
         }
-        return new NumberExpr(Double.parseDouble(cursor.slice(start, cursor.position())));
+
+        int end = cursor.position();
+        String sourceLexeme = cursor.slice(start, end);
+        ExactRationalParseEvidence evidence =
+            exactRationalDomain.parse(sourceLexeme);
+        if (!evidence.exact()) {
+            throw new IllegalArgumentException(
+                "Numeric literal is outside the exact rational domain at "
+                    + "position " + start + ": " + evidence.detailCode());
+        }
+
+        double legacyValue;
+        try {
+            legacyValue = Double.parseDouble(sourceLexeme);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(
+                "Numeric literal is not representable by the legacy AST at "
+                    + "position " + start,
+                exception);
+        }
+        if (!Double.isFinite(legacyValue)
+                || legacyValue == 0.0d
+                    && !evidence.value().orElseThrow().isZero()) {
+            throw new IllegalArgumentException(
+                "Exact numeric literal cannot be represented safely by the "
+                    + "legacy AST at position " + start);
+        }
+
+        NumberExpr number = new NumberExpr(legacyValue);
+        cursor.retainExactLiteral(
+            number,
+            start,
+            end,
+            sourceLexeme,
+            evidence);
+        return number;
     }
 
     private Expr parseVariable(Cursor cursor) {
@@ -152,7 +241,9 @@ public class ExpressionParser {
                 }
             }
             if (!cursor.consume(')')) {
-                throw new IllegalArgumentException("Missing closing ')' after function arguments at position " + cursor.position());
+                throw new IllegalArgumentException(
+                    "Missing closing ')' after function arguments at position "
+                        + cursor.position());
             }
             return new FunctionExpr(name, arguments);
         }
@@ -161,6 +252,8 @@ public class ExpressionParser {
 
     private static final class Cursor {
         private final String value;
+        private final List<ExactParsedTerm.LiteralOccurrence> exactLiterals =
+            new ArrayList<>();
         private int position;
 
         private Cursor(String value) {
@@ -173,7 +266,8 @@ public class ExpressionParser {
         }
 
         private void skipWhitespace() {
-            while (!isAtEnd() && Character.isWhitespace(value.charAt(position))) {
+            while (!isAtEnd()
+                    && Character.isWhitespace(value.charAt(position))) {
                 position++;
             }
         }
@@ -195,15 +289,19 @@ public class ExpressionParser {
         }
 
         private boolean peekDigit() {
-            return !isAtEnd() && Character.isDigit(value.charAt(position));
+            return !isAtEnd()
+                && Character.isDigit(value.charAt(position));
         }
 
         private boolean peekLetter() {
-            return !isAtEnd() && Character.isLetter(value.charAt(position));
+            return !isAtEnd()
+                && Character.isLetter(value.charAt(position));
         }
 
         private boolean peekLetterOrDigitOrUnderscore() {
-            return !isAtEnd() && (Character.isLetterOrDigit(value.charAt(position)) || value.charAt(position) == '_');
+            return !isAtEnd()
+                && (Character.isLetterOrDigit(value.charAt(position))
+                    || value.charAt(position) == '_');
         }
 
         private void advance() {
@@ -214,6 +312,25 @@ public class ExpressionParser {
 
         private String slice(int from, int to) {
             return value.substring(from, to);
+        }
+
+        private void retainExactLiteral(
+            NumberExpr node,
+            int startInclusive,
+            int endExclusive,
+            String sourceLexeme,
+            ExactRationalParseEvidence evidence
+        ) {
+            exactLiterals.add(new ExactParsedTerm.LiteralOccurrence(
+                node,
+                startInclusive,
+                endExclusive,
+                sourceLexeme,
+                evidence));
+        }
+
+        private List<ExactParsedTerm.LiteralOccurrence> exactLiterals() {
+            return List.copyOf(exactLiterals);
         }
     }
 }
