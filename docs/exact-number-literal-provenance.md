@@ -43,7 +43,8 @@ ExactParsedTerm.LiteralOccurrence occurrence =
 The companion result is immutable and its constructor is package-private.
 Occurrence construction is parser-owned. It validates source ranges, node
 uniqueness, exact status, source binding, and semantic replay of every retained
-literal certificate.
+literal certificate. An identity-keyed index is built once at construction, so
+repeated occurrence resolution remains constant-time.
 
 ## Grammar and fail-closed conversion
 
@@ -57,7 +58,7 @@ The exact scalar limits apply before `Double.parseDouble`. A token is rejected
 when it:
 
 - is outside the versioned exact-rational literal grammar or budgets;
-- has a decimal point without a following digit;
+- starts with a decimal point or has one without a following digit;
 - overflows to a non-finite legacy AST value;
 - is exact and non-zero but underflows to legacy `0.0`.
 
@@ -74,10 +75,16 @@ prevents catastrophic class changes such as finite-to-infinite or nonzero-to-zer
 ## Existing parser API
 
 `parseTerm` delegates to `parseExactTerm` and returns only its ordinary
-expression. Existing callers therefore retain the same AST shape and formatting
-for supported inputs. Callers that need exact coefficients must explicitly keep
-the `ExactParsedTerm` companion; formatting and reparsing the AST cannot restore
-source provenance.
+expression. Existing callers retain the same AST shape and formatting for
+supported inputs, but the accepted-input contract is intentionally stricter.
+This is a deliberate breaking behavior change: `parseTerm` now fails closed on
+the exact-rational grammar and budgets instead of accepting every spelling that
+`Double.parseDouble` happens to accept. Inputs such as `1.`, leading-dot decimals,
+non-finite values, or literals beyond the declared digit and scale limits are
+rejected consistently; there is no legacy fallback path.
+
+Callers that need exact coefficients must explicitly keep the `ExactParsedTerm`
+companion; formatting and reparsing the AST cannot restore source provenance.
 
 Equation- and system-wide provenance are not yet exposed as aggregate objects.
 Their existing AST APIs remain unchanged.
@@ -90,15 +97,13 @@ The exact rational path is intentionally layered:
    canonical values and source-bound parse certificates.
 2. This page defines occurrence-preserving parser provenance beside the legacy
    AST.
-3. [Exact rational univariate polynomial view v1](exact-rational-univariate-polynomial-view.md)
-   performs bounded ring operations using only identity-resolved exact source
-   values and produces a canonical ascending coefficient vector.
-4. [Exact rational polynomial content v1](exact-rational-polynomial-content.md)
+3. [Exact rational polynomial content v1](exact-rational-polynomial-content.md)
    clears denominators and extracts a primitive integer polynomial with bounded
    work and replayable Evidence.
-5. The next layer must invoke the existing integer synthesis through a typed
-   boundary, bind both certificates, and verify rational reassembly before
-   emitting a search edge.
+4. The next layer must extract one exact polynomial from `ExactParsedTerm`, bind
+   every coefficient occurrence, invoke the existing integer synthesis through
+   a typed boundary, and verify rational reassembly before emitting a search
+   edge.
 
 No layer may reconstruct exact coefficients from formatted `double` values or
 silently reinterpret historical search identities.

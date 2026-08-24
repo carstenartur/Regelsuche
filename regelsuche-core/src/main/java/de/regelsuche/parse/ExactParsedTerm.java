@@ -8,9 +8,9 @@ import de.regelsuche.scalar.ExactRationalParseEvidence;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * One parsed term together with source-bound exact evidence for every numeric
@@ -25,6 +25,7 @@ public final class ExactParsedTerm {
     private final String source;
     private final Expr expression;
     private final List<LiteralOccurrence> literals;
+    private final Map<NumberExpr, LiteralOccurrence> literalsByNode;
 
     ExactParsedTerm(
         String source,
@@ -35,15 +36,15 @@ public final class ExactParsedTerm {
         this.expression = Objects.requireNonNull(expression, "expression");
         this.literals = List.copyOf(
             Objects.requireNonNull(literals, "literals"));
-        validate();
+        this.literalsByNode = validateAndIndex();
     }
 
-    private void validate() {
-        Set<NumberExpr> nodes = Collections.newSetFromMap(
-            new IdentityHashMap<>());
+    private Map<NumberExpr, LiteralOccurrence> validateAndIndex() {
+        Map<NumberExpr, LiteralOccurrence> occurrences =
+            new IdentityHashMap<>();
         for (LiteralOccurrence literal : literals) {
             Objects.requireNonNull(literal, "literal");
-            if (!nodes.add(literal.node())) {
+            if (occurrences.put(literal.node(), literal) != null) {
                 throw new IllegalArgumentException(
                     "numeric literal node occurs more than once");
             }
@@ -68,6 +69,7 @@ public final class ExactParsedTerm {
                     "numeric literal lacks verified exact evidence");
             }
         }
+        return Collections.unmodifiableMap(occurrences);
     }
 
     public String source() {
@@ -88,9 +90,7 @@ public final class ExactParsedTerm {
      */
     public Optional<LiteralOccurrence> literalFor(NumberExpr node) {
         Objects.requireNonNull(node, "node");
-        return literals.stream()
-            .filter(candidate -> candidate.node() == node)
-            .findFirst();
+        return Optional.ofNullable(literalsByNode.get(node));
     }
 
     /** Parser-issued occurrence; construction is restricted to this package. */

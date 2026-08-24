@@ -156,6 +156,11 @@ public class ExpressionParser {
             }
             return inner;
         }
+        if (cursor.peek('.')) {
+            throw new IllegalArgumentException(
+                "Decimal point must be preceded by a digit at position "
+                    + cursor.position());
+        }
         if (cursor.peekDigit()) {
             return parseNumber(cursor);
         }
@@ -330,7 +335,9 @@ public class ExpressionParser {
         }
 
         private List<ExactParsedTerm.LiteralOccurrence> exactLiterals() {
-            return List.copyOf(exactLiterals);
+            // ExactParsedTerm performs the single defensive copy at the
+            // ownership boundary.
+            return exactLiterals;
         }
     }
 }
