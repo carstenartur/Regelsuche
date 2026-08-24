@@ -4,8 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.ast.VariableExpr;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.TreeMap;
 import org.junit.jupiter.api.Test;
 
 class PolynomialDecompositionSynthesisOperatorTest {
@@ -48,6 +50,42 @@ class PolynomialDecompositionSynthesisOperatorTest {
                 candidate.rule().equals(
                     PolynomialDecompositionSynthesisOperator.RULE_ID)
                 && candidate.equivalencePreservingByConstruction()));
+    }
+
+    @Test
+    void typedPolynomialEntryPointDoesNotRenderAndReparse() {
+        TreeMap<PolynomialSemanticView.Monomial, BigInteger> coefficients =
+            new TreeMap<>();
+        coefficients.put(
+            new PolynomialSemanticView.Monomial(List.of(4)),
+            BigInteger.ONE);
+        coefficients.put(
+            new PolynomialSemanticView.Monomial(List.of(0)),
+            BigInteger.valueOf(4));
+        PolynomialSemanticView.Polynomial typed =
+            new PolynomialSemanticView.Polynomial(
+                PolynomialSemanticView.VIEW_ID,
+                List.of(new PolynomialSemanticView.Atom(
+                    "typed-only:x",
+                    "<typed-x>",
+                    new VariableExpr("x"))),
+                coefficients,
+                4,
+                false,
+                0);
+
+        PolynomialDecompositionSynthesisOperator.SynthesisReport report =
+            operator.synthesize(typed);
+
+        assertTrue(report.generated(), report.detailCode());
+        assertTrue(report.sourcePolynomialMaterial().contains("<typed-x>"));
+        assertTrue(report.candidates().stream().anyMatch(candidate ->
+            factorPair(candidate,
+                List.of(1, -2, 2),
+                List.of(1, 2, 2))));
+        assertTrue(report.candidates().stream().allMatch(candidate ->
+            candidate.transformedExpression().contains("x")
+                && !candidate.transformedExpression().contains("typed-x")));
     }
 
     @Test
