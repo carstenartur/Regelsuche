@@ -189,12 +189,12 @@ public final class PolynomialDecompositionSynthesisOperator
 <span class="fc" id="L189">                    }</span>
 <span class="fc" id="L190">                }</span>
 <span class="fc" id="L191">            }</span>
-<span class="nc" id="L192">        } catch (BudgetExceeded exception) {</span>
-<span class="nc" id="L193">            return SynthesisReport.failure(</span>
+<span class="fc" id="L192">        } catch (BudgetExceeded exception) {</span>
+<span class="fc" id="L193">            return SynthesisReport.failure(</span>
                 Status.BUDGET_EXCEEDED,
-<span class="nc" id="L195">                exception.getMessage(),</span>
-<span class="nc" id="L196">                analysis.status(),</span>
-<span class="nc" id="L197">                work.consideredConfigurations());</span>
+<span class="fc" id="L195">                exception.getMessage(),</span>
+<span class="fc" id="L196">                analysis.status(),</span>
+<span class="fc" id="L197">                work.consideredConfigurations());</span>
 <span class="fc" id="L198">        }</span>
 
 <span class="fc" id="L200">        List&lt;Candidate&gt; ordered = candidates.values().stream()</span>
@@ -514,7 +514,7 @@ public final class PolynomialDecompositionSynthesisOperator
         }
 
         public boolean generated() {
-<span class="pc bpc" id="L517" title="1 of 2 branches missed.">            return status == Status.GENERATED;</span>
+<span class="fc bfc" id="L517" title="All 2 branches covered.">            return status == Status.GENERATED;</span>
         }
     }
 
@@ -640,8 +640,8 @@ public final class PolynomialDecompositionSynthesisOperator
 
         private void consider(int maximum) {
 <span class="fc" id="L642">            consideredConfigurations++;</span>
-<span class="pc bpc" id="L643" title="1 of 2 branches missed.">            if (consideredConfigurations &gt; maximum) {</span>
-<span class="nc" id="L644">                throw new BudgetExceeded(</span>
+<span class="fc bfc" id="L643" title="All 2 branches covered.">            if (consideredConfigurations &gt; maximum) {</span>
+<span class="fc" id="L644">                throw new BudgetExceeded(</span>
                     &quot;MAX_FACTOR_CONFIGURATIONS_EXCEEDED&quot;);
             }
 <span class="fc" id="L647">        }</span>
@@ -654,8 +654,8 @@ public final class PolynomialDecompositionSynthesisOperator
     private static final class BudgetExceeded
             extends RuntimeException {
         private BudgetExceeded(String detailCode) {
-<span class="nc" id="L657">            super(detailCode);</span>
-<span class="nc" id="L658">        }</span>
+<span class="fc" id="L657">            super(detailCode);</span>
+<span class="fc" id="L658">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

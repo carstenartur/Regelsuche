@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheorySubsumptionClassifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">PolynomialTheorySubsumptionClassifier.java</span></div><h1>PolynomialTheorySubsumptionClassifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.value.ExprValueFactory;
+import java.util.Objects;
+
+/**
+ * Classifies an observed polynomial identity against the exact bounded
+ * decomposition theory implemented by
+ * {@link PolynomialDecompositionSynthesisOperator}.
+ *
+ * &lt;p&gt;A positive result means that the right-hand side is one of the exact
+ * decompositions generated from the left-hand side under the same finite
+ * theory budget. It therefore describes a theory-derived instance, not a new
+ * kernel rule or an externally novel mathematical statement. Project-inventory
+ * novelty is deliberately left unevaluated.&lt;/p&gt;
+ */
+public final class PolynomialTheorySubsumptionClassifier {
+    private final PolynomialDecompositionSynthesisOperator synthesizer;
+    private final ExpressionCanonicalizer canonicalizer;
+    private final ExpressionParser parser;
+
+    public PolynomialTheorySubsumptionClassifier() {
+<span class="fc" id="L29">        this(</span>
+            new PolynomialDecompositionSynthesisOperator(Integer.MAX_VALUE),
+            new ExpressionCanonicalizer(),
+            new ExpressionParser());
+<span class="fc" id="L33">    }</span>
+
+    PolynomialTheorySubsumptionClassifier(
+        PolynomialDecompositionSynthesisOperator synthesizer,
+        ExpressionCanonicalizer canonicalizer,
+        ExpressionParser parser
+<span class="fc" id="L39">    ) {</span>
+<span class="fc" id="L40">        this.synthesizer = Objects.requireNonNull(</span>
+            synthesizer,
+            &quot;synthesizer&quot;);
+<span class="fc" id="L43">        this.canonicalizer = Objects.requireNonNull(</span>
+            canonicalizer,
+            &quot;canonicalizer&quot;);
+<span class="fc" id="L46">        this.parser = Objects.requireNonNull(parser, &quot;parser&quot;);</span>
+<span class="fc" id="L47">    }</span>
+
+    public Classification classify(
+        String leftExpression,
+        String rightExpression
+    ) {
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        if (isBlank(leftExpression) || isBlank(rightExpression)) {</span>
+<span class="nc" id="L54">            return Classification.failure(</span>
+                Status.UNSUPPORTED,
+                &quot;EXPRESSION_BLANK&quot;,
+                0);
+        }
+
+        String canonicalSource;
+        Expr target;
+        try {
+<span class="fc" id="L63">            canonicalSource = formatCanonical(leftExpression);</span>
+<span class="fc" id="L64">            target = parseCanonical(rightExpression);</span>
+<span class="nc" id="L65">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L66">            return Classification.failure(</span>
+                Status.UNSUPPORTED,
+                &quot;EXPRESSION_PARSE_OR_CANONICALIZATION_FAILED&quot;,
+                0);
+<span class="fc" id="L70">        }</span>
+
+<span class="fc" id="L72">        PolynomialDecompositionSynthesisOperator.SynthesisReport report =</span>
+<span class="fc" id="L73">            synthesizer.synthesize(leftExpression);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (!report.generated()) {</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">            return switch (report.status()) {</span>
+                case BUDGET_EXCEEDED, CANDIDATE_BUDGET_ZERO -&gt;
+<span class="fc" id="L77">                    Classification.failure(</span>
+                        Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L79">                        report.detailCode(),</span>
+<span class="fc" id="L80">                        report.consideredConfigurations());</span>
+                case NO_INTEGER_QUADRATIC_FACTORIZATION -&gt;
+<span class="nc" id="L82">                    Classification.failure(</span>
+                        Status.NOT_SUBSUMED,
+<span class="nc" id="L84">                        report.detailCode(),</span>
+<span class="nc" id="L85">                        report.consideredConfigurations());</span>
+                case PARSE_ERROR,
+                    UNSUPPORTED_SEMANTIC_VIEW,
+                    NOT_BINARY_HOMOGENEOUS_QUARTIC -&gt;
+<span class="fc" id="L89">                    Classification.failure(</span>
+                        Status.UNSUPPORTED,
+<span class="fc" id="L91">                        report.detailCode(),</span>
+<span class="fc" id="L92">                        report.consideredConfigurations());</span>
+<span class="nc" id="L93">                case GENERATED -&gt; throw new IllegalStateException(</span>
+                    &quot;generated report was handled as a failure&quot;);
+            };
+        }
+
+<span class="fc" id="L98">        try (ExprValueFactory values = new ExprValueFactory()) {</span>
+<span class="fc" id="L99">            ExprValueFactory.ExprValue targetValue = values.fromExpr(target);</span>
+            for (PolynomialDecompositionSynthesisOperator.Candidate candidate
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                    : report.candidates()) {</span>
+                Expr candidateExpression;
+                try {
+<span class="fc" id="L104">                    candidateExpression = parseCanonical(</span>
+<span class="fc" id="L105">                        candidate.transformedExpression());</span>
+<span class="nc" id="L106">                } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L107">                    throw new IllegalStateException(</span>
+                        &quot;exact polynomial synthesizer emitted an expression &quot;
+                            + &quot;that cannot be parsed and canonicalized: &quot;
+<span class="nc" id="L110">                            + candidate.transformedExpression(),</span>
+                        exception);
+<span class="fc" id="L112">                }</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                if (targetValue.sameValue(</span>
+<span class="fc" id="L114">                        values.fromExpr(candidateExpression))) {</span>
+<span class="fc" id="L115">                    return Classification.subsumed(</span>
+                        canonicalSource,
+                        candidate,
+<span class="fc" id="L118">                        report.consideredConfigurations());</span>
+                }
+<span class="fc" id="L120">            }</span>
+<span class="fc" id="L121">        }</span>
+
+<span class="fc" id="L123">        return Classification.failure(</span>
+            Status.NOT_SUBSUMED,
+            &quot;TARGET_NOT_GENERATED_WITHIN_BOUND&quot;,
+<span class="fc" id="L126">            report.consideredConfigurations());</span>
+    }
+
+    private String formatCanonical(String expression) {
+<span class="fc" id="L130">        return ExpressionFormatter.format(parseCanonical(expression));</span>
+    }
+
+    private Expr parseCanonical(String expression) {
+<span class="fc" id="L134">        String canonical = canonicalizer.canonicalize(expression);</span>
+<span class="fc" id="L135">        return parser.parse(new InputRequest(InputType.TERM, canonical))</span>
+<span class="fc" id="L136">            .terms()</span>
+<span class="fc" id="L137">            .getFirst();</span>
+    }
+
+    private static boolean isBlank(String value) {
+<span class="pc bpc" id="L141" title="2 of 4 branches missed.">        return value == null || value.isBlank();</span>
+    }
+
+<span class="fc" id="L144">    public enum Status {</span>
+<span class="fc" id="L145">        THEORY_SUBSUMED,</span>
+<span class="fc" id="L146">        NOT_SUBSUMED,</span>
+<span class="fc" id="L147">        UNSUPPORTED,</span>
+<span class="fc" id="L148">        BUDGET_INCONCLUSIVE</span>
+    }
+
+    /**
+     * Project-inventory novelty needs an inventory snapshot and is intentionally
+     * not inferred from semantic theory classification alone.
+     */
+<span class="fc" id="L155">    public enum ProjectInventoryNovelty {</span>
+<span class="fc" id="L156">        NOT_EVALUATED</span>
+    }
+
+<span class="fc" id="L159">    public enum RetentionDisposition {</span>
+<span class="fc" id="L160">        DERIVED_MACRO_CACHE_ONLY,</span>
+<span class="fc" id="L161">        NONE</span>
+    }
+
+    /**
+     * Immutable classifier-issued evidence.
+     *
+     * &lt;p&gt;The constructor is private so a cache caller cannot manufacture a
+     * positive status around an unrelated pattern or certificate. Every
+     * instance comes from one completed invocation of {@link #classify}.&lt;/p&gt;
+     */
+    public static final class Classification {
+        private final State state;
+
+        private Classification(
+            Status status,
+            String detailCode,
+            String theoryMethodId,
+            String sourceExpression,
+            String certificateHash,
+            String derivedExpression,
+            String applicationKey,
+            int consideredConfigurations,
+            ProjectInventoryNovelty projectInventoryNovelty,
+            RetentionDisposition retentionDisposition
+<span class="fc" id="L185">        ) {</span>
+<span class="fc" id="L186">            Status checkedStatus = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L187" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()</span>
+<span class="pc bpc" id="L188" title="8 of 16 branches missed.">                    || !PolynomialDecompositionSynthesisOperator.METHOD_ID.equals(</span>
+                        theoryMethodId)
+                    || sourceExpression == null
+                    || certificateHash == null
+                    || derivedExpression == null
+                    || applicationKey == null
+                    || consideredConfigurations &lt; 0
+                    || projectInventoryNovelty == null
+                    || retentionDisposition == null) {
+<span class="nc" id="L197">                throw new IllegalArgumentException(</span>
+                    &quot;polynomial theory classification is invalid&quot;);
+            }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (checkedStatus == Status.THEORY_SUBSUMED) {</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                if (sourceExpression.isBlank()</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                        || !certificateHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                        || derivedExpression.isBlank()</span>
+<span class="pc bpc" id="L204" title="2 of 4 branches missed.">                        || applicationKey.isBlank()</span>
+                        || retentionDisposition
+                            != RetentionDisposition.DERIVED_MACRO_CACHE_ONLY) {
+<span class="nc" id="L207">                    throw new IllegalArgumentException(</span>
+                        &quot;subsumed classification lacks exact theory evidence&quot;);
+                }
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            } else if (!sourceExpression.isEmpty()</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                    || !certificateHash.isEmpty()</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                    || !derivedExpression.isEmpty()</span>
+<span class="pc bpc" id="L213" title="2 of 4 branches missed.">                    || !applicationKey.isEmpty()</span>
+                    || retentionDisposition != RetentionDisposition.NONE) {
+<span class="nc" id="L215">                throw new IllegalArgumentException(</span>
+                    &quot;non-subsumed classification must not expose a cache candidate&quot;);
+            }
+<span class="fc" id="L218">            state = new State(</span>
+                checkedStatus,
+                detailCode,
+                theoryMethodId,
+                sourceExpression,
+                certificateHash,
+                derivedExpression,
+                applicationKey,
+                consideredConfigurations,
+                projectInventoryNovelty,
+                retentionDisposition);
+<span class="fc" id="L229">        }</span>
+
+        private static Classification subsumed(
+            String sourceExpression,
+            PolynomialDecompositionSynthesisOperator.Candidate candidate,
+            int consideredConfigurations
+        ) {
+<span class="fc" id="L236">            return new Classification(</span>
+                Status.THEORY_SUBSUMED,
+                &quot;TARGET_MATCHES_GENERATED_DECOMPOSITION&quot;,
+                PolynomialDecompositionSynthesisOperator.METHOD_ID,
+                sourceExpression,
+<span class="fc" id="L241">                candidate.certificateHash(),</span>
+<span class="fc" id="L242">                candidate.transformedExpression(),</span>
+<span class="fc" id="L243">                candidate.applicationKey(),</span>
+                consideredConfigurations,
+                ProjectInventoryNovelty.NOT_EVALUATED,
+                RetentionDisposition.DERIVED_MACRO_CACHE_ONLY);
+        }
+
+        private static Classification failure(
+            Status status,
+            String detailCode,
+            int consideredConfigurations
+        ) {
+<span class="fc" id="L254">            return new Classification(</span>
+                status,
+                detailCode,
+                PolynomialDecompositionSynthesisOperator.METHOD_ID,
+                &quot;&quot;,
+                &quot;&quot;,
+                &quot;&quot;,
+                &quot;&quot;,
+                consideredConfigurations,
+                ProjectInventoryNovelty.NOT_EVALUATED,
+                RetentionDisposition.NONE);
+        }
+
+        public Status status() {
+<span class="fc" id="L268">            return state.status();</span>
+        }
+
+        public String detailCode() {
+<span class="nc" id="L272">            return state.detailCode();</span>
+        }
+
+        public String theoryMethodId() {
+<span class="fc" id="L276">            return state.theoryMethodId();</span>
+        }
+
+        public String sourceExpression() {
+<span class="fc" id="L280">            return state.sourceExpression();</span>
+        }
+
+        public String certificateHash() {
+<span class="fc" id="L284">            return state.certificateHash();</span>
+        }
+
+        public String derivedExpression() {
+<span class="fc" id="L288">            return state.derivedExpression();</span>
+        }
+
+        public String applicationKey() {
+<span class="fc" id="L292">            return state.applicationKey();</span>
+        }
+
+        public int consideredConfigurations() {
+<span class="fc" id="L296">            return state.consideredConfigurations();</span>
+        }
+
+        public ProjectInventoryNovelty projectInventoryNovelty() {
+<span class="fc" id="L300">            return state.projectInventoryNovelty();</span>
+        }
+
+        public RetentionDisposition retentionDisposition() {
+<span class="fc" id="L304">            return state.retentionDisposition();</span>
+        }
+
+        public boolean subsumed() {
+<span class="fc bfc" id="L308" title="All 2 branches covered.">            return status() == Status.THEORY_SUBSUMED;</span>
+        }
+
+        @Override
+        public boolean equals(Object other) {
+<span class="nc" id="L313">            return this == other</span>
+<span class="nc bnc" id="L314" title="All 4 branches missed.">                || other instanceof Classification classification</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">                    &amp;&amp; state.equals(classification.state);</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L320">            return state.hashCode();</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="fc" id="L325">            return &quot;Classification[&quot; + state + &quot;]&quot;;</span>
+        }
+
+<span class="fc" id="L328">        private record State(</span>
+            Status status,
+            String detailCode,
+            String theoryMethodId,
+            String sourceExpression,
+            String certificateHash,
+            String derivedExpression,
+            String applicationKey,
+            int consideredConfigurations,
+            ProjectInventoryNovelty projectInventoryNovelty,
+            RetentionDisposition retentionDisposition
+        ) {
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
