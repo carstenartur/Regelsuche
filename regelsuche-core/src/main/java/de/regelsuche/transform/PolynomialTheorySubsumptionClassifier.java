@@ -104,7 +104,11 @@ public final class PolynomialTheorySubsumptionClassifier {
                     candidateExpression = parseCanonical(
                         candidate.transformedExpression());
                 } catch (IllegalArgumentException exception) {
-                    continue;
+                    throw new IllegalStateException(
+                        "exact polynomial synthesizer emitted an expression "
+                            + "that cannot be parsed and canonicalized: "
+                            + candidate.transformedExpression(),
+                        exception);
                 }
                 if (targetValue.sameValue(
                         values.fromExpr(candidateExpression))) {
