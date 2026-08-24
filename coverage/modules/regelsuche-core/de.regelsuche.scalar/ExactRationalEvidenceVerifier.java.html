@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactRationalEvidenceVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.scalar</a> &gt; <span class="el_source">ExactRationalEvidenceVerifier.java</span></div><h1>ExactRationalEvidenceVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.scalar;
+
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Replays serialized exact-rational evidence against its declared domain and
+ * limits.
+ *
+ * &lt;p&gt;JSON Schema can constrain shapes and canonical spelling, but it cannot
+ * prove greatest-common-divisor reduction or recompute content hashes. This
+ * verifier performs those semantic checks. Over-limit source-length failures
+ * retain only a bounded prefix and are therefore verified as fail-closed
+ * failure shape, not as a replay of the discarded suffix.&lt;/p&gt;
+ */
+<span class="fc" id="L16">public final class ExactRationalEvidenceVerifier {</span>
+
+    public Verification verify(SerializedEvidence evidence) {
+<span class="fc" id="L19">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        if (!ExactRationalDomain.DOMAIN_ID.equals(evidence.domainId())) {</span>
+<span class="nc" id="L21">            return Verification.rejected(&quot;DOMAIN_ID_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L23">        if (evidence.sourceLiteral().length()</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">                &gt; evidence.limits().maxLiteralCharacters()) {</span>
+<span class="nc" id="L25">            return Verification.rejected(</span>
+                &quot;SOURCE_LITERAL_EXCEEDS_DECLARED_LIMIT&quot;);
+        }
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (evidence.status() == ExactRationalDomain.Status.EXACT) {</span>
+<span class="fc" id="L29">            return verifyExact(evidence);</span>
+        }
+<span class="fc" id="L31">        return verifyFailure(evidence);</span>
+    }
+
+    private Verification verifyExact(SerializedEvidence evidence) {
+<span class="fc" id="L35">        ExactRationalParseEvidence replay = replay(evidence);</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (!replay.exact()) {</span>
+<span class="nc" id="L37">            return Verification.rejected(</span>
+                &quot;EXACT_EVIDENCE_SOURCE_DOES_NOT_REPLAY&quot;);
+        }
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (!sameFields(evidence, replay)) {</span>
+<span class="fc" id="L41">            return Verification.rejected(</span>
+                &quot;EXACT_EVIDENCE_REPLAY_MISMATCH&quot;);
+        }
+<span class="fc" id="L44">        return Verification.verified(</span>
+<span class="fc" id="L45">            replay.value().orElseThrow());</span>
+    }
+
+    private Verification verifyFailure(SerializedEvidence evidence) {
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (!evidence.canonicalValue().isEmpty()</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">                || !evidence.valueId().isEmpty()</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                || !evidence.certificateHash().isEmpty()) {</span>
+<span class="nc" id="L52">            return Verification.rejected(</span>
+                &quot;FAILED_EVIDENCE_EXPOSES_EXACT_FIELDS&quot;);
+        }
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (!validFailureDetail(</span>
+<span class="fc" id="L56">                evidence.status(),</span>
+<span class="fc" id="L57">                evidence.detailCode())) {</span>
+<span class="nc" id="L58">            return Verification.rejected(</span>
+                &quot;FAILED_EVIDENCE_DETAIL_MISMATCH&quot;);
+        }
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (isTruncatedSourceFailure(evidence)) {</span>
+<span class="fc" id="L62">            return Verification.verifiedFailure(</span>
+                &quot;BOUNDED_SOURCE_LIMIT_FAILURE_VERIFIED&quot;);
+        }
+
+<span class="fc" id="L66">        ExactRationalParseEvidence replay = replay(evidence);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (replay.status() != evidence.status()</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                || !replay.detailCode().equals(evidence.detailCode())</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                || !replay.sourceLiteral().equals(</span>
+<span class="fc" id="L70">                    evidence.sourceLiteral())) {</span>
+<span class="nc" id="L71">            return Verification.rejected(</span>
+                &quot;FAILED_EVIDENCE_REPLAY_MISMATCH&quot;);
+        }
+<span class="fc" id="L74">        return Verification.verifiedFailure(</span>
+            &quot;FAILURE_EVIDENCE_REPLAY_VERIFIED&quot;);
+    }
+
+    private ExactRationalParseEvidence replay(
+        SerializedEvidence evidence
+    ) {
+<span class="fc" id="L81">        return new ExactRationalDomain(evidence.limits())</span>
+<span class="fc" id="L82">            .parse(evidence.sourceLiteral());</span>
+    }
+
+    private boolean sameFields(
+        SerializedEvidence serialized,
+        ExactRationalParseEvidence replay
+    ) {
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        return serialized.status() == replay.status()</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            &amp;&amp; serialized.detailCode().equals(replay.detailCode())</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            &amp;&amp; serialized.sourceLiteral().equals(</span>
+<span class="fc" id="L92">                replay.sourceLiteral())</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            &amp;&amp; serialized.canonicalValue().equals(</span>
+<span class="fc" id="L94">                replay.canonicalValue())</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            &amp;&amp; serialized.valueId().equals(replay.valueId())</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            &amp;&amp; serialized.certificateHash().equals(</span>
+<span class="fc" id="L97">                replay.certificateHash());</span>
+    }
+
+    private boolean isTruncatedSourceFailure(
+        SerializedEvidence evidence
+    ) {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        return evidence.status()</span>
+            == ExactRationalDomain.Status.LIMIT_EXCEEDED
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            &amp;&amp; &quot;LITERAL_CHARACTER_LIMIT_EXCEEDED&quot;.equals(</span>
+<span class="fc" id="L106">                evidence.detailCode())</span>
+<span class="fc" id="L107">            &amp;&amp; evidence.sourceLiteral().length()</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                == evidence.limits().maxLiteralCharacters();</span>
+    }
+
+    private boolean validFailureDetail(
+        ExactRationalDomain.Status status,
+        String detailCode
+    ) {
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">        return switch (status) {</span>
+            case UNSUPPORTED -&gt;
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                &quot;LITERAL_BLANK&quot;.equals(detailCode)</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                    || &quot;LITERAL_GRAMMAR_UNSUPPORTED&quot;.equals(detailCode);</span>
+            case ZERO_DENOMINATOR -&gt;
+<span class="fc" id="L120">                &quot;RATIONAL_DENOMINATOR_ZERO&quot;.equals(detailCode);</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            case LIMIT_EXCEEDED -&gt; switch (detailCode) {</span>
+                case &quot;LITERAL_CHARACTER_LIMIT_EXCEEDED&quot;,
+                    &quot;RATIONAL_DIGIT_LIMIT_EXCEEDED&quot;,
+                    &quot;INTEGER_DIGIT_LIMIT_EXCEEDED&quot;,
+                    &quot;DECIMAL_DIGIT_LIMIT_EXCEEDED&quot;,
+<span class="fc" id="L126">                    &quot;DECIMAL_SCALE_LIMIT_EXCEEDED&quot; -&gt; true;</span>
+<span class="nc" id="L127">                default -&gt; false;</span>
+            };
+<span class="nc" id="L129">            case EXACT -&gt; false;</span>
+        };
+    }
+
+<span class="fc" id="L133">    public enum Status {</span>
+<span class="fc" id="L134">        VERIFIED_EXACT,</span>
+<span class="fc" id="L135">        VERIFIED_FAILURE,</span>
+<span class="fc" id="L136">        REJECTED</span>
+    }
+
+    public record SerializedEvidence(
+        String domainId,
+        ExactRationalDomain.Status status,
+        String detailCode,
+        String sourceLiteral,
+        ExactRationalDomain.Limits limits,
+        String canonicalValue,
+        String valueId,
+        String certificateHash
+    ) {
+<span class="fc" id="L149">        public SerializedEvidence {</span>
+<span class="fc" id="L150">            Objects.requireNonNull(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L151">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L152" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L153">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L156">            Objects.requireNonNull(sourceLiteral, &quot;sourceLiteral&quot;);</span>
+<span class="fc" id="L157">            Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="fc" id="L158">            Objects.requireNonNull(</span>
+                canonicalValue,
+                &quot;canonicalValue&quot;);
+<span class="fc" id="L161">            Objects.requireNonNull(valueId, &quot;valueId&quot;);</span>
+<span class="fc" id="L162">            Objects.requireNonNull(</span>
+                certificateHash,
+                &quot;certificateHash&quot;);
+<span class="fc" id="L165">        }</span>
+    }
+
+    public record Verification(
+        Status status,
+        String detailCode,
+        Optional&lt;ExactRational&gt; value
+    ) {
+<span class="fc" id="L173">        public Verification {</span>
+<span class="fc" id="L174">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L175" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L176">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L179">            value = Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            if (status == Status.VERIFIED_EXACT</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                    &amp;&amp; value.isEmpty()) {</span>
+<span class="nc" id="L182">                throw new IllegalArgumentException(</span>
+                    &quot;verified exact evidence requires a value&quot;);
+            }
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (status != Status.VERIFIED_EXACT</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                    &amp;&amp; value.isPresent()) {</span>
+<span class="nc" id="L187">                throw new IllegalArgumentException(</span>
+                    &quot;non-exact verification must not expose a value&quot;);
+            }
+<span class="fc" id="L190">        }</span>
+
+        private static Verification verified(
+            ExactRational value
+        ) {
+<span class="fc" id="L195">            return new Verification(</span>
+                Status.VERIFIED_EXACT,
+                &quot;EXACT_EVIDENCE_REPLAY_VERIFIED&quot;,
+<span class="fc" id="L198">                Optional.of(value));</span>
+        }
+
+        private static Verification verifiedFailure(
+            String detailCode
+        ) {
+<span class="fc" id="L204">            return new Verification(</span>
+                Status.VERIFIED_FAILURE,
+                detailCode,
+<span class="fc" id="L207">                Optional.empty());</span>
+        }
+
+        private static Verification rejected(
+            String detailCode
+        ) {
+<span class="fc" id="L213">            return new Verification(</span>
+                Status.REJECTED,
+                detailCode,
+<span class="fc" id="L216">                Optional.empty());</span>
+        }
+
+        public boolean verified() {
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            return status != Status.REJECTED;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,200 +1,176 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Rational.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">Rational.java</span></div><h1>Rational.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
 
+import de.regelsuche.scalar.ExactRational;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Objects;
 
-public record Rational(BigInteger numerator, BigInteger denominator) implements Comparable&lt;Rational&gt; {
-<span class="fc" id="L7">    public static final Rational ZERO = new Rational(BigInteger.ZERO, BigInteger.ONE);</span>
-<span class="fc" id="L8">    public static final Rational ONE = new Rational(BigInteger.ONE, BigInteger.ONE);</span>
-<span class="fc" id="L9">    public static final Rational NEGATIVE_ONE = new Rational(BigInteger.ONE.negate(), BigInteger.ONE);</span>
+/**
+ * Compatibility facade for the historical mathematical-algorithms API.
+ *
+ * &lt;p&gt;All exact normalization and arithmetic delegates to the authoritative
+ * {@link ExactRational} contract in {@code regelsuche-core}. New core code
+ * should use {@code ExactRational} directly. {@link #fromDouble(double)} is a
+ * legacy approximate-input adapter and must not be used to authorize an exact
+ * source-language claim.&lt;/p&gt;
+ */
+public record Rational(
+    BigInteger numerator,
+    BigInteger denominator
+) implements Comparable&lt;Rational&gt; {
+<span class="fc" id="L21">    public static final Rational ZERO =</span>
+<span class="fc" id="L22">        fromExact(ExactRational.ZERO);</span>
+<span class="fc" id="L23">    public static final Rational ONE =</span>
+<span class="fc" id="L24">        fromExact(ExactRational.ONE);</span>
+<span class="fc" id="L25">    public static final Rational NEGATIVE_ONE =</span>
+<span class="fc" id="L26">        fromExact(ExactRational.NEGATIVE_ONE);</span>
 
-<span class="fc" id="L11">    public Rational {</span>
-<span class="pc bpc" id="L12" title="2 of 4 branches missed.">        if (denominator == null || denominator.signum() == 0) {</span>
-<span class="nc" id="L13">            throw new IllegalArgumentException(&quot;denominator must not be zero&quot;);</span>
+<span class="fc" id="L28">    public Rational {</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (numerator == null) {</span>
+<span class="nc" id="L30">            throw new IllegalArgumentException(</span>
+                &quot;numerator must not be null&quot;);
         }
-<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if (numerator == null) {</span>
-<span class="nc" id="L16">            throw new IllegalArgumentException(&quot;numerator must not be null&quot;);</span>
+<span class="pc bpc" id="L33" title="1 of 4 branches missed.">        if (denominator == null || denominator.signum() == 0) {</span>
+<span class="fc" id="L34">            throw new IllegalArgumentException(</span>
+                &quot;denominator must not be zero&quot;);
         }
-<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (numerator.signum() == 0) {</span>
-<span class="fc" id="L19">            denominator = BigInteger.ONE;</span>
-        } else {
-<span class="fc bfc" id="L21" title="All 2 branches covered.">            if (denominator.signum() &lt; 0) {</span>
-<span class="fc" id="L22">                numerator = numerator.negate();</span>
-<span class="fc" id="L23">                denominator = denominator.negate();</span>
-            }
-<span class="fc bfc" id="L25" title="All 2 branches covered.">            if (!denominator.equals(BigInteger.ONE)) {</span>
-<span class="fc" id="L26">                BigInteger gcd = numerator.gcd(denominator);</span>
-<span class="fc bfc" id="L27" title="All 2 branches covered.">                if (!gcd.equals(BigInteger.ONE)) {</span>
-<span class="fc" id="L28">                    numerator = numerator.divide(gcd);</span>
-<span class="fc" id="L29">                    denominator = denominator.divide(gcd);</span>
-                }
-            }
-        }
-<span class="fc" id="L33">    }</span>
+<span class="fc" id="L37">        ExactRational normalized =</span>
+            new ExactRational(numerator, denominator);
+<span class="fc" id="L39">        numerator = normalized.numerator();</span>
+<span class="fc" id="L40">        denominator = normalized.denominator();</span>
+<span class="fc" id="L41">    }</span>
 
     public static Rational of(long value) {
-<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (value == 0) {</span>
-<span class="fc" id="L37">            return ZERO;</span>
-        }
-<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (value == 1) {</span>
-<span class="fc" id="L40">            return ONE;</span>
-        }
-<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (value == -1) {</span>
-<span class="fc" id="L43">            return NEGATIVE_ONE;</span>
-        }
-<span class="fc" id="L45">        return new Rational(BigInteger.valueOf(value), BigInteger.ONE);</span>
+<span class="fc" id="L44">        return fromExact(ExactRational.integer(value));</span>
     }
 
+    /**
+     * Converts an already rounded binary floating-point value through its
+     * canonical decimal rendering. This preserves legacy behavior only.
+     */
     public static Rational fromDouble(double value) {
-<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (!Double.isFinite(value)) {</span>
-<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;number must be finite&quot;);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (!Double.isFinite(value)) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(</span>
+                &quot;number must be finite&quot;);
         }
-<span class="fc" id="L52">        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();</span>
-<span class="fc" id="L53">        BigInteger numerator = decimal.unscaledValue();</span>
-<span class="fc" id="L54">        BigInteger denominator = BigInteger.ONE;</span>
-<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (decimal.scale() &gt; 0) {</span>
-<span class="fc" id="L56">            denominator = BigInteger.TEN.pow(decimal.scale());</span>
-<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        } else if (decimal.scale() &lt; 0) {</span>
-<span class="nc" id="L58">            numerator = numerator.multiply(BigInteger.TEN.pow(-decimal.scale()));</span>
+<span class="fc" id="L56">        BigDecimal decimal =</span>
+<span class="fc" id="L57">            BigDecimal.valueOf(value).stripTrailingZeros();</span>
+<span class="fc" id="L58">        BigInteger numerator = decimal.unscaledValue();</span>
+<span class="fc" id="L59">        BigInteger denominator = BigInteger.ONE;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (decimal.scale() &gt; 0) {</span>
+<span class="fc" id="L61">            denominator = BigInteger.TEN.pow(decimal.scale());</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        } else if (decimal.scale() &lt; 0) {</span>
+<span class="nc" id="L63">            numerator = numerator.multiply(</span>
+<span class="nc" id="L64">                BigInteger.TEN.pow(-decimal.scale()));</span>
         }
-<span class="fc" id="L60">        return new Rational(numerator, denominator);</span>
+<span class="fc" id="L66">        return new Rational(numerator, denominator);</span>
+    }
+
+    public static Rational fromExact(ExactRational value) {
+<span class="fc" id="L70">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L71">        return new Rational(</span>
+<span class="fc" id="L72">            value.numerator(),</span>
+<span class="fc" id="L73">            value.denominator());</span>
+    }
+
+    public ExactRational exactValue() {
+<span class="fc" id="L77">        return new ExactRational(numerator, denominator);</span>
     }
 
     public Rational add(Rational other) {
-<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (other.isZero()) {</span>
-<span class="fc" id="L65">            return this;</span>
+<span class="fc" id="L81">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (other.isZero()) {</span>
+<span class="fc" id="L83">            return this;</span>
         }
-<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (isZero()) {</span>
-<span class="fc" id="L68">            return other;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (isZero()) {</span>
+<span class="fc" id="L86">            return other;</span>
         }
-<span class="fc" id="L70">        BigInteger denominatorGcd = denominator.gcd(other.denominator);</span>
-<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (denominatorGcd.equals(BigInteger.ONE)) {</span>
-<span class="fc" id="L72">            return new Rational(</span>
-<span class="fc" id="L73">                numerator.multiply(other.denominator).add(other.numerator.multiply(denominator)),</span>
-<span class="fc" id="L74">                denominator.multiply(other.denominator)</span>
-            );
-        }
-
-<span class="fc" id="L78">        BigInteger leftMultiplier = other.denominator.divide(denominatorGcd);</span>
-<span class="fc" id="L79">        BigInteger rightMultiplier = denominator.divide(denominatorGcd);</span>
-<span class="fc" id="L80">        BigInteger sum = numerator.multiply(leftMultiplier).add(other.numerator.multiply(rightMultiplier));</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (sum.signum() == 0) {</span>
-<span class="fc" id="L82">            return ZERO;</span>
-        }
-<span class="fc" id="L84">        BigInteger cancellation = sum.abs().gcd(denominatorGcd);</span>
-<span class="fc" id="L85">        return new Rational(</span>
-<span class="fc" id="L86">            sum.divide(cancellation),</span>
-<span class="fc" id="L87">            denominator.divide(cancellation).multiply(leftMultiplier)</span>
-        );
+<span class="fc" id="L88">        return canonical(exactValue().add(other.exactValue()));</span>
     }
 
     public Rational subtract(Rational other) {
-<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (other.isZero()) {</span>
-<span class="fc" id="L93">            return this;</span>
+<span class="fc" id="L92">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (other.isZero()) {</span>
+<span class="fc" id="L94">            return this;</span>
         }
-<span class="fc" id="L95">        return add(other.negate());</span>
+<span class="fc" id="L96">        return canonical(exactValue().subtract(other.exactValue()));</span>
     }
 
     public Rational multiply(Rational other) {
-<span class="fc bfc" id="L99" title="All 4 branches covered.">        if (isZero() || other.isZero()) {</span>
-<span class="fc" id="L100">            return ZERO;</span>
+<span class="fc" id="L100">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">        if (isZero() || other.isZero()) {</span>
+<span class="fc" id="L102">            return ZERO;</span>
         }
-<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (isOne()) {</span>
-<span class="fc" id="L103">            return other;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (other.isOne()) {</span>
+<span class="fc" id="L105">            return this;</span>
         }
-<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (other.isOne()) {</span>
-<span class="fc" id="L106">            return this;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (isOne()) {</span>
+<span class="fc" id="L108">            return other;</span>
         }
-<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (isNegativeOne()) {</span>
-<span class="fc" id="L109">            return other.negate();</span>
-        }
-<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (other.isNegativeOne()) {</span>
-<span class="fc" id="L112">            return negate();</span>
-        }
-
-<span class="fc" id="L115">        BigInteger leftCancellation = numerator.abs().gcd(other.denominator);</span>
-<span class="fc" id="L116">        BigInteger rightCancellation = other.numerator.abs().gcd(denominator);</span>
-<span class="fc" id="L117">        BigInteger reducedLeftNumerator = numerator.divide(leftCancellation);</span>
-<span class="fc" id="L118">        BigInteger reducedRightDenominator = other.denominator.divide(leftCancellation);</span>
-<span class="fc" id="L119">        BigInteger reducedRightNumerator = other.numerator.divide(rightCancellation);</span>
-<span class="fc" id="L120">        BigInteger reducedLeftDenominator = denominator.divide(rightCancellation);</span>
-<span class="fc" id="L121">        return new Rational(</span>
-<span class="fc" id="L122">            reducedLeftNumerator.multiply(reducedRightNumerator),</span>
-<span class="fc" id="L123">            reducedLeftDenominator.multiply(reducedRightDenominator)</span>
-        );
+<span class="fc" id="L110">        return canonical(exactValue().multiply(other.exactValue()));</span>
     }
 
     public Rational divide(Rational other) {
-<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (other.isZero()) {</span>
-<span class="fc" id="L129">            throw new ArithmeticException(&quot;division by zero&quot;);</span>
+<span class="fc" id="L114">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (other.isOne()) {</span>
+<span class="fc" id="L116">            return this;</span>
         }
-<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (isZero()) {</span>
-<span class="nc" id="L132">            return ZERO;</span>
-        }
-<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (other.isOne()) {</span>
-<span class="fc" id="L135">            return this;</span>
-        }
-<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (other.isNegativeOne()) {</span>
-<span class="fc" id="L138">            return negate();</span>
-        }
-
-<span class="fc" id="L141">        BigInteger numeratorCancellation = numerator.abs().gcd(other.numerator.abs());</span>
-<span class="fc" id="L142">        BigInteger denominatorCancellation = denominator.gcd(other.denominator);</span>
-<span class="fc" id="L143">        BigInteger reducedNumerator = numerator.divide(numeratorCancellation);</span>
-<span class="fc" id="L144">        BigInteger reducedDivisorNumerator = other.numerator.divide(numeratorCancellation);</span>
-<span class="fc" id="L145">        BigInteger reducedDenominator = denominator.divide(denominatorCancellation);</span>
-<span class="fc" id="L146">        BigInteger reducedDivisorDenominator = other.denominator.divide(denominatorCancellation);</span>
-<span class="fc" id="L147">        return new Rational(</span>
-<span class="fc" id="L148">            reducedNumerator.multiply(reducedDivisorDenominator),</span>
-<span class="fc" id="L149">            reducedDenominator.multiply(reducedDivisorNumerator)</span>
-        );
+<span class="fc" id="L118">        return canonical(exactValue().divide(other.exactValue()));</span>
     }
 
     public Rational negate() {
-<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (isZero()) {</span>
-<span class="fc" id="L155">            return ZERO;</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (isZero()) {</span>
+<span class="fc" id="L123">            return ZERO;</span>
         }
-<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (isOne()) {</span>
-<span class="fc" id="L158">            return NEGATIVE_ONE;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (isOne()) {</span>
+<span class="fc" id="L126">            return NEGATIVE_ONE;</span>
         }
-<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (isNegativeOne()) {</span>
-<span class="fc" id="L161">            return ONE;</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (isNegativeOne()) {</span>
+<span class="fc" id="L129">            return ONE;</span>
         }
-<span class="fc" id="L163">        return new Rational(numerator.negate(), denominator);</span>
+<span class="fc" id="L131">        return canonical(exactValue().negate());</span>
     }
 
     public Rational abs() {
-<span class="fc bfc" id="L167" title="All 2 branches covered.">        return numerator.signum() &lt; 0 ? negate() : this;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        return numerator.signum() &gt;= 0 ? this : negate();</span>
+    }
+
+    private static Rational canonical(ExactRational value) {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (value.isZero()) {</span>
+<span class="fc" id="L140">            return ZERO;</span>
+        }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (value.isOne()) {</span>
+<span class="fc" id="L143">            return ONE;</span>
+        }
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (value.isNegativeOne()) {</span>
+<span class="fc" id="L146">            return NEGATIVE_ONE;</span>
+        }
+<span class="fc" id="L148">        return fromExact(value);</span>
     }
 
     public boolean isZero() {
-<span class="fc bfc" id="L171" title="All 2 branches covered.">        return numerator.signum() == 0;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        return numerator.signum() == 0;</span>
     }
 
     public boolean isOne() {
-<span class="fc bfc" id="L175" title="All 4 branches covered.">        return numerator.equals(BigInteger.ONE) &amp;&amp; denominator.equals(BigInteger.ONE);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        return numerator.equals(BigInteger.ONE)</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            &amp;&amp; denominator.equals(BigInteger.ONE);</span>
     }
 
     public boolean isNegativeOne() {
-<span class="fc bfc" id="L179" title="All 4 branches covered.">        return numerator.equals(BigInteger.ONE.negate()) &amp;&amp; denominator.equals(BigInteger.ONE);</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        return numerator.equals(BigInteger.ONE.negate())</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            &amp;&amp; denominator.equals(BigInteger.ONE);</span>
     }
 
     @Override
     public int compareTo(Rational other) {
-<span class="pc bpc" id="L184" title="2 of 4 branches missed.">        if (this == other || equals(other)) {</span>
-<span class="nc" id="L185">            return 0;</span>
-        }
-<span class="fc" id="L187">        BigInteger denominatorGcd = denominator.gcd(other.denominator);</span>
-<span class="fc" id="L188">        return numerator.multiply(other.denominator.divide(denominatorGcd))</span>
-<span class="fc" id="L189">            .compareTo(other.numerator.multiply(denominator.divide(denominatorGcd)));</span>
+<span class="fc" id="L167">        return exactValue().compareTo(</span>
+<span class="fc" id="L168">            Objects.requireNonNull(other, &quot;other&quot;).exactValue());</span>
     }
 
     @Override
     public String toString() {
-<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (denominator.equals(BigInteger.ONE)) {</span>
-<span class="fc" id="L195">            return numerator.toString();</span>
-        }
-<span class="fc" id="L197">        return numerator + &quot;/&quot; + denominator;</span>
+<span class="fc" id="L173">        return exactValue().canonicalText();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

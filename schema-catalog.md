@@ -25,6 +25,15 @@ fachlich gruppierten Einstieg; der vollständige Bestand liegt unter
 | [`regelsuche-autonomous-candidate-qualification-run-v1`](schemas/regelsuche-autonomous-candidate-qualification-run-v1.schema.json) | Gebundener Qualifikationslauf |
 | [`regelsuche-autonomous-candidate-qualified-utility-v1`](schemas/regelsuche-autonomous-candidate-qualified-utility-v1.schema.json) | Gepaarter Held-out-Nutzen mit und ohne Kandidat |
 
+## Exakte Werte und Polynomtheorie
+
+| Vertrag | Zweck |
+| --- | --- |
+| [`regelsuche-exact-rational-scalar-v1`](schemas/regelsuche-exact-rational-scalar-v1.schema.json) | Strikte Parse-Evidence für den versionierten exakten Rationalzahlbereich; semantische GCD- und Hashprüfung erfolgt durch den unabhängigen Replay-Verifier |
+
+Die fachliche Grenze, kanonische Hashbildung und JSON-Reproduktion sind unter
+[Exact rational scalar domain v1](exact-rational-scalar-domain.md) dokumentiert.
+
 ## Discovery-Domänen und Lifecycle
 
 | Vertrag | Zweck |

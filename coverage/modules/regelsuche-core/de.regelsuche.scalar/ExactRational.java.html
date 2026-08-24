@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactRational.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.scalar</a> &gt; <span class="el_source">ExactRational.java</span></div><h1>ExactRational.java</h1><pre class="source lang-java linenums">package de.regelsuche.scalar;
+
+import java.math.BigInteger;
+import java.util.Objects;
+
+/**
+ * Canonical arbitrary-precision rational number.
+ *
+ * &lt;p&gt;This is the authoritative exact rational arithmetic contract shared by
+ * the core and legacy mathematical-algorithm adapters. The denominator is
+ * always positive, numerator and denominator are reduced by their greatest
+ * common divisor, and every zero is represented as {@code 0/1}. No binary
+ * floating-point conversion is exposed.&lt;/p&gt;
+ */
+public record ExactRational(
+    BigInteger numerator,
+    BigInteger denominator
+) implements Comparable&lt;ExactRational&gt; {
+<span class="fc" id="L19">    public static final ExactRational ZERO =</span>
+        new ExactRational(BigInteger.ZERO, BigInteger.ONE);
+<span class="fc" id="L21">    public static final ExactRational ONE =</span>
+        new ExactRational(BigInteger.ONE, BigInteger.ONE);
+<span class="fc" id="L23">    public static final ExactRational NEGATIVE_ONE =</span>
+<span class="fc" id="L24">        new ExactRational(BigInteger.ONE.negate(), BigInteger.ONE);</span>
+
+<span class="fc" id="L26">    public ExactRational {</span>
+<span class="fc" id="L27">        Objects.requireNonNull(numerator, &quot;numerator&quot;);</span>
+<span class="fc" id="L28">        Objects.requireNonNull(denominator, &quot;denominator&quot;);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (denominator.signum() == 0) {</span>
+<span class="fc" id="L30">            throw new ArithmeticException(</span>
+                &quot;rational denominator must not be zero&quot;);
+        }
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (numerator.signum() == 0) {</span>
+<span class="fc" id="L34">            numerator = BigInteger.ZERO;</span>
+<span class="fc" id="L35">            denominator = BigInteger.ONE;</span>
+        } else {
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            if (denominator.signum() &lt; 0) {</span>
+<span class="fc" id="L38">                numerator = numerator.negate();</span>
+<span class="fc" id="L39">                denominator = denominator.negate();</span>
+            }
+<span class="fc" id="L41">            BigInteger divisor = numerator.gcd(denominator);</span>
+<span class="fc" id="L42">            numerator = numerator.divide(divisor);</span>
+<span class="fc" id="L43">            denominator = denominator.divide(divisor);</span>
+        }
+<span class="fc" id="L45">    }</span>
+
+    public static ExactRational integer(long value) {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (value == 0) {</span>
+<span class="nc" id="L49">            return ZERO;</span>
+        }
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (value == 1) {</span>
+<span class="fc" id="L52">            return ONE;</span>
+        }
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (value == -1) {</span>
+<span class="fc" id="L55">            return NEGATIVE_ONE;</span>
+        }
+<span class="fc" id="L57">        return new ExactRational(</span>
+<span class="fc" id="L58">            BigInteger.valueOf(value),</span>
+            BigInteger.ONE);
+    }
+
+    public static ExactRational integer(BigInteger value) {
+<span class="fc" id="L63">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (value.signum() == 0) {</span>
+<span class="nc" id="L65">            return ZERO;</span>
+        }
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (value.equals(BigInteger.ONE)) {</span>
+<span class="nc" id="L68">            return ONE;</span>
+        }
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (value.equals(BigInteger.ONE.negate())) {</span>
+<span class="nc" id="L71">            return NEGATIVE_ONE;</span>
+        }
+<span class="fc" id="L73">        return new ExactRational(value, BigInteger.ONE);</span>
+    }
+
+    public ExactRational add(ExactRational other) {
+<span class="fc" id="L77">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (other.isZero()) {</span>
+<span class="nc" id="L79">            return this;</span>
+        }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (isZero()) {</span>
+<span class="nc" id="L82">            return other;</span>
+        }
+<span class="fc" id="L84">        BigInteger denominatorGcd = denominator.gcd(other.denominator);</span>
+<span class="fc" id="L85">        BigInteger leftMultiplier =</span>
+<span class="fc" id="L86">            other.denominator.divide(denominatorGcd);</span>
+<span class="fc" id="L87">        BigInteger rightMultiplier =</span>
+<span class="fc" id="L88">            denominator.divide(denominatorGcd);</span>
+<span class="fc" id="L89">        BigInteger sum = numerator.multiply(leftMultiplier)</span>
+<span class="fc" id="L90">            .add(other.numerator.multiply(rightMultiplier));</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (sum.signum() == 0) {</span>
+<span class="fc" id="L92">            return ZERO;</span>
+        }
+<span class="fc" id="L94">        BigInteger cancellation = sum.abs().gcd(denominatorGcd);</span>
+<span class="fc" id="L95">        return new ExactRational(</span>
+<span class="fc" id="L96">            sum.divide(cancellation),</span>
+<span class="fc" id="L97">            denominator.divide(cancellation).multiply(leftMultiplier));</span>
+    }
+
+    public ExactRational subtract(ExactRational other) {
+<span class="fc" id="L101">        return add(Objects.requireNonNull(other, &quot;other&quot;).negate());</span>
+    }
+
+    public ExactRational multiply(ExactRational other) {
+<span class="fc" id="L105">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">        if (isZero() || other.isZero()) {</span>
+<span class="nc" id="L107">            return ZERO;</span>
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (isOne()) {</span>
+<span class="fc" id="L110">            return other;</span>
+        }
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (other.isOne()) {</span>
+<span class="fc" id="L113">            return this;</span>
+        }
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (isNegativeOne()) {</span>
+<span class="nc" id="L116">            return other.negate();</span>
+        }
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (other.isNegativeOne()) {</span>
+<span class="fc" id="L119">            return negate();</span>
+        }
+
+<span class="fc" id="L122">        BigInteger leftCancellation =</span>
+<span class="fc" id="L123">            numerator.abs().gcd(other.denominator);</span>
+<span class="fc" id="L124">        BigInteger rightCancellation =</span>
+<span class="fc" id="L125">            other.numerator.abs().gcd(denominator);</span>
+<span class="fc" id="L126">        return new ExactRational(</span>
+<span class="fc" id="L127">            numerator.divide(leftCancellation)</span>
+<span class="fc" id="L128">                .multiply(other.numerator.divide(rightCancellation)),</span>
+<span class="fc" id="L129">            denominator.divide(rightCancellation)</span>
+<span class="fc" id="L130">                .multiply(other.denominator.divide(leftCancellation)));</span>
+    }
+
+    public ExactRational divide(ExactRational other) {
+<span class="fc" id="L134">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (other.isZero()) {</span>
+<span class="fc" id="L136">            throw new ArithmeticException(&quot;division by zero rational&quot;);</span>
+        }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (isZero()) {</span>
+<span class="nc" id="L139">            return ZERO;</span>
+        }
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (other.isOne()) {</span>
+<span class="nc" id="L142">            return this;</span>
+        }
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (other.isNegativeOne()) {</span>
+<span class="nc" id="L145">            return negate();</span>
+        }
+
+<span class="fc" id="L148">        BigInteger numeratorCancellation =</span>
+<span class="fc" id="L149">            numerator.abs().gcd(other.numerator.abs());</span>
+<span class="fc" id="L150">        BigInteger denominatorCancellation =</span>
+<span class="fc" id="L151">            denominator.gcd(other.denominator);</span>
+<span class="fc" id="L152">        return new ExactRational(</span>
+<span class="fc" id="L153">            numerator.divide(numeratorCancellation)</span>
+<span class="fc" id="L154">                .multiply(</span>
+<span class="fc" id="L155">                    other.denominator.divide(denominatorCancellation)),</span>
+<span class="fc" id="L156">            denominator.divide(denominatorCancellation)</span>
+<span class="fc" id="L157">                .multiply(</span>
+<span class="fc" id="L158">                    other.numerator.divide(numeratorCancellation)));</span>
+    }
+
+    public ExactRational negate() {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (isZero()) {</span>
+<span class="nc" id="L163">            return ZERO;</span>
+        }
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (isOne()) {</span>
+<span class="nc" id="L166">            return NEGATIVE_ONE;</span>
+        }
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (isNegativeOne()) {</span>
+<span class="fc" id="L169">            return ONE;</span>
+        }
+<span class="fc" id="L171">        return new ExactRational(numerator.negate(), denominator);</span>
+    }
+
+    public ExactRational abs() {
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        return numerator.signum() &lt; 0 ? negate() : this;</span>
+    }
+
+    public ExactRational reciprocal() {
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (isZero()) {</span>
+<span class="fc" id="L180">            throw new ArithmeticException(</span>
+                &quot;zero rational has no reciprocal&quot;);
+        }
+<span class="nc" id="L183">        return new ExactRational(denominator, numerator);</span>
+    }
+
+    public ExactRational pow(int exponent) {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (exponent &lt; 0) {</span>
+<span class="fc" id="L188">            throw new IllegalArgumentException(</span>
+                &quot;exact rational exponent must not be negative&quot;);
+        }
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (exponent == 0) {</span>
+<span class="nc" id="L192">            return ONE;</span>
+        }
+<span class="fc" id="L194">        return new ExactRational(</span>
+<span class="fc" id="L195">            numerator.pow(exponent),</span>
+<span class="fc" id="L196">            denominator.pow(exponent));</span>
+    }
+
+    public int signum() {
+<span class="fc" id="L200">        return numerator.signum();</span>
+    }
+
+    public boolean isZero() {
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        return numerator.signum() == 0;</span>
+    }
+
+    public boolean isOne() {
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        return numerator.equals(BigInteger.ONE)</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            &amp;&amp; denominator.equals(BigInteger.ONE);</span>
+    }
+
+    public boolean isNegativeOne() {
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        return numerator.equals(BigInteger.ONE.negate())</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            &amp;&amp; denominator.equals(BigInteger.ONE);</span>
+    }
+
+    public boolean isInteger() {
+<span class="fc" id="L218">        return denominator.equals(BigInteger.ONE);</span>
+    }
+
+    public String canonicalText() {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        return isInteger()</span>
+<span class="fc" id="L223">            ? numerator.toString()</span>
+<span class="fc" id="L224">            : numerator + &quot;/&quot; + denominator;</span>
+    }
+
+    @Override
+    public int compareTo(ExactRational other) {
+<span class="fc" id="L229">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="pc bpc" id="L230" title="2 of 4 branches missed.">        if (this == other || equals(other)) {</span>
+<span class="nc" id="L231">            return 0;</span>
+        }
+<span class="fc" id="L233">        BigInteger denominatorGcd =</span>
+<span class="fc" id="L234">            denominator.gcd(other.denominator);</span>
+<span class="fc" id="L235">        return numerator.multiply(</span>
+<span class="fc" id="L236">                other.denominator.divide(denominatorGcd))</span>
+<span class="fc" id="L237">            .compareTo(</span>
+<span class="fc" id="L238">                other.numerator.multiply(</span>
+<span class="fc" id="L239">                    denominator.divide(denominatorGcd)));</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L244">        return canonicalText();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
