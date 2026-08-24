@@ -96,6 +96,17 @@ class ExpressionParserExactLiteralTest {
     }
 
     @Test
+    void reportsThePositionOfALeadingDecimalPoint() {
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> parser.parseExactTerm("  .5"));
+
+        assertEquals(
+            "Decimal point must be preceded by a digit at position 2",
+            exception.getMessage());
+    }
+
+    @Test
     void rejectsUnsupportedOrUnsafeLegacyAstRepresentations() {
         String overflow = "9".repeat(309);
         String scaleLimit = "0." + "0".repeat(256) + "1";
