@@ -1,9 +1,9 @@
 name: Diagnose Zenodo concept query
 
 on:
-  push:
+  pull_request:
     branches:
-      - diagnose/zenodo-concept-query-20951900
+      - main
   workflow_dispatch:
 
 permissions:
