@@ -45,6 +45,16 @@ class PolynomialTheorySubsumptionClassifierTest {
     }
 
     @Test
+    void positiveClassificationCanOnlyBeIssuedByTheClassifier() {
+        assertEquals(
+            0,
+            PolynomialTheorySubsumptionClassifier.Classification.class
+                .getConstructors()
+                .length,
+            "cache callers must not manufacture theory-subsumption evidence");
+    }
+
+    @Test
     void acceptsAssociativeCommutativeFactorOrderWithoutBroadEquivalence() {
         PolynomialTheorySubsumptionClassifier.Classification result =
             classifier.classify(
@@ -127,20 +137,8 @@ class PolynomialTheorySubsumptionClassifierTest {
             result,
             List.of(PolynomialDecompositionSynthesisOperator.RULE_ID),
             List.of("path:sophie-replay", "generation:1"));
-        PolynomialTheorySubsumptionClassifier.Classification replay =
-            new PolynomialTheorySubsumptionClassifier.Classification(
-                result.status(),
-                result.detailCode(),
-                result.theoryMethodId(),
-                result.sourceExpression(),
-                result.certificateHash(),
-                result.derivedExpression(),
-                result.applicationKey() + "|replay=2",
-                result.consideredConfigurations() + 1,
-                result.projectInventoryNovelty(),
-                result.retentionDisposition());
         PolynomialDerivedMacroCache.Entry secondLineage = cache.retain(
-            replay,
+            result,
             List.of("ast_expand", "ast_square_difference_factor"),
             List.of("path:sophie-replay-2", "generation:2"));
 
@@ -161,10 +159,10 @@ class PolynomialTheorySubsumptionClassifierTest {
             result.applicationKey(),
             secondLineage.lineages().getFirst().applicationKey());
         assertEquals(
-            replay.applicationKey(),
+            result.applicationKey(),
             secondLineage.lineages().get(1).applicationKey());
         assertEquals(
-            replay.consideredConfigurations(),
+            result.consideredConfigurations(),
             secondLineage.lineages().get(1).consideredConfigurations());
         assertEquals(
             PolynomialDerivedMacroCache.PURPOSE,
