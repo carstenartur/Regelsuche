@@ -18,7 +18,7 @@ sind bewusst von Handbüchern und Architekturtexten getrennt.
 | den aktuellen Forschungsstand verstehen | [Discovery- und Forschungsstand](discovery-status.md) |
 | Claims und Evidence korrekt einordnen | [Capability-Status](generated/capability-status.md), [Glossar](glossary.md) und [Release Readiness](release-readiness.md) |
 | die Architektur verstehen oder Code ändern | [Architektur](architecture.md) und [Developer Guide](developer-guide.md) |
-| einen Release durchführen | [Release-Betrieb](release-operations.md) |
+| einen Release durchführen oder nachträglich prüfen | [Release-Betrieb](release-operations.md) und [Audit eines veröffentlichten Releases](published-release-audit.md) |
 | Regeln oder Plugins entwickeln | [Erweiterungssystem](extension-system.md) |
 | einen Lauf reproduzieren | [Scientific Reproducibility](scientific-reproducibility.md) und [Independent Reproduction](independent-reproduction.md) |
 | einen JSON-Vertrag nachschlagen | [Schema-Katalog](schema-catalog.md) |
@@ -182,6 +182,9 @@ Verträge und Gates.
 
 - [Release-Betrieb](release-operations.md) — verpflichtender Trockenlauf,
   Versionierung, Veröffentlichung, Wiederholung und Nachkontrolle.
+- [Audit eines veröffentlichten Releases](published-release-audit.md) —
+  unabhängiger Download, Hash-/Tag-/Manifestprüfung, Produkt-Smoketests und
+  Zenodo-Abgleich.
 - [Persistenz](persistence.md) — unterstützte Betriebsmodi und Konfiguration.
 - [Storage Architecture](storage-architecture.md) — In-Memory, JSON,
   PostgreSQL/Hibernate und Artefaktablage.
