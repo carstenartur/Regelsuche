@@ -108,10 +108,9 @@ The exact rational path is intentionally layered:
 3. [Exact rational polynomial content v1](exact-rational-polynomial-content.md)
    clears denominators and extracts a primitive integer polynomial with bounded
    work and replayable Evidence.
-4. [Exact rational univariate polynomial view v1](exact-rational-univariate-polynomial-view.md)
-   extracts source-bound coefficients without reading legacy `double` values as
-   exact mathematics.
-5. The next layer must invoke the existing integer synthesis through a typed
+4. The next exact univariate polynomial-view layer extracts source-bound
+   coefficients without reading legacy `double` values as exact mathematics.
+5. A following layer must invoke the existing integer synthesis through a typed
    boundary and verify rational reassembly before emitting a search edge.
 
 No layer may reconstruct exact coefficients from formatted `double` values or
