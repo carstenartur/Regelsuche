@@ -18,7 +18,11 @@ import java.util.Set;
 
 /** Strict JSON codec for rational-polynomial content evidence v1. */
 public final class ExactRationalPolynomialContentJsonCodec {
-    public static final int MAX_JSON_CHARACTERS = 1_000_000;
+    /**
+     * Covers all 65 source coefficients plus two 65-entry vectors at the v1
+     * 262,144-bit intermediate ceiling, with bounded structural headroom.
+     */
+    public static final int MAX_JSON_CHARACTERS = 16_000_000;
 
     private static final Set<String> ROOT_FIELDS = Set.of(
         "domainId",
@@ -112,11 +116,16 @@ public final class ExactRationalPolynomialContentJsonCodec {
         } else {
             writer.nullProperty("normalization");
         }
-        return writer
+        String json = writer
             .object("work", nested -> writeWork(nested, value.work()))
             .property("certificateHash", value.certificateHash())
             .endObject()
             .toString();
+        if (json.length() > MAX_JSON_CHARACTERS) {
+            throw new IllegalStateException(
+                "issued content evidence exceeds the v1 JSON size envelope");
+        }
+        return json;
     }
 
     public DecodedEvidence readAndVerify(String json) {
