@@ -161,20 +161,29 @@ public final class PolynomialTheorySubsumptionClassifier {
         NONE
     }
 
-    public record Classification(
-        Status status,
-        String detailCode,
-        String theoryMethodId,
-        String sourceExpression,
-        String certificateHash,
-        String derivedExpression,
-        String applicationKey,
-        int consideredConfigurations,
-        ProjectInventoryNovelty projectInventoryNovelty,
-        RetentionDisposition retentionDisposition
-    ) {
-        public Classification {
-            Objects.requireNonNull(status, "status");
+    /**
+     * Immutable classifier-issued evidence.
+     *
+     * <p>The constructor is private so a cache caller cannot manufacture a
+     * positive status around an unrelated pattern or certificate. Every
+     * instance comes from one completed invocation of {@link #classify}.</p>
+     */
+    public static final class Classification {
+        private final State state;
+
+        private Classification(
+            Status status,
+            String detailCode,
+            String theoryMethodId,
+            String sourceExpression,
+            String certificateHash,
+            String derivedExpression,
+            String applicationKey,
+            int consideredConfigurations,
+            ProjectInventoryNovelty projectInventoryNovelty,
+            RetentionDisposition retentionDisposition
+        ) {
+            Status checkedStatus = Objects.requireNonNull(status, "status");
             if (detailCode == null || detailCode.isBlank()
                     || !PolynomialDecompositionSynthesisOperator.METHOD_ID.equals(
                         theoryMethodId)
@@ -188,7 +197,7 @@ public final class PolynomialTheorySubsumptionClassifier {
                 throw new IllegalArgumentException(
                     "polynomial theory classification is invalid");
             }
-            if (status == Status.THEORY_SUBSUMED) {
+            if (checkedStatus == Status.THEORY_SUBSUMED) {
                 if (sourceExpression.isBlank()
                         || !certificateHash.matches("sha256:[0-9a-f]{64}")
                         || derivedExpression.isBlank()
@@ -206,6 +215,17 @@ public final class PolynomialTheorySubsumptionClassifier {
                 throw new IllegalArgumentException(
                     "non-subsumed classification must not expose a cache candidate");
             }
+            state = new State(
+                checkedStatus,
+                detailCode,
+                theoryMethodId,
+                sourceExpression,
+                certificateHash,
+                derivedExpression,
+                applicationKey,
+                consideredConfigurations,
+                projectInventoryNovelty,
+                retentionDisposition);
         }
 
         private static Classification subsumed(
@@ -244,8 +264,79 @@ public final class PolynomialTheorySubsumptionClassifier {
                 RetentionDisposition.NONE);
         }
 
+        public Status status() {
+            return state.status();
+        }
+
+        public String detailCode() {
+            return state.detailCode();
+        }
+
+        public String theoryMethodId() {
+            return state.theoryMethodId();
+        }
+
+        public String sourceExpression() {
+            return state.sourceExpression();
+        }
+
+        public String certificateHash() {
+            return state.certificateHash();
+        }
+
+        public String derivedExpression() {
+            return state.derivedExpression();
+        }
+
+        public String applicationKey() {
+            return state.applicationKey();
+        }
+
+        public int consideredConfigurations() {
+            return state.consideredConfigurations();
+        }
+
+        public ProjectInventoryNovelty projectInventoryNovelty() {
+            return state.projectInventoryNovelty();
+        }
+
+        public RetentionDisposition retentionDisposition() {
+            return state.retentionDisposition();
+        }
+
         public boolean subsumed() {
-            return status == Status.THEORY_SUBSUMED;
+            return status() == Status.THEORY_SUBSUMED;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return this == other
+                || other instanceof Classification classification
+                    && state.equals(classification.state);
+        }
+
+        @Override
+        public int hashCode() {
+            return state.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return "Classification[" + state + "]";
+        }
+
+        private record State(
+            Status status,
+            String detailCode,
+            String theoryMethodId,
+            String sourceExpression,
+            String certificateHash,
+            String derivedExpression,
+            String applicationKey,
+            int consideredConfigurations,
+            ProjectInventoryNovelty projectInventoryNovelty,
+            RetentionDisposition retentionDisposition
+        ) {
         }
     }
 }
