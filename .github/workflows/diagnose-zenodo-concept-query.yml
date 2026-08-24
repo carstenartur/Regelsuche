@@ -14,27 +14,30 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
-      - name: Probe current public Zenodo record and search shapes
+      - name: Probe record-provided Zenodo version links
         shell: bash
         run: |
           set -euo pipefail
-          concept_doi='10.5281/zenodo.20951900'
-          concept_number='20951900'
+          seed_record='20951900'
+          parent_record='20951899'
 
           summarize() {
             local label="$1"
             local url="$2"
-            local body status
+            local body headers status content_type
             body=$(mktemp)
+            headers=$(mktemp)
             status=$(curl --silent --show-error --location \
               --retry 3 --retry-delay 1 --retry-max-time 20 \
               -H 'Accept: application/json' \
-              -H 'User-Agent: Regelsuche-zenodo-query-diagnosis/1' \
+              -H 'User-Agent: Regelsuche-zenodo-query-diagnosis/2' \
+              --dump-header "$headers" \
               --output "$body" \
               --write-out '%{http_code}' \
               "$url")
-            echo "::group::${label} status=${status}"
-            if [[ "$status" == 200 ]]; then
+            content_type=$(awk -F': ' 'tolower($1)=="content-type" {print tolower($2)}' "$headers" | tr -d '\r' | tail -n 1)
+            echo "::group::${label} status=${status} content-type=${content_type}"
+            if [[ "$status" == 200 && "$content_type" == application/json* ]]; then
               jq -c '
                 if has("hits") then
                   {
@@ -43,13 +46,20 @@ jobs:
                       elif (.hits.total.value | type) == "number" then .hits.total.value
                       else null end
                     ),
+                    links,
                     hits: [.hits.hits[] | {
                       id,
                       title: .metadata.title,
                       version: .metadata.version,
                       doi: (.pids.doi.identifier // .doi // null),
-                      parent_id: (.parent.id // null),
-                      parent_doi: (.parent.pids.doi.identifier // null)
+                      parent: (.parent // null),
+                      links: {
+                        self: .links.self,
+                        latest: .links.latest,
+                        versions: .links.versions,
+                        parent: .links.parent,
+                        parent_doi: .links.parent_doi
+                      }
                     }]
                   }
                 else
@@ -59,7 +69,13 @@ jobs:
                     version: .metadata.version,
                     doi: (.pids.doi.identifier // .doi // null),
                     parent: (.parent // null),
-                    links: (.links // null)
+                    links: {
+                      self: .links.self,
+                      latest: .links.latest,
+                      versions: .links.versions,
+                      parent: .links.parent,
+                      parent_doi: .links.parent_doi
+                    }
                   }
                 end
               ' "$body"
@@ -68,30 +84,14 @@ jobs:
               echo
             fi
             echo '::endgroup::'
-            rm -f "$body"
+            rm -f "$body" "$headers"
           }
 
-          urlencode() {
-            jq -rn --arg value "$1" '$value|@uri'
-          }
-
-          query() {
-            local label="$1"
-            local expression="$2"
-            local encoded
-            encoded=$(urlencode "$expression")
-            summarize "$label" \
-              "https://zenodo.org/api/records/?q=${encoded}&sort=mostrecent&size=25&page=1"
-          }
-
-          summarize 'direct numeric record' \
-            "https://zenodo.org/api/records/${concept_number}"
-          summarize 'DOI content negotiation' \
-            "https://doi.org/${concept_doi}"
-          query 'legacy conceptrecid' "conceptrecid:${concept_number}"
-          query 'parent numeric id' "parent.id:${concept_number}"
-          query 'parent DOI quoted' "parent.pids.doi.identifier:\"${concept_doi}\""
-          query 'parent DOI escaped slash' "parent.pids.doi.identifier:10.5281\\/zenodo.20951900"
-          query 'record DOI quoted' "pids.doi.identifier:\"${concept_doi}\""
-          query 'bare concept DOI' "\"${concept_doi}\""
-          query 'title and creator fallback' 'metadata.title:"Regelsuche" AND metadata.creators.person_or_org.name:"Hammer, Carsten"'
+          summarize 'seed version 0.1.0' \
+            "https://zenodo.org/api/records/${seed_record}"
+          summarize 'seed versions collection' \
+            "https://zenodo.org/api/records/${seed_record}/versions?size=25&page=1&sort=mostrecent"
+          summarize 'seed latest version' \
+            "https://zenodo.org/api/records/${seed_record}/versions/latest"
+          summarize 'parent concept resource' \
+            "https://zenodo.org/api/records/${parent_record}"
