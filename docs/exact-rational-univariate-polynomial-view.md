@@ -86,6 +86,13 @@ Every node visit and coefficient operation is counted before execution. A
 budget failure retains the exact source-literal bindings and completed work but
 exposes no partial polynomial or variable.
 
+Powers are evaluated by deterministic exponentiation by squaring. This reduces
+the number of polynomial multiplications from linear in the exponent to
+logarithmic while retaining the same coefficient-level work accounting and
+fail-closed degree checks. The focused contract characterizes `x^16` at exactly
+272 arithmetic operations; the former linear loop required 544 and exceeded a
+300-operation budget.
+
 ## Canonical material
 
 A successful analysis retains:
