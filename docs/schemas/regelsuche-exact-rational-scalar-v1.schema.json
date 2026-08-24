@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/carstenartur/Regelsuche/blob/main/docs/schemas/regelsuche-exact-rational-scalar-v1.schema.json",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-exact-rational-scalar-v1.schema.json",
   "title": "Regelsuche exact rational scalar parse evidence v1",
   "type": "object",
   "additionalProperties": false,
@@ -87,9 +87,7 @@
             "const": "EXACT"
           }
         },
-        "required": [
-          "status"
-        ]
+        "required": ["status"]
       },
       "then": {
         "properties": {
@@ -132,9 +130,7 @@
             "const": "UNSUPPORTED"
           }
         },
-        "required": [
-          "status"
-        ]
+        "required": ["status"]
       },
       "then": {
         "properties": {
@@ -154,9 +150,7 @@
             "const": "ZERO_DENOMINATOR"
           }
         },
-        "required": [
-          "status"
-        ]
+        "required": ["status"]
       },
       "then": {
         "properties": {
@@ -173,9 +167,7 @@
             "const": "LIMIT_EXCEEDED"
           }
         },
-        "required": [
-          "status"
-        ]
+        "required": ["status"]
       },
       "then": {
         "properties": {

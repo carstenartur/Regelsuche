@@ -59,7 +59,7 @@ public final class ExactRationalDomain {
                 boundedSource(raw));
         }
 
-        String source = raw.trim();
+        String source = raw.strip();
         if (source.isEmpty()) {
             return failure(
                 Status.UNSUPPORTED,
@@ -99,6 +99,12 @@ public final class ExactRationalDomain {
         String numeratorText,
         String denominatorText
     ) {
+        if (signedDigitsAreZero(denominatorText)) {
+            return failure(
+                Status.ZERO_DENOMINATOR,
+                "RATIONAL_DENOMINATOR_ZERO",
+                source);
+        }
         if (digitCount(numeratorText) + digitCount(denominatorText)
                 > limits.maxDigits()) {
             return failure(
@@ -106,18 +112,11 @@ public final class ExactRationalDomain {
                 "RATIONAL_DIGIT_LIMIT_EXCEEDED",
                 source);
         }
-        BigInteger denominator = new BigInteger(denominatorText);
-        if (denominator.signum() == 0) {
-            return failure(
-                Status.ZERO_DENOMINATOR,
-                "RATIONAL_DENOMINATOR_ZERO",
-                source);
-        }
         return exact(
             source,
             new ExactRational(
                 new BigInteger(numeratorText),
-                denominator));
+                new BigInteger(denominatorText)));
     }
 
     private ExactRationalParseEvidence parseInteger(String source) {
@@ -198,6 +197,19 @@ public final class ExactRationalDomain {
         return raw.substring(0, limits.maxLiteralCharacters());
     }
 
+    private static boolean signedDigitsAreZero(String value) {
+        int index = value.startsWith("+") || value.startsWith("-")
+            ? 1
+            : 0;
+        while (index < value.length()) {
+            if (value.charAt(index) != '0') {
+                return false;
+            }
+            index++;
+        }
+        return true;
+    }
+
     private static int digitCount(String value) {
         int count = 0;
         for (int index = 0; index < value.length(); index++) {
@@ -211,7 +223,8 @@ public final class ExactRationalDomain {
     static String lengthPrefixed(String... values) {
         StringBuilder material = new StringBuilder();
         for (String value : values) {
-            material.append(value.length())
+            int byteLength = value.getBytes(StandardCharsets.UTF_8).length;
+            material.append(byteLength)
                 .append(':')
                 .append(value);
         }

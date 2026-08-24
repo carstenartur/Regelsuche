@@ -9,9 +9,9 @@ import java.util.Optional;
  *
  * <p>JSON Schema can constrain shapes and canonical spelling, but it cannot
  * prove greatest-common-divisor reduction or recompute content hashes. This
- * verifier performs those semantic checks. Over-limit failures retain only a
- * bounded prefix and are therefore verified as fail-closed failure shape, not
- * as a replay of the discarded suffix.</p>
+ * verifier performs those semantic checks. Over-limit source-length failures
+ * retain only a bounded prefix and are therefore verified as fail-closed
+ * failure shape, not as a replay of the discarded suffix.</p>
  */
 public final class ExactRationalEvidenceVerifier {
 
@@ -25,18 +25,19 @@ public final class ExactRationalEvidenceVerifier {
             return Verification.rejected(
                 "SOURCE_LITERAL_EXCEEDS_DECLARED_LIMIT");
         }
-        if (evidence.status() != ExactRationalDomain.Status.EXACT) {
-            return verifyFailureShape(evidence);
+        if (evidence.status() == ExactRationalDomain.Status.EXACT) {
+            return verifyExact(evidence);
         }
+        return verifyFailure(evidence);
+    }
 
-        ExactRationalParseEvidence replay =
-            new ExactRationalDomain(evidence.limits())
-                .parse(evidence.sourceLiteral());
+    private Verification verifyExact(SerializedEvidence evidence) {
+        ExactRationalParseEvidence replay = replay(evidence);
         if (!replay.exact()) {
             return Verification.rejected(
                 "EXACT_EVIDENCE_SOURCE_DOES_NOT_REPLAY");
         }
-        if (!sameExactFields(evidence, replay)) {
+        if (!sameFields(evidence, replay)) {
             return Verification.rejected(
                 "EXACT_EVIDENCE_REPLAY_MISMATCH");
         }
@@ -44,9 +45,7 @@ public final class ExactRationalEvidenceVerifier {
             replay.value().orElseThrow());
     }
 
-    private Verification verifyFailureShape(
-        SerializedEvidence evidence
-    ) {
+    private Verification verifyFailure(SerializedEvidence evidence) {
         if (!evidence.canonicalValue().isEmpty()
                 || !evidence.valueId().isEmpty()
                 || !evidence.certificateHash().isEmpty()) {
@@ -59,20 +58,54 @@ public final class ExactRationalEvidenceVerifier {
             return Verification.rejected(
                 "FAILED_EVIDENCE_DETAIL_MISMATCH");
         }
-        return Verification.verifiedFailure();
+        if (isTruncatedSourceFailure(evidence)) {
+            return Verification.verifiedFailure(
+                "BOUNDED_SOURCE_LIMIT_FAILURE_VERIFIED");
+        }
+
+        ExactRationalParseEvidence replay = replay(evidence);
+        if (replay.status() != evidence.status()
+                || !replay.detailCode().equals(evidence.detailCode())
+                || !replay.sourceLiteral().equals(
+                    evidence.sourceLiteral())) {
+            return Verification.rejected(
+                "FAILED_EVIDENCE_REPLAY_MISMATCH");
+        }
+        return Verification.verifiedFailure(
+            "FAILURE_EVIDENCE_REPLAY_VERIFIED");
     }
 
-    private boolean sameExactFields(
+    private ExactRationalParseEvidence replay(
+        SerializedEvidence evidence
+    ) {
+        return new ExactRationalDomain(evidence.limits())
+            .parse(evidence.sourceLiteral());
+    }
+
+    private boolean sameFields(
         SerializedEvidence serialized,
         ExactRationalParseEvidence replay
     ) {
         return serialized.status() == replay.status()
             && serialized.detailCode().equals(replay.detailCode())
+            && serialized.sourceLiteral().equals(
+                replay.sourceLiteral())
             && serialized.canonicalValue().equals(
                 replay.canonicalValue())
             && serialized.valueId().equals(replay.valueId())
             && serialized.certificateHash().equals(
                 replay.certificateHash());
+    }
+
+    private boolean isTruncatedSourceFailure(
+        SerializedEvidence evidence
+    ) {
+        return evidence.status()
+            == ExactRationalDomain.Status.LIMIT_EXCEEDED
+            && "LITERAL_CHARACTER_LIMIT_EXCEEDED".equals(
+                evidence.detailCode())
+            && evidence.sourceLiteral().length()
+                == evidence.limits().maxLiteralCharacters();
     }
 
     private boolean validFailureDetail(
@@ -85,15 +118,21 @@ public final class ExactRationalEvidenceVerifier {
                     || "LITERAL_GRAMMAR_UNSUPPORTED".equals(detailCode);
             case ZERO_DENOMINATOR ->
                 "RATIONAL_DENOMINATOR_ZERO".equals(detailCode);
-            case LIMIT_EXCEEDED ->
-                detailCode.endsWith("_LIMIT_EXCEEDED");
+            case LIMIT_EXCEEDED -> switch (detailCode) {
+                case "LITERAL_CHARACTER_LIMIT_EXCEEDED",
+                    "RATIONAL_DIGIT_LIMIT_EXCEEDED",
+                    "INTEGER_DIGIT_LIMIT_EXCEEDED",
+                    "DECIMAL_DIGIT_LIMIT_EXCEEDED",
+                    "DECIMAL_SCALE_LIMIT_EXCEEDED" -> true;
+                default -> false;
+            };
             case EXACT -> false;
         };
     }
 
     public enum Status {
         VERIFIED_EXACT,
-        VERIFIED_FAILURE_SHAPE,
+        VERIFIED_FAILURE,
         REJECTED
     }
 
@@ -159,10 +198,12 @@ public final class ExactRationalEvidenceVerifier {
                 Optional.of(value));
         }
 
-        private static Verification verifiedFailure() {
+        private static Verification verifiedFailure(
+            String detailCode
+        ) {
             return new Verification(
-                Status.VERIFIED_FAILURE_SHAPE,
-                "FAILURE_EVIDENCE_SHAPE_VERIFIED",
+                Status.VERIFIED_FAILURE,
+                detailCode,
                 Optional.empty());
         }
 

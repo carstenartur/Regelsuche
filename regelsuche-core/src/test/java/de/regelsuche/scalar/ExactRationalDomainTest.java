@@ -84,23 +84,25 @@ class ExactRationalDomainTest {
         ExactRationalParseEvidence fraction =
             domain.parse(" 6 / -8 ");
         ExactRationalParseEvidence decimal =
-            domain.parse("0.125");
+            domain.parse("0.50");
 
         assertEquals(
             ExactRationalDomain.Status.EXACT,
             integer.status());
         assertEquals("-42", integer.canonicalValue());
         assertEquals("-3/4", fraction.canonicalValue());
-        assertEquals("1/8", decimal.canonicalValue());
+        assertEquals("1/2", decimal.canonicalValue());
         assertEquals(
             ExactRationalDomain.DEFAULT_LIMITS,
             decimal.limits());
-        assertTrue(
-            decimal.certificateHash()
-                .matches("sha256:[0-9a-f]{64}"));
-        assertTrue(
-            decimal.valueId()
-                .matches("sha256:[0-9a-f]{64}"));
+        assertEquals(
+            "sha256:287b26bb93278c5925a066707cdc8b3c8"
+                + "cd030b306cbb28c208d90472f08890d",
+            decimal.valueId());
+        assertEquals(
+            "sha256:e4a1084a45662f69f73aef170a08f15b"
+                + "d84de7b00f16cc37d73014744c97833c",
+            decimal.certificateHash());
     }
 
     @Test
@@ -132,22 +134,16 @@ class ExactRationalDomainTest {
         ExactRationalEvidenceVerifier.SerializedEvidence serialized =
             accepted.serialized();
         ExactRationalEvidenceVerifier.SerializedEvidence noncanonical =
-            new ExactRationalEvidenceVerifier.SerializedEvidence(
-                serialized.domainId(),
-                serialized.status(),
-                serialized.detailCode(),
+            copyWith(
+                serialized,
                 serialized.sourceLiteral(),
-                serialized.limits(),
                 "2/4",
                 serialized.valueId(),
                 serialized.certificateHash());
         ExactRationalEvidenceVerifier.SerializedEvidence rebound =
-            new ExactRationalEvidenceVerifier.SerializedEvidence(
-                serialized.domainId(),
-                serialized.status(),
-                serialized.detailCode(),
+            copyWith(
+                serialized,
                 "3/6",
-                serialized.limits(),
                 serialized.canonicalValue(),
                 serialized.valueId(),
                 serialized.certificateHash());
@@ -176,36 +172,51 @@ class ExactRationalDomainTest {
     }
 
     @Test
-    void rejectsApproximateAndUndefinedFormsWithoutLeakingValues() {
-        ExactRationalParseEvidence exponent =
-            domain.parse("1e-3");
-        ExactRationalParseEvidence repeating =
-            domain.parse("0.(3)");
-        ExactRationalParseEvidence binaryMarker =
-            domain.parse("NaN");
-        ExactRationalParseEvidence zeroDenominator =
-            domain.parse("1/0");
-
+    void rejectsApproximateControlAndUndefinedForms() {
         assertFailure(
-            exponent,
+            domain.parse("1e-3"),
             ExactRationalDomain.Status.UNSUPPORTED,
             "LITERAL_GRAMMAR_UNSUPPORTED");
         assertFailure(
-            repeating,
+            domain.parse("0.(3)"),
             ExactRationalDomain.Status.UNSUPPORTED,
             "LITERAL_GRAMMAR_UNSUPPORTED");
         assertFailure(
-            binaryMarker,
+            domain.parse("NaN"),
             ExactRationalDomain.Status.UNSUPPORTED,
             "LITERAL_GRAMMAR_UNSUPPORTED");
         assertFailure(
-            zeroDenominator,
+            domain.parse("\u00001\u0000"),
+            ExactRationalDomain.Status.UNSUPPORTED,
+            "LITERAL_GRAMMAR_UNSUPPORTED");
+        assertFailure(
+            domain.parse("1/0"),
             ExactRationalDomain.Status.ZERO_DENOMINATOR,
             "RATIONAL_DENOMINATOR_ZERO");
     }
 
     @Test
-    void rawCharacterLimitIsCheckedBeforeWhitespaceTrimming() {
+    void zeroDenominatorIsClassifiedBeforeDigitBudgetWork() {
+        ExactRationalDomain limited =
+            new ExactRationalDomain(
+                new ExactRationalDomain.Limits(
+                    20,
+                    2,
+                    1));
+
+        ExactRationalParseEvidence result =
+            limited.parse("1/000000");
+
+        assertEquals(
+            ExactRationalDomain.Status.ZERO_DENOMINATOR,
+            result.status());
+        assertEquals(
+            "RATIONAL_DENOMINATOR_ZERO",
+            result.detailCode());
+    }
+
+    @Test
+    void rawCharacterLimitIsCheckedBeforeWhitespaceStripping() {
         ExactRationalDomain limited =
             new ExactRationalDomain(
                 new ExactRationalDomain.Limits(
@@ -281,6 +292,24 @@ class ExactRationalDomainTest {
         assertThrows(
             IllegalArgumentException.class,
             () -> ExactRational.ONE.pow(-1));
+    }
+
+    private ExactRationalEvidenceVerifier.SerializedEvidence copyWith(
+        ExactRationalEvidenceVerifier.SerializedEvidence source,
+        String sourceLiteral,
+        String canonical,
+        String valueId,
+        String certificate
+    ) {
+        return new ExactRationalEvidenceVerifier.SerializedEvidence(
+            source.domainId(),
+            source.status(),
+            source.detailCode(),
+            sourceLiteral,
+            source.limits(),
+            canonical,
+            valueId,
+            certificate);
     }
 
     private void assertFailure(

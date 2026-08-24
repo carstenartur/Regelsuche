@@ -12,7 +12,7 @@ source lexeme
   -> canonical arbitrary-precision rational
   -> canonical value identity
   -> source- and limit-bound parse certificate
-  -> semantic evidence replay
+  -> strict JSON codec and semantic replay
 ```
 
 The domain ID is:
@@ -37,6 +37,10 @@ compatibility facade. Its construction and arithmetic delegate to
 `ExactRational`; it is not an independent exact-number implementation. The
 legacy `fromDouble` method remains an explicitly approximate-input adapter and
 must not authorize an exact source-language claim.
+
+`PolynomialNormalizer` also uses `ExactRational` internally. Its conversion from
+legacy `NumberExpr.value()` is explicitly isolated as a compatibility boundary;
+the normalizer no longer contains a second rational arithmetic implementation.
 
 Construction establishes:
 
@@ -68,7 +72,13 @@ The following remain unsupported rather than guessed:
 - `NaN`, infinities and implementation-specific floating-point spellings;
 - algebraic, transcendental, interval or approximate coefficients.
 
-A zero denominator has its own fail-closed status and never creates a value.
+A lexically zero denominator is classified before the digit-work budget is
+considered. Thus `1/000000` remains `ZERO_DENOMINATOR` even under a smaller
+digit limit. No large integer must be constructed to make this decision.
+
+Leading and trailing Unicode whitespace is removed with `String.strip()` only
+after the raw character limit has been checked. Non-whitespace control
+characters, including NUL, are not discarded and therefore remain unsupported.
 
 ## Resource limits
 
@@ -78,26 +88,92 @@ The domain applies finite limits to:
 - total decimal digits;
 - finite-decimal scale.
 
-The raw source-length check runs **before** whitespace trimming. Padding cannot
+The raw source-length check runs **before** whitespace removal. Padding cannot
 therefore bypass the configured character limit. Evidence retains at most the
 configured source-character bound.
 
 Version 1 caps serializable limits at 4,096 source characters, 1,024 digits and
-256 decimal places. Callers may choose smaller limits. Limit exhaustion yields
+256 decimal places. Callers may choose smaller limits. The decimal-scale limit
+may not exceed the selected total-digit limit. Limit exhaustion yields
 `LIMIT_EXCEEDED`; it is not evidence that a mathematical value is invalid.
 
-The selected limits are part of every evidence object and of every successful
+The selected limits are part of every evidence object and every successful
 parse certificate.
 
-## Evidence identities and semantic verification
+## Content-addressed identities
 
-A successful parse exposes:
+All hash inputs use UTF-8. Define the deterministic length-prefix operation as
 
-- `valueId`, depending only on domain version and canonical mathematical value;
-- `certificateHash`, additionally binding limits and the accepted source lexeme.
+```text
+LP(v1, ..., vn) = concat(utf8Length(vi), ":", vi)
+```
 
-Thus `1/2` and `0.50` share a value identity while retaining different source
-certificates.
+where `utf8Length` is the number of UTF-8 bytes, written in base-10 ASCII.
+There is no separator beyond each length prefix.
+
+For canonical value text `canonical`:
+
+```text
+valueMaterial = LP(
+  "regelsuche.exact-rational-scalar/v1.value",
+  canonical
+)
+valueId = "sha256:" + lowerHex(SHA-256(UTF-8(valueMaterial)))
+```
+
+The limits material is exactly:
+
+```text
+maxLiteralCharacters ":" maxDigits ":" maxDecimalScale
+```
+
+For an accepted, stripped source lexeme `source`:
+
+```text
+certificateMaterial = LP(
+  "regelsuche.exact-rational-scalar/v1.parse",
+  limitsMaterial,
+  source,
+  canonical,
+  valueId
+)
+certificateHash =
+  "sha256:" + lowerHex(SHA-256(UTF-8(certificateMaterial)))
+```
+
+Canonical test vector using default limits and source `0.50`:
+
+```text
+canonicalValue = 1/2
+valueMaterial =
+  41:regelsuche.exact-rational-scalar/v1.value3:1/2
+valueId =
+  sha256:287b26bb93278c5925a066707cdc8b3c8cd030b306cbb28c208d90472f08890d
+certificateHash =
+  sha256:e4a1084a45662f69f73aef170a08f15bd84de7b00f16cc37d73014744c97833c
+```
+
+Consequently, `1/2` and `0.50` share a value identity while retaining different
+source certificates.
+
+## JSON and semantic verification
+
+The stable schema ID is:
+
+```text
+https://carstenartur.github.io/Regelsuche/schemas/
+  regelsuche-exact-rational-scalar-v1.schema.json
+```
+
+`ExactRationalEvidenceJsonCodec` emits fields in a deterministic order and
+rejects:
+
+- blank, oversized or non-object JSON;
+- duplicate or unknown fields;
+- missing or incorrectly typed fields;
+- trailing JSON values;
+- invalid cross-field limit combinations;
+- evidence that does not pass semantic replay.
 
 `ExactRationalParseEvidence` has no public constructor. For serialized evidence,
 `ExactRationalEvidenceVerifier` replays the source under the declared limits and
@@ -110,12 +186,13 @@ checks:
 
 This semantic verifier is required because JSON Schema can constrain spelling
 but cannot prove GCD reduction or recompute hashes. Non-exact outcomes expose no
-value or exact hashes; over-limit failures are verified as bounded fail-closed
-failure shape because the rejected suffix is deliberately not retained.
+value or exact hashes. Source-character-limit failures are verified as bounded
+fail-closed failure shape because the rejected suffix is deliberately not
+retained; other failure outcomes are replayed completely.
 
-The schema additionally rejects noncanonical textual forms such as `-0`, `01`
-and `1/1`. A syntactically canonical-looking but reducible value such as `2/4`
-is rejected by semantic replay.
+The schema rejects noncanonical textual forms such as `-0`, `01` and `1/1`. A
+syntactically canonical-looking but reducible value such as `2/4` is rejected by
+semantic replay.
 
 ## Integration boundary
 
@@ -137,7 +214,7 @@ Focused tests:
 mvn --batch-mode --no-transfer-progress \
   -pl regelsuche-core,regelsuche-math-algorithms -am \
   -Dtest=ExactRationalDomainTest,ExactRationalCrossCancellationTest,\
-RationalExactScalarAdapterTest test
+ExactRationalEvidenceJsonCodecTest,RationalExactScalarAdapterTest test
 ```
 
 Complete repository contract:
