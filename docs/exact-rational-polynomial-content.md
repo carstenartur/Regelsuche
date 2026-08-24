@@ -73,6 +73,19 @@ and work-sum consistency. The independent verifier parses every coefficient as
 a canonical reduced `ExactRational`, reruns normalization under the retained
 budget, and compares status, payload, work, and certificate.
 
+## Versioning and compatibility
+
+Version 1 is an additive procedure. It does not reinterpret historical integer
+polynomial synthesis, exact-rational scalar parse evidence, AST identity, or
+previous search results. Existing evidence remains bound to the procedure and
+budget identities under which it was issued.
+
+A consumer must select this domain ID explicitly and verify the complete payload
+through the strict codec and replay verifier. Unknown fields, changed status or
+work semantics, broader coefficient syntax, different normalization rules, or a
+changed certificate preimage require a new versioned domain and schema rather
+than a permissive v1 decoder. No migration rewrites existing evidence in place.
+
 ## Integration boundary
 
 This procedure consumes already exact coefficients. It does not yet preserve
