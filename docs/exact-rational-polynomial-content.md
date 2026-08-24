@@ -73,6 +73,14 @@ and work-sum consistency. The independent verifier parses every coefficient as
 a canonical reduced `ExactRational`, reruns normalization under the retained
 budget, and compares status, payload, work, and certificate.
 
+The document limit is 16,000,000 characters. This is not an arbitrary upload
+allowance: it covers all 65 source rationals plus both 65-entry integer vectors,
+the scalar and structural overhead at the declared 8,192-bit source and
+262,144-bit intermediate ceilings. The schema additionally bounds individual
+source, intermediate and scalar strings. Both the writer and reader enforce the
+same document envelope, and a characterization test derives the required lower
+bound from the public v1 bit and vector limits.
+
 ## Versioning and compatibility
 
 Version 1 is an additive procedure. It does not reinterpret historical integer
