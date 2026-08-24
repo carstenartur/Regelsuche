@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-exact-rational-polynomial-content-v1.schema.json",
+  "title": "Regelsuche exact rational polynomial content evidence v1",
+  "$comment": "The strict runtime codec additionally enforces cross-field budget validity, work-sum equality, coefficient reducedness, vector-size relations, exact reassembly and certificate replay.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "domainId",
+    "status",
+    "detailCode",
+    "sourceCoefficients",
+    "budget",
+    "normalization",
+    "work",
+    "certificateHash"
+  ],
+  "properties": {
+    "domainId": {
+      "const": "regelsuche.exact-rational-polynomial-content/v1"
+    },
+    "status": {
+      "enum": [
+        "NORMALIZED",
+        "ZERO_POLYNOMIAL",
+        "DEGREE_LIMIT_EXCEEDED",
+        "COEFFICIENT_LIMIT_EXCEEDED",
+        "INTERMEDIATE_LIMIT_EXCEEDED",
+        "WORK_LIMIT_EXCEEDED"
+      ]
+    },
+    "detailCode": {
+      "enum": [
+        "RATIONAL_CONTENT_NORMALIZED_EXACTLY",
+        "ZERO_POLYNOMIAL_HAS_NO_PRIMITIVE_CONTENT",
+        "RATIONAL_POLYNOMIAL_DEGREE_LIMIT_EXCEEDED",
+        "RATIONAL_COEFFICIENT_BIT_LIMIT_EXCEEDED",
+        "DENOMINATOR_LCM_BIT_LIMIT_EXCEEDED",
+        "INTEGRAL_COEFFICIENT_BIT_LIMIT_EXCEEDED",
+        "PRIMITIVE_COEFFICIENT_BIT_LIMIT_EXCEEDED",
+        "RATIONAL_CONTENT_WORK_LIMIT_EXCEEDED"
+      ]
+    },
+    "sourceCoefficients": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 65,
+      "items": {
+        "type": "string",
+        "maxLength": 5000,
+        "pattern": "^(?:0|-?[1-9][0-9]*|-?[1-9][0-9]*/[1-9][0-9]*)$"
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxDegree",
+        "maxCoefficientBits",
+        "maxIntermediateBits",
+        "maxArithmeticSteps"
+      ],
+      "properties": {
+        "maxDegree": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "maxCoefficientBits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "maxIntermediateBits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 262144
+        },
+        "maxArithmeticSteps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500000
+        }
+      }
+    },
+    "normalization": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "denominatorClearingFactor",
+            "integralCoefficientsAscending",
+            "integerContent",
+            "primitiveCoefficientsAscending",
+            "scalar"
+          ],
+          "properties": {
+            "denominatorClearingFactor": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "integralCoefficientsAscending": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 65,
+              "items": {
+                "type": "string",
+                "pattern": "^(?:0|-?[1-9][0-9]*)$"
+              }
+            },
+            "integerContent": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            },
+            "primitiveCoefficientsAscending": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 65,
+              "items": {
+                "type": "string",
+                "pattern": "^(?:0|-?[1-9][0-9]*)$"
+              }
+            },
+            "scalar": {
+              "type": "string",
+              "pattern": "^(?:-?[1-9][0-9]*|-?[1-9][0-9]*/[1-9][0-9]*)$"
+            }
+          }
+        }
+      ]
+    },
+    "work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coefficientsVisited",
+        "gcdOperations",
+        "lcmOperations",
+        "multiplications",
+        "divisions",
+        "signAdjustments",
+        "reconstructionChecks",
+        "totalSteps"
+      ],
+      "properties": {
+        "coefficientsVisited": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "gcdOperations": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "lcmOperations": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "multiplications": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "divisions": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "signAdjustments": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "reconstructionChecks": {"type": "integer", "minimum": 0, "maximum": 500000},
+        "totalSteps": {"type": "integer", "minimum": 0, "maximum": 500000}
+      }
+    },
+    "certificateHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"status": {"const": "NORMALIZED"}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "detailCode": {"const": "RATIONAL_CONTENT_NORMALIZED_EXACTLY"},
+          "normalization": {"type": "object"}
+        }
+      },
+      "else": {
+        "properties": {"normalization": {"type": "null"}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"status": {"const": "ZERO_POLYNOMIAL"}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "detailCode": {"const": "ZERO_POLYNOMIAL_HAS_NO_PRIMITIVE_CONTENT"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"status": {"const": "DEGREE_LIMIT_EXCEEDED"}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "detailCode": {"const": "RATIONAL_POLYNOMIAL_DEGREE_LIMIT_EXCEEDED"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"status": {"const": "COEFFICIENT_LIMIT_EXCEEDED"}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "detailCode": {"const": "RATIONAL_COEFFICIENT_BIT_LIMIT_EXCEEDED"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"status": {"const": "WORK_LIMIT_EXCEEDED"}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "detailCode": {"const": "RATIONAL_CONTENT_WORK_LIMIT_EXCEEDED"}
+        }
+      }
+    }
+  ]
+}
