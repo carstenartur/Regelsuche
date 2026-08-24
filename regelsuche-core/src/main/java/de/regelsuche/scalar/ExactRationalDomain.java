@@ -20,8 +20,14 @@ import java.util.regex.Pattern;
 public final class ExactRationalDomain {
     public static final String DOMAIN_ID =
         "regelsuche.exact-rational-scalar/v1";
+    public static final int MAX_LITERAL_CHARACTERS = 4_096;
+    public static final int MAX_DIGITS = 1_024;
+    public static final int MAX_DECIMAL_SCALE = 256;
     public static final Limits DEFAULT_LIMITS =
-        new Limits(4_096, 1_024, 256);
+        new Limits(
+            MAX_LITERAL_CHARACTERS,
+            MAX_DIGITS,
+            MAX_DECIMAL_SCALE);
 
     private static final Pattern INTEGER =
         Pattern.compile("[+-]?[0-9]+");
@@ -45,87 +51,112 @@ public final class ExactRationalDomain {
     }
 
     public ExactRationalParseEvidence parse(String literal) {
-        String source = literal == null ? "" : literal.trim();
+        String raw = literal == null ? "" : literal;
+        if (raw.length() > limits.maxLiteralCharacters()) {
+            return failure(
+                Status.LIMIT_EXCEEDED,
+                "LITERAL_CHARACTER_LIMIT_EXCEEDED",
+                boundedSource(raw));
+        }
+
+        String source = raw.trim();
         if (source.isEmpty()) {
-            return ExactRationalParseEvidence.failure(
+            return failure(
                 Status.UNSUPPORTED,
                 "LITERAL_BLANK",
                 source);
         }
-        if (source.length() > limits.maxLiteralCharacters()) {
-            return ExactRationalParseEvidence.failure(
-                Status.LIMIT_EXCEEDED,
-                "LITERAL_CHARACTER_LIMIT_EXCEEDED",
-                source);
-        }
+        return parseBounded(source);
+    }
 
+    private ExactRationalParseEvidence parseBounded(String source) {
         Matcher fraction = FRACTION.matcher(source);
         if (fraction.matches()) {
-            String numeratorText = fraction.group(1);
-            String denominatorText = fraction.group(2);
-            if (digitCount(numeratorText) + digitCount(denominatorText)
-                    > limits.maxDigits()) {
-                return ExactRationalParseEvidence.failure(
-                    Status.LIMIT_EXCEEDED,
-                    "RATIONAL_DIGIT_LIMIT_EXCEEDED",
-                    source);
-            }
-            BigInteger denominator = new BigInteger(denominatorText);
-            if (denominator.signum() == 0) {
-                return ExactRationalParseEvidence.failure(
-                    Status.ZERO_DENOMINATOR,
-                    "RATIONAL_DENOMINATOR_ZERO",
-                    source);
-            }
-            return exact(
+            return parseFraction(
                 source,
-                new ExactRational(
-                    new BigInteger(numeratorText),
-                    denominator));
+                fraction.group(1),
+                fraction.group(2));
         }
-
         if (INTEGER.matcher(source).matches()) {
-            if (digitCount(source) > limits.maxDigits()) {
-                return ExactRationalParseEvidence.failure(
-                    Status.LIMIT_EXCEEDED,
-                    "INTEGER_DIGIT_LIMIT_EXCEEDED",
-                    source);
-            }
-            return exact(
-                source,
-                ExactRational.integer(new BigInteger(source)));
+            return parseInteger(source);
         }
-
         Matcher decimal = DECIMAL.matcher(source);
         if (decimal.matches()) {
-            String sign = decimal.group(1);
-            String integral = decimal.group(2);
-            String fractional = decimal.group(3);
-            int digits = integral.length() + fractional.length();
-            if (digits > limits.maxDigits()) {
-                return ExactRationalParseEvidence.failure(
-                    Status.LIMIT_EXCEEDED,
-                    "DECIMAL_DIGIT_LIMIT_EXCEEDED",
-                    source);
-            }
-            if (fractional.length() > limits.maxDecimalScale()) {
-                return ExactRationalParseEvidence.failure(
-                    Status.LIMIT_EXCEEDED,
-                    "DECIMAL_SCALE_LIMIT_EXCEEDED",
-                    source);
-            }
-            BigInteger unscaled = new BigInteger(
-                sign + integral + fractional);
-            BigInteger scale = BigInteger.TEN.pow(fractional.length());
-            return exact(
+            return parseDecimal(
                 source,
-                new ExactRational(unscaled, scale));
+                decimal.group(1),
+                decimal.group(2),
+                decimal.group(3));
         }
-
-        return ExactRationalParseEvidence.failure(
+        return failure(
             Status.UNSUPPORTED,
             "LITERAL_GRAMMAR_UNSUPPORTED",
             source);
+    }
+
+    private ExactRationalParseEvidence parseFraction(
+        String source,
+        String numeratorText,
+        String denominatorText
+    ) {
+        if (digitCount(numeratorText) + digitCount(denominatorText)
+                > limits.maxDigits()) {
+            return failure(
+                Status.LIMIT_EXCEEDED,
+                "RATIONAL_DIGIT_LIMIT_EXCEEDED",
+                source);
+        }
+        BigInteger denominator = new BigInteger(denominatorText);
+        if (denominator.signum() == 0) {
+            return failure(
+                Status.ZERO_DENOMINATOR,
+                "RATIONAL_DENOMINATOR_ZERO",
+                source);
+        }
+        return exact(
+            source,
+            new ExactRational(
+                new BigInteger(numeratorText),
+                denominator));
+    }
+
+    private ExactRationalParseEvidence parseInteger(String source) {
+        if (digitCount(source) > limits.maxDigits()) {
+            return failure(
+                Status.LIMIT_EXCEEDED,
+                "INTEGER_DIGIT_LIMIT_EXCEEDED",
+                source);
+        }
+        return exact(
+            source,
+            ExactRational.integer(new BigInteger(source)));
+    }
+
+    private ExactRationalParseEvidence parseDecimal(
+        String source,
+        String sign,
+        String integral,
+        String fractional
+    ) {
+        if (integral.length() + fractional.length()
+                > limits.maxDigits()) {
+            return failure(
+                Status.LIMIT_EXCEEDED,
+                "DECIMAL_DIGIT_LIMIT_EXCEEDED",
+                source);
+        }
+        if (fractional.length() > limits.maxDecimalScale()) {
+            return failure(
+                Status.LIMIT_EXCEEDED,
+                "DECIMAL_SCALE_LIMIT_EXCEEDED",
+                source);
+        }
+        BigInteger unscaled = new BigInteger(
+            sign + integral + fractional);
+        BigInteger scale = BigInteger.TEN.pow(fractional.length());
+        return exact(
+            source,
+            new ExactRational(unscaled, scale));
     }
 
     private ExactRationalParseEvidence exact(
@@ -138,15 +169,33 @@ public final class ExactRationalDomain {
             canonical));
         String certificate = hash(lengthPrefixed(
             DOMAIN_ID + ".parse",
+            limits.canonicalMaterial(),
             source,
             canonical,
             valueId));
         return ExactRationalParseEvidence.exact(
             source,
+            limits,
             value,
             canonical,
             valueId,
             certificate);
+    }
+
+    private ExactRationalParseEvidence failure(
+        Status status,
+        String detailCode,
+        String source
+    ) {
+        return ExactRationalParseEvidence.failure(
+            status,
+            detailCode,
+            source,
+            limits);
+    }
+
+    private String boundedSource(String raw) {
+        return raw.substring(0, limits.maxLiteralCharacters());
     }
 
     private static int digitCount(String value) {
@@ -159,7 +208,7 @@ public final class ExactRationalDomain {
         return count;
     }
 
-    private static String lengthPrefixed(String... values) {
+    static String lengthPrefixed(String... values) {
         StringBuilder material = new StringBuilder();
         for (String value : values) {
             material.append(value.length())
@@ -169,13 +218,15 @@ public final class ExactRationalDomain {
         return material.toString();
     }
 
-    private static String hash(String material) {
+    static String hash(String material) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
                 .digest(material.getBytes(StandardCharsets.UTF_8));
             return "sha256:" + HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 unavailable", exception);
+            throw new IllegalStateException(
+                "SHA-256 unavailable",
+                exception);
         }
     }
 
@@ -193,11 +244,21 @@ public final class ExactRationalDomain {
     ) {
         public Limits {
             if (maxLiteralCharacters < 1
+                    || maxLiteralCharacters > MAX_LITERAL_CHARACTERS
                     || maxDigits < 1
-                    || maxDecimalScale < 0) {
+                    || maxDigits > MAX_DIGITS
+                    || maxDecimalScale < 0
+                    || maxDecimalScale > MAX_DECIMAL_SCALE
+                    || maxDecimalScale > maxDigits) {
                 throw new IllegalArgumentException(
                     "exact rational limits are invalid");
             }
+        }
+
+        String canonicalMaterial() {
+            return maxLiteralCharacters + ":"
+                + maxDigits + ":"
+                + maxDecimalScale;
         }
     }
 }

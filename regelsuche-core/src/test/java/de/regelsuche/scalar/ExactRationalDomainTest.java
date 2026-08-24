@@ -12,20 +12,32 @@ import java.math.BigInteger;
 import org.junit.jupiter.api.Test;
 
 class ExactRationalDomainTest {
-    private final ExactRationalDomain domain = new ExactRationalDomain();
+    private final ExactRationalDomain domain =
+        new ExactRationalDomain();
 
     @Test
     void canonicalizesSignsGreatestCommonDivisorsAndZero() {
         assertEquals(
-            new ExactRational(BigInteger.valueOf(-3), BigInteger.valueOf(4)),
-            new ExactRational(BigInteger.valueOf(6), BigInteger.valueOf(-8)));
+            new ExactRational(
+                BigInteger.valueOf(-3),
+                BigInteger.valueOf(4)),
+            new ExactRational(
+                BigInteger.valueOf(6),
+                BigInteger.valueOf(-8)));
         assertEquals(
             ExactRational.ZERO,
-            new ExactRational(BigInteger.ZERO, BigInteger.valueOf(-19)));
-        assertEquals("-3/4", new ExactRational(
-            BigInteger.valueOf(6),
-            BigInteger.valueOf(-8)).canonicalText());
-        assertEquals("7", ExactRational.integer(7).canonicalText());
+            new ExactRational(
+                BigInteger.ZERO,
+                BigInteger.valueOf(-19)));
+        assertEquals(
+            "-3/4",
+            new ExactRational(
+                BigInteger.valueOf(6),
+                BigInteger.valueOf(-8))
+                .canonicalText());
+        assertEquals(
+            "7",
+            ExactRational.integer(7).canonicalText());
     }
 
     @Test
@@ -38,41 +50,65 @@ class ExactRationalDomainTest {
             BigInteger.valueOf(5));
 
         assertEquals(
-            new ExactRational(BigInteger.valueOf(11), BigInteger.valueOf(15)),
+            new ExactRational(
+                BigInteger.valueOf(11),
+                BigInteger.valueOf(15)),
             oneThird.add(twoFifths));
         assertEquals(
-            new ExactRational(BigInteger.valueOf(-1), BigInteger.valueOf(15)),
+            new ExactRational(
+                BigInteger.valueOf(-1),
+                BigInteger.valueOf(15)),
             oneThird.subtract(twoFifths));
         assertEquals(
-            new ExactRational(BigInteger.valueOf(2), BigInteger.valueOf(15)),
+            new ExactRational(
+                BigInteger.valueOf(2),
+                BigInteger.valueOf(15)),
             oneThird.multiply(twoFifths));
         assertEquals(
-            new ExactRational(BigInteger.valueOf(5), BigInteger.valueOf(6)),
+            new ExactRational(
+                BigInteger.valueOf(5),
+                BigInteger.valueOf(6)),
             oneThird.divide(twoFifths));
         assertEquals(
-            new ExactRational(BigInteger.ONE, BigInteger.valueOf(27)),
+            new ExactRational(
+                BigInteger.ONE,
+                BigInteger.valueOf(27)),
             oneThird.pow(3));
         assertTrue(oneThird.compareTo(twoFifths) < 0);
     }
 
     @Test
     void parsesIntegerFractionAndFiniteDecimalLexemesExactly() {
-        ExactRationalParseEvidence integer = domain.parse("-42");
-        ExactRationalParseEvidence fraction = domain.parse(" 6 / -8 ");
-        ExactRationalParseEvidence decimal = domain.parse("0.125");
+        ExactRationalParseEvidence integer =
+            domain.parse("-42");
+        ExactRationalParseEvidence fraction =
+            domain.parse(" 6 / -8 ");
+        ExactRationalParseEvidence decimal =
+            domain.parse("0.125");
 
-        assertEquals(ExactRationalDomain.Status.EXACT, integer.status());
+        assertEquals(
+            ExactRationalDomain.Status.EXACT,
+            integer.status());
         assertEquals("-42", integer.canonicalValue());
         assertEquals("-3/4", fraction.canonicalValue());
         assertEquals("1/8", decimal.canonicalValue());
-        assertTrue(decimal.certificateHash().matches("sha256:[0-9a-f]{64}"));
-        assertTrue(decimal.valueId().matches("sha256:[0-9a-f]{64}"));
+        assertEquals(
+            ExactRationalDomain.DEFAULT_LIMITS,
+            decimal.limits());
+        assertTrue(
+            decimal.certificateHash()
+                .matches("sha256:[0-9a-f]{64}"));
+        assertTrue(
+            decimal.valueId()
+                .matches("sha256:[0-9a-f]{64}"));
     }
 
     @Test
     void equalLexicalFormsShareValueIdentityButRetainSourceEvidence() {
-        ExactRationalParseEvidence fraction = domain.parse("1/2");
-        ExactRationalParseEvidence decimal = domain.parse("0.50");
+        ExactRationalParseEvidence fraction =
+            domain.parse("1/2");
+        ExactRationalParseEvidence decimal =
+            domain.parse("0.50");
 
         assertEquals(fraction.value(), decimal.value());
         assertEquals(fraction.valueId(), decimal.valueId());
@@ -83,23 +119,72 @@ class ExactRationalDomainTest {
     }
 
     @Test
+    void semanticVerifierRejectsNoncanonicalOrReboundEvidence() {
+        ExactRationalParseEvidence accepted =
+            domain.parse("2/4");
+        ExactRationalEvidenceVerifier verifier =
+            new ExactRationalEvidenceVerifier();
+
+        assertEquals(
+            ExactRationalEvidenceVerifier.Status.VERIFIED_EXACT,
+            accepted.verify().status());
+
+        ExactRationalEvidenceVerifier.SerializedEvidence serialized =
+            accepted.serialized();
+        ExactRationalEvidenceVerifier.SerializedEvidence noncanonical =
+            new ExactRationalEvidenceVerifier.SerializedEvidence(
+                serialized.domainId(),
+                serialized.status(),
+                serialized.detailCode(),
+                serialized.sourceLiteral(),
+                serialized.limits(),
+                "2/4",
+                serialized.valueId(),
+                serialized.certificateHash());
+        ExactRationalEvidenceVerifier.SerializedEvidence rebound =
+            new ExactRationalEvidenceVerifier.SerializedEvidence(
+                serialized.domainId(),
+                serialized.status(),
+                serialized.detailCode(),
+                "3/6",
+                serialized.limits(),
+                serialized.canonicalValue(),
+                serialized.valueId(),
+                serialized.certificateHash());
+
+        assertEquals(
+            ExactRationalEvidenceVerifier.Status.REJECTED,
+            verifier.verify(noncanonical).status());
+        assertEquals(
+            ExactRationalEvidenceVerifier.Status.REJECTED,
+            verifier.verify(rebound).status());
+    }
+
+    @Test
     void evidenceCannotBeConstructedAsAConsumerApi() {
         Constructor<?>[] constructors =
             ExactRationalParseEvidence.class.getConstructors();
 
         assertEquals(0, constructors.length);
         for (Constructor<?> constructor
-                : ExactRationalParseEvidence.class.getDeclaredConstructors()) {
-            assertFalse(Modifier.isPublic(constructor.getModifiers()));
+                : ExactRationalParseEvidence.class
+                    .getDeclaredConstructors()) {
+            assertFalse(
+                Modifier.isPublic(
+                    constructor.getModifiers()));
         }
     }
 
     @Test
     void rejectsApproximateAndUndefinedFormsWithoutLeakingValues() {
-        ExactRationalParseEvidence exponent = domain.parse("1e-3");
-        ExactRationalParseEvidence repeating = domain.parse("0.(3)");
-        ExactRationalParseEvidence binaryMarker = domain.parse("NaN");
-        ExactRationalParseEvidence zeroDenominator = domain.parse("1/0");
+        ExactRationalParseEvidence exponent =
+            domain.parse("1e-3");
+        ExactRationalParseEvidence repeating =
+            domain.parse("0.(3)");
+        ExactRationalParseEvidence binaryMarker =
+            domain.parse("NaN");
+        ExactRationalParseEvidence zeroDenominator =
+            domain.parse("1/0");
 
         assertFailure(
             exponent,
@@ -120,9 +205,36 @@ class ExactRationalDomainTest {
     }
 
     @Test
+    void rawCharacterLimitIsCheckedBeforeWhitespaceTrimming() {
+        ExactRationalDomain limited =
+            new ExactRationalDomain(
+                new ExactRationalDomain.Limits(
+                    20,
+                    5,
+                    2));
+        String padded = " ".repeat(20) + "1";
+
+        ExactRationalParseEvidence result =
+            limited.parse(padded);
+
+        assertEquals(
+            ExactRationalDomain.Status.LIMIT_EXCEEDED,
+            result.status());
+        assertEquals(
+            "LITERAL_CHARACTER_LIMIT_EXCEEDED",
+            result.detailCode());
+        assertEquals(20, result.sourceLiteral().length());
+        assertTrue(result.verify().verified());
+    }
+
+    @Test
     void finiteLimitsFailClosedBeforeLargeIntegerWork() {
-        ExactRationalDomain limited = new ExactRationalDomain(
-            new ExactRationalDomain.Limits(20, 5, 2));
+        ExactRationalDomain limited =
+            new ExactRationalDomain(
+                new ExactRationalDomain.Limits(
+                    20,
+                    5,
+                    2));
 
         assertEquals(
             ExactRationalDomain.Status.LIMIT_EXCEEDED,
@@ -132,17 +244,37 @@ class ExactRationalDomainTest {
             limited.parse("1.234").detailCode());
         assertEquals(
             ExactRationalDomain.Status.LIMIT_EXCEEDED,
-            limited.parse("123456789012345678901").status());
+            limited.parse(
+                "123456789012345678901").status());
+    }
+
+    @Test
+    void versionedLimitsRejectUnserializableRanges() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new ExactRationalDomain.Limits(
+                4_097,
+                1_024,
+                256));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new ExactRationalDomain.Limits(
+                100,
+                5,
+                6));
     }
 
     @Test
     void valueOperationsRejectUndefinedInputs() {
         assertThrows(
             ArithmeticException.class,
-            () -> new ExactRational(BigInteger.ONE, BigInteger.ZERO));
+            () -> new ExactRational(
+                BigInteger.ONE,
+                BigInteger.ZERO));
         assertThrows(
             ArithmeticException.class,
-            () -> ExactRational.ONE.divide(ExactRational.ZERO));
+            () -> ExactRational.ONE.divide(
+                ExactRational.ZERO));
         assertThrows(
             ArithmeticException.class,
             ExactRational.ZERO::reciprocal);
@@ -163,5 +295,6 @@ class ExactRationalDomainTest {
         assertTrue(result.canonicalValue().isEmpty());
         assertTrue(result.valueId().isEmpty());
         assertTrue(result.certificateHash().isEmpty());
+        assertTrue(result.verify().verified());
     }
 }

@@ -8,13 +8,16 @@ import java.util.Optional;
  * source literal under its versioned, bounded contract.
  *
  * <p>The constructor is package-private so code outside the scalar package
- * cannot manufacture an exact status around arbitrary hashes or values.</p>
+ * cannot manufacture an exact status around arbitrary hashes or values.
+ * Serialized consumers can replay the evidence through
+ * {@link ExactRationalEvidenceVerifier}.</p>
  */
 public final class ExactRationalParseEvidence {
     private final String domainId;
     private final ExactRationalDomain.Status status;
     private final String detailCode;
     private final String sourceLiteral;
+    private final ExactRationalDomain.Limits limits;
     private final Optional<ExactRational> value;
     private final String canonicalValue;
     private final String valueId;
@@ -25,6 +28,7 @@ public final class ExactRationalParseEvidence {
         ExactRationalDomain.Status status,
         String detailCode,
         String sourceLiteral,
+        ExactRationalDomain.Limits limits,
         Optional<ExactRational> value,
         String canonicalValue,
         String valueId,
@@ -36,6 +40,7 @@ public final class ExactRationalParseEvidence {
         this.sourceLiteral = Objects.requireNonNull(
             sourceLiteral,
             "sourceLiteral");
+        this.limits = Objects.requireNonNull(limits, "limits");
         this.value = Objects.requireNonNull(value, "value");
         this.canonicalValue = Objects.requireNonNull(
             canonicalValue,
@@ -49,6 +54,7 @@ public final class ExactRationalParseEvidence {
 
     static ExactRationalParseEvidence exact(
         String source,
+        ExactRationalDomain.Limits limits,
         ExactRational value,
         String canonical,
         String valueId,
@@ -59,6 +65,7 @@ public final class ExactRationalParseEvidence {
             ExactRationalDomain.Status.EXACT,
             "EXACT_RATIONAL_LITERAL_ACCEPTED",
             source,
+            limits,
             Optional.of(value),
             canonical,
             valueId,
@@ -68,7 +75,8 @@ public final class ExactRationalParseEvidence {
     static ExactRationalParseEvidence failure(
         ExactRationalDomain.Status status,
         String detailCode,
-        String source
+        String source,
+        ExactRationalDomain.Limits limits
     ) {
         if (status == ExactRationalDomain.Status.EXACT) {
             throw new IllegalArgumentException(
@@ -79,6 +87,7 @@ public final class ExactRationalParseEvidence {
             status,
             detailCode,
             source,
+            limits,
             Optional.empty(),
             "",
             "",
@@ -90,17 +99,32 @@ public final class ExactRationalParseEvidence {
             throw new IllegalArgumentException(
                 "unexpected exact rational domain id");
         }
+        if (sourceLiteral.length() > limits.maxLiteralCharacters()) {
+            throw new IllegalArgumentException(
+                "retained source literal exceeds its declared limit");
+        }
         if (status == ExactRationalDomain.Status.EXACT) {
-            ExactRational exact = value.orElseThrow(() ->
-                new IllegalArgumentException(
-                    "exact evidence lacks a rational value"));
-            if (!canonicalValue.equals(exact.canonicalText())
-                    || !valueId.matches("sha256:[0-9a-f]{64}")
-                    || !certificateHash.matches("sha256:[0-9a-f]{64}")) {
-                throw new IllegalArgumentException(
-                    "exact evidence lacks canonical hashes");
-            }
-        } else if (value.isPresent()
+            validateExact();
+        } else {
+            validateFailure();
+        }
+    }
+
+    private void validateExact() {
+        ExactRational exact = value.orElseThrow(() ->
+            new IllegalArgumentException(
+                "exact evidence lacks a rational value"));
+        if (!"EXACT_RATIONAL_LITERAL_ACCEPTED".equals(detailCode)
+                || !canonicalValue.equals(exact.canonicalText())
+                || !valueId.matches("sha256:[0-9a-f]{64}")
+                || !certificateHash.matches("sha256:[0-9a-f]{64}")) {
+            throw new IllegalArgumentException(
+                "exact evidence lacks canonical fields");
+        }
+    }
+
+    private void validateFailure() {
+        if (value.isPresent()
                 || !canonicalValue.isEmpty()
                 || !valueId.isEmpty()
                 || !certificateHash.isEmpty()) {
@@ -111,9 +135,26 @@ public final class ExactRationalParseEvidence {
 
     private static String requireText(String value, String name) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(name + " must not be blank");
+            throw new IllegalArgumentException(
+                name + " must not be blank");
         }
         return value;
+    }
+
+    public ExactRationalEvidenceVerifier.SerializedEvidence serialized() {
+        return new ExactRationalEvidenceVerifier.SerializedEvidence(
+            domainId,
+            status,
+            detailCode,
+            sourceLiteral,
+            limits,
+            canonicalValue,
+            valueId,
+            certificateHash);
+    }
+
+    public ExactRationalEvidenceVerifier.Verification verify() {
+        return new ExactRationalEvidenceVerifier().verify(serialized());
     }
 
     public String domainId() {
@@ -130,6 +171,10 @@ public final class ExactRationalParseEvidence {
 
     public String sourceLiteral() {
         return sourceLiteral;
+    }
+
+    public ExactRationalDomain.Limits limits() {
+        return limits;
     }
 
     public Optional<ExactRational> value() {
@@ -164,6 +209,7 @@ public final class ExactRationalParseEvidence {
             && status == evidence.status
             && detailCode.equals(evidence.detailCode)
             && sourceLiteral.equals(evidence.sourceLiteral)
+            && limits.equals(evidence.limits)
             && value.equals(evidence.value)
             && canonicalValue.equals(evidence.canonicalValue)
             && valueId.equals(evidence.valueId)
@@ -177,6 +223,7 @@ public final class ExactRationalParseEvidence {
             status,
             detailCode,
             sourceLiteral,
+            limits,
             value,
             canonicalValue,
             valueId,
@@ -189,6 +236,7 @@ public final class ExactRationalParseEvidence {
             + ", status=" + status
             + ", detailCode=" + detailCode
             + ", sourceLiteral=" + sourceLiteral
+            + ", limits=" + limits
             + ", canonicalValue=" + canonicalValue
             + ", valueId=" + valueId
             + ", certificateHash=" + certificateHash

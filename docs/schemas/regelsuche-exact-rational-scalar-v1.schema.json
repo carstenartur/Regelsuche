@@ -9,6 +9,7 @@
     "status",
     "detailCode",
     "sourceLiteral",
+    "limits",
     "canonicalValue",
     "valueId",
     "certificateHash"
@@ -26,11 +27,47 @@
       ]
     },
     "detailCode": {
-      "type": "string",
-      "minLength": 1
+      "enum": [
+        "EXACT_RATIONAL_LITERAL_ACCEPTED",
+        "LITERAL_BLANK",
+        "LITERAL_GRAMMAR_UNSUPPORTED",
+        "RATIONAL_DENOMINATOR_ZERO",
+        "LITERAL_CHARACTER_LIMIT_EXCEEDED",
+        "RATIONAL_DIGIT_LIMIT_EXCEEDED",
+        "INTEGER_DIGIT_LIMIT_EXCEEDED",
+        "DECIMAL_DIGIT_LIMIT_EXCEEDED",
+        "DECIMAL_SCALE_LIMIT_EXCEEDED"
+      ]
     },
     "sourceLiteral": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 4096
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxLiteralCharacters",
+        "maxDigits",
+        "maxDecimalScale"
+      ],
+      "properties": {
+        "maxLiteralCharacters": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "maxDigits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "maxDecimalScale": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 256
+        }
+      }
     },
     "canonicalValue": {
       "type": "string"
@@ -50,12 +87,21 @@
             "const": "EXACT"
           }
         },
-        "required": ["status"]
+        "required": [
+          "status"
+        ]
       },
       "then": {
         "properties": {
+          "detailCode": {
+            "const": "EXACT_RATIONAL_LITERAL_ACCEPTED"
+          },
+          "sourceLiteral": {
+            "minLength": 1,
+            "pattern": "^[+-]?[0-9]+(?:\\s*/\\s*[+-]?[0-9]+|\\.[0-9]+)?$"
+          },
           "canonicalValue": {
-            "pattern": "^-?[0-9]+(?:/[1-9][0-9]*)?$"
+            "pattern": "^(?:0|-?[1-9][0-9]*|-?[1-9][0-9]*/[1-9][0-9]*)$"
           },
           "valueId": {
             "pattern": "^sha256:[0-9a-f]{64}$"
@@ -75,6 +121,72 @@
           },
           "certificateHash": {
             "const": ""
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "UNSUPPORTED"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "detailCode": {
+            "enum": [
+              "LITERAL_BLANK",
+              "LITERAL_GRAMMAR_UNSUPPORTED"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "ZERO_DENOMINATOR"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "detailCode": {
+            "const": "RATIONAL_DENOMINATOR_ZERO"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "LIMIT_EXCEEDED"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "detailCode": {
+            "enum": [
+              "LITERAL_CHARACTER_LIMIT_EXCEEDED",
+              "RATIONAL_DIGIT_LIMIT_EXCEEDED",
+              "INTEGER_DIGIT_LIMIT_EXCEEDED",
+              "DECIMAL_DIGIT_LIMIT_EXCEEDED",
+              "DECIMAL_SCALE_LIMIT_EXCEEDED"
+            ]
           }
         }
       }
