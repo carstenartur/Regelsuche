@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-exact-rational-polynomial-content-v1.schema.json",
   "title": "Regelsuche exact rational polynomial content evidence v1",
-  "$comment": "The strict runtime codec additionally enforces cross-field budget validity, work-sum equality, coefficient reducedness, vector-size relations, exact reassembly and certificate replay.",
+  "$comment": "The strict runtime codec additionally enforces a 16,000,000-character document envelope, cross-field budget validity, work-sum equality, coefficient reducedness, vector-size relations, exact reassembly and certificate replay. The string maxima cover the declared 8,192-bit source and 262,144-bit intermediate ceilings.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -99,6 +99,7 @@
           "properties": {
             "denominatorClearingFactor": {
               "type": "string",
+              "maxLength": 78914,
               "pattern": "^[1-9][0-9]*$"
             },
             "integralCoefficientsAscending": {
@@ -107,11 +108,13 @@
               "maxItems": 65,
               "items": {
                 "type": "string",
+                "maxLength": 78915,
                 "pattern": "^(?:0|-?[1-9][0-9]*)$"
               }
             },
             "integerContent": {
               "type": "string",
+              "maxLength": 78914,
               "pattern": "^[1-9][0-9]*$"
             },
             "primitiveCoefficientsAscending": {
@@ -120,11 +123,13 @@
               "maxItems": 65,
               "items": {
                 "type": "string",
+                "maxLength": 78915,
                 "pattern": "^(?:0|-?[1-9][0-9]*)$"
               }
             },
             "scalar": {
               "type": "string",
+              "maxLength": 157830,
               "pattern": "^(?:-?[1-9][0-9]*|-?[1-9][0-9]*/[1-9][0-9]*)$"
             }
           }
