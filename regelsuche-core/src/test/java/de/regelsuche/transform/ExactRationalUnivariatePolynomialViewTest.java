@@ -57,6 +57,21 @@ class ExactRationalUnivariatePolynomialViewTest {
     }
 
     @Test
+    void exponentiationBySquaringFitsATighterArithmeticBudget() {
+        var boundedView = new ExactRationalUnivariatePolynomialView(
+            new ExactRationalUnivariatePolynomialView.Budget(
+                16,
+                4_096,
+                512,
+                300));
+        var analysis = boundedView.analyze(parser.parseExactTerm("x^16"));
+
+        assertTrue(analysis.supported(), analysis.detailCode());
+        assertEquals(16, analysis.polynomial().orElseThrow().degree());
+        assertEquals(272, analysis.work().arithmeticOperations());
+    }
+
+    @Test
     void treatsParserUnaryMinusAsExactNegationNotAsAProvenanceHole() {
         var analysis = view.analyze(parser.parseExactTerm("-x + 0.25"));
 
