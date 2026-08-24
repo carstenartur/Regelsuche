@@ -211,37 +211,69 @@ zenodo_total() {
   ' "$1"
 }
 
-fetch_zenodo_concept_records() {
-  local concept_record=$1
+fetch_zenodo_version_lineage() {
+  local seed_doi=$1
   local target=$2
+  local metadata_target=$3
+  local seed_record=${seed_doi##*.}
+  local seed_file="$TMP/zenodo-seed.json"
+  local latest_file="$TMP/zenodo-latest.json"
   local page=1
   local page_size=25
   local max_pages=10
   local seen=0
   local total=-1
-  local page_file page_count
-  : > "$TMP/zenodo-hits.ndjson"
+  local page_file page_count versions_url latest_url parent_url
+  local parent_doi_url concept_doi
 
+  [[ "$seed_record" =~ ^[0-9]+$ ]] ||
+    fail "Tagged README DOI does not end in a numeric Zenodo record ID"
+
+  curl --fail --silent --show-error --location \
+    --retry 5 --retry-delay 1 --retry-max-time 30 \
+    -H 'Accept: application/json' \
+    -H 'User-Agent: Regelsuche-published-release-audit/1' \
+    "https://zenodo.org/api/records/${seed_record}" \
+    > "$seed_file"
+
+  require_equal "$seed_doi" \
+    "$(jq -r '.pids.doi.identifier // .doi // empty' "$seed_file")" \
+    'Tagged README DOI does not identify the retrieved Zenodo seed record'
+
+  versions_url=$(jq -r '.links.versions // empty' "$seed_file")
+  latest_url=$(jq -r '.links.latest // empty' "$seed_file")
+  parent_url=$(jq -r '.links.parent // empty' "$seed_file")
+  parent_doi_url=$(jq -r '.links.parent_doi // empty' "$seed_file")
+  [[ "$versions_url" =~ ^https://zenodo\.org/api/records/[0-9]+/versions$ ]] ||
+    fail "Zenodo seed record exposes an unsafe versions URL: $versions_url"
+  [[ "$latest_url" =~ ^https://zenodo\.org/api/records/[0-9]+/versions/latest$ ]] ||
+    fail "Zenodo seed record exposes an unsafe latest URL: $latest_url"
+  [[ "$parent_url" =~ ^https://zenodo\.org/api/records/[0-9]+$ ]] ||
+    fail "Zenodo seed record exposes an unsafe parent URL: $parent_url"
+  [[ "$parent_doi_url" =~ ^https://doi\.org/10\.5281/zenodo\.[0-9]+$ ]] ||
+    fail "Zenodo seed record exposes an unsafe parent DOI URL: $parent_doi_url"
+  concept_doi=${parent_doi_url#https://doi.org/}
+
+  : > "$TMP/zenodo-hits.ndjson"
   while (( page <= max_pages )); do
     page_file="$TMP/zenodo-pages/page-${page}.json"
     curl --fail --silent --show-error --location \
       --retry 5 --retry-delay 1 --retry-max-time 30 \
       -H 'Accept: application/json' \
       -H 'User-Agent: Regelsuche-published-release-audit/1' \
-      --get 'https://zenodo.org/api/records/' \
-      --data-urlencode "q=conceptrecid:${concept_record}" \
+      --get "$versions_url" \
       --data-urlencode 'sort=mostrecent' \
       --data-urlencode "size=${page_size}" \
       --data-urlencode "page=${page}" \
       > "$page_file"
 
     jq -e '.hits.hits | type == "array"' "$page_file" >/dev/null ||
-      fail "Zenodo search page ${page} has no records array"
+      fail "Zenodo versions page ${page} has no records array"
     page_count=$(jq '.hits.hits | length' "$page_file")
     if (( total < 0 )); then
       total=$(zenodo_total "$page_file")
       [[ "$total" =~ ^[0-9]+$ ]] ||
-        fail "Zenodo search returned an invalid total: $total"
+        fail "Zenodo versions endpoint returned an invalid total: $total"
       (( total <= page_size * max_pages )) ||
         fail "Zenodo concept exceeds the bounded ${page_size}x${max_pages} audit window"
     fi
@@ -252,12 +284,12 @@ fetch_zenodo_concept_records() {
       break
     fi
     (( page_count > 0 )) ||
-      fail "Zenodo pagination ended before all ${total} records were returned"
+      fail "Zenodo pagination ended before all ${total} versions were returned"
     page=$((page + 1))
   done
 
   (( seen == total )) ||
-    fail "Zenodo pagination retained ${seen} of ${total} records"
+    fail "Zenodo pagination retained ${seen} of ${total} versions"
   if (( total == 0 )); then
     jq -n '{hits: {hits: [], total: 0}}' > "$target"
   else
@@ -269,7 +301,29 @@ fetch_zenodo_concept_records() {
     [.hits.hits[].id] as $ids
     | ($ids | length) == ($ids | unique | length)
   ' "$target" >/dev/null ||
-    fail "Zenodo pagination returned duplicate record IDs"
+    fail "Zenodo versions endpoint returned duplicate record IDs"
+
+  curl --fail --silent --show-error --location \
+    --retry 5 --retry-delay 1 --retry-max-time 30 \
+    -H 'Accept: application/json' \
+    -H 'User-Agent: Regelsuche-published-release-audit/1' \
+    "$latest_url" > "$latest_file"
+
+  jq -n \
+    --arg seedDoi "$seed_doi" \
+    --arg seedRecordId "$seed_record" \
+    --arg conceptDoi "$concept_doi" \
+    --arg versionsUrl "$versions_url" \
+    --arg latestUrl "$latest_url" \
+    --arg parentUrl "$parent_url" \
+    '{
+      seedDoi: $seedDoi,
+      seedRecordId: $seedRecordId,
+      conceptDoi: $conceptDoi,
+      versionsUrl: $versionsUrl,
+      latestUrl: $latestUrl,
+      parentUrl: $parentUrl
+    }' > "$metadata_target"
 }
 
 # Public GitHub release and exact asset membership.
@@ -589,21 +643,29 @@ POLYNOMIAL_OUTPUT=$(run_smoke polynomial-synthesis \
 grep -Fq 'POLYNOMIAL_RELEASE_SMOKE_OK' "$POLYNOMIAL_OUTPUT" ||
   fail 'Released product did not synthesize a certified quartic decomposition'
 
-# Zenodo concept/version audit with the documented anonymous 25-record page
-# ceiling. Pagination is bounded and complete within that declared window.
-CONCEPT_DOI=$(grep -oE \
+# Zenodo concept/version audit. The tagged README DOI is a seed: historical
+# releases may contain either a version DOI or the concept DOI. The retrieved
+# record itself supplies the authoritative versions, latest and parent-DOI URLs.
+ZENODO_SEED_DOI=$(grep -oE \
   '10\.5281/zenodo\.[0-9]+' \
   "$TMP/tagged/README.md" | head -n 1)
-[[ -n "$CONCEPT_DOI" ]] ||
-  fail 'Tagged README does not expose a Zenodo concept DOI'
-CONCEPT_RECORD=${CONCEPT_DOI##*.}
-fetch_zenodo_concept_records \
-  "$CONCEPT_RECORD" \
-  "$TMP/zenodo-search.json"
+[[ -n "$ZENODO_SEED_DOI" ]] ||
+  fail 'Tagged README does not expose a Zenodo DOI seed'
+fetch_zenodo_version_lineage \
+  "$ZENODO_SEED_DOI" \
+  "$TMP/zenodo-versions.json" \
+  "$TMP/zenodo-lineage.json"
 jq -e '.hits.hits | type == "array" and length > 0' \
-  "$TMP/zenodo-search.json" >/dev/null ||
-  fail "Zenodo has no records for ${CONCEPT_DOI}"
+  "$TMP/zenodo-versions.json" >/dev/null ||
+  fail "Zenodo exposes no versions for seed ${ZENODO_SEED_DOI}"
 
+ZENODO_CONCEPT_DOI=$(jq -r '.conceptDoi' "$TMP/zenodo-lineage.json")
+AVAILABLE_ZENODO_VERSIONS=$(jq -r '
+  [.hits.hits[].metadata.version // empty]
+  | unique
+  | sort
+  | join(",")
+' "$TMP/zenodo-versions.json")
 ZENODO_MATCH_COUNT=$(jq --arg version "$VERSION" '
   [.hits.hits[] |
     select(
@@ -611,9 +673,12 @@ ZENODO_MATCH_COUNT=$(jq --arg version "$VERSION" '
       and .metadata.title == "Regelsuche"
     )]
   | length
-' "$TMP/zenodo-search.json")
-require_equal 1 "$ZENODO_MATCH_COUNT" \
-  "Zenodo concept does not contain exactly one Regelsuche ${VERSION} record"
+' "$TMP/zenodo-versions.json")
+if [[ "$ZENODO_MATCH_COUNT" != 1 ]]; then
+  fail "Zenodo concept ${ZENODO_CONCEPT_DOI} does not contain exactly one " \
+    "Regelsuche ${VERSION} record (found ${ZENODO_MATCH_COUNT}; " \
+    "published versions: ${AVAILABLE_ZENODO_VERSIONS:-<none>})"
+fi
 ZENODO_RECORD_ID=$(jq -r --arg version "$VERSION" '
   .hits.hits[]
   | select(
@@ -621,20 +686,18 @@ ZENODO_RECORD_ID=$(jq -r --arg version "$VERSION" '
       and .metadata.title == "Regelsuche"
     )
   | .id
-' "$TMP/zenodo-search.json")
-NEWEST_ZENODO_ID=$(jq -r '.hits.hits[0].id' "$TMP/zenodo-search.json")
-NEWEST_ZENODO_VERSION=$(
-  jq -r '.hits.hits[0].metadata.version' "$TMP/zenodo-search.json"
-)
-require_equal "$VERSION" "$NEWEST_ZENODO_VERSION" \
-  'Zenodo concept DOI does not point to the released version as newest'
-require_equal "$ZENODO_RECORD_ID" "$NEWEST_ZENODO_ID" \
-  'Zenodo release record is not the newest concept version'
+' "$TMP/zenodo-versions.json")
+LATEST_ZENODO_ID=$(jq -r '.id' "$TMP/zenodo-latest.json")
+LATEST_ZENODO_VERSION=$(jq -r '.metadata.version' "$TMP/zenodo-latest.json")
+require_equal "$VERSION" "$LATEST_ZENODO_VERSION" \
+  'Zenodo concept does not expose the released version as latest'
+require_equal "$ZENODO_RECORD_ID" "$LATEST_ZENODO_ID" \
+  'Zenodo release record is not the concept latest version'
 
 OTHER_ZENODO_VERSIONS=$(jq -r --arg version "$VERSION" '
   .hits.hits[].metadata.version // empty
   | select(. != $version)
-' "$TMP/zenodo-search.json" | sort -u)
+' "$TMP/zenodo-versions.json" | sort -u)
 [[ -n "$OTHER_ZENODO_VERSIONS" ]] ||
   fail 'Zenodo concept does not retain an earlier release version'
 
@@ -705,9 +768,13 @@ ACTUAL_CREATORS=$(jq -r '
 require_equal "$EXPECTED_CREATORS" "$ACTUAL_CREATORS" \
   'Zenodo creators/ORCIDs differ from tagged metadata'
 
-ZENODO_CONCEPT_DOI=$(jq -r '
+RECORD_CONCEPT_DOI=$(jq -r '
   .conceptdoi
   // .parent.pids.doi.identifier
+  // (
+    .links.parent_doi
+    | sub("^https://doi.org/"; "")
+  )
   // empty
 ' "$TMP/zenodo-record.json")
 ZENODO_DOI=$(jq -r '
@@ -715,8 +782,8 @@ ZENODO_DOI=$(jq -r '
   // .pids.doi.identifier
   // empty
 ' "$TMP/zenodo-record.json")
-require_equal "$CONCEPT_DOI" "$ZENODO_CONCEPT_DOI" \
-  'Zenodo record is not bound to the tagged concept DOI'
+require_equal "$ZENODO_CONCEPT_DOI" "$RECORD_CONCEPT_DOI" \
+  'Zenodo record is not bound to the authoritative parent concept DOI'
 [[ -n "$ZENODO_DOI" ]] ||
   fail 'Zenodo version DOI is missing'
 
@@ -802,7 +869,8 @@ jq -n \
   --arg polynomialSmoke 'POLYNOMIAL_DECOMPOSITION_SYNTHESIS_OK' \
   --arg zenodoRecordId "$ZENODO_RECORD_ID" \
   --arg zenodoDoi "$ZENODO_DOI" \
-  --arg zenodoConceptDoi "$CONCEPT_DOI" \
+  --arg zenodoSeedDoi "$ZENODO_SEED_DOI" \
+  --arg zenodoConceptDoi "$ZENODO_CONCEPT_DOI" \
   --arg zenodoVersions "$ZENODO_VERSIONS" \
   --slurpfile assets "$TMP/assets.sorted.json" \
   --slurpfile manifest "$TMP/manifest.json" \
@@ -825,6 +893,7 @@ jq -n \
     assets: $assets[0],
     manifest: $manifest[0],
     zenodo: {
+      seedDoi: $zenodoSeedDoi,
       recordId: $zenodoRecordId,
       doi: $zenodoDoi,
       conceptDoi: $zenodoConceptDoi,

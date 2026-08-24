@@ -49,13 +49,20 @@ class PublishedReleaseAuditTest {
         assertTrue(content.contains("rightCoefficients()"));
         assertTrue(content.contains("TARGET.equals(reconstructed)"));
         assertTrue(content.contains("POLYNOMIAL_RELEASE_SMOKE_OK"));
-        assertTrue(content.contains("https://zenodo.org/api/records/"));
+        assertTrue(content.contains("fetch_zenodo_version_lineage"));
+        assertTrue(content.contains(".links.versions // empty"));
+        assertTrue(content.contains(".links.latest // empty"));
+        assertTrue(content.contains(".links.parent_doi // empty"));
         assertTrue(content.contains("local page_size=25"));
         assertTrue(content.contains("local max_pages=10"));
         assertTrue(content.contains(
             "--data-urlencode \"page=${page}\""));
+        assertTrue(content.contains("ZENODO_SEED_DOI"));
+        assertTrue(content.contains("ZENODO_CONCEPT_DOI"));
+        assertTrue(content.contains("published versions:"));
         assertTrue(content.contains("EXPECTED_CREATORS=$(jq"));
         assertTrue(content.contains("ACTUAL_CREATORS=$(jq"));
+        assertFalse(content.contains("conceptrecid"));
         assertFalse(content.contains("size=100"));
         assertFalse(content.contains("releases/latest"));
         assertTrue(content.contains(

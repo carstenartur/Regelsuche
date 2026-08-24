@@ -112,25 +112,41 @@ allgemeine mathematische oder funktionale Vollständigkeitsbehauptung.
 
 ## Zenodo
 
-Der Concept DOI wird aus dem getaggten README gelesen. Die anonyme Zenodo-Suche
-verwendet höchstens 25 Treffer pro Seite. Der Audit paginiert vollständig,
-begrenzt den Abruf auf zehn Seiten und verwirft unvollständige oder doppelte
-Trefferfolgen. Überschreitet eine Konzeptlinie diese explizite Grenze von 250
-Versionen, wird sie nicht stillschweigend abgeschnitten, sondern als außerhalb
-des aktuellen Auditvertrags abgelehnt.
+Die erste Zenodo-DOI im getaggten README dient ausschließlich als
+**Seed-Datensatz**. Historische Stände können dort eine konkrete Versions-DOI
+statt der Konzept-DOI enthalten. Der Audit lädt den Seed-Datensatz und verwendet
+danach ausschließlich dessen von Zenodo selbst ausgegebene Links:
+
+- `links.versions` für die vollständige Versionslinie;
+- `links.latest` für den autoritativen jüngsten Datensatz;
+- `links.parent_doi` für die tatsächliche Konzept-DOI;
+- `links.parent` für die Parent-Ressource.
+
+Damit hängt der Audit weder vom veralteten Suchfeld `conceptrecid` noch von
+einem geratenen internen Indexfeld ab. Die Versions-API wird mit höchstens 25
+Treffern pro Seite vollständig paginiert. Der Abruf ist auf zehn Seiten
+begrenzt und verwirft unvollständige oder doppelte Folgen. Überschreitet eine
+Konzeptlinie diese explizite Grenze von 250 Versionen, wird sie nicht
+stillschweigend abgeschnitten, sondern als außerhalb des aktuellen
+Auditvertrags abgelehnt.
 
 Für die vollständig geladene Konzeptlinie verlangt der Audit:
 
 - genau einen Regelsuche-Datensatz mit der geprüften Version und dem getaggten
   Titel;
-- diese Version als jüngsten Datensatz des Konzepts;
+- denselben Datensatz über `links.latest` als jüngste Version des Konzepts;
 - unveränderte Existenz mindestens einer früheren Version;
-- Übereinstimmung von Version, Veröffentlichungsdatum und Concept DOI mit der
-  getaggten `.zenodo.json`;
+- Übereinstimmung von Version, Veröffentlichungsdatum und der aus
+  `links.parent_doi` abgeleiteten Konzept-DOI;
 - exakte Übereinstimmung der Creator-Namen und normalisierten ORCID-Werte mit
   den getaggten Metadaten, statt einen bestimmten Namen im Audit zu codieren;
 - mindestens eine eindeutig versionsgebundene Regelsuche-Softwaredatei ohne
   eingemischte veraltete SemVer-Angabe.
+
+Fehlt die erwartete Version, nennt die Fehlermeldung die Konzept-DOI und alle
+tatsächlich veröffentlichten Versionen. Ein noch nicht von Zenodo erzeugter
+Datensatz wird dadurch als realer Publikationsmangel sichtbar und nicht durch
+eine breitere Titelsuche oder einen lokalen Ersatzdatensatz verdeckt.
 
 Die GitHub-Zenodo-Integration darf statt der fünf GitHub-Binärassets einen
 getaggten Quell-Snapshot archivieren. Deshalb wird keine künstliche
@@ -148,8 +164,8 @@ build/reports/release-audit/X.Y.Z.json
 Das normale CI-Artefakt nimmt `build/reports/**` bereits auf. Der Bericht bindet
 Release- und Quell-Commit, Tagobjekt, Maintenance-Commit, Assetgrößen,
 GitHub-Digests und lokal berechnete SHA-256-Werte, Manifest, Paketwurzel,
-Cytoscape-Version, beide Smoketests sowie Zenodo-Version, DOI, Concept DOI und
-Dateiliste.
+Cytoscape-Version, beide Smoketests sowie Zenodo-Seed-DOI, Versions-DOI,
+Konzept-DOI und Dateiliste.
 
 ## Aussagegrenze
 
