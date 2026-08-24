@@ -277,8 +277,16 @@ public final class ExactRationalUnivariatePolynomialView {
         Work work
     ) {
         PolynomialValue result = PolynomialValue.constant(ExactRational.ONE);
-        for (int step = 0; step < exponent; step++) {
-            result = multiply(result, base, work);
+        PolynomialValue factor = base;
+        int remaining = exponent;
+        while (remaining > 0) {
+            if ((remaining & 1) != 0) {
+                result = multiply(result, factor, work);
+            }
+            remaining >>>= 1;
+            if (remaining > 0) {
+                factor = multiply(factor, factor, work);
+            }
         }
         return result;
     }
