@@ -90,13 +90,15 @@ The exact rational path is intentionally layered:
    canonical values and source-bound parse certificates.
 2. This page defines occurrence-preserving parser provenance beside the legacy
    AST.
-3. [Exact rational polynomial content v1](exact-rational-polynomial-content.md)
+3. [Exact rational univariate polynomial view v1](exact-rational-univariate-polynomial-view.md)
+   performs bounded ring operations using only identity-resolved exact source
+   values and produces a canonical ascending coefficient vector.
+4. [Exact rational polynomial content v1](exact-rational-polynomial-content.md)
    clears denominators and extracts a primitive integer polynomial with bounded
    work and replayable Evidence.
-4. The next layer must extract one exact polynomial from `ExactParsedTerm`, bind
-   every coefficient occurrence, invoke the existing integer synthesis through
-   a typed boundary, and verify rational reassembly before emitting a search
-   edge.
+5. The next layer must invoke the existing integer synthesis through a typed
+   boundary, bind both certificates, and verify rational reassembly before
+   emitting a search edge.
 
 No layer may reconstruct exact coefficients from formatted `double` values or
 silently reinterpret historical search identities.
