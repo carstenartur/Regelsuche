@@ -1,0 +1,97 @@
+name: Diagnose Zenodo concept query
+
+on:
+  push:
+    branches:
+      - diagnose/zenodo-concept-query-20951900
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Probe current public Zenodo record and search shapes
+        shell: bash
+        run: |
+          set -euo pipefail
+          concept_doi='10.5281/zenodo.20951900'
+          concept_number='20951900'
+
+          summarize() {
+            local label="$1"
+            local url="$2"
+            local body status
+            body=$(mktemp)
+            status=$(curl --silent --show-error --location \
+              --retry 3 --retry-delay 1 --retry-max-time 20 \
+              -H 'Accept: application/json' \
+              -H 'User-Agent: Regelsuche-zenodo-query-diagnosis/1' \
+              --output "$body" \
+              --write-out '%{http_code}' \
+              "$url")
+            echo "::group::${label} status=${status}"
+            if [[ "$status" == 200 ]]; then
+              jq -c '
+                if has("hits") then
+                  {
+                    total: (
+                      if (.hits.total | type) == "number" then .hits.total
+                      elif (.hits.total.value | type) == "number" then .hits.total.value
+                      else null end
+                    ),
+                    hits: [.hits.hits[] | {
+                      id,
+                      title: .metadata.title,
+                      version: .metadata.version,
+                      doi: (.pids.doi.identifier // .doi // null),
+                      parent_id: (.parent.id // null),
+                      parent_doi: (.parent.pids.doi.identifier // null)
+                    }]
+                  }
+                else
+                  {
+                    id,
+                    title: .metadata.title,
+                    version: .metadata.version,
+                    doi: (.pids.doi.identifier // .doi // null),
+                    parent: (.parent // null),
+                    links: (.links // null)
+                  }
+                end
+              ' "$body"
+            else
+              head -c 1000 "$body" || true
+              echo
+            fi
+            echo '::endgroup::'
+            rm -f "$body"
+          }
+
+          urlencode() {
+            jq -rn --arg value "$1" '$value|@uri'
+          }
+
+          query() {
+            local label="$1"
+            local expression="$2"
+            local encoded
+            encoded=$(urlencode "$expression")
+            summarize "$label" \
+              "https://zenodo.org/api/records/?q=${encoded}&sort=mostrecent&size=25&page=1"
+          }
+
+          summarize 'direct numeric record' \
+            "https://zenodo.org/api/records/${concept_number}"
+          summarize 'DOI content negotiation' \
+            "https://doi.org/${concept_doi}"
+          query 'legacy conceptrecid' "conceptrecid:${concept_number}"
+          query 'parent numeric id' "parent.id:${concept_number}"
+          query 'parent DOI quoted' "parent.pids.doi.identifier:\"${concept_doi}\""
+          query 'parent DOI escaped slash' "parent.pids.doi.identifier:10.5281\\/zenodo.20951900"
+          query 'record DOI quoted' "pids.doi.identifier:\"${concept_doi}\""
+          query 'bare concept DOI' "\"${concept_doi}\""
+          query 'title and creator fallback' 'metadata.title:"Regelsuche" AND metadata.creators.person_or_org.name:"Hammer, Carsten"'
