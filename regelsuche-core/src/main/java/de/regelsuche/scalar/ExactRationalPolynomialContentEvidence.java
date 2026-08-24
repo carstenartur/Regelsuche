@@ -271,5 +271,16 @@ public final class ExactRationalPolynomialContentEvidence {
         public static WorkLedger zero() {
             return new WorkLedger(0, 0, 0, 0, 0, 0, 0, 0);
         }
+
+        String canonicalMaterial() {
+            return coefficientsVisited + ":"
+                + gcdOperations + ":"
+                + lcmOperations + ":"
+                + multiplications + ":"
+                + divisions + ":"
+                + signAdjustments + ":"
+                + reconstructionChecks + ":"
+                + totalSteps;
+        }
     }
 }
