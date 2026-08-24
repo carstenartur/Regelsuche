@@ -82,9 +82,23 @@ class ExpressionParserExactLiteralTest {
     }
 
     @Test
+    void acceptsTheMaximumExactDecimalScaleWithoutLosingTheValue() {
+        String smallestSupported = "0." + "0".repeat(255) + "1";
+        ExactParsedTerm parsed = parser.parseExactTerm(smallestSupported);
+
+        assertEquals(1, parsed.literals().size());
+        assertEquals(
+            new ExactRational(
+                BigInteger.ONE,
+                BigInteger.TEN.pow(256)),
+            parsed.literals().getFirst().exactValue());
+        assertTrue(parsed.literals().getFirst().node().value() > 0.0d);
+    }
+
+    @Test
     void rejectsUnsupportedOrUnsafeLegacyAstRepresentations() {
         String overflow = "9".repeat(309);
-        String underflow = "0." + "0".repeat(255) + "1";
+        String scaleLimit = "0." + "0".repeat(256) + "1";
         String digitLimit = "9".repeat(1_025);
 
         assertThrows(
@@ -95,7 +109,7 @@ class ExpressionParserExactLiteralTest {
             () -> parser.parseExactTerm(overflow));
         assertThrows(
             IllegalArgumentException.class,
-            () -> parser.parseExactTerm(underflow));
+            () -> parser.parseExactTerm(scaleLimit));
         assertThrows(
             IllegalArgumentException.class,
             () -> parser.parseExactTerm(digitLimit));
