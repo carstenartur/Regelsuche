@@ -543,10 +543,10 @@ public class SearchJobManager {
 
 <span class="pc bpc" id="L544" title="1 of 2 branches missed.">                if (error != null) {</span>
 <span class="nc" id="L545">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.FAILED));</span>
-<span class="pc bpc" id="L546" title="1 of 4 branches missed.">                } else if (pauseRequested &amp;&amp; state.get().state() != SearchJob.State.CANCELLED) {</span>
+<span class="pc bpc" id="L546" title="3 of 4 branches missed.">                } else if (pauseRequested &amp;&amp; state.get().state() != SearchJob.State.CANCELLED) {</span>
 <span class="nc" id="L547">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.PAUSED));</span>
-<span class="fc bfc" id="L548" title="All 2 branches covered.">                } else if (state.get().state() == SearchJob.State.CANCELLED) {</span>
-<span class="fc" id="L549">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.CANCELLED));</span>
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">                } else if (state.get().state() == SearchJob.State.CANCELLED) {</span>
+<span class="nc" id="L549">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.CANCELLED));</span>
                 } else {
 <span class="fc" id="L551">                    state.updateAndGet(current -&gt; current.withState(SearchJob.State.DONE));</span>
                 }
