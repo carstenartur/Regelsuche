@@ -202,12 +202,17 @@ Polynom in `Z[x]` mit positivem Leitkoeffizienten. Die Stufe wählt keine
 Primzahl über ein verborgenes CAS-Verhalten, sondern konsumiert eine vollständig
 gebundene `SuitablePrimeSelectionPolicy`.
 
+Die Policy besitzt eine streng aufsteigende Liste zulässiger Primzahlen. Der
+konkrete `FactorizationRequest.maxCandidates()` autorisiert davon höchstens
+einen Präfix für den jeweiligen Lauf. Eine längere Policyliste verleiht dem
+Request daher keine zusätzliche Kandidatenautorität.
+
 ### Algorithmischer Ablauf
 
 ```text
 FactorizationRequest<BigInteger> über Z[x]
   -> Struktur-, Domain-, Primitivitäts- und Work-Prüfung
-  -> Kandidatenfolge der Policy in fester Reihenfolge
+  -> request-autorisierten Präfix der Policy-Kandidatenfolge
   -> exakte Reduktion nach PrimeField(p)[x]
   -> Gradtreue prüfen
   -> quadratfreie modulare Quelle verlangen
@@ -218,10 +223,14 @@ FactorizationRequest<BigInteger> über Z[x]
 
 Primzahlen, die den Leitkoeffizienten teilen, werden mit
 `LEADING_COEFFICIENT_VANISHES_MOD_PRIME` abgelehnt. Nicht quadratfreie
-Reduktionen erhalten `MODULAR_REDUCTION_NOT_SQUARE_FREE`. Ein erschöpfter
-Kandidatenpräfix bleibt `NO_SUITABLE_PRIME_WITHIN_POLICY` und damit
-`BUDGET_INCONCLUSIVE`; er ist kein Beweis, dass keine geeignete Primzahl
-existiert.
+Reduktionen erhalten `MODULAR_REDUCTION_NOT_SQUARE_FREE`.
+
+Wird die vollständige Policyliste ohne geeigneten Kandidaten verarbeitet,
+lautet der Detailcode `NO_SUITABLE_PRIME_WITHIN_POLICY`. Endet der
+autorisierte Präfix dagegen bereits an `maxCandidates()`, obwohl die Policy
+weitere Kandidaten enthält, lautet er `PRIME_CANDIDATE_BUDGET_EXHAUSTED`.
+Beide Ergebnisse bleiben `BUDGET_INCONCLUSIVE`; keines beweist, dass keine
+geeignete Primzahl existiert.
 
 Kanonische Restklassen können mehr Bits benötigen als ein negativer
 Quellkoeffizient. Die verschachtelte modulare Requestgrenze wird deshalb exakt
@@ -239,6 +248,12 @@ Abschluss verlangt zusätzlich, dass
 `FiniteFieldFactorizationResult.sourcePolynomialHash()` exakt mit dem Hash der
 ausgewählten modularen Quelle übereinstimmt. Dadurch wird ein Zertifikat für ein
 anderes Polynom desselben Primkörpers abgelehnt.
+
+Die ausgewählte modulare Quelle wird außerdem unabhängig erneut aus der
+ursprünglichen ganzzahligen Quelle reduziert. Auch diese Prüfung läuft unter
+dem gemeinsamen nicht zurücksetzbaren Arbeitsbudget. Eine Erschöpfung während
+dieser Stufe bewahrt den aktuellen Primversuch samt verschachteltem Zertifikat
+als terminal inconclusive.
 
 `COMPLETED` autorisiert nur die ausgewählte, gradtreue und vollständig
 faktorisierte modulare Ausgangslage. Hensel-Lifting, ganzzahlige Rekombination
