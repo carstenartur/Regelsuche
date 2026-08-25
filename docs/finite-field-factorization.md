@@ -73,16 +73,25 @@ FiniteFieldFactorization.factorSquareFree(
 - das Kandidatenbudget;
 - das nicht zurücksetzbare Gesamtarbeitsbudget.
 
-Die Stufenpolitik ergänzt ausschließlich die algorithmusspezifische Grenze,
-wie viele Körperresiduen der deterministische Splitter enumerieren darf:
+Die Stufenpolitik ergänzt ausschließlich zwei algorithmusspezifische
+Ressourcengrenzen:
 
 ```java
 FiniteFieldFactorizationPolicy.deterministicBerlekamp(
-    maxEnumeratedFieldElements)
+    maxEnumeratedFieldElements,
+    maxMatrixCells)
 ```
 
-Sie darf weder Source-Strukturgrenzen noch das Gesamtarbeitsbudget duplizieren
-oder erweitern.
+- `maxEnumeratedFieldElements` begrenzt die kanonische Residuenenumeration des
+  Splitters;
+- `maxMatrixCells` begrenzt die dichte `n x n`-Berlekamp-Matrix vor ihrer
+  Allokation.
+
+Die Matrixzellen-Grenze ist erforderlich, weil ein Work-Budget bereits
+materialisierten Speicher nicht rückwirkend begrenzen kann. Der Algorithmus
+prüft `n * n` mit `long`-Arithmetik, bevor ein Matrixarray erzeugt wird. Die
+Policy darf weder Source-Strukturgrenzen noch das Gesamtarbeitsbudget
+duplizieren oder erweitern.
 
 ## Vorbedingungen
 
@@ -93,6 +102,7 @@ Die erste Stufe verlangt:
 - ein nichtkonstantes Quellpolynom;
 - mindestens ein erlaubtes Faktorisierungsergebnis;
 - eine Primzahl innerhalb der expliziten Enumerationspolitik;
+- eine Berlekamp-Matrix innerhalb der expliziten Zellenpolitik;
 - ein quadratfreies Polynom.
 
 Die Quadratfreiheit wird nicht als Eingabeannahme übernommen. Nach monischer
@@ -222,6 +232,10 @@ bereits belastete Budget. Eine abweichende Budgetautorität wird mit
 `FINITE_FIELD_WORK_BUDGET_AUTHORITY_MISMATCH` zurückgewiesen. Ein Folgeschritt
 kann verbrauchte Arbeit daher weder vergessen noch das Requestbudget erhöhen.
 
+Speicher- und Enumerationsgrenzen werden vor der jeweiligen Arbeit geprüft.
+Sie erscheinen deshalb mit null verbrauchten Work Units, wenn die Quelle bereits
+an der Policy-Grenze abgelehnt wird.
+
 ## Statussemantik
 
 | Status | Bedeutung |
@@ -229,7 +243,7 @@ kann verbrauchte Arbeit daher weder vergessen noch das Requestbudget erhöhen.
 | `COMPLETED` | Vollständige, rekonstruierte und irreduzibel geprüfte Faktorisierung im deklarierten `F_p[x]`. |
 | `UNSUPPORTED_DOMAIN` | Der Ring verwendet keine deklarierte `PrimeField`-Domäne. |
 | `UNSUPPORTED_SHAPE` | Die Quelle ist nicht univariat, konstant oder nicht quadratfrei. |
-| `BUDGET_INCONCLUSIVE` | Struktur-, Kandidaten-, Feldenumerations- oder Gesamtarbeitsgrenze wurde erreicht. |
+| `BUDGET_INCONCLUSIVE` | Struktur-, Kandidaten-, Feldenumerations-, Matrixzellen- oder Gesamtarbeitsgrenze wurde erreicht. |
 | `TECHNICAL_FAILURE` | Eine Algorithmus-, Matrix-, Rekonstruktions- oder Zertifikatsinvariante ist verletzt. |
 
 `FiniteFieldFactorizationResult` besitzt keinen öffentlichen Konstruktor.
