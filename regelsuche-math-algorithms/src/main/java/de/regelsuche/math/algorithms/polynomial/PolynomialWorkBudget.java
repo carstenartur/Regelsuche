@@ -1,6 +1,6 @@
 package de.regelsuche.math.algorithms.polynomial;
 
-import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.polynomial.PolynomialWorkSink;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -35,8 +35,8 @@ final class PolynomialWorkBudget implements PolynomialWorkSink {
         stages.merge(stage, units, Math::addExact);
     }
 
-    FactorizationEngine.WorkLedger ledger() {
-        return new FactorizationEngine.WorkLedger(stages);
+    PolynomialWorkLedger ledger() {
+        return new PolynomialWorkLedger(stages);
     }
 
     static final class LimitReached extends RuntimeException {
