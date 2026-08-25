@@ -33,6 +33,14 @@ public final class UnivariatePolynomialAlgorithms {
                 left,
                 right);
         }
+        if (left.isZero() && right.isZero()) {
+            return GcdResult.failure(
+                Status.UNSUPPORTED_SHAPE,
+                "GCD_ZERO_ZERO_UNDEFINED",
+                FactorizationEngine.WorkLedger.empty(),
+                left,
+                right);
+        }
         ExactField<C> field = exactField(left.ring());
         if (field == null) {
             return GcdResult.failure(
@@ -89,6 +97,10 @@ public final class UnivariatePolynomialAlgorithms {
         if (!left.ring().equals(right.ring())) {
             throw new IllegalArgumentException(
                 "polynomial gcd ring mismatch");
+        }
+        if (left.isZero() && right.isZero()) {
+            throw new IllegalArgumentException(
+                "gcd of two zero polynomials is undefined");
         }
         if (left.isZero()) {
             return right.monic(
