@@ -1,0 +1,151 @@
+package de.regelsuche.math.algorithms.polynomial;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialVariable;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class SuitablePrimeSelectionEvidenceTest {
+    private final PolynomialRing<BigInteger> integerRing =
+        new PolynomialRing<>(
+            BigIntegerDomain.INSTANCE,
+            List.of(new PolynomialVariable("x")),
+            PolynomialRing.MonomialOrder.LEXICOGRAPHIC);
+    private final FactorizationRequest.StructuralLimits limits =
+        new FactorizationRequest.StructuralLimits(
+            1,
+            4,
+            8,
+            64);
+    private final FiniteFieldFactorizationPolicy finiteFieldPolicy =
+        FiniteFieldFactorizationPolicy.deterministicBerlekamp(
+            101,
+            1_000_000);
+
+    @Test
+    void selectedAttemptBindsTheIssuedSourceAndNestedCertificate() {
+        FactorizationRequest<BigInteger> request = request();
+        SuitablePrimeSelectionPolicy policy = policy(3);
+
+        SuitablePrimeSelectionResult result =
+            SuitablePrimeSelection.selectAndFactor(request, policy);
+
+        assertTrue(result.completed(), result.toString());
+        SuitablePrimeSelectionResult.PrimeAttempt selected =
+            result.attempts().getLast();
+        assertEquals(
+            SuitablePrimeSelectionResult.PrimeAttempt.Disposition.SELECTED,
+            selected.disposition());
+        assertEquals(
+            AlgorithmEvidence.sha256(
+                result.modularSource().canonicalMaterial()),
+            selected.modularSourceHash());
+        assertEquals(
+            result.modularFactorization().certificateHash(),
+            selected.modularFactorizationCertificateHash());
+    }
+
+    @Test
+    void issuerRejectsAttemptsOutsideTheBoundCandidatePrefix() {
+        FactorizationRequest<BigInteger> request = request();
+        SuitablePrimeSelectionPolicy policy = policy(3, 5);
+        SuitablePrimeSelectionResult.PrimeAttempt wrongFirstAttempt =
+            SuitablePrimeSelectionResult.issueAttempt(
+                5,
+                SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                    .REJECTED,
+                "LEADING_COEFFICIENT_VANISHES_MOD_PRIME",
+                modularPolynomial(5, 1, 1),
+                null,
+                0);
+
+        assertThrows(IllegalArgumentException.class, () ->
+            SuitablePrimeSelectionResult.failure(
+                SuitablePrimeSelectionResult.Status.BUDGET_INCONCLUSIVE,
+                "NO_SUITABLE_PRIME_WITHIN_POLICY",
+                List.of(wrongFirstAttempt),
+                PolynomialWorkLedger.empty(),
+                request,
+                policy));
+    }
+
+    @Test
+    void issuerRejectsASelectedAttemptForAnotherModularSource() {
+        FactorizationRequest<BigInteger> request = request();
+        SuitablePrimeSelectionPolicy policy = policy(3);
+        SuitablePrimeSelectionResult valid =
+            SuitablePrimeSelection.selectAndFactor(request, policy);
+        assertTrue(valid.completed(), valid.toString());
+
+        SuitablePrimeSelectionResult.PrimeAttempt forgedSelectedAttempt =
+            SuitablePrimeSelectionResult.issueAttempt(
+                3,
+                SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                    .SELECTED,
+                "SUITABLE_PRIME_SELECTED",
+                modularPolynomial(3, 1, 1),
+                valid.modularFactorization().certificateHash(),
+                valid.attempts().getLast().workUnits());
+
+        assertThrows(IllegalArgumentException.class, () ->
+            SuitablePrimeSelectionResult.completed(
+                List.of(forgedSelectedAttempt),
+                3,
+                valid.modularSource(),
+                valid.modularFactorization(),
+                valid.work(),
+                request,
+                policy));
+    }
+
+    private FactorizationRequest<BigInteger> request() {
+        SparsePolynomial<BigInteger> source =
+            UnivariatePolynomialView.of(
+                integerRing,
+                List.of(
+                    BigInteger.valueOf(-1),
+                    BigInteger.ZERO,
+                    BigInteger.ONE))
+                .toSparsePolynomial();
+        return FactorizationRequest.verifiedDecomposition(
+            source,
+            limits,
+            1,
+            1_000_000);
+    }
+
+    private SuitablePrimeSelectionPolicy policy(Integer... primes) {
+        return new SuitablePrimeSelectionPolicy(
+            SuitablePrimeSelectionPolicy.Algorithm
+                .DETERMINISTIC_ASCENDING_PRIMES_V1,
+            List.of(primes),
+            finiteFieldPolicy);
+    }
+
+    private static SparsePolynomial<BigInteger> modularPolynomial(
+        int prime,
+        long... coefficients
+    ) {
+        PolynomialRing<BigInteger> ring = new PolynomialRing<>(
+            PrimeField.of(prime),
+            List.of(new PolynomialVariable("x")),
+            PolynomialRing.MonomialOrder.LEXICOGRAPHIC);
+        return UnivariatePolynomialView.of(
+            ring,
+            java.util.Arrays.stream(coefficients)
+                .mapToObj(BigInteger::valueOf)
+                .toList())
+            .toSparsePolynomial();
+    }
+}
