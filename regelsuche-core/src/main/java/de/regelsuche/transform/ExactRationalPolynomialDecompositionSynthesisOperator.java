@@ -20,11 +20,11 @@ import java.util.TreeMap;
 /**
  * Synthesizes bounded exact rational factorizations of univariate quartics.
  *
- * <p>The operator preserves source-issued exact literal evidence, extracts one
+ * <p>The operator preserves parser-issued exact literal evidence, extracts one
  * exact rational polynomial, normalizes it into an exact scalar and a primitive
  * integer polynomial, invokes the typed integer decomposition boundary, and
- * verifies both coefficient reassembly and the final rendered expression. It
- * is deliberately not registered in a default discovery profile yet.</p>
+ * verifies both coefficient reassembly and the rendered expression. It is
+ * deliberately not registered in a default discovery profile.</p>
  */
 public final class ExactRationalPolynomialDecompositionSynthesisOperator
         implements HypothesisOperator {
@@ -100,6 +100,14 @@ public final class ExactRationalPolynomialDecompositionSynthesisOperator
             return SynthesisReport.failure(
                 Status.INTEGER_SYNTHESIS_FAILED,
                 "MAX_CANDIDATES_IS_ZERO",
+                "",
+                "",
+                0);
+        }
+        if (expression == null || expression.isBlank()) {
+            return SynthesisReport.failure(
+                Status.PARSE_ERROR,
+                "EXPRESSION_BLANK",
                 "",
                 "",
                 0);
@@ -320,7 +328,6 @@ public final class ExactRationalPolynomialDecompositionSynthesisOperator
                     coefficient);
             }
         }
-        boolean homogeneous = coefficients.size() <= 1;
         return new PolynomialSemanticView.Polynomial(
             PolynomialSemanticView.VIEW_ID,
             List.of(new PolynomialSemanticView.Atom(
@@ -329,7 +336,7 @@ public final class ExactRationalPolynomialDecompositionSynthesisOperator
                 new VariableExpr(variable))),
             coefficients,
             coefficientsAscending.size() - 1,
-            homogeneous,
+            coefficients.size() <= 1,
             visitedNodes);
     }
 
