@@ -474,6 +474,8 @@ public final class SuitablePrimeSelectionResult {
                         instanceof PrimeField field)
                     || field.prime() != selectedPrime
                     || !modularFactorization.completed()
+                    || !modularFactorization.sourcePolynomialHash()
+                        .equals(modularSourceHash)
                     || modularFactorization.prime() != selectedPrime
                     || !selectedAttempt
                         .modularFactorizationCertificateHash()
