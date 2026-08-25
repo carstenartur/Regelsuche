@@ -85,6 +85,39 @@ class SuitablePrimeSelectionEvidenceTest {
     }
 
     @Test
+    void issuerRejectsAttemptsBeyondTheRequestCandidateBudget() {
+        FactorizationRequest<BigInteger> request = request();
+        SuitablePrimeSelectionPolicy policy = policy(3, 5);
+        SuitablePrimeSelectionResult.PrimeAttempt first =
+            SuitablePrimeSelectionResult.issueAttempt(
+                3,
+                SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                    .REJECTED,
+                "MODULAR_REDUCTION_NOT_SQUARE_FREE",
+                modularPolynomial(3, 1, 1),
+                null,
+                0);
+        SuitablePrimeSelectionResult.PrimeAttempt second =
+            SuitablePrimeSelectionResult.issueAttempt(
+                5,
+                SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                    .REJECTED,
+                "MODULAR_REDUCTION_NOT_SQUARE_FREE",
+                modularPolynomial(5, 1, 1),
+                null,
+                0);
+
+        assertThrows(IllegalArgumentException.class, () ->
+            SuitablePrimeSelectionResult.failure(
+                SuitablePrimeSelectionResult.Status.BUDGET_INCONCLUSIVE,
+                "NO_SUITABLE_PRIME_WITHIN_POLICY",
+                List.of(first, second),
+                PolynomialWorkLedger.empty(),
+                request,
+                policy));
+    }
+
+    @Test
     void issuerRejectsASelectedAttemptForAnotherModularSource() {
         FactorizationRequest<BigInteger> request = request();
         SuitablePrimeSelectionPolicy policy = policy(3);
