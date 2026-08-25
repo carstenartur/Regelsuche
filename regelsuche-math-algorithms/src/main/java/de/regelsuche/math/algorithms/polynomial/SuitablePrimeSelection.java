@@ -226,16 +226,19 @@ public final class SuitablePrimeSelection {
                         policy);
                 }
                 long attemptWork = total(work) - workBefore;
-                attempts.add(SuitablePrimeSelectionResult.issueAttempt(
-                    prime,
-                    SuitablePrimeSelectionResult.PrimeAttempt.Disposition
-                        .SELECTED,
-                    "SUITABLE_PRIME_SELECTED",
-                    modularSource,
-                    factorization.certificateHash(),
-                    attemptWork));
+                ArrayList<SuitablePrimeSelectionResult.PrimeAttempt>
+                    completedAttempts = new ArrayList<>(attempts);
+                completedAttempts.add(
+                    SuitablePrimeSelectionResult.issueAttempt(
+                        prime,
+                        SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                            .SELECTED,
+                        "SUITABLE_PRIME_SELECTED",
+                        modularSource,
+                        factorization.certificateHash(),
+                        attemptWork));
                 return SuitablePrimeSelectionResult.completed(
-                    attempts,
+                    completedAttempts,
                     prime,
                     modularSource,
                     factorization,
