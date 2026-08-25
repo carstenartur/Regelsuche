@@ -252,7 +252,7 @@ class BinaryQuarticFactorizationEngineTest {
                     engineId(),
                     Outcome.CANDIDATES,
                     "TEST_ENGINE_PROPOSAL",
-                    WorkLedger.empty(),
+                    PolynomialWorkLedger.empty(),
                     List.of(proposal),
                     backendClaim,
                     "sha256:" + "c".repeat(64));
