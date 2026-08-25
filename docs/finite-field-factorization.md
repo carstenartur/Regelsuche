@@ -84,14 +84,20 @@ FiniteFieldFactorizationPolicy.deterministicBerlekamp(
 
 - `maxEnumeratedFieldElements` begrenzt die kanonische Residuenenumeration des
   Splitters;
-- `maxMatrixCells` begrenzt die dichte `n x n`-Berlekamp-Matrix vor ihrer
-  Allokation.
+- `maxMatrixCells` begrenzt die gemeinsame Zahl der Zellen der ursprünglichen
+  Berlekamp-Matrix und ihrer RREF-Arbeitskopie vor der ersten Allokation.
 
 Die Matrixzellen-Grenze ist erforderlich, weil ein Work-Budget bereits
-materialisierten Speicher nicht rückwirkend begrenzen kann. Der Algorithmus
-prüft `n * n` mit `long`-Arithmetik, bevor ein Matrixarray erzeugt wird. Die
-Policy darf weder Source-Strukturgrenzen noch das Gesamtarbeitsbudget
-duplizieren oder erweitern.
+materialisierten Speicher nicht rückwirkend begrenzen kann. Für Grad `n` prüft
+der Algorithmus deshalb vorab
+
+```text
+2 * n * n <= maxMatrixCells
+```
+
+Die Berechnung ist als `n * n <= maxMatrixCells / 2` formuliert und vermeidet
+damit auch bei extremen Requestwerten einen Überlauf. Die Policy darf weder
+Source-Strukturgrenzen noch das Gesamtarbeitsbudget duplizieren oder erweitern.
 
 ## Vorbedingungen
 
@@ -102,7 +108,7 @@ Die erste Stufe verlangt:
 - ein nichtkonstantes Quellpolynom;
 - mindestens ein erlaubtes Faktorisierungsergebnis;
 - eine Primzahl innerhalb der expliziten Enumerationspolitik;
-- eine Berlekamp-Matrix innerhalb der expliziten Zellenpolitik;
+- beide benötigten Berlekamp-Matrizen innerhalb der Zellenpolitik;
 - ein quadratfreies Polynom.
 
 Die Quadratfreiheit wird nicht als Eingabeannahme übernommen. Nach monischer
@@ -151,9 +157,10 @@ Gauß-Jordan-Elimination im deklarierten Primkörper:
 - freie Spalten werden in aufsteigender Reihenfolge zu Basisvektoren;
 - die Basis wird abschließend nach kanonischem Polynommaterial geordnet.
 
-Jeder erzeugte Basisvektor wird unabhängig gegen die ursprüngliche Matrix
-multipliziert. Erst wenn jede Zeile exakt null ergibt, wird eine
-Kernel-Evidence ausgestellt.
+Die unveränderte Ausgangsmatrix bleibt für eine getrennte Prüfung erhalten,
+während die Arbeitskopie in RREF überführt wird. Jeder erzeugte Basisvektor wird
+gegen die Ausgangsmatrix multipliziert. Erst wenn jede Zeile exakt null ergibt,
+wird eine Kernel-Evidence ausgestellt.
 
 Für ein quadratfreies Polynom ist die Nullität gleich der Zahl seiner
 irreduziblen Faktoren über `F_p`. Das Faktorsplitting muss deshalb genau diese
