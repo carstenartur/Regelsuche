@@ -7,9 +7,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-/** Canonical exponent vector in one declared polynomial ring. */
-public record Monomial(List<Integer> exponents)
-        implements Comparable<Monomial> {
+/** Canonical exponent vector whose ordering is supplied by its polynomial ring. */
+public record Monomial(List<Integer> exponents) {
     public Monomial {
         exponents = List.copyOf(
             Objects.requireNonNull(exponents, "exponents"));
@@ -53,10 +52,7 @@ public record Monomial(List<Integer> exponents)
 
     public Monomial multiply(Monomial other) {
         Objects.requireNonNull(other, "other");
-        if (arity() != other.arity()) {
-            throw new IllegalArgumentException(
-                "monomial arity mismatch");
-        }
+        requireSameArity(other);
         List<Integer> result = new ArrayList<>(arity());
         for (int index = 0; index < arity(); index++) {
             result.add(Math.addExact(
@@ -76,32 +72,17 @@ public record Monomial(List<Integer> exponents)
         return new Monomial(result);
     }
 
+    public void requireSameArity(Monomial other) {
+        Objects.requireNonNull(other, "other");
+        if (arity() != other.arity()) {
+            throw new IllegalArgumentException(
+                "monomial arity mismatch");
+        }
+    }
+
     public String canonicalMaterial() {
         return exponents.stream()
             .map(String::valueOf)
             .collect(Collectors.joining(","));
-    }
-
-    @Override
-    public int compareTo(Monomial other) {
-        Objects.requireNonNull(other, "other");
-        int degreeComparison = Integer.compare(
-            other.totalDegree(),
-            totalDegree());
-        if (degreeComparison != 0) {
-            return degreeComparison;
-        }
-        int length = Math.max(arity(), other.arity());
-        for (int index = 0; index < length; index++) {
-            int left = index < arity() ? exponent(index) : 0;
-            int right = index < other.arity()
-                ? other.exponent(index)
-                : 0;
-            int comparison = Integer.compare(right, left);
-            if (comparison != 0) {
-                return comparison;
-            }
-        }
-        return Integer.compare(arity(), other.arity());
     }
 }
