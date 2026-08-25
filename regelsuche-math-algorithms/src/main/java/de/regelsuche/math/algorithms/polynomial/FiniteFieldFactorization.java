@@ -156,6 +156,15 @@ public final class FiniteFieldFactorization {
                 field,
                 work);
         }
+        if (!policy.permitsMatrixDegree(source.degree(0))) {
+            return failure(
+                FiniteFieldFactorizationResult.Status.BUDGET_INCONCLUSIVE,
+                "BERLEKAMP_MATRIX_CELL_POLICY_EXCEEDED",
+                request,
+                policy,
+                field,
+                work);
+        }
         return null;
     }
 
