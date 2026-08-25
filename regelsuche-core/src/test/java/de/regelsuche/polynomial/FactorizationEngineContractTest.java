@@ -42,7 +42,7 @@ class FactorizationEngineContractTest {
     }
 
     @Test
-    void completeBackendClaimCannotRetainAnUnresolvedRemainder() {
+    void unresolvedRemainderMustBeCanonicalAndMatchBackendClaim() {
         PolynomialRing<BigInteger> ring = new PolynomialRing<>(
             BigIntegerDomain.INSTANCE,
             List.of(new PolynomialVariable("x")),
@@ -52,7 +52,17 @@ class FactorizationEngineContractTest {
             Map.of(
                 Monomial.of(1), BigInteger.ONE,
                 Monomial.of(0), BigInteger.ONE));
-        SparsePolynomial<BigInteger> remainder = new SparsePolynomial<>(
+        List<PolynomialFactor<BigInteger>> factors = List.of(
+            new PolynomialFactor<>(factor, 1));
+
+        assertThrows(IllegalArgumentException.class, () ->
+            new FactorizationEngine.Proposal<>(
+                BigInteger.ONE,
+                factors,
+                SparsePolynomial.constant(ring, BigInteger.TWO),
+                "sha256:" + "a".repeat(64)));
+
+        SparsePolynomial<BigInteger> unresolved = new SparsePolynomial<>(
             ring,
             Map.of(
                 Monomial.of(1), BigInteger.ONE,
@@ -60,9 +70,9 @@ class FactorizationEngineContractTest {
         FactorizationEngine.Proposal<BigInteger> proposal =
             new FactorizationEngine.Proposal<>(
                 BigInteger.ONE,
-                List.of(new PolynomialFactor<>(factor, 1)),
-                remainder,
-                "sha256:" + "a".repeat(64));
+                factors,
+                unresolved,
+                "sha256:" + "b".repeat(64));
 
         assertThrows(IllegalArgumentException.class, () ->
             new FactorizationEngine.EngineResult<>(
@@ -72,6 +82,6 @@ class FactorizationEngineContractTest {
                 FactorizationEngine.WorkLedger.empty(),
                 List.of(proposal),
                 FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION,
-                "sha256:" + "b".repeat(64)));
+                "sha256:" + "c".repeat(64)));
     }
 }
