@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.regelsuche.polynomial.FactorizationCandidate;
+import de.regelsuche.polynomial.FactorizationVerifier;
 import de.regelsuche.polynomial.SparsePolynomial;
 import java.math.BigInteger;
 import java.util.List;
@@ -64,14 +64,19 @@ class PolynomialDecompositionSynthesisOperatorTest {
             operator.factorExpression("x^4 + 4*y^4");
 
         assertTrue(report.generated(), report.detailCode());
+        assertEquals(
+            FactorizationVerifier.ClaimStrength.VERIFIED_DECOMPOSITION,
+            report.claimStrength());
         assertTrue(report.candidates().stream().anyMatch(candidate ->
             factorPair(
                 candidate.factorization(),
                 List.of(1, -2, 2),
                 List.of(1, 2, 2))));
         assertTrue(report.candidates().stream().allMatch(candidate ->
-            candidate.factorization().certificateHash()
+            candidate.factorization().verificationCertificateHash()
                 .matches("sha256:[0-9a-f]{64}")));
+        assertTrue(report.verificationHash().matches(
+            "sha256:[0-9a-f]{64}"));
         assertTrue(operator.generateCandidates("x^4 + 4*y^4").stream()
             .allMatch(candidate ->
                 candidate.rule().equals(
@@ -160,7 +165,7 @@ class PolynomialDecompositionSynthesisOperatorTest {
     }
 
     @Test
-    void candidateOrderAndCertificatesAreDeterministic() {
+    void candidateOrderWorkAndCertificatesAreDeterministic() {
         ExpressionFactorizationReport first =
             operator.factorExpression("x^4 + 4*y^4");
         ExpressionFactorizationReport second =
@@ -168,11 +173,13 @@ class PolynomialDecompositionSynthesisOperatorTest {
 
         assertEquals(first, second);
         assertFalse(first.candidates().isEmpty());
-        assertTrue(first.arithmeticSteps() > 0);
+        assertTrue(first.totalWorkUnits() > 0);
+        assertTrue(first.work().units("engine.divisor-tests") > 0);
+        assertTrue(first.work().units("verify.product-comparisons") > 0);
     }
 
     private static boolean factorPair(
-        FactorizationCandidate<BigInteger> candidate,
+        FactorizationVerifier.VerifiedCandidate<BigInteger> candidate,
         List<Integer> expectedLeft,
         List<Integer> expectedRight
     ) {
