@@ -78,31 +78,74 @@ public record Rational(
     }
 
     public Rational add(Rational other) {
-        return fromExact(exactValue().add(
-            Objects.requireNonNull(other, "other").exactValue()));
+        Objects.requireNonNull(other, "other");
+        if (other.isZero()) {
+            return this;
+        }
+        if (isZero()) {
+            return other;
+        }
+        return canonical(exactValue().add(other.exactValue()));
     }
 
     public Rational subtract(Rational other) {
-        return fromExact(exactValue().subtract(
-            Objects.requireNonNull(other, "other").exactValue()));
+        Objects.requireNonNull(other, "other");
+        if (other.isZero()) {
+            return this;
+        }
+        return canonical(exactValue().subtract(other.exactValue()));
     }
 
     public Rational multiply(Rational other) {
-        return fromExact(exactValue().multiply(
-            Objects.requireNonNull(other, "other").exactValue()));
+        Objects.requireNonNull(other, "other");
+        if (isZero() || other.isZero()) {
+            return ZERO;
+        }
+        if (other.isOne()) {
+            return this;
+        }
+        if (isOne()) {
+            return other;
+        }
+        return canonical(exactValue().multiply(other.exactValue()));
     }
 
     public Rational divide(Rational other) {
-        return fromExact(exactValue().divide(
-            Objects.requireNonNull(other, "other").exactValue()));
+        Objects.requireNonNull(other, "other");
+        if (other.isOne()) {
+            return this;
+        }
+        return canonical(exactValue().divide(other.exactValue()));
     }
 
     public Rational negate() {
-        return fromExact(exactValue().negate());
+        if (isZero()) {
+            return ZERO;
+        }
+        if (isOne()) {
+            return NEGATIVE_ONE;
+        }
+        if (isNegativeOne()) {
+            return ONE;
+        }
+        return canonical(exactValue().negate());
     }
 
     public Rational abs() {
-        return fromExact(exactValue().abs());
+        return numerator.signum() >= 0 ? this : negate();
+    }
+
+    private static Rational canonical(ExactRational value) {
+        if (value.isZero()) {
+            return ZERO;
+        }
+        if (value.isOne()) {
+            return ONE;
+        }
+        if (value.isNegativeOne()) {
+            return NEGATIVE_ONE;
+        }
+        return fromExact(value);
     }
 
     public boolean isZero() {
