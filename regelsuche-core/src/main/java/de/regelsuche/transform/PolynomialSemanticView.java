@@ -20,7 +20,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
 
 /**
  * Converts a bounded exact expression fragment into a canonical polynomial and
@@ -125,7 +124,7 @@ public final class PolynomialSemanticView {
             atomIndexes.put(atomKeys.get(index), index);
         }
 
-        TreeMap<Monomial, BigInteger> coefficients = new TreeMap<>();
+        Map<Monomial, BigInteger> coefficients = new LinkedHashMap<>();
         for (RawTerm raw : effectiveTerms) {
             List<Integer> exponents = new ArrayList<>(
                 Collections.nCopies(atomKeys.size(), 0));
@@ -147,7 +146,8 @@ public final class PolynomialSemanticView {
 
         PolynomialRing<BigInteger> ring = new PolynomialRing<>(
             BigIntegerDomain.INSTANCE,
-            atomKeys.stream().map(PolynomialVariable::new).toList());
+            atomKeys.stream().map(PolynomialVariable::new).toList(),
+            PolynomialRing.MonomialOrder.GRADED_LEXICOGRAPHIC);
         SparsePolynomial<BigInteger> polynomial =
             new SparsePolynomial<>(ring, coefficients);
         PolynomialView view = new PolynomialView(
