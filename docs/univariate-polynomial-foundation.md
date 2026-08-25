@@ -8,7 +8,38 @@ noch nicht vollständig in irreduzible Faktoren. Sie stellt aber die
 algorithmische Grundlage bereit, auf der die modulare Faktorisierung über
 `Z[x]` und `Q[x]` aufbauen kann.
 
-## Architektur
+## Verantwortungs- und Modulgrenze
+
+Die Implementierung folgt der bestehenden Modularchitektur und erzeugt keine
+neue Rückabhängigkeit:
+
+```text
+regelsuche-core
+  CoefficientDomain / ExactField
+  PolynomialRing / SparsePolynomial
+  UnivariatePolynomialView
+  PolynomialWorkSink
+
+        ↓
+
+regelsuche-math-algorithms
+  nicht zurücksetzbares Arbeitsbudget
+  euklidischer Polynom-ggT
+  quadratfreie Zerlegung
+  algorithmische Evidence
+```
+
+`regelsuche-core` besitzt damit ausschließlich die exakten mathematischen
+Werte, ihre verlustfreien Darstellungen und einen minimalen Work-Sink.
+Allgemeine Lösungsverfahren und ihre Ablauf-Evidence liegen in
+`regelsuche-math-algorithms`, dessen deklarierte Verantwortung reine
+mathematische Algorithmen und interne Referenzverfahren ist.
+
+Es gibt weder ein Split-Package noch delegierende Kompatibilitätsklassen am
+alten Ort. Der erste Zwischenstand im Core wurde vollständig verschoben, bevor
+er zu einer dauerhaften falschen Abstraktionsgrenze werden konnte.
+
+## Repräsentationsfluss
 
 ```text
 SparsePolynomial<C>
@@ -19,7 +50,7 @@ SparsePolynomial<C>
   -> exakte Rekonstruktion und Zertifikat
 ```
 
-`SparsePolynomial` bleibt die kanonische mathematische Identität. Die neue
+`SparsePolynomial` bleibt die kanonische mathematische Identität. Die
 `UnivariatePolynomialView` ist eine dichte, aufsteigend indizierte
 Koeffizientenansicht für Algorithmen:
 
@@ -27,13 +58,13 @@ Koeffizientenansicht für Algorithmen:
 [a0, a1, ..., an]  <=>  a0 + a1*x + ... + an*x^n
 ```
 
-Sie ist kein zweites öffentliches Polynommodell. Die Projektion ist verlustfrei,
+Sie ist kein zweites unabhängiges Polynommodell. Die Projektion ist verlustfrei,
 bindet denselben `PolynomialRing` und kann jederzeit exakt in die Sparse-IR
 zurückgeführt werden.
 
 ## Explizite Koeffizientendomäne
 
-`CoefficientDomain` deklariert jetzt zusätzlich:
+`CoefficientDomain` deklariert zusätzlich:
 
 - die Charakteristik;
 - die kanonische Einbettung ganzer Zahlen.
@@ -54,7 +85,7 @@ ihre rationale beziehungsweise modulare Arbeitsdomäne in der Evidence binden.
 
 ## Request-weite Strukturgrenzen
 
-`FactorizationRequest` bindet jetzt neben Kandidaten- und Arbeitsbudgets
+`FactorizationRequest` bindet neben Kandidaten- und Arbeitsbudgets
 verpflichtend:
 
 - maximale Variablenzahl;
@@ -66,8 +97,9 @@ Die Grenzen werden vom unabhängigen Verifier geprüft, bevor eine Engine den
 Ausdruck inspizieren darf. Eine Überschreitung führt zu
 `BUDGET_INCONCLUSIVE`, nicht zu „nicht faktorisierbar“ oder „irreduzibel“.
 
-Damit hängen Speicher- und Strukturkosten nicht mehr nur von einem
-engine-internen, zurücksetzbaren Arbeitszähler ab.
+Damit hängen Speicher- und Strukturkosten nicht nur von einem engine-internen,
+zurücksetzbaren Arbeitszähler ab. Die frühere Factory ohne explizite
+Strukturgrenzen wird nicht als Kompatibilitätsoberfläche weitergeführt.
 
 ## Allgemeine univariate Operationen
 
@@ -81,9 +113,25 @@ engine-internen, zurücksetzbaren Arbeitszähler ab.
 - Polynomdivision mit Quotient und Rest;
 - exakt geprüften Quotienten.
 
-Die euklidische ggT-Berechnung gibt einen monischen ggT zurück und verwendet
-einen nicht zurücksetzbaren, nach Stufen getrennten Arbeitszähler. Bei
-Budgeterschöpfung wird kein Teilresultat als mathematischer Abschluss
+Die öffentlichen Operationen können ohne Work-Erfassung verwendet werden oder
+einen `PolynomialWorkSink` erhalten. Der Core kennt dadurch keine konkrete
+Budget- oder Evidence-Implementierung. `regelsuche-math-algorithms` stellt den
+nicht zurücksetzbaren, nach Stufen getrennten Arbeitszähler bereit.
+
+## Euklidischer Polynom-ggT
+
+Die allgemeine ggT-Berechnung arbeitet über einem deklarierten exakten Feld,
+gibt einen monischen ggT zurück und behält eine deterministische Arbeitsbilanz
+sowie ein content-adressiertes Zertifikat.
+
+Besondere Ausgänge bleiben fachlich getrennt:
+
+- Ring- oder Formabweichung: `UNSUPPORTED_SHAPE`;
+- Koeffizientendomäne ohne exakte Felddivision: `UNSUPPORTED_DOMAIN`;
+- erschöpftes Arbeitsbudget: `BUDGET_INCONCLUSIVE`;
+- `gcd(0, 0)`: ausdrücklich undefiniert, nicht das Nullpolynom als Erfolg.
+
+Bei Budgeterschöpfung wird kein Teilresultat als mathematischer Abschluss
 ausgegeben.
 
 ## Quadratfreie Zerlegung
@@ -100,13 +148,15 @@ Multiplizitäten `3`, `2` und `1` zerlegt.
 
 Nach der Bildung werden unabhängig geprüft:
 
-1. das Produkt aus Einheit und potenzierten Faktoren rekonstruiert exakt das
-   Quellpolynom;
-2. jeder ausgegebene Faktor ist tatsächlich quadratfrei, also
+1. Das Produkt aus Einheit und potenzierten Faktoren rekonstruiert exakt das
+   Quellpolynom.
+2. Jeder ausgegebene Faktor ist tatsächlich quadratfrei, also
    `gcd(f, f') = 1`.
 
 Das Zertifikat bindet Methode, Ring, Quellpolynom, Strukturgrenzen,
-Arbeitsbilanz, Einheit, Faktoren und Multiplizitäten.
+Arbeitsbilanz, Einheit, Faktoren und Multiplizitäten. Die Resultatklasse ist
+issuer-owned; Aufrufer können keinen positiven Abschluss um fremde Faktoren
+konstruieren.
 
 ## Aussagegrenze
 
@@ -126,12 +176,20 @@ Noch offen bleiben:
 
 ## Prüfung
 
+Core-Repräsentation und Verifier-Grenze:
+
 ```bash
 ./gradlew :regelsuche-core:test \
   --tests de.regelsuche.polynomial.UnivariatePolynomialViewTest \
-  --tests de.regelsuche.polynomial.UnivariatePolynomialAlgorithmsTest \
-  --tests de.regelsuche.polynomial.SquareFreeDecompositionTest \
   --tests de.regelsuche.polynomial.FactorizationStructuralLimitsTest
+```
+
+Allgemeine mathematische Algorithmen:
+
+```bash
+./gradlew :regelsuche-math-algorithms:test \
+  --tests de.regelsuche.math.algorithms.polynomial.UnivariatePolynomialAlgorithmsTest \
+  --tests de.regelsuche.math.algorithms.polynomial.SquareFreeDecompositionTest
 ```
 
 Der vollständige Checkout-Vertrag bleibt:
