@@ -13,9 +13,41 @@ Der aktuelle Registry-Fokus liegt auf:
 - `pslq`
 - `numericRelationSearch`
 
-Die Algorithmen werden über die Registry aktiviert/deaktiviert und von der Validierungs-/Discovery-Schicht konsumiert; direkte Rewrite-Regeln bleiben davon getrennt.
+Die Algorithmen werden über die Registry aktiviert/deaktiviert und von der Validierungs-/Discovery-Schicht konsumiert; direkte Rewrite-Regeln bleiben davon getrennt. Die domänenbewusste Polynomfaktorisierung liegt im mathematischen Core hinter einer eigenen Engine-/Verifier-Grenze und ist kein untypisierter Registry-Aufruf.
 
 ## Implementierter Stand
+
+### Domänenbewusste Polynomfaktorisierung
+
+Der Faktorisierungskern trennt algebraische Daten, algorithmische Vorschläge und Evidence:
+
+```text
+CoefficientDomain
+  -> PolynomialRing mit expliziter Monomordnung
+  -> kanonisches SparsePolynomial
+  -> FactorizationRequest
+  -> FactorizationEngine: untrusted Proposal und BackendClaim
+  -> FactorizationVerifier: Vertrags- und Produktprüfung
+  -> verifier-ausgestellte Kandidaten und Report-Evidence
+```
+
+Implementiert sind exakte Integer- und Rational-Domänenverträge, lexikographische, graduiert-lexikographische und graduiert-revers-lexikographische Monomordnungen sowie unveränderliche Sparse-Polynome mit exakter Addition, Subtraktion, Skalierung, Multiplikation, Potenzierung und Homogenisierung.
+
+Die erste Engine `regelsuche.factorization.binary-quartic-2x2/v1` löst die allgemeinen Koeffizientenbedingungen
+
+```text
+(a*A^2 + b*A*B + c*B^2)
+*
+(d*A^2 + e*A*B + f*B^2)
+```
+
+für binäre homogene Quartiken unter expliziten Koeffizienten-, Kandidaten- und Work-Budgets. Sie speichert weder die Sophie-Germain-Identität noch andere benannte Einzelfälle. Teiler der äußeren Koeffizienten werden begrenzt enumeriert; die verbleibenden linearen Bedingungen werden exakt gelöst.
+
+Eine Engine-Ausgabe autorisiert keine Suchkante. `FactorizationVerifier` prüft Engine-ID, Koeffizientendomäne, Request- und Kandidatenbudget, kanonische Ringe sowie die exakte Rückmultiplikation von Einheit, Faktoren, Multiplizitäten und ungelöstem Rest. Backend-Claims zu Vollständigkeit oder Irreduzibilität bleiben von unabhängig zertifizierter Evidence getrennt.
+
+Das stage-getrennte Work Ledger verwendet eine kanonisch sortierte, unveränderliche Abbildung. Evidence-Hashes hängen damit nicht von einer nicht spezifizierten Java-Map-Iterationsreihenfolge ab.
+
+### Gröbner-Basen und weitere Backends
 
 - `groebnerBasis` nutzt die interne `pureJavaSmallGroebner`-Reduktion für kleine Polynomideale mit mehreren Generatoren, Nicht-Null-Rest, Budget- und Unsupported-Domain-Status.
 - Der interne Buchberger-Kern priorisiert kritische Paare nach dem Totalgrad ihres kleinsten gemeinsamen Vielfachen. Das Produktkriterium verwirft Paare mit teilerfremden Leitmonomen bereits vor dem Einreihen; das Kettenkriterium verwirft nur Paare, deren beide Teilketten bereits vollständig erledigt sind. Dadurch wird die Anzahl tatsächlich zu reduzierenden S-Polynome begrenzt, ohne die Beweissemanik aufzuweichen.
@@ -43,6 +75,9 @@ Die Algorithmen werden über die Registry aktiviert/deaktiviert und von der Vali
 
 ## Grenzen der High-End-Ausbaustufe
 
+- Die aktuelle Faktorisierungsengine ist eine exakte, begrenzte `2 + 2`-Engine für binäre homogene Quartiken. Sie ist keine vollständige univariate oder multivariate Faktorisierung.
+- Noch nicht implementiert sind quadratfreie Zerlegung mit allgemeiner Multiplizitätsbehandlung, Faktorisierung über endlichen Körpern, geeignete Primzahlauswahl, Hensel-Lifting, Zassenhaus- oder LLL-/van-Hoeij-Rekombination und rationale Reassemblierung für beliebige Grade.
+- Ein Engine-Miss ist kein Irreduzibilitätsbeweis. Ein Backend-Claim wird retained, erfüllt aber ohne zusätzlichen unabhängigen Verifier keinen `INDEPENDENT_COMPLETE`-Request.
 - Der integrierte Gröbner-Kern ist für kleine Polynomideale über rationalen Koeffizienten gedacht.
 - Die Paarselektion bleibt ein optimierter Buchberger-Ansatz; F4/F5, modulare Berechnung, Signaturen und spezialisierte Datenstrukturen professioneller Computeralgebrasysteme sind nicht implementiert.
 - Exakte Cache-Treffer und inkrementelle Erweiterungen werden anhand kanonisierter Generatorenmengen erkannt. Algebraisch identische Ideale mit wesentlich anderen Generatorensystemen werden noch nicht automatisch als derselbe Cache-Zustand erkannt.
@@ -57,6 +92,9 @@ Die Algorithmen werden über die Registry aktiviert/deaktiviert und von der Vali
 
 Weiterführende Dokumente:
 
+- [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md)
+- [Semantische Polynomansicht und quartische Zerlegungsengine](polynomial-decomposition-synthesis.md)
+- [ADR: Domänenbewusster Polynomkern statt Quartik-API](adr/domain-aware-polynomial-factorization.md)
 - [docs/rule-discovery.md](rule-discovery.md)
 - [docs/search-intelligence.md](search-intelligence.md)
 - [docs/equality-saturation.md](equality-saturation.md)
