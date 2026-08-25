@@ -144,6 +144,16 @@ public interface FactorizationEngine<C> {
                 }
                 canonical.merge(stage, units, Math::addExact);
             });
+            try {
+                long total = 0;
+                for (long units : canonical.values()) {
+                    total = Math.addExact(total, units);
+                }
+            } catch (ArithmeticException exception) {
+                throw new IllegalArgumentException(
+                    "factorization work ledger total exceeds long range",
+                    exception);
+            }
             stages = Collections.unmodifiableMap(
                 new LinkedHashMap<>(canonical));
         }
