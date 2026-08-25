@@ -4,8 +4,8 @@
 
 Die ursprüngliche Zerlegungssynthese bleibt als mathematische Fähigkeit erhalten,
 ist aber nicht länger die zentrale Polynomarchitektur. Der allgemeine Vertrag
-für Domänen, Ringe, Polynome, Faktorisierungsengines, Ergebnisse und Evidence
-steht unter
+für Domänen, Ringe, Polynome, untrusted Engine-Proposals und
+verifier-ausgestellte Evidence steht unter
 [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md).
 
 Diese Seite beschreibt die konkrete erste Engine und ihre Integration in die
@@ -35,10 +35,11 @@ dieselbe Koeffizientenstruktur wie
 A^4 + 5*A^2*B^2 + 4*B^4.
 ```
 
-Die mathematische Identität liegt in einem `PolynomialRing<BigInteger>` und
-einem `SparsePolynomial<BigInteger>`. Anzeigezeichenfolgen und konkrete
-AST-Knoten werden separat im View gebunden. Dadurch kann später dieselbe
-Polynomengine auch aus anderen Eingabepfaden aufgerufen werden.
+Die mathematische Identität liegt in einem `PolynomialRing<BigInteger>` mit
+expliziter Monomordnung und einem `SparsePolynomial<BigInteger>`.
+Anzeigezeichenfolgen und konkrete AST-Knoten werden separat im View gebunden.
+Dadurch kann dieselbe Engine später auch aus anderen Eingabepfaden aufgerufen
+werden.
 
 Exakte Koeffizienten und Exponenten werden aus `ExactParsedTerm` gelesen. Der
 historische `double`-Wert eines `NumberExpr` ist nicht autoritativ. So bleibt
@@ -80,6 +81,10 @@ gelöst. Die Engine speichert weder die Sophie-Germain-Identität noch andere
 konkrete Zerlegungen. Sie enumeriert begrenzte Teiler der äußeren Koeffizienten
 und löst die verbleibenden linearen Bedingungen exakt.
 
+Die Engine erzeugt noch keine vertrauenswürdige Suchkante. Sie liefert
+`FactorizationEngine.Proposal<BigInteger>` mit `BackendClaim.NONE`, ihrem
+stage-getrennten Work Ledger und content-addressed Backendprovenienz.
+
 ## Beispiele derselben Engine
 
 ### Sophie-Germain
@@ -88,7 +93,7 @@ und löst die verbleibenden linearen Bedingungen exakt.
 A^4 + 4*B^4
 ```
 
-liefert unter anderem
+liefert unter anderem das Proposal
 
 ```text
 (A^2 - 2*A*B + 2*B^2)
@@ -144,27 +149,55 @@ x^4 + 4
 Die Einheit erweitert den Ring ausdrücklich. Sie wird beim Rendern nicht als
 sichtbares `1^n` ausgegeben.
 
-## Ergebnisvertrag
+## Untrusted Proposal und unabhängige Prüfung
 
-Die Engine gibt `FactorizationCandidate<BigInteger>` zurück. Jeder Kandidat
-enthält:
+Ein Engine-Proposal enthält:
 
 - skalare Einheit;
-- zwei kanonische Faktoren mit Multiplizitäten;
-- den auf eins reduzierten Rest;
-- ein content-addressed Zertifikat;
-- Evidenzstärke `DECOMPOSITION_ONLY`.
+- kanonisch sortierte Faktoren mit positiven Multiplizitäten;
+- einen ungelösten Rest, hier exakt eins;
+- Engine-Zertifikat und Rohresultat-Hash.
 
-`FactorizationVerifier` multipliziert Einheit, Faktoren und Rest unabhängig
-zurück und verlangt exakte Gleichheit mit dem Quellpolynom.
+Gleiche Faktoren werden zusammengeführt. Ein konstanter Rest ungleich eins ist
+nicht kanonisch und muss in die skalare Einheit verschoben werden.
 
-Die Engine meldet trotzdem `PARTIAL_FACTORIZATION`, nicht
-`COMPLETE_FACTORIZATION`: Sie beweist die Zerlegung, aber nicht die
-Irreduzibilität der beiden quadratischen Faktoren im deklarierten Ring.
+`FactorizationVerifier.execute` prüft unabhängig:
 
-Ein nicht gefundener Kandidat wird als `NO_FACTORIZATION_FOUND` ausgegeben. Das
-ist kein Irreduzibilitätsbeweis; der Ausdruck kann außerhalb dieser
-Faktorgradschablone oder Koeffizientengrenze zerlegbar sein.
+- Engine- und Koeffizientendomänen-ID;
+- Kandidaten- und Gesamtbudget;
+- Ringgleichheit aller Faktoren;
+- exakte Rückmultiplikation von Einheit, Faktorpotenzen und Rest.
+
+Erst danach entsteht ein
+`FactorizationVerifier.VerifiedCandidate<BigInteger>` und ein issuer-owned
+`FactorizationVerifier.Report<BigInteger>`.
+
+Der positive Status lautet `PARTIAL_FACTORIZATION` mit
+`ClaimStrength.VERIFIED_DECOMPOSITION`: Das Produkt ist exakt rekonstruiert,
+aber die Engine beweist nicht die Irreduzibilität der beiden quadratischen
+Faktoren.
+
+Ein Engine-Miss führt zu `NO_FACTORIZATION_FOUND`. Das ist kein
+Irreduzibilitätsbeweis; der Ausdruck kann außerhalb dieser Faktorgradschablone
+oder Koeffizientengrenze zerlegbar sein.
+
+## Gemeinsames Work-Budget
+
+Engine und Verifier teilen ein nicht zurücksetzbares Requestbudget. Typische
+Stages sind:
+
+```text
+engine.divisor-tests
+engine.factor-pair-configurations
+engine.middle-system-solves
+verify.factor-power-multiplications
+verify.factor-product-multiplications
+verify.product-comparisons
+```
+
+Die Stage-Reihenfolge ist kanonisch. Reicht die nach der Engine verbleibende
+Arbeit nicht für die Produktrekonstruktion, wird kein Kandidat autorisiert; das
+Resultat bleibt `BUDGET_INCONCLUSIVE`.
 
 ## Ausdrucksadapter und Suchkante
 
@@ -176,7 +209,8 @@ Quelltext
   -> PolynomialSemanticView
   -> FactorizationRequest
   -> BinaryQuarticFactorizationEngine
-  -> geprüfter FactorizationCandidate
+  -> FactorizationVerifier
+  -> VerifiedCandidate
   -> Transformation
 ```
 
@@ -190,17 +224,25 @@ und bleibt dadurch von deklarativen Regeln, historischen Spezialbridges und
 abgeleiteten Makros unterscheidbar. Exakte Faktorkoeffizienten werden direkt als
 Text gerendert und nicht über `NumberExpr(int/double)` zurückgeführt.
 
+Der verbleibende Operator ist ein aktueller Search-Adapter mit konkreter
+Verantwortung, keine Kompatibilitätsfassade für die entfernten verschachtelten
+Quartiktypen.
+
 ## Theory-Subsumption und Cache
 
 `PolynomialTheorySubsumptionClassifier` prüft, ob ein beobachtetes Ziel einer
-der unter demselben Budget erzeugten Faktorisierungen entspricht. Ein positiver
-Treffer ist eine theorieabgeleitete Instanz, keine neue Kernelregel und keine
-externe mathematische Neuheit.
+der unter demselben Budget erzeugten und verifizierten Faktorisierungen
+entspricht. Ein positiver Treffer ist eine theorieabgeleitete Instanz, keine neue
+Kernelregel und keine externe mathematische Neuheit.
 
 `PolynomialDerivedMacroCache` darf solche Instanzen als begrenzten
-Performancecache halten. Er bindet Zertifikat, Engine-ID, Anwendungsschlüssel,
-arithmetische Arbeit und mehrere unabhängige Lineages. Der Cache gehört weder
-zum Kernel noch automatisch zum Standardinventar.
+Performancecache halten. Er bindet Verifier-Zertifikat, Engine-ID,
+Anwendungsschlüssel, vollständiges Work Ledger und mehrere unabhängige
+Lineages. Der Cache gehört weder zum Kernel noch automatisch zum
+Standardinventar.
+
+Der Discovery-Integrationstest prüft den retained Pfad über mathematische
+Wertgleichheit und nicht über historische Renderer-Teilstrings.
 
 ## Aktuelle Grenze
 
@@ -211,7 +253,7 @@ Die konkrete Engine unterstützt:
 - homogenes Polynom vierten Grades;
 - Faktorgradaufteilung `2 + 2`;
 - begrenzte ganzzahlige Faktorkoeffizienten;
-- begrenzte arithmetische Arbeit und Kandidatenzahl.
+- begrenzte Engine- und Verifier-Arbeit sowie Kandidatenzahl.
 
 Nicht unterstützt sind durch diese Engine allein:
 
@@ -222,15 +264,16 @@ Nicht unterstützt sind durch diese Engine allein:
 - mehr als zwei Variablen;
 - multivariate Faktorisierung.
 
-Diese Grenzen sind jetzt Eigenschaften einer Engine und keine Grenzen des
-Polynom- oder Faktorisierungsvertrags. Weitere Engines werden unter demselben
-Request-/Result-Modell ergänzt.
+Diese Grenzen sind Eigenschaften der Engine und keine Grenzen des Polynom- oder
+Faktorisierungsvertrags. Weitere Engines werden unter demselben
+Request-/Proposal-/Verifier-Modell ergänzt.
 
 ## Prüfung aus dem Checkout
 
 ```bash
 ./gradlew :regelsuche-core:test \
   --tests de.regelsuche.polynomial.BinaryQuarticFactorizationEngineTest \
+  --tests de.regelsuche.polynomial.FactorizationEngineContractTest \
   --tests de.regelsuche.transform.PolynomialDecompositionSynthesisOperatorTest \
   --tests de.regelsuche.transform.PolynomialTheorySubsumptionClassifierTest
 ```
@@ -251,7 +294,7 @@ mvn --batch-mode --no-transfer-progress -Pfull verify
 
 ## Aussagegrenze
 
-Die Engine belegt eine exakt verifizierte quadratisch-mal-quadratische
-Zerlegungssynthese in einem begrenzten Quartikfragment. Sie belegt keine
-vollständige allgemeine Polynomfaktorisierung und keine Überlegenheit gegenüber
-einem etablierten CAS.
+Die Engine belegt eine unabhängig produktverifizierte
+quadratisch-mal-quadratische Zerlegungssynthese in einem begrenzten
+Quartikfragment. Sie belegt keine vollständige allgemeine
+Polynomfaktorisierung und keine Überlegenheit gegenüber einem etablierten CAS.
