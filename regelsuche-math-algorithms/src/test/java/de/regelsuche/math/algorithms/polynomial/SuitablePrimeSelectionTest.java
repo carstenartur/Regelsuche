@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 
 class SuitablePrimeSelectionTest {
     private static final long TEST_MATRIX_CELLS = 1_000_000L;
+    private static final int DEFAULT_CANDIDATE_BUDGET = 32;
 
     private final PolynomialRing<BigInteger> integerRing =
         new PolynomialRing<>(
@@ -129,6 +130,30 @@ class SuitablePrimeSelectionTest {
         assertThrows(
             IllegalStateException.class,
             result::selectedPrime);
+    }
+
+    @Test
+    void requestCandidateBudgetBoundsTheConsideredPrimePrefix() {
+        SparsePolynomial<BigInteger> source = integer(5, 2, 2);
+
+        SuitablePrimeSelectionResult result =
+            SuitablePrimeSelection.selectAndFactor(
+                request(source, limits, 2, 1_000_000),
+                policy(2, 3, 5));
+
+        assertEquals(
+            SuitablePrimeSelectionResult.Status.BUDGET_INCONCLUSIVE,
+            result.status());
+        assertEquals(
+            "PRIME_CANDIDATE_BUDGET_EXHAUSTED",
+            result.detailCode());
+        assertEquals(List.of(2, 3), result.attempts().stream()
+            .map(SuitablePrimeSelectionResult.PrimeAttempt::prime)
+            .toList());
+        assertTrue(result.attempts().stream()
+            .allMatch(attempt -> attempt.disposition()
+                == SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                    .REJECTED));
     }
 
     @Test
@@ -351,10 +376,23 @@ class SuitablePrimeSelectionTest {
         FactorizationRequest.StructuralLimits structuralLimits,
         long maximumWork
     ) {
+        return request(
+            source,
+            structuralLimits,
+            DEFAULT_CANDIDATE_BUDGET,
+            maximumWork);
+    }
+
+    private static FactorizationRequest<BigInteger> request(
+        SparsePolynomial<BigInteger> source,
+        FactorizationRequest.StructuralLimits structuralLimits,
+        int maximumCandidates,
+        long maximumWork
+    ) {
         return FactorizationRequest.verifiedDecomposition(
             source,
             structuralLimits,
-            1,
+            maximumCandidates,
             maximumWork);
     }
 
