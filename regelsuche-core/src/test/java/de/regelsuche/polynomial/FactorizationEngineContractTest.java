@@ -39,6 +39,12 @@ class FactorizationEngineContractTest {
         assertEquals(10L, first.totalWorkUnits());
         assertThrows(UnsupportedOperationException.class, () ->
             first.stages().put("late-stage", 1L));
+
+        Map<String, Long> overflowing = new LinkedHashMap<>();
+        overflowing.put("engine.maximum", Long.MAX_VALUE);
+        overflowing.put("verify.one-more", 1L);
+        assertThrows(IllegalArgumentException.class, () ->
+            new FactorizationEngine.WorkLedger(overflowing));
     }
 
     @Test
