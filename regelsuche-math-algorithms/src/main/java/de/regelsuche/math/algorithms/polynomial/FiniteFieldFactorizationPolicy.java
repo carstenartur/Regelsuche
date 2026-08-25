@@ -16,7 +16,7 @@ public record FiniteFieldFactorizationPolicy(
         Objects.requireNonNull(algorithm, "algorithm");
         if (maxEnumeratedFieldElements < 2
                 || maxEnumeratedFieldElements > MAX_FIELD_ELEMENTS
-                || maxMatrixCells < RETAINED_DENSE_CELL_SETS
+                || maxMatrixCells < 1
                 || maxMatrixCells > MAX_MATRIX_CELLS) {
             throw new IllegalArgumentException(
                 "finite-field factorization policy is invalid");
