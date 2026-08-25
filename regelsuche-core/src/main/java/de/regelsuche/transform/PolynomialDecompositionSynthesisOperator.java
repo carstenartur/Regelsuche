@@ -1,10 +1,8 @@
 package de.regelsuche.transform;
 
 import de.regelsuche.polynomial.BinaryQuarticFactorizationEngine;
-import de.regelsuche.polynomial.FactorizationCandidate;
-import de.regelsuche.polynomial.FactorizationReport;
 import de.regelsuche.polynomial.FactorizationRequest;
-import de.regelsuche.polynomial.FactorizationStatus;
+import de.regelsuche.polynomial.FactorizationVerifier;
 import de.regelsuche.polynomial.Monomial;
 import de.regelsuche.polynomial.PolynomialFactor;
 import de.regelsuche.polynomial.SparsePolynomial;
@@ -18,8 +16,8 @@ import java.util.Objects;
  * Expression adapter for one factorization engine.
  *
  * <p>The domain-aware polynomial and factorization contracts are authoritative;
- * this class only maps source syntax to that core and renders verified candidates
- * back into transformation strings.</p>
+ * this class only maps source syntax to the core verifier and renders its
+ * issuer-owned candidates back into transformation strings.</p>
  */
 public final class PolynomialDecompositionSynthesisOperator
         implements HypothesisOperator {
@@ -31,12 +29,12 @@ public final class PolynomialDecompositionSynthesisOperator
     private static final String PACK_ID = "core-polynomial-synthesis";
     private static final String LICENSE = "PROJECT";
     private static final int DEFAULT_MAX_CANDIDATES = 6;
-    private static final long DEFAULT_MAX_ARITHMETIC_STEPS = 4_096;
+    private static final long DEFAULT_MAX_WORK_UNITS = 4_096;
 
     private final PolynomialSemanticView semanticView;
     private final BinaryQuarticFactorizationEngine engine;
     private final int maxCandidates;
-    private final long maxArithmeticSteps;
+    private final long maxWorkUnits;
 
     public PolynomialDecompositionSynthesisOperator() {
         this(DEFAULT_MAX_CANDIDATES);
@@ -48,25 +46,25 @@ public final class PolynomialDecompositionSynthesisOperator
                 new PolynomialSemanticView.Budget(2, 4, 16, 256)),
             new BinaryQuarticFactorizationEngine(),
             maxCandidates,
-            DEFAULT_MAX_ARITHMETIC_STEPS);
+            DEFAULT_MAX_WORK_UNITS);
     }
 
     PolynomialDecompositionSynthesisOperator(
         PolynomialSemanticView semanticView,
         BinaryQuarticFactorizationEngine engine,
         int maxCandidates,
-        long maxArithmeticSteps
+        long maxWorkUnits
     ) {
         this.semanticView = Objects.requireNonNull(
             semanticView,
             "semanticView");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.maxCandidates = Math.max(0, maxCandidates);
-        if (maxArithmeticSteps < 1) {
+        if (maxWorkUnits < 1) {
             throw new IllegalArgumentException(
-                "factorization arithmetic budget must be positive");
+                "factorization work budget must be positive");
         }
-        this.maxArithmeticSteps = maxArithmeticSteps;
+        this.maxWorkUnits = maxWorkUnits;
     }
 
     @Override
@@ -96,63 +94,64 @@ public final class PolynomialDecompositionSynthesisOperator
         PolynomialSemanticView.Analysis analysis =
             semanticView.analyze(expression);
         if (!analysis.supported()) {
-            return ExpressionFactorizationReport.failure(
+            return ExpressionFactorizationReport.semanticFailure(
                 statusFor(analysis.status()),
                 analysis.detailCode(),
-                analysis.status(),
-                "",
-                0);
+                analysis.status());
         }
 
         PolynomialSemanticView.PolynomialView view = analysis.view();
         if (view.polynomial().isZero()) {
-            return ExpressionFactorizationReport.failure(
+            return ExpressionFactorizationReport.semanticFailure(
                 ExpressionFactorizationReport.Status.NO_FACTORIZATION_FOUND,
                 "ZERO_POLYNOMIAL_HAS_NO_FINITE_FACTORIZATION",
-                analysis.status(),
-                view.canonicalMaterial(),
-                0);
+                analysis.status());
         }
         if (view.polynomial().ring().variableCount() == 1
                 && view.polynomial().totalDegree() <= 4) {
             view = view.homogenizeWithUnitAtom(4);
         }
 
-        FactorizationReport<BigInteger> factorization = engine.factor(
-            FactorizationRequest.verifiedDecomposition(
-                view.polynomial(),
-                maxCandidates,
-                maxArithmeticSteps));
+        FactorizationVerifier.Report<BigInteger> factorization =
+            FactorizationVerifier.execute(
+                engine,
+                FactorizationRequest.verifiedDecomposition(
+                    view.polynomial(),
+                    maxCandidates,
+                    maxWorkUnits));
         if (!factorization.successful()) {
-            return ExpressionFactorizationReport.failure(
+            return ExpressionFactorizationReport.coreFailure(
                 statusFor(factorization.status()),
-                factorization.detailCode(),
                 analysis.status(),
                 view.canonicalMaterial(),
-                factorization.arithmeticSteps());
+                factorization);
         }
 
         PolynomialSemanticView.PolynomialView renderedView = view;
+        FactorizationVerifier.Report<BigInteger> verifiedReport =
+            factorization;
         List<ExpressionFactorizationReport.RenderedFactorization> candidates =
             factorization.candidates().stream()
                 .map(candidate -> render(
                     candidate,
                     renderedView,
-                    factorization.arithmeticSteps()))
+                    verifiedReport))
                 .toList();
         return new ExpressionFactorizationReport(
             ExpressionFactorizationReport.Status.GENERATED,
             factorization.detailCode(),
             analysis.status(),
             view.canonicalMaterial(),
-            factorization.arithmeticSteps(),
+            factorization.work(),
+            factorization.claimStrength(),
+            factorization.verificationHash(),
             candidates);
     }
 
     private ExpressionFactorizationReport.RenderedFactorization render(
-        FactorizationCandidate<BigInteger> candidate,
+        FactorizationVerifier.VerifiedCandidate<BigInteger> candidate,
         PolynomialSemanticView.PolynomialView view,
-        long arithmeticSteps
+        FactorizationVerifier.Report<BigInteger> report
     ) {
         List<String> multiplicands = new ArrayList<>();
         if (!candidate.unit().equals(BigInteger.ONE)) {
@@ -177,8 +176,12 @@ public final class PolynomialDecompositionSynthesisOperator
         String transformed = String.join(" * ", multiplicands);
         String applicationKey = RULE_ID
             + "|method=" + METHOD_ID
-            + "|certificate=" + candidate.certificateHash()
-            + "|work=" + arithmeticSteps;
+            + "|engineCertificate="
+            + candidate.engineCertificateHash()
+            + "|verificationCertificate="
+            + candidate.verificationCertificateHash()
+            + "|report=" + report.verificationHash()
+            + "|work=" + report.work().totalWorkUnits();
         return new ExpressionFactorizationReport.RenderedFactorization(
             transformed,
             candidate,
@@ -279,7 +282,7 @@ public final class PolynomialDecompositionSynthesisOperator
     }
 
     private static ExpressionFactorizationReport.Status statusFor(
-        FactorizationStatus status
+        FactorizationVerifier.Status status
     ) {
         return switch (status) {
             case COMPLETE_FACTORIZATION,
