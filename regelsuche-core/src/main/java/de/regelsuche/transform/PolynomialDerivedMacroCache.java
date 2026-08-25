@@ -212,7 +212,7 @@ public final class PolynomialDerivedMacroCache {
         List<String> primitiveRuleIds,
         List<String> sourceProvenance,
         String applicationKey,
-        long arithmeticSteps
+        long workUnits
     ) {
         public Lineage {
             if (id == null
@@ -227,9 +227,9 @@ public final class PolynomialDerivedMacroCache {
                 sourceProvenance,
                 "sourceProvenance");
             requireText(applicationKey, "applicationKey");
-            if (arithmeticSteps < 0) {
+            if (workUnits < 0) {
                 throw new IllegalArgumentException(
-                    "arithmeticSteps must not be negative");
+                    "workUnits must not be negative");
             }
         }
 
@@ -254,7 +254,7 @@ public final class PolynomialDerivedMacroCache {
             append(material, classification.applicationKey());
             append(
                 material,
-                Long.toString(classification.arithmeticSteps()));
+                Long.toString(classification.workUnits()));
             append(material, Integer.toString(primitives.size()));
             primitives.forEach(value -> append(material, value));
             append(material, Integer.toString(provenance.size()));
@@ -264,7 +264,7 @@ public final class PolynomialDerivedMacroCache {
                 primitives,
                 provenance,
                 classification.applicationKey(),
-                classification.arithmeticSteps());
+                classification.workUnits());
         }
     }
 }
