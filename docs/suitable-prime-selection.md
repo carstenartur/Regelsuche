@@ -179,6 +179,20 @@ Jeder `PrimeAttempt` speichert zusätzlich die in diesem Versuch verbrauchten
 Work Units. Die Gesamtbilanz bleibt als vollständiges stage-getrenntes
 `PolynomialWorkLedger` im Resultat erhalten.
 
+Auch die unabhängige erneute Reduktion der ganzzahligen Quelle wird unter den
+Stufen
+
+```text
+suitable-prime.verify.source-reduction.coefficients
+suitable-prime.verify.source-reduction.comparisons
+```
+
+im selben Budget verbucht. Reicht das Restbudget nach einer erfolgreichen
+Primkörperfaktorisierung nicht mehr für diese Korrespondenzprüfung, bleibt der
+betroffene Primversuch als `TERMINAL_INCONCLUSIVE` mit
+`SOURCE_CORRESPONDENCE_WORK_BUDGET_EXCEEDED` erhalten; das Gesamtergebnis
+meldet `SOURCE_CORRESPONDENCE_INCONCLUSIVE`.
+
 ## Evidence
 
 `SuitablePrimeSelectionResult` und seine `PrimeAttempt`-Objekte besitzen keine
@@ -211,7 +225,7 @@ Primkörpers nicht in das äußere Ergebnis eingesetzt werden.
 
 Darüber hinaus rekonstruiert die Ergebnisprüfung aus der ursprünglichen
 `Z[x]`-Quelle und der ausgewählten Primzahl nochmals unabhängig das kanonische
-Polynom in `F_p[x]`. Dieses Polynom muss exakt der retained modularen Quelle
+Polynom in `F_p[x]`. Dieses Polynom muss exakt der bewahrten modularen Quelle
 entsprechen. Damit wird auch ein in sich konsistentes Paar aus Modularpolynom
 und passendem Faktorisierungszertifikat abgelehnt, wenn es nicht tatsächlich
 die Reduktion der gebundenen ganzzahligen Quelle ist.
@@ -233,9 +247,9 @@ NO_SUITABLE_PRIME_WITHIN_POLICY
 ```
 
 und ist kein Beweis, dass keine geeignete Primzahl existiert. Eine
-Ressourcenüberschreitung der modularen Faktorisierung ist terminal und wird
-nicht fälschlich als mathematische Ablehnung der betreffenden Primzahl
-weitergezählt.
+Ressourcenüberschreitung der modularen Faktorisierung oder der anschließenden
+Quellkorrespondenzprüfung ist terminal und wird nicht fälschlich als
+mathematische Ablehnung der betreffenden Primzahl weitergezählt.
 
 ## Claim-Grenze
 
