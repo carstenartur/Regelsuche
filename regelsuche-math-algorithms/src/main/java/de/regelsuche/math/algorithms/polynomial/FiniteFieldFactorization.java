@@ -355,8 +355,8 @@ public final class FiniteFieldFactorization {
     ) {
         ArrayList<UnivariatePolynomialView<BigInteger>> result =
             new ArrayList<>(factors);
-        result.sort(Comparator.comparing(
-            UnivariatePolynomialView::canonicalMaterial));
+        result.sort(Comparator.comparing(factor ->
+            factor.toSparsePolynomial().canonicalMaterial()));
         return result;
     }
 
