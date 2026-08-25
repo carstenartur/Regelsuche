@@ -4,15 +4,18 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
-import de.regelsuche.input.InputRequest;
-import de.regelsuche.input.InputType;
-import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExactExpressionFormatter;
+import de.regelsuche.parse.ExactParsedTerm;
 import de.regelsuche.parse.ExpressionParser;
-import java.math.BigDecimal;
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.Monomial;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialVariable;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,19 +23,23 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * Converts a bounded expression fragment into an exact commutative polynomial
- * over structural AST atoms.
+ * Converts a bounded exact expression fragment into a canonical polynomial and
+ * separate source-AST bindings for its structural atoms.
  *
- * <p>An atom is not limited to a variable name. A complete subtree such as
- * {@code x + 1} or {@code sin(t)} can be one indeterminate. Consequently one
- * semantic polynomial covers infinitely many concrete substitutions without
- * learning a separate rule for every substituted expression.</p>
+ * <p>The mathematical polynomial never stores display syntax or source
+ * occurrences. Exact numeric coefficients and atom identities are derived from
+ * parser-issued provenance, never reconstructed from {@code NumberExpr(double)}.
+ * </p>
  */
 public final class PolynomialSemanticView {
     public static final String VIEW_ID =
-        "regelsuche.polynomial-semantic-view/v1";
+        "regelsuche.polynomial-semantic-view/v2";
+    public static final String STRUCTURAL_UNIT_ID =
+        "structural-unit:1";
 
-    private final ExpressionParser parser = new ExpressionParser();
+    private static final String STRUCTURAL_ATOM_PREFIX = "ast:";
+
+    private final ExpressionParser parser;
     private final Budget budget;
 
     public PolynomialSemanticView() {
@@ -40,186 +47,269 @@ public final class PolynomialSemanticView {
     }
 
     public PolynomialSemanticView(Budget budget) {
+        this(new ExpressionParser(), budget);
+    }
+
+    PolynomialSemanticView(
+        ExpressionParser parser,
+        Budget budget
+    ) {
+        this.parser = Objects.requireNonNull(parser, "parser");
         this.budget = Objects.requireNonNull(budget, "budget");
     }
 
     public Analysis analyze(String expression) {
         if (expression == null || expression.isBlank()) {
-            return Analysis.failure(Status.PARSE_ERROR, "EXPRESSION_BLANK");
+            return Analysis.failure(
+                Status.PARSE_ERROR,
+                "EXPRESSION_BLANK");
         }
         Work work = new Work();
         try {
-            Expr root = parser.parse(new InputRequest(InputType.TERM, expression))
-                .terms().getFirst();
+            ExactParsedTerm parsed = parser.parseExactTerm(expression);
             List<RawTerm> rawTerms = new ArrayList<>();
-            collectAddends(root, BigInteger.ONE, rawTerms, work);
+            collectAddends(
+                parsed.expression(),
+                BigInteger.ONE,
+                rawTerms,
+                work,
+                parsed);
             if (rawTerms.size() > budget.maxTerms()) {
                 throw new BudgetExceeded("MAX_TERMS_EXCEEDED");
             }
-
-            List<RawTerm> effectiveTerms = rawTerms.stream()
-                .filter(term -> term.coefficient().signum() != 0)
-                .toList();
-            Map<String, Expr> atomExpressions = new LinkedHashMap<>();
-            effectiveTerms.forEach(term -> term.atoms().forEach((key, atom) ->
-                atomExpressions.putIfAbsent(key, atom.expression())));
-            List<String> atomKeys = atomExpressions.keySet().stream()
-                .sorted()
-                .toList();
-            if (atomKeys.size() > budget.maxAtoms()) {
-                throw new BudgetExceeded("MAX_ATOMS_EXCEEDED");
-            }
-
-            List<Atom> atoms = atomKeys.stream()
-                .map(key -> new Atom(
-                    key,
-                    ExpressionFormatter.format(atomExpressions.get(key)),
-                    atomExpressions.get(key)))
-                .toList();
-            Map<String, Integer> atomIndexes = new LinkedHashMap<>();
-            for (int index = 0; index < atomKeys.size(); index++) {
-                atomIndexes.put(atomKeys.get(index), index);
-            }
-
-            TreeMap<Monomial, BigInteger> coefficients = new TreeMap<>();
-            for (RawTerm raw : effectiveTerms) {
-                List<Integer> exponents = new ArrayList<>(
-                    Collections.nCopies(atomKeys.size(), 0));
-                raw.atoms().forEach((key, atom) -> {
-                    int index = atomIndexes.get(key);
-                    exponents.set(index, atom.exponent());
-                });
-                Monomial monomial = new Monomial(exponents);
-                if (monomial.totalDegree() > budget.maxDegree()) {
-                    throw new BudgetExceeded("MAX_DEGREE_EXCEEDED");
-                }
-                coefficients.merge(
-                    monomial,
-                    raw.coefficient(),
-                    BigInteger::add);
-            }
-            coefficients.entrySet().removeIf(entry ->
-                entry.getValue().signum() == 0);
-
-            int degree = coefficients.keySet().stream()
-                .mapToInt(Monomial::totalDegree)
-                .max()
-                .orElse(0);
-            boolean homogeneous = coefficients.isEmpty()
-                || coefficients.keySet().stream()
-                    .mapToInt(Monomial::totalDegree)
-                    .distinct()
-                    .count() == 1;
-            Polynomial polynomial = new Polynomial(
-                VIEW_ID,
-                atoms,
-                coefficients,
-                degree,
-                homogeneous,
-                work.visitedNodes());
-            return new Analysis(
-                Status.SUPPORTED,
-                "EXACT_INTEGER_POLYNOMIAL",
-                polynomial);
+            return supportedAnalysis(rawTerms, work, parsed);
         } catch (BudgetExceeded exception) {
-            return Analysis.failure(Status.BUDGET_EXCEEDED, exception.getMessage());
+            return Analysis.failure(
+                Status.BUDGET_EXCEEDED,
+                exception.getMessage());
         } catch (UnsupportedExpression exception) {
-            return Analysis.failure(Status.UNSUPPORTED, exception.getMessage());
+            return Analysis.failure(
+                Status.UNSUPPORTED,
+                exception.getMessage());
         } catch (IllegalArgumentException exception) {
-            return Analysis.failure(Status.PARSE_ERROR, safeMessage(exception));
+            return Analysis.failure(
+                Status.PARSE_ERROR,
+                safeMessage(exception));
         }
+    }
+
+    private Analysis supportedAnalysis(
+        List<RawTerm> rawTerms,
+        Work work,
+        ExactParsedTerm parsed
+    ) {
+        List<RawTerm> effectiveTerms = rawTerms.stream()
+            .filter(term -> term.coefficient().signum() != 0)
+            .toList();
+        Map<String, RawAtom> atomDefinitions = new LinkedHashMap<>();
+        effectiveTerms.forEach(term -> term.atoms().forEach(
+            atomDefinitions::putIfAbsent));
+        List<String> atomKeys = atomDefinitions.keySet().stream()
+            .sorted()
+            .toList();
+        if (atomKeys.size() > budget.maxAtoms()) {
+            throw new BudgetExceeded("MAX_ATOMS_EXCEEDED");
+        }
+
+        List<StructuralAtom> atoms = atomKeys.stream()
+            .map(key -> {
+                RawAtom atom = atomDefinitions.get(key);
+                return new StructuralAtom(
+                    key,
+                    atom.display(),
+                    atom.expression());
+            })
+            .toList();
+        Map<String, Integer> atomIndexes = new LinkedHashMap<>();
+        for (int index = 0; index < atomKeys.size(); index++) {
+            atomIndexes.put(atomKeys.get(index), index);
+        }
+
+        TreeMap<Monomial, BigInteger> coefficients = new TreeMap<>();
+        for (RawTerm raw : effectiveTerms) {
+            List<Integer> exponents = new ArrayList<>(
+                Collections.nCopies(atomKeys.size(), 0));
+            raw.atoms().forEach((key, atom) -> {
+                int index = atomIndexes.get(key);
+                exponents.set(index, atom.exponent());
+            });
+            Monomial monomial = new Monomial(exponents);
+            if (monomial.totalDegree() > budget.maxDegree()) {
+                throw new BudgetExceeded("MAX_DEGREE_EXCEEDED");
+            }
+            coefficients.merge(
+                monomial,
+                raw.coefficient(),
+                BigInteger::add);
+        }
+        coefficients.entrySet().removeIf(
+            entry -> entry.getValue().signum() == 0);
+
+        PolynomialRing<BigInteger> ring = new PolynomialRing<>(
+            BigIntegerDomain.INSTANCE,
+            atomKeys.stream().map(PolynomialVariable::new).toList());
+        SparsePolynomial<BigInteger> polynomial =
+            new SparsePolynomial<>(ring, coefficients);
+        PolynomialView view = new PolynomialView(
+            VIEW_ID,
+            polynomial,
+            atoms,
+            work.visitedNodes(),
+            parsed.source());
+        return new Analysis(
+            Status.SUPPORTED,
+            "EXACT_INTEGER_POLYNOMIAL",
+            view);
     }
 
     private void collectAddends(
         Expr expression,
         BigInteger sign,
         List<RawTerm> terms,
-        Work work
+        Work work,
+        ExactParsedTerm parsed
     ) {
         work.visit(budget);
         if (expression instanceof BinaryExpr binary
                 && binary.operator() == BinaryOperator.ADD) {
-            collectAddends(binary.left(), sign, terms, work);
-            collectAddends(binary.right(), sign, terms, work);
+            collectAddends(
+                binary.left(),
+                sign,
+                terms,
+                work,
+                parsed);
+            collectAddends(
+                binary.right(),
+                sign,
+                terms,
+                work,
+                parsed);
             return;
         }
         if (expression instanceof BinaryExpr binary
                 && binary.operator() == BinaryOperator.SUB) {
-            collectAddends(binary.left(), sign, terms, work);
-            collectAddends(binary.right(), sign.negate(), terms, work);
+            collectAddends(
+                binary.left(),
+                sign,
+                terms,
+                work,
+                parsed);
+            collectAddends(
+                binary.right(),
+                sign.negate(),
+                terms,
+                work,
+                parsed);
             return;
         }
         MutableTerm term = new MutableTerm(sign);
-        collectProduct(expression, term, work);
+        collectProduct(expression, term, work, parsed);
         terms.add(term.freeze());
     }
 
     private void collectProduct(
         Expr expression,
         MutableTerm term,
-        Work work
+        Work work,
+        ExactParsedTerm parsed
     ) {
         work.visit(budget);
         if (expression instanceof BinaryExpr binary
                 && binary.operator() == BinaryOperator.MUL) {
-            collectProduct(binary.left(), term, work);
-            collectProduct(binary.right(), term, work);
+            collectProduct(binary.left(), term, work, parsed);
+            collectProduct(binary.right(), term, work, parsed);
             return;
         }
         if (expression instanceof BinaryExpr binary
                 && binary.operator() == BinaryOperator.DIV) {
-            throw unsupported("DIVISION_NOT_IN_INTEGER_POLYNOMIAL_VIEW");
+            throw unsupported(
+                "DIVISION_NOT_IN_INTEGER_POLYNOMIAL_VIEW");
         }
         if (expression instanceof NumberExpr number) {
-            term.multiply(exactInteger(number.value()));
+            term.multiply(exactInteger(number, parsed));
             return;
         }
         if (expression instanceof BinaryExpr binary
                 && binary.operator() == BinaryOperator.POW) {
-            int exponent = exactExponent(binary.right());
+            int exponent = exactExponent(binary.right(), parsed);
             if (binary.left() instanceof NumberExpr number) {
-                term.multiply(exactInteger(number.value()).pow(exponent));
+                BigInteger base = exactInteger(number, parsed);
+                if (base.signum() == 0 && exponent == 0) {
+                    throw unsupported("ZERO_TO_ZERO_POWER_UNSUPPORTED");
+                }
+                term.multiply(base.pow(exponent));
                 return;
             }
-            if (exponent > budget.maxDegree()) {
-                throw new BudgetExceeded("MAX_DEGREE_EXCEEDED");
-            }
             if (exponent > 0) {
-                term.addAtom(binary.left(), exponent);
+                term.addAtom(binary.left(), exponent, parsed);
             }
             return;
         }
-        term.addAtom(expression, 1);
+        term.addAtom(expression, 1, parsed);
     }
 
-    private int exactExponent(Expr expression) {
+    private int exactExponent(
+        Expr expression,
+        ExactParsedTerm parsed
+    ) {
         if (!(expression instanceof NumberExpr number)) {
-            throw unsupported("POWER_EXPONENT_MUST_BE_NONNEGATIVE_INTEGER");
+            throw unsupported(
+                "POWER_EXPONENT_MUST_BE_NONNEGATIVE_INTEGER");
         }
-        BigInteger integer = exactInteger(number.value());
-        if (integer.signum() < 0
-                || integer.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) > 0) {
-            throw unsupported("POWER_EXPONENT_OUTSIDE_SUPPORTED_RANGE");
+        BigInteger integer = exactInteger(number, parsed);
+        if (integer.signum() < 0) {
+            throw unsupported(
+                "POWER_EXPONENT_MUST_BE_NONNEGATIVE_INTEGER");
+        }
+        if (integer.compareTo(
+                BigInteger.valueOf(budget.maxDegree())) > 0) {
+            throw new BudgetExceeded("MAX_DEGREE_EXCEEDED");
         }
         return integer.intValueExact();
     }
 
-    private static BigInteger exactInteger(double value) {
-        if (!Double.isFinite(value) || value != Math.rint(value)) {
-            throw unsupported("COEFFICIENT_MUST_BE_EXACT_INTEGER");
-        }
-        try {
-            return BigDecimal.valueOf(value).toBigIntegerExact();
-        } catch (ArithmeticException exception) {
-            throw unsupported("COEFFICIENT_OUTSIDE_EXACT_INTEGER_RANGE");
-        }
+    private static BigInteger exactInteger(
+        NumberExpr number,
+        ExactParsedTerm parsed
+    ) {
+        return parsed.literalFor(number)
+            .map(ExactParsedTerm.LiteralOccurrence::exactValue)
+            .map(PolynomialSemanticView::requireInteger)
+            .orElseGet(() -> {
+                if (number.value() == 0.0d) {
+                    return BigInteger.ZERO;
+                }
+                throw unsupported(
+                    "NUMERIC_NODE_LACKS_EXACT_SOURCE_EVIDENCE");
+            });
     }
 
-    private static String atomKey(Expr expression) {
-        return ExpressionFormatter.format(expression);
+    private static BigInteger requireInteger(ExactRational value) {
+        if (!value.isInteger()) {
+            throw unsupported(
+                "COEFFICIENT_MUST_BE_EXACT_INTEGER");
+        }
+        return value.numerator();
     }
 
-    private static UnsupportedExpression unsupported(String detailCode) {
+    private static RawAtom atom(
+        Expr expression,
+        int exponent,
+        ExactParsedTerm parsed
+    ) {
+        String display = ExactExpressionFormatter.format(
+            expression,
+            parsed);
+        return new RawAtom(
+            expression,
+            exponent,
+            STRUCTURAL_ATOM_PREFIX + display,
+            display);
+    }
+
+    private static UnsupportedExpression unsupported(
+        String detailCode
+    ) {
         return new UnsupportedExpression(detailCode);
     }
 
@@ -243,11 +333,17 @@ public final class PolynomialSemanticView {
         int maxTerms,
         int maxVisitedNodes
     ) {
-        public static final Budget DEFAULT = new Budget(4, 12, 64, 512);
+        public static final Budget DEFAULT = new Budget(
+            4,
+            12,
+            64,
+            512);
 
         public Budget {
-            if (maxAtoms < 1 || maxDegree < 0
-                    || maxTerms < 1 || maxVisitedNodes < 1) {
+            if (maxAtoms < 1
+                    || maxDegree < 0
+                    || maxTerms < 1
+                    || maxVisitedNodes < 1) {
                 throw new IllegalArgumentException(
                     "polynomial semantic-view budget is invalid");
             }
@@ -257,7 +353,7 @@ public final class PolynomialSemanticView {
     public record Analysis(
         Status status,
         String detailCode,
-        Polynomial polynomial
+        PolynomialView view
     ) {
         public Analysis {
             Objects.requireNonNull(status, "status");
@@ -265,17 +361,20 @@ public final class PolynomialSemanticView {
                 throw new IllegalArgumentException(
                     "detailCode must not be blank");
             }
-            if (status == Status.SUPPORTED && polynomial == null) {
+            if (status == Status.SUPPORTED && view == null) {
                 throw new IllegalArgumentException(
-                    "supported analysis requires a polynomial");
+                    "supported analysis requires a polynomial view");
             }
-            if (status != Status.SUPPORTED && polynomial != null) {
+            if (status != Status.SUPPORTED && view != null) {
                 throw new IllegalArgumentException(
-                    "failed analysis must not expose a polynomial");
+                    "failed analysis must not expose a polynomial view");
             }
         }
 
-        static Analysis failure(Status status, String detailCode) {
+        static Analysis failure(
+            Status status,
+            String detailCode
+        ) {
             return new Analysis(status, detailCode, null);
         }
 
@@ -284,162 +383,92 @@ public final class PolynomialSemanticView {
         }
     }
 
-    public record Atom(
+    public record StructuralAtom(
         String key,
         String display,
         Expr expression
     ) {
-        public Atom {
-            if (key == null || key.isBlank()
-                    || display == null || display.isBlank()
+        public StructuralAtom {
+            if (key == null
+                    || key.isBlank()
+                    || display == null
+                    || display.isBlank()
                     || expression == null) {
                 throw new IllegalArgumentException(
-                    "polynomial atom is invalid");
+                    "polynomial structural atom is invalid");
             }
+        }
+
+        public boolean structuralUnit() {
+            return STRUCTURAL_UNIT_ID.equals(key);
         }
     }
 
-    public record Monomial(List<Integer> exponents)
-            implements Comparable<Monomial> {
-        public Monomial {
-            exponents = List.copyOf(exponents);
-            if (exponents.stream().anyMatch(value -> value == null || value < 0)) {
-                throw new IllegalArgumentException(
-                    "monomial exponents must be nonnegative");
-            }
-        }
-
-        public int totalDegree() {
-            return exponents.stream().mapToInt(Integer::intValue).sum();
-        }
-
-        @Override
-        public int compareTo(Monomial other) {
-            int degreeComparison = Integer.compare(
-                other.totalDegree(),
-                totalDegree());
-            if (degreeComparison != 0) {
-                return degreeComparison;
-            }
-            int length = Math.max(exponents.size(), other.exponents.size());
-            for (int index = 0; index < length; index++) {
-                int left = index < exponents.size() ? exponents.get(index) : 0;
-                int right = index < other.exponents.size()
-                    ? other.exponents.get(index)
-                    : 0;
-                int comparison = Integer.compare(right, left);
-                if (comparison != 0) {
-                    return comparison;
-                }
-            }
-            return Integer.compare(exponents.size(), other.exponents.size());
-        }
-
-        public String canonicalMaterial() {
-            return exponents.stream()
-                .map(String::valueOf)
-                .collect(java.util.stream.Collectors.joining(","));
-        }
-    }
-
-    public record Polynomial(
+    public record PolynomialView(
         String viewId,
-        List<Atom> atoms,
-        Map<Monomial, BigInteger> coefficients,
-        int degree,
-        boolean homogeneous,
-        int visitedNodes
+        SparsePolynomial<BigInteger> polynomial,
+        List<StructuralAtom> atoms,
+        int visitedNodes,
+        String source
     ) {
-        public Polynomial {
+        public PolynomialView {
             if (!VIEW_ID.equals(viewId)
-                    || degree < 0
-                    || visitedNodes < 0) {
+                    || polynomial == null
+                    || visitedNodes < 0
+                    || source == null) {
                 throw new IllegalArgumentException(
                     "polynomial semantic view is invalid");
             }
-            atoms = List.copyOf(atoms);
-            int atomCount = atoms.size();
-            TreeMap<Monomial, BigInteger> sorted = new TreeMap<>();
-            coefficients.forEach((monomial, coefficient) -> {
-                if (coefficient.signum() != 0) {
-                    sorted.put(monomial, coefficient);
+            atoms = List.copyOf(
+                Objects.requireNonNull(atoms, "atoms"));
+            if (atoms.size() != polynomial.ring().variableCount()) {
+                throw new IllegalArgumentException(
+                    "atom count must equal polynomial ring variable count");
+            }
+            for (int index = 0; index < atoms.size(); index++) {
+                if (!atoms.get(index).key().equals(
+                        polynomial.ring().variables().get(index).id())) {
+                    throw new IllegalArgumentException(
+                        "atom order must match polynomial ring variables");
                 }
-            });
-            coefficients = Collections.unmodifiableMap(sorted);
-            if (coefficients.keySet().stream().anyMatch(monomial ->
-                    monomial.exponents().size() != atomCount)) {
-                throw new IllegalArgumentException(
-                    "monomial arity must equal atom count");
             }
         }
 
-        public BigInteger coefficient(int... exponents) {
-            List<Integer> values = java.util.Arrays.stream(exponents)
-                .boxed()
-                .toList();
-            if (values.size() != atoms.size()) {
-                throw new IllegalArgumentException(
-                    "coefficient query arity must equal atom count");
-            }
-            return coefficients.getOrDefault(
-                new Monomial(values),
-                BigInteger.ZERO);
-        }
-
-        /**
-         * Homogenizes a one-atom polynomial by introducing the structural unit
-         * atom. A term {@code A^k} becomes {@code A^k * 1^(n-k)}. This is a
-         * general projective transformation, not a stored identity.
-         */
-        public Polynomial homogenizeWithUnitAtom(int totalDegree) {
-            if (atoms.size() != 1 || totalDegree < degree) {
+        public PolynomialView homogenizeWithUnitAtom(
+            int totalDegree
+        ) {
+            if (atoms.size() != 1
+                    || totalDegree < polynomial.totalDegree()) {
                 throw new IllegalArgumentException(
                     "unit homogenization requires one atom and sufficient degree");
             }
-            Atom unit = new Atom(
-                "structural-unit:1",
+            StructuralAtom unit = new StructuralAtom(
+                STRUCTURAL_UNIT_ID,
                 "1",
                 new NumberExpr(1));
-            TreeMap<Monomial, BigInteger> homogenized = new TreeMap<>();
-            coefficients.forEach((monomial, coefficient) -> {
-                int atomDegree = monomial.exponents().getFirst();
-                homogenized.put(
-                    new Monomial(List.of(
-                        atomDegree,
-                        totalDegree - atomDegree)),
-                    coefficient);
-            });
-            return new Polynomial(
+            return new PolynomialView(
                 viewId,
+                polynomial.homogenize(
+                    totalDegree,
+                    new PolynomialVariable(STRUCTURAL_UNIT_ID)),
                 List.of(atoms.getFirst(), unit),
-                homogenized,
-                totalDegree,
-                true,
-                visitedNodes);
+                visitedNodes,
+                source);
         }
 
-        public boolean isHomogeneousOfDegree(int expectedDegree) {
-            return homogeneous && degree == expectedDegree;
+        public StructuralAtom atom(int index) {
+            return atoms.get(index);
         }
 
         public String canonicalMaterial() {
-            StringBuilder result = new StringBuilder(viewId);
-            atoms.forEach(atom -> append(result, atom.display()));
-            coefficients.forEach((monomial, coefficient) -> {
-                append(result, monomial.canonicalMaterial());
-                append(result, coefficient.toString());
-            });
-            return result.toString();
-        }
-
-        private static void append(StringBuilder target, String value) {
-            target.append('|').append(value.length()).append(':').append(value);
+            return polynomial.canonicalMaterial();
         }
     }
 
     private static final class MutableTerm {
         private BigInteger coefficient;
-        private final Map<String, MutableAtom> atoms = new LinkedHashMap<>();
+        private final Map<String, MutableAtom> atoms =
+            new LinkedHashMap<>();
 
         private MutableTerm(BigInteger coefficient) {
             this.coefficient = coefficient;
@@ -449,13 +478,24 @@ public final class PolynomialSemanticView {
             coefficient = coefficient.multiply(value);
         }
 
-        private void addAtom(Expr expression, int exponent) {
-            String key = atomKey(expression);
-            atoms.compute(key, (ignored, current) -> current == null
-                ? new MutableAtom(expression, exponent)
-                : new MutableAtom(
-                    current.expression(),
-                    Math.addExact(current.exponent(), exponent)));
+        private void addAtom(
+            Expr expression,
+            int exponent,
+            ExactParsedTerm parsed
+        ) {
+            RawAtom next = atom(expression, exponent, parsed);
+            atoms.compute(next.key(), (ignored, current) ->
+                current == null
+                    ? new MutableAtom(
+                        next.expression(),
+                        next.exponent(),
+                        next.display())
+                    : new MutableAtom(
+                        current.expression(),
+                        Math.addExact(
+                            current.exponent(),
+                            exponent),
+                        current.display()));
         }
 
         private RawTerm freeze() {
@@ -466,17 +506,28 @@ public final class PolynomialSemanticView {
                     entry.getKey(),
                     new RawAtom(
                         entry.getValue().expression(),
-                        entry.getValue().exponent())));
+                        entry.getValue().exponent(),
+                        entry.getKey(),
+                        entry.getValue().display())));
             return new RawTerm(
                 coefficient,
                 Collections.unmodifiableMap(frozen));
         }
     }
 
-    private record MutableAtom(Expr expression, int exponent) {
+    private record MutableAtom(
+        Expr expression,
+        int exponent,
+        String display
+    ) {
     }
 
-    private record RawAtom(Expr expression, int exponent) {
+    private record RawAtom(
+        Expr expression,
+        int exponent,
+        String key,
+        String display
+    ) {
     }
 
     private record RawTerm(
@@ -491,7 +542,8 @@ public final class PolynomialSemanticView {
         private void visit(Budget budget) {
             visitedNodes++;
             if (visitedNodes > budget.maxVisitedNodes()) {
-                throw new BudgetExceeded("MAX_VISITED_NODES_EXCEEDED");
+                throw new BudgetExceeded(
+                    "MAX_VISITED_NODES_EXCEEDED");
             }
         }
 
