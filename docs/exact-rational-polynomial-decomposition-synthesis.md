@@ -18,7 +18,7 @@ source expression
   -> typed integer quartic decomposition
   -> exact coefficient reassembly
   -> rendered candidate
-  -> independent exact parse and polynomial replay
+  -> separate exact parse-and-view replay
 ```
 
 The operator is deliberately experimental and is not registered in a default
@@ -64,8 +64,8 @@ For every integer candidate with quadratic coefficient triples
 [d,e,f]
 ```
 
-the rational layer independently reconstructs the primitive ascending
-coefficient vector
+the rational layer reconstructs the primitive ascending coefficient vector
+through a separate coefficient calculation:
 
 ```text
 [c*f,
@@ -89,7 +89,9 @@ Only after both checks does the operator render a candidate such as
 The rendered candidate is parsed again through `parseExactTerm`, analyzed by
 the exact rational polynomial view, and compared with the original source
 polynomial. This second route verifies the actual user-visible expression rather
-than only trusting the internal coefficient objects.
+than only trusting the internal coefficient objects. It is a separate replay
+route through existing exact components, not a claim of implementation-diverse
+formal verification.
 
 ## Exact source provenance
 
@@ -116,6 +118,10 @@ combined certificates. The certificate binds:
 - both integer factor coefficient triples;
 - the rendered candidate;
 - the original exact rational coefficient vector.
+
+The combined hash is currently an operator-owned content address, not a newly
+published serialized Evidence schema. The source literal evidence and content
+normalization evidence retain their own existing replay contracts.
 
 ## Sign handling
 
@@ -191,8 +197,8 @@ fail-closed parse/domain/quartic/factorization cases.
 ## Claim boundary
 
 This contract establishes bounded exact rational decomposition for a declared
-univariate quartic fragment and verifies its emitted expressions through two
-independent reconstruction routes. It does not establish complete rational
-factorization, multivariate factorization, algebraic factors, default-search
-utility, external mathematical novelty or superiority over computer-algebra
-systems.
+univariate quartic fragment and checks emitted expressions through direct
+coefficient reconstruction plus a separate exact parse-and-view replay. It does
+not establish complete rational factorization, multivariate factorization,
+algebraic factors, implementation-diverse proof, default-search utility,
+external mathematical novelty or superiority over computer-algebra systems.
