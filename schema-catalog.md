@@ -30,9 +30,12 @@ fachlich gruppierten Einstieg; der vollständige Bestand liegt unter
 | Vertrag | Zweck |
 | --- | --- |
 | [`regelsuche-exact-rational-scalar-v1`](schemas/regelsuche-exact-rational-scalar-v1.schema.json) | Strikte Parse-Evidence für den versionierten exakten Rationalzahlbereich; semantische GCD- und Hashprüfung erfolgt durch den unabhängigen Replay-Verifier |
+| [`regelsuche-exact-rational-polynomial-content-v1`](schemas/regelsuche-exact-rational-polynomial-content-v1.schema.json) | Exakte Nennerbereinigung und primitive ganzzahlige Inhaltszerlegung rationaler Polynome mit vollständigem Budget-, Arbeits- und Replay-Vertrag |
 
-Die fachliche Grenze, kanonische Hashbildung und JSON-Reproduktion sind unter
-[Exact rational scalar domain v1](exact-rational-scalar-domain.md) dokumentiert.
+Die fachlichen Grenzen, kanonische Hashbildung und JSON-Reproduktion sind unter
+[Exact rational scalar domain v1](exact-rational-scalar-domain.md) und
+[Exact rational polynomial content v1](exact-rational-polynomial-content.md)
+dokumentiert.
 
 ## Discovery-Domänen und Lifecycle
 

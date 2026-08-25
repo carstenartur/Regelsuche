@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactRationalPolynomialContentEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.scalar</a> &gt; <span class="el_source">ExactRationalPolynomialContentEvidence.java</span></div><h1>ExactRationalPolynomialContentEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.scalar;
+
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/** Issuer-owned result of exact rational polynomial content normalization. */
+public final class ExactRationalPolynomialContentEvidence {
+    private final String domainId;
+    private final ExactRationalPolynomialContentNormalizer.Status status;
+    private final String detailCode;
+    private final List&lt;String&gt; sourceCoefficients;
+    private final ExactRationalPolynomialContentNormalizer.Budget budget;
+    private final Optional&lt;Normalization&gt; normalization;
+    private final WorkLedger work;
+    private final String certificateHash;
+
+    ExactRationalPolynomialContentEvidence(
+        String domainId,
+        ExactRationalPolynomialContentNormalizer.Status status,
+        String detailCode,
+        List&lt;String&gt; sourceCoefficients,
+        ExactRationalPolynomialContentNormalizer.Budget budget,
+        Optional&lt;Normalization&gt; normalization,
+        WorkLedger work,
+        String certificateHash
+<span class="fc" id="L28">    ) {</span>
+<span class="fc" id="L29">        this.domainId = Objects.requireNonNull(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L30">        this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L31">        this.detailCode = requireText(detailCode, &quot;detailCode&quot;);</span>
+<span class="fc" id="L32">        this.sourceCoefficients = List.copyOf(</span>
+<span class="fc" id="L33">            Objects.requireNonNull(</span>
+                sourceCoefficients,
+                &quot;sourceCoefficients&quot;));
+<span class="fc" id="L36">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L37">        this.normalization = Objects.requireNonNull(</span>
+            normalization,
+            &quot;normalization&quot;);
+<span class="fc" id="L40">        this.work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L41">        this.certificateHash = requireHash(</span>
+            certificateHash,
+            &quot;certificateHash&quot;);
+<span class="fc" id="L44">        validate();</span>
+<span class="fc" id="L45">    }</span>
+
+    static ExactRationalPolynomialContentEvidence normalized(
+        List&lt;String&gt; sourceCoefficients,
+        ExactRationalPolynomialContentNormalizer.Budget budget,
+        Normalization normalization,
+        WorkLedger work,
+        String certificateHash
+    ) {
+<span class="fc" id="L54">        return new ExactRationalPolynomialContentEvidence(</span>
+            ExactRationalPolynomialContentNormalizer.DOMAIN_ID,
+            ExactRationalPolynomialContentNormalizer.Status.NORMALIZED,
+            &quot;RATIONAL_CONTENT_NORMALIZED_EXACTLY&quot;,
+            sourceCoefficients,
+            budget,
+<span class="fc" id="L60">            Optional.of(normalization),</span>
+            work,
+            certificateHash);
+    }
+
+    static ExactRationalPolynomialContentEvidence failure(
+        ExactRationalPolynomialContentNormalizer.Status status,
+        String detailCode,
+        List&lt;String&gt; sourceCoefficients,
+        ExactRationalPolynomialContentNormalizer.Budget budget,
+        WorkLedger work,
+        String certificateHash
+    ) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (status</span>
+                == ExactRationalPolynomialContentNormalizer.Status.NORMALIZED) {
+<span class="nc" id="L75">            throw new IllegalArgumentException(</span>
+                &quot;failure evidence cannot use NORMALIZED status&quot;);
+        }
+<span class="fc" id="L78">        return new ExactRationalPolynomialContentEvidence(</span>
+            ExactRationalPolynomialContentNormalizer.DOMAIN_ID,
+            status,
+            detailCode,
+            sourceCoefficients,
+            budget,
+<span class="fc" id="L84">            Optional.empty(),</span>
+            work,
+            certificateHash);
+    }
+
+    private void validate() {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (!ExactRationalPolynomialContentNormalizer.DOMAIN_ID.equals(</span>
+                domainId)) {
+<span class="nc" id="L92">            throw new IllegalArgumentException(</span>
+                &quot;unexpected rational polynomial content domain id&quot;);
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (sourceCoefficients.isEmpty()) {</span>
+<span class="nc" id="L96">            throw new IllegalArgumentException(</span>
+                &quot;content evidence requires source coefficients&quot;);
+        }
+<span class="fc" id="L99">        sourceCoefficients.forEach(value -&gt; requireText(</span>
+            value,
+            &quot;source coefficient&quot;));
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (status</span>
+                == ExactRationalPolynomialContentNormalizer.Status.NORMALIZED) {
+<span class="fc" id="L104">            normalization.orElseThrow(() -&gt;</span>
+<span class="nc" id="L105">                new IllegalArgumentException(</span>
+                    &quot;normalized evidence lacks normalization data&quot;));
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        } else if (normalization.isPresent()) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(</span>
+                &quot;failed normalization must not expose a result&quot;);
+        }
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (work.totalSteps() &gt; budget.maxArithmeticSteps()) {</span>
+<span class="nc" id="L112">            throw new IllegalArgumentException(</span>
+                &quot;content evidence exceeds its arithmetic budget&quot;);
+        }
+<span class="fc" id="L115">    }</span>
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L118" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L119">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L121">        return value;</span>
+    }
+
+    private static String requireHash(String value, String name) {
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L126">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L128">        return value;</span>
+    }
+
+    public ExactRationalPolynomialContentVerifier.SerializedEvidence
+            serialized() {
+<span class="fc" id="L133">        return new ExactRationalPolynomialContentVerifier.SerializedEvidence(</span>
+            domainId,
+            status,
+            detailCode,
+            sourceCoefficients,
+            budget,
+<span class="fc" id="L139">            normalization.map(Normalization::serialized),</span>
+            work,
+            certificateHash);
+    }
+
+    public ExactRationalPolynomialContentVerifier.Verification verify() {
+<span class="fc" id="L145">        return new ExactRationalPolynomialContentVerifier()</span>
+<span class="fc" id="L146">            .verify(serialized());</span>
+    }
+
+    public String domainId() {
+<span class="nc" id="L150">        return domainId;</span>
+    }
+
+    public ExactRationalPolynomialContentNormalizer.Status status() {
+<span class="fc" id="L154">        return status;</span>
+    }
+
+    public String detailCode() {
+<span class="nc" id="L158">        return detailCode;</span>
+    }
+
+    public List&lt;String&gt; sourceCoefficients() {
+<span class="nc" id="L162">        return sourceCoefficients;</span>
+    }
+
+    public ExactRationalPolynomialContentNormalizer.Budget budget() {
+<span class="fc" id="L166">        return budget;</span>
+    }
+
+    public Optional&lt;Normalization&gt; normalization() {
+<span class="fc" id="L170">        return normalization;</span>
+    }
+
+    public WorkLedger work() {
+<span class="fc" id="L174">        return work;</span>
+    }
+
+    public String certificateHash() {
+<span class="fc" id="L178">        return certificateHash;</span>
+    }
+
+    public boolean normalized() {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        return status</span>
+            == ExactRationalPolynomialContentNormalizer.Status.NORMALIZED;
+    }
+
+    public record Normalization(
+        BigInteger denominatorClearingFactor,
+        List&lt;BigInteger&gt; integralCoefficientsAscending,
+        BigInteger integerContent,
+        List&lt;BigInteger&gt; primitiveCoefficientsAscending,
+        ExactRational scalar
+    ) {
+<span class="fc" id="L193">        public Normalization {</span>
+<span class="fc" id="L194">            Objects.requireNonNull(</span>
+                denominatorClearingFactor,
+                &quot;denominatorClearingFactor&quot;);
+<span class="fc" id="L197">            integralCoefficientsAscending = List.copyOf(</span>
+<span class="fc" id="L198">                Objects.requireNonNull(</span>
+                    integralCoefficientsAscending,
+                    &quot;integralCoefficientsAscending&quot;));
+<span class="fc" id="L201">            Objects.requireNonNull(integerContent, &quot;integerContent&quot;);</span>
+<span class="fc" id="L202">            primitiveCoefficientsAscending = List.copyOf(</span>
+<span class="fc" id="L203">                Objects.requireNonNull(</span>
+                    primitiveCoefficientsAscending,
+                    &quot;primitiveCoefficientsAscending&quot;));
+<span class="fc" id="L206">            Objects.requireNonNull(scalar, &quot;scalar&quot;);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            if (denominatorClearingFactor.signum() &lt;= 0</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                    || integerContent.signum() &lt;= 0</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                    || integralCoefficientsAscending.isEmpty()</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                    || primitiveCoefficientsAscending.isEmpty()</span>
+<span class="fc" id="L211">                    || integralCoefficientsAscending.size()</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                        != primitiveCoefficientsAscending.size()</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                    || primitiveCoefficientsAscending.getLast().signum() &lt;= 0</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                    || scalar.isZero()) {</span>
+<span class="nc" id="L215">                throw new IllegalArgumentException(</span>
+                    &quot;rational polynomial normalization shape is invalid&quot;);
+            }
+<span class="fc" id="L218">            integralCoefficientsAscending.forEach(value -&gt;</span>
+<span class="fc" id="L219">                Objects.requireNonNull(value, &quot;integral coefficient&quot;));</span>
+<span class="fc" id="L220">            primitiveCoefficientsAscending.forEach(value -&gt;</span>
+<span class="fc" id="L221">                Objects.requireNonNull(value, &quot;primitive coefficient&quot;));</span>
+<span class="fc" id="L222">        }</span>
+
+        ExactRationalPolynomialContentVerifier.SerializedNormalization
+                serialized() {
+<span class="fc" id="L226">            return new ExactRationalPolynomialContentVerifier</span>
+                .SerializedNormalization(
+<span class="fc" id="L228">                    denominatorClearingFactor.toString(),</span>
+<span class="fc" id="L229">                    integralCoefficientsAscending.stream()</span>
+<span class="fc" id="L230">                        .map(BigInteger::toString)</span>
+<span class="fc" id="L231">                        .toList(),</span>
+<span class="fc" id="L232">                    integerContent.toString(),</span>
+<span class="fc" id="L233">                    primitiveCoefficientsAscending.stream()</span>
+<span class="fc" id="L234">                        .map(BigInteger::toString)</span>
+<span class="fc" id="L235">                        .toList(),</span>
+<span class="fc" id="L236">                    scalar.canonicalText());</span>
+        }
+    }
+
+    public record WorkLedger(
+        int coefficientsVisited,
+        int gcdOperations,
+        int lcmOperations,
+        int multiplications,
+        int divisions,
+        int signAdjustments,
+        int reconstructionChecks,
+        int totalSteps
+    ) {
+<span class="fc" id="L250">        public WorkLedger {</span>
+<span class="pc bpc" id="L251" title="8 of 18 branches missed.">            if (coefficientsVisited &lt; 0</span>
+                    || gcdOperations &lt; 0
+                    || lcmOperations &lt; 0
+                    || multiplications &lt; 0
+                    || divisions &lt; 0
+                    || signAdjustments &lt; 0
+                    || reconstructionChecks &lt; 0
+                    || totalSteps &lt; 0
+                    || totalSteps != coefficientsVisited
+                        + gcdOperations
+                        + lcmOperations
+                        + multiplications
+                        + divisions
+                        + signAdjustments
+                        + reconstructionChecks) {
+<span class="fc" id="L266">                throw new IllegalArgumentException(</span>
+                    &quot;rational polynomial work ledger is inconsistent&quot;);
+            }
+<span class="fc" id="L269">        }</span>
+
+        public static WorkLedger zero() {
+<span class="nc" id="L272">            return new WorkLedger(0, 0, 0, 0, 0, 0, 0, 0);</span>
+        }
+
+        String canonicalMaterial() {
+<span class="fc" id="L276">            return coefficientsVisited + &quot;:&quot;</span>
+                + gcdOperations + &quot;:&quot;
+                + lcmOperations + &quot;:&quot;
+                + multiplications + &quot;:&quot;
+                + divisions + &quot;:&quot;
+                + signAdjustments + &quot;:&quot;
+                + reconstructionChecks + &quot;:&quot;
+                + totalSteps;
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

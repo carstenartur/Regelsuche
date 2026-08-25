@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactRationalPolynomialContentJsonCodec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.scalar</a> &gt; <span class="el_source">ExactRationalPolynomialContentJsonCodec.java</span></div><h1>ExactRationalPolynomialContentJsonCodec.java</h1><pre class="source lang-java linenums">package de.regelsuche.scalar;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/** Strict JSON codec for rational-polynomial content evidence v1. */
+public final class ExactRationalPolynomialContentJsonCodec {
+    /**
+     * Covers all 65 source coefficients plus two 65-entry vectors at the v1
+     * 262,144-bit intermediate ceiling, with bounded structural headroom.
+     */
+    public static final int MAX_JSON_CHARACTERS = 16_000_000;
+
+<span class="fc" id="L27">    private static final Set&lt;String&gt; ROOT_FIELDS = Set.of(</span>
+        &quot;domainId&quot;,
+        &quot;status&quot;,
+        &quot;detailCode&quot;,
+        &quot;sourceCoefficients&quot;,
+        &quot;budget&quot;,
+        &quot;normalization&quot;,
+        &quot;work&quot;,
+        &quot;certificateHash&quot;);
+<span class="fc" id="L36">    private static final Set&lt;String&gt; BUDGET_FIELDS = Set.of(</span>
+        &quot;maxDegree&quot;,
+        &quot;maxCoefficientBits&quot;,
+        &quot;maxIntermediateBits&quot;,
+        &quot;maxArithmeticSteps&quot;);
+<span class="fc" id="L41">    private static final Set&lt;String&gt; NORMALIZATION_FIELDS = Set.of(</span>
+        &quot;denominatorClearingFactor&quot;,
+        &quot;integralCoefficientsAscending&quot;,
+        &quot;integerContent&quot;,
+        &quot;primitiveCoefficientsAscending&quot;,
+        &quot;scalar&quot;);
+<span class="fc" id="L47">    private static final Set&lt;String&gt; WORK_FIELDS = Set.of(</span>
+        &quot;coefficientsVisited&quot;,
+        &quot;gcdOperations&quot;,
+        &quot;lcmOperations&quot;,
+        &quot;multiplications&quot;,
+        &quot;divisions&quot;,
+        &quot;signAdjustments&quot;,
+        &quot;reconstructionChecks&quot;,
+        &quot;totalSteps&quot;);
+<span class="fc" id="L56">    private static final ObjectMapper MAPPER = new ObjectMapper(</span>
+<span class="fc" id="L57">        JsonFactory.builder()</span>
+<span class="fc" id="L58">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L59">            .build());</span>
+
+    private final ExactRationalPolynomialContentVerifier verifier;
+
+    public ExactRationalPolynomialContentJsonCodec() {
+<span class="fc" id="L64">        this(new ExactRationalPolynomialContentVerifier());</span>
+<span class="fc" id="L65">    }</span>
+
+    ExactRationalPolynomialContentJsonCodec(
+        ExactRationalPolynomialContentVerifier verifier
+<span class="fc" id="L69">    ) {</span>
+<span class="fc" id="L70">        this.verifier = Objects.requireNonNull(verifier, &quot;verifier&quot;);</span>
+<span class="fc" id="L71">    }</span>
+
+    public String write(
+        ExactRationalPolynomialContentEvidence evidence
+    ) {
+<span class="fc" id="L76">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L77">        ExactRationalPolynomialContentVerifier.SerializedEvidence value =</span>
+<span class="fc" id="L78">            evidence.serialized();</span>
+<span class="fc" id="L79">        JsonWriter writer = new JsonWriter()</span>
+<span class="fc" id="L80">            .beginObject()</span>
+<span class="fc" id="L81">            .property(&quot;domainId&quot;, value.domainId())</span>
+<span class="fc" id="L82">            .property(&quot;status&quot;, value.status().name())</span>
+<span class="fc" id="L83">            .property(&quot;detailCode&quot;, value.detailCode())</span>
+<span class="fc" id="L84">            .stringArray(</span>
+                &quot;sourceCoefficients&quot;,
+<span class="fc" id="L86">                value.sourceCoefficients())</span>
+<span class="fc" id="L87">            .object(&quot;budget&quot;, nested -&gt; nested</span>
+<span class="fc" id="L88">                .property(</span>
+                    &quot;maxDegree&quot;,
+<span class="fc" id="L90">                    value.budget().maxDegree())</span>
+<span class="fc" id="L91">                .property(</span>
+                    &quot;maxCoefficientBits&quot;,
+<span class="fc" id="L93">                    value.budget().maxCoefficientBits())</span>
+<span class="fc" id="L94">                .property(</span>
+                    &quot;maxIntermediateBits&quot;,
+<span class="fc" id="L96">                    value.budget().maxIntermediateBits())</span>
+<span class="fc" id="L97">                .property(</span>
+                    &quot;maxArithmeticSteps&quot;,
+<span class="fc" id="L99">                    value.budget().maxArithmeticSteps()));</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (value.normalization().isPresent()) {</span>
+<span class="fc" id="L101">            var result = value.normalization().orElseThrow();</span>
+<span class="fc" id="L102">            writer.object(&quot;normalization&quot;, nested -&gt; nested</span>
+<span class="fc" id="L103">                .property(</span>
+                    &quot;denominatorClearingFactor&quot;,
+<span class="fc" id="L105">                    result.denominatorClearingFactor())</span>
+<span class="fc" id="L106">                .stringArray(</span>
+                    &quot;integralCoefficientsAscending&quot;,
+<span class="fc" id="L108">                    result.integralCoefficientsAscending())</span>
+<span class="fc" id="L109">                .property(</span>
+                    &quot;integerContent&quot;,
+<span class="fc" id="L111">                    result.integerContent())</span>
+<span class="fc" id="L112">                .stringArray(</span>
+                    &quot;primitiveCoefficientsAscending&quot;,
+<span class="fc" id="L114">                    result.primitiveCoefficientsAscending())</span>
+<span class="fc" id="L115">                .property(&quot;scalar&quot;, result.scalar()));</span>
+<span class="fc" id="L116">        } else {</span>
+<span class="fc" id="L117">            writer.nullProperty(&quot;normalization&quot;);</span>
+        }
+<span class="fc" id="L119">        String json = writer</span>
+<span class="fc" id="L120">            .object(&quot;work&quot;, nested -&gt; writeWork(nested, value.work()))</span>
+<span class="fc" id="L121">            .property(&quot;certificateHash&quot;, value.certificateHash())</span>
+<span class="fc" id="L122">            .endObject()</span>
+<span class="fc" id="L123">            .toString();</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (json.length() &gt; MAX_JSON_CHARACTERS) {</span>
+<span class="nc" id="L125">            throw new IllegalStateException(</span>
+                &quot;issued content evidence exceeds the v1 JSON size envelope&quot;);
+        }
+<span class="fc" id="L128">        return json;</span>
+    }
+
+    public DecodedEvidence readAndVerify(String json) {
+<span class="fc" id="L132">        JsonNode root = parseObject(json);</span>
+<span class="fc" id="L133">        requireExactFields(root, ROOT_FIELDS, &quot;evidence&quot;);</span>
+<span class="fc" id="L134">        JsonNode budgetNode = requiredObject(root, &quot;budget&quot;);</span>
+<span class="fc" id="L135">        JsonNode workNode = requiredObject(root, &quot;work&quot;);</span>
+<span class="fc" id="L136">        requireExactFields(budgetNode, BUDGET_FIELDS, &quot;budget&quot;);</span>
+<span class="fc" id="L137">        requireExactFields(workNode, WORK_FIELDS, &quot;work&quot;);</span>
+
+<span class="fc" id="L139">        var budget = new ExactRationalPolynomialContentNormalizer.Budget(</span>
+<span class="fc" id="L140">            integer(budgetNode, &quot;maxDegree&quot;),</span>
+<span class="fc" id="L141">            integer(budgetNode, &quot;maxCoefficientBits&quot;),</span>
+<span class="fc" id="L142">            integer(budgetNode, &quot;maxIntermediateBits&quot;),</span>
+<span class="fc" id="L143">            integer(budgetNode, &quot;maxArithmeticSteps&quot;));</span>
+<span class="fc" id="L144">        var work = new ExactRationalPolynomialContentEvidence.WorkLedger(</span>
+<span class="fc" id="L145">            integer(workNode, &quot;coefficientsVisited&quot;),</span>
+<span class="fc" id="L146">            integer(workNode, &quot;gcdOperations&quot;),</span>
+<span class="fc" id="L147">            integer(workNode, &quot;lcmOperations&quot;),</span>
+<span class="fc" id="L148">            integer(workNode, &quot;multiplications&quot;),</span>
+<span class="fc" id="L149">            integer(workNode, &quot;divisions&quot;),</span>
+<span class="fc" id="L150">            integer(workNode, &quot;signAdjustments&quot;),</span>
+<span class="fc" id="L151">            integer(workNode, &quot;reconstructionChecks&quot;),</span>
+<span class="fc" id="L152">            integer(workNode, &quot;totalSteps&quot;));</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (work.totalSteps() &gt; budget.maxArithmeticSteps()) {</span>
+<span class="nc" id="L154">            throw new IllegalArgumentException(</span>
+                &quot;content work exceeds its declared budget&quot;);
+        }
+
+<span class="fc" id="L158">        var serialized = new ExactRationalPolynomialContentVerifier</span>
+            .SerializedEvidence(
+<span class="fc" id="L160">                text(root, &quot;domainId&quot;),</span>
+<span class="fc" id="L161">                parseStatus(text(root, &quot;status&quot;)),</span>
+<span class="fc" id="L162">                text(root, &quot;detailCode&quot;),</span>
+<span class="fc" id="L163">                stringArray(root, &quot;sourceCoefficients&quot;),</span>
+                budget,
+<span class="fc" id="L165">                readNormalization(root.get(&quot;normalization&quot;)),</span>
+                work,
+<span class="fc" id="L167">                text(root, &quot;certificateHash&quot;));</span>
+<span class="fc" id="L168">        var verification = verifier.verify(serialized);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (!verification.verified()) {</span>
+<span class="fc" id="L170">            throw new IllegalArgumentException(</span>
+                &quot;content evidence verification failed: &quot;
+<span class="fc" id="L172">                    + verification.detailCode());</span>
+        }
+<span class="fc" id="L174">        return new DecodedEvidence(serialized, verification);</span>
+    }
+
+    private Optional&lt;ExactRationalPolynomialContentVerifier
+            .SerializedNormalization&gt; readNormalization(JsonNode node) {
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (node == null) {</span>
+<span class="nc" id="L180">            throw new IllegalArgumentException(</span>
+                &quot;missing required field: normalization&quot;);
+        }
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (node.isNull()) {</span>
+<span class="fc" id="L184">            return Optional.empty();</span>
+        }
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (!node.isObject()) {</span>
+<span class="nc" id="L187">            throw new IllegalArgumentException(</span>
+                &quot;normalization must be an object or null&quot;);
+        }
+<span class="fc" id="L190">        requireExactFields(</span>
+            node,
+            NORMALIZATION_FIELDS,
+            &quot;normalization&quot;);
+<span class="fc" id="L194">        return Optional.of(</span>
+            new ExactRationalPolynomialContentVerifier
+                .SerializedNormalization(
+<span class="fc" id="L197">                    text(node, &quot;denominatorClearingFactor&quot;),</span>
+<span class="fc" id="L198">                    stringArray(</span>
+                        node,
+                        &quot;integralCoefficientsAscending&quot;),
+<span class="fc" id="L201">                    text(node, &quot;integerContent&quot;),</span>
+<span class="fc" id="L202">                    stringArray(</span>
+                        node,
+                        &quot;primitiveCoefficientsAscending&quot;),
+<span class="fc" id="L205">                    text(node, &quot;scalar&quot;)));</span>
+    }
+
+    private static void writeWork(
+        JsonWriter writer,
+        ExactRationalPolynomialContentEvidence.WorkLedger work
+    ) {
+<span class="fc" id="L212">        writer</span>
+<span class="fc" id="L213">            .property(</span>
+                &quot;coefficientsVisited&quot;,
+<span class="fc" id="L215">                work.coefficientsVisited())</span>
+<span class="fc" id="L216">            .property(&quot;gcdOperations&quot;, work.gcdOperations())</span>
+<span class="fc" id="L217">            .property(&quot;lcmOperations&quot;, work.lcmOperations())</span>
+<span class="fc" id="L218">            .property(&quot;multiplications&quot;, work.multiplications())</span>
+<span class="fc" id="L219">            .property(&quot;divisions&quot;, work.divisions())</span>
+<span class="fc" id="L220">            .property(&quot;signAdjustments&quot;, work.signAdjustments())</span>
+<span class="fc" id="L221">            .property(</span>
+                &quot;reconstructionChecks&quot;,
+<span class="fc" id="L223">                work.reconstructionChecks())</span>
+<span class="fc" id="L224">            .property(&quot;totalSteps&quot;, work.totalSteps());</span>
+<span class="fc" id="L225">    }</span>
+
+    private JsonNode parseObject(String json) {
+<span class="pc bpc" id="L228" title="2 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="nc" id="L229">            throw new IllegalArgumentException(</span>
+                &quot;content evidence JSON must not be blank&quot;);
+        }
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (json.length() &gt; MAX_JSON_CHARACTERS) {</span>
+<span class="nc" id="L233">            throw new IllegalArgumentException(</span>
+                &quot;content evidence JSON exceeds its size limit&quot;);
+        }
+<span class="fc" id="L236">        try (JsonParser parser = MAPPER.getFactory().createParser(json)) {</span>
+<span class="fc" id="L237">            JsonNode root = MAPPER.readTree(parser);</span>
+<span class="pc bpc" id="L238" title="2 of 4 branches missed.">            if (root == null || !root.isObject()) {</span>
+<span class="nc" id="L239">                throw new IllegalArgumentException(</span>
+                    &quot;content evidence JSON must be an object&quot;);
+            }
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (parser.nextToken() != null) {</span>
+<span class="fc" id="L243">                throw new IllegalArgumentException(</span>
+                    &quot;content evidence JSON has trailing content&quot;);
+            }
+<span class="fc" id="L246">            return root;</span>
+<span class="fc" id="L247">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L248">            throw new IllegalArgumentException(</span>
+                &quot;invalid content evidence JSON&quot;,
+                exception);
+<span class="nc" id="L251">        } catch (IOException exception) {</span>
+<span class="nc" id="L252">            throw new IllegalStateException(</span>
+                &quot;failed to close content evidence parser&quot;,
+                exception);
+        }
+    }
+
+    private static void requireExactFields(
+        JsonNode node,
+        Set&lt;String&gt; expected,
+        String objectName
+    ) {
+<span class="fc" id="L263">        Set&lt;String&gt; actual = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L264">        Iterator&lt;String&gt; names = node.fieldNames();</span>
+<span class="fc" id="L265">        names.forEachRemaining(actual::add);</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        if (!actual.equals(expected)) {</span>
+<span class="fc" id="L267">            throw new IllegalArgumentException(</span>
+                objectName + &quot; fields differ from the v1 contract&quot;);
+        }
+<span class="fc" id="L270">    }</span>
+
+    private static JsonNode requiredObject(
+        JsonNode node,
+        String field
+    ) {
+<span class="fc" id="L276">        JsonNode value = node.get(field);</span>
+<span class="pc bpc" id="L277" title="2 of 4 branches missed.">        if (value == null || !value.isObject()) {</span>
+<span class="nc" id="L278">            throw new IllegalArgumentException(</span>
+                field + &quot; must be an object&quot;);
+        }
+<span class="fc" id="L281">        return value;</span>
+    }
+
+    private static String text(JsonNode node, String field) {
+<span class="fc" id="L285">        JsonNode value = node.get(field);</span>
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">        if (value == null || !value.isTextual()) {</span>
+<span class="nc" id="L287">            throw new IllegalArgumentException(</span>
+                field + &quot; must be a string&quot;);
+        }
+<span class="fc" id="L290">        return value.textValue();</span>
+    }
+
+    private static int integer(JsonNode node, String field) {
+<span class="fc" id="L294">        JsonNode value = node.get(field);</span>
+<span class="pc bpc" id="L295" title="2 of 4 branches missed.">        if (value == null || !value.isInt()) {</span>
+<span class="nc" id="L296">            throw new IllegalArgumentException(</span>
+                field + &quot; must be a 32-bit integer&quot;);
+        }
+<span class="fc" id="L299">        return value.intValue();</span>
+    }
+
+    private static List&lt;String&gt; stringArray(
+        JsonNode node,
+        String field
+    ) {
+<span class="fc" id="L306">        JsonNode value = node.get(field);</span>
+<span class="pc bpc" id="L307" title="2 of 4 branches missed.">        if (value == null || !value.isArray()) {</span>
+<span class="nc" id="L308">            throw new IllegalArgumentException(</span>
+                field + &quot; must be an array&quot;);
+        }
+<span class="fc" id="L311">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        for (JsonNode item : value) {</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">            if (!item.isTextual()) {</span>
+<span class="nc" id="L314">                throw new IllegalArgumentException(</span>
+                    field + &quot; entries must be strings&quot;);
+            }
+<span class="fc" id="L317">            result.add(item.textValue());</span>
+<span class="fc" id="L318">        }</span>
+<span class="fc" id="L319">        return List.copyOf(result);</span>
+    }
+
+    private static ExactRationalPolynomialContentNormalizer.Status
+            parseStatus(String value) {
+        try {
+<span class="fc" id="L325">            return ExactRationalPolynomialContentNormalizer.Status.valueOf(</span>
+                value);
+<span class="nc" id="L327">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L328">            throw new IllegalArgumentException(</span>
+                &quot;unsupported content evidence status: &quot; + value,
+                exception);
+        }
+    }
+
+    public record DecodedEvidence(
+        ExactRationalPolynomialContentVerifier.SerializedEvidence evidence,
+        ExactRationalPolynomialContentVerifier.Verification verification
+    ) {
+<span class="fc" id="L338">        public DecodedEvidence {</span>
+<span class="fc" id="L339">            Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L340">            Objects.requireNonNull(verification, &quot;verification&quot;);</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">            if (!verification.verified()) {</span>
+<span class="nc" id="L342">                throw new IllegalArgumentException(</span>
+                    &quot;decoded content evidence must be verified&quot;);
+            }
+<span class="fc" id="L345">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

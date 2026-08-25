@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactRationalPolynomialContentVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.scalar</a> &gt; <span class="el_source">ExactRationalPolynomialContentVerifier.java</span></div><h1>ExactRationalPolynomialContentVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.scalar;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+/** Independently replays serialized rational-content evidence. */
+<span class="fc" id="L11">public final class ExactRationalPolynomialContentVerifier {</span>
+<span class="fc" id="L12">    private static final Pattern CANONICAL_RATIONAL = Pattern.compile(</span>
+        &quot;^(?:0|-?[1-9][0-9]*|-?[1-9][0-9]*/[1-9][0-9]*)$&quot;);
+    private static final int MAX_COEFFICIENT_TEXT = 5_000;
+
+    public Verification verify(SerializedEvidence evidence) {
+<span class="fc" id="L17">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        if (!ExactRationalPolynomialContentNormalizer.DOMAIN_ID.equals(</span>
+<span class="fc" id="L19">                evidence.domainId())) {</span>
+<span class="nc" id="L20">            return Verification.rejected(&quot;DOMAIN_ID_MISMATCH&quot;);</span>
+        }
+        ExactRationalPolynomial polynomial;
+        try {
+<span class="fc" id="L24">            polynomial = new ExactRationalPolynomial(</span>
+<span class="fc" id="L25">                parseCoefficients(evidence.sourceCoefficients()));</span>
+<span class="nc" id="L26">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L27">            return Verification.rejected(</span>
+                &quot;SOURCE_COEFFICIENTS_NOT_CANONICAL&quot;);
+<span class="fc" id="L29">        }</span>
+
+<span class="fc" id="L31">        ExactRationalPolynomialContentEvidence replay =</span>
+            new ExactRationalPolynomialContentNormalizer(
+<span class="fc" id="L33">                evidence.budget()).normalize(polynomial);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (!replay.serialized().equals(evidence)) {</span>
+<span class="fc" id="L35">            return Verification.rejected(</span>
+                &quot;CONTENT_EVIDENCE_REPLAY_MISMATCH&quot;);
+        }
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        return evidence.status()</span>
+<span class="fc" id="L39">            == ExactRationalPolynomialContentNormalizer.Status.NORMALIZED</span>
+<span class="fc" id="L40">                ? Verification.verifiedNormalized()</span>
+<span class="fc" id="L41">                : Verification.verifiedFailure();</span>
+    }
+
+    private List&lt;ExactRational&gt; parseCoefficients(
+        List&lt;String&gt; source
+    ) {
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (source.isEmpty()</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                || source.size()</span>
+                    &gt; ExactRationalPolynomial.MAX_COEFFICIENTS) {
+<span class="nc" id="L50">            throw new IllegalArgumentException(</span>
+                &quot;invalid coefficient count&quot;);
+        }
+<span class="fc" id="L53">        List&lt;ExactRational&gt; result = new ArrayList&lt;&gt;(source.size());</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (String text : source) {</span>
+<span class="fc" id="L55">            result.add(parseCanonical(text));</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        return List.copyOf(result);</span>
+    }
+
+    private ExactRational parseCanonical(String text) {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (text == null</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                || text.length() &gt; MAX_COEFFICIENT_TEXT</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                || !CANONICAL_RATIONAL.matcher(text).matches()) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(</span>
+                &quot;coefficient is not canonical&quot;);
+        }
+<span class="fc" id="L67">        int slash = text.indexOf('/');</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        ExactRational value = slash &lt; 0</span>
+<span class="fc" id="L69">            ? ExactRational.integer(new BigInteger(text))</span>
+<span class="fc" id="L70">            : new ExactRational(</span>
+<span class="fc" id="L71">                new BigInteger(text.substring(0, slash)),</span>
+<span class="fc" id="L72">                new BigInteger(text.substring(slash + 1)));</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (!value.canonicalText().equals(text)) {</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(</span>
+                &quot;coefficient is not reduced&quot;);
+        }
+<span class="fc" id="L77">        return value;</span>
+    }
+
+<span class="fc" id="L80">    public enum Status {</span>
+<span class="fc" id="L81">        VERIFIED_NORMALIZED,</span>
+<span class="fc" id="L82">        VERIFIED_FAILURE,</span>
+<span class="fc" id="L83">        REJECTED</span>
+    }
+
+    public record SerializedNormalization(
+        String denominatorClearingFactor,
+        List&lt;String&gt; integralCoefficientsAscending,
+        String integerContent,
+        List&lt;String&gt; primitiveCoefficientsAscending,
+        String scalar
+    ) {
+<span class="fc" id="L93">        public SerializedNormalization {</span>
+<span class="fc" id="L94">            Objects.requireNonNull(</span>
+                denominatorClearingFactor,
+                &quot;denominatorClearingFactor&quot;);
+<span class="fc" id="L97">            integralCoefficientsAscending = List.copyOf(</span>
+<span class="fc" id="L98">                Objects.requireNonNull(</span>
+                    integralCoefficientsAscending,
+                    &quot;integralCoefficientsAscending&quot;));
+<span class="fc" id="L101">            Objects.requireNonNull(integerContent, &quot;integerContent&quot;);</span>
+<span class="fc" id="L102">            primitiveCoefficientsAscending = List.copyOf(</span>
+<span class="fc" id="L103">                Objects.requireNonNull(</span>
+                    primitiveCoefficientsAscending,
+                    &quot;primitiveCoefficientsAscending&quot;));
+<span class="fc" id="L106">            Objects.requireNonNull(scalar, &quot;scalar&quot;);</span>
+<span class="fc" id="L107">        }</span>
+    }
+
+    public record SerializedEvidence(
+        String domainId,
+        ExactRationalPolynomialContentNormalizer.Status status,
+        String detailCode,
+        List&lt;String&gt; sourceCoefficients,
+        ExactRationalPolynomialContentNormalizer.Budget budget,
+        Optional&lt;SerializedNormalization&gt; normalization,
+        ExactRationalPolynomialContentEvidence.WorkLedger work,
+        String certificateHash
+    ) {
+<span class="fc" id="L120">        public SerializedEvidence {</span>
+<span class="fc" id="L121">            Objects.requireNonNull(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L122">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L123" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L124">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L127">            sourceCoefficients = List.copyOf(</span>
+<span class="fc" id="L128">                Objects.requireNonNull(</span>
+                    sourceCoefficients,
+                    &quot;sourceCoefficients&quot;));
+<span class="fc" id="L131">            Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L132">            normalization = Objects.requireNonNull(</span>
+                normalization,
+                &quot;normalization&quot;);
+<span class="fc" id="L135">            Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (certificateHash == null</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">                    || !certificateHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)) {
+<span class="nc" id="L139">                throw new IllegalArgumentException(</span>
+                    &quot;certificateHash must be SHA-256&quot;);
+            }
+<span class="fc" id="L142">        }</span>
+    }
+
+    public record Verification(
+        Status status,
+        String detailCode
+    ) {
+<span class="fc" id="L149">        public Verification {</span>
+<span class="fc" id="L150">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L151" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L152">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L155">        }</span>
+
+        private static Verification verifiedNormalized() {
+<span class="fc" id="L158">            return new Verification(</span>
+                Status.VERIFIED_NORMALIZED,
+                &quot;CONTENT_NORMALIZATION_REPLAY_VERIFIED&quot;);
+        }
+
+        private static Verification verifiedFailure() {
+<span class="fc" id="L164">            return new Verification(</span>
+                Status.VERIFIED_FAILURE,
+                &quot;CONTENT_FAILURE_REPLAY_VERIFIED&quot;);
+        }
+
+        private static Verification rejected(String detailCode) {
+<span class="fc" id="L170">            return new Verification(Status.REJECTED, detailCode);</span>
+        }
+
+        public boolean verified() {
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            return status != Status.REJECTED;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
