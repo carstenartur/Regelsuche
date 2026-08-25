@@ -2,17 +2,21 @@ package de.regelsuche.math.algorithms.polynomial;
 
 import java.util.Objects;
 
-/** Algorithm selection and algorithm-specific enumeration bound. */
+/** Algorithm selection and algorithm-specific resource bounds. */
 public record FiniteFieldFactorizationPolicy(
     Algorithm algorithm,
-    int maxEnumeratedFieldElements
+    int maxEnumeratedFieldElements,
+    long maxMatrixCells
 ) {
     public static final int MAX_FIELD_ELEMENTS = 1_000_000;
+    public static final long MAX_MATRIX_CELLS = 16_000_000L;
 
     public FiniteFieldFactorizationPolicy {
         Objects.requireNonNull(algorithm, "algorithm");
         if (maxEnumeratedFieldElements < 2
-                || maxEnumeratedFieldElements > MAX_FIELD_ELEMENTS) {
+                || maxEnumeratedFieldElements > MAX_FIELD_ELEMENTS
+                || maxMatrixCells < 1
+                || maxMatrixCells > MAX_MATRIX_CELLS) {
             throw new IllegalArgumentException(
                 "finite-field factorization policy is invalid");
         }
@@ -20,16 +24,24 @@ public record FiniteFieldFactorizationPolicy(
 
     public static FiniteFieldFactorizationPolicy
             deterministicBerlekamp(
-        int maxEnumeratedFieldElements
+        int maxEnumeratedFieldElements,
+        long maxMatrixCells
     ) {
         return new FiniteFieldFactorizationPolicy(
             Algorithm.DETERMINISTIC_BERLEKAMP_V1,
-            maxEnumeratedFieldElements);
+            maxEnumeratedFieldElements,
+            maxMatrixCells);
+    }
+
+    public boolean permitsMatrixDegree(int degree) {
+        return degree >= 0
+            && (long) degree * degree <= maxMatrixCells;
     }
 
     public String canonicalMaterial() {
         return algorithm.id()
-            + ':' + maxEnumeratedFieldElements;
+            + ':' + maxEnumeratedFieldElements
+            + ':' + maxMatrixCells;
     }
 
     public enum Algorithm {
