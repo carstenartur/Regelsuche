@@ -19,6 +19,16 @@ public final class BigIntegerDomain implements GcdDomain<BigInteger> {
     }
 
     @Override
+    public BigInteger characteristic() {
+        return BigInteger.ZERO;
+    }
+
+    @Override
+    public BigInteger fromInteger(BigInteger value) {
+        return canonical(value);
+    }
+
+    @Override
     public BigInteger zero() {
         return BigInteger.ZERO;
     }

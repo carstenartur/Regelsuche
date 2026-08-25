@@ -1,14 +1,21 @@
 package de.regelsuche.polynomial;
 
+import java.math.BigInteger;
+
 /**
  * Exact coefficient arithmetic identified by a stable mathematical domain ID.
  *
- * <p>Implementations must return canonical immutable values. Two domain
- * implementations that expose the same ID are required to implement the same
- * mathematical equality and arithmetic contract.</p>
+ * <p>Implementations return canonical immutable values. The characteristic and
+ * integer embedding are part of the domain contract because derivative,
+ * finite-field and extension algorithms must not infer them from a Java value
+ * type.</p>
  */
 public interface CoefficientDomain<C> {
     String id();
+
+    BigInteger characteristic();
+
+    C fromInteger(BigInteger value);
 
     C zero();
 

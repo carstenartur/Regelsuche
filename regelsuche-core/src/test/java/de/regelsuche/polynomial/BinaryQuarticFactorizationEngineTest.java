@@ -16,6 +16,12 @@ class BinaryQuarticFactorizationEngineTest {
             new PolynomialVariable("A"),
             new PolynomialVariable("B")),
         PolynomialRing.MonomialOrder.GRADED_LEXICOGRAPHIC);
+    private final FactorizationRequest.StructuralLimits limits =
+        new FactorizationRequest.StructuralLimits(
+            2,
+            4,
+            32,
+            4_096);
     private final BinaryQuarticFactorizationEngine engine =
         new BinaryQuarticFactorizationEngine();
 
@@ -31,10 +37,7 @@ class BinaryQuarticFactorizationEngineTest {
         FactorizationVerifier.Report<BigInteger> report =
             FactorizationVerifier.execute(
                 engine,
-                FactorizationRequest.verifiedDecomposition(
-                    source,
-                    8,
-                    4_096));
+                request(source, 8, 4_096));
 
         assertEquals(
             FactorizationVerifier.Status.PARTIAL_FACTORIZATION,
@@ -65,10 +68,7 @@ class BinaryQuarticFactorizationEngineTest {
         FactorizationVerifier.Report<BigInteger> report =
             FactorizationVerifier.execute(
                 engine,
-                FactorizationRequest.verifiedDecomposition(
-                    source,
-                    8,
-                    4_096));
+                request(source, 8, 4_096));
 
         assertEquals(
             FactorizationVerifier.Status.NO_FACTORIZATION_FOUND,
@@ -95,22 +95,17 @@ class BinaryQuarticFactorizationEngineTest {
                     source,
                     FactorizationRequest.EvidenceRequirement
                         .INDEPENDENT_COMPLETE,
+                    limits,
                     8,
                     4_096));
         FactorizationVerifier.Report<BigInteger> zeroCandidates =
             FactorizationVerifier.execute(
                 engine,
-                FactorizationRequest.verifiedDecomposition(
-                    source,
-                    0,
-                    4_096));
+                request(source, 0, 4_096));
         FactorizationVerifier.Report<BigInteger> work =
             FactorizationVerifier.execute(
                 new BinaryQuarticFactorizationEngine(32, 1),
-                FactorizationRequest.verifiedDecomposition(
-                    source,
-                    8,
-                    1));
+                request(source, 8, 1));
 
         assertEquals(
             FactorizationVerifier.Status.UNSUPPORTED_REQUEST,
@@ -140,10 +135,7 @@ class BinaryQuarticFactorizationEngineTest {
         FactorizationVerifier.Report<BigInteger> report =
             FactorizationVerifier.execute(
                 lyingEngine,
-                FactorizationRequest.verifiedDecomposition(
-                    source,
-                    4,
-                    64));
+                request(source, 4, 64));
 
         assertEquals(
             FactorizationVerifier.Status.PARTIAL_FACTORIZATION,
@@ -189,10 +181,7 @@ class BinaryQuarticFactorizationEngineTest {
                     source,
                     wrong,
                     FactorizationEngine.BackendClaim.NONE),
-                FactorizationRequest.verifiedDecomposition(
-                    source,
-                    4,
-                    64));
+                request(source, 4, 64));
 
         assertEquals(
             FactorizationVerifier.Status.TECHNICAL_FAILURE,
@@ -215,10 +204,7 @@ class BinaryQuarticFactorizationEngineTest {
         FactorizationVerifier.Report<BigInteger> report =
             FactorizationVerifier.execute(
                 engine,
-                FactorizationRequest.verifiedDecomposition(
-                    source,
-                    16,
-                    4_096));
+                request(source, 16, 4_096));
 
         assertTrue(report.successful(), report.toString());
         assertTrue(report.candidates().stream().anyMatch(candidate ->
@@ -227,6 +213,18 @@ class BinaryQuarticFactorizationEngineTest {
             .flatMap(candidate -> candidate.factors().stream())
             .allMatch(factor -> coefficientContent(
                 factor.polynomial()).equals(BigInteger.ONE)));
+    }
+
+    private FactorizationRequest<BigInteger> request(
+        SparsePolynomial<BigInteger> source,
+        int maxCandidates,
+        long maxWork
+    ) {
+        return FactorizationRequest.verifiedDecomposition(
+            source,
+            limits,
+            maxCandidates,
+            maxWork);
     }
 
     private FactorizationEngine<BigInteger> engineReturning(
