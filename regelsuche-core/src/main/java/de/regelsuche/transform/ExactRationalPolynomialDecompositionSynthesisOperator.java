@@ -97,76 +97,73 @@ public final class ExactRationalPolynomialDecompositionSynthesisOperator
 
     public SynthesisReport synthesize(String expression) {
         if (maxCandidates == 0) {
-            return SynthesisReport.failure(
+            return failure(
                 Status.INTEGER_SYNTHESIS_FAILED,
-                "MAX_CANDIDATES_IS_ZERO",
-                "",
-                "",
-                0);
+                "MAX_CANDIDATES_IS_ZERO");
         }
         if (expression == null || expression.isBlank()) {
-            return SynthesisReport.failure(
+            return failure(
                 Status.PARSE_ERROR,
-                "EXPRESSION_BLANK",
-                "",
-                "",
-                0);
+                "EXPRESSION_BLANK");
         }
-
-        ExactParsedTerm parsed;
         try {
-            parsed = parser.parseExactTerm(expression);
+            return synthesizeParsed(parser.parseExactTerm(expression));
         } catch (IllegalArgumentException exception) {
-            return SynthesisReport.failure(
+            return failure(
                 Status.PARSE_ERROR,
-                safeMessage(exception),
-                "",
-                "",
-                0);
+                safeMessage(exception));
         }
+    }
 
+    private SynthesisReport synthesizeParsed(ExactParsedTerm parsed) {
         ExactRationalUnivariatePolynomialView.Analysis view =
             rationalView.analyze(parsed);
         if (!view.supported()) {
-            return SynthesisReport.failure(
-                view.status()
-                    == ExactRationalUnivariatePolynomialView.Status
-                        .BUDGET_EXCEEDED
-                    ? Status.BUDGET_EXCEEDED
-                    : Status.UNSUPPORTED_EXACT_POLYNOMIAL,
-                view.detailCode(),
-                "",
-                "",
-                0);
+            return failure(
+                statusFor(view.status()),
+                view.detailCode());
         }
+        return synthesizeView(view);
+    }
 
+    private SynthesisReport synthesizeView(
+        ExactRationalUnivariatePolynomialView.Analysis view
+    ) {
         ExactRationalPolynomial sourcePolynomial =
             view.polynomial().orElseThrow();
         String sourceMaterial =
             sourcePolynomial.canonicalCoefficientText();
         if (sourcePolynomial.degree() != 4
                 || view.variable().isBlank()) {
-            return SynthesisReport.failure(
+            return failure(
                 Status.NOT_UNIVARIATE_QUARTIC,
                 "REQUIRES_ONE_EXACT_UNIVARIATE_QUARTIC",
-                sourceMaterial,
-                "",
-                0);
+                sourceMaterial);
         }
 
         ExactRationalPolynomialContentEvidence content =
             contentNormalizer.normalize(sourcePolynomial);
         if (!content.normalized()) {
             return SynthesisReport.failure(
-                contentLimitExceeded(content.status())
-                    ? Status.BUDGET_EXCEEDED
-                    : Status.CONTENT_NORMALIZATION_FAILED,
+                statusFor(content.status()),
                 content.detailCode(),
                 sourceMaterial,
                 content.certificateHash(),
                 0);
         }
+        return synthesizeNormalized(
+            view,
+            sourcePolynomial,
+            sourceMaterial,
+            content);
+    }
 
+    private SynthesisReport synthesizeNormalized(
+        ExactRationalUnivariatePolynomialView.Analysis view,
+        ExactRationalPolynomial sourcePolynomial,
+        String sourceMaterial,
+        ExactRationalPolynomialContentEvidence content
+    ) {
         ExactRationalPolynomialContentEvidence.Normalization normalization =
             content.normalization().orElseThrow();
         List<BigInteger> primitive =
@@ -190,73 +187,50 @@ public final class ExactRationalPolynomialDecompositionSynthesisOperator
             integerSynthesizer.synthesize(typedPrimitive);
         if (!integer.generated()) {
             return SynthesisReport.failure(
-                integer.status()
-                    == PolynomialDecompositionSynthesisOperator.Status
-                        .BUDGET_EXCEEDED
-                    ? Status.BUDGET_EXCEEDED
-                    : Status.INTEGER_SYNTHESIS_FAILED,
+                statusFor(integer.status()),
                 integer.detailCode(),
                 sourceMaterial,
                 content.certificateHash(),
                 integer.consideredConfigurations());
         }
+        return synthesizeCandidates(
+            view,
+            sourcePolynomial,
+            sourceMaterial,
+            content,
+            normalization,
+            primitive,
+            integer);
+    }
 
+    private SynthesisReport synthesizeCandidates(
+        ExactRationalUnivariatePolynomialView.Analysis view,
+        ExactRationalPolynomial sourcePolynomial,
+        String sourceMaterial,
+        ExactRationalPolynomialContentEvidence content,
+        ExactRationalPolynomialContentEvidence.Normalization normalization,
+        List<BigInteger> primitive,
+        PolynomialDecompositionSynthesisOperator.SynthesisReport integer
+    ) {
         List<Candidate> candidates = new ArrayList<>();
         for (PolynomialDecompositionSynthesisOperator.Candidate integerCandidate
                 : integer.candidates()) {
-            if (!reassemblesPrimitive(integerCandidate, primitive)
-                    || !reassemblesSource(
-                        integerCandidate,
-                        normalization.scalar(),
-                        sourcePolynomial)) {
+            CandidateBuild build = buildCandidate(
+                view,
+                sourcePolynomial,
+                content,
+                normalization,
+                primitive,
+                integerCandidate);
+            if (!build.successful()) {
                 return SynthesisReport.failure(
-                    Status.REASSEMBLY_FAILED,
-                    "TYPED_INTEGER_FACTOR_REASSEMBLY_FAILED",
+                    build.failureStatus(),
+                    build.detailCode(),
                     sourceMaterial,
                     content.certificateHash(),
                     integer.consideredConfigurations());
             }
-
-            String transformed = render(
-                normalization.scalar(),
-                integerCandidate,
-                view.variable());
-            Verification verification = verifyRenderedCandidate(
-                transformed,
-                view.variable(),
-                sourcePolynomial);
-            if (verification.status() != VerificationStatus.VERIFIED) {
-                return SynthesisReport.failure(
-                    verification.status()
-                        == VerificationStatus.NOT_REPRESENTABLE
-                        ? Status.OUTPUT_NOT_REPRESENTABLE
-                        : Status.REASSEMBLY_FAILED,
-                    verification.detailCode(),
-                    sourceMaterial,
-                    content.certificateHash(),
-                    integer.consideredConfigurations());
-            }
-
-            String certificateHash = certificate(
-                view.canonicalMaterial(),
-                content.certificateHash(),
-                integerCandidate,
-                normalization.scalar(),
-                transformed,
-                sourcePolynomial);
-            String applicationKey = RULE_ID
-                + "|method=" + METHOD_ID
-                + "|certificate=" + certificateHash
-                + "|integer=" + integerCandidate.certificateHash();
-            candidates.add(new Candidate(
-                transformed,
-                normalization.scalar().canonicalText(),
-                integerCandidate.leftCoefficients(),
-                integerCandidate.rightCoefficients(),
-                content.certificateHash(),
-                integerCandidate.certificateHash(),
-                certificateHash,
-                applicationKey));
+            candidates.add(build.candidate());
             if (candidates.size() >= maxCandidates) {
                 break;
             }
@@ -275,6 +249,63 @@ public final class ExactRationalPolynomialDecompositionSynthesisOperator
             content.certificateHash(),
             integer.consideredConfigurations(),
             candidates);
+    }
+
+    private CandidateBuild buildCandidate(
+        ExactRationalUnivariatePolynomialView.Analysis view,
+        ExactRationalPolynomial sourcePolynomial,
+        ExactRationalPolynomialContentEvidence content,
+        ExactRationalPolynomialContentEvidence.Normalization normalization,
+        List<BigInteger> primitive,
+        PolynomialDecompositionSynthesisOperator.Candidate integerCandidate
+    ) {
+        if (!reassemblesPrimitive(integerCandidate, primitive)
+                || !reassemblesSource(
+                    integerCandidate,
+                    normalization.scalar(),
+                    sourcePolynomial)) {
+            return CandidateBuild.failure(
+                Status.REASSEMBLY_FAILED,
+                "TYPED_INTEGER_FACTOR_REASSEMBLY_FAILED");
+        }
+
+        String transformed = render(
+            normalization.scalar(),
+            integerCandidate,
+            view.variable());
+        Verification verification = verifyRenderedCandidate(
+            transformed,
+            view.variable(),
+            sourcePolynomial);
+        if (verification.status() != VerificationStatus.VERIFIED) {
+            return CandidateBuild.failure(
+                verification.status()
+                    == VerificationStatus.NOT_REPRESENTABLE
+                    ? Status.OUTPUT_NOT_REPRESENTABLE
+                    : Status.REASSEMBLY_FAILED,
+                verification.detailCode());
+        }
+
+        String certificateHash = certificate(
+            view.canonicalMaterial(),
+            content.certificateHash(),
+            integerCandidate,
+            normalization.scalar(),
+            transformed,
+            sourcePolynomial);
+        String applicationKey = RULE_ID
+            + "|method=" + METHOD_ID
+            + "|certificate=" + certificateHash
+            + "|integer=" + integerCandidate.certificateHash();
+        return CandidateBuild.success(new Candidate(
+            transformed,
+            normalization.scalar().canonicalText(),
+            integerCandidate.leftCoefficients(),
+            integerCandidate.rightCoefficients(),
+            content.certificateHash(),
+            integerCandidate.certificateHash(),
+            certificateHash,
+            applicationKey));
     }
 
     private Verification verifyRenderedCandidate(
@@ -455,16 +486,61 @@ public final class ExactRationalPolynomialDecompositionSynthesisOperator
             .append(term);
     }
 
-    private static boolean contentLimitExceeded(
+    private static Status statusFor(
+        ExactRationalUnivariatePolynomialView.Status status
+    ) {
+        return status
+            == ExactRationalUnivariatePolynomialView.Status.BUDGET_EXCEEDED
+            ? Status.BUDGET_EXCEEDED
+            : Status.UNSUPPORTED_EXACT_POLYNOMIAL;
+    }
+
+    private static Status statusFor(
         ExactRationalPolynomialContentNormalizer.Status status
     ) {
         return switch (status) {
             case DEGREE_LIMIT_EXCEEDED,
                 COEFFICIENT_LIMIT_EXCEEDED,
                 INTERMEDIATE_LIMIT_EXCEEDED,
-                WORK_LIMIT_EXCEEDED -> true;
-            case NORMALIZED, ZERO_POLYNOMIAL -> false;
+                WORK_LIMIT_EXCEEDED -> Status.BUDGET_EXCEEDED;
+            case ZERO_POLYNOMIAL -> Status.CONTENT_NORMALIZATION_FAILED;
+            case NORMALIZED -> throw new IllegalArgumentException(
+                "normalized content has no failure status");
         };
+    }
+
+    private static Status statusFor(
+        PolynomialDecompositionSynthesisOperator.Status status
+    ) {
+        return status
+            == PolynomialDecompositionSynthesisOperator.Status.BUDGET_EXCEEDED
+            ? Status.BUDGET_EXCEEDED
+            : Status.INTEGER_SYNTHESIS_FAILED;
+    }
+
+    private static SynthesisReport failure(
+        Status status,
+        String detailCode
+    ) {
+        return SynthesisReport.failure(
+            status,
+            detailCode,
+            "",
+            "",
+            0);
+    }
+
+    private static SynthesisReport failure(
+        Status status,
+        String detailCode,
+        String sourceMaterial
+    ) {
+        return SynthesisReport.failure(
+            status,
+            detailCode,
+            sourceMaterial,
+            "",
+            0);
     }
 
     private static String certificate(
@@ -633,6 +709,48 @@ public final class ExactRationalPolynomialDecompositionSynthesisOperator
                 throw new IllegalArgumentException(
                     "rational quadratic factors require three coefficients");
             }
+        }
+    }
+
+    private record CandidateBuild(
+        Candidate candidate,
+        Status failureStatus,
+        String detailCode
+    ) {
+        private CandidateBuild {
+            if (candidate == null
+                    && (failureStatus == null
+                        || detailCode == null
+                        || detailCode.isBlank())) {
+                throw new IllegalArgumentException(
+                    "failed candidate build requires a status and detail");
+            }
+            if (candidate != null
+                    && (failureStatus != null || detailCode != null)) {
+                throw new IllegalArgumentException(
+                    "successful candidate build must not expose failure data");
+            }
+        }
+
+        private static CandidateBuild success(Candidate candidate) {
+            return new CandidateBuild(
+                Objects.requireNonNull(candidate, "candidate"),
+                null,
+                null);
+        }
+
+        private static CandidateBuild failure(
+            Status status,
+            String detailCode
+        ) {
+            return new CandidateBuild(
+                null,
+                Objects.requireNonNull(status, "status"),
+                detailCode);
+        }
+
+        private boolean successful() {
+            return candidate != null;
         }
     }
 
