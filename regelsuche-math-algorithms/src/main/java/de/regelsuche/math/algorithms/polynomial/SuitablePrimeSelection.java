@@ -169,7 +169,8 @@ public final class SuitablePrimeSelection {
             SparsePolynomial<BigInteger> modularSource = reduce(
                 source,
                 field,
-                work);
+                work,
+                "suitable-prime.reduction.coefficients");
             work.consume(
                 "suitable-prime.leading-coefficient-tests",
                 1);
@@ -197,9 +198,14 @@ public final class SuitablePrimeSelection {
                     modularRequest,
                     policy.factorizationPolicy(),
                     work);
-            long attemptWork = total(work) - workBefore;
 
             if (factorization.completed()) {
+                verifyModularSourceCorrespondence(
+                    source,
+                    field,
+                    modularSource,
+                    work);
+                long attemptWork = total(work) - workBefore;
                 attempts.add(SuitablePrimeSelectionResult.issueAttempt(
                     prime,
                     SuitablePrimeSelectionResult.PrimeAttempt.Disposition
@@ -217,6 +223,7 @@ public final class SuitablePrimeSelection {
                     request,
                     policy);
             }
+            long attemptWork = total(work) - workBefore;
             if (factorization.status()
                     == FiniteFieldFactorizationResult.Status
                         .UNSUPPORTED_SHAPE
@@ -299,7 +306,8 @@ public final class SuitablePrimeSelection {
     private static SparsePolynomial<BigInteger> reduce(
         SparsePolynomial<BigInteger> source,
         PrimeField field,
-        PolynomialWorkBudget work
+        PolynomialWorkBudget work,
+        String workStage
     ) {
         PolynomialRing<BigInteger> modularRing = new PolynomialRing<>(
             field,
@@ -309,13 +317,33 @@ public final class SuitablePrimeSelection {
             new TreeMap<>(modularRing.monomialComparator());
         for (Map.Entry<Monomial, BigInteger> term
                 : source.terms().entrySet()) {
-            work.consume("suitable-prime.reduction.coefficients", 1);
+            work.consume(workStage, 1);
             BigInteger coefficient = field.canonical(term.getValue());
             if (!field.isZero(coefficient)) {
                 terms.put(term.getKey(), coefficient);
             }
         }
         return new SparsePolynomial<>(modularRing, terms);
+    }
+
+    private static void verifyModularSourceCorrespondence(
+        SparsePolynomial<BigInteger> source,
+        PrimeField field,
+        SparsePolynomial<BigInteger> modularSource,
+        PolynomialWorkBudget work
+    ) {
+        SparsePolynomial<BigInteger> independentlyReduced = reduce(
+            source,
+            field,
+            work,
+            "suitable-prime.verify.source-reduction.coefficients");
+        work.consume(
+            "suitable-prime.verify.source-reduction.comparisons",
+            1);
+        if (!independentlyReduced.equals(modularSource)) {
+            throw new IllegalStateException(
+                "selected modular source does not reduce the integer source");
+        }
     }
 
     private static FactorizationRequest<BigInteger> modularRequest(
