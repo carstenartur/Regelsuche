@@ -44,13 +44,17 @@ class SuitablePrimeSelectionEvidenceTest {
         assertTrue(result.completed(), result.toString());
         SuitablePrimeSelectionResult.PrimeAttempt selected =
             result.attempts().getLast();
+        String modularSourceHash = AlgorithmEvidence.sha256(
+            result.modularSource().canonicalMaterial());
         assertEquals(
             SuitablePrimeSelectionResult.PrimeAttempt.Disposition.SELECTED,
             selected.disposition());
         assertEquals(
-            AlgorithmEvidence.sha256(
-                result.modularSource().canonicalMaterial()),
+            modularSourceHash,
             selected.modularSourceHash());
+        assertEquals(
+            modularSourceHash,
+            result.modularFactorization().sourcePolynomialHash());
         assertEquals(
             result.modularFactorization().certificateHash(),
             selected.modularFactorizationCertificateHash());
@@ -104,6 +108,49 @@ class SuitablePrimeSelectionEvidenceTest {
                 3,
                 valid.modularSource(),
                 valid.modularFactorization(),
+                valid.work(),
+                request,
+                policy));
+    }
+
+    @Test
+    void issuerRejectsANestedCertificateForAnotherModularSource() {
+        FactorizationRequest<BigInteger> request = request();
+        SuitablePrimeSelectionPolicy policy = policy(3);
+        SuitablePrimeSelectionResult valid =
+            SuitablePrimeSelection.selectAndFactor(request, policy);
+        assertTrue(valid.completed(), valid.toString());
+
+        SparsePolynomial<BigInteger> otherSource =
+            modularPolynomial(3, 1, 0, 1);
+        FiniteFieldFactorizationResult otherFactorization =
+            FiniteFieldFactorization.factorSquareFree(
+                FactorizationRequest.verifiedDecomposition(
+                    otherSource,
+                    limits,
+                    1,
+                    1_000_000),
+                finiteFieldPolicy);
+        assertTrue(
+            otherFactorization.completed(),
+            otherFactorization.toString());
+
+        SuitablePrimeSelectionResult.PrimeAttempt forgedSelectedAttempt =
+            SuitablePrimeSelectionResult.issueAttempt(
+                3,
+                SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                    .SELECTED,
+                "SUITABLE_PRIME_SELECTED",
+                valid.modularSource(),
+                otherFactorization.certificateHash(),
+                valid.attempts().getLast().workUnits());
+
+        assertThrows(IllegalArgumentException.class, () ->
+            SuitablePrimeSelectionResult.completed(
+                List.of(forgedSelectedAttempt),
+                3,
+                valid.modularSource(),
+                otherFactorization,
                 valid.work(),
                 request,
                 policy));
