@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scalar.ExactRationalPolynomialContentNormalizer;
 import java.math.BigInteger;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -101,6 +103,23 @@ class ExactRationalPolynomialDecompositionSynthesisOperatorTest {
     }
 
     @Test
+    void rendersUnitAndNegativeUnitScalarsWithoutApproximation() {
+        var positive = operator.synthesize("x^4 + 4");
+        var negative = operator.synthesize("-x^4 - 4");
+
+        assertTrue(positive.generated(), positive.detailCode());
+        assertTrue(positive.candidates().stream().allMatch(candidate ->
+            candidate.scalar().equals("1")
+                && !candidate.transformedExpression().startsWith(
+                    "(1) *")));
+        assertTrue(negative.generated(), negative.detailCode());
+        assertTrue(negative.candidates().stream().allMatch(candidate ->
+            candidate.scalar().equals("-1")
+                && candidate.transformedExpression().startsWith(
+                    "0 - (")));
+    }
+
+    @Test
     void repeatedRunsAreByteStable() {
         var first = operator.synthesize("0.10*x^4 + 0.40");
         var second = operator.synthesize("0.10*x^4 + 0.40");
@@ -125,6 +144,74 @@ class ExactRationalPolynomialDecompositionSynthesisOperatorTest {
         assertEquals("EXPRESSION_BLANK", blankReport.detailCode());
         assertTrue(operator.generateCandidates(null).isEmpty());
         assertTrue(operator.generateCandidates("   ").isEmpty());
+    }
+
+    @Test
+    void zeroCandidateBudgetFailsBeforeIssuingEvidence() {
+        var bounded = new
+            ExactRationalPolynomialDecompositionSynthesisOperator(
+                new ExpressionParser(),
+                new ExactRationalUnivariatePolynomialView(),
+                new ExactRationalPolynomialContentNormalizer(),
+                new PolynomialDecompositionSynthesisOperator(),
+                0);
+
+        var report = bounded.synthesize("x^4 + 4");
+
+        assertEquals(
+            ExactRationalPolynomialDecompositionSynthesisOperator.Status
+                .INTEGER_SYNTHESIS_FAILED,
+            report.status());
+        assertEquals("MAX_CANDIDATES_IS_ZERO", report.detailCode());
+        assertTrue(report.contentCertificateHash().isEmpty());
+        assertTrue(report.candidates().isEmpty());
+    }
+
+    @Test
+    void stageBudgetsRemainDistinguishableAndFailClosed() {
+        var viewBounded = new
+            ExactRationalPolynomialDecompositionSynthesisOperator(
+                new ExpressionParser(),
+                new ExactRationalUnivariatePolynomialView(
+                    new ExactRationalUnivariatePolynomialView.Budget(
+                        3,
+                        4_096,
+                        512,
+                        10_000)),
+                new ExactRationalPolynomialContentNormalizer(),
+                new PolynomialDecompositionSynthesisOperator(),
+                6);
+        var contentBounded = new
+            ExactRationalPolynomialDecompositionSynthesisOperator(
+                new ExpressionParser(),
+                new ExactRationalUnivariatePolynomialView(),
+                new ExactRationalPolynomialContentNormalizer(
+                    new ExactRationalPolynomialContentNormalizer.Budget(
+                        3,
+                        4_096,
+                        131_072,
+                        100_000)),
+                new PolynomialDecompositionSynthesisOperator(),
+                6);
+
+        var viewReport = viewBounded.synthesize("x^4 + 4");
+        var contentReport = contentBounded.synthesize("x^4 + 4");
+
+        assertEquals(
+            ExactRationalPolynomialDecompositionSynthesisOperator.Status
+                .BUDGET_EXCEEDED,
+            viewReport.status());
+        assertEquals("MAX_DEGREE_EXCEEDED", viewReport.detailCode());
+        assertTrue(viewReport.contentCertificateHash().isEmpty());
+        assertEquals(
+            ExactRationalPolynomialDecompositionSynthesisOperator.Status
+                .BUDGET_EXCEEDED,
+            contentReport.status());
+        assertEquals(
+            "RATIONAL_POLYNOMIAL_DEGREE_LIMIT_EXCEEDED",
+            contentReport.detailCode());
+        assertTrue(contentReport.contentCertificateHash().matches(
+            "sha256:[0-9a-f]{64}"));
     }
 
     @Test
