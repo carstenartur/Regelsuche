@@ -14,7 +14,8 @@ class BinaryQuarticFactorizationEngineTest {
         BigIntegerDomain.INSTANCE,
         List.of(
             new PolynomialVariable("A"),
-            new PolynomialVariable("B")));
+            new PolynomialVariable("B")),
+        PolynomialRing.MonomialOrder.GRADED_LEXICOGRAPHIC);
     private final BinaryQuarticFactorizationEngine engine =
         new BinaryQuarticFactorizationEngine();
 
