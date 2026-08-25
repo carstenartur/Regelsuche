@@ -82,14 +82,14 @@ public final class PolynomialTheorySubsumptionClassifier {
                     return Classification.failure(
                         Status.TECHNICAL_FAILURE,
                         "FACTORIZATION_RENDER_CANNOT_BE_PARSED",
-                        report.arithmeticSteps());
+                        report.totalWorkUnits());
                 }
                 if (targetValue.sameValue(
                         values.fromExpr(candidateExpression))) {
                     return Classification.subsumed(
                         canonicalSource,
                         candidate,
-                        report.arithmeticSteps());
+                        report.totalWorkUnits());
                 }
             }
         }
@@ -97,7 +97,7 @@ public final class PolynomialTheorySubsumptionClassifier {
         return Classification.failure(
             Status.NOT_SUBSUMED,
             "TARGET_NOT_GENERATED_WITHIN_BOUND",
-            report.arithmeticSteps());
+            report.totalWorkUnits());
     }
 
     private Classification failure(
@@ -117,7 +117,7 @@ public final class PolynomialTheorySubsumptionClassifier {
         return Classification.failure(
             status,
             report.detailCode(),
-            report.arithmeticSteps());
+            report.totalWorkUnits());
     }
 
     private String formatCanonical(String expression) {
@@ -165,7 +165,7 @@ public final class PolynomialTheorySubsumptionClassifier {
             String certificateHash,
             String derivedExpression,
             String applicationKey,
-            long arithmeticSteps,
+            long workUnits,
             ProjectInventoryNovelty projectInventoryNovelty,
             RetentionDisposition retentionDisposition
         ) {
@@ -180,7 +180,7 @@ public final class PolynomialTheorySubsumptionClassifier {
                     || certificateHash == null
                     || derivedExpression == null
                     || applicationKey == null
-                    || arithmeticSteps < 0
+                    || workUnits < 0
                     || projectInventoryNovelty == null
                     || retentionDisposition == null) {
                 throw new IllegalArgumentException(
@@ -214,7 +214,7 @@ public final class PolynomialTheorySubsumptionClassifier {
                 certificateHash,
                 derivedExpression,
                 applicationKey,
-                arithmeticSteps,
+                workUnits,
                 projectInventoryNovelty,
                 retentionDisposition);
         }
@@ -222,17 +222,18 @@ public final class PolynomialTheorySubsumptionClassifier {
         private static Classification subsumed(
             String sourceExpression,
             ExpressionFactorizationReport.RenderedFactorization candidate,
-            long arithmeticSteps
+            long workUnits
         ) {
             return new Classification(
                 Status.THEORY_SUBSUMED,
-                "TARGET_MATCHES_GENERATED_FACTORIZATION",
+                "TARGET_MATCHES_VERIFIED_FACTORIZATION",
                 PolynomialDecompositionSynthesisOperator.METHOD_ID,
                 sourceExpression,
-                candidate.factorization().certificateHash(),
+                candidate.factorization()
+                    .verificationCertificateHash(),
                 candidate.transformedExpression(),
                 candidate.applicationKey(),
-                arithmeticSteps,
+                workUnits,
                 ProjectInventoryNovelty.NOT_EVALUATED,
                 RetentionDisposition.DERIVED_MACRO_CACHE_ONLY);
         }
@@ -240,7 +241,7 @@ public final class PolynomialTheorySubsumptionClassifier {
         private static Classification failure(
             Status status,
             String detailCode,
-            long arithmeticSteps
+            long workUnits
         ) {
             return new Classification(
                 status,
@@ -250,7 +251,7 @@ public final class PolynomialTheorySubsumptionClassifier {
                 "",
                 "",
                 "",
-                arithmeticSteps,
+                workUnits,
                 ProjectInventoryNovelty.NOT_EVALUATED,
                 RetentionDisposition.NONE);
         }
@@ -283,8 +284,8 @@ public final class PolynomialTheorySubsumptionClassifier {
             return state.applicationKey();
         }
 
-        public long arithmeticSteps() {
-            return state.arithmeticSteps();
+        public long workUnits() {
+            return state.workUnits();
         }
 
         public ProjectInventoryNovelty projectInventoryNovelty() {
@@ -324,7 +325,7 @@ public final class PolynomialTheorySubsumptionClassifier {
             String certificateHash,
             String derivedExpression,
             String applicationKey,
-            long arithmeticSteps,
+            long workUnits,
             ProjectInventoryNovelty projectInventoryNovelty,
             RetentionDisposition retentionDisposition
         ) {
