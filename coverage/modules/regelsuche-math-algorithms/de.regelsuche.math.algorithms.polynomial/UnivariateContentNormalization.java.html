@@ -1,0 +1,628 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnivariateContentNormalization.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">UnivariateContentNormalization.java</span></div><h1>UnivariateContentNormalization.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.ExactRationalField;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.Monomial;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/**
+ * Exact content and primitive-part normalization for univariate
+ * {@code Z[x]} and {@code Q[x]} factorization requests.
+ *
+ * &lt;p&gt;Both entry points return one primitive integer polynomial with positive
+ * leading coefficient. The complete scalar, including sign and cleared
+ * denominator, remains separate for later rational reassembly.&lt;/p&gt;
+ */
+public final class UnivariateContentNormalization {
+    public static final String METHOD_ID =
+        &quot;regelsuche.univariate-content-primitive-part/v1&quot;;
+
+    private UnivariateContentNormalization() {
+    }
+
+    public static UnivariateContentResult normalizeInteger(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        UnivariateContentPolicy policy
+    ) {
+<span class="fc" id="L36">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L37">        return normalizeInteger(</span>
+            request,
+            policy,
+<span class="fc" id="L40">            new PolynomialWorkBudget(request.maxWorkUnits()));</span>
+    }
+
+    public static UnivariateContentResult normalizeRational(
+        FactorizationRequest&lt;ExactRational&gt; request,
+        UnivariateContentPolicy policy
+    ) {
+<span class="fc" id="L47">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L48">        return normalizeRational(</span>
+            request,
+            policy,
+<span class="fc" id="L51">            new PolynomialWorkBudget(request.maxWorkUnits()));</span>
+    }
+
+    static UnivariateContentResult normalizeInteger(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        UnivariateContentPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L59">        return normalize(</span>
+            request,
+            policy,
+            IntegerAccess.INSTANCE,
+            work);
+    }
+
+    static UnivariateContentResult normalizeRational(
+        FactorizationRequest&lt;ExactRational&gt; request,
+        UnivariateContentPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L71">        return normalize(</span>
+            request,
+            policy,
+            RationalAccess.INSTANCE,
+            work);
+    }
+
+    private static &lt;C&gt; UnivariateContentResult normalize(
+        FactorizationRequest&lt;C&gt; request,
+        UnivariateContentPolicy policy,
+        CoefficientAccess&lt;C&gt; access,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L84">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L85">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L86">        Objects.requireNonNull(access, &quot;access&quot;);</span>
+<span class="fc" id="L87">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (work.limit() != request.maxWorkUnits()) {</span>
+<span class="fc" id="L89">            return failure(</span>
+                UnivariateContentResult.Status.TECHNICAL_FAILURE,
+                &quot;CONTENT_NORMALIZATION_WORK_BUDGET_AUTHORITY_MISMATCH&quot;,
+                request,
+                policy,
+<span class="fc" id="L94">                work.ledger());</span>
+        }
+
+<span class="fc" id="L97">        UnivariateContentResult rejected =</span>
+<span class="fc" id="L98">            rejectInput(</span>
+                request,
+                policy,
+                access,
+<span class="fc" id="L102">                work.ledger());</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (rejected != null) {</span>
+<span class="fc" id="L104">            return rejected;</span>
+        }
+
+        try {
+<span class="fc" id="L108">            return completed(</span>
+                request,
+                policy,
+                access,
+                work);
+<span class="fc" id="L113">        } catch (PolynomialWorkBudget.LimitReached exception) {</span>
+<span class="fc" id="L114">            return failure(</span>
+                UnivariateContentResult.Status.BUDGET_INCONCLUSIVE,
+                &quot;CONTENT_NORMALIZATION_WORK_BUDGET_EXCEEDED&quot;,
+                request,
+                policy,
+<span class="fc" id="L119">                work.ledger());</span>
+<span class="fc" id="L120">        } catch (IntermediateLimitReached exception) {</span>
+<span class="fc" id="L121">            return failure(</span>
+                UnivariateContentResult.Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L123">                exception.detailCode(),</span>
+                request,
+                policy,
+<span class="fc" id="L126">                work.ledger());</span>
+<span class="nc" id="L127">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L128">            return failure(</span>
+                UnivariateContentResult.Status.TECHNICAL_FAILURE,
+                &quot;CONTENT_NORMALIZATION_EXACT_ARITHMETIC_FAILED&quot;,
+                request,
+                policy,
+<span class="nc" id="L133">                work.ledger());</span>
+<span class="nc" id="L134">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L135">            return failure(</span>
+                UnivariateContentResult.Status.TECHNICAL_FAILURE,
+                &quot;CONTENT_NORMALIZATION_&quot;
+<span class="nc" id="L138">                    + exception.getClass().getSimpleName()</span>
+<span class="nc" id="L139">                        .toUpperCase(java.util.Locale.ROOT),</span>
+                request,
+                policy,
+<span class="nc" id="L142">                work.ledger());</span>
+        }
+    }
+
+    private static &lt;C&gt; UnivariateContentResult rejectInput(
+        FactorizationRequest&lt;C&gt; request,
+        UnivariateContentPolicy policy,
+        CoefficientAccess&lt;C&gt; access,
+        PolynomialWorkLedger work
+    ) {
+<span class="fc" id="L152">        SparsePolynomial&lt;C&gt; source = request.source();</span>
+<span class="fc" id="L153">        String structuralViolation =</span>
+<span class="fc" id="L154">            request.structuralViolation().orElse(null);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (structuralViolation != null) {</span>
+<span class="fc" id="L156">            return failure(</span>
+                UnivariateContentResult.Status.BUDGET_INCONCLUSIVE,
+                structuralViolation,
+                request,
+                policy,
+                work);
+        }
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (!access.domainId().equals(</span>
+<span class="fc" id="L164">                source.ring().coefficientDomain().id())) {</span>
+<span class="nc" id="L165">            return failure(</span>
+                UnivariateContentResult.Status.UNSUPPORTED_DOMAIN,
+<span class="nc" id="L167">                access.domainFailureCode(),</span>
+                request,
+                policy,
+                work);
+        }
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (source.ring().variableCount() != 1) {</span>
+<span class="fc" id="L173">            return failure(</span>
+                UnivariateContentResult.Status.UNSUPPORTED_SHAPE,
+                &quot;REQUIRES_ONE_POLYNOMIAL_VARIABLE&quot;,
+                request,
+                policy,
+                work);
+        }
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (source.isZero()) {</span>
+<span class="nc" id="L181">            return failure(</span>
+                UnivariateContentResult.Status.UNSUPPORTED_SHAPE,
+                &quot;ZERO_POLYNOMIAL_HAS_NO_PRIMITIVE_PART&quot;,
+                request,
+                policy,
+                work);
+        }
+<span class="fc" id="L188">        return null;</span>
+    }
+
+    private static &lt;C&gt; UnivariateContentResult completed(
+        FactorizationRequest&lt;C&gt; request,
+        UnivariateContentPolicy policy,
+        CoefficientAccess&lt;C&gt; access,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L197">        SparsePolynomial&lt;C&gt; source = request.source();</span>
+<span class="fc" id="L198">        BigInteger denominator = denominatorClearingFactor(</span>
+            source,
+            policy,
+            access,
+            work);
+<span class="fc" id="L203">        NavigableMap&lt;Monomial, BigInteger&gt; integral =</span>
+<span class="fc" id="L204">            integralTerms(</span>
+                source,
+                denominator,
+                policy,
+                access,
+                work);
+<span class="fc" id="L210">        BigInteger content = integerContent(integral, work);</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (content.signum() &lt;= 0) {</span>
+<span class="nc" id="L212">            throw new IllegalStateException(</span>
+                &quot;nonzero polynomial produced invalid content&quot;);
+        }
+
+<span class="fc" id="L216">        work.consume(&quot;content.sign-normalization&quot;, 1);</span>
+        BigInteger signedContent =
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            integral.firstEntry().getValue().signum() &lt; 0</span>
+<span class="fc" id="L219">                ? content.negate()</span>
+<span class="pc" id="L220">                : content;</span>
+<span class="fc" id="L221">        NavigableMap&lt;Monomial, BigInteger&gt; primitiveTerms =</span>
+<span class="fc" id="L222">            primitiveTerms(</span>
+                integral,
+                signedContent,
+                policy,
+                work);
+<span class="fc" id="L227">        SparsePolynomial&lt;BigInteger&gt; primitive =</span>
+<span class="fc" id="L228">            primitivePolynomial(source, primitiveTerms);</span>
+<span class="fc" id="L229">        ExactRational scalar = new ExactRational(</span>
+            signedContent,
+            denominator);
+
+<span class="fc" id="L233">        verify(</span>
+            source,
+            integral,
+            primitive,
+            content,
+            signedContent,
+            scalar,
+            access,
+            work);
+<span class="fc" id="L242">        return UnivariateContentResult.completed(</span>
+            denominator,
+            content,
+            scalar,
+            primitive,
+<span class="fc" id="L247">            work.ledger(),</span>
+            request,
+            policy);
+    }
+
+    private static &lt;C&gt; BigInteger denominatorClearingFactor(
+        SparsePolynomial&lt;C&gt; source,
+        UnivariateContentPolicy policy,
+        CoefficientAccess&lt;C&gt; access,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L258">        BigInteger result = BigInteger.ONE;</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        for (C coefficient : source.terms().values()) {</span>
+<span class="fc" id="L260">            work.consume(</span>
+                &quot;content.denominator-lcm.coefficients&quot;,
+                1);
+<span class="fc" id="L263">            BigInteger denominator =</span>
+<span class="fc" id="L264">                access.denominator(coefficient);</span>
+<span class="fc" id="L265">            requireWithinLimit(</span>
+                denominator,
+                policy,
+                &quot;DENOMINATOR_LCM_BIT_LENGTH_EXCEEDED&quot;);
+<span class="fc" id="L269">            work.consume(&quot;content.denominator-lcm.gcd&quot;, 1);</span>
+<span class="fc" id="L270">            BigInteger gcd = result.gcd(denominator);</span>
+<span class="fc" id="L271">            work.consume(&quot;content.denominator-lcm.division&quot;, 1);</span>
+<span class="fc" id="L272">            BigInteger reduced = result.divide(gcd);</span>
+<span class="fc" id="L273">            work.consume(</span>
+                &quot;content.denominator-lcm.multiplication&quot;,
+                1);
+<span class="fc" id="L276">            result = multiplyWithinLimit(</span>
+                reduced,
+                denominator,
+                policy,
+                &quot;DENOMINATOR_LCM_BIT_LENGTH_EXCEEDED&quot;);
+<span class="fc" id="L281">        }</span>
+<span class="fc" id="L282">        return result;</span>
+    }
+
+    private static &lt;C&gt; NavigableMap&lt;Monomial, BigInteger&gt;
+            integralTerms(
+        SparsePolynomial&lt;C&gt; source,
+        BigInteger denominatorClearingFactor,
+        UnivariateContentPolicy policy,
+        CoefficientAccess&lt;C&gt; access,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L293">        NavigableMap&lt;Monomial, BigInteger&gt; result =</span>
+<span class="fc" id="L294">            new TreeMap&lt;&gt;(source.ring().monomialComparator());</span>
+        for (Map.Entry&lt;Monomial, C&gt; term
+<span class="fc bfc" id="L296" title="All 2 branches covered.">                : source.terms().entrySet()) {</span>
+<span class="fc" id="L297">            work.consume(</span>
+                &quot;content.integralization.coefficients&quot;,
+                1);
+<span class="fc" id="L300">            BigInteger denominator =</span>
+<span class="fc" id="L301">                access.denominator(term.getValue());</span>
+<span class="fc" id="L302">            work.consume(&quot;content.integralization.division&quot;, 1);</span>
+<span class="fc" id="L303">            BigInteger multiplier =</span>
+<span class="fc" id="L304">                denominatorClearingFactor.divide(denominator);</span>
+<span class="fc" id="L305">            work.consume(</span>
+                &quot;content.integralization.multiplication&quot;,
+                1);
+<span class="fc" id="L308">            BigInteger value = multiplyWithinLimit(</span>
+<span class="fc" id="L309">                access.numerator(term.getValue()),</span>
+                multiplier,
+                policy,
+                &quot;INTEGRAL_COEFFICIENT_BIT_LENGTH_EXCEEDED&quot;);
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">            if (value.signum() == 0) {</span>
+<span class="nc" id="L314">                throw new IllegalStateException(</span>
+                    &quot;sparse source exposed a zero term&quot;);
+            }
+<span class="fc" id="L317">            result.put(term.getKey(), value);</span>
+<span class="fc" id="L318">        }</span>
+<span class="fc" id="L319">        return result;</span>
+    }
+
+    private static BigInteger integerContent(
+        NavigableMap&lt;Monomial, BigInteger&gt; integral,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L326">        BigInteger result = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        for (BigInteger coefficient : integral.values()) {</span>
+<span class="fc" id="L328">            work.consume(&quot;content.integer-content.gcd&quot;, 1);</span>
+<span class="fc" id="L329">            result = result.gcd(coefficient.abs());</span>
+<span class="fc" id="L330">        }</span>
+<span class="fc" id="L331">        return result;</span>
+    }
+
+    private static NavigableMap&lt;Monomial, BigInteger&gt;
+            primitiveTerms(
+        NavigableMap&lt;Monomial, BigInteger&gt; integral,
+        BigInteger signedContent,
+        UnivariateContentPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L341">        NavigableMap&lt;Monomial, BigInteger&gt; result =</span>
+<span class="fc" id="L342">            new TreeMap&lt;&gt;(integral.comparator());</span>
+        for (Map.Entry&lt;Monomial, BigInteger&gt; term
+<span class="fc bfc" id="L344" title="All 2 branches covered.">                : integral.entrySet()) {</span>
+<span class="fc" id="L345">            work.consume(&quot;content.primitive-part.division&quot;, 1);</span>
+<span class="fc" id="L346">            BigInteger coefficient =</span>
+<span class="fc" id="L347">                term.getValue().divide(signedContent);</span>
+<span class="fc" id="L348">            requireWithinLimit(</span>
+                coefficient,
+                policy,
+                &quot;PRIMITIVE_COEFFICIENT_BIT_LENGTH_EXCEEDED&quot;);
+<span class="fc" id="L352">            result.put(term.getKey(), coefficient);</span>
+<span class="fc" id="L353">        }</span>
+<span class="fc" id="L354">        return result;</span>
+    }
+
+    private static &lt;C&gt; SparsePolynomial&lt;BigInteger&gt;
+            primitivePolynomial(
+        SparsePolynomial&lt;C&gt; source,
+        NavigableMap&lt;Monomial, BigInteger&gt; terms
+    ) {
+<span class="fc" id="L362">        PolynomialRing&lt;BigInteger&gt; ring =</span>
+            new PolynomialRing&lt;&gt;(
+                BigIntegerDomain.INSTANCE,
+<span class="fc" id="L365">                source.ring().variables(),</span>
+<span class="fc" id="L366">                source.ring().monomialOrder());</span>
+<span class="fc" id="L367">        return new SparsePolynomial&lt;&gt;(ring, terms);</span>
+    }
+
+    private static &lt;C&gt; void verify(
+        SparsePolynomial&lt;C&gt; source,
+        NavigableMap&lt;Monomial, BigInteger&gt; integral,
+        SparsePolynomial&lt;BigInteger&gt; primitive,
+        BigInteger content,
+        BigInteger signedContent,
+        ExactRational scalar,
+        CoefficientAccess&lt;C&gt; access,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L380">        verifyPrimitive(primitive, content, work);</span>
+<span class="fc" id="L381">        verifyIntegral(</span>
+            integral,
+            primitive,
+            signedContent,
+            work);
+<span class="fc" id="L386">        verifySource(</span>
+            source,
+            primitive,
+            scalar,
+            access,
+            work);
+<span class="fc" id="L392">    }</span>
+
+    private static void verifyPrimitive(
+        SparsePolynomial&lt;BigInteger&gt; primitive,
+        BigInteger content,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L399">        BigInteger gcd = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        for (BigInteger coefficient : primitive.terms().values()) {</span>
+<span class="fc" id="L401">            work.consume(&quot;content.verify.primitive-gcd&quot;, 1);</span>
+<span class="fc" id="L402">            gcd = gcd.gcd(coefficient.abs());</span>
+<span class="fc" id="L403">        }</span>
+<span class="fc" id="L404">        work.consume(&quot;content.verify.primitive-comparison&quot;, 1);</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">        if (!BigInteger.ONE.equals(gcd)</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">                || content.signum() &lt;= 0</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">                || primitive.leadingCoefficient().signum() &lt;= 0) {</span>
+<span class="nc" id="L408">            throw new IllegalStateException(</span>
+                &quot;primitive-part verification failed&quot;);
+        }
+<span class="fc" id="L411">    }</span>
+
+    private static void verifyIntegral(
+        NavigableMap&lt;Monomial, BigInteger&gt; integral,
+        SparsePolynomial&lt;BigInteger&gt; primitive,
+        BigInteger signedContent,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L419">        work.consume(&quot;content.verify.integral-support&quot;, 1);</span>
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">        if (!integral.keySet().equals(</span>
+<span class="fc" id="L421">                primitive.terms().keySet())) {</span>
+<span class="nc" id="L422">            throw new IllegalStateException(</span>
+                &quot;primitive part changed integral support&quot;);
+        }
+        for (Map.Entry&lt;Monomial, BigInteger&gt; term
+<span class="fc bfc" id="L426" title="All 2 branches covered.">                : primitive.terms().entrySet()) {</span>
+<span class="fc" id="L427">            work.consume(</span>
+                &quot;content.verify.integral-multiplication&quot;,
+                1);
+<span class="fc" id="L430">            BigInteger reconstructed =</span>
+<span class="fc" id="L431">                term.getValue().multiply(signedContent);</span>
+<span class="fc" id="L432">            work.consume(</span>
+                &quot;content.verify.integral-comparison&quot;,
+                1);
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">            if (!reconstructed.equals(</span>
+<span class="fc" id="L436">                    integral.get(term.getKey()))) {</span>
+<span class="nc" id="L437">                throw new IllegalStateException(</span>
+                    &quot;integer content reconstruction failed&quot;);
+            }
+<span class="fc" id="L440">        }</span>
+<span class="fc" id="L441">    }</span>
+
+    private static &lt;C&gt; void verifySource(
+        SparsePolynomial&lt;C&gt; source,
+        SparsePolynomial&lt;BigInteger&gt; primitive,
+        ExactRational scalar,
+        CoefficientAccess&lt;C&gt; access,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L450">        work.consume(&quot;content.verify.source-support&quot;, 1);</span>
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">        if (!source.terms().keySet().equals(</span>
+<span class="fc" id="L452">                primitive.terms().keySet())) {</span>
+<span class="nc" id="L453">            throw new IllegalStateException(</span>
+                &quot;primitive part changed source support&quot;);
+        }
+        for (Map.Entry&lt;Monomial, C&gt; term
+<span class="fc bfc" id="L457" title="All 2 branches covered.">                : source.terms().entrySet()) {</span>
+<span class="fc" id="L458">            work.consume(</span>
+                &quot;content.verify.source-multiplication&quot;,
+                1);
+<span class="fc" id="L461">            ExactRational reconstructed =</span>
+<span class="fc" id="L462">                ExactRational.integer(</span>
+<span class="fc" id="L463">                    primitive.terms().get(term.getKey()))</span>
+<span class="fc" id="L464">                    .multiply(scalar);</span>
+<span class="fc" id="L465">            work.consume(</span>
+                &quot;content.verify.source-comparison&quot;,
+                1);
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">            if (!access.matches(</span>
+<span class="fc" id="L469">                    term.getValue(),</span>
+                    reconstructed)) {
+<span class="nc" id="L471">                throw new IllegalStateException(</span>
+                    &quot;source content reconstruction failed&quot;);
+            }
+<span class="fc" id="L474">        }</span>
+<span class="fc" id="L475">    }</span>
+
+    private static BigInteger multiplyWithinLimit(
+        BigInteger left,
+        BigInteger right,
+        UnivariateContentPolicy policy,
+        String detailCode
+    ) {
+<span class="pc bpc" id="L483" title="2 of 4 branches missed.">        if (left.signum() != 0 &amp;&amp; right.signum() != 0) {</span>
+<span class="fc" id="L484">            long minimumBits =</span>
+<span class="fc" id="L485">                (long) left.abs().bitLength()</span>
+<span class="fc" id="L486">                    + right.abs().bitLength()</span>
+                    - 1L;
+<span class="fc" id="L488">            if (minimumBits</span>
+                    &gt; policy
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">                        .maxIntermediateCoefficientBitLength()) {</span>
+<span class="nc" id="L491">                throw new IntermediateLimitReached(detailCode);</span>
+            }
+        }
+<span class="fc" id="L494">        BigInteger result = left.multiply(right);</span>
+<span class="fc" id="L495">        requireWithinLimit(result, policy, detailCode);</span>
+<span class="fc" id="L496">        return result;</span>
+    }
+
+    private static void requireWithinLimit(
+        BigInteger value,
+        UnivariateContentPolicy policy,
+        String detailCode
+    ) {
+<span class="fc" id="L504">        if (value.abs().bitLength()</span>
+<span class="fc bfc" id="L505" title="All 2 branches covered.">                &gt; policy.maxIntermediateCoefficientBitLength()) {</span>
+<span class="fc" id="L506">            throw new IntermediateLimitReached(detailCode);</span>
+        }
+<span class="fc" id="L508">    }</span>
+
+    private static &lt;C&gt; UnivariateContentResult failure(
+        UnivariateContentResult.Status status,
+        String detailCode,
+        FactorizationRequest&lt;C&gt; request,
+        UnivariateContentPolicy policy,
+        PolynomialWorkLedger work
+    ) {
+<span class="fc" id="L517">        return UnivariateContentResult.failure(</span>
+            status,
+            detailCode,
+            work,
+            request,
+            policy);
+    }
+
+    private interface CoefficientAccess&lt;C&gt; {
+        String domainId();
+
+        String domainFailureCode();
+
+        BigInteger numerator(C coefficient);
+
+        BigInteger denominator(C coefficient);
+
+        boolean matches(
+            C sourceCoefficient,
+            ExactRational reconstructed);
+    }
+
+<span class="fc" id="L539">    private enum IntegerAccess</span>
+            implements CoefficientAccess&lt;BigInteger&gt; {
+<span class="fc" id="L541">        INSTANCE;</span>
+
+        @Override
+        public String domainId() {
+<span class="fc" id="L545">            return BigIntegerDomain.DOMAIN_ID;</span>
+        }
+
+        @Override
+        public String domainFailureCode() {
+<span class="nc" id="L550">            return &quot;REQUIRES_EXACT_INTEGER_COEFFICIENT_DOMAIN&quot;;</span>
+        }
+
+        @Override
+        public BigInteger numerator(BigInteger coefficient) {
+<span class="fc" id="L555">            return Objects.requireNonNull(</span>
+                coefficient,
+                &quot;coefficient&quot;);
+        }
+
+        @Override
+        public BigInteger denominator(BigInteger coefficient) {
+<span class="fc" id="L562">            Objects.requireNonNull(coefficient, &quot;coefficient&quot;);</span>
+<span class="fc" id="L563">            return BigInteger.ONE;</span>
+        }
+
+        @Override
+        public boolean matches(
+            BigInteger sourceCoefficient,
+            ExactRational reconstructed
+        ) {
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">            return reconstructed.isInteger()</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">                &amp;&amp; sourceCoefficient.equals(</span>
+<span class="fc" id="L573">                    reconstructed.numerator());</span>
+        }
+    }
+
+<span class="fc" id="L577">    private enum RationalAccess</span>
+            implements CoefficientAccess&lt;ExactRational&gt; {
+<span class="fc" id="L579">        INSTANCE;</span>
+
+        @Override
+        public String domainId() {
+<span class="fc" id="L583">            return ExactRationalField.DOMAIN_ID;</span>
+        }
+
+        @Override
+        public String domainFailureCode() {
+<span class="nc" id="L588">            return &quot;REQUIRES_EXACT_RATIONAL_COEFFICIENT_DOMAIN&quot;;</span>
+        }
+
+        @Override
+        public BigInteger numerator(ExactRational coefficient) {
+<span class="fc" id="L593">            return Objects.requireNonNull(</span>
+                coefficient,
+<span class="fc" id="L595">                &quot;coefficient&quot;).numerator();</span>
+        }
+
+        @Override
+        public BigInteger denominator(ExactRational coefficient) {
+<span class="fc" id="L600">            return Objects.requireNonNull(</span>
+                coefficient,
+<span class="fc" id="L602">                &quot;coefficient&quot;).denominator();</span>
+        }
+
+        @Override
+        public boolean matches(
+            ExactRational sourceCoefficient,
+            ExactRational reconstructed
+        ) {
+<span class="fc" id="L610">            return sourceCoefficient.equals(reconstructed);</span>
+        }
+    }
+
+    private static final class IntermediateLimitReached
+            extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final String detailCode;
+
+<span class="fc" id="L619">        private IntermediateLimitReached(String detailCode) {</span>
+<span class="fc" id="L620">            this.detailCode = detailCode;</span>
+<span class="fc" id="L621">        }</span>
+
+        private String detailCode() {
+<span class="fc" id="L624">            return detailCode;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

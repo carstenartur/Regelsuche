@@ -5,7 +5,7 @@ import de.regelsuche.polynomial.PolynomialWorkSink;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Shared non-resettable work budget for one exact polynomial algorithm. */
+/** Shared non-resettable work budget for exact polynomial algorithm stages. */
 final class PolynomialWorkBudget implements PolynomialWorkSink {
     private final long limit;
 <span class="fc" id="L11">    private final Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
@@ -19,27 +19,31 @@ final class PolynomialWorkBudget implements PolynomialWorkSink {
 <span class="fc" id="L19">        this.limit = limit;</span>
 <span class="fc" id="L20">    }</span>
 
-    @Override
-    public void consume(String stage, long units) {
-<span class="pc bpc" id="L24" title="3 of 6 branches missed.">        if (stage == null || stage.isBlank() || units &lt; 0) {</span>
-<span class="nc" id="L25">            throw new IllegalArgumentException(</span>
-                &quot;polynomial work entry is invalid&quot;);
-        }
-<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if (units == 0) {</span>
-<span class="nc" id="L29">            return;</span>
-        }
-<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (total &gt; limit - units) {</span>
-<span class="fc" id="L32">            throw new LimitReached();</span>
-        }
-<span class="fc" id="L34">        total += units;</span>
-<span class="fc" id="L35">        stages.merge(stage, units, Math::addExact);</span>
-<span class="fc" id="L36">    }</span>
-
-    PolynomialWorkLedger ledger() {
-<span class="fc" id="L39">        return new PolynomialWorkLedger(stages);</span>
+    long limit() {
+<span class="fc" id="L23">        return limit;</span>
     }
 
-<span class="fc" id="L42">    static final class LimitReached extends RuntimeException {</span>
+    @Override
+    public void consume(String stage, long units) {
+<span class="pc bpc" id="L28" title="3 of 6 branches missed.">        if (stage == null || stage.isBlank() || units &lt; 0) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(</span>
+                &quot;polynomial work entry is invalid&quot;);
+        }
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (units == 0) {</span>
+<span class="nc" id="L33">            return;</span>
+        }
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (total &gt; limit - units) {</span>
+<span class="fc" id="L36">            throw new LimitReached();</span>
+        }
+<span class="fc" id="L38">        total += units;</span>
+<span class="fc" id="L39">        stages.merge(stage, units, Math::addExact);</span>
+<span class="fc" id="L40">    }</span>
+
+    PolynomialWorkLedger ledger() {
+<span class="fc" id="L43">        return new PolynomialWorkLedger(stages);</span>
+    }
+
+<span class="fc" id="L46">    static final class LimitReached extends RuntimeException {</span>
         private static final long serialVersionUID = 1L;
     }
 }
