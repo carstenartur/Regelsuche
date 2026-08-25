@@ -106,13 +106,15 @@ public final class ExactRationalPolynomialDecompositionSynthesisOperator
                 Status.PARSE_ERROR,
                 "EXPRESSION_BLANK");
         }
+        ExactParsedTerm parsed;
         try {
-            return synthesizeParsed(parser.parseExactTerm(expression));
+            parsed = parser.parseExactTerm(expression);
         } catch (IllegalArgumentException exception) {
             return failure(
                 Status.PARSE_ERROR,
                 safeMessage(exception));
         }
+        return synthesizeParsed(parsed);
     }
 
     private SynthesisReport synthesizeParsed(ExactParsedTerm parsed) {
