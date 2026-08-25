@@ -200,11 +200,31 @@ public final class SuitablePrimeSelection {
                     work);
 
             if (factorization.completed()) {
-                verifyModularSourceCorrespondence(
-                    source,
-                    field,
-                    modularSource,
-                    work);
+                try {
+                    verifyModularSourceCorrespondence(
+                        source,
+                        field,
+                        modularSource,
+                        work);
+                } catch (PolynomialWorkBudget.LimitReached exception) {
+                    long attemptWork = total(work) - workBefore;
+                    attempts.add(SuitablePrimeSelectionResult.issueAttempt(
+                        prime,
+                        SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                            .TERMINAL_INCONCLUSIVE,
+                        "SOURCE_CORRESPONDENCE_WORK_BUDGET_EXCEEDED",
+                        modularSource,
+                        factorization.certificateHash(),
+                        attemptWork));
+                    return failure(
+                        SuitablePrimeSelectionResult.Status
+                            .BUDGET_INCONCLUSIVE,
+                        "SOURCE_CORRESPONDENCE_INCONCLUSIVE",
+                        attempts,
+                        work.ledger(),
+                        request,
+                        policy);
+                }
                 long attemptWork = total(work) - workBefore;
                 attempts.add(SuitablePrimeSelectionResult.issueAttempt(
                     prime,
