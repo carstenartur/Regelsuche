@@ -9,13 +9,14 @@ public record FiniteFieldFactorizationPolicy(
     long maxMatrixCells
 ) {
     public static final int MAX_FIELD_ELEMENTS = 1_000_000;
-    public static final long MAX_MATRIX_CELLS = 16_000_000L;
+    public static final long MAX_MATRIX_CELLS = 4_000_000L;
+    private static final long RETAINED_DENSE_MATRICES = 2L;
 
     public FiniteFieldFactorizationPolicy {
         Objects.requireNonNull(algorithm, "algorithm");
         if (maxEnumeratedFieldElements < 2
                 || maxEnumeratedFieldElements > MAX_FIELD_ELEMENTS
-                || maxMatrixCells < 1
+                || maxMatrixCells < RETAINED_DENSE_MATRICES
                 || maxMatrixCells > MAX_MATRIX_CELLS) {
             throw new IllegalArgumentException(
                 "finite-field factorization policy is invalid");
@@ -35,7 +36,8 @@ public record FiniteFieldFactorizationPolicy(
 
     public boolean permitsMatrixDegree(int degree) {
         return degree >= 0
-            && (long) degree * degree <= maxMatrixCells;
+            && (long) degree * degree
+                <= maxMatrixCells / RETAINED_DENSE_MATRICES;
     }
 
     public String canonicalMaterial() {
