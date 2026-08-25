@@ -1,8 +1,10 @@
 package de.regelsuche.polynomial;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigInteger;
 import java.util.List;
@@ -47,6 +49,15 @@ class PrimeFieldTest {
 
         assertEquals(five, anotherFive);
         assertNotEquals(five, seven);
+    }
+
+    @Test
+    void sharedPredicateDefinesTheAcceptedPrimeModuli() {
+        assertTrue(PrimeField.isPrimeModulus(2));
+        assertTrue(PrimeField.isPrimeModulus(65_521));
+        assertFalse(PrimeField.isPrimeModulus(1));
+        assertFalse(PrimeField.isPrimeModulus(15));
+        assertFalse(PrimeField.isPrimeModulus(Integer.MAX_VALUE - 1));
     }
 
     @Test
