@@ -16,15 +16,15 @@ import java.util.Optional;
  * exact theory method.
  *
  * <p>The cache is deliberately separate from the kernel and standard rule
- * inventory. A distinct mathematical macro occupies one capacity slot while
- * independently content-addressed lineages retain primitive expansion and
- * source provenance. Eviction is deterministic insertion-order FIFO. A cache
- * miss carries no mathematical meaning.</p>
+ * inventory. One mathematical macro occupies one capacity slot while distinct
+ * content-addressed lineages retain primitive expansion and source provenance.
+ * Eviction is deterministic insertion-order FIFO. A cache miss carries no
+ * mathematical meaning.</p>
  */
 public final class PolynomialDerivedMacroCache {
     public static final int DEFAULT_CAPACITY = 128;
     public static final String SCHEMA =
-        "regelsuche.polynomial-derived-macro-cache-entry/v1";
+        "regelsuche.polynomial-derived-macro-cache-entry/v2";
     public static final String PURPOSE =
         "PERFORMANCE_CACHE_FOR_THEORY_DERIVED_POLYNOMIAL_MACROS";
 
@@ -127,7 +127,8 @@ public final class PolynomialDerivedMacroCache {
     ) {
         Objects.requireNonNull(values, name);
         if (values.isEmpty()) {
-            throw new IllegalArgumentException(name + " must not be empty");
+            throw new IllegalArgumentException(
+                name + " must not be empty");
         }
         List<String> copy = new ArrayList<>(values.size());
         for (String value : values) {
@@ -139,7 +140,8 @@ public final class PolynomialDerivedMacroCache {
 
     private static void requireText(String value, String name) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(name + " must not be blank");
+            throw new IllegalArgumentException(
+                name + " must not be blank");
         }
     }
 
@@ -149,7 +151,9 @@ public final class PolynomialDerivedMacroCache {
                 .digest(material.getBytes(StandardCharsets.UTF_8));
             return "sha256:" + HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 unavailable", exception);
+            throw new IllegalStateException(
+                "SHA-256 unavailable",
+                exception);
         }
     }
 
@@ -162,13 +166,20 @@ public final class PolynomialDerivedMacroCache {
         String purpose
     ) {
         public Entry {
-            if (id == null || !id.matches("sha256:[0-9a-f]{64}")
-                    || leftPattern == null || leftPattern.isBlank()
-                    || rightPattern == null || rightPattern.isBlank()
-                    || classification == null || !classification.subsumed()
-                    || !leftPattern.equals(classification.sourceExpression())
-                    || !rightPattern.equals(classification.derivedExpression())
-                    || purpose == null || !PURPOSE.equals(purpose)) {
+            if (id == null
+                    || !id.matches("sha256:[0-9a-f]{64}")
+                    || leftPattern == null
+                    || leftPattern.isBlank()
+                    || rightPattern == null
+                    || rightPattern.isBlank()
+                    || classification == null
+                    || !classification.subsumed()
+                    || !leftPattern.equals(
+                        classification.sourceExpression())
+                    || !rightPattern.equals(
+                        classification.derivedExpression())
+                    || purpose == null
+                    || !PURPOSE.equals(purpose)) {
                 throw new IllegalArgumentException(
                     "derived polynomial macro cache entry is invalid");
             }
@@ -201,10 +212,11 @@ public final class PolynomialDerivedMacroCache {
         List<String> primitiveRuleIds,
         List<String> sourceProvenance,
         String applicationKey,
-        int consideredConfigurations
+        long arithmeticSteps
     ) {
         public Lineage {
-            if (id == null || !id.matches("sha256:[0-9a-f]{64}")) {
+            if (id == null
+                    || !id.matches("sha256:[0-9a-f]{64}")) {
                 throw new IllegalArgumentException(
                     "derived polynomial macro lineage id is invalid");
             }
@@ -215,9 +227,9 @@ public final class PolynomialDerivedMacroCache {
                 sourceProvenance,
                 "sourceProvenance");
             requireText(applicationKey, "applicationKey");
-            if (consideredConfigurations < 0) {
+            if (arithmeticSteps < 0) {
                 throw new IllegalArgumentException(
-                    "consideredConfigurations must not be negative");
+                    "arithmeticSteps must not be negative");
             }
         }
 
@@ -242,7 +254,7 @@ public final class PolynomialDerivedMacroCache {
             append(material, classification.applicationKey());
             append(
                 material,
-                Integer.toString(classification.consideredConfigurations()));
+                Long.toString(classification.arithmeticSteps()));
             append(material, Integer.toString(primitives.size()));
             primitives.forEach(value -> append(material, value));
             append(material, Integer.toString(provenance.size()));
@@ -252,7 +264,7 @@ public final class PolynomialDerivedMacroCache {
                 primitives,
                 provenance,
                 classification.applicationKey(),
-                classification.consideredConfigurations());
+                classification.arithmeticSteps());
         }
     }
 }
