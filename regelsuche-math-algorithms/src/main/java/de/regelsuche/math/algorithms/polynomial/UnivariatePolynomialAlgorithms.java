@@ -2,8 +2,8 @@ package de.regelsuche.math.algorithms.polynomial;
 
 import de.regelsuche.polynomial.CoefficientDomain;
 import de.regelsuche.polynomial.ExactField;
-import de.regelsuche.polynomial.FactorizationEngine;
 import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.polynomial.SparsePolynomial;
 import de.regelsuche.polynomial.UnivariatePolynomialView;
 import java.util.Objects;
@@ -27,7 +27,7 @@ public final class UnivariatePolynomialAlgorithms {
             return GcdResult.failure(
                 Status.UNSUPPORTED_SHAPE,
                 "POLYNOMIAL_RING_MISMATCH",
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 left,
                 right);
         }
@@ -35,7 +35,7 @@ public final class UnivariatePolynomialAlgorithms {
             return GcdResult.failure(
                 Status.UNSUPPORTED_SHAPE,
                 "REQUIRES_ONE_POLYNOMIAL_VARIABLE",
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 left,
                 right);
         }
@@ -43,7 +43,7 @@ public final class UnivariatePolynomialAlgorithms {
             return GcdResult.failure(
                 Status.UNSUPPORTED_SHAPE,
                 "GCD_ZERO_ZERO_UNDEFINED",
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 left,
                 right);
         }
@@ -52,7 +52,7 @@ public final class UnivariatePolynomialAlgorithms {
             return GcdResult.failure(
                 Status.UNSUPPORTED_DOMAIN,
                 "REQUIRES_EXACT_COEFFICIENT_FIELD",
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 left,
                 right);
         }
@@ -180,7 +180,7 @@ public final class UnivariatePolynomialAlgorithms {
             Status status,
             String detailCode,
             SparsePolynomial<C> gcd,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             String certificateHash
         ) {
             state = new State<>(
@@ -193,7 +193,7 @@ public final class UnivariatePolynomialAlgorithms {
 
         private static <C> GcdResult<C> completed(
             SparsePolynomial<C> gcd,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             SparsePolynomial<C> left,
             SparsePolynomial<C> right
         ) {
@@ -209,7 +209,7 @@ public final class UnivariatePolynomialAlgorithms {
         private static <C> GcdResult<C> failure(
             Status status,
             String detailCode,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             SparsePolynomial<C> left,
             SparsePolynomial<C> right
         ) {
@@ -230,7 +230,7 @@ public final class UnivariatePolynomialAlgorithms {
             Status status,
             String detailCode,
             SparsePolynomial<C> gcd,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             SparsePolynomial<C> left,
             SparsePolynomial<C> right
         ) {
@@ -273,7 +273,7 @@ public final class UnivariatePolynomialAlgorithms {
             return state.gcd();
         }
 
-        public FactorizationEngine.WorkLedger work() {
+        public PolynomialWorkLedger work() {
             return state.work();
         }
 
@@ -306,7 +306,7 @@ public final class UnivariatePolynomialAlgorithms {
             Status status,
             String detailCode,
             SparsePolynomial<C> gcd,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             String certificateHash
         ) {
             private State {
