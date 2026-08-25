@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +15,18 @@ class UnivariatePolynomialViewTest {
             ExactRationalField.INSTANCE,
             List.of(new PolynomialVariable("x")),
             PolynomialRing.MonomialOrder.LEXICOGRAPHIC);
+
+    @Test
+    void exactRationalFieldDeclaresCharacteristicAndIntegerEmbedding() {
+        assertEquals(
+            BigInteger.ZERO,
+            ExactRationalField.INSTANCE.characteristic());
+        assertEquals(
+            ExactRational.integer(
+                new BigInteger("9007199254740993")),
+            ExactRationalField.INSTANCE.fromInteger(
+                new BigInteger("9007199254740993")));
+    }
 
     @Test
     void projectionRoundTripsAndRetainsCanonicalAscendingCoefficients() {
