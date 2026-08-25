@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.polynomial.BinaryQuarticFactorizationEngine;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -41,7 +42,7 @@ class PolynomialTheorySubsumptionClassifierTest {
         assertTrue(result.certificateHash().matches("sha256:[0-9a-f]{64}"));
         assertFalse(result.derivedExpression().isBlank());
         assertFalse(result.applicationKey().isBlank());
-        assertTrue(result.consideredConfigurations() > 0);
+        assertTrue(result.workUnits() > 0);
     }
 
     @Test
@@ -95,8 +96,8 @@ class PolynomialTheorySubsumptionClassifierTest {
             new PolynomialDecompositionSynthesisOperator(
                 new PolynomialSemanticView(
                     new PolynomialSemanticView.Budget(2, 4, 16, 256)),
+                new BinaryQuarticFactorizationEngine(32, 1),
                 6,
-                32,
                 1);
         PolynomialTheorySubsumptionClassifier boundedClassifier =
             new PolynomialTheorySubsumptionClassifier(
@@ -147,7 +148,8 @@ class PolynomialTheorySubsumptionClassifierTest {
         assertEquals(2, secondLineage.lineages().size());
         assertEquals(result.sourceExpression(), secondLineage.leftPattern());
         assertEquals(result.derivedExpression(), secondLineage.rightPattern());
-        assertEquals(result.certificateHash(),
+        assertEquals(
+            result.certificateHash(),
             secondLineage.classification().certificateHash());
         assertEquals(
             List.of(PolynomialDecompositionSynthesisOperator.RULE_ID),
@@ -162,8 +164,8 @@ class PolynomialTheorySubsumptionClassifierTest {
             result.applicationKey(),
             secondLineage.lineages().get(1).applicationKey());
         assertEquals(
-            result.consideredConfigurations(),
-            secondLineage.lineages().get(1).consideredConfigurations());
+            result.workUnits(),
+            secondLineage.lineages().get(1).workUnits());
         assertEquals(
             PolynomialDerivedMacroCache.PURPOSE,
             secondLineage.purpose());

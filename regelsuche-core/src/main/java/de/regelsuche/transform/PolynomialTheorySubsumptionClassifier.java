@@ -10,36 +10,30 @@ import de.regelsuche.value.ExprValueFactory;
 import java.util.Objects;
 
 /**
- * Classifies an observed polynomial identity against the exact bounded
- * decomposition theory implemented by
- * {@link PolynomialDecompositionSynthesisOperator}.
- *
- * <p>A positive result means that the right-hand side is one of the exact
- * decompositions generated from the left-hand side under the same finite
- * theory budget. It therefore describes a theory-derived instance, not a new
- * kernel rule or an externally novel mathematical statement. Project-inventory
- * novelty is deliberately left unevaluated.</p>
+ * Classifies one observed polynomial identity against the configured exact
+ * factorization theory.
  */
 public final class PolynomialTheorySubsumptionClassifier {
-    private final PolynomialDecompositionSynthesisOperator synthesizer;
+    private final PolynomialDecompositionSynthesisOperator factorization;
     private final ExpressionCanonicalizer canonicalizer;
     private final ExpressionParser parser;
 
     public PolynomialTheorySubsumptionClassifier() {
         this(
-            new PolynomialDecompositionSynthesisOperator(Integer.MAX_VALUE),
+            new PolynomialDecompositionSynthesisOperator(
+                Integer.MAX_VALUE),
             new ExpressionCanonicalizer(),
             new ExpressionParser());
     }
 
     PolynomialTheorySubsumptionClassifier(
-        PolynomialDecompositionSynthesisOperator synthesizer,
+        PolynomialDecompositionSynthesisOperator factorization,
         ExpressionCanonicalizer canonicalizer,
         ExpressionParser parser
     ) {
-        this.synthesizer = Objects.requireNonNull(
-            synthesizer,
-            "synthesizer");
+        this.factorization = Objects.requireNonNull(
+            factorization,
+            "factorization");
         this.canonicalizer = Objects.requireNonNull(
             canonicalizer,
             "canonicalizer");
@@ -69,53 +63,33 @@ public final class PolynomialTheorySubsumptionClassifier {
                 0);
         }
 
-        PolynomialDecompositionSynthesisOperator.SynthesisReport report =
-            synthesizer.synthesize(leftExpression);
+        ExpressionFactorizationReport report =
+            factorization.factorExpression(leftExpression);
         if (!report.generated()) {
-            return switch (report.status()) {
-                case BUDGET_EXCEEDED, CANDIDATE_BUDGET_ZERO ->
-                    Classification.failure(
-                        Status.BUDGET_INCONCLUSIVE,
-                        report.detailCode(),
-                        report.consideredConfigurations());
-                case NO_INTEGER_QUADRATIC_FACTORIZATION ->
-                    Classification.failure(
-                        Status.NOT_SUBSUMED,
-                        report.detailCode(),
-                        report.consideredConfigurations());
-                case PARSE_ERROR,
-                    UNSUPPORTED_SEMANTIC_VIEW,
-                    NOT_BINARY_HOMOGENEOUS_QUARTIC ->
-                    Classification.failure(
-                        Status.UNSUPPORTED,
-                        report.detailCode(),
-                        report.consideredConfigurations());
-                case GENERATED -> throw new IllegalStateException(
-                    "generated report was handled as a failure");
-            };
+            return failure(report);
         }
 
         try (ExprValueFactory values = new ExprValueFactory()) {
-            ExprValueFactory.ExprValue targetValue = values.fromExpr(target);
-            for (PolynomialDecompositionSynthesisOperator.Candidate candidate
+            ExprValueFactory.ExprValue targetValue =
+                values.fromExpr(target);
+            for (ExpressionFactorizationReport.RenderedFactorization candidate
                     : report.candidates()) {
                 Expr candidateExpression;
                 try {
                     candidateExpression = parseCanonical(
                         candidate.transformedExpression());
                 } catch (IllegalArgumentException exception) {
-                    throw new IllegalStateException(
-                        "exact polynomial synthesizer emitted an expression "
-                            + "that cannot be parsed and canonicalized: "
-                            + candidate.transformedExpression(),
-                        exception);
+                    return Classification.failure(
+                        Status.TECHNICAL_FAILURE,
+                        "FACTORIZATION_RENDER_CANNOT_BE_PARSED",
+                        report.totalWorkUnits());
                 }
                 if (targetValue.sameValue(
                         values.fromExpr(candidateExpression))) {
                     return Classification.subsumed(
                         canonicalSource,
                         candidate,
-                        report.consideredConfigurations());
+                        report.totalWorkUnits());
                 }
             }
         }
@@ -123,7 +97,27 @@ public final class PolynomialTheorySubsumptionClassifier {
         return Classification.failure(
             Status.NOT_SUBSUMED,
             "TARGET_NOT_GENERATED_WITHIN_BOUND",
-            report.consideredConfigurations());
+            report.totalWorkUnits());
+    }
+
+    private Classification failure(
+        ExpressionFactorizationReport report
+    ) {
+        Status status = switch (report.status()) {
+            case BUDGET_INCONCLUSIVE -> Status.BUDGET_INCONCLUSIVE;
+            case NO_FACTORIZATION_FOUND, IRREDUCIBLE ->
+                Status.NOT_SUBSUMED;
+            case PARSE_ERROR,
+                UNSUPPORTED_SEMANTIC_VIEW,
+                UNSUPPORTED_FACTORIZATION_REQUEST -> Status.UNSUPPORTED;
+            case TECHNICAL_FAILURE -> Status.TECHNICAL_FAILURE;
+            case GENERATED -> throw new IllegalStateException(
+                "generated report was handled as a failure");
+        };
+        return Classification.failure(
+            status,
+            report.detailCode(),
+            report.totalWorkUnits());
     }
 
     private String formatCanonical(String expression) {
@@ -145,13 +139,11 @@ public final class PolynomialTheorySubsumptionClassifier {
         THEORY_SUBSUMED,
         NOT_SUBSUMED,
         UNSUPPORTED,
-        BUDGET_INCONCLUSIVE
+        BUDGET_INCONCLUSIVE,
+        TECHNICAL_FAILURE
     }
 
-    /**
-     * Project-inventory novelty needs an inventory snapshot and is intentionally
-     * not inferred from semantic theory classification alone.
-     */
+    /** Project-inventory novelty requires a separate inventory snapshot. */
     public enum ProjectInventoryNovelty {
         NOT_EVALUATED
     }
@@ -161,13 +153,7 @@ public final class PolynomialTheorySubsumptionClassifier {
         NONE
     }
 
-    /**
-     * Immutable classifier-issued evidence.
-     *
-     * <p>The constructor is private so a cache caller cannot manufacture a
-     * positive status around an unrelated pattern or certificate. Every
-     * instance comes from one completed invocation of {@link #classify}.</p>
-     */
+    /** Classifier-issued immutable theory evidence. */
     public static final class Classification {
         private final State state;
 
@@ -179,19 +165,22 @@ public final class PolynomialTheorySubsumptionClassifier {
             String certificateHash,
             String derivedExpression,
             String applicationKey,
-            int consideredConfigurations,
+            long workUnits,
             ProjectInventoryNovelty projectInventoryNovelty,
             RetentionDisposition retentionDisposition
         ) {
-            Status checkedStatus = Objects.requireNonNull(status, "status");
-            if (detailCode == null || detailCode.isBlank()
-                    || !PolynomialDecompositionSynthesisOperator.METHOD_ID.equals(
-                        theoryMethodId)
+            Status checkedStatus = Objects.requireNonNull(
+                status,
+                "status");
+            if (detailCode == null
+                    || detailCode.isBlank()
+                    || !PolynomialDecompositionSynthesisOperator.METHOD_ID
+                        .equals(theoryMethodId)
                     || sourceExpression == null
                     || certificateHash == null
                     || derivedExpression == null
                     || applicationKey == null
-                    || consideredConfigurations < 0
+                    || workUnits < 0
                     || projectInventoryNovelty == null
                     || retentionDisposition == null) {
                 throw new IllegalArgumentException(
@@ -199,11 +188,13 @@ public final class PolynomialTheorySubsumptionClassifier {
             }
             if (checkedStatus == Status.THEORY_SUBSUMED) {
                 if (sourceExpression.isBlank()
-                        || !certificateHash.matches("sha256:[0-9a-f]{64}")
+                        || !certificateHash.matches(
+                            "sha256:[0-9a-f]{64}")
                         || derivedExpression.isBlank()
                         || applicationKey.isBlank()
                         || retentionDisposition
-                            != RetentionDisposition.DERIVED_MACRO_CACHE_ONLY) {
+                            != RetentionDisposition
+                                .DERIVED_MACRO_CACHE_ONLY) {
                     throw new IllegalArgumentException(
                         "subsumed classification lacks exact theory evidence");
                 }
@@ -223,25 +214,26 @@ public final class PolynomialTheorySubsumptionClassifier {
                 certificateHash,
                 derivedExpression,
                 applicationKey,
-                consideredConfigurations,
+                workUnits,
                 projectInventoryNovelty,
                 retentionDisposition);
         }
 
         private static Classification subsumed(
             String sourceExpression,
-            PolynomialDecompositionSynthesisOperator.Candidate candidate,
-            int consideredConfigurations
+            ExpressionFactorizationReport.RenderedFactorization candidate,
+            long workUnits
         ) {
             return new Classification(
                 Status.THEORY_SUBSUMED,
-                "TARGET_MATCHES_GENERATED_DECOMPOSITION",
+                "TARGET_MATCHES_VERIFIED_FACTORIZATION",
                 PolynomialDecompositionSynthesisOperator.METHOD_ID,
                 sourceExpression,
-                candidate.certificateHash(),
+                candidate.factorization()
+                    .verificationCertificateHash(),
                 candidate.transformedExpression(),
                 candidate.applicationKey(),
-                consideredConfigurations,
+                workUnits,
                 ProjectInventoryNovelty.NOT_EVALUATED,
                 RetentionDisposition.DERIVED_MACRO_CACHE_ONLY);
         }
@@ -249,7 +241,7 @@ public final class PolynomialTheorySubsumptionClassifier {
         private static Classification failure(
             Status status,
             String detailCode,
-            int consideredConfigurations
+            long workUnits
         ) {
             return new Classification(
                 status,
@@ -259,7 +251,7 @@ public final class PolynomialTheorySubsumptionClassifier {
                 "",
                 "",
                 "",
-                consideredConfigurations,
+                workUnits,
                 ProjectInventoryNovelty.NOT_EVALUATED,
                 RetentionDisposition.NONE);
         }
@@ -292,8 +284,8 @@ public final class PolynomialTheorySubsumptionClassifier {
             return state.applicationKey();
         }
 
-        public int consideredConfigurations() {
-            return state.consideredConfigurations();
+        public long workUnits() {
+            return state.workUnits();
         }
 
         public ProjectInventoryNovelty projectInventoryNovelty() {
@@ -333,7 +325,7 @@ public final class PolynomialTheorySubsumptionClassifier {
             String certificateHash,
             String derivedExpression,
             String applicationKey,
-            int consideredConfigurations,
+            long workUnits,
             ProjectInventoryNovelty projectInventoryNovelty,
             RetentionDisposition retentionDisposition
         ) {

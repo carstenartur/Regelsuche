@@ -36,9 +36,9 @@ autoritative Verifikationsvertrag liegt im Checkout.
 ### 1. Mathematische Grundlage
 
 - `regelsuche-core` — AST, Parser, kanonische Ausdrucksidentität, atomare
-  Transformationen, exakte Vorbereitungsspezialisten und deren Registry sowie
-  semantische Views und exakte Syntheseoperatoren für begrenzte
-  Polynomdarstellungen.
+  Transformationen, exakte Vorbereitungsspezialisten und deren Registry,
+  semantische Views sowie exakte Koeffizientendomänen, Polynomringe,
+  Faktorisierungsengine- und Verifier-Verträge.
 - `regelsuche-egraph` — Equality-Saturation-Strukturen auf Basis des Core.
 - `regelsuche-search` — Suchprobleme, Strategien, Scoring, Budgets,
   Frontier-/Transposition-Memory und die Koordinatoren für direkte, exakte und
@@ -231,43 +231,81 @@ einen einzelnen Ausdrucksstring abgeflacht.
 Die direkte Teilnahme dieser typisierten Objektbrücken am Unified Preparation
 Coordinator bleibt eine offene Integrationsgrenze.
 
-## Semantische Darstellungs- und Syntheseoperatoren
+## Domänenbewusste Polynomdarstellung und Faktorisierung
 
-Eine semantische View ist weder bloße Formatierung noch automatisch ein
-Beweis. Sie interpretiert einen vollständigen AST unter einer ausdrücklich
-begrenzten Theorie und kann dadurch einen spezialisierten exakten Operator
-anwendbar machen:
+Eine semantische View ist weder bloße Formatierung noch automatisch ein Beweis.
+Die Polynomarchitektur trennt deshalb Syntaxinterpretation, mathematische
+Identität, algorithmische Vorschläge und autorisierte Evidence:
 
 ```mermaid
 flowchart LR
-    ast[AST-Teilbaum] --> view[PolynomialSemanticView]
-    view --> atoms[Strukturelle Atome + exakte Koeffizienten]
-    atoms --> constraints[Begrenzte Koeffizientenbedingungen]
-    constraints --> synthesis[Exact Synthesis Operator]
-    synthesis --> certificate[Ergebnis-AST + content-addressed Certificate]
-    certificate --> verify[Unabhängige Polynomidentitätsprüfung]
+    source[ExactParsedTerm] --> view[PolynomialSemanticView]
+    view --> ring[CoefficientDomain + PolynomialRing]
+    ring --> polynomial[Canonical SparsePolynomial]
+    polynomial --> request[FactorizationRequest]
+    request --> engine[FactorizationEngine: untrusted proposals]
+    engine --> verifier[FactorizationVerifier]
+    verifier --> evidence[Verified candidates + report evidence]
+    evidence --> adapter[Search / Discovery adapter]
 ```
 
-Der aktuelle `PolynomialDecompositionSynthesisOperator` behandelt vollständige
-AST-Teilbäume wie `x + 1` oder `sin(t)` als strukturelle Atome und löst eine
-begrenzte ganzzahlige quadratisch-mal-quadratische Zerlegung für binäre
-homogene Quartiken. Univariate Quartiken werden über eine explizite strukturelle
-Einheit homogenisiert.
+Der mathematische Kern enthält:
+
+- `CoefficientDomain<C>` und getrennte algebraische Fähigkeiten wie
+  `ExactField<C>` und `GcdDomain<C>`;
+- einen `PolynomialRing<C>` mit geordneten Variablen und ausdrücklich gewählter
+  Monomordnung;
+- ein unveränderliches, kanonisches `SparsePolynomial<C>`;
+- typisierte Faktorisierungsanforderungen mit einem nicht zurücksetzbaren
+  Gesamtbudget;
+- eine backendneutrale Engine-Schnittstelle;
+- einen unabhängigen Verifier als einzige Quelle vertrauenswürdiger
+  Faktorisierungsevidence.
+
+`PolynomialSemanticView` liest numerische Koeffizienten und Exponenten nur aus
+parserausgestellter exakter Literalprovenienz. Der historische
+`NumberExpr(double)`-Wert ist keine Quelle exakter Mathematik. Konkrete
+AST-Vorkommen und Anzeigezeichenfolgen verbleiben im View; die Engine arbeitet
+nur auf dem mathematischen Polynom.
+
+Eine `FactorizationEngine` darf Kandidaten vorschlagen und eigene Backend-Claims
+retained ausgeben. Diese Daten sind ausdrücklich untrusted. Erst
+`FactorizationVerifier` prüft mindestens:
+
+- Engine- und Koeffizientendomänenidentität;
+- Request-, Kandidaten- und Work-Budgets;
+- Ringgleichheit aller Faktoren und des Restes;
+- exakte Rückmultiplikation von Einheit, Faktoren, Multiplizitäten und Rest;
+- die Trennung von Backend-Claim und unabhängig autorisierter Claim-Stärke.
+
+Das stage-getrennte Work Ledger besitzt eine tatsächlich kanonische
+Schlüsselreihenfolge. Hashmaterial darf nicht von der nicht spezifizierten
+Iterationsreihenfolge einer unveränderlichen Java-Map abhängen.
+
+Die erste integrierte Engine ist
+`BinaryQuarticFactorizationEngine`. Sie löst begrenzt und exakt die
+quadratisch-mal-quadratisch-Zerlegung binärer homogener Quartiken. Der
+`PolynomialDecompositionSynthesisOperator` ist nur noch ein Adapter vom
+Ausdruckspfad zur Engine-/Verifier-Grenze und zurück zur Suchkante. Seine
+historische Bezeichnung definiert weder das Polynommodell noch die allgemeine
+Faktorisierungs-API.
 
 Wesentliche Grenzen:
 
-- Atome sind occurrence- und strukturgebunden; eine ähnliche Darstellung wird
-  nicht stillschweigend gleichgesetzt.
-- Der Syntheseoperator ist ein deklarierter Theorieoperator mit eigener
-  Budget-, Domain- und Zertifikatsidentität, keine nachträglich benannte
-  Spezialregel.
-- Jede positive Zerlegung wird exakt rekonstruiert und unabhängig verifiziert.
-- Nicht unterstützte Grade, Koeffizientenbereiche oder ausgeschöpfte Budgets
-  bleiben explizite Nicht-Erfolge.
-- Das Verfahren ist keine vollständige multivariate Faktorisierung.
+- Ein Engine-Miss ist kein Irreduzibilitätsbeweis.
+- Ein Backend-Claim ist keine unabhängig zertifizierte Vollständigkeit.
+- Die aktuelle Quartikengine belegt eine exakte Zerlegung, nicht die
+  Irreduzibilität jedes ausgegebenen Faktors.
+- Vollständige Faktorisierung über `Z[x]` oder `Q[x]`, endliche Körper,
+  Hensel-Lifting, Rekombination und multivariate Verfahren sind Folgearbeiten.
+- Die früheren verschachtelten Quartiktypen werden nicht als parallele
+  Kompatibilitäts-API weitergeführt.
 
 Details stehen in
-[Polynomial Decomposition Synthesis](polynomial-decomposition-synthesis.md).
+[Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md),
+[Semantische Polynomansicht und quartische Zerlegungsengine](polynomial-decomposition-synthesis.md)
+und im
+[ADR zum domänenbewussten Polynomkern](adr/domain-aware-polynomial-factorization.md).
 
 ## Regel- und Erweiterungsmodell
 
@@ -330,7 +368,8 @@ Vollständigkeit und Hashes.
 | Exact-Spezialist vs. fremde Regel | Nur die registrierte native Principal-ID erhält den jeweiligen Solververtrag |
 | Rohe Lernregel vs. Promotion | Ausführbarkeit oder Fitness autorisiert keine Äquivalenz; Promotion erzeugt eine neue Identität nach eigenem Nachweis |
 | Generation `n` vs. `n+1` | Neu gebildete Regeln werden erst nach vollständigem Generationsabschluss im nächsten eingefrorenen Schatteninventar aktiv |
-| Semantische View vs. mathematischer Claim | Repräsentationserkennung autorisiert nur den gebundenen Theorieoperator; Ergebnis und Relation werden separat verifiziert |
+| Semantische View vs. mathematischer Claim | Repräsentationserkennung autorisiert nur einen gebundenen mathematischen Request; Ergebnis und Relation werden separat verifiziert |
+| Faktorisierungsengine vs. Verifier | Engine-Proposals und Backend-Claims sind untrusted; nur der unabhängige Verifier autorisiert eine Faktorisierungskante |
 | Search vs. Validation | Validatoren beurteilen Outputs; sie erzeugen nicht den zu bewertenden Kandidaten |
 | TRAIN vs. VALIDATION | VALIDATION darf Konfigurationen auswählen, aber keine TRAIN-Fitness erzeugen |
 | VALIDATION vs. FINAL TEST | FINAL TEST wird erst nach eingefrorener Auswahl genau einmal geöffnet |

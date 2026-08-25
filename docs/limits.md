@@ -56,6 +56,50 @@ Default-Inventar des aktuellen targetfreien Vergleichs behält deshalb bewusst
 den kubischen Verlustfall. Implementierte Fähigkeit und gemessene
 Standardkonfiguration werden nicht nachträglich vermischt.
 
+#### Domänenbewusste Polynomfaktorisierung
+
+Implementiert ist ein allgemeiner typisierter Kern aus:
+
+- exakten Integer- und Rational-Koeffizientendomänen;
+- Polynomringen mit geordneten Variablen und expliziter Monomordnung;
+- kanonischen unveränderlichen Sparse-Polynomen;
+- `FactorizationRequest` und backendneutralem `FactorizationEngine`-SPI;
+- untrusted Engine-Proposals und ausdrücklich retained Backend-Claims;
+- unabhängiger Vertrags- und Produktprüfung durch `FactorizationVerifier`;
+- stage-getrenntem, kanonisch geordnetem Work Accounting.
+
+Dieser allgemeine Vertrag ist nicht gleichbedeutend mit einer vollständigen
+allgemeinen Faktorisierungsimplementierung. Die derzeit integrierte
+`BinaryQuarticFactorizationEngine` unterstützt exakt und begrenzt:
+
+- Koeffizienten in `Z`;
+- zwei strukturelle Atome;
+- homogene Polynome vierten Grades;
+- Faktorgradaufteilung `2 + 2`;
+- begrenzte ganzzahlige Faktorkoeffizienten, Kandidaten und Work Units;
+- begrenzte univariate Quartiken nach expliziter Homogenisierung mit einer
+  strukturellen Einheit.
+
+Jeder positive Kandidat wird im Quellring exakt zurückmultipliziert. Daraus
+folgt eine verifizierte Zerlegung, aber noch kein Nachweis, dass alle Faktoren
+irreduzibel oder die Zerlegung vollständig ist. Insbesondere gilt:
+
+- `NO_CANDIDATE` ist kein Irreduzibilitätsbeweis;
+- ein Backend-Claim erfüllt keinen `INDEPENDENT_COMPLETE`-Request;
+- die Quartikengine autorisiert keinen Claim für andere Grade oder
+  Faktorgradaufteilungen;
+- rationale, endliche oder algebraische Koeffizientendomänen benötigen eigene
+  qualifizierte Engines beziehungsweise Adapter;
+- quadratfreie Zerlegung, endliche-Körper-Faktorisierung, Primzahlauswahl,
+  Hensel-Lifting, Zassenhaus-/LLL-/van-Hoeij-Rekombination und vollständige
+  rationale Reassemblierung sind noch nicht implementiert;
+- multivariate Faktorisierung ist nicht implementiert.
+
+Details stehen in
+[Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md)
+und
+[Semantische Polynomansicht und quartische Zerlegungsengine](polynomial-decomposition-synthesis.md).
+
 ### Gleichungssysteme, Matrizen und weitere Domänen
 
 Für affine skalare Gleichungssysteme existiert ein exakter Objektpfad über
@@ -292,6 +336,8 @@ Diese reale Prüfung ist noch nicht abgeschlossen; das Profil bleibt `BLOCKED`.
 ## Siehe auch
 
 - [Discovery- und Forschungsstand](discovery-status.md)
+- [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md)
+- [ADR: Domänenbewusster Polynomkern statt Quartik-API](adr/domain-aware-polynomial-factorization.md)
 - [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md)
 - [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md)
 - [Architektur](architecture.md)

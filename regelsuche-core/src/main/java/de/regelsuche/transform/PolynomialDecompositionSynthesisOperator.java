@@ -1,57 +1,40 @@
 package de.regelsuche.transform;
 
-import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.BinaryOperator;
-import de.regelsuche.ast.Expr;
-import de.regelsuche.ast.NumberExpr;
-import de.regelsuche.json.JsonWriter;
-import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.polynomial.BinaryQuarticFactorizationEngine;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.FactorizationVerifier;
+import de.regelsuche.polynomial.Monomial;
+import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.SparsePolynomial;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HexFormat;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 /**
- * Synthesizes exact quadratic-by-quadratic decompositions of bounded binary
- * homogeneous quartics by solving their coefficient constraints.
+ * Expression adapter for one factorization engine.
  *
- * <p>This operator does not store Sophie-Germain or any other concrete
- * identity. It first obtains a semantic polynomial over two arbitrary AST atoms
- * and then solves the general ansatz</p>
- *
- * <pre>
- * (a A^2 + b A B + c B^2) (d A^2 + e A B + f B^2).
- * </pre>
- *
- * <p>The resulting coefficient equations cover infinitely many concrete
- * substitutions for {@code A} and {@code B}. Every emitted candidate carries a
- * content-addressed certificate over the semantic source and the solved exact
- * integer coefficients.</p>
+ * <p>The domain-aware polynomial and factorization contracts are authoritative;
+ * this class only maps source syntax to the core verifier and renders its
+ * issuer-owned candidates back into transformation strings.</p>
  */
 public final class PolynomialDecompositionSynthesisOperator
         implements HypothesisOperator {
     public static final String RULE_ID =
         "hypothesis_polynomial_decomposition_synthesis";
     public static final String METHOD_ID =
-        "regelsuche.binary-quartic-quadratic-decomposition/v1";
+        BinaryQuarticFactorizationEngine.ENGINE_ID;
 
     private static final String PACK_ID = "core-polynomial-synthesis";
     private static final String LICENSE = "PROJECT";
     private static final int DEFAULT_MAX_CANDIDATES = 6;
-    private static final int DEFAULT_MAX_COEFFICIENT_ABS = 32;
-    private static final int DEFAULT_MAX_FACTOR_CONFIGURATIONS = 4_096;
+    private static final long DEFAULT_MAX_WORK_UNITS = 4_096;
 
     private final PolynomialSemanticView semanticView;
+    private final BinaryQuarticFactorizationEngine engine;
     private final int maxCandidates;
-    private final int maxCoefficientAbs;
-    private final int maxFactorConfigurations;
+    private final long maxWorkUnits;
 
     public PolynomialDecompositionSynthesisOperator() {
         this(DEFAULT_MAX_CANDIDATES);
@@ -61,37 +44,36 @@ public final class PolynomialDecompositionSynthesisOperator
         this(
             new PolynomialSemanticView(
                 new PolynomialSemanticView.Budget(2, 4, 16, 256)),
+            new BinaryQuarticFactorizationEngine(),
             maxCandidates,
-            DEFAULT_MAX_COEFFICIENT_ABS,
-            DEFAULT_MAX_FACTOR_CONFIGURATIONS);
+            DEFAULT_MAX_WORK_UNITS);
     }
 
     PolynomialDecompositionSynthesisOperator(
         PolynomialSemanticView semanticView,
+        BinaryQuarticFactorizationEngine engine,
         int maxCandidates,
-        int maxCoefficientAbs,
-        int maxFactorConfigurations
+        long maxWorkUnits
     ) {
         this.semanticView = Objects.requireNonNull(
             semanticView,
             "semanticView");
+        this.engine = Objects.requireNonNull(engine, "engine");
         this.maxCandidates = Math.max(0, maxCandidates);
-        if (maxCoefficientAbs < 1 || maxFactorConfigurations < 1) {
+        if (maxWorkUnits < 1) {
             throw new IllegalArgumentException(
-                "decomposition synthesis budget is invalid");
+                "factorization work budget must be positive");
         }
-        this.maxCoefficientAbs = maxCoefficientAbs;
-        this.maxFactorConfigurations = maxFactorConfigurations;
+        this.maxWorkUnits = maxWorkUnits;
     }
 
     @Override
     public List<Transformation> generateCandidates(String expression) {
-        SynthesisReport report = synthesize(expression);
-        if (report.status() != Status.GENERATED) {
+        ExpressionFactorizationReport report = factorExpression(expression);
+        if (!report.generated()) {
             return List.of();
         }
         return report.candidates().stream()
-            .limit(maxCandidates)
             .map(candidate -> new Transformation(
                 RULE_ID,
                 candidate.transformedExpression(),
@@ -106,555 +88,218 @@ public final class PolynomialDecompositionSynthesisOperator
             .toList();
     }
 
-    public SynthesisReport synthesize(String expression) {
+    public ExpressionFactorizationReport factorExpression(
+        String expression
+    ) {
         PolynomialSemanticView.Analysis analysis =
             semanticView.analyze(expression);
         if (!analysis.supported()) {
-            return SynthesisReport.failure(
+            return ExpressionFactorizationReport.semanticFailure(
                 statusFor(analysis.status()),
                 analysis.detailCode(),
-                analysis.status(),
-                0);
-        }
-        PolynomialSemanticView.Polynomial polynomial =
-            analysis.polynomial();
-        if (polynomial.atoms().size() == 1 && polynomial.degree() <= 4) {
-            polynomial = polynomial.homogenizeWithUnitAtom(4);
-        }
-        if (polynomial.atoms().size() != 2
-                || !polynomial.isHomogeneousOfDegree(4)
-                || polynomial.coefficient(4, 0).signum() == 0
-                || polynomial.coefficient(0, 4).signum() == 0) {
-            return SynthesisReport.failure(
-                Status.NOT_BINARY_HOMOGENEOUS_QUARTIC,
-                "REQUIRES_TWO_ATOMS_AND_NONZERO_EXTREME_QUARTIC_TERMS",
-                analysis.status(),
-                0);
-        }
-        if (maxCandidates == 0) {
-            return SynthesisReport.failure(
-                Status.CANDIDATE_BUDGET_ZERO,
-                "MAX_CANDIDATES_IS_ZERO",
-                analysis.status(),
-                0);
+                analysis.status());
         }
 
-        Coefficients target = new Coefficients(
-            polynomial.coefficient(4, 0),
-            polynomial.coefficient(3, 1),
-            polynomial.coefficient(2, 2),
-            polynomial.coefficient(1, 3),
-            polynomial.coefficient(0, 4));
-        Work work = new Work();
-        Map<String, Candidate> candidates = new LinkedHashMap<>();
-        try {
-            for (BigInteger a : divisors(target.c40())) {
-                BigInteger d = target.c40().divide(a);
-                if (!withinBound(d)) {
-                    continue;
-                }
-                for (BigInteger c : divisors(target.c04())) {
-                    work.consider(maxFactorConfigurations);
-                    BigInteger f = target.c04().divide(c);
-                    if (!withinBound(f)) {
-                        continue;
-                    }
-                    for (MiddlePair middle : solveMiddle(
-                            a,
-                            d,
-                            c,
-                            f,
-                            target)) {
-                        if (!withinBound(middle.b())
-                                || !withinBound(middle.e())) {
-                            continue;
-                        }
-                        BigInteger reconstructedMiddle = a.multiply(f)
-                            .add(middle.b().multiply(middle.e()))
-                            .add(c.multiply(d));
-                        if (!reconstructedMiddle.equals(target.c22())) {
-                            continue;
-                        }
-                        FactorPair pair = FactorPair.canonical(
-                            new Quadratic(a, middle.b(), c),
-                            new Quadratic(d, middle.e(), f));
-                        Candidate candidate = candidate(
-                            polynomial,
-                            target,
-                            pair,
-                            work.consideredConfigurations());
-                        candidates.putIfAbsent(
-                            candidate.certificateHash(),
-                            candidate);
-                    }
-                }
-            }
-        } catch (BudgetExceeded exception) {
-            return SynthesisReport.failure(
-                Status.BUDGET_EXCEEDED,
-                exception.getMessage(),
-                analysis.status(),
-                work.consideredConfigurations());
+        PolynomialSemanticView.PolynomialView view = analysis.view();
+        if (view.polynomial().isZero()) {
+            return ExpressionFactorizationReport.semanticFailure(
+                ExpressionFactorizationReport.Status.NO_FACTORIZATION_FOUND,
+                "ZERO_POLYNOMIAL_HAS_NO_FINITE_FACTORIZATION",
+                analysis.status());
+        }
+        if (view.polynomial().ring().variableCount() == 1
+                && view.polynomial().totalDegree() <= 4) {
+            view = view.homogenizeWithUnitAtom(4);
         }
 
-        List<Candidate> ordered = candidates.values().stream()
-            .sorted(Comparator
-                .comparing(Candidate::factorMaterial)
-                .thenComparing(Candidate::transformedExpression))
-            .limit(maxCandidates)
-            .toList();
-        if (ordered.isEmpty()) {
-            return SynthesisReport.failure(
-                Status.NO_INTEGER_QUADRATIC_FACTORIZATION,
-                "NO_BOUNDED_INTEGER_COEFFICIENT_SOLUTION",
+        FactorizationVerifier.Report<BigInteger> factorization =
+            FactorizationVerifier.execute(
+                engine,
+                FactorizationRequest.verifiedDecomposition(
+                    view.polynomial(),
+                    maxCandidates,
+                    maxWorkUnits));
+        if (!factorization.successful()) {
+            return ExpressionFactorizationReport.coreFailure(
+                statusFor(factorization.status()),
                 analysis.status(),
-                work.consideredConfigurations());
+                view.canonicalMaterial(),
+                factorization);
         }
-        return new SynthesisReport(
-            Status.GENERATED,
-            "EXACT_COEFFICIENT_CONSTRAINTS_SOLVED",
+
+        PolynomialSemanticView.PolynomialView renderedView = view;
+        FactorizationVerifier.Report<BigInteger> verifiedReport =
+            factorization;
+        List<ExpressionFactorizationReport.RenderedFactorization> candidates =
+            factorization.candidates().stream()
+                .map(candidate -> render(
+                    candidate,
+                    renderedView,
+                    verifiedReport))
+                .toList();
+        return new ExpressionFactorizationReport(
+            ExpressionFactorizationReport.Status.GENERATED,
+            factorization.detailCode(),
             analysis.status(),
-            polynomial.canonicalMaterial(),
-            work.consideredConfigurations(),
-            ordered);
+            view.canonicalMaterial(),
+            factorization.work(),
+            factorization.claimStrength(),
+            factorization.verificationHash(),
+            candidates);
     }
 
-    private List<MiddlePair> solveMiddle(
-        BigInteger a,
-        BigInteger d,
-        BigInteger c,
-        BigInteger f,
-        Coefficients target
+    private ExpressionFactorizationReport.RenderedFactorization render(
+        FactorizationVerifier.VerifiedCandidate<BigInteger> candidate,
+        PolynomialSemanticView.PolynomialView view,
+        FactorizationVerifier.Report<BigInteger> report
     ) {
-        BigInteger determinant = d.multiply(c).subtract(a.multiply(f));
-        if (determinant.signum() != 0) {
-            BigInteger bNumerator = target.c31().multiply(c)
-                .subtract(a.multiply(target.c13()));
-            BigInteger eNumerator = d.multiply(target.c13())
-                .subtract(f.multiply(target.c31()));
-            if (!isDivisible(bNumerator, determinant)
-                    || !isDivisible(eNumerator, determinant)) {
-                return List.of();
-            }
-            return List.of(new MiddlePair(
-                bNumerator.divide(determinant),
-                eNumerator.divide(determinant)));
+        List<String> multiplicands = new ArrayList<>();
+        if (!candidate.unit().equals(BigInteger.ONE)) {
+            multiplicands.add(candidate.unit().toString());
         }
-
-        List<MiddlePair> result = new ArrayList<>();
-        for (int value = -maxCoefficientAbs;
-                value <= maxCoefficientAbs;
-                value++) {
-            BigInteger b = BigInteger.valueOf(value);
-            BigInteger eNumerator =
-                target.c31().subtract(d.multiply(b));
-            if (!isDivisible(eNumerator, a)) {
-                continue;
-            }
-            BigInteger e = eNumerator.divide(a);
-            if (f.multiply(b).add(c.multiply(e)).equals(target.c13())) {
-                result.add(new MiddlePair(b, e));
-            }
+        for (PolynomialFactor<BigInteger> factor : candidate.factors()) {
+            String rendered = parenthesize(
+                renderPolynomial(factor.polynomial(), view));
+            multiplicands.add(factor.multiplicity() == 1
+                ? rendered
+                : rendered + " ^ " + factor.multiplicity());
         }
-        return List.copyOf(result);
-    }
-
-    private Candidate candidate(
-        PolynomialSemanticView.Polynomial polynomial,
-        Coefficients target,
-        FactorPair pair,
-        int consideredConfigurations
-    ) {
-        PolynomialSemanticView.Atom first = polynomial.atoms().get(0);
-        PolynomialSemanticView.Atom second = polynomial.atoms().get(1);
-        Expr left = quadraticExpression(pair.left(), first, second);
-        Expr right = quadraticExpression(pair.right(), first, second);
-        String transformed = ExpressionFormatter.format(
-            new BinaryExpr(left, BinaryOperator.MUL, right));
-        String factorMaterial = pair.canonicalMaterial();
-        String certificateHash = sha256(
-            certificateMaterial(
-                polynomial,
-                target,
-                pair,
-                transformed));
+        if (!candidate.unresolvedRemainder().isOne()) {
+            multiplicands.add(parenthesize(renderPolynomial(
+                candidate.unresolvedRemainder(),
+                view)));
+        }
+        if (multiplicands.isEmpty()) {
+            throw new IllegalStateException(
+                "factorization candidate rendered no expression");
+        }
+        String transformed = String.join(" * ", multiplicands);
         String applicationKey = RULE_ID
             + "|method=" + METHOD_ID
-            + "|certificate=" + certificateHash
-            + "|work=" + consideredConfigurations;
-        return new Candidate(
+            + "|engineCertificate="
+            + candidate.engineCertificateHash()
+            + "|verificationCertificate="
+            + candidate.verificationCertificateHash()
+            + "|report=" + report.verificationHash()
+            + "|work=" + report.work().totalWorkUnits();
+        return new ExpressionFactorizationReport.RenderedFactorization(
             transformed,
-            pair.left().coefficients(),
-            pair.right().coefficients(),
-            factorMaterial,
-            certificateHash,
+            candidate,
             applicationKey);
     }
 
-    private Expr quadraticExpression(
-        Quadratic quadratic,
-        PolynomialSemanticView.Atom first,
-        PolynomialSemanticView.Atom second
+    private String renderPolynomial(
+        SparsePolynomial<BigInteger> polynomial,
+        PolynomialSemanticView.PolynomialView view
     ) {
-        List<SignedTerm> terms = List.of(
-            new SignedTerm(
-                quadratic.a(),
-                squaredAtom(first)),
-            new SignedTerm(
-                quadratic.b(),
-                multipliedAtoms(first, second)),
-            new SignedTerm(
-                quadratic.c(),
-                squaredAtom(second)));
-        Expr result = null;
-        for (SignedTerm term : terms) {
-            if (term.coefficient().signum() == 0) {
-                continue;
-            }
-            if (result == null) {
-                result = scaled(
-                    term.coefficient(),
-                    term.expression());
-                continue;
-            }
-            if (term.coefficient().signum() > 0) {
-                result = new BinaryExpr(
-                    result,
-                    BinaryOperator.ADD,
-                    scaled(term.coefficient(), term.expression()));
+        if (!polynomial.ring().equals(view.polynomial().ring())) {
+            throw new IllegalArgumentException(
+                "rendered polynomial ring does not match structural atoms");
+        }
+        StringBuilder result = new StringBuilder();
+        for (Map.Entry<Monomial, BigInteger> term
+                : polynomial.terms().entrySet()) {
+            BigInteger coefficient = term.getValue();
+            String unsigned = renderUnsignedTerm(
+                coefficient.abs(),
+                term.getKey(),
+                view);
+            if (result.isEmpty()) {
+                if (coefficient.signum() < 0) {
+                    result.append('-');
+                }
+                result.append(unsigned);
             } else {
-                result = new BinaryExpr(
-                    result,
-                    BinaryOperator.SUB,
-                    scaled(term.coefficient().abs(), term.expression()));
+                result.append(coefficient.signum() < 0
+                    ? " - "
+                    : " + ");
+                result.append(unsigned);
             }
         }
-        if (result == null) {
-            throw new IllegalStateException(
-                "quadratic factor must not be zero");
+        if (result.isEmpty()) {
+            throw new IllegalArgumentException(
+                "zero polynomial cannot be rendered as a factor");
         }
-        return result;
+        return result.toString();
     }
 
-    private Expr squaredAtom(PolynomialSemanticView.Atom atom) {
-        if (isStructuralUnit(atom)) {
-            return new NumberExpr(1);
-        }
-        return new BinaryExpr(
-            atom.expression(),
-            BinaryOperator.POW,
-            new NumberExpr(2));
-    }
-
-    private Expr multipliedAtoms(
-        PolynomialSemanticView.Atom first,
-        PolynomialSemanticView.Atom second
+    private String renderUnsignedTerm(
+        BigInteger coefficient,
+        Monomial monomial,
+        PolynomialSemanticView.PolynomialView view
     ) {
-        if (isStructuralUnit(first)) {
-            return second.expression();
+        String renderedMonomial = renderMonomial(monomial, view);
+        if ("1".equals(renderedMonomial)) {
+            return coefficient.toString();
         }
-        if (isStructuralUnit(second)) {
-            return first.expression();
-        }
-        return new BinaryExpr(
-            first.expression(),
-            BinaryOperator.MUL,
-            second.expression());
+        return coefficient.equals(BigInteger.ONE)
+            ? renderedMonomial
+            : coefficient + " * " + renderedMonomial;
     }
 
-    private boolean isStructuralUnit(PolynomialSemanticView.Atom atom) {
-        return atom.key().equals("structural-unit:1");
-    }
-
-    private Expr scaled(BigInteger coefficient, Expr expression) {
-        if (coefficient.equals(BigInteger.ONE)) {
-            return expression;
-        }
-        if (coefficient.equals(BigInteger.ONE.negate())) {
-            return new BinaryExpr(
-                new NumberExpr(-1),
-                BinaryOperator.MUL,
-                expression);
-        }
-        return new BinaryExpr(
-            new NumberExpr(coefficient.intValueExact()),
-            BinaryOperator.MUL,
-            expression);
-    }
-
-    private List<BigInteger> divisors(BigInteger value) {
-        BigInteger absolute = value.abs();
-        List<BigInteger> result = new ArrayList<>();
-        for (int divisor = 1;
-                divisor <= maxCoefficientAbs
-                    && BigInteger.valueOf(divisor)
-                        .compareTo(absolute) <= 0;
-                divisor++) {
-            BigInteger candidate = BigInteger.valueOf(divisor);
-            if (absolute.mod(candidate).signum() == 0) {
-                result.add(candidate);
-                result.add(candidate.negate());
+    private String renderMonomial(
+        Monomial monomial,
+        PolynomialSemanticView.PolynomialView view
+    ) {
+        List<String> factors = new ArrayList<>();
+        for (int index = 0; index < monomial.arity(); index++) {
+            int exponent = monomial.exponent(index);
+            if (exponent == 0) {
+                continue;
             }
+            PolynomialSemanticView.StructuralAtom atom = view.atom(index);
+            if (atom.structuralUnit()) {
+                continue;
+            }
+            String factor = parenthesize(atom.display());
+            factors.add(exponent == 1
+                ? factor
+                : factor + " ^ " + exponent);
         }
-        return result.stream().distinct().sorted().toList();
+        return factors.isEmpty()
+            ? "1"
+            : String.join(" * ", factors);
     }
 
-    private boolean withinBound(BigInteger value) {
-        return value.abs().compareTo(
-            BigInteger.valueOf(maxCoefficientAbs)) <= 0;
+    private static String parenthesize(String expression) {
+        return "(" + expression + ")";
     }
 
-    private static boolean isDivisible(
-        BigInteger numerator,
-        BigInteger denominator
-    ) {
-        return denominator.signum() != 0
-            && numerator.remainder(denominator).signum() == 0;
-    }
-
-    private static Status statusFor(
+    private static ExpressionFactorizationReport.Status statusFor(
         PolynomialSemanticView.Status status
     ) {
         return switch (status) {
-            case PARSE_ERROR -> Status.PARSE_ERROR;
-            case UNSUPPORTED -> Status.UNSUPPORTED_SEMANTIC_VIEW;
-            case BUDGET_EXCEEDED -> Status.BUDGET_EXCEEDED;
+            case PARSE_ERROR ->
+                ExpressionFactorizationReport.Status.PARSE_ERROR;
+            case UNSUPPORTED ->
+                ExpressionFactorizationReport.Status
+                    .UNSUPPORTED_SEMANTIC_VIEW;
+            case BUDGET_EXCEEDED ->
+                ExpressionFactorizationReport.Status.BUDGET_INCONCLUSIVE;
             case SUPPORTED -> throw new IllegalArgumentException(
                 "supported semantic view has no failure status");
         };
     }
 
-    private static String certificateMaterial(
-        PolynomialSemanticView.Polynomial polynomial,
-        Coefficients target,
-        FactorPair pair,
-        String transformed
+    private static ExpressionFactorizationReport.Status statusFor(
+        FactorizationVerifier.Status status
     ) {
-        return new JsonWriter().beginObject()
-            .property("schema", METHOD_ID)
-            .property("semanticView", polynomial.viewId())
-            .property("source", polynomial.canonicalMaterial())
-            .stringArray("targetCoefficients", target.values().stream()
-                .map(BigInteger::toString)
-                .toList())
-            .stringArray("leftFactor", pair.left().coefficients().stream()
-                .map(BigInteger::toString)
-                .toList())
-            .stringArray("rightFactor", pair.right().coefficients().stream()
-                .map(BigInteger::toString)
-                .toList())
-            .property("transformedExpression", transformed)
-            .endObject()
-            .toString();
-    }
-
-    private static String sha256(String value) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                .digest(value.getBytes(StandardCharsets.UTF_8));
-            return "sha256:" + HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException(
-                "SHA-256 unavailable",
-                exception);
-        }
-    }
-
-    public enum Status {
-        GENERATED,
-        PARSE_ERROR,
-        UNSUPPORTED_SEMANTIC_VIEW,
-        NOT_BINARY_HOMOGENEOUS_QUARTIC,
-        NO_INTEGER_QUADRATIC_FACTORIZATION,
-        CANDIDATE_BUDGET_ZERO,
-        BUDGET_EXCEEDED
-    }
-
-    public record SynthesisReport(
-        Status status,
-        String detailCode,
-        PolynomialSemanticView.Status semanticStatus,
-        String sourcePolynomialMaterial,
-        int consideredConfigurations,
-        List<Candidate> candidates
-    ) {
-        public SynthesisReport {
-            Objects.requireNonNull(status, "status");
-            if (detailCode == null || detailCode.isBlank()
-                    || semanticStatus == null
-                    || sourcePolynomialMaterial == null
-                    || consideredConfigurations < 0) {
-                throw new IllegalArgumentException(
-                    "decomposition synthesis report is invalid");
-            }
-            candidates = List.copyOf(candidates);
-            if (status == Status.GENERATED && candidates.isEmpty()) {
-                throw new IllegalArgumentException(
-                    "generated report requires candidates");
-            }
-            if (status != Status.GENERATED && !candidates.isEmpty()) {
-                throw new IllegalArgumentException(
-                    "failed report must not expose candidates");
-            }
-        }
-
-        static SynthesisReport failure(
-            Status status,
-            String detailCode,
-            PolynomialSemanticView.Status semanticStatus,
-            int consideredConfigurations
-        ) {
-            return new SynthesisReport(
-                status,
-                detailCode,
-                semanticStatus,
-                "",
-                consideredConfigurations,
-                List.of());
-        }
-
-        public boolean generated() {
-            return status == Status.GENERATED;
-        }
-    }
-
-    public record Candidate(
-        String transformedExpression,
-        List<BigInteger> leftCoefficients,
-        List<BigInteger> rightCoefficients,
-        String factorMaterial,
-        String certificateHash,
-        String applicationKey
-    ) {
-        public Candidate {
-            if (transformedExpression == null
-                    || transformedExpression.isBlank()
-                    || factorMaterial == null
-                    || factorMaterial.isBlank()
-                    || certificateHash == null
-                    || !certificateHash.matches("sha256:[0-9a-f]{64}")
-                    || applicationKey == null
-                    || applicationKey.isBlank()) {
-                throw new IllegalArgumentException(
-                    "decomposition candidate is invalid");
-            }
-            leftCoefficients = List.copyOf(leftCoefficients);
-            rightCoefficients = List.copyOf(rightCoefficients);
-            if (leftCoefficients.size() != 3
-                    || rightCoefficients.size() != 3) {
-                throw new IllegalArgumentException(
-                    "quadratic factors require three coefficients");
-            }
-        }
-    }
-
-    private record Coefficients(
-        BigInteger c40,
-        BigInteger c31,
-        BigInteger c22,
-        BigInteger c13,
-        BigInteger c04
-    ) {
-        private List<BigInteger> values() {
-            return List.of(c40, c31, c22, c13, c04);
-        }
-    }
-
-    private record MiddlePair(BigInteger b, BigInteger e) {
-    }
-
-    private record SignedTerm(
-        BigInteger coefficient,
-        Expr expression
-    ) {
-    }
-
-    private record Quadratic(
-        BigInteger a,
-        BigInteger b,
-        BigInteger c
-    ) {
-        private Quadratic {
-            Objects.requireNonNull(a, "a");
-            Objects.requireNonNull(b, "b");
-            Objects.requireNonNull(c, "c");
-        }
-
-        private List<BigInteger> coefficients() {
-            return List.of(a, b, c);
-        }
-
-        private Quadratic negate() {
-            return new Quadratic(a.negate(), b.negate(), c.negate());
-        }
-
-        private int firstNonzeroSign() {
-            for (BigInteger value : coefficients()) {
-                if (value.signum() != 0) {
-                    return value.signum();
-                }
-            }
-            return 0;
-        }
-
-        private String canonicalMaterial() {
-            return coefficients().stream()
-                .map(BigInteger::toString)
-                .collect(java.util.stream.Collectors.joining(","));
-        }
-    }
-
-    private record FactorPair(Quadratic left, Quadratic right) {
-        private static FactorPair canonical(
-            Quadratic left,
-            Quadratic right
-        ) {
-            FactorPair normalized = normalizeSign(
-                new FactorPair(left, right));
-            if (normalized.left().canonicalMaterial().compareTo(
-                    normalized.right().canonicalMaterial()) > 0) {
-                normalized = new FactorPair(
-                    normalized.right(),
-                    normalized.left());
-                normalized = normalizeSign(normalized);
-            }
-            return normalized;
-        }
-
-        private static FactorPair normalizeSign(FactorPair pair) {
-            return pair.left().firstNonzeroSign() < 0
-                ? new FactorPair(
-                    pair.left().negate(),
-                    pair.right().negate())
-                : pair;
-        }
-
-        private String canonicalMaterial() {
-            return left.canonicalMaterial()
-                + "|" + right.canonicalMaterial();
-        }
-    }
-
-    private static final class Work {
-        private int consideredConfigurations;
-
-        private void consider(int maximum) {
-            consideredConfigurations++;
-            if (consideredConfigurations > maximum) {
-                throw new BudgetExceeded(
-                    "MAX_FACTOR_CONFIGURATIONS_EXCEEDED");
-            }
-        }
-
-        private int consideredConfigurations() {
-            return consideredConfigurations;
-        }
-    }
-
-    private static final class BudgetExceeded
-            extends RuntimeException {
-        private BudgetExceeded(String detailCode) {
-            super(detailCode);
-        }
+        return switch (status) {
+            case COMPLETE_FACTORIZATION,
+                PARTIAL_FACTORIZATION ->
+                    ExpressionFactorizationReport.Status.GENERATED;
+            case IRREDUCIBLE ->
+                ExpressionFactorizationReport.Status.IRREDUCIBLE;
+            case NO_FACTORIZATION_FOUND ->
+                ExpressionFactorizationReport.Status.NO_FACTORIZATION_FOUND;
+            case UNSUPPORTED_DOMAIN,
+                UNSUPPORTED_REQUEST ->
+                    ExpressionFactorizationReport.Status
+                        .UNSUPPORTED_FACTORIZATION_REQUEST;
+            case BUDGET_INCONCLUSIVE ->
+                ExpressionFactorizationReport.Status.BUDGET_INCONCLUSIVE;
+            case TECHNICAL_FAILURE ->
+                ExpressionFactorizationReport.Status.TECHNICAL_FAILURE;
+        };
     }
 }

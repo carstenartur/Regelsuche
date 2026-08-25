@@ -21,6 +21,7 @@ Validierungs- und Proof-Backends sowie hashgebundene Forschungsartefakte.
 [Dokumentation](docs/README.md) ·
 [Aktueller Forschungsstand](docs/discovery-status.md) ·
 [Architektur](docs/architecture.md) ·
+[Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md) ·
 [Unabhängige Reproduktion](docs/independent-reproduction.md)
 
 > Regelsuche ist weder ein allgemeiner Ersatz für ein Computer-Algebra-System
@@ -108,9 +109,10 @@ für unendlich viele konkrete Ausdrücke stehen.
   experimentelle Regeln werden erst nach Abschluss einer Generation in ein
   eingefrorenes Schatteninventar der nächsten Generation übernommen. Gleichzeitiges
   Lernen und Nutzen innerhalb derselben Generation ist ausgeschlossen.
-- **Mathematische Darstellungen synthetisieren:** Semantische Views können
-  vollständige AST-Teilbäume als strukturelle Atome interpretieren und daraus
-  unter exakten, begrenzten Koeffizientenbedingungen neue Zerlegungen erzeugen.
+- **Mathematische Darstellungen und Faktorisierungen synthetisieren:** Exakte
+  semantische Views erzeugen kanonische Polynome in expliziten Ringen. Engines
+  liefern zunächst untrusted Vorschläge; erst unabhängige Vertrags- und
+  Produktprüfung autorisiert eine Suchkante.
 - **Beweisobligationen erzeugen:** Proof-Backends erhalten versionierte
   Obligationen. Ein formaler Status wird nur aus tatsächlich bestätigter
   Proof-Evidence abgeleitet.
@@ -226,26 +228,47 @@ Schatteninventar, keine autonome mathematische Neuheit.
 
 Details: [Generational Rule Mining](docs/generational-rule-mining.md).
 
-## Semantische Polynomzerlegung
+## Domänenbewusste Polynomfaktorisierung
 
-`PolynomialSemanticView` interpretiert vollständige AST-Teilbäume wie `x + 1`
-oder `sin(t)` als strukturelle Polynom-Atome. Der
-`PolynomialDecompositionSynthesisOperator` löst anschließend exakt die
-Koeffizientenbedingungen für eine begrenzte quadratisch-mal-quadratische
-Zerlegung binärer homogener Quartiken. Univariate Quartiken werden über eine
-explizite strukturelle Einheit homogenisiert.
+Der allgemeine Polynomkern trennt mathematische Identität, Backend-Vorschläge
+und Evidence:
 
-Dadurch werden der historische Sophie-Germain-Fall, weitere unabhängige
-Quartikfamilien und unterstützte AST-Substitutionen durch dasselbe allgemeine
-Verfahren erreicht. Der alte benannte Spezial-Bridge bleibt nur als
-deaktivierter historischer Kontrollpfad erhalten.
+```text
+parsergebundene exakte Literale
+  -> CoefficientDomain
+  -> PolynomialRing mit expliziter Monomordnung
+  -> SparsePolynomial
+  -> FactorizationRequest
+  -> FactorizationEngine: untrusted Proposals und Backend-Claims
+  -> FactorizationVerifier: Vertrags- und Produktprüfung
+  -> verifier-ausgestellte Kandidaten und Suchkante
+```
 
-Die gegenwärtige Domäne ist absichtlich eng: ganzzahlige binäre homogene
-Quartiken sowie begrenzte univariate Quartiken mit struktureller Einheit und
-ganzzahligen quadratischen Faktoren. Das ist keine vollständige multivariate
-Polynomfaktorisierung.
+`PolynomialSemanticView` bindet vollständige AST-Teilbäume wie `x + 1` oder
+`sin(t)` als strukturelle Atome an ein kanonisches Polynom. Display-Syntax und
+konkrete AST-Vorkommen bleiben außerhalb der mathematischen Koeffizienten- und
+Ringoperationen. Numerische Koeffizienten und Exponenten stammen ausschließlich
+aus parserausgestellter exakter Provenienz, nicht aus `NumberExpr(double)`.
 
-Details: [Polynomial Decomposition Synthesis](docs/polynomial-decomposition-synthesis.md).
+Die derzeit integrierte `BinaryQuarticFactorizationEngine` löst exakt eine
+begrenzte quadratisch-mal-quadratische Zerlegung binärer homogener Quartiken.
+Univariate Quartiken können über eine explizite strukturelle Einheit
+homogenisiert werden. Der historische Sophie-Germain-Fall und weitere
+Quartikfamilien entstehen aus derselben Koeffizientenschablone; ein benannter
+Spezial-Bridge bleibt nur als deaktivierter Kontrollpfad erhalten.
+
+Jede positive Zerlegung wird durch `FactorizationVerifier` unabhängig im
+Quellring zurückmultipliziert. Ein Engine-Miss ist kein Irreduzibilitätsbeweis,
+ein Backend-Claim keine unabhängig zertifizierte Vollständigkeit. Vollständige
+allgemeine Faktorisierung über `Z[x]` oder `Q[x]`, endliche Körper,
+Hensel-Lifting und multivariate Verfahren sind Folgearbeiten unter demselben
+Vertrag.
+
+Details:
+
+- [Domänenbewusste Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md)
+- [Semantische Polynomansicht und quartische Zerlegungsengine](docs/polynomial-decomposition-synthesis.md)
+- [ADR: Domänenbewusster Polynomkern statt Quartik-API](docs/adr/domain-aware-polynomial-factorization.md)
 
 ## Aktueller Stand
 
@@ -264,9 +287,9 @@ Der gegenwärtige Stand ist bewusst mehrstufig:
 5. Eine generationengetrennte Kampagne demonstriert proof-gated Regelbildung
    und kumulative Wiederverwendung in content-addressed Schatteninventaren,
    ohne das Produktionsinventar zu verändern.
-6. Die allgemeine semantische Polynomzerlegung ersetzt für den unterstützten
-   Quartikbereich den benannten Sophie-Germain-Spezialweg, bleibt aber bewusst
-   auf einen exakt definierten begrenzten Bereich beschränkt.
+6. Der domänenbewusste Polynom-, Engine- und Verifier-Kern ist implementiert;
+   die erste integrierte Engine bleibt bewusst auf binäre homogene Quartiken
+   und begrenzte univariate Homogenisierung beschränkt.
 7. Das stärkere Flagship-Experiment zur proof-carrying Selbstverbesserung ist
    technisch vorbereitet, aber noch nicht mit realem VALIDATION- und
    FINAL-TEST-Material ausgeführt.
@@ -379,7 +402,8 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
   [Sicherer Regelvorbereitungskoordinator](docs/safe-rule-preparation-coordinator.md),
   [Promotion gelernter Pattern-Regeln](docs/learned-pattern-rule-promotion.md),
   [Generational Rule Mining](docs/generational-rule-mining.md),
-  [Polynomial Decomposition Synthesis](docs/polynomial-decomposition-synthesis.md),
+  [Domänenbewusste Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md),
+  [quartische Zerlegungsengine](docs/polynomial-decomposition-synthesis.md),
   [Benchmarks](docs/discovery-benchmarks.md),
   [Scientific Reproducibility](docs/scientific-reproducibility.md)
 - **Entwicklung:** [Architektur](docs/architecture.md),
