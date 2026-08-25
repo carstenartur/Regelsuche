@@ -55,6 +55,8 @@ public interface FactorizationEngine<C> {
                 Objects.requireNonNull(unit, "unit"));
             if (ring.coefficientDomain().isZero(unit)
                     || unresolvedRemainder.isZero()
+                    || unresolvedRemainder.isConstant()
+                        && !unresolvedRemainder.isOne()
                     || engineCertificateHash == null
                     || !engineCertificateHash.matches(
                         "sha256:[0-9a-f]{64}")) {
