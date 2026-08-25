@@ -3,7 +3,9 @@ package de.regelsuche.docs;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.PolynomialDecompositionSynthesisOperator;
+import de.regelsuche.value.ExprValueFactory;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -23,9 +25,9 @@ class PolynomialDecompositionDiscoveryIntegrationTest {
         assertTrue(evidence.success(), evidence.failureReason());
         assertTrue(evidence.withoutMacroRun().appliedRuleIds().contains(
             PolynomialDecompositionSynthesisOperator.RULE_ID));
-        assertTrue(evidence.withoutMacroRun().path().stream().anyMatch(value ->
-            value.contains("x ^ 2 + y ^ 2")
-                && value.contains("x ^ 2 + 4 * y ^ 2")));
+        assertTrue(pathContainsValue(
+            evidence.withoutMacroRun().path(),
+            scenario.targetExpression()));
     }
 
     @Test
@@ -44,6 +46,21 @@ class PolynomialDecompositionDiscoveryIntegrationTest {
         assertFalse(evidence.success(), evidence.failureReason());
         assertFalse(evidence.withoutMacroRun().appliedRuleIds().contains(
             PolynomialDecompositionSynthesisOperator.RULE_ID));
+    }
+
+    private static boolean pathContainsValue(
+        List<String> path,
+        String expectedExpression
+    ) {
+        ExpressionParser parser = new ExpressionParser();
+        try (ExprValueFactory values = new ExprValueFactory()) {
+            ExprValueFactory.ExprValue expected = values.fromExpr(
+                parser.parseTerm(expectedExpression));
+            return path.stream()
+                .map(parser::parseTerm)
+                .map(values::fromExpr)
+                .anyMatch(expected::sameValue);
+        }
     }
 
     private static DiscoveryBenchmarkScenario scenario() {
