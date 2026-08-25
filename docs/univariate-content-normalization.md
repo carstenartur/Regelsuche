@@ -2,15 +2,16 @@
 
 **Implementierungsstand: 25. August 2026**
 
-Diese Stufe überführt ein exaktes univariates Polynom aus `Z[x]` oder `Q[x]`
-in eine gemeinsame kanonische Form für die späteren modularen
-Faktorisierungsalgorithmen. Sie faktorisiert das Polynom noch nicht.
+Diese Stufe überführt einen typisierten Faktorisierungsrequest über `Z[x]` oder
+`Q[x]` in eine gemeinsame kanonische Form für die späteren modularen
+Faktorisierungsalgorithmen. Sie faktorisiert den primitiven Teil noch nicht.
 
 ## Position in der Faktorisierungspipeline
 
 ```text
-SparsePolynomial<BigInteger> oder SparsePolynomial<ExactRational>
-  -> Source-Strukturgrenzen
+FactorizationRequest<BigInteger oder ExactRational>
+  -> request-weite Source-Strukturgrenzen
+  -> gemeinsame nicht zurücksetzbare Arbeitsbilanz
   -> Nenner-LCM und exakte Ganzzahligmachung
   -> ganzzahliger Koeffizienteninhalt
   -> Vorzeichenkanonisierung
@@ -91,20 +92,38 @@ primitivePart             = 2*x^2 - 5*x + 3
 `UnivariateContentNormalization` besitzt zwei typisierte Einstiegspunkte:
 
 ```java
-normalizeInteger(SparsePolynomial<BigInteger>, UnivariateContentRequest)
-normalizeRational(SparsePolynomial<ExactRational>, UnivariateContentRequest)
+normalizeInteger(
+    FactorizationRequest<BigInteger>,
+    UnivariateContentPolicy)
+
+normalizeRational(
+    FactorizationRequest<ExactRational>,
+    UnivariateContentPolicy)
 ```
 
-Es gibt keinen untypisierten Einstieg, der anhand eines Java-Werts errät, in
-welcher mathematischen Domäne gerechnet wird.
+Der bestehende `FactorizationRequest` bleibt damit die einzige öffentliche
+Quelle für:
+
+- das Quellpolynom;
+- die geforderte Evidence-Autorität;
+- request-weite Strukturgrenzen;
+- Kandidatenbudget;
+- request-weites Arbeitsbudget.
+
+Es existiert keine zweite Normalisierungsrequest-Klasse mit duplizierten
+Struktur- oder Arbeitsgrenzen. `UnivariateContentPolicy` ergänzt ausschließlich
+die für diese Stufe neue Grenze für wachsende Zwischenkoeffizienten.
+
+Es gibt auch keinen untypisierten Einstieg, der anhand eines Java-Werts errät,
+in welcher mathematischen Domäne gerechnet wird.
 
 `UnivariateContentResult` ist von außen nur lesbar. Öffentliche Aufrufer können
 keinen erfolgreichen Status mit frei gewählten Koeffizienten erzeugen. Das
 Zertifikat bindet:
 
 - Methoden-ID und Quelldomäne;
-- kanonisches Quellpolynom;
-- sämtliche Struktur-, Zwischenwert- und Arbeitsgrenzen;
+- den vollständigen kanonischen `FactorizationRequest`;
+- die Zwischenkoeffizienten-Policy;
 - Status und Detailcode;
 - vollständige stage-getrennte Arbeitsbilanz;
 - Nennerbeseitigungsfaktor und ganzzahligen Inhalt;
@@ -113,12 +132,13 @@ Zertifikat bindet:
 
 ## Explizite Grenzen
 
-`UnivariateContentRequest` trennt drei Kostenarten.
+Die Kostenkontrolle besteht aus dem bestehenden Faktorisierungsrequest und
+einer eng begrenzten zusätzlichen Stufenpolitik.
 
 ### Strukturgrenzen der Quelle
 
-Die bestehenden `FactorizationRequest.StructuralLimits` begrenzen vor jeder
-arithmetischen Verarbeitung:
+`FactorizationRequest.StructuralLimits` begrenzt vor jeder arithmetischen
+Verarbeitung:
 
 - Variablenzahl;
 - Gesamtgrad;
@@ -128,10 +148,16 @@ arithmetischen Verarbeitung:
 Eine Überschreitung übernimmt den konkreten Detailcode, beispielsweise
 `MAX_TOTAL_DEGREE_EXCEEDED`.
 
+Das Nullpolynom kann bereits keinen gültigen `FactorizationRequest` bilden. Ein
+multivariater, aber innerhalb seiner Strukturgrenzen liegender Request wird von
+der univariaten Stufe mit `UNSUPPORTED_SHAPE` zurückgewiesen.
+
 ### Bitgrenze für Zwischenkoeffizienten
 
 Das Nenner-LCM kann wesentlich größer als jeder einzelne Nenner werden. Darum
-ist `maxIntermediateCoefficientBitLength` eine eigene verpflichtende Grenze.
+enthält `UnivariateContentPolicy` verpflichtend
+`maxIntermediateCoefficientBitLength`.
+
 Der Algorithmus prüft eine sichere untere Bitlängenschranke vor einer
 Multiplikation und anschließend die exakte Ergebnisbitlänge. Dadurch wird eine
 bereits sicher zu große Ganzzahl nicht erst vollständig materialisiert.
@@ -142,12 +168,19 @@ Mögliche Detailcodes sind unter anderem:
 - `INTEGRAL_COEFFICIENT_BIT_LENGTH_EXCEEDED`;
 - `PRIMITIVE_COEFFICIENT_BIT_LENGTH_EXCEEDED`.
 
-### Nicht zurücksetzbares Arbeitsbudget
+### Nicht zurücksetzbares request-weites Arbeitsbudget
 
 Alle GGT-, LCM-, Divisions-, Multiplikations-, Vorzeichen- und
-Verifikationsschritte laufen über ein gemeinsames `PolynomialWorkBudget`.
-Unteraufrufe können den Zähler nicht zurücksetzen. Bei Erschöpfung lautet der
-Status `BUDGET_INCONCLUSIVE` mit
+Verifikationsschritte laufen über `PolynomialWorkBudget`. Der öffentliche
+Einstieg initialisiert es exakt aus `FactorizationRequest.maxWorkUnits()`.
+
+Für die spätere vollständige Engine existiert zusätzlich ein paketinterner
+Einstieg, der denselben bereits verwendeten `PolynomialWorkBudget` an die
+Normalisierung weitergibt. Folgestufen können den Zähler deshalb nicht
+zurücksetzen. Ein eigener Test führt zwei Normalisierungen mit demselben Budget
+aus und weist nach, dass die zweite Stufe am verbliebenen Restbudget scheitert.
+
+Bei Erschöpfung lautet der Status `BUDGET_INCONCLUSIVE` mit
 `CONTENT_NORMALIZATION_WORK_BUDGET_EXCEEDED`.
 
 ## Unabhängige Prüfung
@@ -171,8 +204,8 @@ sondern als `TECHNICAL_FAILURE` ausgegeben.
 | Status | Bedeutung |
 | --- | --- |
 | `COMPLETED` | Inhalt und primitiver Teil wurden exakt erzeugt und rekonstruiert. |
-| `UNSUPPORTED_DOMAIN` | Die aufgerufene typisierte Methode passt nicht zur deklarierten Koeffizientendomäne. |
-| `UNSUPPORTED_SHAPE` | Die Quelle ist nicht univariat oder ist das Nullpolynom. |
+| `UNSUPPORTED_DOMAIN` | Die typisierte Methode passt nicht zur deklarierten Koeffizientendomäne. |
+| `UNSUPPORTED_SHAPE` | Die Quelle liegt nicht in einem univariaten Polynomring. |
 | `BUDGET_INCONCLUSIVE` | Eine Struktur-, Zwischenwert- oder Arbeitsgrenze wurde erreicht. |
 | `TECHNICAL_FAILURE` | Eine interne exakte Invariante oder arithmetische Operation ist fehlgeschlagen. |
 
