@@ -213,6 +213,12 @@ public interface FactorizationEngine<C> {
                 throw new IllegalArgumentException(
                     "candidate result cannot claim irreducibility");
             }
+            if (backendClaim == BackendClaim.COMPLETE_FACTORIZATION
+                    && proposals.stream().anyMatch(proposal ->
+                        !proposal.unresolvedRemainder().isOne())) {
+                throw new IllegalArgumentException(
+                    "complete backend claim cannot retain an unresolved remainder");
+            }
             if (outcome != Outcome.CANDIDATES
                     && outcome != Outcome.NO_CANDIDATE
                     && backendClaim != BackendClaim.NONE) {
