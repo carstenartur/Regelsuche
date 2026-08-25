@@ -3,14 +3,26 @@
 Diese Seite beschreibt, was Regelsuche derzeit zuverlässig unterstützt und
 welche Fähigkeiten bewusst begrenzt, optional oder noch nicht qualifiziert
 sind. Sie ist keine Roadmap und kein globaler Projektstatus; aktuelle
-Forschungsergebnisse stehen in [Discovery- und Forschungsstand](discovery-status.md).
+Forschungsergebnisse stehen in
+[Discovery- und Forschungsstand](discovery-status.md).
 
 ## Produkt- und Einsatzgrenze
 
 Regelsuche ist eine Plattform für explizite symbolische Transformationsräume,
 Suchpfade, Candidate Formation und reproduzierbare Evidence. Das Projekt ist
-nicht als allgemeiner Ersatz für ein Computer-Algebra-System, einen
-Theorem-Prover oder eine produktionsfertige Mehrnutzerplattform positioniert.
+kein allgemeiner Ersatz für ein Computer-Algebra-System, einen Theorem-Prover
+oder eine produktionsfertige Mehrnutzerplattform.
+
+Ein erfolgreicher technischer Lauf autorisiert nur den Claim des ausgeführten
+Vertrags. Insbesondere werden folgende Stufen nicht gleichgesetzt:
+
+- Sucherfolg;
+- exakte Produktrekonstruktion;
+- Irreduzibilität in einem deklarierten Ring;
+- vollständige Faktorisierung;
+- formaler Beweis;
+- externe mathematische Neuheit;
+- Veröffentlichung.
 
 ## Unterstützte mathematische Grundlage
 
@@ -61,21 +73,26 @@ Standardkonfiguration werden nicht nachträglich vermischt.
 Implementiert ist ein allgemeiner typisierter Kern aus:
 
 - exakten Integer- und Rational-Koeffizientendomänen;
+- expliziten Primkörpern `PrimeField` mit deterministisch geprüfter Primzahl;
 - Polynomringen mit geordneten Variablen und expliziter Monomordnung;
 - kanonischen unveränderlichen Sparse-Polynomen;
 - verlustfreier univariater Koeffizientenansicht;
 - `FactorizationRequest` mit request-weiten Grenzen für Variablenzahl,
-  Gesamtgrad, Termzahl und Quellkoeffizientenbitlänge;
+  Gesamtgrad, Termzahl, Quellkoeffizientenbitlänge, Kandidaten und Arbeit;
 - exakter Inhalts- und Primitivteilnormalisierung für `Z[x]` und `Q[x]`;
 - exakter Ableitung, Multiplikation, Polynomdivision und monischer Normierung;
 - budgetiertem euklidischem Polynom-GGT über exakten Feldern;
 - charakteristik-0-quadratfreier Zerlegung mit Multiplizitäten;
+- deterministischer Berlekamp-Faktorisierung quadratfreier univariater
+  Polynome über einem ausdrücklich deklarierten `F_p`;
+- unabhängiger Produkt-, Koprimheits- und Rabin-/Frobenius-
+  Irreduzibilitätsprüfung der Primkörperfaktoren;
 - backendneutralem `FactorizationEngine`-SPI;
 - untrusted Engine-Proposals und ausdrücklich retained Backend-Claims;
 - unabhängiger Vertrags- und Produktprüfung durch `FactorizationVerifier`;
 - stage-getrenntem, kanonisch geordnetem `PolynomialWorkLedger`.
 
-Die Inhaltsnormalisierung erzeugt für beide Quelldomänen einen exakten
+Die Inhaltsnormalisierung erzeugt für `Z[x]`- und `Q[x]`-Quellen einen exakten
 rationalen Skalar und einen primitiven ganzzahligen Teil mit positivem
 Leitkoeffizienten. Sie prüft die ganzzahlige Zwischenform und die ursprüngliche
 Quelle durch unabhängige Rückmultiplikation. Eine zusätzliche explizite
@@ -85,11 +102,72 @@ Koeffizientenwachstum. Das Arbeitsbudget bleibt Eigentum desselben
 werden.
 
 Die quadratfreie Zerlegung rekonstruiert das Quellpolynom und prüft für jeden
-ausgegebenen Faktor `gcd(f, f') = 1`. Quadratfrei bedeutet nicht irreduzibel.
+ausgegebenen Faktor `gcd(f, f') = 1`. Quadratfrei bedeutet noch nicht
+irreduzibel.
 
-Dieser allgemeine Vertrag und diese Vorstufen sind nicht gleichbedeutend mit
-einer vollständigen allgemeinen Faktorisierungsimplementierung. Die derzeit
-integrierte `BinaryQuarticFactorizationEngine` unterstützt exakt und begrenzt:
+#### Vollständige Faktorisierung im deklarierten Primkörper
+
+`FiniteFieldFactorization` faktorisiert ein nichtkonstantes, quadratfreies
+univariates Polynom vollständig in dem durch `PrimeField` deklarierten Ring
+`F_p[x]`.
+
+Der positive Abschluss umfasst:
+
+1. Monisierung unter Beibehaltung des ursprünglichen Leitkoeffizienten als
+   Einheit des Feldes;
+2. exakte Quadratfreiheitsprüfung;
+3. Konstruktion der Berlekamp-Matrix `Q - I`;
+4. deterministische RREF- und Nullraumberechnung;
+5. erneute Prüfung jedes Nullraumvektors gegen die unveränderte Matrix;
+6. deterministisches Splitting nach Basisreihenfolge und Restklassen;
+7. exakte Rekonstruktion des Ausgangspolynoms;
+8. paarweise Koprimheitsprüfung;
+9. Rabin-/Frobenius-Irreduzibilitätsprüfung jedes ausgegebenen Faktors;
+10. Abgleich von Faktoranzahl und Berlekamp-Nullität.
+
+Damit ist `COMPLETED` ein vollständiger Faktorisierungsabschluss **im
+angegebenen Primkörper**. Daraus folgt kein vollständiger Claim für ein
+ursprüngliches Polynom über `Z[x]` oder `Q[x]`.
+
+Die erste Primkörperimplementierung besitzt bewusst enge Grenzen:
+
+- der Modul wird als deterministisch geprüfte positive `int`-Primzahl
+  angegeben;
+- die Eingabe muss genau eine Variable besitzen und quadratfrei sein;
+- die Anzahl enumerierter Restklassen wird durch
+  `FiniteFieldFactorizationPolicy.maxEnumeratedFieldElements` begrenzt;
+- die Peak-Größe der quadratischen Berlekamp-Matrix wird vor ihrer Allokation
+  durch `maxBerlekampMatrixCells` begrenzt;
+- sämtliche Arithmetik, Matrixreduktion, Splitting- und Verifikationsarbeit
+  teilt ein nicht zurücksetzbares Requestbudget;
+- Budget- oder Policy-Erschöpfung bleibt `BUDGET_INCONCLUSIVE` und wird nicht
+  als Irreduzibilität ausgegeben.
+
+Details stehen unter
+[Deterministische Faktorisierung über Primkörpern](finite-field-factorization.md).
+
+#### Noch offene vollständige `Z[x]`-/`Q[x]`-Pipeline
+
+Die vorhandene Primkörperfaktorisierung ist ein notwendiger Baustein, aber noch
+keine vollständige Faktorisierungsengine für ganzzahlige oder rationale
+Quellen. Weiterhin offen sind:
+
+- geeignete Primzahlauswahl mit retained Ablehnungsgründen für ungeeignete
+  Primzahlen;
+- Abbildung des primitiven ganzzahligen Polynoms in den ausgewählten
+  Primkörper;
+- Hensel-Lifting der modularen Faktoren;
+- ganzzahlige Faktorrekomposition, zunächst etwa Zassenhaus;
+- spätere LLL-/van-Hoeij-Rekombination, wenn sie qualifiziert ist;
+- exakte rationale Faktorreassemblierung;
+- Integration der vollständigen `Z[x]`-/`Q[x]`-Evidence in den allgemeinen
+  Engine-/Verifier-Vertrag;
+- beliebige unterstützte Grade und Faktorgradpartitionen unter eingefrorenen
+  Qualifikationsbudgets;
+- multivariate Faktorisierung.
+
+Die weiterhin integrierte `BinaryQuarticFactorizationEngine` unterstützt
+unabhängig davon exakt und begrenzt:
 
 - Koeffizienten in `Z`;
 - zwei strukturelle Atome;
@@ -100,8 +178,9 @@ integrierte `BinaryQuarticFactorizationEngine` unterstützt exakt und begrenzt:
   strukturellen Einheit.
 
 Jeder positive Engine-Kandidat wird im Quellring exakt zurückmultipliziert.
-Daraus folgt eine verifizierte Zerlegung, aber noch kein Nachweis, dass alle
-Faktoren irreduzibel oder die Zerlegung vollständig ist. Insbesondere gilt:
+Daraus folgt eine verifizierte Zerlegung, aber ohne zusätzliche Evidence noch
+kein Nachweis, dass alle Faktoren irreduzibel oder die Zerlegung vollständig
+ist. Insbesondere gilt:
 
 - `NO_CANDIDATE` ist kein Irreduzibilitätsbeweis;
 - ein Backend-Claim erfüllt keinen `INDEPENDENT_COMPLETE`-Request;
@@ -109,19 +188,16 @@ Faktoren irreduzibel oder die Zerlegung vollständig ist. Insbesondere gilt:
   Faktorgradaufteilungen;
 - die allgemeine rationale Inhaltsnormalisierung ist implementiert, eine
   vollständige `Q[x]`-Faktorisierungsengine jedoch noch nicht;
-- endliche-Körper-Faktorisierung, geeignete Primzahlauswahl mit
-  Ablehnungsgründen, Hensel-Lifting,
-  Zassenhaus-/LLL-/van-Hoeij-Rekombination, rationale Faktorreassemblierung und
-  unabhängige Vollständigkeits- beziehungsweise
-  Irreduzibilitätszertifikate sind noch nicht implementiert;
-- multivariate Faktorisierung ist nicht implementiert.
+- ein vollständiger Abschluss in `F_p[x]` darf nicht als Abschluss in `Z[x]`
+  oder `Q[x]` umetikettiert werden.
 
-Details stehen in
-[Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md),
-[Univariate Polynomgrundlage, Inhalt und quadratfreie Zerlegung](univariate-polynomial-foundation.md),
-[Univariate Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md)
-und
-[Semantische Polynomansicht und quartische Zerlegungsengine](polynomial-decomposition-synthesis.md).
+Weiterführende Seiten:
+
+- [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md)
+- [Univariate Polynomgrundlage, Inhalt und quadratfreie Zerlegung](univariate-polynomial-foundation.md)
+- [Univariate Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md)
+- [Deterministische Faktorisierung über Primkörpern](finite-field-factorization.md)
+- [Semantische Polynomansicht und quartische Zerlegungsengine](polynomial-decomposition-synthesis.md)
 
 ### Gleichungssysteme, Matrizen und weitere Domänen
 
@@ -162,7 +238,7 @@ Nicht unterstützt ist eine universelle, vollständige Annahmenlogik für alle
 Ausdrucksarten und externen Backends. Insbesondere können externe Systeme nicht
 jede zusammengesetzte Annahme in ihrer nativen Symbolkonfiguration abbilden.
 Eine unabhängige annahmenbewusste Validierung jedes extern erzeugten
-Simplifier-Outputs bleibt im aktuellen Vergleich ein Coverage Gap.
+Simplifier-Outputs bleibt ein Coverage Gap.
 
 ## Suche und Equality Saturation
 
@@ -229,7 +305,7 @@ VALIDATION- und FINAL-TEST-Material ausgeführt.
 ## Counterexample Search und Validation
 
 Counterexample Search ist ein Angriffsmechanismus. Ein reproduzierbarer
-Gegenfall widerlegt die betroffene allgemeine Behauptung innerhalb ihres
+Gegenfall widerlegt die betroffene allgemeine Behauptung innerhalb seines
 Vertrags. Ein begrenzter Nicht-Fund ist kein Beweis.
 
 Mögliche Ergebnisse bleiben getrennt:
@@ -362,6 +438,7 @@ Diese reale Prüfung ist noch nicht abgeschlossen; das Profil bleibt `BLOCKED`.
 - [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md)
 - [Univariate Polynomgrundlage, Inhalt und quadratfreie Zerlegung](univariate-polynomial-foundation.md)
 - [Univariate Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md)
+- [Deterministische Faktorisierung über Primkörpern](finite-field-factorization.md)
 - [ADR: Domänenbewusster Polynomkern statt Quartik-API](adr/domain-aware-polynomial-factorization.md)
 - [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md)
 - [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md)
