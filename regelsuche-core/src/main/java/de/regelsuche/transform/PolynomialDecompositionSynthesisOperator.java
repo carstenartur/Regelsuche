@@ -65,7 +65,7 @@ public final class PolynomialDecompositionSynthesisOperator
             new PolynomialSemanticView(
                 new PolynomialSemanticView.Budget(2, 4, 16, 256)),
             maxCandidates,
-            DEFAULT_MAX_COEFFIC_ABS,
+            DEFAULT_MAX_COEFFICIENT_ABS,
             DEFAULT_MAX_FACTOR_CONFIGURATIONS);
     }
 
