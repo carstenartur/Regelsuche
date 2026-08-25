@@ -167,6 +167,43 @@ class SuitablePrimeSelectionTest {
     }
 
     @Test
+    void sourceCorrespondenceBudgetFailureRetainsThePrimeAttempt() {
+        SparsePolynomial<BigInteger> source = integer(-1, 0, 1);
+        SuitablePrimeSelectionPolicy policy = policy(3);
+        SuitablePrimeSelectionResult calibration =
+            SuitablePrimeSelection.selectAndFactor(
+                request(source, limits, 1_000_000),
+                policy);
+        assertTrue(calibration.completed(), calibration.toString());
+        long completeWork = calibration.work().totalWorkUnits();
+
+        SuitablePrimeSelectionResult result =
+            SuitablePrimeSelection.selectAndFactor(
+                request(source, limits, completeWork - 1),
+                policy);
+
+        assertEquals(
+            SuitablePrimeSelectionResult.Status.BUDGET_INCONCLUSIVE,
+            result.status());
+        assertEquals(
+            "SOURCE_CORRESPONDENCE_INCONCLUSIVE",
+            result.detailCode());
+        assertEquals(1, result.attempts().size());
+        SuitablePrimeSelectionResult.PrimeAttempt attempt =
+            result.attempts().getFirst();
+        assertEquals(
+            SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                .TERMINAL_INCONCLUSIVE,
+            attempt.disposition());
+        assertEquals(
+            "SOURCE_CORRESPONDENCE_WORK_BUDGET_EXCEEDED",
+            attempt.detailCode());
+        assertTrue(attempt.workUnits() > 0);
+        assertTrue(attempt.modularFactorizationCertificateHash().matches(
+            "sha256:[0-9a-f]{64}"));
+    }
+
+    @Test
     void nonprimitiveNegativeLeadingAndWrongDomainsFailClosed() {
         SuitablePrimeSelectionResult nonprimitive =
             SuitablePrimeSelection.selectAndFactor(
