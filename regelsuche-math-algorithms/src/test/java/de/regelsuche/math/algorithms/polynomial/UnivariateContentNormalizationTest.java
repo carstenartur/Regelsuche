@@ -44,8 +44,8 @@ class UnivariateContentNormalizationTest {
 
         UnivariateContentResult result =
             UnivariateContentNormalization.normalizeInteger(
-                source,
-                request(4_096, 10_000));
+                integerRequest(source, limits, 10_000),
+                policy(4_096));
 
         assertTrue(result.completed(), result.toString());
         assertEquals(
@@ -71,17 +71,18 @@ class UnivariateContentNormalizationTest {
                 q(-2, 5),
                 q(2, 3),
                 q(-4, 15));
-        UnivariateContentRequest request =
-            request(4_096, 10_000);
+        FactorizationRequest<ExactRational> request =
+            rationalRequest(source, limits, 10_000);
+        UnivariateContentPolicy policy = policy(4_096);
 
         UnivariateContentResult first =
             UnivariateContentNormalization.normalizeRational(
-                source,
-                request);
+                request,
+                policy);
         UnivariateContentResult second =
             UnivariateContentNormalization.normalizeRational(
-                source,
-                request);
+                request,
+                policy);
 
         assertTrue(first.completed(), first.toString());
         assertEquals(
@@ -112,8 +113,8 @@ class UnivariateContentNormalizationTest {
 
         UnivariateContentResult result =
             UnivariateContentNormalization.normalizeRational(
-                source,
-                request(128, 1_000));
+                rationalRequest(source, limits, 1_000),
+                policy(128));
 
         assertTrue(result.completed(), result.toString());
         assertEquals(q(-6, 5), result.scalar());
@@ -135,23 +136,25 @@ class UnivariateContentNormalizationTest {
             rational(q(1, 1), q(0, 1), q(1, 1));
         UnivariateContentResult structural =
             UnivariateContentNormalization.normalizeRational(
-                quadratic,
-                new UnivariateContentRequest(
+                rationalRequest(
+                    quadratic,
                     new FactorizationRequest.StructuralLimits(
                         1,
                         1,
                         8,
                         128),
-                    128,
-                    1_000));
+                    1_000),
+                policy(128));
+        SparsePolynomial<ExactRational> growing =
+            rational(q(1, 6), q(1, 35));
         UnivariateContentResult intermediate =
             UnivariateContentNormalization.normalizeRational(
-                rational(q(1, 6), q(1, 35)),
-                request(4, 1_000));
+                rationalRequest(growing, limits, 1_000),
+                policy(4));
         UnivariateContentResult work =
             UnivariateContentNormalization.normalizeRational(
-                quadratic,
-                request(128, 1));
+                rationalRequest(quadratic, limits, 1),
+                policy(128));
 
         assertEquals(
             UnivariateContentResult.Status.BUDGET_INCONCLUSIVE,
@@ -175,11 +178,51 @@ class UnivariateContentNormalizationTest {
     }
 
     @Test
-    void zeroAndMultivariateInputsFailWithoutMathematicalClaims() {
-        UnivariateContentResult zero =
-            UnivariateContentNormalization.normalizeInteger(
+    void aSharedFactorizationBudgetCannotBeResetBetweenStages() {
+        SparsePolynomial<ExactRational> source =
+            rational(q(-2, 5), q(2, 3), q(-4, 15));
+        UnivariateContentPolicy policy = policy(4_096);
+        UnivariateContentResult calibration =
+            UnivariateContentNormalization.normalizeRational(
+                rationalRequest(source, limits, 10_000),
+                policy);
+        long oneRun = calibration.work().totalWorkUnits();
+        FactorizationRequest<ExactRational> request =
+            rationalRequest(source, limits, oneRun + 1);
+        PolynomialWorkBudget shared =
+            new PolynomialWorkBudget(oneRun + 1);
+
+        UnivariateContentResult first =
+            UnivariateContentNormalization.normalizeRational(
+                request,
+                policy,
+                shared);
+        UnivariateContentResult second =
+            UnivariateContentNormalization.normalizeRational(
+                request,
+                policy,
+                shared);
+
+        assertTrue(first.completed(), first.toString());
+        assertEquals(
+            UnivariateContentResult.Status.BUDGET_INCONCLUSIVE,
+            second.status());
+        assertEquals(
+            "CONTENT_NORMALIZATION_WORK_BUDGET_EXCEEDED",
+            second.detailCode());
+        assertTrue(
+            second.work().totalWorkUnits() > oneRun);
+        assertTrue(
+            second.work().totalWorkUnits() <= oneRun + 1);
+    }
+
+    @Test
+    void invalidZeroAndMultivariateRequestsFailBeforeClaims() {
+        assertThrows(IllegalArgumentException.class, () ->
+            integerRequest(
                 SparsePolynomial.zero(integerRing),
-                request(128, 1_000));
+                limits,
+                1_000));
         PolynomialRing<BigInteger> multivariateRing =
             new PolynomialRing<>(
                 BigIntegerDomain.INSTANCE,
@@ -193,38 +236,55 @@ class UnivariateContentNormalizationTest {
                 Map.of(Monomial.of(1, 0), BigInteger.ONE));
         UnivariateContentResult shape =
             UnivariateContentNormalization.normalizeInteger(
-                multivariate,
-                new UnivariateContentRequest(
+                integerRequest(
+                    multivariate,
                     new FactorizationRequest.StructuralLimits(
                         2,
                         4,
                         8,
                         128),
-                    128,
-                    1_000));
+                    1_000),
+                policy(128));
 
-        assertEquals(
-            UnivariateContentResult.Status.UNSUPPORTED_SHAPE,
-            zero.status());
-        assertEquals(
-            "ZERO_POLYNOMIAL_HAS_NO_PRIMITIVE_PART",
-            zero.detailCode());
-        assertThrows(IllegalStateException.class, zero::scalar);
         assertEquals(
             UnivariateContentResult.Status.UNSUPPORTED_SHAPE,
             shape.status());
         assertEquals(
             "REQUIRES_ONE_POLYNOMIAL_VARIABLE",
             shape.detailCode());
+        assertThrows(
+            IllegalStateException.class,
+            shape::scalar);
     }
 
-    private UnivariateContentRequest request(
-        int maximumIntermediateBits,
+    private static UnivariateContentPolicy policy(
+        int maximumIntermediateBits
+    ) {
+        return new UnivariateContentPolicy(
+            maximumIntermediateBits);
+    }
+
+    private static FactorizationRequest<BigInteger> integerRequest(
+        SparsePolynomial<BigInteger> source,
+        FactorizationRequest.StructuralLimits structuralLimits,
         long maximumWork
     ) {
-        return new UnivariateContentRequest(
-            limits,
-            maximumIntermediateBits,
+        return FactorizationRequest.verifiedDecomposition(
+            source,
+            structuralLimits,
+            1,
+            maximumWork);
+    }
+
+    private static FactorizationRequest<ExactRational> rationalRequest(
+        SparsePolynomial<ExactRational> source,
+        FactorizationRequest.StructuralLimits structuralLimits,
+        long maximumWork
+    ) {
+        return FactorizationRequest.verifiedDecomposition(
+            source,
+            structuralLimits,
+            1,
             maximumWork);
     }
 
