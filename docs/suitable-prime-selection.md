@@ -51,12 +51,12 @@ Polynom wird nicht stillschweigend normalisiert; dafür bleibt die vorgelagerte
 [Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md)
 zuständig.
 
-## Explizite Kandidatenfolge
+## Explizite Kandidatenfolge und Kandidatenbudget
 
 `SuitablePrimeSelectionPolicy` bindet:
 
 - die Algorithmus-ID;
-- eine streng aufsteigende Liste tatsächlich zu betrachtender Primzahlen;
+- eine streng aufsteigende Liste tatsächlich zulässiger Primzahlen;
 - die vollständige `FiniteFieldFactorizationPolicy` der modularen Folgestufe.
 
 Eine Policy kann eine explizite Kandidatenliste verwenden oder einen
@@ -77,6 +77,20 @@ Die Kandidatenfolge ist auf 4096 Primzahlen begrenzt. Jeder Kandidat muss im von
 der eingebetteten Primkörperfaktorisierung erlaubten Enumerationsbereich
 liegen. Duplikate, fallende Folgen, zusammengesetzte Werte und widersprüchliche
 Policies werden bereits beim Erzeugen der Policy abgelehnt.
+
+Zusätzlich begrenzt `FactorizationRequest.maxCandidates()` die Zahl der in
+einem konkreten Lauf tatsächlich betrachteten Primzahlen. Die Policy kann also
+einen größeren zulässigen Vorrat binden, ohne dem Request mehr
+Kandidatenautorität zu geben. Erschöpft der Lauf dieses Budget, bevor die
+Policyfolge endet, lautet der terminale Detailcode
+
+```text
+PRIME_CANDIDATE_BUDGET_EXHAUSTED
+```
+
+und der Status bleibt `BUDGET_INCONCLUSIVE`. Die Auditspur enthält genau den
+bereits autorisierten und betrachteten Policypräfix. `maxCandidates = 0` wird
+vor dem ersten Versuch als `MAX_CANDIDATES_IS_ZERO` zurückgewiesen.
 
 ## Auswahlregel
 
@@ -133,7 +147,8 @@ Für
 f(x) = 2*x^2 + 2*x + 5
 ```
 
-mit der Kandidatenfolge `2, 3, 5, 7` entsteht:
+mit der Kandidatenfolge `2, 3, 5, 7` entsteht bei ausreichendem
+Request-Kandidatenbudget:
 
 | Primzahl | Ergebnis | Grund |
 | ---: | --- | --- |
@@ -141,6 +156,10 @@ mit der Kandidatenfolge `2, 3, 5, 7` entsteht:
 | 3 | abgelehnt | `2*x^2 + 2*x + 2` ist nicht quadratfrei |
 | 5 | ausgewählt | `2*x*(x + 1)` ist quadratfrei und vollständig faktorisiert |
 | 7 | nicht mehr betrachtet | erster geeigneter Kandidat wurde bereits ausgewählt |
+
+Bei `maxCandidates = 2` endet derselbe Lauf nach den beiden bewahrten
+Ablehnungen für `2` und `3` mit `PRIME_CANDIDATE_BUDGET_EXHAUSTED`; die
+mathematisch geeignete Primzahl `5` wird nicht mehr betrachtet.
 
 ## Modulare Repräsentationsgrenze
 
@@ -207,7 +226,8 @@ meldet `SOURCE_CORRESPONDENCE_INCONCLUSIVE`.
 
 Das abschließende Zertifikat bindet zusätzlich:
 
-- den vollständigen ursprünglichen `FactorizationRequest`;
+- den vollständigen ursprünglichen `FactorizationRequest` einschließlich
+  Kandidaten- und Arbeitsbudget;
 - die vollständige Auswahl- und Faktorisierungspolicy;
 - sämtliche Versuche in Reihenfolge;
 - die gesamte Arbeitsbilanz;
@@ -237,28 +257,34 @@ die Reduktion der gebundenen ganzzahligen Quelle ist.
 | `COMPLETED` | Eine gradtreue, quadratfreie Primzahl wurde ausgewählt und die modulare Quelle vollständig faktorisiert. |
 | `UNSUPPORTED_DOMAIN` | Die Quelle liegt nicht im deklarierten ganzzahligen Koeffizientenring. |
 | `UNSUPPORTED_SHAPE` | Die Quelle ist nicht univariat, konstant oder nicht kanonisch primitiv. |
-| `BUDGET_INCONCLUSIVE` | Struktur-, Arbeits- oder modulare Ressourcen reichen nicht aus oder kein Kandidat der gebundenen Liste war geeignet. |
+| `BUDGET_INCONCLUSIVE` | Struktur-, Kandidaten-, Arbeits- oder modulare Ressourcen reichen nicht aus oder kein Kandidat der gebundenen Liste war geeignet. |
 | `TECHNICAL_FAILURE` | Eine interne oder verschachtelte Vertragsinvariante wurde verletzt. |
 
-Ein ausgeschöpfter Kandidatenvorrat meldet
+Ein vollständig ausgeschöpfter Policyevorrat meldet
 
 ```text
 NO_SUITABLE_PRIME_WITHIN_POLICY
 ```
 
-und ist kein Beweis, dass keine geeignete Primzahl existiert. Eine
-Ressourcenüberschreitung der modularen Faktorisierung oder der anschließenden
-Quellkorrespondenzprüfung ist terminal und wird nicht fälschlich als
-mathematische Ablehnung der betreffenden Primzahl weitergezählt.
+während ein früher erschöpftes Request-Kandidatenbudget
+
+```text
+PRIME_CANDIDATE_BUDGET_EXHAUSTED
+```
+
+meldet. Keines der beiden Ergebnisse beweist, dass keine geeignete Primzahl
+existiert. Eine Ressourcenüberschreitung der modularen Faktorisierung oder der
+anschließenden Quellkorrespondenzprüfung ist terminal und wird nicht fälschlich
+als mathematische Ablehnung der betreffenden Primzahl weitergezählt.
 
 ## Claim-Grenze
 
 `COMPLETED` autorisiert genau:
 
-> Für das gebundene primitive ganzzahlige Polynom wurde aus der gebundenen
-> Kandidatenfolge die erste gradtreue Primzahl mit quadratfreier Reduktion
-> gewählt; diese Reduktion wurde im gebundenen `F_p[x]` vollständig und
-> irreduzibel faktorisiert.
+> Für das gebundene primitive ganzzahlige Polynom wurde innerhalb des
+> request-autorisierten Präfixes der gebundenen Kandidatenfolge die erste
+> gradtreue Primzahl mit quadratfreier Reduktion gewählt; diese Reduktion wurde
+> im gebundenen `F_p[x]` vollständig und irreduzibel faktorisiert.
 
 Nicht autorisiert sind:
 
