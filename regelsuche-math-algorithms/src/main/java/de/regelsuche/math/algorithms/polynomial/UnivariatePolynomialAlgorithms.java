@@ -1,5 +1,11 @@
-package de.regelsuche.polynomial;
+package de.regelsuche.math.algorithms.polynomial;
 
+import de.regelsuche.polynomial.CoefficientDomain;
+import de.regelsuche.polynomial.ExactField;
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
 import java.util.Objects;
 
 /** Exact, budgeted primitive algorithms over canonical univariate polynomials. */
@@ -229,18 +235,18 @@ public final class UnivariatePolynomialAlgorithms {
             SparsePolynomial<C> right
         ) {
             StringBuilder material = new StringBuilder(GCD_METHOD_ID);
-            PolynomialEvidence.append(
+            AlgorithmEvidence.append(
                 material,
                 left.canonicalMaterial());
-            PolynomialEvidence.append(
+            AlgorithmEvidence.append(
                 material,
                 right.canonicalMaterial());
-            PolynomialEvidence.append(material, status.name());
-            PolynomialEvidence.append(material, detailCode);
-            PolynomialEvidence.append(
+            AlgorithmEvidence.append(material, status.name());
+            AlgorithmEvidence.append(material, detailCode);
+            AlgorithmEvidence.append(
                 material,
                 work.canonicalMaterial());
-            PolynomialEvidence.append(
+            AlgorithmEvidence.append(
                 material,
                 gcd == null ? "" : gcd.canonicalMaterial());
             return new GcdResult<>(
@@ -248,7 +254,7 @@ public final class UnivariatePolynomialAlgorithms {
                 detailCode,
                 gcd,
                 work,
-                PolynomialEvidence.sha256(material.toString()));
+                AlgorithmEvidence.sha256(material.toString()));
         }
 
         public Status status() {

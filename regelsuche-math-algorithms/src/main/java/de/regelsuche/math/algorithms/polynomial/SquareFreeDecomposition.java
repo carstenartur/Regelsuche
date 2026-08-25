@@ -1,5 +1,12 @@
-package de.regelsuche.polynomial;
+package de.regelsuche.math.algorithms.polynomial;
 
+import de.regelsuche.polynomial.CoefficientDomain;
+import de.regelsuche.polynomial.ExactField;
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -343,27 +350,27 @@ public final class SquareFreeDecomposition {
             FactorizationRequest.StructuralLimits limits
         ) {
             StringBuilder material = new StringBuilder(METHOD_ID);
-            PolynomialEvidence.append(
+            AlgorithmEvidence.append(
                 material,
                 source.canonicalMaterial());
-            PolynomialEvidence.append(
+            AlgorithmEvidence.append(
                 material,
                 limits.canonicalMaterial());
-            PolynomialEvidence.append(material, status.name());
-            PolynomialEvidence.append(material, detailCode);
-            PolynomialEvidence.append(
+            AlgorithmEvidence.append(material, status.name());
+            AlgorithmEvidence.append(material, detailCode);
+            AlgorithmEvidence.append(
                 material,
                 work.canonicalMaterial());
             CoefficientDomain<C> domain =
                 source.ring().coefficientDomain();
-            PolynomialEvidence.append(
+            AlgorithmEvidence.append(
                 material,
                 unit == null ? "" : domain.canonicalText(unit));
             factors.forEach(factor -> {
-                PolynomialEvidence.append(
+                AlgorithmEvidence.append(
                     material,
                     Integer.toString(factor.multiplicity()));
-                PolynomialEvidence.append(
+                AlgorithmEvidence.append(
                     material,
                     factor.polynomial().canonicalMaterial());
             });
@@ -373,7 +380,7 @@ public final class SquareFreeDecomposition {
                 unit,
                 factors,
                 work,
-                PolynomialEvidence.sha256(material.toString()));
+                AlgorithmEvidence.sha256(material.toString()));
         }
 
         public Status status() {

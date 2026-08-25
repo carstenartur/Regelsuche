@@ -1,10 +1,19 @@
-package de.regelsuche.polynomial;
+package de.regelsuche.math.algorithms.polynomial;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.ExactRationalField;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.Monomial;
+import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialVariable;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
 import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.List;

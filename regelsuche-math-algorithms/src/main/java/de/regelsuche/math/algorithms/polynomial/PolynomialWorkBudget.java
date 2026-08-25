@@ -1,10 +1,12 @@
-package de.regelsuche.polynomial;
+package de.regelsuche.math.algorithms.polynomial;
 
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.PolynomialWorkSink;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Shared non-resettable work budget for one exact polynomial operation. */
-final class PolynomialWorkBudget {
+/** Shared non-resettable work budget for one exact polynomial algorithm. */
+final class PolynomialWorkBudget implements PolynomialWorkSink {
     private final long limit;
     private final Map<String, Long> stages = new LinkedHashMap<>();
     private long total;
@@ -17,7 +19,8 @@ final class PolynomialWorkBudget {
         this.limit = limit;
     }
 
-    void consume(String stage, long units) {
+    @Override
+    public void consume(String stage, long units) {
         if (stage == null || stage.isBlank() || units < 0) {
             throw new IllegalArgumentException(
                 "polynomial work entry is invalid");
@@ -30,14 +33,6 @@ final class PolynomialWorkBudget {
         }
         total += units;
         stages.merge(stage, units, Math::addExact);
-    }
-
-    long total() {
-        return total;
-    }
-
-    long remaining() {
-        return limit - total;
     }
 
     FactorizationEngine.WorkLedger ledger() {

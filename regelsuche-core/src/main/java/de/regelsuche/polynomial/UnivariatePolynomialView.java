@@ -142,13 +142,19 @@ public final class UnivariatePolynomialView<C> {
     public UnivariatePolynomialView<C> add(
         UnivariatePolynomialView<C> other
     ) {
-        return add(other, null, "");
+        return add(
+            other,
+            PolynomialWorkSink.none(),
+            "univariate.add");
     }
 
     public UnivariatePolynomialView<C> subtract(
         UnivariatePolynomialView<C> other
     ) {
-        return subtract(other, null, "");
+        return subtract(
+            other,
+            PolynomialWorkSink.none(),
+            "univariate.subtract");
     }
 
     public UnivariatePolynomialView<C> negate() {
@@ -159,47 +165,61 @@ public final class UnivariatePolynomialView<C> {
     }
 
     public UnivariatePolynomialView<C> scale(C scalar) {
-        return scale(scalar, null, "");
+        return scale(
+            scalar,
+            PolynomialWorkSink.none(),
+            "univariate.scale");
     }
 
     public UnivariatePolynomialView<C> multiply(
         UnivariatePolynomialView<C> other
     ) {
-        return multiply(other, null, "");
+        return multiply(
+            other,
+            PolynomialWorkSink.none(),
+            "univariate.multiply");
     }
 
     public UnivariatePolynomialView<C> derivative() {
-        return derivative(null, "");
+        return derivative(
+            PolynomialWorkSink.none(),
+            "univariate.derivative");
     }
 
     public UnivariatePolynomialView<C> monic(
         ExactField<C> field
     ) {
-        return monic(field, null, "");
+        return monic(
+            field,
+            PolynomialWorkSink.none(),
+            "univariate.monic");
     }
 
     public DivisionResult<C> divideAndRemainder(
         UnivariatePolynomialView<C> divisor,
         ExactField<C> field
     ) {
-        return divideAndRemainder(divisor, field, null, "");
+        return divideAndRemainder(
+            divisor,
+            field,
+            PolynomialWorkSink.none(),
+            "univariate.division");
     }
 
     public UnivariatePolynomialView<C> exactQuotient(
         UnivariatePolynomialView<C> divisor,
         ExactField<C> field
     ) {
-        DivisionResult<C> result = divideAndRemainder(divisor, field);
-        if (!result.remainder().isZero()) {
-            throw new ArithmeticException(
-                "polynomial division has nonzero remainder");
-        }
-        return result.quotient();
+        return exactQuotient(
+            divisor,
+            field,
+            PolynomialWorkSink.none(),
+            "univariate.exact-quotient");
     }
 
-    UnivariatePolynomialView<C> add(
+    public UnivariatePolynomialView<C> add(
         UnivariatePolynomialView<C> other,
-        PolynomialWorkBudget work,
+        PolynomialWorkSink work,
         String stage
     ) {
         requireSameRing(other);
@@ -217,9 +237,9 @@ public final class UnivariatePolynomialView<C> {
         return new UnivariatePolynomialView<>(ring, result);
     }
 
-    UnivariatePolynomialView<C> subtract(
+    public UnivariatePolynomialView<C> subtract(
         UnivariatePolynomialView<C> other,
-        PolynomialWorkBudget work,
+        PolynomialWorkSink work,
         String stage
     ) {
         requireSameRing(other);
@@ -237,9 +257,9 @@ public final class UnivariatePolynomialView<C> {
         return new UnivariatePolynomialView<>(ring, result);
     }
 
-    UnivariatePolynomialView<C> scale(
+    public UnivariatePolynomialView<C> scale(
         C scalar,
-        PolynomialWorkBudget work,
+        PolynomialWorkSink work,
         String stage
     ) {
         CoefficientDomain<C> domain = ring.coefficientDomain();
@@ -256,9 +276,9 @@ public final class UnivariatePolynomialView<C> {
         return new UnivariatePolynomialView<>(ring, result);
     }
 
-    UnivariatePolynomialView<C> multiply(
+    public UnivariatePolynomialView<C> multiply(
         UnivariatePolynomialView<C> other,
-        PolynomialWorkBudget work,
+        PolynomialWorkSink work,
         String stage
     ) {
         requireSameRing(other);
@@ -285,8 +305,8 @@ public final class UnivariatePolynomialView<C> {
         return new UnivariatePolynomialView<>(ring, result);
     }
 
-    UnivariatePolynomialView<C> derivative(
-        PolynomialWorkBudget work,
+    public UnivariatePolynomialView<C> derivative(
+        PolynomialWorkSink work,
         String stage
     ) {
         if (degree() <= 0) {
@@ -308,9 +328,9 @@ public final class UnivariatePolynomialView<C> {
         return new UnivariatePolynomialView<>(ring, result);
     }
 
-    UnivariatePolynomialView<C> monic(
+    public UnivariatePolynomialView<C> monic(
         ExactField<C> field,
-        PolynomialWorkBudget work,
+        PolynomialWorkSink work,
         String stage
     ) {
         requireField(field);
@@ -324,10 +344,10 @@ public final class UnivariatePolynomialView<C> {
         return scale(inverse, work, stage);
     }
 
-    DivisionResult<C> divideAndRemainder(
+    public DivisionResult<C> divideAndRemainder(
         UnivariatePolynomialView<C> divisor,
         ExactField<C> field,
-        PolynomialWorkBudget work,
+        PolynomialWorkSink work,
         String stage
     ) {
         requireSameRing(divisor);
@@ -380,10 +400,10 @@ public final class UnivariatePolynomialView<C> {
             new UnivariatePolynomialView<>(ring, remainder));
     }
 
-    UnivariatePolynomialView<C> exactQuotient(
+    public UnivariatePolynomialView<C> exactQuotient(
         UnivariatePolynomialView<C> divisor,
         ExactField<C> field,
-        PolynomialWorkBudget work,
+        PolynomialWorkSink work,
         String stage
     ) {
         DivisionResult<C> result =
@@ -464,17 +484,15 @@ public final class UnivariatePolynomialView<C> {
     }
 
     private static void consume(
-        PolynomialWorkBudget work,
+        PolynomialWorkSink work,
         String stage,
         long units
     ) {
-        if (work != null) {
-            work.consume(
-                stage == null || stage.isBlank()
-                    ? "univariate.arithmetic"
-                    : stage,
-                units);
-        }
+        Objects.requireNonNull(work, "work").consume(
+            stage == null || stage.isBlank()
+                ? "univariate.arithmetic"
+                : stage,
+            units);
     }
 
     public record DivisionResult<C>(
