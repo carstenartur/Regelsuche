@@ -102,7 +102,7 @@ class FiniteFieldFactorizationTest {
     @Test
     void certificatesAreDeterministicAndIssuerOwned() {
         PolynomialRing<BigInteger> ring = ring(5);
-        SparsePolynomial<BigInteger> source = polynomial(ring, 4, 0, 1)
+        SparsePolynomial<BigInteger> source = polynomial(ring, 2, 0, 1)
             .multiply(polynomial(ring, 1, 1));
         FactorizationRequest<BigInteger> request =
             request(source, 1_000_000);
@@ -112,6 +112,7 @@ class FiniteFieldFactorizationTest {
         FiniteFieldFactorizationResult second =
             FiniteFieldFactorization.factorSquareFree(request, policy);
 
+        assertTrue(first.completed(), first.toString());
         assertEquals(first, second);
         assertEquals(
             0,
