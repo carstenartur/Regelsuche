@@ -106,8 +106,8 @@ A successful analysis retains:
 - visited-node and exact-arithmetic counts.
 
 `canonicalMaterial()` length-prefixes all top-level fields by UTF-8 byte length.
-It is the deterministic input for the next combined synthesis certificate; it
-is not yet a standalone serialized Evidence contract.
+It is the deterministic input for the combined synthesis certificate; it is not
+itself a standalone serialized Evidence contract.
 
 ## Integration sequence
 
@@ -121,13 +121,23 @@ ExactParsedTerm
   -> primitive integer polynomial
   -> existing typed integer decomposition synthesis
   -> exact scalar reassembly
-  -> independently reconstructed rational candidate
+  -> exact replay of the rendered rational candidate
 ```
 
-The next layer must add a typed entry point to the existing integer quartic
-synthesizer instead of rendering the primitive polynomial to text and reparsing
-it through `double`. It must bind this view material, the content certificate,
-the integer synthesis certificate and the final transformed expression.
+The typed entry point is implemented as
+`PolynomialDecompositionSynthesisOperator.synthesize(PolynomialSemanticView.Polynomial)`
+and documented in
+[Semantische Polynomansicht und Zerlegungssynthese](polynomial-decomposition-synthesis.md).
+It accepts the already validated primitive integer polynomial directly and does
+not render coefficient text or reconstruct exact values from `double`.
+
+[Exact rational polynomial decomposition synthesis v1](exact-rational-polynomial-decomposition-synthesis.md)
+then binds this view material, the content-normalization certificate, the typed
+integer candidate certificate, the exact scalar and the final transformed
+expression. It verifies primitive and rational coefficient reassembly and
+replays the rendered expression through the exact parser/view before exposing
+an experimental `HypothesisOperator` candidate. Registration in a default
+search profile remains intentionally separate.
 
 ## Verification
 
@@ -150,5 +160,4 @@ mvn --batch-mode --no-transfer-progress -Pfull verify
 This layer establishes exact, bounded extraction of one univariate rational
 polynomial from parser-issued source provenance. It does not establish general
 polynomial recognition, multivariate or non-commutative semantics, complete
-factorization, a rational search edge, held-out utility or production-profile
-activation.
+factorization, held-out utility or production-profile activation.
