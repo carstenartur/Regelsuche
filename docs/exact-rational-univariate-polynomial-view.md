@@ -124,10 +124,17 @@ ExactParsedTerm
   -> independently reconstructed rational candidate
 ```
 
-The next layer must add a typed entry point to the existing integer quartic
-synthesizer instead of rendering the primitive polynomial to text and reparsing
-it through `double`. It must bind this view material, the content certificate,
-the integer synthesis certificate and the final transformed expression.
+The typed entry point is now implemented as
+`PolynomialDecompositionSynthesisOperator.synthesize(PolynomialSemanticView.Polynomial)`
+and documented in
+[Semantische Polynomansicht und Zerlegungssynthese](polynomial-decomposition-synthesis.md).
+It accepts the already validated primitive integer polynomial directly and does
+not render coefficient text or reconstruct exact values from `double`.
+
+The remaining layer must bind this view material, the content-normalization
+certificate, the integer-synthesis certificate and the final transformed
+expression. It must reapply the exact scalar and independently verify rational
+coefficient reconstruction before authorizing a search edge.
 
 ## Verification
 
