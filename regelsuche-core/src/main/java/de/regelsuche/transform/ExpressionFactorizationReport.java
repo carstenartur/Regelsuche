@@ -1,26 +1,34 @@
 package de.regelsuche.transform;
 
-import de.regelsuche.polynomial.FactorizationCandidate;
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.FactorizationVerifier;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Objects;
 
-/** Expression adapter result around the domain-neutral factorization core. */
+/** Expression adapter result around independently verified factorization data. */
 public record ExpressionFactorizationReport(
     Status status,
     String detailCode,
     PolynomialSemanticView.Status semanticStatus,
     String sourcePolynomialMaterial,
-    long arithmeticSteps,
+    FactorizationEngine.WorkLedger work,
+    FactorizationVerifier.ClaimStrength claimStrength,
+    String verificationHash,
     List<RenderedFactorization> candidates
 ) {
     public ExpressionFactorizationReport {
         Objects.requireNonNull(status, "status");
         Objects.requireNonNull(semanticStatus, "semanticStatus");
+        Objects.requireNonNull(work, "work");
+        Objects.requireNonNull(claimStrength, "claimStrength");
         if (detailCode == null
                 || detailCode.isBlank()
                 || sourcePolynomialMaterial == null
-                || arithmeticSteps < 0) {
+                || verificationHash == null
+                || (!verificationHash.isEmpty()
+                    && !verificationHash.matches(
+                        "sha256:[0-9a-f]{64}"))) {
             throw new IllegalArgumentException(
                 "expression factorization report is invalid");
         }
@@ -30,25 +38,52 @@ public record ExpressionFactorizationReport(
             throw new IllegalArgumentException(
                 "expression factorization status/candidate mismatch");
         }
+        if (status == Status.GENERATED
+                && verificationHash.isEmpty()) {
+            throw new IllegalArgumentException(
+                "generated expression factorization requires verifier evidence");
+        }
     }
 
     public boolean generated() {
         return status == Status.GENERATED;
     }
 
-    public static ExpressionFactorizationReport failure(
+    public long totalWorkUnits() {
+        return work.totalWorkUnits();
+    }
+
+    public static ExpressionFactorizationReport semanticFailure(
         Status status,
         String detailCode,
-        PolynomialSemanticView.Status semanticStatus,
-        String sourcePolynomialMaterial,
-        long arithmeticSteps
+        PolynomialSemanticView.Status semanticStatus
     ) {
         return new ExpressionFactorizationReport(
             status,
             detailCode,
             semanticStatus,
+            "",
+            FactorizationEngine.WorkLedger.empty(),
+            FactorizationVerifier.ClaimStrength.NONE,
+            "",
+            List.of());
+    }
+
+    public static ExpressionFactorizationReport coreFailure(
+        Status status,
+        PolynomialSemanticView.Status semanticStatus,
+        String sourcePolynomialMaterial,
+        FactorizationVerifier.Report<BigInteger> report
+    ) {
+        Objects.requireNonNull(report, "report");
+        return new ExpressionFactorizationReport(
+            status,
+            report.detailCode(),
+            semanticStatus,
             sourcePolynomialMaterial,
-            arithmeticSteps,
+            report.work(),
+            report.claimStrength(),
+            report.verificationHash(),
             List.of());
     }
 
@@ -65,7 +100,7 @@ public record ExpressionFactorizationReport(
 
     public record RenderedFactorization(
         String transformedExpression,
-        FactorizationCandidate<BigInteger> factorization,
+        FactorizationVerifier.VerifiedCandidate<BigInteger> factorization,
         String applicationKey
     ) {
         public RenderedFactorization {
