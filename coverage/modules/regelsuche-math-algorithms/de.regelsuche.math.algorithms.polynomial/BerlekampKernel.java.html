@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BerlekampKernel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">BerlekampKernel.java</span></div><h1>BerlekampKernel.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+/** Deterministic Berlekamp kernel construction over one declared prime field. */
+final class BerlekampKernel {
+    static final String METHOD_ID =
+        &quot;regelsuche.berlekamp-kernel/v1&quot;;
+
+    private BerlekampKernel() {
+    }
+
+    static Kernel compute(
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="pc bpc" id="L23" title="2 of 4 branches missed.">        if (source.isZero() || source.isConstant()) {</span>
+<span class="nc" id="L24">            throw new IllegalArgumentException(</span>
+                &quot;Berlekamp kernel requires a nonconstant polynomial&quot;);
+        }
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (!field.isOne(source.leadingCoefficient())) {</span>
+<span class="nc" id="L28">            throw new IllegalArgumentException(</span>
+                &quot;Berlekamp kernel requires a monic polynomial&quot;);
+        }
+<span class="fc" id="L31">        int dimension = source.degree();</span>
+<span class="fc" id="L32">        BigInteger[][] matrix = matrix(</span>
+            source,
+            field,
+            work);
+<span class="fc" id="L36">        Nullspace nullspace = nullspace(</span>
+            matrix,
+            source,
+            field,
+            work);
+<span class="fc" id="L41">        verify(</span>
+            matrix,
+<span class="fc" id="L43">            nullspace.basis(),</span>
+            field,
+            work);
+
+<span class="fc" id="L47">        StringBuilder material = new StringBuilder(METHOD_ID);</span>
+<span class="fc" id="L48">        AlgorithmEvidence.append(material, field.id());</span>
+<span class="fc" id="L49">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L51">            source.canonicalMaterial());</span>
+<span class="fc" id="L52">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L54">            Integer.toString(dimension));</span>
+<span class="fc" id="L55">        nullspace.pivotColumns().forEach(column -&gt;</span>
+<span class="fc" id="L56">            AlgorithmEvidence.append(</span>
+                material,
+                &quot;pivot=&quot; + column));
+<span class="fc" id="L59">        nullspace.basis().forEach(vector -&gt;</span>
+<span class="fc" id="L60">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L62">                vector.canonicalMaterial()));</span>
+<span class="fc" id="L63">        return new Kernel(</span>
+<span class="fc" id="L64">            nullspace.basis(),</span>
+<span class="fc" id="L65">            nullspace.basis().size(),</span>
+<span class="fc" id="L66">            AlgorithmEvidence.sha256(material.toString()));</span>
+    }
+
+    private static BigInteger[][] matrix(
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L74">        int dimension = source.degree();</span>
+<span class="fc" id="L75">        BigInteger[][] result = new BigInteger[dimension][dimension];</span>
+<span class="fc" id="L76">        UnivariatePolynomialView&lt;BigInteger&gt; x =</span>
+<span class="fc" id="L77">            FiniteFieldPolynomialArithmetic.x(source.ring());</span>
+<span class="fc" id="L78">        UnivariatePolynomialView&lt;BigInteger&gt; xToPrime =</span>
+<span class="fc" id="L79">            FiniteFieldPolynomialArithmetic.powMod(</span>
+                x,
+<span class="fc" id="L81">                field.characteristic(),</span>
+                source,
+                field,
+                work,
+                &quot;berlekamp.matrix.x-to-prime&quot;);
+<span class="fc" id="L86">        UnivariatePolynomialView&lt;BigInteger&gt; columnPolynomial =</span>
+<span class="fc" id="L87">            UnivariatePolynomialView.one(source.ring());</span>
+
+<span class="fc" id="L89">        for (int column = 0;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                column &lt; dimension;</span>
+<span class="fc" id="L91">                column++) {</span>
+<span class="fc" id="L92">            work.consume(&quot;berlekamp.matrix.columns&quot;, 1);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            for (int row = 0; row &lt; dimension; row++) {</span>
+<span class="fc" id="L94">                work.consume(</span>
+                    &quot;berlekamp.matrix.coefficient-copies&quot;,
+                    1);
+<span class="fc" id="L97">                result[row][column] =</span>
+<span class="fc" id="L98">                    columnPolynomial.coefficient(row);</span>
+            }
+<span class="fc" id="L100">            work.consume(</span>
+                &quot;berlekamp.matrix.identity-subtractions&quot;,
+                1);
+<span class="fc" id="L103">            result[column][column] = field.subtract(</span>
+                result[column][column],
+<span class="fc" id="L105">                field.one());</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (column + 1 &lt; dimension) {</span>
+<span class="fc" id="L107">                columnPolynomial =</span>
+<span class="fc" id="L108">                    FiniteFieldPolynomialArithmetic.multiplyMod(</span>
+                        columnPolynomial,
+                        xToPrime,
+                        source,
+                        field,
+                        work,
+                        &quot;berlekamp.matrix.next-column&quot;);
+            }
+        }
+<span class="fc" id="L117">        return result;</span>
+    }
+
+    private static Nullspace nullspace(
+        BigInteger[][] matrix,
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L126">        int rows = matrix.length;</span>
+<span class="fc" id="L127">        int columns = rows;</span>
+<span class="fc" id="L128">        BigInteger[][] reduced = copy(matrix, work);</span>
+<span class="fc" id="L129">        ArrayList&lt;Integer&gt; pivotColumns = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L130">        int pivotRow = 0;</span>
+
+<span class="fc" id="L132">        for (int column = 0;</span>
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">                column &lt; columns &amp;&amp; pivotRow &lt; rows;</span>
+<span class="fc" id="L134">                column++) {</span>
+<span class="fc" id="L135">            int selected = selectPivot(</span>
+                reduced,
+                pivotRow,
+                column,
+                field,
+                work);
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (selected &lt; 0) {</span>
+<span class="fc" id="L142">                continue;</span>
+            }
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (selected != pivotRow) {</span>
+<span class="fc" id="L145">                BigInteger[] swapped = reduced[pivotRow];</span>
+<span class="fc" id="L146">                reduced[pivotRow] = reduced[selected];</span>
+<span class="fc" id="L147">                reduced[selected] = swapped;</span>
+<span class="fc" id="L148">                work.consume(&quot;berlekamp.rref.row-swaps&quot;, 1);</span>
+            }
+<span class="fc" id="L150">            normalizePivotRow(</span>
+                reduced,
+                pivotRow,
+                column,
+                field,
+                work);
+<span class="fc" id="L156">            eliminateColumn(</span>
+                reduced,
+                pivotRow,
+                column,
+                field,
+                work);
+<span class="fc" id="L162">            pivotColumns.add(column);</span>
+<span class="fc" id="L163">            pivotRow++;</span>
+        }
+
+<span class="fc" id="L166">        boolean[] pivot = new boolean[columns];</span>
+<span class="fc" id="L167">        pivotColumns.forEach(column -&gt; pivot[column] = true);</span>
+<span class="fc" id="L168">        ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; basis =</span>
+            new ArrayList&lt;&gt;();
+<span class="fc" id="L170">        for (int freeColumn = 0;</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                freeColumn &lt; columns;</span>
+<span class="fc" id="L172">                freeColumn++) {</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (pivot[freeColumn]) {</span>
+<span class="fc" id="L174">                continue;</span>
+            }
+<span class="fc" id="L176">            ArrayList&lt;BigInteger&gt; vector = zeros(field, columns);</span>
+<span class="fc" id="L177">            vector.set(freeColumn, field.one());</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            for (int row = 0; row &lt; pivotColumns.size(); row++) {</span>
+<span class="fc" id="L179">                work.consume(</span>
+                    &quot;berlekamp.nullspace.back-substitutions&quot;,
+                    1);
+<span class="fc" id="L182">                vector.set(</span>
+<span class="fc" id="L183">                    pivotColumns.get(row),</span>
+<span class="fc" id="L184">                    field.negate(reduced[row][freeColumn]));</span>
+            }
+<span class="fc" id="L186">            basis.add(UnivariatePolynomialView.of(</span>
+<span class="fc" id="L187">                source.ring(),</span>
+                vector));
+        }
+<span class="fc" id="L190">        basis.sort(Comparator.comparing(</span>
+            UnivariatePolynomialView::canonicalMaterial));
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (basis.isEmpty()) {</span>
+<span class="nc" id="L193">            throw new IllegalStateException(</span>
+                &quot;Berlekamp kernel unexpectedly has dimension zero&quot;);
+        }
+<span class="fc" id="L196">        return new Nullspace(</span>
+<span class="fc" id="L197">            List.copyOf(basis),</span>
+<span class="fc" id="L198">            List.copyOf(pivotColumns));</span>
+    }
+
+    private static int selectPivot(
+        BigInteger[][] matrix,
+        int firstRow,
+        int column,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (int row = firstRow; row &lt; matrix.length; row++) {</span>
+<span class="fc" id="L209">            work.consume(&quot;berlekamp.rref.pivot-tests&quot;, 1);</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            if (!field.isZero(matrix[row][column])) {</span>
+<span class="fc" id="L211">                return row;</span>
+            }
+        }
+<span class="fc" id="L214">        return -1;</span>
+    }
+
+    private static void normalizePivotRow(
+        BigInteger[][] matrix,
+        int row,
+        int column,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L224">        work.consume(&quot;berlekamp.rref.pivot-divisions&quot;, 1);</span>
+<span class="fc" id="L225">        BigInteger inverse = field.divide(</span>
+<span class="fc" id="L226">            field.one(),</span>
+            matrix[row][column]);
+<span class="fc" id="L228">        for (int current = 0;</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">                current &lt; matrix[row].length;</span>
+<span class="fc" id="L230">                current++) {</span>
+<span class="fc" id="L231">            work.consume(</span>
+                &quot;berlekamp.rref.row-normalizations&quot;,
+                1);
+<span class="fc" id="L234">            matrix[row][current] = field.multiply(</span>
+                matrix[row][current],
+                inverse);
+        }
+<span class="fc" id="L238">    }</span>
+
+    private static void eliminateColumn(
+        BigInteger[][] matrix,
+        int pivotRow,
+        int column,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        for (int row = 0; row &lt; matrix.length; row++) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            if (row == pivotRow</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">                    || field.isZero(matrix[row][column])) {</span>
+<span class="fc" id="L250">                continue;</span>
+            }
+<span class="fc" id="L252">            BigInteger multiplier = matrix[row][column];</span>
+<span class="fc" id="L253">            for (int current = 0;</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                    current &lt; matrix[row].length;</span>
+<span class="fc" id="L255">                    current++) {</span>
+<span class="fc" id="L256">                work.consume(</span>
+                    &quot;berlekamp.rref.elimination-updates&quot;,
+                    2);
+<span class="fc" id="L259">                matrix[row][current] = field.subtract(</span>
+                    matrix[row][current],
+<span class="fc" id="L261">                    field.multiply(</span>
+                        multiplier,
+                        matrix[pivotRow][current]));
+            }
+        }
+<span class="fc" id="L266">    }</span>
+
+    private static void verify(
+        BigInteger[][] matrix,
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; basis,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        for (UnivariatePolynomialView&lt;BigInteger&gt; vector : basis) {</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            for (BigInteger[] row : matrix) {</span>
+<span class="fc" id="L276">                BigInteger sum = field.zero();</span>
+<span class="fc" id="L277">                for (int column = 0;</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                        column &lt; row.length;</span>
+<span class="fc" id="L279">                        column++) {</span>
+<span class="fc" id="L280">                    work.consume(</span>
+                        &quot;berlekamp.verify.kernel-products&quot;,
+                        2);
+<span class="fc" id="L283">                    sum = field.add(</span>
+                        sum,
+<span class="fc" id="L285">                        field.multiply(</span>
+                            row[column],
+<span class="fc" id="L287">                            vector.coefficient(column)));</span>
+                }
+<span class="fc" id="L289">                work.consume(</span>
+                    &quot;berlekamp.verify.kernel-comparisons&quot;,
+                    1);
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                if (!field.isZero(sum)) {</span>
+<span class="nc" id="L293">                    throw new IllegalStateException(</span>
+                        &quot;Berlekamp nullspace verification failed&quot;);
+                }
+            }
+<span class="fc" id="L297">        }</span>
+<span class="fc" id="L298">    }</span>
+
+    private static BigInteger[][] copy(
+        BigInteger[][] source,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L304">        BigInteger[][] result = new BigInteger[source.length][];</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        for (int row = 0; row &lt; source.length; row++) {</span>
+<span class="fc" id="L306">            work.consume(</span>
+                &quot;berlekamp.rref.matrix-copy-cells&quot;,
+                source[row].length);
+<span class="fc" id="L309">            result[row] = source[row].clone();</span>
+        }
+<span class="fc" id="L311">        return result;</span>
+    }
+
+    private static ArrayList&lt;BigInteger&gt; zeros(
+        PrimeField field,
+        int size
+    ) {
+<span class="fc" id="L318">        ArrayList&lt;BigInteger&gt; result = new ArrayList&lt;&gt;(size);</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        for (int index = 0; index &lt; size; index++) {</span>
+<span class="fc" id="L320">            result.add(field.zero());</span>
+        }
+<span class="fc" id="L322">        return result;</span>
+    }
+
+    record Kernel(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; basis,
+        int nullity,
+        String certificateHash
+    ) {
+<span class="fc" id="L330">        Kernel {</span>
+<span class="fc" id="L331">            basis = List.copyOf(basis);</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">            if (basis.isEmpty()</span>
+<span class="pc bpc" id="L333" title="2 of 4 branches missed.">                    || nullity != basis.size()</span>
+                    || certificateHash == null
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">                    || !certificateHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)) {
+<span class="nc" id="L337">                throw new IllegalArgumentException(</span>
+                    &quot;Berlekamp kernel result is invalid&quot;);
+            }
+<span class="fc" id="L340">        }</span>
+    }
+
+<span class="fc" id="L343">    private record Nullspace(</span>
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; basis,
+        List&lt;Integer&gt; pivotColumns
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

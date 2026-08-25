@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FiniteFieldPolynomialArithmetic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">FiniteFieldPolynomialArithmetic.java</span></div><h1>FiniteFieldPolynomialArithmetic.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/** Package-local exact arithmetic used by finite-field algorithms. */
+final class FiniteFieldPolynomialArithmetic {
+    static final String IRREDUCIBILITY_METHOD_ID =
+        &quot;regelsuche.prime-field-irreducibility-rabin/v1&quot;;
+
+    private FiniteFieldPolynomialArithmetic() {
+    }
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; x(
+        PolynomialRing&lt;BigInteger&gt; ring
+    ) {
+<span class="fc" id="L23">        PrimeField field = requirePrimeField(ring);</span>
+<span class="fc" id="L24">        return UnivariatePolynomialView.of(</span>
+            ring,
+<span class="fc" id="L26">            List.of(field.zero(), field.one()));</span>
+    }
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; constant(
+        PolynomialRing&lt;BigInteger&gt; ring,
+        BigInteger value
+    ) {
+<span class="fc" id="L33">        PrimeField field = requirePrimeField(ring);</span>
+<span class="fc" id="L34">        return UnivariatePolynomialView.of(</span>
+            ring,
+<span class="fc" id="L36">            List.of(field.canonical(value)));</span>
+    }
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; subtractConstant(
+        UnivariatePolynomialView&lt;BigInteger&gt; value,
+        BigInteger constant,
+        PrimeField field,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L46">        requireField(value, field);</span>
+<span class="fc" id="L47">        work.consume(stage, 1);</span>
+<span class="fc" id="L48">        ArrayList&lt;BigInteger&gt; coefficients =</span>
+<span class="fc" id="L49">            new ArrayList&lt;&gt;(value.coefficients());</span>
+<span class="fc" id="L50">        BigInteger adjusted = field.subtract(</span>
+<span class="fc" id="L51">            value.coefficient(0),</span>
+            constant);
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (coefficients.isEmpty()) {</span>
+<span class="nc" id="L54">            coefficients.add(adjusted);</span>
+        } else {
+<span class="fc" id="L56">            coefficients.set(0, adjusted);</span>
+        }
+<span class="fc" id="L58">        return UnivariatePolynomialView.of(</span>
+<span class="fc" id="L59">            value.ring(),</span>
+            coefficients);
+    }
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; remainder(
+        UnivariatePolynomialView&lt;BigInteger&gt; value,
+        UnivariatePolynomialView&lt;BigInteger&gt; modulus,
+        PrimeField field,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L70">        requireSameRing(value, modulus, field);</span>
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">        if (modulus.isZero() || modulus.isConstant()) {</span>
+<span class="nc" id="L72">            throw new IllegalArgumentException(</span>
+                &quot;polynomial modulus must be nonconstant&quot;);
+        }
+<span class="fc" id="L75">        work.consume(stage + &quot;.degree-comparisons&quot;, 1);</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if (value.isZero() || value.degree() &lt; modulus.degree()) {</span>
+<span class="fc" id="L77">            return value;</span>
+        }
+<span class="fc" id="L79">        return value.divideAndRemainder(</span>
+            modulus,
+            field,
+            work,
+            stage + &quot;.division&quot;)
+<span class="fc" id="L84">            .remainder();</span>
+    }
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; multiplyMod(
+        UnivariatePolynomialView&lt;BigInteger&gt; left,
+        UnivariatePolynomialView&lt;BigInteger&gt; right,
+        UnivariatePolynomialView&lt;BigInteger&gt; modulus,
+        PrimeField field,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L95">        requireSameRing(left, right, field);</span>
+<span class="fc" id="L96">        requireSameRing(left, modulus, field);</span>
+<span class="fc" id="L97">        UnivariatePolynomialView&lt;BigInteger&gt; product = left.multiply(</span>
+            right,
+            work,
+            stage + &quot;.multiply&quot;);
+<span class="fc" id="L101">        return remainder(</span>
+            product,
+            modulus,
+            field,
+            work,
+            stage + &quot;.reduce&quot;);
+    }
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; powMod(
+        UnivariatePolynomialView&lt;BigInteger&gt; base,
+        BigInteger exponent,
+        UnivariatePolynomialView&lt;BigInteger&gt; modulus,
+        PrimeField field,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L117">        requireSameRing(base, modulus, field);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (exponent.signum() &lt; 0) {</span>
+<span class="nc" id="L119">            throw new IllegalArgumentException(</span>
+                &quot;modular polynomial exponent must not be negative&quot;);
+        }
+<span class="fc" id="L122">        UnivariatePolynomialView&lt;BigInteger&gt; result =</span>
+<span class="fc" id="L123">            UnivariatePolynomialView.one(base.ring());</span>
+<span class="fc" id="L124">        UnivariatePolynomialView&lt;BigInteger&gt; factor = remainder(</span>
+            base,
+            modulus,
+            field,
+            work,
+            stage + &quot;.base&quot;);
+<span class="fc" id="L130">        BigInteger remaining = exponent;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        while (remaining.signum() &gt; 0) {</span>
+<span class="fc" id="L132">            work.consume(stage + &quot;.exponent-bits&quot;, 1);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (remaining.testBit(0)) {</span>
+<span class="fc" id="L134">                result = multiplyMod(</span>
+                    result,
+                    factor,
+                    modulus,
+                    field,
+                    work,
+                    stage + &quot;.accumulate&quot;);
+            }
+<span class="fc" id="L142">            remaining = remaining.shiftRight(1);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (remaining.signum() &gt; 0) {</span>
+<span class="fc" id="L144">                factor = multiplyMod(</span>
+                    factor,
+                    factor,
+                    modulus,
+                    field,
+                    work,
+                    stage + &quot;.square&quot;);
+            }
+        }
+<span class="fc" id="L153">        return result;</span>
+    }
+
+    static IrreducibilityEvidence verifyIrreducible(
+        UnivariatePolynomialView&lt;BigInteger&gt; factor,
+        PrimeField field,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L162">        requireField(factor, field);</span>
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        if (factor.isZero() || factor.isConstant()) {</span>
+<span class="nc" id="L164">            throw new IllegalArgumentException(</span>
+                &quot;irreducibility requires a nonconstant polynomial&quot;);
+        }
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (!field.isOne(factor.leadingCoefficient())) {</span>
+<span class="nc" id="L168">            throw new IllegalArgumentException(</span>
+                &quot;irreducibility verification requires a monic polynomial&quot;);
+        }
+
+<span class="fc" id="L172">        int degree = factor.degree();</span>
+<span class="fc" id="L173">        List&lt;Integer&gt; primeDivisors = primeDivisors(degree);</span>
+<span class="fc" id="L174">        StringBuilder material = new StringBuilder(</span>
+            IRREDUCIBILITY_METHOD_ID);
+<span class="fc" id="L176">        AlgorithmEvidence.append(material, field.id());</span>
+<span class="fc" id="L177">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L179">            factor.canonicalMaterial());</span>
+<span class="fc" id="L180">        AlgorithmEvidence.append(material, Integer.toString(degree));</span>
+<span class="fc" id="L181">        primeDivisors.forEach(divisor -&gt;</span>
+<span class="fc" id="L182">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L184">                Integer.toString(divisor)));</span>
+
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (degree == 1) {</span>
+<span class="fc" id="L187">            work.consume(stage + &quot;.linear&quot;, 1);</span>
+<span class="fc" id="L188">            AlgorithmEvidence.append(material, &quot;LINEAR&quot;);</span>
+<span class="fc" id="L189">            return new IrreducibilityEvidence(</span>
+                true,
+<span class="fc" id="L191">                AlgorithmEvidence.sha256(material.toString()));</span>
+        }
+
+<span class="fc" id="L194">        Set&lt;Integer&gt; gcdCheckpoints = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L195">        primeDivisors.forEach(divisor -&gt;</span>
+<span class="fc" id="L196">            gcdCheckpoints.add(degree / divisor));</span>
+<span class="fc" id="L197">        UnivariatePolynomialView&lt;BigInteger&gt; x = x(factor.ring());</span>
+<span class="fc" id="L198">        UnivariatePolynomialView&lt;BigInteger&gt; frobenius = x;</span>
+<span class="fc" id="L199">        boolean irreducible = true;</span>
+
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        for (int exponent = 1; exponent &lt;= degree; exponent++) {</span>
+<span class="fc" id="L202">            frobenius = powMod(</span>
+                frobenius,
+<span class="fc" id="L204">                field.characteristic(),</span>
+                factor,
+                field,
+                work,
+                stage + &quot;.frobenius-&quot; + exponent);
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (gcdCheckpoints.contains(exponent)) {</span>
+<span class="fc" id="L210">                UnivariatePolynomialView&lt;BigInteger&gt; difference =</span>
+<span class="fc" id="L211">                    frobenius.subtract(</span>
+                        x,
+                        work,
+                        stage + &quot;.checkpoint-&quot; + exponent
+                            + &quot;.subtract&quot;);
+<span class="fc" id="L216">                UnivariatePolynomialView&lt;BigInteger&gt; gcd =</span>
+<span class="fc" id="L217">                    UnivariatePolynomialAlgorithms.gcd(</span>
+                        factor,
+                        difference,
+                        field,
+                        work,
+                        stage + &quot;.checkpoint-&quot; + exponent
+                            + &quot;.gcd&quot;);
+<span class="fc" id="L224">                work.consume(</span>
+                    stage + &quot;.checkpoint-comparisons&quot;,
+                    1);
+<span class="fc" id="L227">                AlgorithmEvidence.append(</span>
+                    material,
+<span class="fc" id="L229">                    exponent + &quot;:&quot; + gcd.canonicalMaterial());</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                if (!gcd.isOne()) {</span>
+<span class="nc" id="L231">                    irreducible = false;</span>
+                }
+            }
+        }
+
+<span class="fc" id="L236">        work.consume(stage + &quot;.final-comparison&quot;, 1);</span>
+<span class="fc" id="L237">        boolean finalCongruence = frobenius.equals(x);</span>
+<span class="fc" id="L238">        AlgorithmEvidence.append(</span>
+            material,
+            &quot;FINAL=&quot; + finalCongruence);
+<span class="fc" id="L241">        irreducible &amp;= finalCongruence;</span>
+<span class="fc" id="L242">        AlgorithmEvidence.append(</span>
+            material,
+            &quot;IRREDUCIBLE=&quot; + irreducible);
+<span class="fc" id="L245">        return new IrreducibilityEvidence(</span>
+            irreducible,
+<span class="fc" id="L247">            AlgorithmEvidence.sha256(material.toString()));</span>
+    }
+
+    private static List&lt;Integer&gt; primeDivisors(int value) {
+<span class="fc" id="L251">        ArrayList&lt;Integer&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L252">        int remaining = value;</span>
+<span class="fc" id="L253">        for (int divisor = 2;</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                (long) divisor * divisor &lt;= remaining;</span>
+<span class="fc" id="L255">                divisor++) {</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            if (remaining % divisor == 0) {</span>
+<span class="fc" id="L257">                result.add(divisor);</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                while (remaining % divisor == 0) {</span>
+<span class="fc" id="L259">                    remaining /= divisor;</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        if (remaining &gt; 1) {</span>
+<span class="fc" id="L264">            result.add(remaining);</span>
+        }
+<span class="fc" id="L266">        return List.copyOf(result);</span>
+    }
+
+    private static PrimeField requirePrimeField(
+        PolynomialRing&lt;BigInteger&gt; ring
+    ) {
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        if (!(ring.coefficientDomain() instanceof PrimeField field)) {</span>
+<span class="nc" id="L273">            throw new IllegalArgumentException(</span>
+                &quot;polynomial ring is not over a declared prime field&quot;);
+        }
+<span class="fc" id="L276">        return field;</span>
+    }
+
+    private static void requireField(
+        UnivariatePolynomialView&lt;BigInteger&gt; value,
+        PrimeField field
+    ) {
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (!value.ring().coefficientDomain().id().equals(field.id())) {</span>
+<span class="nc" id="L284">            throw new IllegalArgumentException(</span>
+                &quot;prime field does not match polynomial ring&quot;);
+        }
+<span class="fc" id="L287">    }</span>
+
+    private static void requireSameRing(
+        UnivariatePolynomialView&lt;BigInteger&gt; left,
+        UnivariatePolynomialView&lt;BigInteger&gt; right,
+        PrimeField field
+    ) {
+<span class="fc" id="L294">        requireField(left, field);</span>
+<span class="fc" id="L295">        requireField(right, field);</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        if (!left.ring().equals(right.ring())) {</span>
+<span class="nc" id="L297">            throw new IllegalArgumentException(</span>
+                &quot;finite-field polynomial ring mismatch&quot;);
+        }
+<span class="fc" id="L300">    }</span>
+
+    record IrreducibilityEvidence(
+        boolean irreducible,
+        String certificateHash
+    ) {
+<span class="fc" id="L306">        IrreducibilityEvidence {</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            if (certificateHash == null</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">                    || !certificateHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)) {
+<span class="nc" id="L310">                throw new IllegalArgumentException(</span>
+                    &quot;irreducibility evidence is invalid&quot;);
+            }
+<span class="fc" id="L313">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

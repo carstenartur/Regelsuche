@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrimeField.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">PrimeField.java</span></div><h1>PrimeField.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import java.math.BigInteger;
+import java.util.Objects;
+
+/**
+ * Exact prime field over canonical {@link BigInteger} residues.
+ *
+ * &lt;p&gt;The modulus is validated deterministically in the supported positive
+ * {@code int} range. The modulus is part of the stable coefficient-domain ID,
+ * so polynomial rings over different prime fields cannot compare equal.&lt;/p&gt;
+ */
+public final class PrimeField implements ExactField&lt;BigInteger&gt; {
+    private static final String ID_PREFIX =
+        &quot;regelsuche.coefficients.prime-field/v1/p=&quot;;
+
+    private final int prime;
+    private final BigInteger modulus;
+    private final String id;
+
+<span class="fc" id="L21">    private PrimeField(int prime) {</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (!isPrime(prime)) {</span>
+<span class="fc" id="L23">            throw new IllegalArgumentException(</span>
+                &quot;prime-field modulus must be prime&quot;);
+        }
+<span class="fc" id="L26">        this.prime = prime;</span>
+<span class="fc" id="L27">        modulus = BigInteger.valueOf(prime);</span>
+<span class="fc" id="L28">        id = ID_PREFIX + prime;</span>
+<span class="fc" id="L29">    }</span>
+
+    public static PrimeField of(int prime) {
+<span class="fc" id="L32">        return new PrimeField(prime);</span>
+    }
+
+    public int prime() {
+<span class="nc" id="L36">        return prime;</span>
+    }
+
+    public BigInteger modulus() {
+<span class="nc" id="L40">        return modulus;</span>
+    }
+
+    @Override
+    public String id() {
+<span class="fc" id="L45">        return id;</span>
+    }
+
+    @Override
+    public BigInteger characteristic() {
+<span class="fc" id="L50">        return modulus;</span>
+    }
+
+    @Override
+    public BigInteger fromInteger(BigInteger value) {
+<span class="nc" id="L55">        return canonical(value);</span>
+    }
+
+    @Override
+    public BigInteger zero() {
+<span class="nc" id="L60">        return BigInteger.ZERO;</span>
+    }
+
+    @Override
+    public BigInteger one() {
+<span class="nc" id="L65">        return BigInteger.ONE;</span>
+    }
+
+    @Override
+    public BigInteger canonical(BigInteger value) {
+<span class="fc" id="L70">        return Objects.requireNonNull(value, &quot;value&quot;).mod(modulus);</span>
+    }
+
+    @Override
+    public BigInteger add(BigInteger left, BigInteger right) {
+<span class="fc" id="L75">        return canonical(left).add(canonical(right)).mod(modulus);</span>
+    }
+
+    @Override
+    public BigInteger negate(BigInteger value) {
+<span class="fc" id="L80">        BigInteger canonical = canonical(value);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        return canonical.signum() == 0</span>
+<span class="nc" id="L82">            ? BigInteger.ZERO</span>
+<span class="fc" id="L83">            : modulus.subtract(canonical);</span>
+    }
+
+    @Override
+    public BigInteger multiply(BigInteger left, BigInteger right) {
+<span class="fc" id="L88">        return canonical(left).multiply(canonical(right)).mod(modulus);</span>
+    }
+
+    @Override
+    public boolean isZero(BigInteger value) {
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        return canonical(value).signum() == 0;</span>
+    }
+
+    @Override
+    public String canonicalText(BigInteger value) {
+<span class="nc" id="L98">        return canonical(value).toString();</span>
+    }
+
+    @Override
+    public int bitLength(BigInteger value) {
+<span class="nc" id="L103">        return canonical(value).bitLength();</span>
+    }
+
+    @Override
+    public BigInteger divide(
+        BigInteger dividend,
+        BigInteger divisor
+    ) {
+<span class="fc" id="L111">        BigInteger canonicalDivisor = canonical(divisor);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (canonicalDivisor.signum() == 0) {</span>
+<span class="fc" id="L113">            throw new ArithmeticException(</span>
+                &quot;division by zero in prime field&quot;);
+        }
+<span class="fc" id="L116">        return canonical(dividend)</span>
+<span class="fc" id="L117">            .multiply(canonicalDivisor.modInverse(modulus))</span>
+<span class="fc" id="L118">            .mod(modulus);</span>
+    }
+
+    private static boolean isPrime(int candidate) {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (candidate == 2) {</span>
+<span class="nc" id="L123">            return true;</span>
+        }
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">        if (candidate &lt; 2 || (candidate &amp; 1) == 0) {</span>
+<span class="fc" id="L126">            return false;</span>
+        }
+<span class="fc" id="L128">        for (int divisor = 3;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                (long) divisor * divisor &lt;= candidate;</span>
+<span class="nc" id="L130">                divisor += 2) {</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            if (candidate % divisor == 0) {</span>
+<span class="fc" id="L132">                return false;</span>
+            }
+        }
+<span class="fc" id="L135">        return true;</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc" id="L140">        return this == other</span>
+<span class="nc bnc" id="L141" title="All 6 branches missed.">            || other instanceof PrimeField field</span>
+                &amp;&amp; prime == field.prime;
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L147">        return Integer.hashCode(prime);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L152">        return &quot;F_&quot; + prime;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

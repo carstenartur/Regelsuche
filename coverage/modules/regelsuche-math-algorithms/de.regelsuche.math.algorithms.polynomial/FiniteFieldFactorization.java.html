@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FiniteFieldFactorization.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">FiniteFieldFactorization.java</span></div><h1>FiniteFieldFactorization.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Deterministic complete factorization of square-free univariate polynomials
+ * over an explicitly declared prime field.
+ */
+public final class FiniteFieldFactorization {
+    public static final String METHOD_ID =
+        &quot;regelsuche.prime-field-factorization/v1&quot;;
+
+    private FiniteFieldFactorization() {
+    }
+
+    public static FiniteFieldFactorizationResult factorSquareFree(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        FiniteFieldFactorizationPolicy policy
+    ) {
+<span class="fc" id="L30">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L31">        return factorSquareFree(</span>
+            request,
+            policy,
+<span class="fc" id="L34">            new PolynomialWorkBudget(request.maxWorkUnits()));</span>
+    }
+
+    static FiniteFieldFactorizationResult factorSquareFree(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        FiniteFieldFactorizationPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L42">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L43">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L44">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L45">        PrimeField field = primeField(request);</span>
+
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (work.limit() != request.maxWorkUnits()) {</span>
+<span class="fc" id="L48">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.TECHNICAL_FAILURE,
+                &quot;FINITE_FIELD_WORK_BUDGET_AUTHORITY_MISMATCH&quot;,
+                request,
+                policy,
+                field,
+<span class="fc" id="L54">                work.ledger());</span>
+        }
+<span class="fc" id="L56">        FiniteFieldFactorizationResult rejected = rejectInput(</span>
+            request,
+            policy,
+            field,
+<span class="fc" id="L60">            work.ledger());</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (rejected != null) {</span>
+<span class="fc" id="L62">            return rejected;</span>
+        }
+
+        try {
+<span class="fc" id="L66">            return execute(request, policy, field, work);</span>
+<span class="fc" id="L67">        } catch (PolynomialWorkBudget.LimitReached exception) {</span>
+<span class="fc" id="L68">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.BUDGET_INCONCLUSIVE,
+                &quot;FINITE_FIELD_FACTORIZATION_WORK_BUDGET_EXCEEDED&quot;,
+                request,
+                policy,
+                field,
+<span class="fc" id="L74">                work.ledger());</span>
+<span class="nc" id="L75">        } catch (AlgorithmFailure exception) {</span>
+<span class="nc" id="L76">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.TECHNICAL_FAILURE,
+<span class="nc" id="L78">                exception.detailCode(),</span>
+                request,
+                policy,
+                field,
+<span class="nc" id="L82">                work.ledger());</span>
+<span class="nc" id="L83">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L84">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.TECHNICAL_FAILURE,
+                &quot;FINITE_FIELD_EXACT_ARITHMETIC_FAILED&quot;,
+                request,
+                policy,
+                field,
+<span class="nc" id="L90">                work.ledger());</span>
+<span class="nc" id="L91">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L92">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.TECHNICAL_FAILURE,
+                &quot;FINITE_FIELD_&quot;
+<span class="nc" id="L95">                    + exception.getClass().getSimpleName()</span>
+<span class="nc" id="L96">                        .toUpperCase(java.util.Locale.ROOT),</span>
+                request,
+                policy,
+                field,
+<span class="nc" id="L100">                work.ledger());</span>
+        }
+    }
+
+    private static FiniteFieldFactorizationResult rejectInput(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        FiniteFieldFactorizationPolicy policy,
+        PrimeField field,
+        PolynomialWorkLedger work
+    ) {
+<span class="fc" id="L110">        String structuralViolation =</span>
+<span class="fc" id="L111">            request.structuralViolation().orElse(null);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (structuralViolation != null) {</span>
+<span class="fc" id="L113">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.BUDGET_INCONCLUSIVE,
+                structuralViolation,
+                request,
+                policy,
+                field,
+                work);
+        }
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (field == null) {</span>
+<span class="fc" id="L122">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.UNSUPPORTED_DOMAIN,
+                &quot;REQUIRES_DECLARED_PRIME_FIELD_COEFFICIENT_DOMAIN&quot;,
+                request,
+                policy,
+                null,
+                work);
+        }
+<span class="fc" id="L130">        SparsePolynomial&lt;BigInteger&gt; source = request.source();</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (source.ring().variableCount() != 1</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                || source.isConstant()) {</span>
+<span class="nc" id="L133">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.UNSUPPORTED_SHAPE,
+                &quot;REQUIRES_NONCONSTANT_UNIVARIATE_POLYNOMIAL&quot;,
+                request,
+                policy,
+                field,
+                work);
+        }
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (request.maxCandidates() == 0) {</span>
+<span class="nc" id="L142">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.BUDGET_INCONCLUSIVE,
+                &quot;MAX_CANDIDATES_IS_ZERO&quot;,
+                request,
+                policy,
+                field,
+                work);
+        }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (field.prime() &gt; policy.maxEnumeratedFieldElements()) {</span>
+<span class="fc" id="L151">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.BUDGET_INCONCLUSIVE,
+                &quot;PRIME_FIELD_ENUMERATION_POLICY_EXCEEDED&quot;,
+                request,
+                policy,
+                field,
+                work);
+        }
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (!policy.permitsMatrixDegree(source.degree(0))) {</span>
+<span class="fc" id="L160">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.BUDGET_INCONCLUSIVE,
+                &quot;BERLEKAMP_MATRIX_CELL_POLICY_EXCEEDED&quot;,
+                request,
+                policy,
+                field,
+                work);
+        }
+<span class="fc" id="L168">        return null;</span>
+    }
+
+    private static FiniteFieldFactorizationResult execute(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        FiniteFieldFactorizationPolicy policy,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L177">        UnivariatePolynomialView&lt;BigInteger&gt; original =</span>
+<span class="fc" id="L178">            UnivariatePolynomialView.from(request.source());</span>
+<span class="fc" id="L179">        BigInteger unit = original.leadingCoefficient();</span>
+<span class="fc" id="L180">        UnivariatePolynomialView&lt;BigInteger&gt; monic = original.monic(</span>
+            field,
+            work,
+            &quot;finite-field.leading-normalization&quot;);
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (!isSquareFree(monic, field, work)) {</span>
+<span class="fc" id="L185">            return failure(</span>
+                FiniteFieldFactorizationResult.Status.UNSUPPORTED_SHAPE,
+                &quot;REQUIRES_SQUARE_FREE_INPUT&quot;,
+                request,
+                policy,
+                field,
+<span class="fc" id="L191">                work.ledger());</span>
+        }
+
+<span class="fc" id="L194">        BerlekampKernel.Kernel kernel = BerlekampKernel.compute(</span>
+            monic,
+            field,
+            work);
+<span class="fc" id="L198">        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; factors = split(</span>
+            monic,
+            kernel,
+            field,
+            work);
+<span class="fc" id="L203">        Verification verification = verify(</span>
+            original,
+            unit,
+            factors,
+            field,
+            work);
+<span class="fc" id="L209">        List&lt;PolynomialFactor&lt;BigInteger&gt;&gt; issuedFactors = factors.stream()</span>
+<span class="fc" id="L210">            .map(factor -&gt; new PolynomialFactor&lt;&gt;(</span>
+<span class="fc" id="L211">                factor.toSparsePolynomial(),</span>
+                1))
+<span class="fc" id="L213">            .toList();</span>
+<span class="fc" id="L214">        return FiniteFieldFactorizationResult.completed(</span>
+            unit,
+            issuedFactors,
+<span class="fc" id="L217">            kernel.nullity(),</span>
+<span class="fc" id="L218">            kernel.certificateHash(),</span>
+<span class="fc" id="L219">            verification.irreducibilityCertificateHashes(),</span>
+<span class="fc" id="L220">            work.ledger(),</span>
+            request,
+            policy,
+            field);
+    }
+
+    private static boolean isSquareFree(
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L231">        UnivariatePolynomialView&lt;BigInteger&gt; derivative = source.derivative(</span>
+            work,
+            &quot;finite-field.square-free.derivative&quot;);
+<span class="fc" id="L234">        work.consume(</span>
+            &quot;finite-field.square-free.derivative-zero-tests&quot;,
+            1);
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        if (derivative.isZero()) {</span>
+<span class="nc" id="L238">            return false;</span>
+        }
+<span class="fc" id="L240">        UnivariatePolynomialView&lt;BigInteger&gt; gcd =</span>
+<span class="fc" id="L241">            UnivariatePolynomialAlgorithms.gcd(</span>
+                source,
+                derivative,
+                field,
+                work,
+                &quot;finite-field.square-free.gcd&quot;);
+<span class="fc" id="L247">        work.consume(</span>
+            &quot;finite-field.square-free.comparisons&quot;,
+            1);
+<span class="fc" id="L250">        return gcd.isOne();</span>
+    }
+
+    private static List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; split(
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        BerlekampKernel.Kernel kernel,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L259">        ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; factors =</span>
+            new ArrayList&lt;&gt;();
+<span class="fc" id="L261">        factors.add(source);</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (kernel.nullity() == 1) {</span>
+<span class="fc" id="L263">            return List.copyOf(factors);</span>
+        }
+
+        for (UnivariatePolynomialView&lt;BigInteger&gt; vector
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                : kernel.basis()) {</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            if (vector.isConstant()) {</span>
+<span class="nc" id="L269">                continue;</span>
+            }
+<span class="fc" id="L271">            for (int residue = 0;</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                    residue &lt; field.prime()</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">                        &amp;&amp; factors.size() &lt; kernel.nullity();</span>
+<span class="fc" id="L274">                    residue++) {</span>
+<span class="fc" id="L275">                work.consume(&quot;berlekamp.split.residues&quot;, 1);</span>
+<span class="fc" id="L276">                UnivariatePolynomialView&lt;BigInteger&gt; splitter =</span>
+<span class="fc" id="L277">                    FiniteFieldPolynomialArithmetic.subtractConstant(</span>
+                        vector,
+<span class="fc" id="L279">                        BigInteger.valueOf(residue),</span>
+                        field,
+                        work,
+                        &quot;berlekamp.split.constant-subtractions&quot;);
+<span class="fc" id="L283">                factors = splitCurrentFactors(</span>
+                    factors,
+                    splitter,
+                    field,
+                    work);
+            }
+<span class="fc bfc" id="L289" title="All 2 branches covered.">            if (factors.size() == kernel.nullity()) {</span>
+<span class="fc" id="L290">                break;</span>
+            }
+<span class="fc" id="L292">        }</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        if (factors.size() != kernel.nullity()) {</span>
+<span class="nc" id="L294">            throw new AlgorithmFailure(</span>
+                &quot;BERLEKAMP_SPLITTING_DID_NOT_REACH_KERNEL_NULLITY&quot;);
+        }
+<span class="fc" id="L297">        return canonicalFactors(factors);</span>
+    }
+
+    private static ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt;
+            splitCurrentFactors(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; factors,
+        UnivariatePolynomialView&lt;BigInteger&gt; splitter,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L307">        ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; next =</span>
+            new ArrayList&lt;&gt;();
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        for (UnivariatePolynomialView&lt;BigInteger&gt; factor : factors) {</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            if (factor.degree() == 1) {</span>
+<span class="fc" id="L311">                next.add(factor);</span>
+<span class="fc" id="L312">                continue;</span>
+            }
+<span class="fc" id="L314">            UnivariatePolynomialView&lt;BigInteger&gt; reducedSplitter =</span>
+<span class="fc" id="L315">                FiniteFieldPolynomialArithmetic.remainder(</span>
+                    splitter,
+                    factor,
+                    field,
+                    work,
+                    &quot;berlekamp.split.reduce-splitter&quot;);
+<span class="fc" id="L321">            UnivariatePolynomialView&lt;BigInteger&gt; gcd =</span>
+<span class="fc" id="L322">                UnivariatePolynomialAlgorithms.gcd(</span>
+                    factor,
+                    reducedSplitter,
+                    field,
+                    work,
+                    &quot;berlekamp.split.gcd&quot;);
+<span class="fc" id="L328">            work.consume(&quot;berlekamp.split.gcd-comparisons&quot;, 2);</span>
+<span class="fc bfc" id="L329" title="All 4 branches covered.">            if (gcd.isOne() || gcd.equals(factor)) {</span>
+<span class="fc" id="L330">                next.add(factor);</span>
+<span class="fc" id="L331">                continue;</span>
+            }
+<span class="fc" id="L333">            UnivariatePolynomialView&lt;BigInteger&gt; quotient =</span>
+<span class="fc" id="L334">                UnivariatePolynomialAlgorithms.exactQuotient(</span>
+                    factor,
+                    gcd,
+                    field,
+                    work,
+                    &quot;berlekamp.split.quotient&quot;);
+<span class="fc" id="L340">            next.add(gcd.monic(</span>
+                field,
+                work,
+                &quot;berlekamp.split.normalize-gcd&quot;));
+<span class="fc" id="L344">            next.add(quotient.monic(</span>
+                field,
+                work,
+                &quot;berlekamp.split.normalize-quotient&quot;));
+<span class="fc" id="L348">        }</span>
+<span class="fc" id="L349">        return canonicalFactors(next);</span>
+    }
+
+    private static ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt;
+            canonicalFactors(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; factors
+    ) {
+<span class="fc" id="L356">        ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; result =</span>
+            new ArrayList&lt;&gt;(factors);
+<span class="fc" id="L358">        result.sort(Comparator.comparing(factor -&gt;</span>
+<span class="fc" id="L359">            factor.toSparsePolynomial().canonicalMaterial()));</span>
+<span class="fc" id="L360">        return result;</span>
+    }
+
+    private static Verification verify(
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        BigInteger unit,
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; factors,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L370">        UnivariatePolynomialView&lt;BigInteger&gt; reconstructed =</span>
+<span class="fc" id="L371">            FiniteFieldPolynomialArithmetic.constant(</span>
+<span class="fc" id="L372">                source.ring(),</span>
+                unit);
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        for (UnivariatePolynomialView&lt;BigInteger&gt; factor : factors) {</span>
+<span class="fc" id="L375">            work.consume(</span>
+                &quot;finite-field.verify.monic-comparisons&quot;,
+                1);
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            if (!field.isOne(factor.leadingCoefficient())) {</span>
+<span class="nc" id="L379">                throw new AlgorithmFailure(</span>
+                    &quot;FINITE_FIELD_FACTOR_IS_NOT_MONIC&quot;);
+            }
+<span class="fc" id="L382">            reconstructed = reconstructed.multiply(</span>
+                factor,
+                work,
+                &quot;finite-field.verify.product&quot;);
+<span class="fc" id="L386">        }</span>
+<span class="fc" id="L387">        work.consume(&quot;finite-field.verify.product-comparisons&quot;, 1);</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">        if (!source.equals(reconstructed)) {</span>
+<span class="nc" id="L389">            throw new AlgorithmFailure(</span>
+                &quot;FINITE_FIELD_FACTORS_DO_NOT_RECONSTRUCT_SOURCE&quot;);
+        }
+
+<span class="fc" id="L393">        verifyPairwiseCoprime(factors, field, work);</span>
+<span class="fc" id="L394">        ArrayList&lt;String&gt; certificates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        for (int index = 0; index &lt; factors.size(); index++) {</span>
+<span class="fc" id="L396">            FiniteFieldPolynomialArithmetic.IrreducibilityEvidence evidence =</span>
+<span class="fc" id="L397">                FiniteFieldPolynomialArithmetic.verifyIrreducible(</span>
+<span class="fc" id="L398">                    factors.get(index),</span>
+                    field,
+                    work,
+                    &quot;finite-field.verify.irreducible-&quot; + index);
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">            if (!evidence.irreducible()) {</span>
+<span class="nc" id="L403">                throw new AlgorithmFailure(</span>
+                    &quot;FINITE_FIELD_FACTOR_FAILED_IRREDUCIBILITY_CHECK&quot;);
+            }
+<span class="fc" id="L406">            certificates.add(evidence.certificateHash());</span>
+        }
+<span class="fc" id="L408">        return new Verification(List.copyOf(certificates));</span>
+    }
+
+    private static void verifyPairwiseCoprime(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; factors,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        for (int left = 0; left &lt; factors.size(); left++) {</span>
+<span class="fc" id="L417">            for (int right = left + 1;</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">                    right &lt; factors.size();</span>
+<span class="fc" id="L419">                    right++) {</span>
+<span class="fc" id="L420">                UnivariatePolynomialView&lt;BigInteger&gt; gcd =</span>
+<span class="fc" id="L421">                    UnivariatePolynomialAlgorithms.gcd(</span>
+<span class="fc" id="L422">                        factors.get(left),</span>
+<span class="fc" id="L423">                        factors.get(right),</span>
+                        field,
+                        work,
+                        &quot;finite-field.verify.pairwise-gcd&quot;);
+<span class="fc" id="L427">                work.consume(</span>
+                    &quot;finite-field.verify.pairwise-comparisons&quot;,
+                    1);
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">                if (!gcd.isOne()) {</span>
+<span class="nc" id="L431">                    throw new AlgorithmFailure(</span>
+                        &quot;FINITE_FIELD_FACTORS_ARE_NOT_PAIRWISE_COPRIME&quot;);
+                }
+            }
+        }
+<span class="fc" id="L436">    }</span>
+
+    private static PrimeField primeField(
+        FactorizationRequest&lt;BigInteger&gt; request
+    ) {
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        return request.source().ring().coefficientDomain()</span>
+<span class="fc" id="L442">                instanceof PrimeField field</span>
+<span class="fc" id="L443">            ? field</span>
+<span class="fc" id="L444">            : null;</span>
+    }
+
+    private static FiniteFieldFactorizationResult failure(
+        FiniteFieldFactorizationResult.Status status,
+        String detailCode,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        FiniteFieldFactorizationPolicy policy,
+        PrimeField field,
+        PolynomialWorkLedger work
+    ) {
+<span class="fc" id="L455">        return FiniteFieldFactorizationResult.failure(</span>
+            status,
+            detailCode,
+            work,
+            request,
+            policy,
+            field);
+    }
+
+    private record Verification(
+        List&lt;String&gt; irreducibilityCertificateHashes
+    ) {
+<span class="fc" id="L467">        private Verification {</span>
+<span class="fc" id="L468">            irreducibilityCertificateHashes =</span>
+<span class="fc" id="L469">                List.copyOf(irreducibilityCertificateHashes);</span>
+<span class="fc" id="L470">        }</span>
+    }
+
+    private static final class AlgorithmFailure
+            extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final String detailCode;
+
+<span class="nc" id="L478">        private AlgorithmFailure(String detailCode) {</span>
+<span class="nc" id="L479">            this.detailCode = detailCode;</span>
+<span class="nc" id="L480">        }</span>
+
+        private String detailCode() {
+<span class="nc" id="L483">            return detailCode;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
