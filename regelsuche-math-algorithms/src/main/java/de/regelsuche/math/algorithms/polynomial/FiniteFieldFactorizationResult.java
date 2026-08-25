@@ -5,7 +5,6 @@ import de.regelsuche.polynomial.PolynomialFactor;
 import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.polynomial.PrimeField;
 import java.math.BigInteger;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -91,10 +90,8 @@ public final class FiniteFieldFactorizationResult {
         int prime = status == Status.COMPLETED
             ? Objects.requireNonNull(field, "field").prime()
             : 0;
-        List<PolynomialFactor<BigInteger>> ordered = factors.stream()
-            .sorted(Comparator.comparing(factor ->
-                factor.polynomial().canonicalMaterial()))
-            .toList();
+        List<PolynomialFactor<BigInteger>> ordered =
+            List.copyOf(factors);
         List<String> irreducibilityHashes =
             List.copyOf(irreducibilityCertificateHashes);
 
@@ -124,16 +121,20 @@ public final class FiniteFieldFactorizationResult {
             kernelCertificateHash == null
                 ? ""
                 : kernelCertificateHash);
-        ordered.forEach(factor -> {
+        for (int index = 0; index < ordered.size(); index++) {
+            PolynomialFactor<BigInteger> factor = ordered.get(index);
             AlgorithmEvidence.append(
                 material,
                 Integer.toString(factor.multiplicity()));
             AlgorithmEvidence.append(
                 material,
                 factor.polynomial().canonicalMaterial());
-        });
-        irreducibilityHashes.forEach(hash ->
-            AlgorithmEvidence.append(material, hash));
+            AlgorithmEvidence.append(
+                material,
+                index < irreducibilityHashes.size()
+                    ? irreducibilityHashes.get(index)
+                    : "");
+        }
 
         return new FiniteFieldFactorizationResult(new State(
             status,
@@ -307,16 +308,23 @@ public final class FiniteFieldFactorizationResult {
                     "completed finite-field result is invalid");
             }
             String expectedDomain = PrimeField.of(prime).id();
-            if (factors.stream().anyMatch(factor ->
-                    factor.multiplicity() != 1
+            String previousMaterial = null;
+            for (PolynomialFactor<BigInteger> factor : factors) {
+                String material =
+                    factor.polynomial().canonicalMaterial();
+                if (factor.multiplicity() != 1
                         || !expectedDomain.equals(
                             factor.polynomial().ring()
                                 .coefficientDomain().id())
                         || !BigInteger.ONE.equals(
                             factor.polynomial()
-                                .leadingCoefficient()))) {
-                throw new IllegalArgumentException(
-                    "finite-field factors are not canonical");
+                                .leadingCoefficient())
+                        || previousMaterial != null
+                            && previousMaterial.compareTo(material) >= 0) {
+                    throw new IllegalArgumentException(
+                        "finite-field factors are not canonical");
+                }
+                previousMaterial = material;
             }
         }
     }
