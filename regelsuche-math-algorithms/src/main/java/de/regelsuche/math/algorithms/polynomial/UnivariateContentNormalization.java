@@ -2,6 +2,7 @@ package de.regelsuche.math.algorithms.polynomial;
 
 import de.regelsuche.polynomial.BigIntegerDomain;
 import de.regelsuche.polynomial.ExactRationalField;
+import de.regelsuche.polynomial.FactorizationRequest;
 import de.regelsuche.polynomial.Monomial;
 import de.regelsuche.polynomial.PolynomialRing;
 import de.regelsuche.polynomial.PolynomialWorkLedger;
@@ -15,7 +16,7 @@ import java.util.TreeMap;
 
 /**
  * Exact content and primitive-part normalization for univariate
- * {@code Z[x]} and {@code Q[x]} polynomials.
+ * {@code Z[x]} and {@code Q[x]} factorization requests.
  *
  * <p>Both entry points return one primitive integer polynomial with positive
  * leading coefficient. The complete scalar, including sign and cleared
@@ -29,64 +30,98 @@ public final class UnivariateContentNormalization {
     }
 
     public static UnivariateContentResult normalizeInteger(
-        SparsePolynomial<BigInteger> source,
-        UnivariateContentRequest request
+        FactorizationRequest<BigInteger> request,
+        UnivariateContentPolicy policy
     ) {
-        return normalize(
-            source,
+        Objects.requireNonNull(request, "request");
+        return normalizeInteger(
             request,
-            IntegerAccess.INSTANCE);
+            policy,
+            new PolynomialWorkBudget(request.maxWorkUnits()));
     }
 
     public static UnivariateContentResult normalizeRational(
-        SparsePolynomial<ExactRational> source,
-        UnivariateContentRequest request
+        FactorizationRequest<ExactRational> request,
+        UnivariateContentPolicy policy
+    ) {
+        Objects.requireNonNull(request, "request");
+        return normalizeRational(
+            request,
+            policy,
+            new PolynomialWorkBudget(request.maxWorkUnits()));
+    }
+
+    static UnivariateContentResult normalizeInteger(
+        FactorizationRequest<BigInteger> request,
+        UnivariateContentPolicy policy,
+        PolynomialWorkBudget work
     ) {
         return normalize(
-            source,
             request,
-            RationalAccess.INSTANCE);
+            policy,
+            IntegerAccess.INSTANCE,
+            work);
+    }
+
+    static UnivariateContentResult normalizeRational(
+        FactorizationRequest<ExactRational> request,
+        UnivariateContentPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+        return normalize(
+            request,
+            policy,
+            RationalAccess.INSTANCE,
+            work);
     }
 
     private static <C> UnivariateContentResult normalize(
-        SparsePolynomial<C> source,
-        UnivariateContentRequest request,
-        CoefficientAccess<C> access
+        FactorizationRequest<C> request,
+        UnivariateContentPolicy policy,
+        CoefficientAccess<C> access,
+        PolynomialWorkBudget work
     ) {
-        Objects.requireNonNull(source, "source");
         Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(policy, "policy");
         Objects.requireNonNull(access, "access");
+        Objects.requireNonNull(work, "work");
 
         UnivariateContentResult rejected =
-            rejectInput(source, request, access);
+            rejectInput(
+                request,
+                policy,
+                access,
+                work.ledger());
         if (rejected != null) {
             return rejected;
         }
 
-        PolynomialWorkBudget work =
-            new PolynomialWorkBudget(request.maxWorkUnits());
         try {
-            return completed(source, request, access, work);
+            return completed(
+                request,
+                policy,
+                access,
+                work);
         } catch (PolynomialWorkBudget.LimitReached exception) {
             return failure(
                 UnivariateContentResult.Status.BUDGET_INCONCLUSIVE,
                 "CONTENT_NORMALIZATION_WORK_BUDGET_EXCEEDED",
-                source,
                 request,
+                policy,
                 work.ledger());
         } catch (IntermediateLimitReached exception) {
             return failure(
                 UnivariateContentResult.Status.BUDGET_INCONCLUSIVE,
                 exception.detailCode(),
-                source,
                 request,
+                policy,
                 work.ledger());
         } catch (ArithmeticException exception) {
             return failure(
                 UnivariateContentResult.Status.TECHNICAL_FAILURE,
                 "CONTENT_NORMALIZATION_EXACT_ARITHMETIC_FAILED",
-                source,
                 request,
+                policy,
                 work.ledger());
         } catch (RuntimeException exception) {
             return failure(
@@ -94,74 +129,74 @@ public final class UnivariateContentNormalization {
                 "CONTENT_NORMALIZATION_"
                     + exception.getClass().getSimpleName()
                         .toUpperCase(java.util.Locale.ROOT),
-                source,
                 request,
+                policy,
                 work.ledger());
         }
     }
 
     private static <C> UnivariateContentResult rejectInput(
-        SparsePolynomial<C> source,
-        UnivariateContentRequest request,
-        CoefficientAccess<C> access
+        FactorizationRequest<C> request,
+        UnivariateContentPolicy policy,
+        CoefficientAccess<C> access,
+        PolynomialWorkLedger work
     ) {
+        SparsePolynomial<C> source = request.source();
         String structuralViolation =
-            request.structuralLimits()
-                .firstViolation(source)
-                .orElse(null);
+            request.structuralViolation().orElse(null);
         if (structuralViolation != null) {
             return failure(
                 UnivariateContentResult.Status.BUDGET_INCONCLUSIVE,
                 structuralViolation,
-                source,
                 request,
-                PolynomialWorkLedger.empty());
+                policy,
+                work);
         }
         if (!access.domainId().equals(
                 source.ring().coefficientDomain().id())) {
             return failure(
                 UnivariateContentResult.Status.UNSUPPORTED_DOMAIN,
                 access.domainFailureCode(),
-                source,
                 request,
-                PolynomialWorkLedger.empty());
+                policy,
+                work);
         }
         if (source.ring().variableCount() != 1) {
             return failure(
                 UnivariateContentResult.Status.UNSUPPORTED_SHAPE,
                 "REQUIRES_ONE_POLYNOMIAL_VARIABLE",
-                source,
                 request,
-                PolynomialWorkLedger.empty());
+                policy,
+                work);
         }
         if (source.isZero()) {
             return failure(
                 UnivariateContentResult.Status.UNSUPPORTED_SHAPE,
                 "ZERO_POLYNOMIAL_HAS_NO_PRIMITIVE_PART",
-                source,
                 request,
-                PolynomialWorkLedger.empty());
+                policy,
+                work);
         }
         return null;
     }
 
     private static <C> UnivariateContentResult completed(
-        SparsePolynomial<C> source,
-        UnivariateContentRequest request,
+        FactorizationRequest<C> request,
+        UnivariateContentPolicy policy,
         CoefficientAccess<C> access,
         PolynomialWorkBudget work
     ) {
-        BigInteger denominator =
-            denominatorClearingFactor(
-                source,
-                request,
-                access,
-                work);
+        SparsePolynomial<C> source = request.source();
+        BigInteger denominator = denominatorClearingFactor(
+            source,
+            policy,
+            access,
+            work);
         NavigableMap<Monomial, BigInteger> integral =
             integralTerms(
                 source,
                 denominator,
-                request,
+                policy,
                 access,
                 work);
         BigInteger content = integerContent(integral, work);
@@ -179,7 +214,7 @@ public final class UnivariateContentNormalization {
             primitiveTerms(
                 integral,
                 signedContent,
-                request,
+                policy,
                 work);
         SparsePolynomial<BigInteger> primitive =
             primitivePolynomial(source, primitiveTerms);
@@ -202,13 +237,13 @@ public final class UnivariateContentNormalization {
             scalar,
             primitive,
             work.ledger(),
-            source,
-            request);
+            request,
+            policy);
     }
 
     private static <C> BigInteger denominatorClearingFactor(
         SparsePolynomial<C> source,
-        UnivariateContentRequest request,
+        UnivariateContentPolicy policy,
         CoefficientAccess<C> access,
         PolynomialWorkBudget work
     ) {
@@ -221,7 +256,7 @@ public final class UnivariateContentNormalization {
                 access.denominator(coefficient);
             requireWithinLimit(
                 denominator,
-                request,
+                policy,
                 "DENOMINATOR_LCM_BIT_LENGTH_EXCEEDED");
             work.consume("content.denominator-lcm.gcd", 1);
             BigInteger gcd = result.gcd(denominator);
@@ -233,7 +268,7 @@ public final class UnivariateContentNormalization {
             result = multiplyWithinLimit(
                 reduced,
                 denominator,
-                request,
+                policy,
                 "DENOMINATOR_LCM_BIT_LENGTH_EXCEEDED");
         }
         return result;
@@ -243,7 +278,7 @@ public final class UnivariateContentNormalization {
             integralTerms(
         SparsePolynomial<C> source,
         BigInteger denominatorClearingFactor,
-        UnivariateContentRequest request,
+        UnivariateContentPolicy policy,
         CoefficientAccess<C> access,
         PolynomialWorkBudget work
     ) {
@@ -265,7 +300,7 @@ public final class UnivariateContentNormalization {
             BigInteger value = multiplyWithinLimit(
                 access.numerator(term.getValue()),
                 multiplier,
-                request,
+                policy,
                 "INTEGRAL_COEFFICIENT_BIT_LENGTH_EXCEEDED");
             if (value.signum() == 0) {
                 throw new IllegalStateException(
@@ -292,7 +327,7 @@ public final class UnivariateContentNormalization {
             primitiveTerms(
         NavigableMap<Monomial, BigInteger> integral,
         BigInteger signedContent,
-        UnivariateContentRequest request,
+        UnivariateContentPolicy policy,
         PolynomialWorkBudget work
     ) {
         NavigableMap<Monomial, BigInteger> result =
@@ -304,7 +339,7 @@ public final class UnivariateContentNormalization {
                 term.getValue().divide(signedContent);
             requireWithinLimit(
                 coefficient,
-                request,
+                policy,
                 "PRIMITIVE_COEFFICIENT_BIT_LENGTH_EXCEEDED");
             result.put(term.getKey(), coefficient);
         }
@@ -434,7 +469,7 @@ public final class UnivariateContentNormalization {
     private static BigInteger multiplyWithinLimit(
         BigInteger left,
         BigInteger right,
-        UnivariateContentRequest request,
+        UnivariateContentPolicy policy,
         String detailCode
     ) {
         if (left.signum() != 0 && right.signum() != 0) {
@@ -443,23 +478,23 @@ public final class UnivariateContentNormalization {
                     + right.abs().bitLength()
                     - 1L;
             if (minimumBits
-                    > request
+                    > policy
                         .maxIntermediateCoefficientBitLength()) {
                 throw new IntermediateLimitReached(detailCode);
             }
         }
         BigInteger result = left.multiply(right);
-        requireWithinLimit(result, request, detailCode);
+        requireWithinLimit(result, policy, detailCode);
         return result;
     }
 
     private static void requireWithinLimit(
         BigInteger value,
-        UnivariateContentRequest request,
+        UnivariateContentPolicy policy,
         String detailCode
     ) {
         if (value.abs().bitLength()
-                > request.maxIntermediateCoefficientBitLength()) {
+                > policy.maxIntermediateCoefficientBitLength()) {
             throw new IntermediateLimitReached(detailCode);
         }
     }
@@ -467,16 +502,16 @@ public final class UnivariateContentNormalization {
     private static <C> UnivariateContentResult failure(
         UnivariateContentResult.Status status,
         String detailCode,
-        SparsePolynomial<C> source,
-        UnivariateContentRequest request,
+        FactorizationRequest<C> request,
+        UnivariateContentPolicy policy,
         PolynomialWorkLedger work
     ) {
         return UnivariateContentResult.failure(
             status,
             detailCode,
             work,
-            source,
-            request);
+            request,
+            policy);
     }
 
     private interface CoefficientAccess<C> {
