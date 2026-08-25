@@ -163,7 +163,19 @@ public final class SuitablePrimeSelection {
                 policy);
         }
 
+        int consideredPrimes = 0;
         for (int prime : policy.candidatePrimes()) {
+            if (consideredPrimes >= request.maxCandidates()) {
+                return failure(
+                    SuitablePrimeSelectionResult.Status
+                        .BUDGET_INCONCLUSIVE,
+                    "PRIME_CANDIDATE_BUDGET_EXHAUSTED",
+                    attempts,
+                    work.ledger(),
+                    request,
+                    policy);
+            }
+            consideredPrimes++;
             long workBefore = total(work);
             PrimeField field = PrimeField.of(prime);
             SparsePolynomial<BigInteger> modularSource = reduce(
