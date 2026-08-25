@@ -187,7 +187,7 @@ class FiniteFieldFactorizationTest {
             FiniteFieldFactorization.factorSquareFree(
                 request(source, 100_000),
                 FiniteFieldFactorizationPolicy
-                    .deterministicBerlekamp(101, 1));
+                    .deterministicBerlekamp(101, 2));
         FiniteFieldFactorizationResult work =
             FiniteFieldFactorization.factorSquareFree(
                 request(source, 1),
