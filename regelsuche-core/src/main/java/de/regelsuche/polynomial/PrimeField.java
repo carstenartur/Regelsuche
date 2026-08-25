@@ -19,7 +19,7 @@ public final class PrimeField implements ExactField<BigInteger> {
     private final String id;
 
     private PrimeField(int prime) {
-        if (!isPrime(prime)) {
+        if (!isPrimeModulus(prime)) {
             throw new IllegalArgumentException(
                 "prime-field modulus must be prime");
         }
@@ -30,6 +30,29 @@ public final class PrimeField implements ExactField<BigInteger> {
 
     public static PrimeField of(int prime) {
         return new PrimeField(prime);
+    }
+
+    /**
+     * Returns whether the supplied positive {@code int} is a prime modulus.
+     *
+     * <p>This is the authoritative deterministic predicate used by both field
+     * construction and bounded prime-selection policies.</p>
+     */
+    public static boolean isPrimeModulus(int candidate) {
+        if (candidate == 2) {
+            return true;
+        }
+        if (candidate < 2 || (candidate & 1) == 0) {
+            return false;
+        }
+        for (int divisor = 3;
+                (long) divisor * divisor <= candidate;
+                divisor += 2) {
+            if (candidate % divisor == 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public int prime() {
@@ -116,23 +139,6 @@ public final class PrimeField implements ExactField<BigInteger> {
         return canonical(dividend)
             .multiply(canonicalDivisor.modInverse(modulus))
             .mod(modulus);
-    }
-
-    private static boolean isPrime(int candidate) {
-        if (candidate == 2) {
-            return true;
-        }
-        if (candidate < 2 || (candidate & 1) == 0) {
-            return false;
-        }
-        for (int divisor = 3;
-                (long) divisor * divisor <= candidate;
-                divisor += 2) {
-            if (candidate % divisor == 0) {
-                return false;
-            }
-        }
-        return true;
     }
 
     @Override
