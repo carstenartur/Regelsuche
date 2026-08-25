@@ -124,13 +124,7 @@ class SuitablePrimeSelectionEvidenceTest {
         SparsePolynomial<BigInteger> otherSource =
             modularPolynomial(3, 1, 0, 1);
         FiniteFieldFactorizationResult otherFactorization =
-            FiniteFieldFactorization.factorSquareFree(
-                FactorizationRequest.verifiedDecomposition(
-                    otherSource,
-                    limits,
-                    1,
-                    1_000_000),
-                finiteFieldPolicy);
+            factor(otherSource);
         assertTrue(
             otherFactorization.completed(),
             otherFactorization.toString());
@@ -154,6 +148,51 @@ class SuitablePrimeSelectionEvidenceTest {
                 valid.work(),
                 request,
                 policy));
+    }
+
+    @Test
+    void issuerRejectsAModularSourceThatDoesNotReduceTheIntegerSource() {
+        FactorizationRequest<BigInteger> request = request();
+        SuitablePrimeSelectionPolicy policy = policy(3);
+        SparsePolynomial<BigInteger> forgedSource =
+            modularPolynomial(3, 1, 0, 1);
+        FiniteFieldFactorizationResult forgedFactorization =
+            factor(forgedSource);
+        assertTrue(
+            forgedFactorization.completed(),
+            forgedFactorization.toString());
+
+        SuitablePrimeSelectionResult.PrimeAttempt forgedSelectedAttempt =
+            SuitablePrimeSelectionResult.issueAttempt(
+                3,
+                SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                    .SELECTED,
+                "SUITABLE_PRIME_SELECTED",
+                forgedSource,
+                forgedFactorization.certificateHash(),
+                forgedFactorization.work().totalWorkUnits());
+
+        assertThrows(IllegalArgumentException.class, () ->
+            SuitablePrimeSelectionResult.completed(
+                List.of(forgedSelectedAttempt),
+                3,
+                forgedSource,
+                forgedFactorization,
+                forgedFactorization.work(),
+                request,
+                policy));
+    }
+
+    private FiniteFieldFactorizationResult factor(
+        SparsePolynomial<BigInteger> source
+    ) {
+        return FiniteFieldFactorization.factorSquareFree(
+            FactorizationRequest.verifiedDecomposition(
+                source,
+                limits,
+                1,
+                1_000_000),
+            finiteFieldPolicy);
     }
 
     private FactorizationRequest<BigInteger> request() {

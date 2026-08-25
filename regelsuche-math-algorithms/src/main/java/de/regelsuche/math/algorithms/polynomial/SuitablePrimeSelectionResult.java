@@ -2,12 +2,17 @@ package de.regelsuche.math.algorithms.polynomial;
 
 import de.regelsuche.polynomial.BigIntegerDomain;
 import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.Monomial;
+import de.regelsuche.polynomial.PolynomialRing;
 import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.polynomial.PrimeField;
 import de.regelsuche.polynomial.SparsePolynomial;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Objects;
+import java.util.TreeMap;
 
 /**
  * Issuer-owned evidence for one bounded suitable-prime selection campaign.
@@ -88,6 +93,12 @@ public final class SuitablePrimeSelectionResult {
             .ring()
             .coefficientDomain()
             .id();
+        if (status == Status.COMPLETED) {
+            validateModularSourceCorrespondence(
+                request.source(),
+                selectedPrime,
+                modularSource);
+        }
 
         StringBuilder material = new StringBuilder(
             SuitablePrimeSelection.METHOD_ID);
@@ -154,6 +165,34 @@ public final class SuitablePrimeSelectionResult {
                 throw new IllegalArgumentException(
                     "only the final suitable-prime attempt may be terminal");
             }
+        }
+    }
+
+    private static void validateModularSourceCorrespondence(
+        SparsePolynomial<BigInteger> source,
+        int selectedPrime,
+        SparsePolynomial<BigInteger> modularSource
+    ) {
+        Objects.requireNonNull(modularSource, "modularSource");
+        PrimeField field = PrimeField.of(selectedPrime);
+        PolynomialRing<BigInteger> expectedRing = new PolynomialRing<>(
+            field,
+            source.ring().variables(),
+            source.ring().monomialOrder());
+        NavigableMap<Monomial, BigInteger> expectedTerms =
+            new TreeMap<>(expectedRing.monomialComparator());
+        for (Map.Entry<Monomial, BigInteger> term
+                : source.terms().entrySet()) {
+            BigInteger coefficient = field.canonical(term.getValue());
+            if (!field.isZero(coefficient)) {
+                expectedTerms.put(term.getKey(), coefficient);
+            }
+        }
+        SparsePolynomial<BigInteger> expected =
+            new SparsePolynomial<>(expectedRing, expectedTerms);
+        if (!expected.equals(modularSource)) {
+            throw new IllegalArgumentException(
+                "selected modular source does not reduce the integer source");
         }
     }
 
