@@ -2,9 +2,9 @@ package de.regelsuche.math.algorithms.polynomial;
 
 import de.regelsuche.polynomial.CoefficientDomain;
 import de.regelsuche.polynomial.ExactField;
-import de.regelsuche.polynomial.FactorizationEngine;
 import de.regelsuche.polynomial.FactorizationRequest;
 import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.polynomial.SparsePolynomial;
 import de.regelsuche.polynomial.UnivariatePolynomialView;
 import java.util.ArrayList;
@@ -39,7 +39,7 @@ public final class SquareFreeDecomposition {
             return Result.failure(
                 Status.BUDGET_INCONCLUSIVE,
                 violation,
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 source,
                 structuralLimits);
         }
@@ -48,7 +48,7 @@ public final class SquareFreeDecomposition {
             return Result.failure(
                 Status.UNSUPPORTED_SHAPE,
                 "REQUIRES_NONCONSTANT_UNIVARIATE_POLYNOMIAL",
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 source,
                 structuralLimits);
         }
@@ -57,7 +57,7 @@ public final class SquareFreeDecomposition {
             return Result.failure(
                 Status.UNSUPPORTED_DOMAIN,
                 "REQUIRES_CHARACTERISTIC_ZERO",
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 source,
                 structuralLimits);
         }
@@ -67,7 +67,7 @@ public final class SquareFreeDecomposition {
             return Result.failure(
                 Status.UNSUPPORTED_DOMAIN,
                 "REQUIRES_EXACT_COEFFICIENT_FIELD",
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 source,
                 structuralLimits);
         }
@@ -290,7 +290,7 @@ public final class SquareFreeDecomposition {
             String detailCode,
             C unit,
             List<PolynomialFactor<C>> factors,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             String certificateHash
         ) {
             state = new State<>(
@@ -305,7 +305,7 @@ public final class SquareFreeDecomposition {
         private static <C> Result<C> completed(
             C unit,
             List<PolynomialFactor<C>> factors,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             SparsePolynomial<C> source,
             FactorizationRequest.StructuralLimits limits
         ) {
@@ -322,7 +322,7 @@ public final class SquareFreeDecomposition {
         private static <C> Result<C> failure(
             Status status,
             String detailCode,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             SparsePolynomial<C> source,
             FactorizationRequest.StructuralLimits limits
         ) {
@@ -345,7 +345,7 @@ public final class SquareFreeDecomposition {
             String detailCode,
             C unit,
             List<PolynomialFactor<C>> factors,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             SparsePolynomial<C> source,
             FactorizationRequest.StructuralLimits limits
         ) {
@@ -400,7 +400,7 @@ public final class SquareFreeDecomposition {
             return state.factors();
         }
 
-        public FactorizationEngine.WorkLedger work() {
+        public PolynomialWorkLedger work() {
             return state.work();
         }
 
@@ -441,7 +441,7 @@ public final class SquareFreeDecomposition {
             String detailCode,
             C unit,
             List<PolynomialFactor<C>> factors,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             String certificateHash
         ) {
             private State {
