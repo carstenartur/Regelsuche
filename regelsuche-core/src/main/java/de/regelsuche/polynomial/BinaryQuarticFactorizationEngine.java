@@ -134,7 +134,7 @@ public final class BinaryQuarticFactorizationEngine
                 request,
                 Outcome.UNSUPPORTED_DOMAIN,
                 "REQUIRES_EXACT_INTEGER_COEFFICIENT_DOMAIN",
-                WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 List.of(),
                 BackendClaim.NONE);
         }
@@ -145,7 +145,7 @@ public final class BinaryQuarticFactorizationEngine
                 request,
                 Outcome.UNSUPPORTED_REQUEST,
                 "ENGINE_DOES_NOT_CERTIFY_FACTOR_IRREDUCIBILITY",
-                WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 List.of(),
                 BackendClaim.NONE);
         }
@@ -157,7 +157,7 @@ public final class BinaryQuarticFactorizationEngine
                 request,
                 Outcome.UNSUPPORTED_REQUEST,
                 "REQUIRES_BINARY_HOMOGENEOUS_QUARTIC_WITH_NONZERO_EXTREME_TERMS",
-                WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 List.of(),
                 BackendClaim.NONE);
         }
@@ -166,7 +166,7 @@ public final class BinaryQuarticFactorizationEngine
                 request,
                 Outcome.BUDGET_INCONCLUSIVE,
                 "MAX_CANDIDATES_IS_ZERO",
-                WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 List.of(),
                 BackendClaim.NONE);
         }
@@ -394,7 +394,7 @@ public final class BinaryQuarticFactorizationEngine
         FactorizationRequest<BigInteger> request,
         Outcome outcome,
         String detailCode,
-        WorkLedger work,
+        PolynomialWorkLedger work,
         List<Proposal<BigInteger>> proposals,
         BackendClaim backendClaim
     ) {
@@ -519,8 +519,8 @@ public final class BinaryQuarticFactorizationEngine
             stages.merge(stage, units, Math::addExact);
         }
 
-        private WorkLedger ledger() {
-            return new WorkLedger(stages);
+        private PolynomialWorkLedger ledger() {
+            return new PolynomialWorkLedger(stages);
         }
     }
 
