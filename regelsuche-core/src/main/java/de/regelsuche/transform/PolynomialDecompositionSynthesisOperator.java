@@ -12,11 +12,13 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Synthesizes exact quadratic-by-quadratic decompositions of bounded binary
@@ -44,6 +46,7 @@ public final class PolynomialDecompositionSynthesisOperator
 
     private static final String PACK_ID = "core-polynomial-synthesis";
     private static final String LICENSE = "PROJECT";
+    private static final String STRUCTURAL_UNIT_KEY = "structural-unit:1";
     private static final int DEFAULT_MAX_CANDIDATES = 6;
     private static final int DEFAULT_MAX_COEFFICIENT_ABS = 32;
     private static final int DEFAULT_MAX_FACTOR_CONFIGURATIONS = 4_096;
@@ -62,7 +65,7 @@ public final class PolynomialDecompositionSynthesisOperator
             new PolynomialSemanticView(
                 new PolynomialSemanticView.Budget(2, 4, 16, 256)),
             maxCandidates,
-            DEFAULT_MAX_COEFFICIENT_ABS,
+            DEFAULT_MAX_COEFFIC_ABS,
             DEFAULT_MAX_FACTOR_CONFIGURATIONS);
     }
 
@@ -122,12 +125,14 @@ public final class PolynomialDecompositionSynthesisOperator
     }
 
     /**
-     * Synthesizes directly from an already validated exact integer polynomial.
+     * Synthesizes directly from an exact integer polynomial object.
      *
      * <p>This is the typed integration boundary for upstream semantic views.
      * It never renders the polynomial to text and never reparses coefficients
-     * through {@code double}. The ordinary string entry point is only a parser
-     * adapter in front of this method.</p>
+     * through {@code double}. Because {@link PolynomialSemanticView.Polynomial}
+     * has a public constructor, this method independently revalidates derived
+     * degree/homogeneity metadata, atom-key uniqueness and the reserved
+     * structural-unit atom before it trusts the typed value.</p>
      */
     public SynthesisReport synthesize(
         PolynomialSemanticView.Polynomial polynomial
@@ -141,6 +146,16 @@ public final class PolynomialDecompositionSynthesisOperator
         PolynomialSemanticView.Polynomial sourcePolynomial,
         PolynomialSemanticView.Status semanticStatus
     ) {
+        String typedValidationFailure =
+            typedPolynomialValidationFailure(sourcePolynomial);
+        if (typedValidationFailure != null) {
+            return SynthesisReport.failure(
+                Status.UNSUPPORTED_SEMANTIC_VIEW,
+                typedValidationFailure,
+                semanticStatus,
+                0);
+        }
+
         PolynomialSemanticView.Polynomial polynomial = sourcePolynomial;
         if (polynomial.atoms().size() == 1 && polynomial.degree() <= 4) {
             polynomial = polynomial.homogenizeWithUnitAtom(4);
@@ -241,6 +256,40 @@ public final class PolynomialDecompositionSynthesisOperator
             polynomial.canonicalMaterial(),
             work.consideredConfigurations(),
             ordered);
+    }
+
+    private static String typedPolynomialValidationFailure(
+        PolynomialSemanticView.Polynomial polynomial
+    ) {
+        int actualDegree = polynomial.coefficients().keySet().stream()
+            .mapToInt(PolynomialSemanticView.Monomial::totalDegree)
+            .max()
+            .orElse(0);
+        boolean actualHomogeneous = polynomial.coefficients().isEmpty()
+            || polynomial.coefficients().keySet().stream()
+                .mapToInt(PolynomialSemanticView.Monomial::totalDegree)
+                .distinct()
+                .count() == 1;
+        if (polynomial.degree() != actualDegree
+                || polynomial.homogeneous() != actualHomogeneous) {
+            return "TYPED_POLYNOMIAL_METADATA_INCONSISTENT";
+        }
+
+        Set<String> atomKeys = new HashSet<>();
+        for (PolynomialSemanticView.Atom atom : polynomial.atoms()) {
+            if (!atomKeys.add(atom.key())) {
+                return "TYPED_POLYNOMIAL_ATOM_KEYS_NOT_UNIQUE";
+            }
+            if (isStructuralUnit(atom)
+                    && !isVerifiedStructuralUnit(atom)) {
+                return "TYPED_POLYNOMIAL_STRUCTURAL_UNIT_INVALID";
+            }
+        }
+        if (polynomial.atoms().size() == 1
+                && isStructuralUnit(polynomial.atoms().getFirst())) {
+            return "TYPED_POLYNOMIAL_STRUCTURAL_UNIT_INVALID";
+        }
+        return null;
     }
 
     private List<MiddlePair> solveMiddle(
@@ -386,8 +435,18 @@ public final class PolynomialDecompositionSynthesisOperator
             second.expression());
     }
 
-    private boolean isStructuralUnit(PolynomialSemanticView.Atom atom) {
-        return atom.key().equals("structural-unit:1");
+    private static boolean isStructuralUnit(
+        PolynomialSemanticView.Atom atom
+    ) {
+        return atom.key().equals(STRUCTURAL_UNIT_KEY);
+    }
+
+    private static boolean isVerifiedStructuralUnit(
+        PolynomialSemanticView.Atom atom
+    ) {
+        return "1".equals(atom.display())
+            && atom.expression() instanceof NumberExpr number
+            && number.value() == 1.0d;
     }
 
     private Expr scaled(BigInteger coefficient, Expr expression) {
