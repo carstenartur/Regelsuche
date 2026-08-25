@@ -88,6 +88,10 @@ public final class SuitablePrimeSelectionResult {
         Objects.requireNonNull(policy, "policy");
         Objects.requireNonNull(work, "work");
         List<PrimeAttempt> retainedAttempts = List.copyOf(attempts);
+        if (retainedAttempts.size() > request.maxCandidates()) {
+            throw new IllegalArgumentException(
+                "suitable-prime attempts exceed the request candidate budget");
+        }
         validateAttemptSequence(retainedAttempts, policy);
         String sourceDomainId = request.source()
             .ring()
