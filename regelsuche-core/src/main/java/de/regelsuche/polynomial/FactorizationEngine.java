@@ -144,26 +144,13 @@ public interface FactorizationEngine<C> {
                 }
                 canonical.merge(stage, units, Math::addExact);
             });
-            try {
-                long total = 0;
-                for (long units : canonical.values()) {
-                    total = Math.addExact(total, units);
-                }
-            } catch (ArithmeticException exception) {
-                throw new IllegalArgumentException(
-                    "factorization work ledger total exceeds long range",
-                    exception);
-            }
+            checkedTotal(canonical.values());
             stages = Collections.unmodifiableMap(
                 new LinkedHashMap<>(canonical));
         }
 
         public long totalWorkUnits() {
-            long total = 0;
-            for (long units : stages.values()) {
-                total = Math.addExact(total, units);
-            }
-            return total;
+            return checkedTotal(stages.values());
         }
 
         public long units(String stage) {
@@ -186,6 +173,20 @@ public interface FactorizationEngine<C> {
 
         public static WorkLedger empty() {
             return new WorkLedger(Map.of());
+        }
+
+        private static long checkedTotal(Iterable<Long> unitsByStage) {
+            try {
+                long total = 0;
+                for (long units : unitsByStage) {
+                    total = Math.addExact(total, units);
+                }
+                return total;
+            } catch (ArithmeticException exception) {
+                throw new IllegalArgumentException(
+                    "factorization work ledger total exceeds long range",
+                    exception);
+            }
         }
     }
 
