@@ -88,7 +88,9 @@ public final class FiniteFieldFactorizationResult {
             .ring()
             .coefficientDomain()
             .id();
-        int prime = field == null ? 0 : field.prime();
+        int prime = status == Status.COMPLETED
+            ? Objects.requireNonNull(field, "field").prime()
+            : 0;
         List<PolynomialFactor<BigInteger>> ordered = factors.stream()
             .sorted(Comparator.comparing(factor ->
                 factor.polynomial().canonicalMaterial()))
