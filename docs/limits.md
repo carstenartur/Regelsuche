@@ -63,14 +63,33 @@ Implementiert ist ein allgemeiner typisierter Kern aus:
 - exakten Integer- und Rational-Koeffizientendomänen;
 - Polynomringen mit geordneten Variablen und expliziter Monomordnung;
 - kanonischen unveränderlichen Sparse-Polynomen;
-- `FactorizationRequest` und backendneutralem `FactorizationEngine`-SPI;
+- verlustfreier univariater Koeffizientenansicht;
+- `FactorizationRequest` mit request-weiten Grenzen für Variablenzahl,
+  Gesamtgrad, Termzahl und Quellkoeffizientenbitlänge;
+- exakter Inhalts- und Primitivteilnormalisierung für `Z[x]` und `Q[x]`;
+- exakter Ableitung, Multiplikation, Polynomdivision und monischer Normierung;
+- budgetiertem euklidischem Polynom-GGT über exakten Feldern;
+- charakteristik-0-quadratfreier Zerlegung mit Multiplizitäten;
+- backendneutralem `FactorizationEngine`-SPI;
 - untrusted Engine-Proposals und ausdrücklich retained Backend-Claims;
 - unabhängiger Vertrags- und Produktprüfung durch `FactorizationVerifier`;
-- stage-getrenntem, kanonisch geordnetem Work Accounting.
+- stage-getrenntem, kanonisch geordnetem `PolynomialWorkLedger`.
 
-Dieser allgemeine Vertrag ist nicht gleichbedeutend mit einer vollständigen
-allgemeinen Faktorisierungsimplementierung. Die derzeit integrierte
-`BinaryQuarticFactorizationEngine` unterstützt exakt und begrenzt:
+Die Inhaltsnormalisierung erzeugt für beide Quelldomänen einen exakten
+rationalen Skalar und einen primitiven ganzzahligen Teil mit positivem
+Leitkoeffizienten. Sie prüft die ganzzahlige Zwischenform und die ursprüngliche
+Quelle durch unabhängige Rückmultiplikation. Eine zusätzliche explizite
+Zwischenkoeffizienten-Bitgrenze verhindert unbegrenztes Nenner-LCM- und
+Koeffizientenwachstum. Das Arbeitsbudget bleibt Eigentum desselben
+`FactorizationRequest` und kann zwischen Algorithmusstufen nicht zurückgesetzt
+werden.
+
+Die quadratfreie Zerlegung rekonstruiert das Quellpolynom und prüft für jeden
+ausgegebenen Faktor `gcd(f, f') = 1`. Quadratfrei bedeutet nicht irreduzibel.
+
+Dieser allgemeine Vertrag und diese Vorstufen sind nicht gleichbedeutend mit
+einer vollständigen allgemeinen Faktorisierungsimplementierung. Die derzeit
+integrierte `BinaryQuarticFactorizationEngine` unterstützt exakt und begrenzt:
 
 - Koeffizienten in `Z`;
 - zwei strukturelle Atome;
@@ -80,23 +99,27 @@ allgemeinen Faktorisierungsimplementierung. Die derzeit integrierte
 - begrenzte univariate Quartiken nach expliziter Homogenisierung mit einer
   strukturellen Einheit.
 
-Jeder positive Kandidat wird im Quellring exakt zurückmultipliziert. Daraus
-folgt eine verifizierte Zerlegung, aber noch kein Nachweis, dass alle Faktoren
-irreduzibel oder die Zerlegung vollständig ist. Insbesondere gilt:
+Jeder positive Engine-Kandidat wird im Quellring exakt zurückmultipliziert.
+Daraus folgt eine verifizierte Zerlegung, aber noch kein Nachweis, dass alle
+Faktoren irreduzibel oder die Zerlegung vollständig ist. Insbesondere gilt:
 
 - `NO_CANDIDATE` ist kein Irreduzibilitätsbeweis;
 - ein Backend-Claim erfüllt keinen `INDEPENDENT_COMPLETE`-Request;
 - die Quartikengine autorisiert keinen Claim für andere Grade oder
   Faktorgradaufteilungen;
-- rationale, endliche oder algebraische Koeffizientendomänen benötigen eigene
-  qualifizierte Engines beziehungsweise Adapter;
-- quadratfreie Zerlegung, endliche-Körper-Faktorisierung, Primzahlauswahl,
-  Hensel-Lifting, Zassenhaus-/LLL-/van-Hoeij-Rekombination und vollständige
-  rationale Reassemblierung sind noch nicht implementiert;
+- die allgemeine rationale Inhaltsnormalisierung ist implementiert, eine
+  vollständige `Q[x]`-Faktorisierungsengine jedoch noch nicht;
+- endliche-Körper-Faktorisierung, geeignete Primzahlauswahl mit
+  Ablehnungsgründen, Hensel-Lifting,
+  Zassenhaus-/LLL-/van-Hoeij-Rekombination, rationale Faktorreassemblierung und
+  unabhängige Vollständigkeits- beziehungsweise
+  Irreduzibilitätszertifikate sind noch nicht implementiert;
 - multivariate Faktorisierung ist nicht implementiert.
 
 Details stehen in
-[Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md)
+[Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md),
+[Univariate Polynomgrundlage, Inhalt und quadratfreie Zerlegung](univariate-polynomial-foundation.md),
+[Univariate Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md)
 und
 [Semantische Polynomansicht und quartische Zerlegungsengine](polynomial-decomposition-synthesis.md).
 
@@ -337,6 +360,8 @@ Diese reale Prüfung ist noch nicht abgeschlossen; das Profil bleibt `BLOCKED`.
 
 - [Discovery- und Forschungsstand](discovery-status.md)
 - [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md)
+- [Univariate Polynomgrundlage, Inhalt und quadratfreie Zerlegung](univariate-polynomial-foundation.md)
+- [Univariate Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md)
 - [ADR: Domänenbewusster Polynomkern statt Quartik-API](adr/domain-aware-polynomial-factorization.md)
 - [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md)
 - [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md)
