@@ -45,11 +45,11 @@ public record SuitablePrimeSelectionPolicy(
                     || candidate > MAX_CANDIDATE_VALUE
                     || candidate
                         > factorizationPolicy
-                            .maxEnumeratedFieldElements()) {
+                            .maxEnumeratedFieldElements()
+                    || !PrimeField.isPrimeModulus(candidate)) {
                 throw new IllegalArgumentException(
-                    "suitable-prime candidates must be increasing and bounded");
+                    "suitable-prime candidates must be increasing prime moduli within bounds");
             }
-            PrimeField.of(candidate);
             previous = candidate;
         }
     }
@@ -78,7 +78,7 @@ public record SuitablePrimeSelectionPolicy(
                 candidate <= maximumPrime
                     && primes.size() < maximumPrimes;
                 candidate++) {
-            if (isPrime(candidate)) {
+            if (PrimeField.isPrimeModulus(candidate)) {
                 primes.add(candidate);
             }
         }
@@ -109,23 +109,6 @@ public record SuitablePrimeSelectionPolicy(
                 result,
                 Integer.toString(candidate)));
         return result.toString();
-    }
-
-    private static boolean isPrime(int candidate) {
-        if (candidate == 2) {
-            return true;
-        }
-        if (candidate < 2 || (candidate & 1) == 0) {
-            return false;
-        }
-        for (int divisor = 3;
-                (long) divisor * divisor <= candidate;
-                divisor += 2) {
-            if (candidate % divisor == 0) {
-                return false;
-            }
-        }
-        return true;
     }
 
     public enum Algorithm {
