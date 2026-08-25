@@ -100,7 +100,6 @@ public final class FiniteFieldFactorizationResult {
         StringBuilder material = new StringBuilder(
             FiniteFieldFactorization.METHOD_ID);
         AlgorithmEvidence.append(material, sourceDomainId);
-        AlgorithmEvidence.append(material, sourcePolynomialHash);
         AlgorithmEvidence.append(
             material,
             request.canonicalMaterial());
