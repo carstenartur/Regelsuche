@@ -17,7 +17,7 @@ public final class SparsePolynomial<C> {
     ) {
         this.ring = Objects.requireNonNull(ring, "ring");
         Objects.requireNonNull(terms, "terms");
-        TreeMap<Monomial, C> normalized = new TreeMap<>();
+        TreeMap<Monomial, C> normalized = newTermMap(ring);
         for (Map.Entry<Monomial, C> entry : terms.entrySet()) {
             Monomial monomial = Objects.requireNonNull(
                 entry.getKey(),
@@ -152,7 +152,8 @@ public final class SparsePolynomial<C> {
 
     public SparsePolynomial<C> add(SparsePolynomial<C> other) {
         requireSameRing(other);
-        TreeMap<Monomial, C> result = new TreeMap<>(terms);
+        TreeMap<Monomial, C> result = newTermMap(ring);
+        result.putAll(terms);
         other.terms.forEach(
             (monomial, coefficient) -> merge(
                 result,
@@ -168,7 +169,7 @@ public final class SparsePolynomial<C> {
     }
 
     public SparsePolynomial<C> negate() {
-        TreeMap<Monomial, C> result = new TreeMap<>();
+        TreeMap<Monomial, C> result = newTermMap(ring);
         terms.forEach((monomial, coefficient) -> result.put(
             monomial,
             ring.coefficientDomain().negate(coefficient)));
@@ -180,7 +181,7 @@ public final class SparsePolynomial<C> {
         if (ring.coefficientDomain().isZero(checked) || isZero()) {
             return zero(ring);
         }
-        TreeMap<Monomial, C> result = new TreeMap<>();
+        TreeMap<Monomial, C> result = newTermMap(ring);
         terms.forEach((monomial, coefficient) -> result.put(
             monomial,
             ring.coefficientDomain().multiply(
@@ -196,7 +197,7 @@ public final class SparsePolynomial<C> {
         if (isZero() || other.isZero()) {
             return zero(ring);
         }
-        TreeMap<Monomial, C> result = new TreeMap<>();
+        TreeMap<Monomial, C> result = newTermMap(ring);
         for (Map.Entry<Monomial, C> left : terms.entrySet()) {
             for (Map.Entry<Monomial, C> right
                     : other.terms.entrySet()) {
@@ -242,7 +243,7 @@ public final class SparsePolynomial<C> {
         }
         PolynomialRing<C> targetRing = ring.appendVariable(
             homogenizingVariable);
-        TreeMap<Monomial, C> result = new TreeMap<>();
+        TreeMap<Monomial, C> result = newTermMap(targetRing);
         terms.forEach((monomial, coefficient) -> result.put(
             monomial.appendExponent(
                 targetTotalDegree - monomial.totalDegree()),
@@ -285,6 +286,12 @@ public final class SparsePolynomial<C> {
             throw new IllegalArgumentException(
                 "polynomial ring mismatch");
         }
+    }
+
+    private static <C> TreeMap<Monomial, C> newTermMap(
+        PolynomialRing<C> ring
+    ) {
+        return new TreeMap<>(ring.monomialComparator());
     }
 
     private static void append(
