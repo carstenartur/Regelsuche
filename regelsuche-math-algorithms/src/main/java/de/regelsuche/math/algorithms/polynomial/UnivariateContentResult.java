@@ -1,6 +1,7 @@
 package de.regelsuche.math.algorithms.polynomial;
 
 import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.FactorizationRequest;
 import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.polynomial.SparsePolynomial;
 import de.regelsuche.scalar.ExactRational;
@@ -11,8 +12,8 @@ import java.util.Objects;
  * Package-issued evidence for exact content and primitive-part normalization.
  *
  * <p>Public callers can inspect a result but cannot construct a successful
- * result. The algorithm package binds source, limits, work and exact output into
- * one deterministic certificate.</p>
+ * result. The algorithm package binds the complete factorization request,
+ * growth policy, work and exact output into one deterministic certificate.</p>
  */
 public final class UnivariateContentResult {
     private final State state;
@@ -46,8 +47,8 @@ public final class UnivariateContentResult {
         ExactRational scalar,
         SparsePolynomial<BigInteger> primitivePart,
         PolynomialWorkLedger work,
-        SparsePolynomial<C> source,
-        UnivariateContentRequest request
+        FactorizationRequest<C> request,
+        UnivariateContentPolicy policy
     ) {
         return create(
             Status.COMPLETED,
@@ -57,16 +58,16 @@ public final class UnivariateContentResult {
             scalar,
             primitivePart,
             work,
-            source,
-            request);
+            request,
+            policy);
     }
 
     static <C> UnivariateContentResult failure(
         Status status,
         String detailCode,
         PolynomialWorkLedger work,
-        SparsePolynomial<C> source,
-        UnivariateContentRequest request
+        FactorizationRequest<C> request,
+        UnivariateContentPolicy policy
     ) {
         if (status == Status.COMPLETED) {
             throw new IllegalArgumentException(
@@ -80,8 +81,8 @@ public final class UnivariateContentResult {
             null,
             null,
             work,
-            source,
-            request);
+            request,
+            policy);
     }
 
     private static <C> UnivariateContentResult create(
@@ -92,20 +93,24 @@ public final class UnivariateContentResult {
         ExactRational scalar,
         SparsePolynomial<BigInteger> primitivePart,
         PolynomialWorkLedger work,
-        SparsePolynomial<C> source,
-        UnivariateContentRequest request
+        FactorizationRequest<C> request,
+        UnivariateContentPolicy policy
     ) {
-        String sourceDomainId =
-            source.ring().coefficientDomain().id();
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(policy, "policy");
+        String sourceDomainId = request.source()
+            .ring()
+            .coefficientDomain()
+            .id();
         StringBuilder material = new StringBuilder(
             UnivariateContentNormalization.METHOD_ID);
         AlgorithmEvidence.append(material, sourceDomainId);
         AlgorithmEvidence.append(
             material,
-            source.canonicalMaterial());
+            request.canonicalMaterial());
         AlgorithmEvidence.append(
             material,
-            request.canonicalMaterial());
+            policy.canonicalMaterial());
         AlgorithmEvidence.append(material, status.name());
         AlgorithmEvidence.append(material, detailCode);
         AlgorithmEvidence.append(
