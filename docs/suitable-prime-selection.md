@@ -200,6 +200,22 @@ Das abschließende Zertifikat bindet zusätzlich:
 - die ausgewählte modulare Quelle;
 - das vollständige Zertifikat der ausgewählten Primkörperfaktorisierung.
 
+Das verschachtelte `FiniteFieldFactorizationResult` weist außerdem einen
+issuer-eigenen `sourcePolynomialHash` aus. Der Quellausdruck war bereits über
+den vollständigen `FactorizationRequest` in der v1-Zertifikats-ID gebunden;
+die neue Projektion ändert diese Identität nicht. Ein abgeschlossener
+`SuitablePrimeSelectionResult` verlangt, dass der exponierte Hash exakt mit dem
+Hash der ausgewählten modularen Quelle übereinstimmt. Dadurch kann ein formal
+gültiges Faktorisierungszertifikat für ein anderes Polynom desselben
+Primkörpers nicht in das äußere Ergebnis eingesetzt werden.
+
+Darüber hinaus rekonstruiert die Ergebnisprüfung aus der ursprünglichen
+`Z[x]`-Quelle und der ausgewählten Primzahl nochmals unabhängig das kanonische
+Polynom in `F_p[x]`. Dieses Polynom muss exakt der retained modularen Quelle
+entsprechen. Damit wird auch ein in sich konsistentes Paar aus Modularpolynom
+und passendem Faktorisierungszertifikat abgelehnt, wenn es nicht tatsächlich
+die Reduktion der gebundenen ganzzahligen Quelle ist.
+
 ## Terminale Ergebnisse
 
 | Status | Bedeutung |
@@ -247,7 +263,8 @@ Fokussierte Tests:
 
 ```bash
 ./gradlew :regelsuche-math-algorithms:test \
-  --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionTest
+  --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionTest \
+  --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionEvidenceTest
 ```
 
 Vollständiger Checkout-Vertrag:
