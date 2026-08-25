@@ -31,7 +31,7 @@ public final class FactorizationVerifier {
                 engine.engineId(),
                 Status.BUDGET_INCONCLUSIVE,
                 structuralViolation,
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 ClaimStrength.NONE,
                 "",
                 request);
@@ -42,7 +42,7 @@ public final class FactorizationVerifier {
                 engine.engineId(),
                 Status.UNSUPPORTED_DOMAIN,
                 "ENGINE_COEFFICIENT_DOMAIN_MISMATCH",
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 ClaimStrength.NONE,
                 "",
                 request);
@@ -58,7 +58,7 @@ public final class FactorizationVerifier {
                 engine.engineId(),
                 Status.TECHNICAL_FAILURE,
                 technicalDetail(exception),
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 ClaimStrength.NONE,
                 "",
                 request);
@@ -189,7 +189,7 @@ public final class FactorizationVerifier {
                 request.source()));
         }
 
-        FactorizationEngine.WorkLedger combined =
+        PolynomialWorkLedger combined =
             merge(raw.work(), verificationWork.ledger());
         ClaimStrength claim = claimFor(raw.backendClaim());
         if (request.evidenceRequirement()
@@ -343,9 +343,9 @@ public final class FactorizationVerifier {
             : ClaimStrength.VERIFIED_DECOMPOSITION;
     }
 
-    private static FactorizationEngine.WorkLedger merge(
-        FactorizationEngine.WorkLedger first,
-        FactorizationEngine.WorkLedger second
+    private static PolynomialWorkLedger merge(
+        PolynomialWorkLedger first,
+        PolynomialWorkLedger second
     ) {
         Map<String, Long> merged =
             new LinkedHashMap<>(first.stages());
@@ -353,14 +353,14 @@ public final class FactorizationVerifier {
             stage,
             units,
             Math::addExact));
-        return new FactorizationEngine.WorkLedger(merged);
+        return new PolynomialWorkLedger(merged);
     }
 
     private static <C> Report<C> success(
         String engineId,
         Status status,
         String detailCode,
-        FactorizationEngine.WorkLedger work,
+        PolynomialWorkLedger work,
         ClaimStrength claimStrength,
         List<VerifiedCandidate<C>> candidates,
         String engineResultHash,
@@ -390,7 +390,7 @@ public final class FactorizationVerifier {
         String engineId,
         Status status,
         String detailCode,
-        FactorizationEngine.WorkLedger work,
+        PolynomialWorkLedger work,
         ClaimStrength claimStrength,
         String engineResultHash,
         FactorizationRequest<C> request
@@ -419,7 +419,7 @@ public final class FactorizationVerifier {
         String engineId,
         Status status,
         String detailCode,
-        FactorizationEngine.WorkLedger work,
+        PolynomialWorkLedger work,
         ClaimStrength claimStrength,
         List<VerifiedCandidate<C>> candidates,
         String engineResultHash,
@@ -600,7 +600,7 @@ public final class FactorizationVerifier {
             String engineId,
             Status status,
             String detailCode,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             ClaimStrength claimStrength,
             List<VerifiedCandidate<C>> candidates,
             String engineResultHash,
@@ -629,7 +629,7 @@ public final class FactorizationVerifier {
             return state.detailCode();
         }
 
-        public FactorizationEngine.WorkLedger work() {
+        public PolynomialWorkLedger work() {
             return state.work();
         }
 
@@ -675,7 +675,7 @@ public final class FactorizationVerifier {
             String engineId,
             Status status,
             String detailCode,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             ClaimStrength claimStrength,
             List<VerifiedCandidate<C>> candidates,
             String engineResultHash,
@@ -760,8 +760,8 @@ public final class FactorizationVerifier {
             stages.merge(stage, units, Math::addExact);
         }
 
-        private FactorizationEngine.WorkLedger ledger() {
-            return new FactorizationEngine.WorkLedger(stages);
+        private PolynomialWorkLedger ledger() {
+            return new PolynomialWorkLedger(stages);
         }
     }
 
