@@ -85,6 +85,14 @@ public final class UnivariateContentNormalization {
         Objects.requireNonNull(policy, "policy");
         Objects.requireNonNull(access, "access");
         Objects.requireNonNull(work, "work");
+        if (work.limit() != request.maxWorkUnits()) {
+            return failure(
+                UnivariateContentResult.Status.TECHNICAL_FAILURE,
+                "CONTENT_NORMALIZATION_WORK_BUDGET_AUTHORITY_MISMATCH",
+                request,
+                policy,
+                work.ledger());
+        }
 
         UnivariateContentResult rejected =
             rejectInput(
