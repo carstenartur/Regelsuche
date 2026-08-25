@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnivariatePolynomialView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">UnivariatePolynomialView.java</span></div><h1>UnivariatePolynomialView.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/**
+ * Efficient dense ascending coefficient view of one canonical univariate
+ * polynomial.
+ *
+ * &lt;p&gt;The sparse polynomial remains the mathematical identity. This view is a
+ * lossless algorithm representation and never owns source syntax.&lt;/p&gt;
+ */
+public final class UnivariatePolynomialView&lt;C&gt; {
+    private final PolynomialRing&lt;C&gt; ring;
+    private final List&lt;C&gt; coefficients;
+
+    private UnivariatePolynomialView(
+        PolynomialRing&lt;C&gt; ring,
+        List&lt;C&gt; coefficients
+<span class="fc" id="L24">    ) {</span>
+<span class="fc" id="L25">        this.ring = requireUnivariateRing(ring);</span>
+<span class="fc" id="L26">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="fc" id="L27">        ArrayList&lt;C&gt; canonical = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L28">            Objects.requireNonNull(coefficients, &quot;coefficients&quot;).size());</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (C coefficient : coefficients) {</span>
+<span class="fc" id="L30">            canonical.add(domain.canonical(</span>
+<span class="fc" id="L31">                Objects.requireNonNull(coefficient, &quot;coefficient&quot;)));</span>
+<span class="fc" id="L32">        }</span>
+<span class="fc" id="L33">        int size = canonical.size();</span>
+<span class="fc bfc" id="L34" title="All 4 branches covered.">        while (size &gt; 0 &amp;&amp; domain.isZero(canonical.get(size - 1))) {</span>
+<span class="fc" id="L35">            size--;</span>
+        }
+<span class="fc" id="L37">        this.coefficients = List.copyOf(canonical.subList(0, size));</span>
+<span class="fc" id="L38">    }</span>
+
+    public static &lt;C&gt; UnivariatePolynomialView&lt;C&gt; from(
+        SparsePolynomial&lt;C&gt; polynomial
+    ) {
+<span class="fc" id="L43">        Objects.requireNonNull(polynomial, &quot;polynomial&quot;);</span>
+<span class="fc" id="L44">        PolynomialRing&lt;C&gt; ring = requireUnivariateRing(polynomial.ring());</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (polynomial.isZero()) {</span>
+<span class="nc" id="L46">            return zero(ring);</span>
+        }
+<span class="fc" id="L48">        ArrayList&lt;C&gt; coefficients = zeros(</span>
+<span class="fc" id="L49">            ring.coefficientDomain(),</span>
+<span class="fc" id="L50">            polynomial.degree(0) + 1);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, C&gt; term : polynomial.terms().entrySet()) {</span>
+<span class="fc" id="L52">            coefficients.set(</span>
+<span class="fc" id="L53">                term.getKey().exponent(0),</span>
+<span class="fc" id="L54">                term.getValue());</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">        return new UnivariatePolynomialView&lt;&gt;(ring, coefficients);</span>
+    }
+
+    public static &lt;C&gt; UnivariatePolynomialView&lt;C&gt; of(
+        PolynomialRing&lt;C&gt; ring,
+        List&lt;C&gt; ascendingCoefficients
+    ) {
+<span class="fc" id="L63">        return new UnivariatePolynomialView&lt;&gt;(ring, ascendingCoefficients);</span>
+    }
+
+    public static &lt;C&gt; UnivariatePolynomialView&lt;C&gt; zero(
+        PolynomialRing&lt;C&gt; ring
+    ) {
+<span class="nc" id="L69">        return new UnivariatePolynomialView&lt;&gt;(ring, List.of());</span>
+    }
+
+    public static &lt;C&gt; UnivariatePolynomialView&lt;C&gt; one(
+        PolynomialRing&lt;C&gt; ring
+    ) {
+<span class="nc" id="L75">        return new UnivariatePolynomialView&lt;&gt;(</span>
+            ring,
+<span class="nc" id="L77">            List.of(ring.coefficientDomain().one()));</span>
+    }
+
+    public PolynomialRing&lt;C&gt; ring() {
+<span class="fc" id="L81">        return ring;</span>
+    }
+
+    public List&lt;C&gt; coefficients() {
+<span class="fc" id="L85">        return coefficients;</span>
+    }
+
+    public int degree() {
+<span class="fc" id="L89">        return coefficients.size() - 1;</span>
+    }
+
+    public int coefficientCount() {
+<span class="fc" id="L93">        return coefficients.size();</span>
+    }
+
+    public boolean isZero() {
+<span class="fc" id="L97">        return coefficients.isEmpty();</span>
+    }
+
+    public boolean isOne() {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        return degree() == 0</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            &amp;&amp; ring.coefficientDomain().isOne(coefficients.getFirst());</span>
+    }
+
+    public boolean isConstant() {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        return degree() &lt;= 0;</span>
+    }
+
+    public C coefficient(int exponent) {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (exponent &lt; 0) {</span>
+<span class="nc" id="L111">            throw new IllegalArgumentException(</span>
+                &quot;univariate exponent must not be negative&quot;);
+        }
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        return exponent &lt; coefficients.size()</span>
+<span class="fc" id="L115">            ? coefficients.get(exponent)</span>
+<span class="nc" id="L116">            : ring.coefficientDomain().zero();</span>
+    }
+
+    public C leadingCoefficient() {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (isZero()) {</span>
+<span class="nc" id="L121">            throw new IllegalStateException(</span>
+                &quot;zero polynomial has no leading coefficient&quot;);
+        }
+<span class="fc" id="L124">        return coefficients.getLast();</span>
+    }
+
+    public SparsePolynomial&lt;C&gt; toSparsePolynomial() {
+<span class="fc" id="L128">        TreeMap&lt;Monomial, C&gt; terms =</span>
+<span class="fc" id="L129">            new TreeMap&lt;&gt;(ring.monomialComparator());</span>
+<span class="fc" id="L130">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="fc" id="L131">        for (int exponent = 0;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                exponent &lt; coefficients.size();</span>
+<span class="fc" id="L133">                exponent++) {</span>
+<span class="fc" id="L134">            C coefficient = coefficients.get(exponent);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (!domain.isZero(coefficient)) {</span>
+<span class="fc" id="L136">                terms.put(Monomial.of(exponent), coefficient);</span>
+            }
+        }
+<span class="fc" id="L139">        return new SparsePolynomial&lt;&gt;(ring, terms);</span>
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; add(
+        UnivariatePolynomialView&lt;C&gt; other
+    ) {
+<span class="nc" id="L145">        return add(</span>
+            other,
+<span class="nc" id="L147">            PolynomialWorkSink.none(),</span>
+            &quot;univariate.add&quot;);
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; subtract(
+        UnivariatePolynomialView&lt;C&gt; other
+    ) {
+<span class="nc" id="L154">        return subtract(</span>
+            other,
+<span class="nc" id="L156">            PolynomialWorkSink.none(),</span>
+            &quot;univariate.subtract&quot;);
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; negate() {
+<span class="nc" id="L161">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="nc" id="L162">        return new UnivariatePolynomialView&lt;&gt;(</span>
+            ring,
+<span class="nc" id="L164">            coefficients.stream().map(domain::negate).toList());</span>
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; scale(C scalar) {
+<span class="nc" id="L168">        return scale(</span>
+            scalar,
+<span class="nc" id="L170">            PolynomialWorkSink.none(),</span>
+            &quot;univariate.scale&quot;);
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; multiply(
+        UnivariatePolynomialView&lt;C&gt; other
+    ) {
+<span class="nc" id="L177">        return multiply(</span>
+            other,
+<span class="nc" id="L179">            PolynomialWorkSink.none(),</span>
+            &quot;univariate.multiply&quot;);
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; derivative() {
+<span class="fc" id="L184">        return derivative(</span>
+<span class="fc" id="L185">            PolynomialWorkSink.none(),</span>
+            &quot;univariate.derivative&quot;);
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; monic(
+        ExactField&lt;C&gt; field
+    ) {
+<span class="nc" id="L192">        return monic(</span>
+            field,
+<span class="nc" id="L194">            PolynomialWorkSink.none(),</span>
+            &quot;univariate.monic&quot;);
+    }
+
+    public DivisionResult&lt;C&gt; divideAndRemainder(
+        UnivariatePolynomialView&lt;C&gt; divisor,
+        ExactField&lt;C&gt; field
+    ) {
+<span class="fc" id="L202">        return divideAndRemainder(</span>
+            divisor,
+            field,
+<span class="fc" id="L205">            PolynomialWorkSink.none(),</span>
+            &quot;univariate.division&quot;);
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; exactQuotient(
+        UnivariatePolynomialView&lt;C&gt; divisor,
+        ExactField&lt;C&gt; field
+    ) {
+<span class="fc" id="L213">        return exactQuotient(</span>
+            divisor,
+            field,
+<span class="fc" id="L216">            PolynomialWorkSink.none(),</span>
+            &quot;univariate.exact-quotient&quot;);
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; add(
+        UnivariatePolynomialView&lt;C&gt; other,
+        PolynomialWorkSink work,
+        String stage
+    ) {
+<span class="nc" id="L225">        requireSameRing(other);</span>
+<span class="nc" id="L226">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="nc" id="L227">        int size = Math.max(coefficientCount(), other.coefficientCount());</span>
+<span class="nc" id="L228">        ArrayList&lt;C&gt; result = zeros(domain, size);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        for (int exponent = 0; exponent &lt; size; exponent++) {</span>
+<span class="nc" id="L230">            consume(work, stage, 1);</span>
+<span class="nc" id="L231">            result.set(</span>
+                exponent,
+<span class="nc" id="L233">                domain.add(</span>
+<span class="nc" id="L234">                    coefficient(exponent),</span>
+<span class="nc" id="L235">                    other.coefficient(exponent)));</span>
+        }
+<span class="nc" id="L237">        return new UnivariatePolynomialView&lt;&gt;(ring, result);</span>
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; subtract(
+        UnivariatePolynomialView&lt;C&gt; other,
+        PolynomialWorkSink work,
+        String stage
+    ) {
+<span class="nc" id="L245">        requireSameRing(other);</span>
+<span class="nc" id="L246">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="nc" id="L247">        int size = Math.max(coefficientCount(), other.coefficientCount());</span>
+<span class="nc" id="L248">        ArrayList&lt;C&gt; result = zeros(domain, size);</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        for (int exponent = 0; exponent &lt; size; exponent++) {</span>
+<span class="nc" id="L250">            consume(work, stage, 1);</span>
+<span class="nc" id="L251">            result.set(</span>
+                exponent,
+<span class="nc" id="L253">                domain.subtract(</span>
+<span class="nc" id="L254">                    coefficient(exponent),</span>
+<span class="nc" id="L255">                    other.coefficient(exponent)));</span>
+        }
+<span class="nc" id="L257">        return new UnivariatePolynomialView&lt;&gt;(ring, result);</span>
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; scale(
+        C scalar,
+        PolynomialWorkSink work,
+        String stage
+    ) {
+<span class="nc" id="L265">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="nc" id="L266">        C canonicalScalar = domain.canonical(</span>
+<span class="nc" id="L267">            Objects.requireNonNull(scalar, &quot;scalar&quot;));</span>
+<span class="nc bnc" id="L268" title="All 4 branches missed.">        if (domain.isZero(canonicalScalar) || isZero()) {</span>
+<span class="nc" id="L269">            return zero(ring);</span>
+        }
+<span class="nc" id="L271">        ArrayList&lt;C&gt; result = new ArrayList&lt;&gt;(coefficientCount());</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        for (C coefficient : coefficients) {</span>
+<span class="nc" id="L273">            consume(work, stage, 1);</span>
+<span class="nc" id="L274">            result.add(domain.multiply(coefficient, canonicalScalar));</span>
+<span class="nc" id="L275">        }</span>
+<span class="nc" id="L276">        return new UnivariatePolynomialView&lt;&gt;(ring, result);</span>
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; multiply(
+        UnivariatePolynomialView&lt;C&gt; other,
+        PolynomialWorkSink work,
+        String stage
+    ) {
+<span class="nc" id="L284">        requireSameRing(other);</span>
+<span class="nc bnc" id="L285" title="All 4 branches missed.">        if (isZero() || other.isZero()) {</span>
+<span class="nc" id="L286">            return zero(ring);</span>
+        }
+<span class="nc" id="L288">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="nc" id="L289">        ArrayList&lt;C&gt; result = zeros(</span>
+            domain,
+<span class="nc" id="L291">            degree() + other.degree() + 1);</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        for (int left = 0; left &lt; coefficientCount(); left++) {</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">            for (int right = 0; right &lt; other.coefficientCount(); right++) {</span>
+<span class="nc" id="L294">                consume(work, stage, 2);</span>
+<span class="nc" id="L295">                int exponent = left + right;</span>
+<span class="nc" id="L296">                result.set(</span>
+                    exponent,
+<span class="nc" id="L298">                    domain.add(</span>
+<span class="nc" id="L299">                        result.get(exponent),</span>
+<span class="nc" id="L300">                        domain.multiply(</span>
+<span class="nc" id="L301">                            coefficient(left),</span>
+<span class="nc" id="L302">                            other.coefficient(right))));</span>
+            }
+        }
+<span class="nc" id="L305">        return new UnivariatePolynomialView&lt;&gt;(ring, result);</span>
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; derivative(
+        PolynomialWorkSink work,
+        String stage
+    ) {
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        if (degree() &lt;= 0) {</span>
+<span class="nc" id="L313">            return zero(ring);</span>
+        }
+<span class="fc" id="L315">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="fc" id="L316">        ArrayList&lt;C&gt; result = zeros(domain, degree());</span>
+<span class="fc" id="L317">        for (int exponent = 1;</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">                exponent &lt; coefficientCount();</span>
+<span class="fc" id="L319">                exponent++) {</span>
+<span class="fc" id="L320">            consume(work, stage, 1);</span>
+<span class="fc" id="L321">            result.set(</span>
+                exponent - 1,
+<span class="fc" id="L323">                domain.multiply(</span>
+<span class="fc" id="L324">                    coefficient(exponent),</span>
+<span class="fc" id="L325">                    domain.fromInteger(</span>
+<span class="fc" id="L326">                        BigInteger.valueOf(exponent))));</span>
+        }
+<span class="fc" id="L328">        return new UnivariatePolynomialView&lt;&gt;(ring, result);</span>
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; monic(
+        ExactField&lt;C&gt; field,
+        PolynomialWorkSink work,
+        String stage
+    ) {
+<span class="nc" id="L336">        requireField(field);</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (isZero()) {</span>
+<span class="nc" id="L338">            return this;</span>
+        }
+<span class="nc" id="L340">        consume(work, stage, 1);</span>
+<span class="nc" id="L341">        C inverse = field.divide(</span>
+<span class="nc" id="L342">            field.one(),</span>
+<span class="nc" id="L343">            leadingCoefficient());</span>
+<span class="nc" id="L344">        return scale(inverse, work, stage);</span>
+    }
+
+    public DivisionResult&lt;C&gt; divideAndRemainder(
+        UnivariatePolynomialView&lt;C&gt; divisor,
+        ExactField&lt;C&gt; field,
+        PolynomialWorkSink work,
+        String stage
+    ) {
+<span class="fc" id="L353">        requireSameRing(divisor);</span>
+<span class="fc" id="L354">        requireField(field);</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">        if (divisor.isZero()) {</span>
+<span class="nc" id="L356">            throw new ArithmeticException(</span>
+                &quot;polynomial division by zero&quot;);
+        }
+<span class="pc bpc" id="L359" title="2 of 4 branches missed.">        if (isZero() || degree() &lt; divisor.degree()) {</span>
+<span class="nc" id="L360">            return new DivisionResult&lt;&gt;(</span>
+<span class="nc" id="L361">                zero(ring),</span>
+                this);
+        }
+
+<span class="fc" id="L365">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="fc" id="L366">        ArrayList&lt;C&gt; quotient = zeros(</span>
+            domain,
+<span class="fc" id="L368">            degree() - divisor.degree() + 1);</span>
+<span class="fc" id="L369">        ArrayList&lt;C&gt; remainder = new ArrayList&lt;&gt;(coefficients);</span>
+<span class="fc" id="L370">        int remainderDegree = trimmedDegree(remainder, domain);</span>
+
+<span class="fc bfc" id="L372" title="All 2 branches covered.">        while (remainderDegree &gt;= divisor.degree()) {</span>
+<span class="fc" id="L373">            consume(work, stage + &quot;.iterations&quot;, 1);</span>
+<span class="fc" id="L374">            int shift = remainderDegree - divisor.degree();</span>
+<span class="fc" id="L375">            consume(work, stage + &quot;.coefficient-divisions&quot;, 1);</span>
+<span class="fc" id="L376">            C scale = field.divide(</span>
+<span class="fc" id="L377">                remainder.get(remainderDegree),</span>
+<span class="fc" id="L378">                divisor.leadingCoefficient());</span>
+<span class="fc" id="L379">            quotient.set(</span>
+                shift,
+<span class="fc" id="L381">                domain.add(quotient.get(shift), scale));</span>
+<span class="fc" id="L382">            for (int exponent = 0;</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">                    exponent &lt;= divisor.degree();</span>
+<span class="fc" id="L384">                    exponent++) {</span>
+<span class="fc" id="L385">                consume(work, stage + &quot;.coefficient-updates&quot;, 2);</span>
+<span class="fc" id="L386">                int index = exponent + shift;</span>
+<span class="fc" id="L387">                remainder.set(</span>
+                    index,
+<span class="fc" id="L389">                    domain.subtract(</span>
+<span class="fc" id="L390">                        remainder.get(index),</span>
+<span class="fc" id="L391">                        domain.multiply(</span>
+                            scale,
+<span class="fc" id="L393">                            divisor.coefficient(exponent))));</span>
+            }
+<span class="fc" id="L395">            remainderDegree = trimmedDegree(remainder, domain);</span>
+<span class="fc" id="L396">        }</span>
+
+<span class="fc" id="L398">        return new DivisionResult&lt;&gt;(</span>
+            new UnivariatePolynomialView&lt;&gt;(ring, quotient),
+            new UnivariatePolynomialView&lt;&gt;(ring, remainder));
+    }
+
+    public UnivariatePolynomialView&lt;C&gt; exactQuotient(
+        UnivariatePolynomialView&lt;C&gt; divisor,
+        ExactField&lt;C&gt; field,
+        PolynomialWorkSink work,
+        String stage
+    ) {
+<span class="fc" id="L409">        DivisionResult&lt;C&gt; result =</span>
+<span class="fc" id="L410">            divideAndRemainder(divisor, field, work, stage);</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        if (!result.remainder().isZero()) {</span>
+<span class="fc" id="L412">            throw new ArithmeticException(</span>
+                &quot;polynomial division has nonzero remainder&quot;);
+        }
+<span class="fc" id="L415">        return result.quotient();</span>
+    }
+
+    public String canonicalMaterial() {
+<span class="nc" id="L419">        StringBuilder result = new StringBuilder(</span>
+<span class="nc" id="L420">            ring.canonicalMaterial());</span>
+<span class="nc" id="L421">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="nc" id="L422">        for (int exponent = 0;</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">                exponent &lt; coefficients.size();</span>
+<span class="nc" id="L424">                exponent++) {</span>
+<span class="nc" id="L425">            PolynomialEvidence.append(</span>
+                result,
+<span class="nc" id="L427">                Integer.toString(exponent));</span>
+<span class="nc" id="L428">            PolynomialEvidence.append(</span>
+                result,
+<span class="nc" id="L430">                domain.canonicalText(coefficients.get(exponent)));</span>
+        }
+<span class="nc" id="L432">        return result.toString();</span>
+    }
+
+    private void requireSameRing(
+        UnivariatePolynomialView&lt;C&gt; other
+    ) {
+<span class="fc" id="L438">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">        if (!ring.equals(other.ring)) {</span>
+<span class="nc" id="L440">            throw new IllegalArgumentException(</span>
+                &quot;univariate polynomial ring mismatch&quot;);
+        }
+<span class="fc" id="L443">    }</span>
+
+    private void requireField(ExactField&lt;C&gt; field) {
+<span class="fc" id="L446">        Objects.requireNonNull(field, &quot;field&quot;);</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        if (!ring.coefficientDomain().id().equals(field.id())) {</span>
+<span class="nc" id="L448">            throw new IllegalArgumentException(</span>
+                &quot;field does not match polynomial coefficient domain&quot;);
+        }
+<span class="fc" id="L451">    }</span>
+
+    private static &lt;C&gt; PolynomialRing&lt;C&gt; requireUnivariateRing(
+        PolynomialRing&lt;C&gt; ring
+    ) {
+<span class="fc" id="L456">        Objects.requireNonNull(ring, &quot;ring&quot;);</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">        if (ring.variableCount() != 1) {</span>
+<span class="fc" id="L458">            throw new IllegalArgumentException(</span>
+                &quot;univariate view requires exactly one ring variable&quot;);
+        }
+<span class="fc" id="L461">        return ring;</span>
+    }
+
+    private static &lt;C&gt; ArrayList&lt;C&gt; zeros(
+        CoefficientDomain&lt;C&gt; domain,
+        int size
+    ) {
+<span class="fc" id="L468">        ArrayList&lt;C&gt; result = new ArrayList&lt;&gt;(size);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        for (int index = 0; index &lt; size; index++) {</span>
+<span class="fc" id="L470">            result.add(domain.zero());</span>
+        }
+<span class="fc" id="L472">        return result;</span>
+    }
+
+    private static &lt;C&gt; int trimmedDegree(
+        List&lt;C&gt; values,
+        CoefficientDomain&lt;C&gt; domain
+    ) {
+<span class="fc" id="L479">        int degree = values.size() - 1;</span>
+<span class="fc bfc" id="L480" title="All 4 branches covered.">        while (degree &gt;= 0 &amp;&amp; domain.isZero(values.get(degree))) {</span>
+<span class="fc" id="L481">            degree--;</span>
+        }
+<span class="fc" id="L483">        return degree;</span>
+    }
+
+    private static void consume(
+        PolynomialWorkSink work,
+        String stage,
+        long units
+    ) {
+<span class="fc" id="L491">        Objects.requireNonNull(work, &quot;work&quot;).consume(</span>
+<span class="pc bpc" id="L492" title="2 of 4 branches missed.">            stage == null || stage.isBlank()</span>
+<span class="nc" id="L493">                ? &quot;univariate.arithmetic&quot;</span>
+<span class="fc" id="L494">                : stage,</span>
+            units);
+<span class="fc" id="L496">    }</span>
+
+    public record DivisionResult&lt;C&gt;(
+        UnivariatePolynomialView&lt;C&gt; quotient,
+        UnivariatePolynomialView&lt;C&gt; remainder
+    ) {
+<span class="fc" id="L502">        public DivisionResult {</span>
+<span class="fc" id="L503">            Objects.requireNonNull(quotient, &quot;quotient&quot;);</span>
+<span class="fc" id="L504">            Objects.requireNonNull(remainder, &quot;remainder&quot;);</span>
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">            if (!quotient.ring().equals(remainder.ring())) {</span>
+<span class="nc" id="L506">                throw new IllegalArgumentException(</span>
+                    &quot;division result ring mismatch&quot;);
+            }
+<span class="fc" id="L509">        }</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="fc" id="L514">        return this == other</span>
+<span class="pc bpc" id="L515" title="2 of 4 branches missed.">            || other instanceof UnivariatePolynomialView&lt;?&gt; view</span>
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">                &amp;&amp; ring.equals(view.ring)</span>
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">                &amp;&amp; coefficients.equals(view.coefficients);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L522">        return Objects.hash(ring, coefficients);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L527">        return coefficients.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

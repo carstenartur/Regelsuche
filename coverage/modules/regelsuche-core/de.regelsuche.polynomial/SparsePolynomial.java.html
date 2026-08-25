@@ -123,24 +123,24 @@ public final class SparsePolynomial&lt;C&gt; {
     }
 
     public int degree(int variableIndex) {
-<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (variableIndex &lt; 0</span>
-<span class="nc bnc" id="L127" title="All 2 branches missed.">                || variableIndex &gt;= ring.variableCount()) {</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (variableIndex &lt; 0</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                || variableIndex &gt;= ring.variableCount()) {</span>
 <span class="nc" id="L128">            throw new IllegalArgumentException(</span>
                 &quot;variable index outside polynomial ring&quot;);
         }
-<span class="nc bnc" id="L131" title="All 2 branches missed.">        return isZero()</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        return isZero()</span>
 <span class="nc" id="L132">            ? -1</span>
-<span class="nc" id="L133">            : terms.keySet().stream()</span>
-<span class="nc" id="L134">                .mapToInt(monomial -&gt; monomial.exponent(variableIndex))</span>
-<span class="nc" id="L135">                .max()</span>
-<span class="nc" id="L136">                .orElseThrow();</span>
+<span class="fc" id="L133">            : terms.keySet().stream()</span>
+<span class="fc" id="L134">                .mapToInt(monomial -&gt; monomial.exponent(variableIndex))</span>
+<span class="fc" id="L135">                .max()</span>
+<span class="fc" id="L136">                .orElseThrow();</span>
     }
 
     public int maxCoefficientBitLength() {
-<span class="nc" id="L140">        return terms.values().stream()</span>
-<span class="nc" id="L141">            .mapToInt(ring.coefficientDomain()::bitLength)</span>
-<span class="nc" id="L142">            .max()</span>
-<span class="nc" id="L143">            .orElse(0);</span>
+<span class="fc" id="L140">        return terms.values().stream()</span>
+<span class="fc" id="L141">            .mapToInt(ring.coefficientDomain()::bitLength)</span>
+<span class="fc" id="L142">            .max()</span>
+<span class="fc" id="L143">            .orElse(0);</span>
     }
 
     public boolean isHomogeneousOfDegree(int expectedDegree) {

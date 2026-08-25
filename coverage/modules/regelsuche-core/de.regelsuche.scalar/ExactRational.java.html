@@ -45,8 +45,8 @@ public record ExactRational(
 <span class="fc" id="L45">    }</span>
 
     public static ExactRational integer(long value) {
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (value == 0) {</span>
-<span class="nc" id="L49">            return ZERO;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (value == 0) {</span>
+<span class="fc" id="L49">            return ZERO;</span>
         }
 <span class="fc bfc" id="L51" title="All 2 branches covered.">        if (value == 1) {</span>
 <span class="fc" id="L52">            return ONE;</span>
@@ -138,8 +138,8 @@ public record ExactRational(
 <span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (isZero()) {</span>
 <span class="nc" id="L139">            return ZERO;</span>
         }
-<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (other.isOne()) {</span>
-<span class="nc" id="L142">            return this;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (other.isOne()) {</span>
+<span class="fc" id="L142">            return this;</span>
         }
 <span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (other.isNegativeOne()) {</span>
 <span class="nc" id="L145">            return negate();</span>
@@ -162,8 +162,8 @@ public record ExactRational(
 <span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (isZero()) {</span>
 <span class="nc" id="L163">            return ZERO;</span>
         }
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (isOne()) {</span>
-<span class="nc" id="L166">            return NEGATIVE_ONE;</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (isOne()) {</span>
+<span class="fc" id="L166">            return NEGATIVE_ONE;</span>
         }
 <span class="fc bfc" id="L168" title="All 2 branches covered.">        if (isNegativeOne()) {</span>
 <span class="fc" id="L169">            return ONE;</span>

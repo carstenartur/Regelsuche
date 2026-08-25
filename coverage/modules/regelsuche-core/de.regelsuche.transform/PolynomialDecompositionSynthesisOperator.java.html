@@ -30,6 +30,13 @@ public final class PolynomialDecompositionSynthesisOperator
     private static final String LICENSE = &quot;PROJECT&quot;;
     private static final int DEFAULT_MAX_CANDIDATES = 6;
     private static final long DEFAULT_MAX_WORK_UNITS = 4_096;
+    private static final FactorizationRequest.StructuralLimits
+<span class="fc" id="L34">        DEFAULT_STRUCTURAL_LIMITS =</span>
+            new FactorizationRequest.StructuralLimits(
+                2,
+                4,
+                16,
+                4_096);
 
     private final PolynomialSemanticView semanticView;
     private final BinaryQuarticFactorizationEngine engine;
@@ -37,114 +44,115 @@ public final class PolynomialDecompositionSynthesisOperator
     private final long maxWorkUnits;
 
     public PolynomialDecompositionSynthesisOperator() {
-<span class="fc" id="L40">        this(DEFAULT_MAX_CANDIDATES);</span>
-<span class="fc" id="L41">    }</span>
+<span class="fc" id="L47">        this(DEFAULT_MAX_CANDIDATES);</span>
+<span class="fc" id="L48">    }</span>
 
     public PolynomialDecompositionSynthesisOperator(int maxCandidates) {
-<span class="fc" id="L44">        this(</span>
+<span class="fc" id="L51">        this(</span>
             new PolynomialSemanticView(
                 new PolynomialSemanticView.Budget(2, 4, 16, 256)),
             new BinaryQuarticFactorizationEngine(),
             maxCandidates,
             DEFAULT_MAX_WORK_UNITS);
-<span class="fc" id="L50">    }</span>
+<span class="fc" id="L57">    }</span>
 
     PolynomialDecompositionSynthesisOperator(
         PolynomialSemanticView semanticView,
         BinaryQuarticFactorizationEngine engine,
         int maxCandidates,
         long maxWorkUnits
-<span class="fc" id="L57">    ) {</span>
-<span class="fc" id="L58">        this.semanticView = Objects.requireNonNull(</span>
+<span class="fc" id="L64">    ) {</span>
+<span class="fc" id="L65">        this.semanticView = Objects.requireNonNull(</span>
             semanticView,
             &quot;semanticView&quot;);
-<span class="fc" id="L61">        this.engine = Objects.requireNonNull(engine, &quot;engine&quot;);</span>
-<span class="fc" id="L62">        this.maxCandidates = Math.max(0, maxCandidates);</span>
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (maxWorkUnits &lt; 1) {</span>
-<span class="nc" id="L64">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L68">        this.engine = Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="fc" id="L69">        this.maxCandidates = Math.max(0, maxCandidates);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (maxWorkUnits &lt; 1) {</span>
+<span class="nc" id="L71">            throw new IllegalArgumentException(</span>
                 &quot;factorization work budget must be positive&quot;);
         }
-<span class="fc" id="L67">        this.maxWorkUnits = maxWorkUnits;</span>
-<span class="fc" id="L68">    }</span>
+<span class="fc" id="L74">        this.maxWorkUnits = maxWorkUnits;</span>
+<span class="fc" id="L75">    }</span>
 
     @Override
     public List&lt;Transformation&gt; generateCandidates(String expression) {
-<span class="fc" id="L72">        ExpressionFactorizationReport report = factorExpression(expression);</span>
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (!report.generated()) {</span>
-<span class="nc" id="L74">            return List.of();</span>
+<span class="fc" id="L79">        ExpressionFactorizationReport report = factorExpression(expression);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (!report.generated()) {</span>
+<span class="nc" id="L81">            return List.of();</span>
         }
-<span class="fc" id="L76">        return report.candidates().stream()</span>
-<span class="fc" id="L77">            .map(candidate -&gt; new Transformation(</span>
+<span class="fc" id="L83">        return report.candidates().stream()</span>
+<span class="fc" id="L84">            .map(candidate -&gt; new Transformation(</span>
                 RULE_ID,
-<span class="fc" id="L79">                candidate.transformedExpression(),</span>
+<span class="fc" id="L86">                candidate.transformedExpression(),</span>
                 RewriteKind.FACTOR,
                 true,
                 -2,
                 true,
-<span class="fc" id="L84">                candidate.applicationKey(),</span>
-<span class="fc" id="L85">                List.of(),</span>
+<span class="fc" id="L91">                candidate.applicationKey(),</span>
+<span class="fc" id="L92">                List.of(),</span>
                 PACK_ID,
                 LICENSE))
-<span class="fc" id="L88">            .toList();</span>
+<span class="fc" id="L95">            .toList();</span>
     }
 
     public ExpressionFactorizationReport factorExpression(
         String expression
     ) {
-<span class="fc" id="L94">        PolynomialSemanticView.Analysis analysis =</span>
-<span class="fc" id="L95">            semanticView.analyze(expression);</span>
-<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (!analysis.supported()) {</span>
-<span class="fc" id="L97">            return ExpressionFactorizationReport.semanticFailure(</span>
-<span class="fc" id="L98">                statusFor(analysis.status()),</span>
-<span class="fc" id="L99">                analysis.detailCode(),</span>
-<span class="fc" id="L100">                analysis.status());</span>
+<span class="fc" id="L101">        PolynomialSemanticView.Analysis analysis =</span>
+<span class="fc" id="L102">            semanticView.analyze(expression);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!analysis.supported()) {</span>
+<span class="fc" id="L104">            return ExpressionFactorizationReport.semanticFailure(</span>
+<span class="fc" id="L105">                statusFor(analysis.status()),</span>
+<span class="fc" id="L106">                analysis.detailCode(),</span>
+<span class="fc" id="L107">                analysis.status());</span>
         }
 
-<span class="fc" id="L103">        PolynomialSemanticView.PolynomialView view = analysis.view();</span>
-<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (view.polynomial().isZero()) {</span>
-<span class="fc" id="L105">            return ExpressionFactorizationReport.semanticFailure(</span>
+<span class="fc" id="L110">        PolynomialSemanticView.PolynomialView view = analysis.view();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (view.polynomial().isZero()) {</span>
+<span class="fc" id="L112">            return ExpressionFactorizationReport.semanticFailure(</span>
                 ExpressionFactorizationReport.Status.NO_FACTORIZATION_FOUND,
                 &quot;ZERO_POLYNOMIAL_HAS_NO_FINITE_FACTORIZATION&quot;,
-<span class="fc" id="L108">                analysis.status());</span>
+<span class="fc" id="L115">                analysis.status());</span>
         }
-<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (view.polynomial().ring().variableCount() == 1</span>
-<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                &amp;&amp; view.polynomial().totalDegree() &lt;= 4) {</span>
-<span class="fc" id="L112">            view = view.homogenizeWithUnitAtom(4);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (view.polynomial().ring().variableCount() == 1</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                &amp;&amp; view.polynomial().totalDegree() &lt;= 4) {</span>
+<span class="fc" id="L119">            view = view.homogenizeWithUnitAtom(4);</span>
         }
 
-<span class="fc" id="L115">        FactorizationVerifier.Report&lt;BigInteger&gt; factorization =</span>
-<span class="fc" id="L116">            FactorizationVerifier.execute(</span>
+<span class="fc" id="L122">        FactorizationVerifier.Report&lt;BigInteger&gt; factorization =</span>
+<span class="fc" id="L123">            FactorizationVerifier.execute(</span>
                 engine,
-<span class="fc" id="L118">                FactorizationRequest.verifiedDecomposition(</span>
-<span class="fc" id="L119">                    view.polynomial(),</span>
+<span class="fc" id="L125">                FactorizationRequest.verifiedDecomposition(</span>
+<span class="fc" id="L126">                    view.polynomial(),</span>
+                    DEFAULT_STRUCTURAL_LIMITS,
                     maxCandidates,
                     maxWorkUnits));
-<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (!factorization.successful()) {</span>
-<span class="fc" id="L123">            return ExpressionFactorizationReport.coreFailure(</span>
-<span class="fc" id="L124">                statusFor(factorization.status()),</span>
-<span class="fc" id="L125">                analysis.status(),</span>
-<span class="fc" id="L126">                view.canonicalMaterial(),</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (!factorization.successful()) {</span>
+<span class="fc" id="L131">            return ExpressionFactorizationReport.coreFailure(</span>
+<span class="fc" id="L132">                statusFor(factorization.status()),</span>
+<span class="fc" id="L133">                analysis.status(),</span>
+<span class="fc" id="L134">                view.canonicalMaterial(),</span>
                 factorization);
         }
 
-<span class="fc" id="L130">        PolynomialSemanticView.PolynomialView renderedView = view;</span>
-<span class="fc" id="L131">        FactorizationVerifier.Report&lt;BigInteger&gt; verifiedReport =</span>
+<span class="fc" id="L138">        PolynomialSemanticView.PolynomialView renderedView = view;</span>
+<span class="fc" id="L139">        FactorizationVerifier.Report&lt;BigInteger&gt; verifiedReport =</span>
             factorization;
-<span class="fc" id="L133">        List&lt;ExpressionFactorizationReport.RenderedFactorization&gt; candidates =</span>
-<span class="fc" id="L134">            factorization.candidates().stream()</span>
-<span class="fc" id="L135">                .map(candidate -&gt; render(</span>
+<span class="fc" id="L141">        List&lt;ExpressionFactorizationReport.RenderedFactorization&gt; candidates =</span>
+<span class="fc" id="L142">            factorization.candidates().stream()</span>
+<span class="fc" id="L143">                .map(candidate -&gt; render(</span>
                     candidate,
                     renderedView,
                     verifiedReport))
-<span class="fc" id="L139">                .toList();</span>
-<span class="fc" id="L140">        return new ExpressionFactorizationReport(</span>
+<span class="fc" id="L147">                .toList();</span>
+<span class="fc" id="L148">        return new ExpressionFactorizationReport(</span>
             ExpressionFactorizationReport.Status.GENERATED,
-<span class="fc" id="L142">            factorization.detailCode(),</span>
-<span class="fc" id="L143">            analysis.status(),</span>
-<span class="fc" id="L144">            view.canonicalMaterial(),</span>
-<span class="fc" id="L145">            factorization.work(),</span>
-<span class="fc" id="L146">            factorization.claimStrength(),</span>
-<span class="fc" id="L147">            factorization.verificationHash(),</span>
+<span class="fc" id="L150">            factorization.detailCode(),</span>
+<span class="fc" id="L151">            analysis.status(),</span>
+<span class="fc" id="L152">            view.canonicalMaterial(),</span>
+<span class="fc" id="L153">            factorization.work(),</span>
+<span class="fc" id="L154">            factorization.claimStrength(),</span>
+<span class="fc" id="L155">            factorization.verificationHash(),</span>
             candidates);
     }
 
@@ -153,36 +161,36 @@ public final class PolynomialDecompositionSynthesisOperator
         PolynomialSemanticView.PolynomialView view,
         FactorizationVerifier.Report&lt;BigInteger&gt; report
     ) {
-<span class="fc" id="L156">        List&lt;String&gt; multiplicands = new ArrayList&lt;&gt;();</span>
-<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (!candidate.unit().equals(BigInteger.ONE)) {</span>
-<span class="nc" id="L158">            multiplicands.add(candidate.unit().toString());</span>
+<span class="fc" id="L164">        List&lt;String&gt; multiplicands = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (!candidate.unit().equals(BigInteger.ONE)) {</span>
+<span class="nc" id="L166">            multiplicands.add(candidate.unit().toString());</span>
         }
-<span class="fc bfc" id="L160" title="All 2 branches covered.">        for (PolynomialFactor&lt;BigInteger&gt; factor : candidate.factors()) {</span>
-<span class="fc" id="L161">            String rendered = parenthesize(</span>
-<span class="fc" id="L162">                renderPolynomial(factor.polynomial(), view));</span>
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            multiplicands.add(factor.multiplicity() == 1</span>
-<span class="fc" id="L164">                ? rendered</span>
-<span class="nc" id="L165">                : rendered + &quot; ^ &quot; + factor.multiplicity());</span>
-<span class="fc" id="L166">        }</span>
-<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (!candidate.unresolvedRemainder().isOne()) {</span>
-<span class="nc" id="L168">            multiplicands.add(parenthesize(renderPolynomial(</span>
-<span class="nc" id="L169">                candidate.unresolvedRemainder(),</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        for (PolynomialFactor&lt;BigInteger&gt; factor : candidate.factors()) {</span>
+<span class="fc" id="L169">            String rendered = parenthesize(</span>
+<span class="fc" id="L170">                renderPolynomial(factor.polynomial(), view));</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            multiplicands.add(factor.multiplicity() == 1</span>
+<span class="fc" id="L172">                ? rendered</span>
+<span class="nc" id="L173">                : rendered + &quot; ^ &quot; + factor.multiplicity());</span>
+<span class="fc" id="L174">        }</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (!candidate.unresolvedRemainder().isOne()) {</span>
+<span class="nc" id="L176">            multiplicands.add(parenthesize(renderPolynomial(</span>
+<span class="nc" id="L177">                candidate.unresolvedRemainder(),</span>
                 view)));
         }
-<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (multiplicands.isEmpty()) {</span>
-<span class="nc" id="L173">            throw new IllegalStateException(</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (multiplicands.isEmpty()) {</span>
+<span class="nc" id="L181">            throw new IllegalStateException(</span>
                 &quot;factorization candidate rendered no expression&quot;);
         }
-<span class="fc" id="L176">        String transformed = String.join(&quot; * &quot;, multiplicands);</span>
-<span class="fc" id="L177">        String applicationKey = RULE_ID</span>
+<span class="fc" id="L184">        String transformed = String.join(&quot; * &quot;, multiplicands);</span>
+<span class="fc" id="L185">        String applicationKey = RULE_ID</span>
             + &quot;|method=&quot; + METHOD_ID
             + &quot;|engineCertificate=&quot;
-<span class="fc" id="L180">            + candidate.engineCertificateHash()</span>
+<span class="fc" id="L188">            + candidate.engineCertificateHash()</span>
             + &quot;|verificationCertificate=&quot;
-<span class="fc" id="L182">            + candidate.verificationCertificateHash()</span>
-<span class="fc" id="L183">            + &quot;|report=&quot; + report.verificationHash()</span>
-<span class="fc" id="L184">            + &quot;|work=&quot; + report.work().totalWorkUnits();</span>
-<span class="fc" id="L185">        return new ExpressionFactorizationReport.RenderedFactorization(</span>
+<span class="fc" id="L190">            + candidate.verificationCertificateHash()</span>
+<span class="fc" id="L191">            + &quot;|report=&quot; + report.verificationHash()</span>
+<span class="fc" id="L192">            + &quot;|work=&quot; + report.work().totalWorkUnits();</span>
+<span class="fc" id="L193">        return new ExpressionFactorizationReport.RenderedFactorization(</span>
             transformed,
             candidate,
             applicationKey);
@@ -192,35 +200,35 @@ public final class PolynomialDecompositionSynthesisOperator
         SparsePolynomial&lt;BigInteger&gt; polynomial,
         PolynomialSemanticView.PolynomialView view
     ) {
-<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (!polynomial.ring().equals(view.polynomial().ring())) {</span>
-<span class="nc" id="L196">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (!polynomial.ring().equals(view.polynomial().ring())) {</span>
+<span class="nc" id="L204">            throw new IllegalArgumentException(</span>
                 &quot;rendered polynomial ring does not match structural atoms&quot;);
         }
-<span class="fc" id="L199">        StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L207">        StringBuilder result = new StringBuilder();</span>
         for (Map.Entry&lt;Monomial, BigInteger&gt; term
-<span class="fc bfc" id="L201" title="All 2 branches covered.">                : polynomial.terms().entrySet()) {</span>
-<span class="fc" id="L202">            BigInteger coefficient = term.getValue();</span>
-<span class="fc" id="L203">            String unsigned = renderUnsignedTerm(</span>
-<span class="fc" id="L204">                coefficient.abs(),</span>
-<span class="fc" id="L205">                term.getKey(),</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                : polynomial.terms().entrySet()) {</span>
+<span class="fc" id="L210">            BigInteger coefficient = term.getValue();</span>
+<span class="fc" id="L211">            String unsigned = renderUnsignedTerm(</span>
+<span class="fc" id="L212">                coefficient.abs(),</span>
+<span class="fc" id="L213">                term.getKey(),</span>
                 view);
-<span class="fc bfc" id="L207" title="All 2 branches covered.">            if (result.isEmpty()) {</span>
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                if (coefficient.signum() &lt; 0) {</span>
-<span class="nc" id="L209">                    result.append('-');</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            if (result.isEmpty()) {</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                if (coefficient.signum() &lt; 0) {</span>
+<span class="nc" id="L217">                    result.append('-');</span>
                 }
-<span class="fc" id="L211">                result.append(unsigned);</span>
+<span class="fc" id="L219">                result.append(unsigned);</span>
             } else {
-<span class="fc bfc" id="L213" title="All 2 branches covered.">                result.append(coefficient.signum() &lt; 0</span>
-<span class="fc" id="L214">                    ? &quot; - &quot;</span>
-<span class="fc" id="L215">                    : &quot; + &quot;);</span>
-<span class="fc" id="L216">                result.append(unsigned);</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">                result.append(coefficient.signum() &lt; 0</span>
+<span class="fc" id="L222">                    ? &quot; - &quot;</span>
+<span class="fc" id="L223">                    : &quot; + &quot;);</span>
+<span class="fc" id="L224">                result.append(unsigned);</span>
             }
-<span class="fc" id="L218">        }</span>
-<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (result.isEmpty()) {</span>
-<span class="nc" id="L220">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L226">        }</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (result.isEmpty()) {</span>
+<span class="nc" id="L228">            throw new IllegalArgumentException(</span>
                 &quot;zero polynomial cannot be rendered as a factor&quot;);
         }
-<span class="fc" id="L223">        return result.toString();</span>
+<span class="fc" id="L231">        return result.toString();</span>
     }
 
     private String renderUnsignedTerm(
@@ -228,55 +236,55 @@ public final class PolynomialDecompositionSynthesisOperator
         Monomial monomial,
         PolynomialSemanticView.PolynomialView view
     ) {
-<span class="fc" id="L231">        String renderedMonomial = renderMonomial(monomial, view);</span>
-<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (&quot;1&quot;.equals(renderedMonomial)) {</span>
-<span class="fc" id="L233">            return coefficient.toString();</span>
+<span class="fc" id="L239">        String renderedMonomial = renderMonomial(monomial, view);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (&quot;1&quot;.equals(renderedMonomial)) {</span>
+<span class="fc" id="L241">            return coefficient.toString();</span>
         }
-<span class="fc bfc" id="L235" title="All 2 branches covered.">        return coefficient.equals(BigInteger.ONE)</span>
-<span class="fc" id="L236">            ? renderedMonomial</span>
-<span class="fc" id="L237">            : coefficient + &quot; * &quot; + renderedMonomial;</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        return coefficient.equals(BigInteger.ONE)</span>
+<span class="fc" id="L244">            ? renderedMonomial</span>
+<span class="fc" id="L245">            : coefficient + &quot; * &quot; + renderedMonomial;</span>
     }
 
     private String renderMonomial(
         Monomial monomial,
         PolynomialSemanticView.PolynomialView view
     ) {
-<span class="fc" id="L244">        List&lt;String&gt; factors = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L245" title="All 2 branches covered.">        for (int index = 0; index &lt; monomial.arity(); index++) {</span>
-<span class="fc" id="L246">            int exponent = monomial.exponent(index);</span>
-<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (exponent == 0) {</span>
-<span class="fc" id="L248">                continue;</span>
+<span class="fc" id="L252">        List&lt;String&gt; factors = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        for (int index = 0; index &lt; monomial.arity(); index++) {</span>
+<span class="fc" id="L254">            int exponent = monomial.exponent(index);</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (exponent == 0) {</span>
+<span class="fc" id="L256">                continue;</span>
             }
-<span class="fc" id="L250">            PolynomialSemanticView.StructuralAtom atom = view.atom(index);</span>
-<span class="fc bfc" id="L251" title="All 2 branches covered.">            if (atom.structuralUnit()) {</span>
-<span class="fc" id="L252">                continue;</span>
+<span class="fc" id="L258">            PolynomialSemanticView.StructuralAtom atom = view.atom(index);</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            if (atom.structuralUnit()) {</span>
+<span class="fc" id="L260">                continue;</span>
             }
-<span class="fc" id="L254">            String factor = parenthesize(atom.display());</span>
-<span class="fc bfc" id="L255" title="All 2 branches covered.">            factors.add(exponent == 1</span>
-<span class="fc" id="L256">                ? factor</span>
-<span class="fc" id="L257">                : factor + &quot; ^ &quot; + exponent);</span>
+<span class="fc" id="L262">            String factor = parenthesize(atom.display());</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            factors.add(exponent == 1</span>
+<span class="fc" id="L264">                ? factor</span>
+<span class="fc" id="L265">                : factor + &quot; ^ &quot; + exponent);</span>
         }
-<span class="fc bfc" id="L259" title="All 2 branches covered.">        return factors.isEmpty()</span>
-<span class="fc" id="L260">            ? &quot;1&quot;</span>
-<span class="fc" id="L261">            : String.join(&quot; * &quot;, factors);</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        return factors.isEmpty()</span>
+<span class="fc" id="L268">            ? &quot;1&quot;</span>
+<span class="fc" id="L269">            : String.join(&quot; * &quot;, factors);</span>
     }
 
     private static String parenthesize(String expression) {
-<span class="fc" id="L265">        return &quot;(&quot; + expression + &quot;)&quot;;</span>
+<span class="fc" id="L273">        return &quot;(&quot; + expression + &quot;)&quot;;</span>
     }
 
     private static ExpressionFactorizationReport.Status statusFor(
         PolynomialSemanticView.Status status
     ) {
-<span class="pc bpc" id="L271" title="3 of 4 branches missed.">        return switch (status) {</span>
+<span class="pc bpc" id="L279" title="3 of 4 branches missed.">        return switch (status) {</span>
             case PARSE_ERROR -&gt;
-<span class="nc" id="L273">                ExpressionFactorizationReport.Status.PARSE_ERROR;</span>
+<span class="nc" id="L281">                ExpressionFactorizationReport.Status.PARSE_ERROR;</span>
             case UNSUPPORTED -&gt;
-<span class="fc" id="L275">                ExpressionFactorizationReport.Status</span>
+<span class="fc" id="L283">                ExpressionFactorizationReport.Status</span>
                     .UNSUPPORTED_SEMANTIC_VIEW;
             case BUDGET_EXCEEDED -&gt;
-<span class="nc" id="L278">                ExpressionFactorizationReport.Status.BUDGET_INCONCLUSIVE;</span>
-<span class="nc" id="L279">            case SUPPORTED -&gt; throw new IllegalArgumentException(</span>
+<span class="nc" id="L286">                ExpressionFactorizationReport.Status.BUDGET_INCONCLUSIVE;</span>
+<span class="nc" id="L287">            case SUPPORTED -&gt; throw new IllegalArgumentException(</span>
                 &quot;supported semantic view has no failure status&quot;);
         };
     }
@@ -284,22 +292,22 @@ public final class PolynomialDecompositionSynthesisOperator
     private static ExpressionFactorizationReport.Status statusFor(
         FactorizationVerifier.Status status
     ) {
-<span class="pc bpc" id="L287" title="3 of 6 branches missed.">        return switch (status) {</span>
+<span class="pc bpc" id="L295" title="3 of 6 branches missed.">        return switch (status) {</span>
             case COMPLETE_FACTORIZATION,
                 PARTIAL_FACTORIZATION -&gt;
-<span class="nc" id="L290">                    ExpressionFactorizationReport.Status.GENERATED;</span>
+<span class="nc" id="L298">                    ExpressionFactorizationReport.Status.GENERATED;</span>
             case IRREDUCIBLE -&gt;
-<span class="nc" id="L292">                ExpressionFactorizationReport.Status.IRREDUCIBLE;</span>
+<span class="nc" id="L300">                ExpressionFactorizationReport.Status.IRREDUCIBLE;</span>
             case NO_FACTORIZATION_FOUND -&gt;
-<span class="fc" id="L294">                ExpressionFactorizationReport.Status.NO_FACTORIZATION_FOUND;</span>
+<span class="fc" id="L302">                ExpressionFactorizationReport.Status.NO_FACTORIZATION_FOUND;</span>
             case UNSUPPORTED_DOMAIN,
                 UNSUPPORTED_REQUEST -&gt;
-<span class="fc" id="L297">                    ExpressionFactorizationReport.Status</span>
+<span class="fc" id="L305">                    ExpressionFactorizationReport.Status</span>
                         .UNSUPPORTED_FACTORIZATION_REQUEST;
             case BUDGET_INCONCLUSIVE -&gt;
-<span class="fc" id="L300">                ExpressionFactorizationReport.Status.BUDGET_INCONCLUSIVE;</span>
+<span class="fc" id="L308">                ExpressionFactorizationReport.Status.BUDGET_INCONCLUSIVE;</span>
             case TECHNICAL_FAILURE -&gt;
-<span class="nc" id="L302">                ExpressionFactorizationReport.Status.TECHNICAL_FAILURE;</span>
+<span class="nc" id="L310">                ExpressionFactorizationReport.Status.TECHNICAL_FAILURE;</span>
         };
     }
 }

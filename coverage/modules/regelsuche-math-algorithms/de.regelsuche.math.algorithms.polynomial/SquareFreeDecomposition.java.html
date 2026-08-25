@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SquareFreeDecomposition.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">SquareFreeDecomposition.java</span></div><h1>SquareFreeDecomposition.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.CoefficientDomain;
+import de.regelsuche.polynomial.ExactField;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Exact characteristic-zero square-free decomposition with multiplicities.
+ *
+ * &lt;p&gt;This stage separates repeated factors. It does not claim that the
+ * square-free factors are irreducible.&lt;/p&gt;
+ */
+public final class SquareFreeDecomposition {
+    public static final String METHOD_ID =
+        &quot;regelsuche.square-free-decomposition.char-zero/v1&quot;;
+
+    private SquareFreeDecomposition() {
+    }
+
+    public static &lt;C&gt; Result&lt;C&gt; decompose(
+        SparsePolynomial&lt;C&gt; source,
+        FactorizationRequest.StructuralLimits structuralLimits,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L32">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L33">        Objects.requireNonNull(</span>
+            structuralLimits,
+            &quot;structuralLimits&quot;);
+<span class="fc" id="L36">        String violation = structuralLimits.firstViolation(source)</span>
+<span class="fc" id="L37">            .orElse(null);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (violation != null) {</span>
+<span class="fc" id="L39">            return Result.failure(</span>
+                Status.BUDGET_INCONCLUSIVE,
+                violation,
+<span class="fc" id="L42">                PolynomialWorkLedger.empty(),</span>
+                source,
+                structuralLimits);
+        }
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (source.ring().variableCount() != 1</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                || source.isConstant()) {</span>
+<span class="nc" id="L48">            return Result.failure(</span>
+                Status.UNSUPPORTED_SHAPE,
+                &quot;REQUIRES_NONCONSTANT_UNIVARIATE_POLYNOMIAL&quot;,
+<span class="nc" id="L51">                PolynomialWorkLedger.empty(),</span>
+                source,
+                structuralLimits);
+        }
+<span class="fc" id="L55">        if (source.ring().coefficientDomain()</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                .characteristic().signum() != 0) {</span>
+<span class="nc" id="L57">            return Result.failure(</span>
+                Status.UNSUPPORTED_DOMAIN,
+                &quot;REQUIRES_CHARACTERISTIC_ZERO&quot;,
+<span class="nc" id="L60">                PolynomialWorkLedger.empty(),</span>
+                source,
+                structuralLimits);
+        }
+<span class="fc" id="L64">        ExactField&lt;C&gt; field =</span>
+<span class="fc" id="L65">            UnivariatePolynomialAlgorithms.exactField(source.ring());</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (field == null) {</span>
+<span class="fc" id="L67">            return Result.failure(</span>
+                Status.UNSUPPORTED_DOMAIN,
+                &quot;REQUIRES_EXACT_COEFFICIENT_FIELD&quot;,
+<span class="fc" id="L70">                PolynomialWorkLedger.empty(),</span>
+                source,
+                structuralLimits);
+        }
+
+<span class="fc" id="L75">        PolynomialWorkBudget work =</span>
+            new PolynomialWorkBudget(maxWorkUnits);
+        try {
+<span class="fc" id="L78">            return completed(</span>
+                source,
+                structuralLimits,
+                field,
+                work);
+<span class="fc" id="L83">        } catch (PolynomialWorkBudget.LimitReached exception) {</span>
+<span class="fc" id="L84">            return Result.failure(</span>
+                Status.BUDGET_INCONCLUSIVE,
+                &quot;SQUARE_FREE_WORK_BUDGET_EXCEEDED&quot;,
+<span class="fc" id="L87">                work.ledger(),</span>
+                source,
+                structuralLimits);
+<span class="nc" id="L90">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L91">            return Result.failure(</span>
+                Status.TECHNICAL_FAILURE,
+                &quot;SQUARE_FREE_EXACT_DIVISION_FAILED&quot;,
+<span class="nc" id="L94">                work.ledger(),</span>
+                source,
+                structuralLimits);
+<span class="nc" id="L97">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L98">            return Result.failure(</span>
+                Status.TECHNICAL_FAILURE,
+                &quot;SQUARE_FREE_&quot;
+<span class="nc" id="L101">                    + exception.getClass().getSimpleName()</span>
+<span class="nc" id="L102">                        .toUpperCase(java.util.Locale.ROOT),</span>
+<span class="nc" id="L103">                work.ledger(),</span>
+                source,
+                structuralLimits);
+        }
+    }
+
+    private static &lt;C&gt; Result&lt;C&gt; completed(
+        SparsePolynomial&lt;C&gt; source,
+        FactorizationRequest.StructuralLimits structuralLimits,
+        ExactField&lt;C&gt; field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L115">        UnivariatePolynomialView&lt;C&gt; original =</span>
+<span class="fc" id="L116">            UnivariatePolynomialView.from(source);</span>
+<span class="fc" id="L117">        C unit = original.leadingCoefficient();</span>
+<span class="fc" id="L118">        work.consume(&quot;square-free.leading-normalization&quot;, 1);</span>
+<span class="fc" id="L119">        UnivariatePolynomialView&lt;C&gt; monic = original.scale(</span>
+<span class="fc" id="L120">            field.divide(field.one(), unit),</span>
+            work,
+            &quot;square-free.leading-normalization&quot;);
+<span class="fc" id="L123">        UnivariatePolynomialView&lt;C&gt; derivative = monic.derivative(</span>
+            work,
+            &quot;square-free.derivative&quot;);
+
+<span class="fc" id="L127">        UnivariatePolynomialView&lt;C&gt; repeated =</span>
+<span class="fc" id="L128">            UnivariatePolynomialAlgorithms.gcd(</span>
+                monic,
+                derivative,
+                field,
+                work,
+                &quot;square-free.initial-gcd&quot;);
+<span class="fc" id="L134">        UnivariatePolynomialView&lt;C&gt; current =</span>
+<span class="fc" id="L135">            UnivariatePolynomialAlgorithms.exactQuotient(</span>
+                monic,
+                repeated,
+                field,
+                work,
+                &quot;square-free.initial-quotient&quot;);
+
+<span class="fc" id="L142">        List&lt;PolynomialFactor&lt;C&gt;&gt; factors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L143">        int multiplicity = 1;</span>
+<span class="fc" id="L144">        int maximumMultiplicity = monic.degree();</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        while (!current.isOne()) {</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            if (multiplicity &gt; maximumMultiplicity) {</span>
+<span class="nc" id="L147">                throw new IllegalStateException(</span>
+                    &quot;square-free multiplicity exceeded source degree&quot;);
+            }
+<span class="fc" id="L150">            UnivariatePolynomialView&lt;C&gt; shared =</span>
+<span class="fc" id="L151">                UnivariatePolynomialAlgorithms.gcd(</span>
+                    current,
+                    repeated,
+                    field,
+                    work,
+                    &quot;square-free.layer-&quot; + multiplicity + &quot;.gcd&quot;);
+<span class="fc" id="L157">            UnivariatePolynomialView&lt;C&gt; layer =</span>
+<span class="fc" id="L158">                UnivariatePolynomialAlgorithms.exactQuotient(</span>
+                    current,
+                    shared,
+                    field,
+                    work,
+                    &quot;square-free.layer-&quot; + multiplicity + &quot;.factor&quot;);
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            if (!layer.isOne()) {</span>
+<span class="fc" id="L165">                factors.add(new PolynomialFactor&lt;&gt;(</span>
+<span class="fc" id="L166">                    layer.toSparsePolynomial(),</span>
+                    multiplicity));
+            }
+<span class="fc" id="L169">            current = shared;</span>
+<span class="fc" id="L170">            repeated = UnivariatePolynomialAlgorithms.exactQuotient(</span>
+                repeated,
+                shared,
+                field,
+                work,
+                &quot;square-free.layer-&quot; + multiplicity + &quot;.remainder&quot;);
+<span class="fc" id="L176">            multiplicity++;</span>
+<span class="fc" id="L177">        }</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (!repeated.isOne()) {</span>
+<span class="nc" id="L179">            throw new IllegalStateException(</span>
+                &quot;characteristic-zero square-free remainder is not one&quot;);
+        }
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (factors.isEmpty()) {</span>
+<span class="nc" id="L183">            throw new IllegalStateException(</span>
+                &quot;nonconstant polynomial produced no square-free factor&quot;);
+        }
+
+<span class="fc" id="L187">        verifyReconstruction(</span>
+            original,
+            unit,
+            factors,
+            field,
+            work);
+<span class="fc" id="L193">        return Result.completed(</span>
+            unit,
+            factors,
+<span class="fc" id="L196">            work.ledger(),</span>
+            source,
+            structuralLimits);
+    }
+
+    private static &lt;C&gt; void verifyReconstruction(
+        UnivariatePolynomialView&lt;C&gt; source,
+        C unit,
+        List&lt;PolynomialFactor&lt;C&gt;&gt; factors,
+        ExactField&lt;C&gt; field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L208">        UnivariatePolynomialView&lt;C&gt; reconstructed =</span>
+<span class="fc" id="L209">            UnivariatePolynomialView.of(</span>
+<span class="fc" id="L210">                source.ring(),</span>
+<span class="fc" id="L211">                List.of(unit));</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        for (PolynomialFactor&lt;C&gt; factor : factors) {</span>
+<span class="fc" id="L213">            UnivariatePolynomialView&lt;C&gt; powered = power(</span>
+<span class="fc" id="L214">                UnivariatePolynomialView.from(factor.polynomial()),</span>
+<span class="fc" id="L215">                factor.multiplicity(),</span>
+                work,
+                &quot;square-free.verify.factor-power&quot;);
+<span class="fc" id="L218">            reconstructed = reconstructed.multiply(</span>
+                powered,
+                work,
+                &quot;square-free.verify.product&quot;);
+<span class="fc" id="L222">        }</span>
+<span class="fc" id="L223">        work.consume(&quot;square-free.verify.comparison&quot;, 1);</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (!source.equals(reconstructed)) {</span>
+<span class="nc" id="L225">            throw new IllegalStateException(</span>
+                &quot;square-free factors do not reconstruct the source&quot;);
+        }
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        for (PolynomialFactor&lt;C&gt; factor : factors) {</span>
+<span class="fc" id="L229">            UnivariatePolynomialView&lt;C&gt; polynomial =</span>
+<span class="fc" id="L230">                UnivariatePolynomialView.from(factor.polynomial());</span>
+<span class="fc" id="L231">            UnivariatePolynomialView&lt;C&gt; gcd =</span>
+<span class="fc" id="L232">                UnivariatePolynomialAlgorithms.gcd(</span>
+                    polynomial,
+<span class="fc" id="L234">                    polynomial.derivative(</span>
+                        work,
+                        &quot;square-free.verify.derivative&quot;),
+                    field,
+                    work,
+                    &quot;square-free.verify.gcd&quot;);
+<span class="fc" id="L240">            work.consume(&quot;square-free.verify.square-free-comparison&quot;, 1);</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            if (!gcd.isOne()) {</span>
+<span class="nc" id="L242">                throw new IllegalStateException(</span>
+                    &quot;reported factor is not square-free&quot;);
+            }
+<span class="fc" id="L245">        }</span>
+<span class="fc" id="L246">    }</span>
+
+    private static &lt;C&gt; UnivariatePolynomialView&lt;C&gt; power(
+        UnivariatePolynomialView&lt;C&gt; base,
+        int exponent,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L254">        UnivariatePolynomialView&lt;C&gt; result =</span>
+<span class="fc" id="L255">            UnivariatePolynomialView.one(base.ring());</span>
+<span class="fc" id="L256">        UnivariatePolynomialView&lt;C&gt; factor = base;</span>
+<span class="fc" id="L257">        int remaining = exponent;</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            if ((remaining &amp; 1) == 1) {</span>
+<span class="fc" id="L260">                result = result.multiply(</span>
+                    factor,
+                    work,
+                    stage + &quot;.multiply&quot;);
+            }
+<span class="fc" id="L265">            remaining &gt;&gt;&gt;= 1;</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (remaining &gt; 0) {</span>
+<span class="fc" id="L267">                factor = factor.multiply(</span>
+                    factor,
+                    work,
+                    stage + &quot;.square&quot;);
+            }
+        }
+<span class="fc" id="L273">        return result;</span>
+    }
+
+<span class="fc" id="L276">    public enum Status {</span>
+<span class="fc" id="L277">        COMPLETED,</span>
+<span class="fc" id="L278">        UNSUPPORTED_DOMAIN,</span>
+<span class="fc" id="L279">        UNSUPPORTED_SHAPE,</span>
+<span class="fc" id="L280">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L281">        TECHNICAL_FAILURE</span>
+    }
+
+    /** Issuer-owned exact square-free decomposition evidence. */
+    public static final class Result&lt;C&gt; {
+        private final State&lt;C&gt; state;
+
+        private Result(
+            Status status,
+            String detailCode,
+            C unit,
+            List&lt;PolynomialFactor&lt;C&gt;&gt; factors,
+            PolynomialWorkLedger work,
+            String certificateHash
+<span class="fc" id="L295">        ) {</span>
+<span class="fc" id="L296">            state = new State&lt;&gt;(</span>
+                status,
+                detailCode,
+                unit,
+                factors,
+                work,
+                certificateHash);
+<span class="fc" id="L303">        }</span>
+
+        private static &lt;C&gt; Result&lt;C&gt; completed(
+            C unit,
+            List&lt;PolynomialFactor&lt;C&gt;&gt; factors,
+            PolynomialWorkLedger work,
+            SparsePolynomial&lt;C&gt; source,
+            FactorizationRequest.StructuralLimits limits
+        ) {
+<span class="fc" id="L312">            return create(</span>
+                Status.COMPLETED,
+                &quot;SQUARE_FREE_DECOMPOSITION_VERIFIED&quot;,
+                unit,
+                factors,
+                work,
+                source,
+                limits);
+        }
+
+        private static &lt;C&gt; Result&lt;C&gt; failure(
+            Status status,
+            String detailCode,
+            PolynomialWorkLedger work,
+            SparsePolynomial&lt;C&gt; source,
+            FactorizationRequest.StructuralLimits limits
+        ) {
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">            if (status == Status.COMPLETED) {</span>
+<span class="nc" id="L330">                throw new IllegalArgumentException(</span>
+                    &quot;completed status requires decomposition&quot;);
+            }
+<span class="fc" id="L333">            return create(</span>
+                status,
+                detailCode,
+                null,
+<span class="fc" id="L337">                List.of(),</span>
+                work,
+                source,
+                limits);
+        }
+
+        private static &lt;C&gt; Result&lt;C&gt; create(
+            Status status,
+            String detailCode,
+            C unit,
+            List&lt;PolynomialFactor&lt;C&gt;&gt; factors,
+            PolynomialWorkLedger work,
+            SparsePolynomial&lt;C&gt; source,
+            FactorizationRequest.StructuralLimits limits
+        ) {
+<span class="fc" id="L352">            StringBuilder material = new StringBuilder(METHOD_ID);</span>
+<span class="fc" id="L353">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L355">                source.canonicalMaterial());</span>
+<span class="fc" id="L356">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L358">                limits.canonicalMaterial());</span>
+<span class="fc" id="L359">            AlgorithmEvidence.append(material, status.name());</span>
+<span class="fc" id="L360">            AlgorithmEvidence.append(material, detailCode);</span>
+<span class="fc" id="L361">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L363">                work.canonicalMaterial());</span>
+<span class="fc" id="L364">            CoefficientDomain&lt;C&gt; domain =</span>
+<span class="fc" id="L365">                source.ring().coefficientDomain();</span>
+<span class="fc" id="L366">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc bfc" id="L368" title="All 2 branches covered.">                unit == null ? &quot;&quot; : domain.canonicalText(unit));</span>
+<span class="fc" id="L369">            factors.forEach(factor -&gt; {</span>
+<span class="fc" id="L370">                AlgorithmEvidence.append(</span>
+                    material,
+<span class="fc" id="L372">                    Integer.toString(factor.multiplicity()));</span>
+<span class="fc" id="L373">                AlgorithmEvidence.append(</span>
+                    material,
+<span class="fc" id="L375">                    factor.polynomial().canonicalMaterial());</span>
+<span class="fc" id="L376">            });</span>
+<span class="fc" id="L377">            return new Result&lt;&gt;(</span>
+                status,
+                detailCode,
+                unit,
+                factors,
+                work,
+<span class="fc" id="L383">                AlgorithmEvidence.sha256(material.toString()));</span>
+        }
+
+        public Status status() {
+<span class="fc" id="L387">            return state.status();</span>
+        }
+
+        public String detailCode() {
+<span class="fc" id="L391">            return state.detailCode();</span>
+        }
+
+        public C unit() {
+<span class="fc" id="L395">            requireCompleted();</span>
+<span class="fc" id="L396">            return state.unit();</span>
+        }
+
+        public List&lt;PolynomialFactor&lt;C&gt;&gt; factors() {
+<span class="fc" id="L400">            return state.factors();</span>
+        }
+
+        public PolynomialWorkLedger work() {
+<span class="fc" id="L404">            return state.work();</span>
+        }
+
+        public String certificateHash() {
+<span class="fc" id="L408">            return state.certificateHash();</span>
+        }
+
+        public boolean completed() {
+<span class="fc bfc" id="L412" title="All 2 branches covered.">            return status() == Status.COMPLETED;</span>
+        }
+
+        private void requireCompleted() {
+<span class="fc bfc" id="L416" title="All 2 branches covered.">            if (!completed()) {</span>
+<span class="fc" id="L417">                throw new IllegalStateException(</span>
+                    &quot;failed square-free result has no unit&quot;);
+            }
+<span class="fc" id="L420">        }</span>
+
+        @Override
+        public boolean equals(Object other) {
+<span class="fc" id="L424">            return this == other</span>
+<span class="pc bpc" id="L425" title="2 of 4 branches missed.">                || other instanceof Result&lt;?&gt; result</span>
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">                    &amp;&amp; state.equals(result.state);</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L431">            return state.hashCode();</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="fc" id="L436">            return &quot;SquareFreeResult[&quot; + state + ']';</span>
+        }
+
+        private record State&lt;C&gt;(
+            Status status,
+            String detailCode,
+            C unit,
+            List&lt;PolynomialFactor&lt;C&gt;&gt; factors,
+            PolynomialWorkLedger work,
+            String certificateHash
+        ) {
+<span class="fc" id="L447">            private State {</span>
+<span class="fc" id="L448">                Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">                if (detailCode == null</span>
+<span class="pc bpc" id="L450" title="3 of 6 branches missed.">                        || detailCode.isBlank()</span>
+                        || work == null
+                        || certificateHash == null
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">                        || !certificateHash.matches(</span>
+                            &quot;sha256:[0-9a-f]{64}&quot;)) {
+<span class="nc" id="L455">                    throw new IllegalArgumentException(</span>
+                        &quot;square-free result is invalid&quot;);
+                }
+<span class="fc" id="L458">                factors = List.copyOf(factors);</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">                if (status == Status.COMPLETED) {</span>
+<span class="fc" id="L460">                    Objects.requireNonNull(unit, &quot;unit&quot;);</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">                    if (factors.isEmpty()) {</span>
+<span class="nc" id="L462">                        throw new IllegalArgumentException(</span>
+                            &quot;completed square-free result requires factors&quot;);
+                    }
+<span class="pc bpc" id="L465" title="2 of 4 branches missed.">                } else if (unit != null || !factors.isEmpty()) {</span>
+<span class="nc" id="L466">                    throw new IllegalArgumentException(</span>
+                        &quot;failed square-free result cannot expose factors&quot;);
+                }
+<span class="fc" id="L469">            }</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -19,53 +19,63 @@ public final class BigIntegerDomain implements GcdDomain&lt;BigInteger&gt; {
     }
 
     @Override
+    public BigInteger characteristic() {
+<span class="nc" id="L23">        return BigInteger.ZERO;</span>
+    }
+
+    @Override
+    public BigInteger fromInteger(BigInteger value) {
+<span class="nc" id="L28">        return canonical(value);</span>
+    }
+
+    @Override
     public BigInteger zero() {
-<span class="fc" id="L23">        return BigInteger.ZERO;</span>
+<span class="fc" id="L33">        return BigInteger.ZERO;</span>
     }
 
     @Override
     public BigInteger one() {
-<span class="fc" id="L28">        return BigInteger.ONE;</span>
+<span class="fc" id="L38">        return BigInteger.ONE;</span>
     }
 
     @Override
     public BigInteger canonical(BigInteger value) {
-<span class="fc" id="L33">        return Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L43">        return Objects.requireNonNull(value, &quot;value&quot;);</span>
     }
 
     @Override
     public BigInteger add(BigInteger left, BigInteger right) {
-<span class="fc" id="L38">        return canonical(left).add(canonical(right));</span>
+<span class="fc" id="L48">        return canonical(left).add(canonical(right));</span>
     }
 
     @Override
     public BigInteger negate(BigInteger value) {
-<span class="fc" id="L43">        return canonical(value).negate();</span>
+<span class="fc" id="L53">        return canonical(value).negate();</span>
     }
 
     @Override
     public BigInteger multiply(BigInteger left, BigInteger right) {
-<span class="fc" id="L48">        return canonical(left).multiply(canonical(right));</span>
+<span class="fc" id="L58">        return canonical(left).multiply(canonical(right));</span>
     }
 
     @Override
     public boolean isZero(BigInteger value) {
-<span class="fc bfc" id="L53" title="All 2 branches covered.">        return canonical(value).signum() == 0;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        return canonical(value).signum() == 0;</span>
     }
 
     @Override
     public String canonicalText(BigInteger value) {
-<span class="fc" id="L58">        return canonical(value).toString();</span>
+<span class="fc" id="L68">        return canonical(value).toString();</span>
     }
 
     @Override
     public int bitLength(BigInteger value) {
-<span class="nc" id="L63">        return canonical(value).abs().bitLength();</span>
+<span class="fc" id="L73">        return canonical(value).abs().bitLength();</span>
     }
 
     @Override
     public BigInteger gcd(BigInteger left, BigInteger right) {
-<span class="nc" id="L68">        return canonical(left).abs().gcd(canonical(right).abs());</span>
+<span class="nc" id="L78">        return canonical(left).abs().gcd(canonical(right).abs());</span>
     }
 
     @Override
@@ -73,18 +83,18 @@ public final class BigIntegerDomain implements GcdDomain&lt;BigInteger&gt; {
         BigInteger dividend,
         BigInteger divisor
     ) {
-<span class="nc" id="L76">        BigInteger checkedDivisor = canonical(divisor);</span>
-<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (checkedDivisor.signum() == 0) {</span>
-<span class="nc" id="L78">            throw new ArithmeticException(</span>
+<span class="nc" id="L86">        BigInteger checkedDivisor = canonical(divisor);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (checkedDivisor.signum() == 0) {</span>
+<span class="nc" id="L88">            throw new ArithmeticException(</span>
                 &quot;integer exact division by zero&quot;);
         }
-<span class="nc" id="L81">        BigInteger[] quotientAndRemainder = canonical(dividend)</span>
-<span class="nc" id="L82">            .divideAndRemainder(checkedDivisor);</span>
-<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (quotientAndRemainder[1].signum() != 0) {</span>
-<span class="nc" id="L84">            throw new ArithmeticException(</span>
+<span class="nc" id="L91">        BigInteger[] quotientAndRemainder = canonical(dividend)</span>
+<span class="nc" id="L92">            .divideAndRemainder(checkedDivisor);</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (quotientAndRemainder[1].signum() != 0) {</span>
+<span class="nc" id="L94">            throw new ArithmeticException(</span>
                 &quot;integer division is not exact&quot;);
         }
-<span class="nc" id="L87">        return quotientAndRemainder[0];</span>
+<span class="nc" id="L97">        return quotientAndRemainder[0];</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

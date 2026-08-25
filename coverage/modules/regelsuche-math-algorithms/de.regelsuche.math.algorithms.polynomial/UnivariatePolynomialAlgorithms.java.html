@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnivariatePolynomialAlgorithms.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">UnivariatePolynomialAlgorithms.java</span></div><h1>UnivariatePolynomialAlgorithms.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.CoefficientDomain;
+import de.regelsuche.polynomial.ExactField;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.util.Objects;
+
+/** Exact, budgeted primitive algorithms over canonical univariate polynomials. */
+public final class UnivariatePolynomialAlgorithms {
+    public static final String GCD_METHOD_ID =
+        &quot;regelsuche.univariate-polynomial-gcd/v1&quot;;
+
+    private UnivariatePolynomialAlgorithms() {
+    }
+
+    public static &lt;C&gt; GcdResult&lt;C&gt; gcd(
+        SparsePolynomial&lt;C&gt; left,
+        SparsePolynomial&lt;C&gt; right,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L24">        Objects.requireNonNull(left, &quot;left&quot;);</span>
+<span class="fc" id="L25">        Objects.requireNonNull(right, &quot;right&quot;);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (!left.ring().equals(right.ring())) {</span>
+<span class="nc" id="L27">            return GcdResult.failure(</span>
+                Status.UNSUPPORTED_SHAPE,
+                &quot;POLYNOMIAL_RING_MISMATCH&quot;,
+<span class="nc" id="L30">                PolynomialWorkLedger.empty(),</span>
+                left,
+                right);
+        }
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (left.ring().variableCount() != 1) {</span>
+<span class="nc" id="L35">            return GcdResult.failure(</span>
+                Status.UNSUPPORTED_SHAPE,
+                &quot;REQUIRES_ONE_POLYNOMIAL_VARIABLE&quot;,
+<span class="nc" id="L38">                PolynomialWorkLedger.empty(),</span>
+                left,
+                right);
+        }
+<span class="pc bpc" id="L42" title="1 of 4 branches missed.">        if (left.isZero() &amp;&amp; right.isZero()) {</span>
+<span class="fc" id="L43">            return GcdResult.failure(</span>
+                Status.UNSUPPORTED_SHAPE,
+                &quot;GCD_ZERO_ZERO_UNDEFINED&quot;,
+<span class="fc" id="L46">                PolynomialWorkLedger.empty(),</span>
+                left,
+                right);
+        }
+<span class="fc" id="L50">        ExactField&lt;C&gt; field = exactField(left.ring());</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (field == null) {</span>
+<span class="fc" id="L52">            return GcdResult.failure(</span>
+                Status.UNSUPPORTED_DOMAIN,
+                &quot;REQUIRES_EXACT_COEFFICIENT_FIELD&quot;,
+<span class="fc" id="L55">                PolynomialWorkLedger.empty(),</span>
+                left,
+                right);
+        }
+
+<span class="fc" id="L60">        PolynomialWorkBudget work =</span>
+            new PolynomialWorkBudget(maxWorkUnits);
+        try {
+<span class="fc" id="L63">            UnivariatePolynomialView&lt;C&gt; result = gcd(</span>
+<span class="fc" id="L64">                UnivariatePolynomialView.from(left),</span>
+<span class="fc" id="L65">                UnivariatePolynomialView.from(right),</span>
+                field,
+                work,
+                &quot;gcd&quot;);
+<span class="fc" id="L69">            return GcdResult.completed(</span>
+<span class="fc" id="L70">                result.toSparsePolynomial(),</span>
+<span class="fc" id="L71">                work.ledger(),</span>
+                left,
+                right);
+<span class="fc" id="L74">        } catch (PolynomialWorkBudget.LimitReached exception) {</span>
+<span class="fc" id="L75">            return GcdResult.failure(</span>
+                Status.BUDGET_INCONCLUSIVE,
+                &quot;GCD_WORK_BUDGET_EXCEEDED&quot;,
+<span class="fc" id="L78">                work.ledger(),</span>
+                left,
+                right);
+<span class="nc" id="L81">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L82">            return GcdResult.failure(</span>
+                Status.TECHNICAL_FAILURE,
+<span class="nc" id="L84">                &quot;GCD_&quot; + exception.getClass().getSimpleName()</span>
+<span class="nc" id="L85">                    .toUpperCase(java.util.Locale.ROOT),</span>
+<span class="nc" id="L86">                work.ledger(),</span>
+                left,
+                right);
+        }
+    }
+
+    static &lt;C&gt; UnivariatePolynomialView&lt;C&gt; gcd(
+        UnivariatePolynomialView&lt;C&gt; left,
+        UnivariatePolynomialView&lt;C&gt; right,
+        ExactField&lt;C&gt; field,
+        PolynomialWorkBudget work,
+        String stagePrefix
+    ) {
+<span class="fc" id="L99">        Objects.requireNonNull(left, &quot;left&quot;);</span>
+<span class="fc" id="L100">        Objects.requireNonNull(right, &quot;right&quot;);</span>
+<span class="fc" id="L101">        Objects.requireNonNull(field, &quot;field&quot;);</span>
+<span class="fc" id="L102">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (!left.ring().equals(right.ring())) {</span>
+<span class="nc" id="L104">            throw new IllegalArgumentException(</span>
+                &quot;polynomial gcd ring mismatch&quot;);
+        }
+<span class="pc bpc" id="L107" title="3 of 4 branches missed.">        if (left.isZero() &amp;&amp; right.isZero()) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(</span>
+                &quot;gcd of two zero polynomials is undefined&quot;);
+        }
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (left.isZero()) {</span>
+<span class="nc" id="L112">            return right.monic(</span>
+                field,
+                work,
+                stagePrefix + &quot;.normalize&quot;);
+        }
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (right.isZero()) {</span>
+<span class="nc" id="L118">            return left.monic(</span>
+                field,
+                work,
+                stagePrefix + &quot;.normalize&quot;);
+        }
+
+<span class="fc" id="L124">        UnivariatePolynomialView&lt;C&gt; a = left;</span>
+<span class="fc" id="L125">        UnivariatePolynomialView&lt;C&gt; b = right;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        while (!b.isZero()) {</span>
+<span class="fc" id="L127">            work.consume(stagePrefix + &quot;.iterations&quot;, 1);</span>
+<span class="fc" id="L128">            UnivariatePolynomialView.DivisionResult&lt;C&gt; division =</span>
+<span class="fc" id="L129">                a.divideAndRemainder(</span>
+                    b,
+                    field,
+                    work,
+                    stagePrefix + &quot;.division&quot;);
+<span class="fc" id="L134">            a = b;</span>
+<span class="fc" id="L135">            b = division.remainder();</span>
+<span class="fc" id="L136">        }</span>
+<span class="fc" id="L137">        return a.monic(</span>
+            field,
+            work,
+            stagePrefix + &quot;.normalize&quot;);
+    }
+
+    static &lt;C&gt; UnivariatePolynomialView&lt;C&gt; exactQuotient(
+        UnivariatePolynomialView&lt;C&gt; dividend,
+        UnivariatePolynomialView&lt;C&gt; divisor,
+        ExactField&lt;C&gt; field,
+        PolynomialWorkBudget work,
+        String stagePrefix
+    ) {
+<span class="fc" id="L150">        return dividend.exactQuotient(</span>
+            divisor,
+            field,
+            work,
+            stagePrefix);
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    static &lt;C&gt; ExactField&lt;C&gt; exactField(
+        PolynomialRing&lt;C&gt; ring
+    ) {
+<span class="fc" id="L161">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        return domain instanceof ExactField&lt;?&gt; field</span>
+<span class="fc" id="L163">            ? (ExactField&lt;C&gt;) field</span>
+<span class="fc" id="L164">            : null;</span>
+    }
+
+<span class="fc" id="L167">    public enum Status {</span>
+<span class="fc" id="L168">        COMPLETED,</span>
+<span class="fc" id="L169">        UNSUPPORTED_DOMAIN,</span>
+<span class="fc" id="L170">        UNSUPPORTED_SHAPE,</span>
+<span class="fc" id="L171">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L172">        TECHNICAL_FAILURE</span>
+    }
+
+    /** Issuer-owned gcd result. */
+    public static final class GcdResult&lt;C&gt; {
+        private final State&lt;C&gt; state;
+
+        private GcdResult(
+            Status status,
+            String detailCode,
+            SparsePolynomial&lt;C&gt; gcd,
+            PolynomialWorkLedger work,
+            String certificateHash
+<span class="fc" id="L185">        ) {</span>
+<span class="fc" id="L186">            state = new State&lt;&gt;(</span>
+                status,
+                detailCode,
+                gcd,
+                work,
+                certificateHash);
+<span class="fc" id="L192">        }</span>
+
+        private static &lt;C&gt; GcdResult&lt;C&gt; completed(
+            SparsePolynomial&lt;C&gt; gcd,
+            PolynomialWorkLedger work,
+            SparsePolynomial&lt;C&gt; left,
+            SparsePolynomial&lt;C&gt; right
+        ) {
+<span class="fc" id="L200">            return create(</span>
+                Status.COMPLETED,
+                &quot;MONIC_EUCLIDEAN_GCD_COMPLETED&quot;,
+                gcd,
+                work,
+                left,
+                right);
+        }
+
+        private static &lt;C&gt; GcdResult&lt;C&gt; failure(
+            Status status,
+            String detailCode,
+            PolynomialWorkLedger work,
+            SparsePolynomial&lt;C&gt; left,
+            SparsePolynomial&lt;C&gt; right
+        ) {
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">            if (status == Status.COMPLETED) {</span>
+<span class="nc" id="L217">                throw new IllegalArgumentException(</span>
+                    &quot;completed gcd requires a result&quot;);
+            }
+<span class="fc" id="L220">            return create(</span>
+                status,
+                detailCode,
+                null,
+                work,
+                left,
+                right);
+        }
+
+        private static &lt;C&gt; GcdResult&lt;C&gt; create(
+            Status status,
+            String detailCode,
+            SparsePolynomial&lt;C&gt; gcd,
+            PolynomialWorkLedger work,
+            SparsePolynomial&lt;C&gt; left,
+            SparsePolynomial&lt;C&gt; right
+        ) {
+<span class="fc" id="L237">            StringBuilder material = new StringBuilder(GCD_METHOD_ID);</span>
+<span class="fc" id="L238">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L240">                left.canonicalMaterial());</span>
+<span class="fc" id="L241">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L243">                right.canonicalMaterial());</span>
+<span class="fc" id="L244">            AlgorithmEvidence.append(material, status.name());</span>
+<span class="fc" id="L245">            AlgorithmEvidence.append(material, detailCode);</span>
+<span class="fc" id="L246">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L248">                work.canonicalMaterial());</span>
+<span class="fc" id="L249">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc bfc" id="L251" title="All 2 branches covered.">                gcd == null ? &quot;&quot; : gcd.canonicalMaterial());</span>
+<span class="fc" id="L252">            return new GcdResult&lt;&gt;(</span>
+                status,
+                detailCode,
+                gcd,
+                work,
+<span class="fc" id="L257">                AlgorithmEvidence.sha256(material.toString()));</span>
+        }
+
+        public Status status() {
+<span class="fc" id="L261">            return state.status();</span>
+        }
+
+        public String detailCode() {
+<span class="fc" id="L265">            return state.detailCode();</span>
+        }
+
+        public SparsePolynomial&lt;C&gt; gcd() {
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            if (!completed()) {</span>
+<span class="nc" id="L270">                throw new IllegalStateException(</span>
+                    &quot;failed gcd result has no polynomial&quot;);
+            }
+<span class="fc" id="L273">            return state.gcd();</span>
+        }
+
+        public PolynomialWorkLedger work() {
+<span class="fc" id="L277">            return state.work();</span>
+        }
+
+        public String certificateHash() {
+<span class="fc" id="L281">            return state.certificateHash();</span>
+        }
+
+        public boolean completed() {
+<span class="fc bfc" id="L285" title="All 2 branches covered.">            return status() == Status.COMPLETED;</span>
+        }
+
+        @Override
+        public boolean equals(Object other) {
+<span class="fc" id="L290">            return this == other</span>
+<span class="pc bpc" id="L291" title="2 of 4 branches missed.">                || other instanceof GcdResult&lt;?&gt; result</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                    &amp;&amp; state.equals(result.state);</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L297">            return state.hashCode();</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="fc" id="L302">            return &quot;GcdResult[&quot; + state + ']';</span>
+        }
+
+        private record State&lt;C&gt;(
+            Status status,
+            String detailCode,
+            SparsePolynomial&lt;C&gt; gcd,
+            PolynomialWorkLedger work,
+            String certificateHash
+        ) {
+<span class="fc" id="L312">            private State {</span>
+<span class="fc" id="L313">                Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">                if (detailCode == null</span>
+<span class="pc bpc" id="L315" title="3 of 6 branches missed.">                        || detailCode.isBlank()</span>
+                        || work == null
+                        || certificateHash == null
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                        || !certificateHash.matches(</span>
+                            &quot;sha256:[0-9a-f]{64}&quot;)) {
+<span class="nc" id="L320">                    throw new IllegalArgumentException(</span>
+                        &quot;gcd result is invalid&quot;);
+                }
+<span class="pc bpc" id="L323" title="1 of 6 branches missed.">                if ((status == Status.COMPLETED) != (gcd != null)) {</span>
+<span class="nc" id="L324">                    throw new IllegalArgumentException(</span>
+                        &quot;gcd status/result mismatch&quot;);
+                }
+<span class="fc" id="L327">            }</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

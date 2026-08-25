@@ -134,7 +134,7 @@ public final class BinaryQuarticFactorizationEngine
                 request,
                 Outcome.UNSUPPORTED_DOMAIN,
                 &quot;REQUIRES_EXACT_INTEGER_COEFFICIENT_DOMAIN&quot;,
-<span class="nc" id="L137">                WorkLedger.empty(),</span>
+<span class="nc" id="L137">                PolynomialWorkLedger.empty(),</span>
 <span class="nc" id="L138">                List.of(),</span>
                 BackendClaim.NONE);
         }
@@ -145,7 +145,7 @@ public final class BinaryQuarticFactorizationEngine
                 request,
                 Outcome.UNSUPPORTED_REQUEST,
                 &quot;ENGINE_DOES_NOT_CERTIFY_FACTOR_IRREDUCIBILITY&quot;,
-<span class="fc" id="L148">                WorkLedger.empty(),</span>
+<span class="fc" id="L148">                PolynomialWorkLedger.empty(),</span>
 <span class="fc" id="L149">                List.of(),</span>
                 BackendClaim.NONE);
         }
@@ -157,7 +157,7 @@ public final class BinaryQuarticFactorizationEngine
                 request,
                 Outcome.UNSUPPORTED_REQUEST,
                 &quot;REQUIRES_BINARY_HOMOGENEOUS_QUARTIC_WITH_NONZERO_EXTREME_TERMS&quot;,
-<span class="fc" id="L160">                WorkLedger.empty(),</span>
+<span class="fc" id="L160">                PolynomialWorkLedger.empty(),</span>
 <span class="fc" id="L161">                List.of(),</span>
                 BackendClaim.NONE);
         }
@@ -166,7 +166,7 @@ public final class BinaryQuarticFactorizationEngine
                 request,
                 Outcome.BUDGET_INCONCLUSIVE,
                 &quot;MAX_CANDIDATES_IS_ZERO&quot;,
-<span class="fc" id="L169">                WorkLedger.empty(),</span>
+<span class="fc" id="L169">                PolynomialWorkLedger.empty(),</span>
 <span class="fc" id="L170">                List.of(),</span>
                 BackendClaim.NONE);
         }
@@ -394,7 +394,7 @@ public final class BinaryQuarticFactorizationEngine
         FactorizationRequest&lt;BigInteger&gt; request,
         Outcome outcome,
         String detailCode,
-        WorkLedger work,
+        PolynomialWorkLedger work,
         List&lt;Proposal&lt;BigInteger&gt;&gt; proposals,
         BackendClaim backendClaim
     ) {
@@ -519,8 +519,8 @@ public final class BinaryQuarticFactorizationEngine
 <span class="fc" id="L519">            stages.merge(stage, units, Math::addExact);</span>
 <span class="fc" id="L520">        }</span>
 
-        private WorkLedger ledger() {
-<span class="fc" id="L523">            return new WorkLedger(stages);</span>
+        private PolynomialWorkLedger ledger() {
+<span class="fc" id="L523">            return new PolynomialWorkLedger(stages);</span>
         }
     }
 
