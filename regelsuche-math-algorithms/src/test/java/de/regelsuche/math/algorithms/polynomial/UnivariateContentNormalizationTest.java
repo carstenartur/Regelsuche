@@ -178,7 +178,7 @@ class UnivariateContentNormalizationTest {
     }
 
     @Test
-    void aSharedFactorizationBudgetCannotBeResetBetweenStages() {
+    void aSharedFactorizationBudgetCannotBeResetOrReauthorized() {
         SparsePolynomial<ExactRational> source =
             rational(q(-2, 5), q(2, 3), q(-4, 15));
         UnivariateContentPolicy policy = policy(4_096);
@@ -189,6 +189,11 @@ class UnivariateContentNormalizationTest {
         long oneRun = calibration.work().totalWorkUnits();
         FactorizationRequest<ExactRational> request =
             rationalRequest(source, limits, oneRun + 1);
+        UnivariateContentResult mismatched =
+            UnivariateContentNormalization.normalizeRational(
+                request,
+                policy,
+                new PolynomialWorkBudget(oneRun + 2));
         PolynomialWorkBudget shared =
             new PolynomialWorkBudget(oneRun + 1);
 
@@ -203,6 +208,13 @@ class UnivariateContentNormalizationTest {
                 policy,
                 shared);
 
+        assertEquals(
+            UnivariateContentResult.Status.TECHNICAL_FAILURE,
+            mismatched.status());
+        assertEquals(
+            "CONTENT_NORMALIZATION_WORK_BUDGET_AUTHORITY_MISMATCH",
+            mismatched.detailCode());
+        assertEquals(0, mismatched.work().totalWorkUnits());
         assertTrue(first.completed(), first.toString());
         assertEquals(
             UnivariateContentResult.Status.BUDGET_INCONCLUSIVE,
