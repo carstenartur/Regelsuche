@@ -44,6 +44,22 @@ class UnivariatePolynomialAlgorithmsTest {
     }
 
     @Test
+    void zeroZeroGcdRemainsAnExplicitUndefinedCase() {
+        SparsePolynomial<ExactRational> zero =
+            SparsePolynomial.zero(rationalRing);
+
+        UnivariatePolynomialAlgorithms.GcdResult<ExactRational> result =
+            UnivariatePolynomialAlgorithms.gcd(zero, zero, 100);
+
+        assertFalse(result.completed());
+        assertEquals(
+            UnivariatePolynomialAlgorithms.Status.UNSUPPORTED_SHAPE,
+            result.status());
+        assertEquals("GCD_ZERO_ZERO_UNDEFINED", result.detailCode());
+        assertEquals(0, result.work().totalWorkUnits());
+    }
+
+    @Test
     void budgetAndNonfieldDomainsRemainExplicitNonresults() {
         SparsePolynomial<ExactRational> left =
             polynomial(-1, 1).pow(4);
