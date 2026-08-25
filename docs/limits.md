@@ -87,6 +87,10 @@ Implementiert ist ein allgemeiner typisierter Kern aus:
   Polynome über einem ausdrücklich deklarierten `F_p`;
 - unabhängiger Produkt-, Koprimheits- und Rabin-/Frobenius-
   Irreduzibilitätsprüfung der Primkörperfaktoren;
+- deterministischer Auswahl einer geeigneten Primzahl aus einer ausdrücklich
+  gebundenen Kandidatenfolge;
+- exakter Reduktion eines kanonischen primitiven `Z[x]`-Polynoms nach `F_p[x]`,
+  bewahrten Ablehnungsgründen und quellgebundener modularer Evidence;
 - backendneutralem `FactorizationEngine`-SPI;
 - untrusted Engine-Proposals und ausdrücklich retained Backend-Claims;
 - unabhängiger Vertrags- und Produktprüfung durch `FactorizationVerifier`;
@@ -131,13 +135,14 @@ ursprüngliches Polynom über `Z[x]` oder `Q[x]`.
 
 Die erste Primkörperimplementierung besitzt bewusst enge Grenzen:
 
-- der Modul wird als deterministisch geprüfte positive `int`-Primzahl
+- das Modul wird als deterministisch geprüfte positive `int`-Primzahl
   angegeben;
 - die Eingabe muss genau eine Variable besitzen und quadratfrei sein;
 - die Anzahl enumerierter Restklassen wird durch
   `FiniteFieldFactorizationPolicy.maxEnumeratedFieldElements` begrenzt;
-- die Peak-Größe der quadratischen Berlekamp-Matrix wird vor ihrer Allokation
-  durch `maxBerlekampMatrixCells` begrenzt;
+- die Peak-Größe von Ausgangsmatrix, RREF-Kopie und Nullraumbasis wird vor der
+  Allokation durch `maxMatrixCells` mit `3 * degree² <= maxMatrixCells`
+  begrenzt;
 - sämtliche Arithmetik, Matrixreduktion, Splitting- und Verifikationsarbeit
   teilt ein nicht zurücksetzbares Requestbudget;
 - Budget- oder Policy-Erschöpfung bleibt `BUDGET_INCONCLUSIVE` und wird nicht
@@ -146,16 +151,42 @@ Die erste Primkörperimplementierung besitzt bewusst enge Grenzen:
 Details stehen unter
 [Deterministische Faktorisierung über Primkörpern](finite-field-factorization.md).
 
+#### Geeignete Primzahl und modulare Übergabeevidence
+
+`SuitablePrimeSelection` verbindet ein kanonisches primitives Polynom in
+`Z[x]` mit der bereits qualifizierten Primkörperfaktorisierung. Die Stufe:
+
+- betrachtet ausschließlich die in `SuitablePrimeSelectionPolicy` gebundene,
+  streng aufsteigende Primzahlenfolge;
+- lehnt Primzahlen ab, die den Leitkoeffizienten teilen;
+- reduziert das Quellpolynom exakt und kanonisch nach `PrimeField(p)[x]`;
+- lehnt gradverlierende oder nicht quadratfreie Reduktionen mit typisiertem
+  Grund ab;
+- wählt den ersten Kandidaten mit vollständiger modularer Faktorisierung;
+- teilt dasselbe nicht zurücksetzbare `PolynomialWorkBudget` mit allen
+  verschachtelten Stufen;
+- bindet jeden Versuch, seine Kosten, den Modularquellhash und das
+  Faktorisierungszertifikat in issuer-eigene Evidence.
+
+Das verschachtelte `FiniteFieldFactorizationResult` exponiert den Hash des
+Quellpolynoms, das bereits im vollständigen Request des v1-Zertifikats gebunden
+ist. Ein positiver Auswahlabschluss verlangt dessen Gleichheit mit dem Hash der
+ausgewählten modularen Quelle. Ein gültiges Zertifikat für ein anderes Polynom
+im selben Primkörper kann daher nicht eingesetzt werden.
+
+Ein ausgeschöpfter Kandidatenvorrat oder ein Arbeitslimit bleibt
+`BUDGET_INCONCLUSIVE`. `COMPLETED` autorisiert weder Hensel-Lifting noch eine
+Faktorisierung des ursprünglichen Polynoms in `Z[x]` oder `Q[x]`.
+
+Details stehen unter
+[Deterministische Auswahl einer geeigneten Primzahl](suitable-prime-selection.md).
+
 #### Noch offene vollständige `Z[x]`-/`Q[x]`-Pipeline
 
-Die vorhandene Primkörperfaktorisierung ist ein notwendiger Baustein, aber noch
-keine vollständige Faktorisierungsengine für ganzzahlige oder rationale
-Quellen. Weiterhin offen sind:
+Primkörperfaktorisierung und geeignete Primzahlauswahl sind notwendige
+Bausteine, aber noch keine vollständige Faktorisierungsengine für ganzzahlige
+oder rationale Quellen. Weiterhin offen sind:
 
-- geeignete Primzahlauswahl mit retained Ablehnungsgründen für ungeeignete
-  Primzahlen;
-- Abbildung des primitiven ganzzahligen Polynoms in den ausgewählten
-  Primkörper;
 - Hensel-Lifting der modularen Faktoren;
 - ganzzahlige Faktorrekomposition, zunächst etwa Zassenhaus;
 - spätere LLL-/van-Hoeij-Rekombination, wenn sie qualifiziert ist;
@@ -197,6 +228,7 @@ Weiterführende Seiten:
 - [Univariate Polynomgrundlage, Inhalt und quadratfreie Zerlegung](univariate-polynomial-foundation.md)
 - [Univariate Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md)
 - [Deterministische Faktorisierung über Primkörpern](finite-field-factorization.md)
+- [Deterministische Auswahl einer geeigneten Primzahl](suitable-prime-selection.md)
 - [Semantische Polynomansicht und quartische Zerlegungsengine](polynomial-decomposition-synthesis.md)
 
 ### Gleichungssysteme, Matrizen und weitere Domänen
@@ -439,6 +471,7 @@ Diese reale Prüfung ist noch nicht abgeschlossen; das Profil bleibt `BLOCKED`.
 - [Univariate Polynomgrundlage, Inhalt und quadratfreie Zerlegung](univariate-polynomial-foundation.md)
 - [Univariate Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md)
 - [Deterministische Faktorisierung über Primkörpern](finite-field-factorization.md)
+- [Deterministische Auswahl einer geeigneten Primzahl](suitable-prime-selection.md)
 - [ADR: Domänenbewusster Polynomkern statt Quartik-API](adr/domain-aware-polynomial-factorization.md)
 - [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md)
 - [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md)

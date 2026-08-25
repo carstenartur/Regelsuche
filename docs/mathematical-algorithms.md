@@ -49,7 +49,7 @@ Implementiert sind:
 ```text
 regelsuche.coefficients.integer/v1
 regelsuche.coefficients.rational/v1
-regelsuche.coefficients.prime-field/<p>/v1
+regelsuche.coefficients.prime-field/v1/p=<p>
 ```
 
 `BigIntegerDomain` und `ExactRationalField` bilden `Z` beziehungsweise `Q`
@@ -69,15 +69,15 @@ graduiert-lexikographische und graduiert-revers-lexikographische Ordnung.
 
 `SparsePolynomial` ist die kanonische mathematische Identität. Die
 `UnivariatePolynomialView` ist eine verlustfreie dichte
-Koeffizientendarstellung
+Koeffizientendarstellung für allgemeine Algorithmen:
 
 ```text
 [a0, a1, ..., an]  <=>  a0 + a1*x + ... + an*x^n
 ```
 
-für allgemeine Algorithmen. Sie implementiert exakte Addition, Subtraktion,
-Skalierung, Multiplikation, Ableitung, monische Normierung, Division mit Rest
-und exakt geprüfte Quotientenbildung.
+Sie implementiert exakte Addition, Subtraktion, Skalierung, Multiplikation,
+Ableitung, monische Normierung, Division mit Rest und exakt geprüfte
+Quotientenbildung.
 
 ### Inhalt und primitiver Teil
 
@@ -123,7 +123,7 @@ deklarierten `PrimeField`.
 ```text
 FactorizationRequest<BigInteger> über PrimeField(p)
   -> Struktur-, Kandidaten- und Work-Prüfung
-  -> Monisierung und retained Feldeinheit
+  -> Monisierung und bewahrte Feldeinheit
   -> Ableitung und Quadratfreiheits-GGT
   -> Frobenius-Potenzen x^(p*j) mod f
   -> Berlekamp-Matrix Q - I
@@ -135,10 +135,16 @@ FactorizationRequest<BigInteger> über PrimeField(p)
   -> issuer-owned vollständige F_p-Evidence
 ```
 
-Die Berlekamp-Matrix wird spaltenweise aus `x^(p*j) mod f` aufgebaut. Vor ihrer
-quadratischen Allokation prüft die Stufenpolitik `degree²` gegen
-`maxBerlekampMatrixCells`. RREF, Nullraumbasis und jeder Basisvektor werden
-unter demselben nicht zurücksetzbaren Arbeitsbudget verarbeitet.
+Die Berlekamp-Matrix wird spaltenweise aus `x^(p*j) mod f` aufgebaut. Vor der
+Allokation prüft die Stufenpolitik die konservative Peak-Schranke
+
+```text
+3 * degree² <= maxMatrixCells
+```
+
+für Ausgangsmatrix, vollständige RREF-Kopie und Nullraumbasis im Worst Case.
+RREF, Nullraumbasis und jeder Basisvektor werden unter demselben nicht
+zurücksetzbaren Arbeitsbudget verarbeitet.
 
 Das Splitting ist deterministisch: Basisvektoren werden kanonisch geordnet,
 Restklassen in der Reihenfolge `0 .. p-1` betrachtet und Zwischenfaktoren nach
@@ -165,6 +171,12 @@ Faktorgraden werden alle unterschiedlichen Primteiler des Grades geprüft.
 angegebenen Primkörper. Der Claim wird nicht auf ein ursprüngliches Polynom über
 `Z[x]` oder `Q[x]` übertragen.
 
+Das issuer-eigene Ergebnis exponiert außerdem den Hash des Quellpolynoms, das
+bereits über den vollständigen `FactorizationRequest` in der v1-Zertifikats-ID
+gebunden ist. Diese Projektion erlaubt einer äußeren Algorithmusstufe, die
+Quellidentität des verschachtelten Zertifikats zu prüfen, ohne die bestehende
+Zertifikatsidentität zu verändern.
+
 ### Grenzen und Budgets
 
 `FiniteFieldFactorizationPolicy` bindet ausschließlich algorithmusspezifische
@@ -172,7 +184,7 @@ Grenzen:
 
 - `Algorithm.DETERMINISTIC_BERLEKAMP_V1`;
 - maximale Anzahl enumerierter Feldelemente;
-- maximale Anzahl Zellen der Berlekamp-Matrix.
+- maximale Peak-Anzahl dichter Matrixzellen.
 
 Alle übrigen Grenzen stammen aus dem `FactorizationRequest`. Ein
 paketinterner Einstieg akzeptiert ein bereits belastetes
@@ -182,6 +194,58 @@ Fehler abgelehnt. Unterläufe und Policy-Grenzen bleiben
 
 Details und Reproduktionsbefehle stehen unter
 [Deterministische Faktorisierung über Primkörpern](finite-field-factorization.md).
+
+## Deterministische Auswahl einer geeigneten Primzahl
+
+`SuitablePrimeSelection` übernimmt ein kanonisches primitives, nichtkonstantes
+Polynom in `Z[x]` mit positivem Leitkoeffizienten. Die Stufe wählt keine
+Primzahl über ein verborgenes CAS-Verhalten, sondern konsumiert eine vollständig
+gebundene `SuitablePrimeSelectionPolicy`.
+
+### Algorithmischer Ablauf
+
+```text
+FactorizationRequest<BigInteger> über Z[x]
+  -> Struktur-, Domain-, Primitivitäts- und Work-Prüfung
+  -> Kandidatenfolge der Policy in fester Reihenfolge
+  -> exakte Reduktion nach PrimeField(p)[x]
+  -> Gradtreue prüfen
+  -> quadratfreie modulare Quelle verlangen
+  -> vorhandene FiniteFieldFactorization mit demselben WorkBudget
+  -> ersten vollständig faktorisierten Kandidaten auswählen
+  -> alle Versuche und terminalen Gründe binden
+```
+
+Primzahlen, die den Leitkoeffizienten teilen, werden mit
+`LEADING_COEFFICIENT_VANISHES_MOD_PRIME` abgelehnt. Nicht quadratfreie
+Reduktionen erhalten `MODULAR_REDUCTION_NOT_SQUARE_FREE`. Ein erschöpfter
+Kandidatenpräfix bleibt `NO_SUITABLE_PRIME_WITHIN_POLICY` und damit
+`BUDGET_INCONCLUSIVE`; er ist kein Beweis, dass keine geeignete Primzahl
+existiert.
+
+Kanonische Restklassen können mehr Bits benötigen als ein negativer
+Quellkoeffizient. Die verschachtelte modulare Requestgrenze wird deshalb exakt
+als
+
+```text
+max(sourceCoefficientBitLimit, bitLength(p - 1))
+```
+
+abgeleitet. Sie erweitert nicht den zulässigen ganzzahligen Eingang.
+
+Jeder `PrimeAttempt` bindet Primzahl, Disposition, Detailcode, modularen
+Quellhash, verschachtelte Zertifikats-ID und Versuchskosten. Ein positiver
+Abschluss verlangt zusätzlich, dass
+`FiniteFieldFactorizationResult.sourcePolynomialHash()` exakt mit dem Hash der
+ausgewählten modularen Quelle übereinstimmt. Dadurch wird ein Zertifikat für ein
+anderes Polynom desselben Primkörpers abgelehnt.
+
+`COMPLETED` autorisiert nur die ausgewählte, gradtreue und vollständig
+faktorisierte modulare Ausgangslage. Hensel-Lifting, ganzzahlige Rekombination
+und ein vollständiger `Z[x]`-/`Q[x]`-Claim bleiben Folgearbeiten.
+
+Details und Reproduktionsbefehle stehen unter
+[Deterministische Auswahl einer geeigneten Primzahl](suitable-prime-selection.md).
 
 ## Erste Engine: binäre homogene Quartiken
 
@@ -212,18 +276,15 @@ zertifizierter Evidence getrennt.
 
 ## Noch offene `Z[x]`-/`Q[x]`-Faktorisierung
 
-Die vorhandene Primkörperfaktorisierung ist ein qualifizierter algorithmischer
-Baustein, aber noch keine vollständige Faktorisierungsengine für ganzzahlige
-oder rationale Quellen. Noch offen sind:
+Primkörperfaktorisierung und geeignete Primzahlauswahl sind qualifizierte
+algorithmische Bausteine, aber noch keine vollständige Faktorisierungsengine für
+ganzzahlige oder rationale Quellen. Noch offen sind:
 
-1. geeignete Primzahlauswahl mit retained Ablehnungsgründen;
-2. Reduktion des primitiven ganzzahligen Polynoms modulo der ausgewählten
-   Primzahl;
-3. Hensel-Lifting;
-4. ganzzahlige Rekombination, zunächst etwa Zassenhaus;
-5. spätere LLL-/van-Hoeij-Rekombination, wenn qualifiziert;
-6. exakte rationale Faktorreassemblierung;
-7. unabhängige vollständige `Z[x]`-/`Q[x]`-Evidence hinter dem allgemeinen
+1. Hensel-Lifting mit expliziter Liftpräzision und Zwischenwertgrenzen;
+2. ganzzahlige Rekombination, zunächst etwa Zassenhaus;
+3. spätere LLL-/van-Hoeij-Rekombination, wenn qualifiziert;
+4. exakte rationale Faktorreassemblierung;
+5. unabhängige vollständige `Z[x]`-/`Q[x]`-Evidence hinter dem allgemeinen
    Engine-/Verifier-Vertrag.
 
 Ein vollständiger Abschluss in `F_p[x]` ist kein Beweis für Vollständigkeit
@@ -309,7 +370,7 @@ CAS-Erfolgsraten.
 
 ## Prüfung
 
-Fokussierte Primkörperprüfung:
+Fokussierte Primkörper- und Primzahlauswahlprüfung:
 
 ```bash
 ./gradlew :regelsuche-core:test \
@@ -317,7 +378,9 @@ Fokussierte Primkörperprüfung:
 
 ./gradlew :regelsuche-math-algorithms:test \
   --tests de.regelsuche.math.algorithms.polynomial.FiniteFieldFactorizationTest \
-  --tests de.regelsuche.math.algorithms.polynomial.FiniteFieldFactorizationHigherDegreeTest
+  --tests de.regelsuche.math.algorithms.polynomial.FiniteFieldFactorizationHigherDegreeTest \
+  --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionTest \
+  --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionEvidenceTest
 ```
 
 Vollständiger Repositoryvertrag:
@@ -333,6 +396,7 @@ mvn --batch-mode --no-transfer-progress -Pfull verify
 - [Univariate Polynomgrundlage, Inhalt und quadratfreie Zerlegung](univariate-polynomial-foundation.md)
 - [Univariate Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md)
 - [Deterministische Faktorisierung über Primkörpern](finite-field-factorization.md)
+- [Deterministische Auswahl einer geeigneten Primzahl](suitable-prime-selection.md)
 - [Semantische Polynomansicht und quartische Zerlegungsengine](polynomial-decomposition-synthesis.md)
 - [Rule Discovery](rule-discovery.md)
 - [Search Intelligence](search-intelligence.md)
