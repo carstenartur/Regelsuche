@@ -87,6 +87,8 @@ public final class FiniteFieldFactorizationResult {
             .ring()
             .coefficientDomain()
             .id();
+        String sourcePolynomialHash = AlgorithmEvidence.sha256(
+            request.source().canonicalMaterial());
         int prime = status == Status.COMPLETED
             ? Objects.requireNonNull(field, "field").prime()
             : 0;
@@ -140,6 +142,7 @@ public final class FiniteFieldFactorizationResult {
             status,
             detailCode,
             sourceDomainId,
+            sourcePolynomialHash,
             prime,
             unit,
             ordered,
@@ -160,6 +163,10 @@ public final class FiniteFieldFactorizationResult {
 
     public String sourceDomainId() {
         return state.sourceDomainId();
+    }
+
+    public String sourcePolynomialHash() {
+        return state.sourcePolynomialHash();
     }
 
     public int prime() {
@@ -238,6 +245,7 @@ public final class FiniteFieldFactorizationResult {
         Status status,
         String detailCode,
         String sourceDomainId,
+        String sourcePolynomialHash,
         int prime,
         BigInteger unit,
         List<PolynomialFactor<BigInteger>> factors,
@@ -253,6 +261,9 @@ public final class FiniteFieldFactorizationResult {
                     || detailCode.isBlank()
                     || sourceDomainId == null
                     || sourceDomainId.isBlank()
+                    || sourcePolynomialHash == null
+                    || !sourcePolynomialHash.matches(
+                        "sha256:[0-9a-f]{64}")
                     || work == null
                     || certificateHash == null
                     || !certificateHash.matches(
