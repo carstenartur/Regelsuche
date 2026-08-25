@@ -48,6 +48,23 @@ class ExactRationalPolynomialDecompositionSynthesisOperatorTest {
     }
 
     @Test
+    void synthesizesASecondQuarticFamilyWithRationalContent() {
+        var report = operator.synthesize(
+            "(1 / 6)*x^4 + (5 / 6)*x^2 + 2 / 3");
+
+        assertTrue(report.generated(), report.detailCode());
+        assertEquals("[2/3, 0, 5/6, 0, 1/6]",
+            report.sourcePolynomialMaterial());
+        assertTrue(report.candidates().stream().allMatch(candidate ->
+            candidate.scalar().equals("1/6")
+                && candidate.transformedExpression().contains("1 / 6")));
+        assertTrue(report.candidates().stream().anyMatch(candidate ->
+            factorPair(candidate,
+                List.of(1, 0, 1),
+                List.of(1, 0, 4))));
+    }
+
+    @Test
     void equivalentDecimalAndFractionSourcesRetainDistinctProvenance() {
         var decimal = operator.synthesize("0.10*x^4 + 0.40");
         var fraction = operator.synthesize("(1 / 10)*x^4 + 2 / 5");
@@ -89,6 +106,25 @@ class ExactRationalPolynomialDecompositionSynthesisOperatorTest {
         var second = operator.synthesize("0.10*x^4 + 0.40");
 
         assertEquals(first, second);
+    }
+
+    @Test
+    void nullAndBlankInputsFailClosed() {
+        var nullReport = operator.synthesize(null);
+        var blankReport = operator.synthesize("   ");
+
+        assertEquals(
+            ExactRationalPolynomialDecompositionSynthesisOperator.Status
+                .PARSE_ERROR,
+            nullReport.status());
+        assertEquals("EXPRESSION_BLANK", nullReport.detailCode());
+        assertEquals(
+            ExactRationalPolynomialDecompositionSynthesisOperator.Status
+                .PARSE_ERROR,
+            blankReport.status());
+        assertEquals("EXPRESSION_BLANK", blankReport.detailCode());
+        assertTrue(operator.generateCandidates(null).isEmpty());
+        assertTrue(operator.generateCandidates("   ").isEmpty());
     }
 
     @Test
