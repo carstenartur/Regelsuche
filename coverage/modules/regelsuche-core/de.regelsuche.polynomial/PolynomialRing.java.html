@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialRing.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">PolynomialRing.java</span></div><h1>PolynomialRing.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Immutable polynomial ring identity over an explicit coefficient domain,
+ * ordered variables and explicit monomial order.
+ */
+public final class PolynomialRing&lt;C&gt; {
+    private final CoefficientDomain&lt;C&gt; coefficientDomain;
+    private final List&lt;PolynomialVariable&gt; variables;
+    private final MonomialOrder monomialOrder;
+
+    public PolynomialRing(
+        CoefficientDomain&lt;C&gt; coefficientDomain,
+        List&lt;PolynomialVariable&gt; variables,
+        MonomialOrder monomialOrder
+<span class="fc" id="L22">    ) {</span>
+<span class="fc" id="L23">        this.coefficientDomain = Objects.requireNonNull(</span>
+            coefficientDomain,
+            &quot;coefficientDomain&quot;);
+<span class="fc" id="L26">        this.variables = List.copyOf(</span>
+<span class="fc" id="L27">            Objects.requireNonNull(variables, &quot;variables&quot;));</span>
+<span class="fc" id="L28">        this.monomialOrder = Objects.requireNonNull(</span>
+            monomialOrder,
+            &quot;monomialOrder&quot;);
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (this.variables.stream().anyMatch(Objects::isNull)</span>
+<span class="fc" id="L32">                || new HashSet&lt;&gt;(this.variables).size()</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">                    != this.variables.size()) {</span>
+<span class="nc" id="L34">            throw new IllegalArgumentException(</span>
+                &quot;polynomial ring variables must be non-null and unique&quot;);
+        }
+<span class="fc" id="L37">    }</span>
+
+    public CoefficientDomain&lt;C&gt; coefficientDomain() {
+<span class="fc" id="L40">        return coefficientDomain;</span>
+    }
+
+    public List&lt;PolynomialVariable&gt; variables() {
+<span class="fc" id="L44">        return variables;</span>
+    }
+
+    public MonomialOrder monomialOrder() {
+<span class="fc" id="L48">        return monomialOrder;</span>
+    }
+
+    public Comparator&lt;Monomial&gt; monomialComparator() {
+<span class="fc" id="L52">        return monomialOrder.comparator();</span>
+    }
+
+    public int variableCount() {
+<span class="fc" id="L56">        return variables.size();</span>
+    }
+
+    public PolynomialRing&lt;C&gt; appendVariable(
+        PolynomialVariable variable
+    ) {
+<span class="fc" id="L62">        Objects.requireNonNull(variable, &quot;variable&quot;);</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (variables.contains(variable)) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(</span>
+                &quot;polynomial variable already belongs to ring&quot;);
+        }
+<span class="fc" id="L67">        ArrayList&lt;PolynomialVariable&gt; extended =</span>
+            new ArrayList&lt;&gt;(variables);
+<span class="fc" id="L69">        extended.add(variable);</span>
+<span class="fc" id="L70">        return new PolynomialRing&lt;&gt;(</span>
+            coefficientDomain,
+            extended,
+            monomialOrder);
+    }
+
+    public String canonicalMaterial() {
+<span class="fc" id="L77">        StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L78">        append(result, coefficientDomain.id());</span>
+<span class="fc" id="L79">        append(result, monomialOrder.id());</span>
+<span class="fc" id="L80">        variables.forEach(variable -&gt; append(result, variable.id()));</span>
+<span class="fc" id="L81">        return result.toString();</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L85">        target.append('|')</span>
+<span class="fc" id="L86">            .append(value.length())</span>
+<span class="fc" id="L87">            .append(':')</span>
+<span class="fc" id="L88">            .append(value);</span>
+<span class="fc" id="L89">    }</span>
+
+    @Override
+    public boolean equals(Object other) {
+<span class="fc" id="L93">        return this == other</span>
+<span class="pc bpc" id="L94" title="1 of 4 branches missed.">            || other instanceof PolynomialRing&lt;?&gt; ring</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                &amp;&amp; coefficientDomain.id().equals(</span>
+<span class="fc" id="L96">                    ring.coefficientDomain.id())</span>
+<span class="fc bfc" id="L97" title="All 4 branches covered.">                &amp;&amp; variables.equals(ring.variables)</span>
+                &amp;&amp; monomialOrder == ring.monomialOrder;
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L103">        return Objects.hash(</span>
+<span class="nc" id="L104">            coefficientDomain.id(),</span>
+            variables,
+            monomialOrder);
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L111">        return coefficientDomain.id()</span>
+<span class="nc" id="L112">            + '[' + monomialOrder.id() + ']'</span>
+            + variables;
+    }
+
+    /** Standard leading-term orders, with the largest monomial first. */
+<span class="fc" id="L117">    public enum MonomialOrder {</span>
+<span class="fc" id="L118">        LEXICOGRAPHIC(&quot;lex&quot;) {</span>
+            @Override
+            int compareSameArity(Monomial left, Monomial right) {
+<span class="fc" id="L121">                return compareLexicographically(left, right);</span>
+            }
+        },
+<span class="fc" id="L124">        GRADED_LEXICOGRAPHIC(&quot;grlex&quot;) {</span>
+            @Override
+            int compareSameArity(Monomial left, Monomial right) {
+<span class="fc" id="L127">                int degree = Integer.compare(</span>
+<span class="fc" id="L128">                    right.totalDegree(),</span>
+<span class="fc" id="L129">                    left.totalDegree());</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                return degree != 0</span>
+<span class="fc" id="L131">                    ? degree</span>
+<span class="fc" id="L132">                    : compareLexicographically(left, right);</span>
+            }
+        },
+<span class="fc" id="L135">        GRADED_REVERSE_LEXICOGRAPHIC(&quot;grevlex&quot;) {</span>
+            @Override
+            int compareSameArity(Monomial left, Monomial right) {
+<span class="fc" id="L138">                int degree = Integer.compare(</span>
+<span class="fc" id="L139">                    right.totalDegree(),</span>
+<span class="fc" id="L140">                    left.totalDegree());</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                if (degree != 0) {</span>
+<span class="fc" id="L142">                    return degree;</span>
+                }
+<span class="fc" id="L144">                for (int index = left.arity() - 1;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                        index &gt;= 0;</span>
+<span class="fc" id="L146">                        index--) {</span>
+<span class="fc" id="L147">                    int comparison = Integer.compare(</span>
+<span class="fc" id="L148">                        left.exponent(index),</span>
+<span class="fc" id="L149">                        right.exponent(index));</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                    if (comparison != 0) {</span>
+<span class="fc" id="L151">                        return comparison;</span>
+                    }
+                }
+<span class="fc" id="L154">                return 0;</span>
+            }
+        };
+
+        private final String id;
+
+<span class="fc" id="L160">        MonomialOrder(String id) {</span>
+<span class="fc" id="L161">            this.id = id;</span>
+<span class="fc" id="L162">        }</span>
+
+        public String id() {
+<span class="fc" id="L165">            return id;</span>
+        }
+
+        public Comparator&lt;Monomial&gt; comparator() {
+<span class="fc" id="L169">            return this::compare;</span>
+        }
+
+        public int compare(Monomial left, Monomial right) {
+<span class="fc" id="L173">            Objects.requireNonNull(left, &quot;left&quot;);</span>
+<span class="fc" id="L174">            Objects.requireNonNull(right, &quot;right&quot;);</span>
+<span class="fc" id="L175">            left.requireSameArity(right);</span>
+<span class="fc" id="L176">            return compareSameArity(left, right);</span>
+        }
+
+        abstract int compareSameArity(
+            Monomial left,
+            Monomial right
+        );
+
+        private static int compareLexicographically(
+            Monomial left,
+            Monomial right
+        ) {
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            for (int index = 0; index &lt; left.arity(); index++) {</span>
+<span class="fc" id="L189">                int comparison = Integer.compare(</span>
+<span class="fc" id="L190">                    right.exponent(index),</span>
+<span class="fc" id="L191">                    left.exponent(index));</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                if (comparison != 0) {</span>
+<span class="fc" id="L193">                    return comparison;</span>
+                }
+            }
+<span class="fc" id="L196">            return 0;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

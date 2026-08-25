@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CoefficientDomain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">CoefficientDomain.java</span></div><h1>CoefficientDomain.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+/**
+ * Exact coefficient arithmetic identified by a stable mathematical domain ID.
+ *
+ * &lt;p&gt;Implementations must return canonical immutable values. Two domain
+ * implementations that expose the same ID are required to implement the same
+ * mathematical equality and arithmetic contract.&lt;/p&gt;
+ */
+public interface CoefficientDomain&lt;C&gt; {
+    String id();
+
+    C zero();
+
+    C one();
+
+    C canonical(C value);
+
+    C add(C left, C right);
+
+    C negate(C value);
+
+    C multiply(C left, C right);
+
+    boolean isZero(C value);
+
+    String canonicalText(C value);
+
+    int bitLength(C value);
+
+    default C subtract(C left, C right) {
+<span class="nc" id="L32">        return add(left, negate(right));</span>
+    }
+
+    default boolean isOne(C value) {
+<span class="fc" id="L36">        return canonical(value).equals(one());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

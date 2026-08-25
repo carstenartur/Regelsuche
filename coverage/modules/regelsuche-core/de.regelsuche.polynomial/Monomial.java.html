@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Monomial.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">Monomial.java</span></div><h1>Monomial.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+/** Canonical exponent vector whose ordering is supplied by its polynomial ring. */
+public record Monomial(List&lt;Integer&gt; exponents) {
+<span class="fc" id="L12">    public Monomial {</span>
+<span class="fc" id="L13">        exponents = List.copyOf(</span>
+<span class="fc" id="L14">            Objects.requireNonNull(exponents, &quot;exponents&quot;));</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if (exponents.stream().anyMatch(</span>
+<span class="pc bpc" id="L16" title="2 of 4 branches missed.">                value -&gt; value == null || value &lt; 0)) {</span>
+<span class="nc" id="L17">            throw new IllegalArgumentException(</span>
+                &quot;monomial exponents must be nonnegative&quot;);
+        }
+<span class="fc" id="L20">    }</span>
+
+    public static Monomial of(int... exponents) {
+<span class="fc" id="L23">        Objects.requireNonNull(exponents, &quot;exponents&quot;);</span>
+<span class="fc" id="L24">        return new Monomial(</span>
+<span class="fc" id="L25">            Arrays.stream(exponents).boxed().toList());</span>
+    }
+
+    public static Monomial one(int arity) {
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (arity &lt; 0) {</span>
+<span class="nc" id="L30">            throw new IllegalArgumentException(</span>
+                &quot;monomial arity must not be negative&quot;);
+        }
+<span class="fc" id="L33">        return new Monomial(</span>
+<span class="fc" id="L34">            Collections.nCopies(arity, 0));</span>
+    }
+
+    public int arity() {
+<span class="fc" id="L38">        return exponents.size();</span>
+    }
+
+    public int exponent(int index) {
+<span class="fc" id="L42">        return exponents.get(index);</span>
+    }
+
+    public int totalDegree() {
+<span class="fc" id="L46">        int result = 0;</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (int exponent : exponents) {</span>
+<span class="fc" id="L48">            result = Math.addExact(result, exponent);</span>
+<span class="fc" id="L49">        }</span>
+<span class="fc" id="L50">        return result;</span>
+    }
+
+    public Monomial multiply(Monomial other) {
+<span class="fc" id="L54">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc" id="L55">        requireSameArity(other);</span>
+<span class="fc" id="L56">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(arity());</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (int index = 0; index &lt; arity(); index++) {</span>
+<span class="fc" id="L58">            result.add(Math.addExact(</span>
+<span class="fc" id="L59">                exponent(index),</span>
+<span class="fc" id="L60">                other.exponent(index)));</span>
+        }
+<span class="fc" id="L62">        return new Monomial(result);</span>
+    }
+
+    public Monomial appendExponent(int exponent) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (exponent &lt; 0) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(</span>
+                &quot;appended exponent must be nonnegative&quot;);
+        }
+<span class="fc" id="L70">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(exponents);</span>
+<span class="fc" id="L71">        result.add(exponent);</span>
+<span class="fc" id="L72">        return new Monomial(result);</span>
+    }
+
+    public void requireSameArity(Monomial other) {
+<span class="fc" id="L76">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (arity() != other.arity()) {</span>
+<span class="nc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;monomial arity mismatch&quot;);
+        }
+<span class="fc" id="L81">    }</span>
+
+    public String canonicalMaterial() {
+<span class="fc" id="L84">        return exponents.stream()</span>
+<span class="fc" id="L85">            .map(String::valueOf)</span>
+<span class="fc" id="L86">            .collect(Collectors.joining(&quot;,&quot;));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

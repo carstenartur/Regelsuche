@@ -1,6 +1,6 @@
 # Discovery- und Forschungsstand
 
-**Stand: 23. August 2026**
+**Stand: 25. August 2026**
 
 Diese Seite fasst den gegenwärtigen Forschungsstand zusammen. Sie trennt
 implementierte Softwarefähigkeiten, reproduzierte Projektergebnisse,
@@ -27,14 +27,22 @@ Seit dem Stand vom 21. August sind zusätzliche Kernfähigkeiten implementiert:
   gelernte Polynom-Pattern;
 - generationengetrenntes, proof-gated Regelmining mit eingefrorenen
   Schatteninventaren und nachgewiesener kumulativer Wiederverwendung;
-- eine allgemeine exakte Polynomzerlegungssynthese für einen begrenzten
-  Quartikbereich auf Basis semantischer AST-Atome.
+- ein domänenbewusster exakter Polynomkern mit Koeffizientendomänen,
+  Polynomringen, kanonischen Sparse-Polynomen und expliziten Monomordnungen;
+- eine backendneutrale Faktorisierungsengine-Schnittstelle mit untrusted
+  Proposals und retained Backend-Claims;
+- ein unabhängiger Faktorisierungsverifier als einzige Quelle autorisierter
+  Kandidaten- und Report-Evidence;
+- eine erste begrenzte Engine für quadratisch-mal-quadratische Zerlegungen
+  binärer homogener Quartiken auf Basis semantischer AST-Atome.
 
 Diese Implementierungen erweitern Mechanismus, mathematische Reichweite und
 diagnostische Evidenz. Sie qualifizieren weder automatisch das
 Produktdefaultprofil noch den öffentlichen Claim `PROMOTION`. Die
-Generationskampagne verändert ausschließlich experimentelle Schatteninventare;
-der Syntheseoperator ist keine vollständige Polynomfaktorisierung.
+Generationskampagne verändert ausschließlich experimentelle Schatteninventare.
+Der allgemeine Faktorisierungsvertrag ist implementiert; vollständige
+Faktorisierung über `Z[x]` oder `Q[x]`, endliche Körper, Hensel-Lifting,
+Rekombination und multivariate Verfahren sind noch nicht implementiert.
 
 Das stärkere Flagship-Ziel — ein aus primitiven Operationen erlerntes,
 interpretierbares `RewriteProgram`, das auf einem genau einmal verwendeten
@@ -53,7 +61,8 @@ anschließenden TRAIN-/VALIDATION-/FINAL-TEST-Ergebnisse fehlen noch.
 | Regelvorbereitung | Direkter Replay, native Exact-Registry, lokale Pattern-Bridges, Guards und Zertifikate sind implementiert | Noch kein allgemeines Workbench-/CLI-Defaultprofil und keine globale Vollständigkeit |
 | Enge Lernregel-Promotion | Assumption-free Polynom-Pattern können nach exaktem Identitätsnachweis eine neue Regelidentität erhalten | Evidence-Roots werden in v1 nur gebunden; `PROMOTION` bleibt `NOT_EVALUATED` |
 | Generationenbasiertes Regelmining | Drei eingefrorene Generationen, proof-gated Akzeptanz, Inventar-Hashkette und kumulativer Reuse-Audit sind implementiert | Nur experimentelle Schatteninventare; keine same-generation Nutzung und keine Produktionspromotion |
-| Polynomzerlegungssynthese | Semantische AST-Atome und exakte Koeffizientenbedingungen erzeugen zertifizierte quadratisch-mal-quadratische Quartikzerlegungen | Begrenzte binäre homogene und homogenisierte univariate Quartiken; keine vollständige multivariate Faktorisierung |
+| Polynomfaktorisierungsarchitektur | Exakte Domains, Ringe, Sparse-Polynome, Monomordnungen, Engine-SPI, kanonisches Work Ledger und unabhängiger Verifier sind implementiert | Allgemeiner Vertrag, aber noch keine vollständige `Z[x]`-/`Q[x]`- oder multivariate Faktorisierung |
+| Erste Faktorisierungsengine | Verifier-geprüfte quadratisch-mal-quadratische Zerlegungen für binäre homogene und homogenisierte univariate Quartiken | Engine-Miss ist kein Irreduzibilitätsbeweis; keine unabhängig zertifizierte Vollständigkeit |
 | Autonome Referenz-Campaign | Für den eng definierten internen Claim qualifiziert und reproduzierbar gebunden | Keine externe mathematische Neuheit |
 | Mehrdomänen-Discovery | Expression Rewrite und endliche Differenzen sind getrennt qualifiziert | Kein universeller domänenunabhängiger Discovery-Nachweis |
 | Targetfreie Simplification | Acht getrennte Konfigurationen; primär Regelsuche 6/7 gegenüber SymPy `simplify` 7/7 | Negatives Portfolio-Ergebnis; keine allgemeine Rangfolge oder nachträgliche Best-of-Auswahl |
@@ -227,28 +236,57 @@ autonome externe Neuheit noch den öffentlichen Claim `PROMOTION`. Vollständige
 Abgrenzung und Reproduktion:
 [Generational Rule Mining](generational-rule-mining.md).
 
-### Semantische Polynomzerlegungssynthese
+### Domänenbewusste Polynomfaktorisierung
 
-`PolynomialSemanticView` interpretiert vollständige AST-Teilbäume wie `x + 1`
-oder `sin(t)` als strukturelle Polynom-Atome. Der
-`PolynomialDecompositionSynthesisOperator` löst anschließend exakt die
-Koeffizientenbedingungen der begrenzten Form
+Die neue Kernarchitektur lautet:
+
+```text
+ExactParsedTerm
+  -> CoefficientDomain
+  -> PolynomialRing mit expliziter Monomordnung
+  -> kanonisches SparsePolynomial
+  -> FactorizationRequest
+  -> FactorizationEngine: untrusted Proposal und BackendClaim
+  -> FactorizationVerifier
+  -> verifier-ausgestellte Kandidaten- und Report-Evidence
+  -> Search-/Discovery-Adapter
+```
+
+Exakte Zahlen werden aus parserausgestellter Literalprovenienz gelesen; der
+historische `NumberExpr(double)`-Wert ist für diese Pfade nicht autoritativ.
+Engine-Proposals dürfen Faktoren, Multiplizitäten, einen ungelösten Rest und
+einen Backend-Claim enthalten. Sie autorisieren noch keine Suchkante.
+
+`FactorizationVerifier` prüft Engine- und Domain-Identität, Request-,
+Kandidaten- und Work-Budgets, Ringgleichheit und die exakte Rückmultiplikation
+von Einheit, Faktoren, Multiplizitäten und Rest. Das stage-getrennte Work Ledger
+besitzt eine kanonische Schlüsselreihenfolge; Evidence-Hashes hängen nicht von
+einer nicht spezifizierten Java-Map-Iterationsreihenfolge ab.
+
+Die erste integrierte `BinaryQuarticFactorizationEngine` löst die begrenzte Form
 
 ```text
 (a*A^2 + b*A*B + c*B^2) * (d*A^2 + e*A*B + f*B^2)
 ```
 
 für ganzzahlige binäre homogene Quartiken. Begrenzte univariate Quartiken werden
-über eine explizite strukturelle Einheit homogenisiert. Ergebnis,
-Koeffizientenbelegung, Domain, Budget und Rekonstruktionsprüfung werden in einem
-content-addressed Zertifikat gebunden.
+über eine explizite strukturelle Einheit homogenisiert. Dasselbe Verfahren
+deckt den historischen Sophie-Germain-Fall, andere Quartikfamilien und
+unterstützte AST-Substitutionen ab. Der frühere benannte Spezial-Bridge bleibt
+nur als deaktivierter historischer Kontrollpfad erhalten.
 
-Dasselbe Verfahren deckt den historischen Sophie-Germain-Fall, andere
-Quartikfamilien und unterstützte AST-Substitutionen ab. Der frühere benannte
-Spezial-Bridge bleibt nur als deaktivierter historischer Kontrollpfad erhalten.
-Die aktuelle Domäne ist keine vollständige multivariate Faktorisierung.
+Der `PolynomialDecompositionSynthesisOperator` ist nur noch der Ausdrucks- und
+Suchadapter für diese Engine; er definiert nicht die allgemeine Polynom- oder
+Faktorisierungs-API. Ein Engine-Miss ist kein Irreduzibilitätsbeweis. Ein
+Backend-Claim ist keine unabhängig zertifizierte Vollständigkeit. Vollständige
+`Z[x]`-/`Q[x]`-Faktorisierung, endliche Körper, Hensel-Lifting, Rekombination
+und multivariate Verfahren bleiben offen.
+
 Vollständige Abgrenzung und Reproduktion:
-[Polynomial Decomposition Synthesis](polynomial-decomposition-synthesis.md).
+[Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md),
+[Semantische Polynomansicht und quartische Zerlegungsengine](polynomial-decomposition-synthesis.md)
+und
+[ADR: Domänenbewusster Polynomkern statt Quartik-API](adr/domain-aware-polynomial-factorization.md).
 
 ## Aktuelle vergleichende Benchmarks
 
@@ -356,9 +394,10 @@ Regelsuche unterscheidet mindestens:
    projektintern neue Hypothese.
 4. **Autonomous Campaign Qualification:** Ein autonom erzeugter Kandidat besteht
    die eingefrorene interne Qualifikation und Reproduktion.
-5. **Bounded Semantic Synthesis:** Ein allgemeiner, exakt begrenzter
-   Theorieoperator konstruiert eine zertifizierte Darstellung oder Zerlegung;
-   dies ist weder Vollständigkeit noch externe Neuheit.
+5. **Bounded Verified Factorization:** Eine Engine konstruiert unter expliziten
+   Domain-, Ring- und Work-Verträgen eine Zerlegung, die ein unabhängiger
+   Verifier exakt rekonstruiert; dies ist weder vollständige Faktorisierung noch
+   externe Neuheit.
 6. **Proof-gated Generational Reuse:** Exakt qualifizierte Regeln einer
    abgeschlossenen Generation verbessern einen späteren Schatteninventar-Lauf;
    dies ist noch keine Produktionspromotion.
@@ -395,11 +434,15 @@ Fokussierte Vorbereitung und Promotion:
   --tests de.regelsuche.evolution.LearnedPatternRulePromoterTest
 ```
 
-Generationenbasiertes Regelmining und Polynomzerlegungssynthese:
+Generationenbasiertes Regelmining und domänenbewusste Faktorisierung:
 
 ```bash
 ./gradlew :app:test \
   --tests de.regelsuche.docs.GenerationalRuleMiningCampaignTest
+
+./gradlew :regelsuche-core:test \
+  --tests 'de.regelsuche.polynomial.*' \
+  --tests de.regelsuche.transform.PolynomialDecompositionSynthesisOperatorTest
 
 ./gradlew :app:test \
   --tests de.regelsuche.docs.PolynomialDecompositionDiscoveryIntegrationTest
@@ -426,17 +469,21 @@ Unabhängiges Reproduktionspaket und Claim-Grenzen:
    über das Produktdefault entscheiden;
 2. gemeinsame Multi-Principal-Traversierung und typisierte
    Repräsentationsbrücken integrieren;
-3. die semantische Synthese auf weitere ausdrücklich preregistrierte
-   Darstellungsfamilien ausweiten, ohne den aktuellen Quartik-Claim umzudeuten;
-4. reale Evidence-Root-Artefakte im Promotions-/Qualification-Lifecycle laden
+3. vollständige, budgetierte univariate Faktorisierung über `Z[x]` und `Q[x]`
+   hinter dem neuen Engine-/Verifier-Vertrag implementieren: Inhalt,
+   quadratfreie Zerlegung, endliche Körper, Primzahlauswahl, Hensel-Lifting und
+   Faktorrekomposition;
+4. externe Faktorisierungsbackends nur als Proposal-Quellen integrieren und ihre
+   Ergebnisse intern exakt rekonstruieren;
+5. reale Evidence-Root-Artefakte im Promotions-/Qualification-Lifecycle laden
    und semantisch prüfen;
-5. reales Flagship-`FROZEN_NOT_RUN`-Receipt erzeugen und #533 abschließen;
-6. TRAIN-Populationen, VALIDATION-Auswahl und genau einmaligen FINAL TEST für
+6. reales Flagship-`FROZEN_NOT_RUN`-Receipt erzeugen und #533 abschließen;
+7. TRAIN-Populationen, VALIDATION-Auswahl und genau einmaligen FINAL TEST für
    #521 ausführen;
-7. information-paritäre Baselines und Ablationen aus #235 vervollständigen;
-8. Performance-Optimierungen nur bei Evidence- und Work-Accounting-Parität
+8. information-paritäre Baselines und Ablationen aus #235 vervollständigen;
+9. Performance-Optimierungen nur bei Evidence- und Work-Accounting-Parität
    aktivieren;
-9. externe Interestingness- und Novelty-Prüfungen als getrennte reale Studien
+10. externe Interestingness- und Novelty-Prüfungen als getrennte reale Studien
    durchführen.
 
 ## Verbindliche Grenzen
@@ -447,8 +494,9 @@ Unabhängiges Reproduktionspaket und Claim-Grenzen:
   Informationen dürfen nicht in eine frühere Formation einfließen.
 - Eine Generation darf ihre eigenen neu gebildeten Regeln nicht während
   desselben Laufs aktivieren.
-- Semantische Repräsentationserkennung ist kein Beweis; jeder autorisierende
-  Synthese- oder Brückenschritt besitzt eine eigene Verifikation.
+- Semantische Repräsentationserkennung autorisiert nur einen typisierten
+  Request; Engine-Proposals und Backend-Claims bleiben bis zur unabhängigen
+  Verifikation untrusted.
 - Konfigurierte, ausgeführte, übersprungene und verbleibende Arbeit wird
   vollständig bilanziert.
 - Fehlende Evidence führt zu `BLOCKED` oder `NOT_EVALUATED`, niemals zu einem

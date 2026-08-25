@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FactorizationRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">FactorizationRequest.java</span></div><h1>FactorizationRequest.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import java.util.Objects;
+
+/** Typed factorization request with one non-resettable work budget. */
+public record FactorizationRequest&lt;C&gt;(
+    SparsePolynomial&lt;C&gt; source,
+    EvidenceRequirement evidenceRequirement,
+    int maxCandidates,
+    long maxWorkUnits
+) {
+<span class="fc" id="L12">    public FactorizationRequest {</span>
+<span class="fc" id="L13">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L14">        Objects.requireNonNull(</span>
+            evidenceRequirement,
+            &quot;evidenceRequirement&quot;);
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        if (source.isZero()) {</span>
+<span class="nc" id="L18">            throw new IllegalArgumentException(</span>
+                &quot;zero polynomial has no finite factorization contract&quot;);
+        }
+<span class="pc bpc" id="L21" title="2 of 4 branches missed.">        if (maxCandidates &lt; 0 || maxWorkUnits &lt; 1) {</span>
+<span class="nc" id="L22">            throw new IllegalArgumentException(</span>
+                &quot;factorization request budget is invalid&quot;);
+        }
+<span class="fc" id="L25">    }</span>
+
+    public static &lt;C&gt; FactorizationRequest&lt;C&gt; verifiedDecomposition(
+        SparsePolynomial&lt;C&gt; source,
+        int maxCandidates,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L32">        return new FactorizationRequest&lt;&gt;(</span>
+            source,
+            EvidenceRequirement.VERIFIED_DECOMPOSITION,
+            maxCandidates,
+            maxWorkUnits);
+    }
+
+    /**
+     * Required authority after independent processing of an engine result.
+     * Backend claims never satisfy {@code INDEPENDENT_COMPLETE} by themselves.
+     */
+<span class="fc" id="L43">    public enum EvidenceRequirement {</span>
+<span class="fc" id="L44">        VERIFIED_DECOMPOSITION,</span>
+<span class="fc" id="L45">        INDEPENDENT_COMPLETE</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

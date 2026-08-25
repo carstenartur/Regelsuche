@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SparsePolynomial.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">SparsePolynomial.java</span></div><h1>SparsePolynomial.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/** Immutable canonical sparse polynomial over an explicit ring. */
+public final class SparsePolynomial&lt;C&gt; {
+    private final PolynomialRing&lt;C&gt; ring;
+    private final NavigableMap&lt;Monomial, C&gt; terms;
+
+    public SparsePolynomial(
+        PolynomialRing&lt;C&gt; ring,
+        Map&lt;Monomial, C&gt; terms
+<span class="fc" id="L17">    ) {</span>
+<span class="fc" id="L18">        this.ring = Objects.requireNonNull(ring, &quot;ring&quot;);</span>
+<span class="fc" id="L19">        Objects.requireNonNull(terms, &quot;terms&quot;);</span>
+<span class="fc" id="L20">        TreeMap&lt;Monomial, C&gt; normalized = newTermMap(ring);</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, C&gt; entry : terms.entrySet()) {</span>
+<span class="fc" id="L22">            Monomial monomial = Objects.requireNonNull(</span>
+<span class="fc" id="L23">                entry.getKey(),</span>
+                &quot;monomial&quot;);
+<span class="fc bfc" id="L25" title="All 2 branches covered.">            if (monomial.arity() != ring.variableCount()) {</span>
+<span class="fc" id="L26">                throw new IllegalArgumentException(</span>
+                    &quot;monomial arity must equal polynomial ring variable count&quot;);
+            }
+<span class="fc" id="L29">            C coefficient = ring.coefficientDomain().canonical(</span>
+<span class="fc" id="L30">                Objects.requireNonNull(</span>
+<span class="fc" id="L31">                    entry.getValue(),</span>
+                    &quot;coefficient&quot;));
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            if (!ring.coefficientDomain().isZero(coefficient)) {</span>
+<span class="fc" id="L34">                normalized.put(monomial, coefficient);</span>
+            }
+<span class="fc" id="L36">        }</span>
+<span class="fc" id="L37">        this.terms = Collections.unmodifiableNavigableMap(normalized);</span>
+<span class="fc" id="L38">    }</span>
+
+    public static &lt;C&gt; SparsePolynomial&lt;C&gt; zero(
+        PolynomialRing&lt;C&gt; ring
+    ) {
+<span class="fc" id="L43">        return new SparsePolynomial&lt;&gt;(ring, Map.of());</span>
+    }
+
+    public static &lt;C&gt; SparsePolynomial&lt;C&gt; one(
+        PolynomialRing&lt;C&gt; ring
+    ) {
+<span class="fc" id="L49">        return constant(ring, ring.coefficientDomain().one());</span>
+    }
+
+    public static &lt;C&gt; SparsePolynomial&lt;C&gt; constant(
+        PolynomialRing&lt;C&gt; ring,
+        C coefficient
+    ) {
+<span class="fc" id="L56">        Objects.requireNonNull(ring, &quot;ring&quot;);</span>
+<span class="fc" id="L57">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="fc" id="L58">        C canonical = domain.canonical(coefficient);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        return domain.isZero(canonical)</span>
+<span class="nc" id="L60">            ? zero(ring)</span>
+<span class="fc" id="L61">            : new SparsePolynomial&lt;&gt;(</span>
+                ring,
+<span class="fc" id="L63">                Map.of(Monomial.one(ring.variableCount()), canonical));</span>
+    }
+
+    public PolynomialRing&lt;C&gt; ring() {
+<span class="fc" id="L67">        return ring;</span>
+    }
+
+    public NavigableMap&lt;Monomial, C&gt; terms() {
+<span class="fc" id="L71">        return terms;</span>
+    }
+
+    public int termCount() {
+<span class="fc" id="L75">        return terms.size();</span>
+    }
+
+    public boolean isZero() {
+<span class="fc" id="L79">        return terms.isEmpty();</span>
+    }
+
+    public boolean isOne() {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        return terms.size() == 1</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            &amp;&amp; terms.firstKey().totalDegree() == 0</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            &amp;&amp; ring.coefficientDomain().isOne(</span>
+<span class="fc" id="L86">                terms.firstEntry().getValue());</span>
+    }
+
+    public boolean isConstant() {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        return totalDegree() &lt;= 0;</span>
+    }
+
+    public C leadingCoefficient() {
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (isZero()) {</span>
+<span class="nc" id="L95">            throw new IllegalStateException(</span>
+                &quot;zero polynomial has no leading coefficient&quot;);
+        }
+<span class="fc" id="L98">        return terms.firstEntry().getValue();</span>
+    }
+
+    public C coefficient(Monomial monomial) {
+<span class="fc" id="L102">        Objects.requireNonNull(monomial, &quot;monomial&quot;);</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (monomial.arity() != ring.variableCount()) {</span>
+<span class="nc" id="L104">            throw new IllegalArgumentException(</span>
+                &quot;coefficient query arity mismatch&quot;);
+        }
+<span class="fc" id="L107">        return terms.getOrDefault(</span>
+            monomial,
+<span class="fc" id="L109">            ring.coefficientDomain().zero());</span>
+    }
+
+    public C coefficient(int... exponents) {
+<span class="fc" id="L113">        return coefficient(Monomial.of(exponents));</span>
+    }
+
+    public int totalDegree() {
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        return isZero()</span>
+<span class="nc" id="L118">            ? -1</span>
+<span class="fc" id="L119">            : terms.keySet().stream()</span>
+<span class="fc" id="L120">                .mapToInt(Monomial::totalDegree)</span>
+<span class="fc" id="L121">                .max()</span>
+<span class="fc" id="L122">                .orElseThrow();</span>
+    }
+
+    public int degree(int variableIndex) {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (variableIndex &lt; 0</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                || variableIndex &gt;= ring.variableCount()) {</span>
+<span class="nc" id="L128">            throw new IllegalArgumentException(</span>
+                &quot;variable index outside polynomial ring&quot;);
+        }
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        return isZero()</span>
+<span class="nc" id="L132">            ? -1</span>
+<span class="nc" id="L133">            : terms.keySet().stream()</span>
+<span class="nc" id="L134">                .mapToInt(monomial -&gt; monomial.exponent(variableIndex))</span>
+<span class="nc" id="L135">                .max()</span>
+<span class="nc" id="L136">                .orElseThrow();</span>
+    }
+
+    public int maxCoefficientBitLength() {
+<span class="nc" id="L140">        return terms.values().stream()</span>
+<span class="nc" id="L141">            .mapToInt(ring.coefficientDomain()::bitLength)</span>
+<span class="nc" id="L142">            .max()</span>
+<span class="nc" id="L143">            .orElse(0);</span>
+    }
+
+    public boolean isHomogeneousOfDegree(int expectedDegree) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        return expectedDegree &gt;= 0</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            &amp;&amp; !isZero()</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            &amp;&amp; terms.keySet().stream().allMatch(</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                monomial -&gt; monomial.totalDegree() == expectedDegree);</span>
+    }
+
+    public SparsePolynomial&lt;C&gt; add(SparsePolynomial&lt;C&gt; other) {
+<span class="fc" id="L154">        requireSameRing(other);</span>
+<span class="fc" id="L155">        TreeMap&lt;Monomial, C&gt; result = newTermMap(ring);</span>
+<span class="fc" id="L156">        result.putAll(terms);</span>
+<span class="fc" id="L157">        other.terms.forEach(</span>
+<span class="fc" id="L158">            (monomial, coefficient) -&gt; merge(</span>
+                result,
+                monomial,
+                coefficient));
+<span class="fc" id="L162">        return new SparsePolynomial&lt;&gt;(ring, result);</span>
+    }
+
+    public SparsePolynomial&lt;C&gt; subtract(
+        SparsePolynomial&lt;C&gt; other
+    ) {
+<span class="fc" id="L168">        return add(other.negate());</span>
+    }
+
+    public SparsePolynomial&lt;C&gt; negate() {
+<span class="fc" id="L172">        TreeMap&lt;Monomial, C&gt; result = newTermMap(ring);</span>
+<span class="fc" id="L173">        terms.forEach((monomial, coefficient) -&gt; result.put(</span>
+            monomial,
+<span class="fc" id="L175">            ring.coefficientDomain().negate(coefficient)));</span>
+<span class="fc" id="L176">        return new SparsePolynomial&lt;&gt;(ring, result);</span>
+    }
+
+    public SparsePolynomial&lt;C&gt; scale(C scalar) {
+<span class="nc" id="L180">        C checked = ring.coefficientDomain().canonical(scalar);</span>
+<span class="nc bnc" id="L181" title="All 4 branches missed.">        if (ring.coefficientDomain().isZero(checked) || isZero()) {</span>
+<span class="nc" id="L182">            return zero(ring);</span>
+        }
+<span class="nc" id="L184">        TreeMap&lt;Monomial, C&gt; result = newTermMap(ring);</span>
+<span class="nc" id="L185">        terms.forEach((monomial, coefficient) -&gt; result.put(</span>
+            monomial,
+<span class="nc" id="L187">            ring.coefficientDomain().multiply(</span>
+                coefficient,
+                checked)));
+<span class="nc" id="L190">        return new SparsePolynomial&lt;&gt;(ring, result);</span>
+    }
+
+    public SparsePolynomial&lt;C&gt; multiply(
+        SparsePolynomial&lt;C&gt; other
+    ) {
+<span class="fc" id="L196">        requireSameRing(other);</span>
+<span class="pc bpc" id="L197" title="2 of 4 branches missed.">        if (isZero() || other.isZero()) {</span>
+<span class="nc" id="L198">            return zero(ring);</span>
+        }
+<span class="fc" id="L200">        TreeMap&lt;Monomial, C&gt; result = newTermMap(ring);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, C&gt; left : terms.entrySet()) {</span>
+            for (Map.Entry&lt;Monomial, C&gt; right
+<span class="fc bfc" id="L203" title="All 2 branches covered.">                    : other.terms.entrySet()) {</span>
+<span class="fc" id="L204">                merge(</span>
+                    result,
+<span class="fc" id="L206">                    left.getKey().multiply(right.getKey()),</span>
+<span class="fc" id="L207">                    ring.coefficientDomain().multiply(</span>
+<span class="fc" id="L208">                        left.getValue(),</span>
+<span class="fc" id="L209">                        right.getValue()));</span>
+<span class="fc" id="L210">            }</span>
+<span class="fc" id="L211">        }</span>
+<span class="fc" id="L212">        return new SparsePolynomial&lt;&gt;(ring, result);</span>
+    }
+
+    public SparsePolynomial&lt;C&gt; pow(int exponent) {
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (exponent &lt; 0) {</span>
+<span class="nc" id="L217">            throw new IllegalArgumentException(</span>
+                &quot;polynomial exponent must not be negative&quot;);
+        }
+<span class="fc" id="L220">        SparsePolynomial&lt;C&gt; result = one(ring);</span>
+<span class="fc" id="L221">        SparsePolynomial&lt;C&gt; factor = this;</span>
+<span class="fc" id="L222">        int remaining = exponent;</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">            if ((remaining &amp; 1) == 1) {</span>
+<span class="fc" id="L225">                result = result.multiply(factor);</span>
+            }
+<span class="fc" id="L227">            remaining &gt;&gt;&gt;= 1;</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (remaining &gt; 0) {</span>
+<span class="nc" id="L229">                factor = factor.multiply(factor);</span>
+            }
+        }
+<span class="fc" id="L232">        return result;</span>
+    }
+
+    public SparsePolynomial&lt;C&gt; homogenize(
+        int targetTotalDegree,
+        PolynomialVariable homogenizingVariable
+    ) {
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (targetTotalDegree &lt; 0</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                || totalDegree() &gt; targetTotalDegree) {</span>
+<span class="nc" id="L241">            throw new IllegalArgumentException(</span>
+                &quot;homogenization degree is insufficient&quot;);
+        }
+<span class="fc" id="L244">        PolynomialRing&lt;C&gt; targetRing = ring.appendVariable(</span>
+            homogenizingVariable);
+<span class="fc" id="L246">        TreeMap&lt;Monomial, C&gt; result = newTermMap(targetRing);</span>
+<span class="fc" id="L247">        terms.forEach((monomial, coefficient) -&gt; result.put(</span>
+<span class="fc" id="L248">            monomial.appendExponent(</span>
+<span class="fc" id="L249">                targetTotalDegree - monomial.totalDegree()),</span>
+            coefficient));
+<span class="fc" id="L251">        return new SparsePolynomial&lt;&gt;(targetRing, result);</span>
+    }
+
+    public String canonicalMaterial() {
+<span class="fc" id="L255">        StringBuilder result = new StringBuilder(</span>
+<span class="fc" id="L256">            ring.canonicalMaterial());</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, C&gt; term : terms.entrySet()) {</span>
+<span class="fc" id="L258">            append(result, term.getKey().canonicalMaterial());</span>
+<span class="fc" id="L259">            append(</span>
+                result,
+<span class="fc" id="L261">                ring.coefficientDomain().canonicalText(</span>
+<span class="fc" id="L262">                    term.getValue()));</span>
+<span class="fc" id="L263">        }</span>
+<span class="fc" id="L264">        return result.toString();</span>
+    }
+
+    private void merge(
+        TreeMap&lt;Monomial, C&gt; target,
+        Monomial monomial,
+        C coefficient
+    ) {
+<span class="fc" id="L272">        CoefficientDomain&lt;C&gt; domain = ring.coefficientDomain();</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        C combined = target.containsKey(monomial)</span>
+<span class="fc" id="L274">            ? domain.add(target.get(monomial), coefficient)</span>
+<span class="fc" id="L275">            : domain.canonical(coefficient);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (domain.isZero(combined)) {</span>
+<span class="fc" id="L277">            target.remove(monomial);</span>
+        } else {
+<span class="fc" id="L279">            target.put(monomial, combined);</span>
+        }
+<span class="fc" id="L281">    }</span>
+
+    private void requireSameRing(SparsePolynomial&lt;C&gt; other) {
+<span class="fc" id="L284">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (!ring.equals(other.ring)) {</span>
+<span class="fc" id="L286">            throw new IllegalArgumentException(</span>
+                &quot;polynomial ring mismatch&quot;);
+        }
+<span class="fc" id="L289">    }</span>
+
+    private static &lt;C&gt; TreeMap&lt;Monomial, C&gt; newTermMap(
+        PolynomialRing&lt;C&gt; ring
+    ) {
+<span class="fc" id="L294">        return new TreeMap&lt;&gt;(ring.monomialComparator());</span>
+    }
+
+    private static void append(
+        StringBuilder target,
+        String value
+    ) {
+<span class="fc" id="L301">        target.append('|')</span>
+<span class="fc" id="L302">            .append(value.length())</span>
+<span class="fc" id="L303">            .append(':')</span>
+<span class="fc" id="L304">            .append(value);</span>
+<span class="fc" id="L305">    }</span>
+
+    @Override
+    public boolean equals(Object other) {
+<span class="fc" id="L309">        return this == other</span>
+<span class="pc bpc" id="L310" title="1 of 4 branches missed.">            || other instanceof SparsePolynomial&lt;?&gt; polynomial</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">                &amp;&amp; ring.equals(polynomial.ring)</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">                &amp;&amp; terms.equals(polynomial.terms);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L317">        return Objects.hash(ring, terms);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L322">        return terms.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

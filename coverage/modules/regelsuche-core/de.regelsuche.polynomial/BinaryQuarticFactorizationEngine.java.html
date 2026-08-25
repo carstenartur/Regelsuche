@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BinaryQuarticFactorizationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">BinaryQuarticFactorizationEngine.java</span></div><h1>BinaryQuarticFactorizationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Bounded exact quadratic-by-quadratic proposal engine for binary homogeneous
+ * quartics.
+ *
+ * &lt;p&gt;The engine solves exact coefficient constraints. It does not issue trusted
+ * product, completeness or irreducibility evidence; that authority belongs to
+ * {@link FactorizationVerifier}.&lt;/p&gt;
+ */
+public final class BinaryQuarticFactorizationEngine
+        implements FactorizationEngine&lt;BigInteger&gt; {
+    public static final String ENGINE_ID =
+        &quot;regelsuche.factorization.binary-quartic-2x2/v1&quot;;
+
+    private static final int DEFAULT_MAX_COEFFICIENT_ABS = 32;
+    private static final long DEFAULT_MAX_ENGINE_WORK_UNITS = 4_096;
+
+    private final int maxCoefficientAbs;
+    private final long maxEngineWorkUnits;
+
+    public BinaryQuarticFactorizationEngine() {
+<span class="fc" id="L35">        this(</span>
+            DEFAULT_MAX_COEFFICIENT_ABS,
+            DEFAULT_MAX_ENGINE_WORK_UNITS);
+<span class="fc" id="L38">    }</span>
+
+    public BinaryQuarticFactorizationEngine(
+        int maxCoefficientAbs,
+        long maxEngineWorkUnits
+<span class="fc" id="L43">    ) {</span>
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">        if (maxCoefficientAbs &lt; 1 || maxEngineWorkUnits &lt; 1) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(</span>
+                &quot;binary quartic factorization budget is invalid&quot;);
+        }
+<span class="fc" id="L48">        this.maxCoefficientAbs = maxCoefficientAbs;</span>
+<span class="fc" id="L49">        this.maxEngineWorkUnits = maxEngineWorkUnits;</span>
+<span class="fc" id="L50">    }</span>
+
+    @Override
+    public String engineId() {
+<span class="fc" id="L54">        return ENGINE_ID;</span>
+    }
+
+    @Override
+    public String coefficientDomainId() {
+<span class="fc" id="L59">        return BigIntegerDomain.DOMAIN_ID;</span>
+    }
+
+    @Override
+    public EngineResult&lt;BigInteger&gt; propose(
+        FactorizationRequest&lt;BigInteger&gt; request
+    ) {
+<span class="fc" id="L66">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L67">        SparsePolynomial&lt;BigInteger&gt; source = request.source();</span>
+<span class="fc" id="L68">        EngineResult&lt;BigInteger&gt; unsupported = validateRequest(</span>
+            request,
+            source);
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (unsupported != null) {</span>
+<span class="fc" id="L72">            return unsupported;</span>
+        }
+
+<span class="fc" id="L75">        Work work = new Work(Math.min(</span>
+            maxEngineWorkUnits,
+<span class="fc" id="L77">            request.maxWorkUnits()));</span>
+<span class="fc" id="L78">        Map&lt;String, Proposal&lt;BigInteger&gt;&gt; proposals =</span>
+            new LinkedHashMap&lt;&gt;();
+        try {
+<span class="fc" id="L81">            Coefficients target = coefficients(source);</span>
+<span class="fc" id="L82">            List&lt;BigInteger&gt; leadingDivisors = divisors(</span>
+<span class="fc" id="L83">                target.c40(),</span>
+                work);
+<span class="fc" id="L85">            List&lt;BigInteger&gt; trailingDivisors = divisors(</span>
+<span class="fc" id="L86">                target.c04(),</span>
+                work);
+<span class="fc" id="L88">            enumerateProposals(</span>
+                source,
+                target,
+                leadingDivisors,
+                trailingDivisors,
+                work,
+                proposals);
+<span class="fc" id="L95">        } catch (BudgetExceeded exception) {</span>
+<span class="fc" id="L96">            return result(</span>
+                request,
+                Outcome.BUDGET_INCONCLUSIVE,
+                &quot;ENGINE_WORK_BUDGET_EXCEEDED&quot;,
+<span class="fc" id="L100">                work.ledger(),</span>
+<span class="fc" id="L101">                List.of(),</span>
+                BackendClaim.NONE);
+<span class="fc" id="L103">        }</span>
+
+<span class="fc" id="L105">        List&lt;Proposal&lt;BigInteger&gt;&gt; ordered = proposals.values().stream()</span>
+<span class="fc" id="L106">            .sorted(Comparator.comparing(Proposal::canonicalMaterial))</span>
+<span class="fc" id="L107">            .limit(request.maxCandidates())</span>
+<span class="fc" id="L108">            .toList();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (ordered.isEmpty()) {</span>
+<span class="fc" id="L110">            return result(</span>
+                request,
+                Outcome.NO_CANDIDATE,
+                &quot;NO_BOUNDED_INTEGER_QUADRATIC_DECOMPOSITION&quot;,
+<span class="fc" id="L114">                work.ledger(),</span>
+<span class="fc" id="L115">                List.of(),</span>
+                BackendClaim.NONE);
+        }
+<span class="fc" id="L118">        return result(</span>
+            request,
+            Outcome.CANDIDATES,
+            &quot;EXACT_QUADRATIC_DECOMPOSITION_PROPOSALS&quot;,
+<span class="fc" id="L122">            work.ledger(),</span>
+            ordered,
+            BackendClaim.NONE);
+    }
+
+    private EngineResult&lt;BigInteger&gt; validateRequest(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SparsePolynomial&lt;BigInteger&gt; source
+    ) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (!coefficientDomainId().equals(</span>
+<span class="fc" id="L132">                source.ring().coefficientDomain().id())) {</span>
+<span class="nc" id="L133">            return result(</span>
+                request,
+                Outcome.UNSUPPORTED_DOMAIN,
+                &quot;REQUIRES_EXACT_INTEGER_COEFFICIENT_DOMAIN&quot;,
+<span class="nc" id="L137">                WorkLedger.empty(),</span>
+<span class="nc" id="L138">                List.of(),</span>
+                BackendClaim.NONE);
+        }
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (request.evidenceRequirement()</span>
+                == FactorizationRequest.EvidenceRequirement
+                    .INDEPENDENT_COMPLETE) {
+<span class="fc" id="L144">            return result(</span>
+                request,
+                Outcome.UNSUPPORTED_REQUEST,
+                &quot;ENGINE_DOES_NOT_CERTIFY_FACTOR_IRREDUCIBILITY&quot;,
+<span class="fc" id="L148">                WorkLedger.empty(),</span>
+<span class="fc" id="L149">                List.of(),</span>
+                BackendClaim.NONE);
+        }
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (source.ring().variableCount() != 2</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">                || !source.isHomogeneousOfDegree(4)</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                || source.coefficient(4, 0).signum() == 0</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                || source.coefficient(0, 4).signum() == 0) {</span>
+<span class="fc" id="L156">            return result(</span>
+                request,
+                Outcome.UNSUPPORTED_REQUEST,
+                &quot;REQUIRES_BINARY_HOMOGENEOUS_QUARTIC_WITH_NONZERO_EXTREME_TERMS&quot;,
+<span class="fc" id="L160">                WorkLedger.empty(),</span>
+<span class="fc" id="L161">                List.of(),</span>
+                BackendClaim.NONE);
+        }
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (request.maxCandidates() == 0) {</span>
+<span class="fc" id="L165">            return result(</span>
+                request,
+                Outcome.BUDGET_INCONCLUSIVE,
+                &quot;MAX_CANDIDATES_IS_ZERO&quot;,
+<span class="fc" id="L169">                WorkLedger.empty(),</span>
+<span class="fc" id="L170">                List.of(),</span>
+                BackendClaim.NONE);
+        }
+<span class="fc" id="L173">        return null;</span>
+    }
+
+    private static Coefficients coefficients(
+        SparsePolynomial&lt;BigInteger&gt; source
+    ) {
+<span class="fc" id="L179">        return new Coefficients(</span>
+<span class="fc" id="L180">            source.coefficient(4, 0),</span>
+<span class="fc" id="L181">            source.coefficient(3, 1),</span>
+<span class="fc" id="L182">            source.coefficient(2, 2),</span>
+<span class="fc" id="L183">            source.coefficient(1, 3),</span>
+<span class="fc" id="L184">            source.coefficient(0, 4));</span>
+    }
+
+    private void enumerateProposals(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        Coefficients target,
+        List&lt;BigInteger&gt; leadingDivisors,
+        List&lt;BigInteger&gt; trailingDivisors,
+        Work work,
+        Map&lt;String, Proposal&lt;BigInteger&gt;&gt; proposals
+    ) {
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (BigInteger a : leadingDivisors) {</span>
+<span class="fc" id="L196">            BigInteger d = target.c40().divide(a);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            if (!withinBound(d)) {</span>
+<span class="nc" id="L198">                continue;</span>
+            }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            for (BigInteger c : trailingDivisors) {</span>
+<span class="fc" id="L201">                work.consume(&quot;engine.factor-pair-configurations&quot;, 1);</span>
+<span class="fc" id="L202">                BigInteger f = target.c04().divide(c);</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                if (!withinBound(f)) {</span>
+<span class="nc" id="L204">                    continue;</span>
+                }
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                for (MiddlePair middle : solveMiddle(</span>
+                        a,
+                        d,
+                        c,
+                        f,
+                        target,
+                        work)) {
+<span class="fc" id="L213">                    retainProposal(</span>
+                        source,
+                        target,
+<span class="fc" id="L216">                        new Quadratic(a, middle.b(), c),</span>
+<span class="fc" id="L217">                        new Quadratic(d, middle.e(), f),</span>
+                        work,
+                        proposals);
+<span class="fc" id="L220">                }</span>
+<span class="fc" id="L221">            }</span>
+<span class="fc" id="L222">        }</span>
+<span class="fc" id="L223">    }</span>
+
+    private void retainProposal(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        Coefficients target,
+        Quadratic first,
+        Quadratic second,
+        Work work,
+        Map&lt;String, Proposal&lt;BigInteger&gt;&gt; proposals
+    ) {
+<span class="fc" id="L233">        work.consume(&quot;engine.candidate-reconstructions&quot;, 1);</span>
+<span class="fc" id="L234">        BigInteger reconstructedMiddle = first.a().multiply(second.c())</span>
+<span class="fc" id="L235">            .add(first.b().multiply(second.b()))</span>
+<span class="fc" id="L236">            .add(first.c().multiply(second.a()));</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (!reconstructedMiddle.equals(target.c22())) {</span>
+<span class="fc" id="L238">            return;</span>
+        }
+<span class="fc" id="L240">        NormalizedFactorPair normalized = normalize(</span>
+<span class="fc" id="L241">            source.ring(),</span>
+            first,
+            second);
+<span class="fc" id="L244">        String certificateMaterial = proposalCertificateMaterial(</span>
+            source,
+            normalized);
+<span class="fc" id="L247">        Proposal&lt;BigInteger&gt; proposal = new Proposal&lt;&gt;(</span>
+<span class="fc" id="L248">            normalized.unit(),</span>
+<span class="fc" id="L249">            List.of(</span>
+<span class="fc" id="L250">                new PolynomialFactor&lt;&gt;(normalized.left(), 1),</span>
+<span class="fc" id="L251">                new PolynomialFactor&lt;&gt;(normalized.right(), 1)),</span>
+<span class="fc" id="L252">            SparsePolynomial.one(source.ring()),</span>
+<span class="fc" id="L253">            sha256(certificateMaterial));</span>
+<span class="fc" id="L254">        proposals.putIfAbsent(</span>
+<span class="fc" id="L255">            proposal.canonicalMaterial(),</span>
+            proposal);
+<span class="fc" id="L257">    }</span>
+
+    private List&lt;MiddlePair&gt; solveMiddle(
+        BigInteger a,
+        BigInteger d,
+        BigInteger c,
+        BigInteger f,
+        Coefficients target,
+        Work work
+    ) {
+<span class="fc" id="L267">        BigInteger determinant = d.multiply(c)</span>
+<span class="fc" id="L268">            .subtract(a.multiply(f));</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (determinant.signum() != 0) {</span>
+<span class="fc" id="L270">            work.consume(&quot;engine.middle-system-solves&quot;, 1);</span>
+<span class="fc" id="L271">            BigInteger bNumerator = target.c31().multiply(c)</span>
+<span class="fc" id="L272">                .subtract(a.multiply(target.c13()));</span>
+<span class="fc" id="L273">            BigInteger eNumerator = d.multiply(target.c13())</span>
+<span class="fc" id="L274">                .subtract(f.multiply(target.c31()));</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">            if (!isDivisible(bNumerator, determinant)</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                    || !isDivisible(eNumerator, determinant)) {</span>
+<span class="nc" id="L277">                return List.of();</span>
+            }
+<span class="fc" id="L279">            return List.of(new MiddlePair(</span>
+<span class="fc" id="L280">                bNumerator.divide(determinant),</span>
+<span class="fc" id="L281">                eNumerator.divide(determinant)));</span>
+        }
+
+<span class="fc" id="L284">        List&lt;MiddlePair&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L285">        for (int value = -maxCoefficientAbs;</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">                value &lt;= maxCoefficientAbs;</span>
+<span class="fc" id="L287">                value++) {</span>
+<span class="fc" id="L288">            work.consume(&quot;engine.middle-system-solves&quot;, 1);</span>
+<span class="fc" id="L289">            BigInteger b = BigInteger.valueOf(value);</span>
+<span class="fc" id="L290">            BigInteger eNumerator = target.c31()</span>
+<span class="fc" id="L291">                .subtract(d.multiply(b));</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            if (!isDivisible(eNumerator, a)) {</span>
+<span class="nc" id="L293">                continue;</span>
+            }
+<span class="fc" id="L295">            BigInteger e = eNumerator.divide(a);</span>
+<span class="fc" id="L296">            if (f.multiply(b)</span>
+<span class="fc" id="L297">                    .add(c.multiply(e))</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                    .equals(target.c13())) {</span>
+<span class="fc" id="L299">                result.add(new MiddlePair(b, e));</span>
+            }
+        }
+<span class="fc" id="L302">        return List.copyOf(result);</span>
+    }
+
+    private List&lt;BigInteger&gt; divisors(
+        BigInteger value,
+        Work work
+    ) {
+<span class="fc" id="L309">        BigInteger absolute = value.abs();</span>
+<span class="fc" id="L310">        List&lt;BigInteger&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L311">        for (int divisor = 1;</span>
+                divisor &lt;= maxCoefficientAbs
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">                    &amp;&amp; BigInteger.valueOf(divisor)</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">                        .compareTo(absolute) &lt;= 0;</span>
+<span class="fc" id="L315">                divisor++) {</span>
+<span class="fc" id="L316">            work.consume(&quot;engine.divisor-tests&quot;, 1);</span>
+<span class="fc" id="L317">            BigInteger candidate = BigInteger.valueOf(divisor);</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">            if (absolute.mod(candidate).signum() == 0) {</span>
+<span class="fc" id="L319">                result.add(candidate);</span>
+<span class="fc" id="L320">                result.add(candidate.negate());</span>
+            }
+        }
+<span class="fc" id="L323">        return result.stream()</span>
+<span class="fc" id="L324">            .distinct()</span>
+<span class="fc" id="L325">            .sorted()</span>
+<span class="fc" id="L326">            .toList();</span>
+    }
+
+    private NormalizedFactorPair normalize(
+        PolynomialRing&lt;BigInteger&gt; ring,
+        Quadratic first,
+        Quadratic second
+    ) {
+<span class="fc" id="L334">        PrimitiveQuadratic left = primitive(first);</span>
+<span class="fc" id="L335">        PrimitiveQuadratic right = primitive(second);</span>
+<span class="fc" id="L336">        BigInteger unit = left.content().multiply(right.content());</span>
+<span class="fc" id="L337">        Quadratic leftCoefficients = left.polynomial();</span>
+<span class="fc" id="L338">        Quadratic rightCoefficients = right.polynomial();</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        if (leftCoefficients.a().signum() &lt; 0) {</span>
+<span class="fc" id="L340">            leftCoefficients = leftCoefficients.negate();</span>
+<span class="fc" id="L341">            unit = unit.negate();</span>
+        }
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (rightCoefficients.a().signum() &lt; 0) {</span>
+<span class="fc" id="L344">            rightCoefficients = rightCoefficients.negate();</span>
+<span class="fc" id="L345">            unit = unit.negate();</span>
+        }
+<span class="fc" id="L347">        SparsePolynomial&lt;BigInteger&gt; leftPolynomial = quadratic(</span>
+            ring,
+            leftCoefficients);
+<span class="fc" id="L350">        SparsePolynomial&lt;BigInteger&gt; rightPolynomial = quadratic(</span>
+            ring,
+            rightCoefficients);
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        return leftPolynomial.canonicalMaterial().compareTo(</span>
+<span class="fc" id="L354">                rightPolynomial.canonicalMaterial()) &lt;= 0</span>
+<span class="fc" id="L355">            ? new NormalizedFactorPair(</span>
+                unit,
+                leftPolynomial,
+                rightPolynomial)
+<span class="fc" id="L359">            : new NormalizedFactorPair(</span>
+                unit,
+                rightPolynomial,
+                leftPolynomial);
+    }
+
+    private static PrimitiveQuadratic primitive(Quadratic polynomial) {
+<span class="fc" id="L366">        BigInteger content = polynomial.a().abs()</span>
+<span class="fc" id="L367">            .gcd(polynomial.b().abs())</span>
+<span class="fc" id="L368">            .gcd(polynomial.c().abs());</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (content.signum() == 0) {</span>
+<span class="nc" id="L370">            throw new IllegalArgumentException(</span>
+                &quot;zero quadratic factor is invalid&quot;);
+        }
+<span class="fc" id="L373">        return new PrimitiveQuadratic(</span>
+            content,
+            new Quadratic(
+<span class="fc" id="L376">                polynomial.a().divide(content),</span>
+<span class="fc" id="L377">                polynomial.b().divide(content),</span>
+<span class="fc" id="L378">                polynomial.c().divide(content)));</span>
+    }
+
+    private static SparsePolynomial&lt;BigInteger&gt; quadratic(
+        PolynomialRing&lt;BigInteger&gt; ring,
+        Quadratic coefficients
+    ) {
+<span class="fc" id="L385">        return new SparsePolynomial&lt;&gt;(</span>
+            ring,
+<span class="fc" id="L387">            Map.of(</span>
+<span class="fc" id="L388">                Monomial.of(2, 0), coefficients.a(),</span>
+<span class="fc" id="L389">                Monomial.of(1, 1), coefficients.b(),</span>
+<span class="fc" id="L390">                Monomial.of(0, 2), coefficients.c()));</span>
+    }
+
+    private EngineResult&lt;BigInteger&gt; result(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        Outcome outcome,
+        String detailCode,
+        WorkLedger work,
+        List&lt;Proposal&lt;BigInteger&gt;&gt; proposals,
+        BackendClaim backendClaim
+    ) {
+<span class="fc" id="L401">        String resultMaterial = engineConfigurationMaterial()</span>
+<span class="fc" id="L402">            + &quot;|source=&quot; + request.source().canonicalMaterial()</span>
+<span class="fc" id="L403">            + &quot;|evidence=&quot; + request.evidenceRequirement()</span>
+<span class="fc" id="L404">            + &quot;|maxCandidates=&quot; + request.maxCandidates()</span>
+<span class="fc" id="L405">            + &quot;|maxWorkUnits=&quot; + request.maxWorkUnits()</span>
+            + &quot;|outcome=&quot; + outcome
+            + &quot;|detail=&quot; + detailCode
+<span class="fc" id="L408">            + &quot;|work=&quot; + work.canonicalMaterial()</span>
+            + &quot;|backendClaim=&quot; + backendClaim
+<span class="fc" id="L410">            + &quot;|proposals=&quot; + proposals.stream()</span>
+<span class="fc" id="L411">                .map(Proposal::canonicalMaterial)</span>
+<span class="fc" id="L412">                .sorted()</span>
+<span class="fc" id="L413">                .toList();</span>
+<span class="fc" id="L414">        return new EngineResult&lt;&gt;(</span>
+<span class="fc" id="L415">            engineId(),</span>
+            outcome,
+            detailCode,
+            work,
+            proposals,
+            backendClaim,
+<span class="fc" id="L421">            sha256(resultMaterial));</span>
+    }
+
+    private String proposalCertificateMaterial(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        NormalizedFactorPair pair
+    ) {
+<span class="fc" id="L428">        return engineConfigurationMaterial()</span>
+<span class="fc" id="L429">            + &quot;|source=&quot; + source.canonicalMaterial()</span>
+<span class="fc" id="L430">            + &quot;|unit=&quot; + pair.unit()</span>
+<span class="fc" id="L431">            + &quot;|left=&quot; + pair.left().canonicalMaterial()</span>
+<span class="fc" id="L432">            + &quot;|right=&quot; + pair.right().canonicalMaterial()</span>
+            + &quot;|remainder=one&quot;;
+    }
+
+    private String engineConfigurationMaterial() {
+<span class="fc" id="L437">        return ENGINE_ID</span>
+            + &quot;|maxCoefficientAbs=&quot; + maxCoefficientAbs
+            + &quot;|maxEngineWorkUnits=&quot; + maxEngineWorkUnits;
+    }
+
+    private boolean withinBound(BigInteger value) {
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">        return value.abs().compareTo(</span>
+<span class="fc" id="L444">            BigInteger.valueOf(maxCoefficientAbs)) &lt;= 0;</span>
+    }
+
+    private static boolean isDivisible(
+        BigInteger numerator,
+        BigInteger denominator
+    ) {
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">        return denominator.signum() != 0</span>
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">            &amp;&amp; numerator.remainder(denominator).signum() == 0;</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L457">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L458">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L459">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L460">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L461">            throw new IllegalStateException(</span>
+                &quot;SHA-256 unavailable&quot;,
+                exception);
+        }
+    }
+
+<span class="fc" id="L467">    private record Coefficients(</span>
+        BigInteger c40,
+        BigInteger c31,
+        BigInteger c22,
+        BigInteger c13,
+        BigInteger c04
+    ) {
+    }
+
+<span class="fc" id="L476">    private record MiddlePair(</span>
+        BigInteger b,
+        BigInteger e
+    ) {
+    }
+
+<span class="fc" id="L482">    private record Quadratic(</span>
+        BigInteger a,
+        BigInteger b,
+        BigInteger c
+    ) {
+        private Quadratic negate() {
+<span class="fc" id="L488">            return new Quadratic(a.negate(), b.negate(), c.negate());</span>
+        }
+    }
+
+<span class="fc" id="L492">    private record PrimitiveQuadratic(</span>
+        BigInteger content,
+        Quadratic polynomial
+    ) {
+    }
+
+<span class="fc" id="L498">    private record NormalizedFactorPair(</span>
+        BigInteger unit,
+        SparsePolynomial&lt;BigInteger&gt; left,
+        SparsePolynomial&lt;BigInteger&gt; right
+    ) {
+    }
+
+    private static final class Work {
+        private final long limit;
+<span class="fc" id="L507">        private final Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
+        private long total;
+
+<span class="fc" id="L510">        private Work(long limit) {</span>
+<span class="fc" id="L511">            this.limit = limit;</span>
+<span class="fc" id="L512">        }</span>
+
+        private void consume(String stage, long units) {
+<span class="pc bpc" id="L515" title="1 of 4 branches missed.">            if (units &lt; 0 || units &gt; limit - total) {</span>
+<span class="fc" id="L516">                throw new BudgetExceeded();</span>
+            }
+<span class="fc" id="L518">            total += units;</span>
+<span class="fc" id="L519">            stages.merge(stage, units, Math::addExact);</span>
+<span class="fc" id="L520">        }</span>
+
+        private WorkLedger ledger() {
+<span class="fc" id="L523">            return new WorkLedger(stages);</span>
+        }
+    }
+
+    private static final class BudgetExceeded
+            extends RuntimeException {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

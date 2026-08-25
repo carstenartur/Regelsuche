@@ -3,66 +3,66 @@
   "benchmarks": [
     {
       "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.directAstRewriteSource",
-      "bytesPerOperation": 476043.5460515491,
-      "millisecondsPerOperation": 0.1350526690412938,
+      "bytesPerOperation": 477776.0506393171,
+      "millisecondsPerOperation": 0.11112008829158836,
       "workCounters": {}
     },
     {
       "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.preparedAstRewriteSource",
-      "bytesPerOperation": 301706.8426959741,
-      "millisecondsPerOperation": 0.08951912861269616,
+      "bytesPerOperation": 301288.0289005627,
+      "millisecondsPerOperation": 0.07084945928928728,
       "workCounters": {}
     },
     {
       "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceFixedWorkSearch",
-      "bytesPerOperation": 50959837.69465393,
-      "millisecondsPerOperation": 21.57000184961734,
+      "bytesPerOperation": 51533885.54261132,
+      "millisecondsPerOperation": 18.158356085571445,
       "workCounters": {
-        "enqueuedStates": 46368.0,
-        "expandedStates": 9792.0,
-        "exploredStates": 18432.0,
-        "generatedTransformations": 48672.0,
+        "enqueuedStates": 54418.0,
+        "expandedStates": 11492.0,
+        "exploredStates": 21632.0,
+        "generatedTransformations": 57122.0,
         "reachedTargets": 0.0,
-        "searches": 144.0
+        "searches": 169.0
       }
     },
     {
       "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedFixedWorkSearch",
-      "bytesPerOperation": 37353785.065133035,
-      "millisecondsPerOperation": 15.872050512522046,
+      "bytesPerOperation": 36185565.068023,
+      "millisecondsPerOperation": 12.350868432035972,
       "workCounters": {
-        "enqueuedStates": 62146.0,
-        "expandedStates": 13124.0,
-        "exploredStates": 24704.0,
-        "generatedTransformations": 65234.0,
+        "enqueuedStates": 78890.0,
+        "expandedStates": 16660.0,
+        "exploredStates": 31360.0,
+        "generatedTransformations": 82810.0,
         "reachedTargets": 0.0,
-        "searches": 193.0
+        "searches": 245.0
       }
     },
     {
       "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceTargetedSearch",
-      "bytesPerOperation": 1179647.101341869,
-      "millisecondsPerOperation": 0.6000693022352309,
+      "bytesPerOperation": 1159212.9358888099,
+      "millisecondsPerOperation": 0.42939375046174777,
       "workCounters": {
-        "enqueuedStates": 73206.0,
-        "expandedStates": 20916.0,
-        "exploredStates": 26145.0,
-        "generatedTransformations": 73206.0,
-        "reachedTargets": 5229.0,
-        "searches": 5229.0
+        "enqueuedStates": 100002.0,
+        "expandedStates": 28572.0,
+        "exploredStates": 35715.0,
+        "generatedTransformations": 100002.0,
+        "reachedTargets": 7143.0,
+        "searches": 7143.0
       }
     },
     {
       "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedTargetedSearch",
-      "bytesPerOperation": 758899.6990849028,
-      "millisecondsPerOperation": 0.44540498765106157,
+      "bytesPerOperation": 761494.6100184885,
+      "millisecondsPerOperation": 0.29355604177253775,
       "workCounters": {
-        "enqueuedStates": 100786.0,
-        "expandedStates": 28796.0,
-        "exploredStates": 35995.0,
-        "generatedTransformations": 100786.0,
-        "reachedTargets": 7199.0,
-        "searches": 7199.0
+        "enqueuedStates": 145236.0,
+        "expandedStates": 41496.0,
+        "exploredStates": 51870.0,
+        "generatedTransformations": 145236.0,
+        "reachedTargets": 10374.0,
+        "searches": 10374.0
       }
     }
   ],

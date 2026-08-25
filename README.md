@@ -14,7 +14,7 @@ sind bewusst von Handbüchern und Architekturtexten getrennt.
 | verstehen, wie fast passende Regeln vorbereitet werden | [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md) und [Rule-directed Preparation Planning](rule-directed-preparation-planning.md) |
 | die Grenze für selbst gelernte Regeln verstehen | [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md) und [Evolutionäre Suche](evolutionary-search.md) |
 | einen generationenbasierten Mining-Lauf reproduzieren | [Generationenbasiertes Regelmining](generational-rule-mining.md) |
-| verstehen, warum nicht jede Polynomidentität eine Regel braucht | [Semantische Polynomansicht und Zerlegungssynthese](polynomial-decomposition-synthesis.md) |
+| die Polynom- und Faktorisierungsarchitektur verstehen | [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md) und [quartische Zerlegungsengine](polynomial-decomposition-synthesis.md) |
 | den aktuellen Forschungsstand verstehen | [Discovery- und Forschungsstand](discovery-status.md) |
 | Claims und Evidence korrekt einordnen | [Capability-Status](generated/capability-status.md), [Glossar](glossary.md) und [Release Readiness](release-readiness.md) |
 | die Architektur verstehen oder Code ändern | [Architektur](architecture.md) und [Developer Guide](developer-guide.md) |
@@ -88,9 +88,12 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 - [Generationenbasiertes Regelmining](generational-rule-mining.md) —
   generationsgetrennte Schatteninventare, exakte Kandidatenprüfung und
   kumulative Wiederverwendung gelernter Transformationen.
-- [Semantische Polynomansicht und Zerlegungssynthese](polynomial-decomposition-synthesis.md) —
-  strukturelle AST-Atome, exakte Koeffizientenbedingungen und Faktorisierung
-  ohne Katalog benannter Einzelfallidentitäten.
+- [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md) —
+  exakte Koeffizientendomänen, Polynomringe, kanonische Sparse-Polynome,
+  untrusted Engine-Proposals und verifier-ausgestellte Evidence.
+- [Semantische Polynomansicht und quartische Zerlegungsengine](polynomial-decomposition-synthesis.md) —
+  strukturelle AST-Atome und die erste begrenzte Faktorisierungsengine ohne
+  Katalog benannter Einzelfallidentitäten.
 - [Evolutionäre Suche und gelernte Regelprogramme](evolutionary-search.md)
 - [Discovery Engine](discovery-engine.md)
 - [Discovery Evidence v1](discovery-evidence-v1.md)
@@ -136,6 +139,9 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 
 - [Architektur](architecture.md) — Systemkontext, Schichten, Trust-Grenzen und
   zentrale Ausführungsflüsse.
+- [ADR: Domänenbewusster Polynomkern statt Quartik-API](adr/domain-aware-polynomial-factorization.md) —
+  Entscheidung gegen parallele Alt-APIs und für Domain-, Ring-, Engine- und
+  Verifier-Grenzen.
 - [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md)
   — gemeinsame Policy-Grenze zwischen direkter Ausführung, nativen
   Exact-Spezialisten, lokaler Bridge-Suche und verifiziertem Replay.

@@ -1,73 +1,59 @@
-# Semantische Polynomansicht und Zerlegungssynthese
+# Semantische Polynomansicht und quartische Zerlegungsengine
 
-**Implementierungsstand: 23. August 2026**
+**Implementierungsstand: 25. August 2026**
 
-Regelsuche soll mathematische Fähigkeit nicht durch einen unbegrenzt wachsenden
-Katalog konkreter Identitäten darstellen. Insbesondere wäre es falsch, für jede
-Einsetzung in eine bekannte Formel eine eigene Regel zu lernen:
+Die ursprüngliche Zerlegungssynthese bleibt als mathematische Fähigkeit erhalten,
+ist aber nicht länger die zentrale Polynomarchitektur. Der allgemeine Vertrag
+für Domänen, Ringe, Polynome, untrusted Engine-Proposals und
+verifier-ausgestellte Evidence steht unter
+[Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md).
 
-```text
-x^4 + 4*y^4
-(x + 1)^4 + 4*y^4
-sin(t)^4 + 4*(z + 1)^4
-...
-```
-
-Die neue Polynomschicht trennt deshalb drei Dinge:
-
-1. **semantische Darstellung** eines Ausdrucks;
-2. **allgemeine Zerlegungsschablone** mit unbekannten Koeffizienten;
-3. **exakte Lösung und Zertifizierung** der Koeffizientenbedingungen.
-
-Die bisherige Sophie-Germain-spezifische Bridge bleibt als historischer
-Benchmark-Kontrollpfad vorhanden. Sie ist nicht länger die standardmäßig
-gewählte Erklärung der allgemeinen Fähigkeit.
+Diese Seite beschreibt die konkrete erste Engine und ihre Integration in die
+Discovery-Suche.
 
 ## Strukturelle AST-Atome
 
-`PolynomialSemanticView` interpretiert einen begrenzten kommutativen Ausdruck
-als exaktes Polynom mit ganzzahligen Koeffizienten. Eine Unbestimmte muss dabei
-kein einzelner Variablenname sein. Ein vollständiger AST-Teilbaum kann ein Atom
-bilden, beispielsweise:
+`PolynomialSemanticView` v2 interpretiert einen begrenzten kommutativen Ausdruck
+als kanonisches Sparse-Polynom mit ganzzahligen Koeffizienten. Eine Unbestimmte
+muss kein Variablenname sein. Ein vollständiger AST-Teilbaum kann ein
+strukturelles Atom bilden:
 
 ```text
 A := x + 1
 B := sin(t)
 ```
 
-Damit erhält
+Damit besitzt
 
 ```text
 (x + 1)^4 + 5*(x + 1)^2*sin(t)^2 + 4*sin(t)^4
 ```
 
-dieselbe semantische Koeffizientenstruktur wie
+dieselbe Koeffizientenstruktur wie
 
 ```text
 A^4 + 5*A^2*B^2 + 4*B^4.
 ```
 
-Eine einzige mathematische Synthese deckt dadurch unendlich viele konkrete
-AST-Einsetzungen ab. Es werden weder sichtbare Hilfsvariablen in den
-Benutzerausdruck geschrieben noch separate Regeln pro Einsetzung benötigt.
+Die mathematische Identität liegt in einem `PolynomialRing<BigInteger>` mit
+expliziter Monomordnung und einem `SparsePolynomial<BigInteger>`.
+Anzeigezeichenfolgen und konkrete AST-Knoten werden separat im View gebunden.
+Dadurch kann dieselbe Engine später auch aus anderen Eingabepfaden aufgerufen
+werden.
 
-Die Sicht ist content-stabil und enthält:
+Exakte Koeffizienten und Exponenten werden aus `ExactParsedTerm` gelesen. Der
+historische `double`-Wert eines `NumberExpr` ist nicht autoritativ. So bleibt
+beispielsweise `9007199254740993` exakt erhalten.
 
-- deterministisch sortierte strukturelle Atome;
-- exakte `BigInteger`-Koeffizienten;
-- Exponentenvektoren der Monome;
-- Gesamtgrad und Homogenitätsstatus;
-- verbrauchte AST-Arbeit;
-- einen kanonischen Identitätsstring.
+## Engine für binäre homogene Quartiken
 
-Division, nichtganzzahlige Koeffizienten, negative oder nichtganzzahlige
-Exponenten und überschrittene Budgets werden fehlersicher abgelehnt.
+`BinaryQuarticFactorizationEngine` besitzt die stabile ID
 
-## Allgemeine quartische Zerlegung
+```text
+regelsuche.factorization.binary-quartic-2x2/v1
+```
 
-`PolynomialDecompositionSynthesisOperator` speichert keine
-Sophie-Germain-Identität. Für ein binäres homogenes Polynom vierten Grades
-verwendet er die allgemeine Schablone
+und implementiert die allgemeine Schablone
 
 ```text
 (a*A^2 + b*A*B + c*B^2)
@@ -75,7 +61,13 @@ verwendet er die allgemeine Schablone
 (d*A^2 + e*A*B + f*B^2).
 ```
 
-Durch Ausmultiplizieren entstehen die exakten Bedingungen
+Für
+
+```text
+c40*A^4 + c31*A^3*B + c22*A^2*B^2 + c13*A*B^3 + c04*B^4
+```
+
+werden exakt die Bedingungen
 
 ```text
 a*d             = c40
@@ -85,34 +77,23 @@ b*f + c*e       = c13
 c*f             = c04
 ```
 
-für das Eingabepolynom
+gelöst. Die Engine speichert weder die Sophie-Germain-Identität noch andere
+konkrete Zerlegungen. Sie enumeriert begrenzte Teiler der äußeren Koeffizienten
+und löst die verbleibenden linearen Bedingungen exakt.
 
-```text
-c40*A^4 + c31*A^3*B + c22*A^2*B^2 + c13*A*B^3 + c04*B^4.
-```
+Die Engine erzeugt noch keine vertrauenswürdige Suchkante. Sie liefert
+`FactorizationEngine.Proposal<BigInteger>` mit `BackendClaim.NONE`, ihrem
+stage-getrennten Work Ledger und content-addressed Backendprovenienz.
 
-Der Synthesizer enumeriert nur Teiler der äußeren Koeffizienten und löst das
-verbleibende lineare Gleichungssystem exakt. Ein Kandidat wird nur ausgegeben,
-wenn sämtliche fünf Koeffizientenbedingungen erfüllt sind.
+## Beispiele derselben Engine
 
-## Beispiele aus derselben Methode
-
-### Sophie-Germain ohne gespeicherte Spezialidentität
-
-Für
+### Sophie-Germain
 
 ```text
 A^4 + 4*B^4
 ```
 
-findet der Solver unter anderem
-
-```text
-[a,b,c] = [1,-2,2]
-[d,e,f] = [1, 2,2]
-```
-
-und damit
+liefert unter anderem das Proposal
 
 ```text
 (A^2 - 2*A*B + 2*B^2)
@@ -122,27 +103,23 @@ und damit
 
 ### Andere quartische Familie
 
-Für
-
 ```text
 A^4 + 5*A^2*B^2 + 4*B^4
 ```
 
-entsteht aus derselben Schablone
+liefert
 
 ```text
 (A^2 + B^2) * (A^2 + 4*B^2).
 ```
 
-### Symmetrische Faktorisierung
-
-Für
+### Symmetrische Zerlegung
 
 ```text
 A^4 + A^2*B^2 + B^4
 ```
 
-findet der Solver
+liefert
 
 ```text
 (A^2 - A*B + B^2)
@@ -150,100 +127,155 @@ findet der Solver
 (A^2 + A*B + B^2).
 ```
 
-### Beliebige AST-Einsetzungen
-
-Dieselbe bereits implementierte Schablone arbeitet beispielsweise auf
+### AST-Einsetzungen
 
 ```text
 sin(t)^4 + 4*(x + 1)^4
 ```
 
-ohne eine neue Regel für `sin(t)` oder `x + 1` zu lernen. Die beiden Teilbäume
-werden lediglich als die beiden semantischen Atome des aktuellen Problems
-gebunden.
+wird durch dieselbe Engine verarbeitet. `sin(t)` und `x + 1` bleiben dabei die
+beiden gebundenen strukturellen Atome.
 
-## Zertifikat und Suchkante
+## Univariate Homogenisierung
 
-Jeder erzeugte Kandidat trägt einen SHA-256-Nachweis, der mindestens bindet:
+Ein univariates Polynom mit Grad höchstens vier kann für diese Engine durch eine
+explizite strukturelle Einheit auf Grad vier homogenisiert werden:
 
-- Version der Synthesemethode;
-- Version der semantischen Polynomansicht;
-- kanonische Eingabekoeffizienten;
-- beide gelösten Koeffiziententripel;
-- vollständig gerenderten Ergebnis-AST.
+```text
+x^4 + 4
+  -> x^4 + 4*1^4.
+```
 
-Die Suchkante verwendet
+Die Einheit erweitert den Ring ausdrücklich. Sie wird beim Rendern nicht als
+sichtbares `1^n` ausgegeben.
+
+## Untrusted Proposal und unabhängige Prüfung
+
+Ein Engine-Proposal enthält:
+
+- skalare Einheit;
+- kanonisch sortierte Faktoren mit positiven Multiplizitäten;
+- einen ungelösten Rest, hier exakt eins;
+- Engine-Zertifikat und Rohresultat-Hash.
+
+Gleiche Faktoren werden zusammengeführt. Ein konstanter Rest ungleich eins ist
+nicht kanonisch und muss in die skalare Einheit verschoben werden.
+
+`FactorizationVerifier.execute` prüft unabhängig:
+
+- Engine- und Koeffizientendomänen-ID;
+- Kandidaten- und Gesamtbudget;
+- Ringgleichheit aller Faktoren;
+- exakte Rückmultiplikation von Einheit, Faktorpotenzen und Rest.
+
+Erst danach entsteht ein
+`FactorizationVerifier.VerifiedCandidate<BigInteger>` und ein issuer-owned
+`FactorizationVerifier.Report<BigInteger>`.
+
+Der positive Status lautet `PARTIAL_FACTORIZATION` mit
+`ClaimStrength.VERIFIED_DECOMPOSITION`: Das Produkt ist exakt rekonstruiert,
+aber die Engine beweist nicht die Irreduzibilität der beiden quadratischen
+Faktoren.
+
+Ein Engine-Miss führt zu `NO_FACTORIZATION_FOUND`. Das ist kein
+Irreduzibilitätsbeweis; der Ausdruck kann außerhalb dieser Faktorgradschablone
+oder Koeffizientengrenze zerlegbar sein.
+
+## Gemeinsames Work-Budget
+
+Engine und Verifier teilen ein nicht zurücksetzbares Requestbudget. Typische
+Stages sind:
+
+```text
+engine.divisor-tests
+engine.factor-pair-configurations
+engine.middle-system-solves
+verify.factor-power-multiplications
+verify.factor-product-multiplications
+verify.product-comparisons
+```
+
+Die Stage-Reihenfolge ist kanonisch. Reicht die nach der Engine verbleibende
+Arbeit nicht für die Produktrekonstruktion, wird kein Kandidat autorisiert; das
+Resultat bleibt `BUDGET_INCONCLUSIVE`.
+
+## Ausdrucksadapter und Suchkante
+
+`PolynomialDecompositionSynthesisOperator` enthält keine Faktorisierungslogik
+mehr. Er führt nur noch aus:
+
+```text
+Quelltext
+  -> PolynomialSemanticView
+  -> FactorizationRequest
+  -> BinaryQuarticFactorizationEngine
+  -> FactorizationVerifier
+  -> VerifiedCandidate
+  -> Transformation
+```
+
+Die Suchkante verwendet weiterhin die Regel-ID
 
 ```text
 hypothesis_polynomial_decomposition_synthesis
 ```
 
-als Regel-ID und bleibt damit von einem deklarativen oder gelernten
-Spezialmakro unterscheidbar. Kandidatenzahl, Koeffizientenbetrag, AST-Größe und
-untersuchte Faktorkonfigurationen sind begrenzt.
+und bleibt dadurch von deklarativen Regeln, historischen Spezialbridges und
+abgeleiteten Makros unterscheidbar. Exakte Faktorkoeffizienten werden direkt als
+Text gerendert und nicht über `NumberExpr(int/double)` zurückgeführt.
 
-## Auswahlpolitik
+Der verbleibende Operator ist ein aktueller Search-Adapter mit konkreter
+Verantwortung, keine Kompatibilitätsfassade für die entfernten verschachtelten
+Quartiktypen.
 
-In den allgemeinen Discovery-Profilen ist die Zerlegungssynthese nun der
-standardmäßig aktivierte Faktorisierungs-Hypothesenoperator.
+## Theory-Subsumption und Cache
 
-Der bisherige
+`PolynomialTheorySubsumptionClassifier` prüft, ob ein beobachtetes Ziel einer
+der unter demselben Budget erzeugten und verifizierten Faktorisierungen
+entspricht. Ein positiver Treffer ist eine theorieabgeleitete Instanz, keine neue
+Kernelregel und keine externe mathematische Neuheit.
 
-```text
-hypothesis_difference_of_squares_preparation
-```
+`PolynomialDerivedMacroCache` darf solche Instanzen als begrenzten
+Performancecache halten. Er bindet Verifier-Zertifikat, Engine-ID,
+Anwendungsschlüssel, vollständiges Work Ledger und mehrere unabhängige
+Lineages. Der Cache gehört weder zum Kernel noch automatisch zum
+Standardinventar.
 
-bleibt registriert, ist dort aber standardmäßig deaktiviert und als
-`historical-control` markiert. Bestehende reproduzierbare Sophie-Germain-
-Szenarien können ihn weiterhin ausdrücklich auswählen; ihre historische
-Evidence wird nicht stillschweigend umgedeutet.
-
-Die Trennung lautet damit:
-
-```text
-kleiner Regelkern
-  -> semantische Theorieansicht
-  -> allgemeine Zerlegungssynthese
-  -> exakte Kandidatenkante
-  -> optionaler abgeleiteter Makro-Cache
-```
-
-Nicht jede erfolgreich erzeugte Faktorisierung wird als neue Standardregel in
-das Inventar übernommen.
+Der Discovery-Integrationstest prüft den retained Pfad über mathematische
+Wertgleichheit und nicht über historische Renderer-Teilstrings.
 
 ## Aktuelle Grenze
 
-Die erste ausführbare Stufe ist bewusst eng und exakt:
+Die konkrete Engine unterstützt:
 
-- zwei strukturelle Atome;
+- Koeffizientendomäne `Z`;
+- genau zwei strukturelle Atome;
 - homogenes Polynom vierten Grades;
-- ganzzahlige Koeffizienten;
-- Produkt zweier quadratischer Faktoren;
-- ganzzahlige, betragsmäßig begrenzte Faktorkoeffizienten.
+- Faktorgradaufteilung `2 + 2`;
+- begrenzte ganzzahlige Faktorkoeffizienten;
+- begrenzte Engine- und Verifier-Arbeit sowie Kandidatenzahl.
 
-Sie ist kein vollständiger allgemeiner Polynomfaktorisierer. Insbesondere noch
-nicht abgedeckt sind:
+Nicht unterstützt sind durch diese Engine allein:
 
 - beliebige Grade und Faktorgradpartitionen;
 - rationale oder algebraische Faktorkoeffizienten;
-- mehr als zwei semantische Atome;
-- vollständige multivariate Faktorisierung;
-- Auswahl zwischen mehreren Zielringen;
-- optimale Rangordnung aller möglichen Zerlegungen.
+- vollständige Irreduzibilitätsnachweise;
+- allgemeine univariate Faktorisierung;
+- mehr als zwei Variablen;
+- multivariate Faktorisierung.
 
-Diese Grenzen sind nun jedoch Erweiterungen eines allgemeinen Modells statt
-Anlässe für weitere benannte Einzelfalloperatoren. Weitere Templates können
-unter derselben semantischen Ansicht ergänzt werden, beispielsweise
-`Grad 6 -> 2 + 4`, vollständiges Quadrat plus Rest oder allgemeine
-Faktorgradpartitionen.
+Diese Grenzen sind Eigenschaften der Engine und keine Grenzen des Polynom- oder
+Faktorisierungsvertrags. Weitere Engines werden unter demselben
+Request-/Proposal-/Verifier-Modell ergänzt.
 
 ## Prüfung aus dem Checkout
 
-Fokussierte Kerntests:
-
 ```bash
 ./gradlew :regelsuche-core:test \
-  --tests de.regelsuche.transform.PolynomialDecompositionSynthesisOperatorTest
+  --tests de.regelsuche.polynomial.BinaryQuarticFactorizationEngineTest \
+  --tests de.regelsuche.polynomial.FactorizationEngineContractTest \
+  --tests de.regelsuche.transform.PolynomialDecompositionSynthesisOperatorTest \
+  --tests de.regelsuche.transform.PolynomialTheorySubsumptionClassifierTest
 ```
 
 Discovery-Integration:
@@ -253,21 +285,16 @@ Discovery-Integration:
   --tests de.regelsuche.docs.PolynomialDecompositionDiscoveryIntegrationTest
 ```
 
-Vollständiger Repositoryvertrag:
+Vollständiger Vertrag:
 
 ```bash
 ./gradlew --no-configuration-cache ciCheck
+mvn --batch-mode --no-transfer-progress -Pfull verify
 ```
 
 ## Aussagegrenze
 
-Die Implementierung belegt:
-
-> Regelsuche kann innerhalb eines exakt begrenzten Polynomfragments
-> Faktorisierungsdarstellungen durch allgemeine Koeffizientensynthese erzeugen,
-> ohne die konkrete Identität oder jede AST-Einsetzung als eigene Regel zu
-> speichern.
-
-Sie belegt noch keine vollständige Polynomfaktorisierung, keine externe
-mathematische Neuheit und keine allgemeine Überlegenheit gegenüber etablierten
-Computer-Algebra-Systemen.
+Die Engine belegt eine unabhängig produktverifizierte
+quadratisch-mal-quadratische Zerlegungssynthese in einem begrenzten
+Quartikfragment. Sie belegt keine vollständige allgemeine
+Polynomfaktorisierung und keine Überlegenheit gegenüber einem etablierten CAS.
