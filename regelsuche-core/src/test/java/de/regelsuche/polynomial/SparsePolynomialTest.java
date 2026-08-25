@@ -2,6 +2,7 @@ package de.regelsuche.polynomial;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -11,11 +12,10 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class SparsePolynomialTest {
-    private final PolynomialRing<BigInteger> ring = new PolynomialRing<>(
-        BigIntegerDomain.INSTANCE,
-        List.of(
-            new PolynomialVariable("x"),
-            new PolynomialVariable("y")));
+    private final PolynomialRing<BigInteger> ring = ring(
+        PolynomialRing.MonomialOrder.GRADED_LEXICOGRAPHIC,
+        "x",
+        "y");
 
     @Test
     void canonicalSparseArithmeticUsesTheDeclaredRing() {
@@ -43,30 +43,79 @@ class SparsePolynomialTest {
     }
 
     @Test
-    void polynomialIdentityExcludesDisplayAndSourceOccurrences() {
-        PolynomialRing<BigInteger> equivalentRing = new PolynomialRing<>(
-            BigIntegerDomain.INSTANCE,
-            List.of(
-                new PolynomialVariable("x"),
-                new PolynomialVariable("y")));
+    void polynomialIdentityExcludesDisplayButIncludesMonomialOrder() {
+        PolynomialRing<BigInteger> equivalentRing = ring(
+            PolynomialRing.MonomialOrder.GRADED_LEXICOGRAPHIC,
+            "x",
+            "y");
+        PolynomialRing<BigInteger> differentOrder = ring(
+            PolynomialRing.MonomialOrder.LEXICOGRAPHIC,
+            "x",
+            "y");
         SparsePolynomial<BigInteger> first = polynomial(
             Monomial.of(1, 0),
             BigInteger.TWO);
-        SparsePolynomial<BigInteger> second = new SparsePolynomial<>(
+        SparsePolynomial<BigInteger> equivalent = new SparsePolynomial<>(
             equivalentRing,
             Map.of(Monomial.of(1, 0), BigInteger.TWO));
+        SparsePolynomial<BigInteger> differentlyOrdered =
+            new SparsePolynomial<>(
+                differentOrder,
+                Map.of(Monomial.of(1, 0), BigInteger.TWO));
 
-        assertEquals(first, second);
+        assertEquals(first, equivalent);
         assertEquals(
             first.canonicalMaterial(),
-            second.canonicalMaterial());
+            equivalent.canonicalMaterial());
+        assertNotEquals(first, differentlyOrdered);
+        assertNotEquals(
+            first.canonicalMaterial(),
+            differentlyOrdered.canonicalMaterial());
     }
 
     @Test
-    void homogenizationExtendsTheRingWithoutChangingCoefficients() {
-        PolynomialRing<BigInteger> univariateRing = new PolynomialRing<>(
-            BigIntegerDomain.INSTANCE,
-            List.of(new PolynomialVariable("x")));
+    void leadingTermFollowsTheDeclaredOrder() {
+        Map<Monomial, BigInteger> terms = Map.of(
+            Monomial.of(2, 0, 0), BigInteger.valueOf(2),
+            Monomial.of(1, 0, 5), BigInteger.valueOf(3));
+        SparsePolynomial<BigInteger> lex = new SparsePolynomial<>(
+            ring(
+                PolynomialRing.MonomialOrder.LEXICOGRAPHIC,
+                "x",
+                "y",
+                "z"),
+            terms);
+        SparsePolynomial<BigInteger> gradedLex = new SparsePolynomial<>(
+            ring(
+                PolynomialRing.MonomialOrder.GRADED_LEXICOGRAPHIC,
+                "x",
+                "y",
+                "z"),
+            terms);
+
+        assertEquals(BigInteger.valueOf(2), lex.leadingCoefficient());
+        assertEquals(
+            BigInteger.valueOf(3),
+            gradedLex.leadingCoefficient());
+        assertEquals(
+            List.of(
+                Monomial.of(2, 0),
+                Monomial.of(1, 1),
+                Monomial.of(0, 2)),
+            List.of(
+                Monomial.of(2, 0),
+                Monomial.of(1, 1),
+                Monomial.of(0, 2)).stream()
+                .sorted(PolynomialRing.MonomialOrder
+                    .GRADED_REVERSE_LEXICOGRAPHIC.comparator())
+                .toList());
+    }
+
+    @Test
+    void homogenizationExtendsTheRingWithoutChangingItsOrder() {
+        PolynomialRing<BigInteger> univariateRing = ring(
+            PolynomialRing.MonomialOrder.GRADED_REVERSE_LEXICOGRAPHIC,
+            "x");
         SparsePolynomial<BigInteger> polynomial = new SparsePolynomial<>(
             univariateRing,
             Map.of(
@@ -78,6 +127,9 @@ class SparsePolynomialTest {
             new PolynomialVariable("unit"));
 
         assertEquals(2, homogenized.ring().variableCount());
+        assertEquals(
+            PolynomialRing.MonomialOrder.GRADED_REVERSE_LEXICOGRAPHIC,
+            homogenized.ring().monomialOrder());
         assertEquals(BigInteger.ONE, homogenized.coefficient(3, 1));
         assertEquals(
             BigInteger.valueOf(-2),
@@ -87,9 +139,9 @@ class SparsePolynomialTest {
 
     @Test
     void ringMismatchAndInvalidMonomialsFailImmediately() {
-        PolynomialRing<BigInteger> otherRing = new PolynomialRing<>(
-            BigIntegerDomain.INSTANCE,
-            List.of(new PolynomialVariable("z")));
+        PolynomialRing<BigInteger> otherRing = ring(
+            PolynomialRing.MonomialOrder.GRADED_LEXICOGRAPHIC,
+            "z");
         SparsePolynomial<BigInteger> other = new SparsePolynomial<>(
             otherRing,
             Map.of(Monomial.of(1), BigInteger.ONE));
@@ -109,5 +161,17 @@ class SparsePolynomialTest {
         return new SparsePolynomial<>(
             ring,
             Map.of(monomial, coefficient));
+    }
+
+    private static PolynomialRing<BigInteger> ring(
+        PolynomialRing.MonomialOrder order,
+        String... variables
+    ) {
+        return new PolynomialRing<>(
+            BigIntegerDomain.INSTANCE,
+            java.util.Arrays.stream(variables)
+                .map(PolynomialVariable::new)
+                .toList(),
+            order);
     }
 }
