@@ -3,6 +3,7 @@ package de.regelsuche.polynomial;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,5 +39,39 @@ class FactorizationEngineContractTest {
         assertEquals(10L, first.totalWorkUnits());
         assertThrows(UnsupportedOperationException.class, () ->
             first.stages().put("late-stage", 1L));
+    }
+
+    @Test
+    void completeBackendClaimCannotRetainAnUnresolvedRemainder() {
+        PolynomialRing<BigInteger> ring = new PolynomialRing<>(
+            BigIntegerDomain.INSTANCE,
+            List.of(new PolynomialVariable("x")),
+            PolynomialRing.MonomialOrder.GRADED_LEXICOGRAPHIC);
+        SparsePolynomial<BigInteger> factor = new SparsePolynomial<>(
+            ring,
+            Map.of(
+                Monomial.of(1), BigInteger.ONE,
+                Monomial.of(0), BigInteger.ONE));
+        SparsePolynomial<BigInteger> remainder = new SparsePolynomial<>(
+            ring,
+            Map.of(
+                Monomial.of(1), BigInteger.ONE,
+                Monomial.of(0), BigInteger.TWO));
+        FactorizationEngine.Proposal<BigInteger> proposal =
+            new FactorizationEngine.Proposal<>(
+                BigInteger.ONE,
+                List.of(new PolynomialFactor<>(factor, 1)),
+                remainder,
+                "sha256:" + "a".repeat(64));
+
+        assertThrows(IllegalArgumentException.class, () ->
+            new FactorizationEngine.EngineResult<>(
+                "test.factorization-engine/v1",
+                FactorizationEngine.Outcome.CANDIDATES,
+                "CONTRADICTORY_COMPLETE_RESULT",
+                FactorizationEngine.WorkLedger.empty(),
+                List.of(proposal),
+                FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION,
+                "sha256:" + "b".repeat(64)));
     }
 }
