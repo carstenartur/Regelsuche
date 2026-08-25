@@ -5,7 +5,7 @@ import de.regelsuche.polynomial.PolynomialWorkSink;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Shared non-resettable work budget for one exact polynomial algorithm. */
+/** Shared non-resettable work budget for exact polynomial algorithm stages. */
 final class PolynomialWorkBudget implements PolynomialWorkSink {
     private final long limit;
     private final Map<String, Long> stages = new LinkedHashMap<>();
@@ -17,6 +17,10 @@ final class PolynomialWorkBudget implements PolynomialWorkSink {
                 "polynomial work budget must be positive");
         }
         this.limit = limit;
+    }
+
+    long limit() {
+        return limit;
     }
 
     @Override
