@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import java.math.BigInteger;
 import java.util.List;
@@ -55,13 +56,7 @@ class PolynomialDecompositionSynthesisOperatorTest {
     @Test
     void typedPolynomialEntryPointDoesNotRenderAndReparse() {
         TreeMap<PolynomialSemanticView.Monomial, BigInteger> coefficients =
-            new TreeMap<>();
-        coefficients.put(
-            new PolynomialSemanticView.Monomial(List.of(4)),
-            BigInteger.ONE);
-        coefficients.put(
-            new PolynomialSemanticView.Monomial(List.of(0)),
-            BigInteger.valueOf(4));
+            univariateQuarticCoefficients();
         PolynomialSemanticView.Polynomial typed =
             new PolynomialSemanticView.Polynomial(
                 PolynomialSemanticView.VIEW_ID,
@@ -86,6 +81,79 @@ class PolynomialDecompositionSynthesisOperatorTest {
         assertTrue(report.candidates().stream().allMatch(candidate ->
             candidate.transformedExpression().contains("x")
                 && !candidate.transformedExpression().contains("typed-x")));
+    }
+
+    @Test
+    void typedEntryPointRevalidatesPublicPolynomialObjects() {
+        PolynomialSemanticView.Polynomial forgedMetadata =
+            new PolynomialSemanticView.Polynomial(
+                PolynomialSemanticView.VIEW_ID,
+                List.of(
+                    atom("x", new VariableExpr("x")),
+                    atom("y", new VariableExpr("y"))),
+                coefficientsWithLowerDegreeTerm(),
+                4,
+                true,
+                0);
+        PolynomialSemanticView.Polynomial duplicateAtomKeys =
+            new PolynomialSemanticView.Polynomial(
+                PolynomialSemanticView.VIEW_ID,
+                List.of(
+                    atom("same", new VariableExpr("x")),
+                    atom("same", new VariableExpr("y"))),
+                binaryQuarticCoefficients(),
+                4,
+                true,
+                0);
+        PolynomialSemanticView.Polynomial forgedStructuralUnit =
+            new PolynomialSemanticView.Polynomial(
+                PolynomialSemanticView.VIEW_ID,
+                List.of(
+                    atom("x", new VariableExpr("x")),
+                    new PolynomialSemanticView.Atom(
+                        "structural-unit:1",
+                        "1",
+                        new VariableExpr("notOne"))),
+                binaryQuarticCoefficients(),
+                4,
+                true,
+                0);
+
+        assertTypedFailure(
+            forgedMetadata,
+            "TYPED_POLYNOMIAL_METADATA_INCONSISTENT");
+        assertTypedFailure(
+            duplicateAtomKeys,
+            "TYPED_POLYNOMIAL_ATOM_KEYS_NOT_UNIQUE");
+        assertTypedFailure(
+            forgedStructuralUnit,
+            "TYPED_POLYNOMIAL_STRUCTURAL_UNIT_INVALID");
+    }
+
+    @Test
+    void typedEntryAcceptsAnAuthenticPreHomogenizedStructuralUnit() {
+        PolynomialSemanticView.Polynomial typed =
+            new PolynomialSemanticView.Polynomial(
+                PolynomialSemanticView.VIEW_ID,
+                List.of(
+                    atom("x", new VariableExpr("x")),
+                    new PolynomialSemanticView.Atom(
+                        "structural-unit:1",
+                        "1",
+                        new NumberExpr(1))),
+                binaryQuarticCoefficients(),
+                4,
+                true,
+                0);
+
+        PolynomialDecompositionSynthesisOperator.SynthesisReport report =
+            operator.synthesize(typed);
+
+        assertTrue(report.generated(), report.detailCode());
+        assertTrue(report.candidates().stream().anyMatch(candidate ->
+            factorPair(candidate,
+                List.of(1, -2, 2),
+                List.of(1, 2, 2))));
     }
 
     @Test
@@ -162,6 +230,66 @@ class PolynomialDecompositionSynthesisOperatorTest {
 
         assertEquals(first, second);
         assertFalse(first.candidates().isEmpty());
+    }
+
+    private void assertTypedFailure(
+        PolynomialSemanticView.Polynomial polynomial,
+        String detailCode
+    ) {
+        PolynomialDecompositionSynthesisOperator.SynthesisReport report =
+            operator.synthesize(polynomial);
+        assertEquals(
+            PolynomialDecompositionSynthesisOperator.Status
+                .UNSUPPORTED_SEMANTIC_VIEW,
+            report.status());
+        assertEquals(detailCode, report.detailCode());
+        assertTrue(report.candidates().isEmpty());
+    }
+
+    private static PolynomialSemanticView.Atom atom(
+        String key,
+        VariableExpr expression
+    ) {
+        return new PolynomialSemanticView.Atom(
+            key,
+            expression.name(),
+            expression);
+    }
+
+    private static TreeMap<PolynomialSemanticView.Monomial, BigInteger>
+            univariateQuarticCoefficients() {
+        TreeMap<PolynomialSemanticView.Monomial, BigInteger> coefficients =
+            new TreeMap<>();
+        coefficients.put(
+            new PolynomialSemanticView.Monomial(List.of(4)),
+            BigInteger.ONE);
+        coefficients.put(
+            new PolynomialSemanticView.Monomial(List.of(0)),
+            BigInteger.valueOf(4));
+        return coefficients;
+    }
+
+    private static TreeMap<PolynomialSemanticView.Monomial, BigInteger>
+            binaryQuarticCoefficients() {
+        TreeMap<PolynomialSemanticView.Monomial, BigInteger> coefficients =
+            new TreeMap<>();
+        coefficients.put(
+            new PolynomialSemanticView.Monomial(List.of(4, 0)),
+            BigInteger.ONE);
+        coefficients.put(
+            new PolynomialSemanticView.Monomial(List.of(0, 4)),
+            BigInteger.valueOf(4));
+        return coefficients;
+    }
+
+    private static TreeMap<PolynomialSemanticView.Monomial, BigInteger>
+            coefficientsWithLowerDegreeTerm() {
+        TreeMap<PolynomialSemanticView.Monomial, BigInteger> coefficients =
+            binaryQuarticCoefficients();
+        coefficients.put(
+            new PolynomialSemanticView.Monomial(List.of(1, 0)),
+            BigInteger.valueOf(7));
+        return coefficients;
     }
 
     private static boolean factorPair(
