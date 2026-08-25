@@ -73,12 +73,6 @@ final class BerlekampKernel {
     ) {
         int dimension = source.degree();
         BigInteger[][] result = new BigInteger[dimension][dimension];
-        for (int row = 0; row < dimension; row++) {
-            for (int column = 0; column < dimension; column++) {
-                result[row][column] = field.zero();
-            }
-        }
-
         UnivariatePolynomialView<BigInteger> x =
             FiniteFieldPolynomialArithmetic.x(source.ring());
         UnivariatePolynomialView<BigInteger> xToPrime =
@@ -131,7 +125,7 @@ final class BerlekampKernel {
     ) {
         int rows = matrix.length;
         int columns = rows;
-        BigInteger[][] reduced = copy(matrix);
+        BigInteger[][] reduced = copy(matrix, work);
         ArrayList<Integer> pivotColumns = new ArrayList<>();
         int pivotRow = 0;
 
@@ -303,9 +297,15 @@ final class BerlekampKernel {
         }
     }
 
-    private static BigInteger[][] copy(BigInteger[][] source) {
+    private static BigInteger[][] copy(
+        BigInteger[][] source,
+        PolynomialWorkBudget work
+    ) {
         BigInteger[][] result = new BigInteger[source.length][];
         for (int row = 0; row < source.length; row++) {
+            work.consume(
+                "berlekamp.rref.matrix-copy-cells",
+                source[row].length);
             result[row] = source[row].clone();
         }
         return result;
