@@ -1,17 +1,18 @@
-# Univariate Polynomgrundlage und quadratfreie Zerlegung
+# Univariate Polynomgrundlage, Inhalt und quadratfreie Zerlegung
 
 **Implementierungsstand: 25. August 2026**
 
-Diese Stufe erweitert den domänenbewussten Polynomkern um die ersten allgemeinen
-Algorithmen, die nicht an eine Quartikschablone gebunden sind. Sie faktorisiert
-noch nicht vollständig in irreduzible Faktoren. Sie stellt aber die
-algorithmische Grundlage bereit, auf der die modulare Faktorisierung über
-`Z[x]` und `Q[x]` aufbauen kann.
+Diese Stufe erweitert den domänenbewussten Polynomkern um allgemeine
+univariate Algorithmen, die nicht an eine Quartikschablone gebunden sind. Sie
+stellt jetzt die gemeinsame Darstellung, Inhaltsnormalisierung, exakte
+Polynomarithmetik, den euklidischen Polynom-GGT und die quadratfreie Zerlegung
+bereit. Eine vollständige Zerlegung in irreduzible Faktoren ist noch nicht
+implementiert.
 
 ## Verantwortungs- und Modulgrenze
 
 Die Implementierung folgt der bestehenden Modularchitektur und erzeugt keine
-neue Rückabhängigkeit:
+Rückabhängigkeit:
 
 ```text
 regelsuche-core
@@ -24,30 +25,32 @@ regelsuche-core
 
 regelsuche-math-algorithms
   nicht zurücksetzbares Arbeitsbudget
-  euklidischer Polynom-ggT
+  Inhalt und primitiver Teil für Z[x] und Q[x]
+  euklidischer Polynom-GGT
   quadratfreie Zerlegung
   algorithmische Evidence
 ```
 
-`regelsuche-core` besitzt damit ausschließlich die exakten mathematischen
-Werte, ihre verlustfreien Darstellungen und einen minimalen Work-Sink.
-Allgemeine Lösungsverfahren und ihre Ablauf-Evidence liegen in
-`regelsuche-math-algorithms`, dessen deklarierte Verantwortung reine
-mathematische Algorithmen und interne Referenzverfahren ist.
+`regelsuche-core` besitzt die exakten mathematischen Werte, ihre verlustfreien
+Darstellungen und einen minimalen Work-Sink. Allgemeine Lösungsverfahren und
+ihre Ablauf-Evidence liegen in `regelsuche-math-algorithms`.
 
-Es gibt weder ein Split-Package noch delegierende Kompatibilitätsklassen am
-alten Ort. Der erste Zwischenstand im Core wurde vollständig verschoben, bevor
-er zu einer dauerhaften falschen Abstraktionsgrenze werden konnte.
+Es gibt weder Split-Packages noch delegierende Kompatibilitätsklassen an alten
+Paketorten. Die Algorithmen bauen auf dem gemeinsamen kanonischen
+`SparsePolynomial` auf.
 
-## Repräsentationsfluss
+## Repräsentations- und Faktorisierungsfluss
 
 ```text
-SparsePolynomial<C>
-  -> verlustfreie UnivariatePolynomialView<C>
-  -> Ableitung / exakte Division / euklidischer ggT
+SparsePolynomial<BigInteger oder ExactRational>
+  -> request-weite Strukturgrenzen
+  -> verlustfreie UnivariatePolynomialView
+  -> kanonischer Skalar + primitiver Teil in Z[x]
+  -> Ableitung / exakte Division / euklidischer GGT
   -> charakteristik-0-quadratfreie Zerlegung
-  -> Faktoren mit Multiplizitäten
-  -> exakte Rekonstruktion und Zertifikat
+  -> spätere Faktorisierung über endlichen Körpern
+  -> Hensel-Lifting und ganzzahlige Rekombination
+  -> exakte Rekonstruktion und Verifier-Evidence
 ```
 
 `SparsePolynomial` bleibt die kanonische mathematische Identität. Die
@@ -58,48 +61,82 @@ Koeffizientenansicht für Algorithmen:
 [a0, a1, ..., an]  <=>  a0 + a1*x + ... + an*x^n
 ```
 
-Sie ist kein zweites unabhängiges Polynommodell. Die Projektion ist verlustfrei,
-bindet denselben `PolynomialRing` und kann jederzeit exakt in die Sparse-IR
-zurückgeführt werden.
+Sie ist kein zweites unabhängiges Polynommodell. Die Projektion bindet denselben
+`PolynomialRing` und kann exakt in die Sparse-IR zurückgeführt werden.
 
 ## Explizite Koeffizientendomäne
 
-`CoefficientDomain` deklariert zusätzlich:
+`CoefficientDomain` deklariert:
 
+- eine stabile Domänen-ID;
 - die Charakteristik;
-- die kanonische Einbettung ganzer Zahlen.
+- die kanonische Einbettung ganzer Zahlen;
+- exakte Arithmetik und kanonische Textdarstellung.
 
-Diese Angaben werden für Ableitungen und spätere endliche Körper benötigt. Ein
-Algorithmus darf nicht aus dem Java-Wertetyp erraten, ob er in
-Charakteristik null oder in einem endlichen Körper arbeitet.
+Ableitungs-, Feld- und spätere endliche-Körper-Algorithmen dürfen diese
+Eigenschaften nicht aus einem Java-Wertetyp erraten.
 
-Die erste quadratfreie Implementierung verlangt ausdrücklich:
+Die gegenwärtige quadratfreie Implementierung verlangt:
 
 - genau eine Polynomvariable;
 - eine exakte Koeffizientenfeld-Implementierung;
 - Charakteristik null.
 
-`Z[x]` wird nicht stillschweigend nach `Q[x]` angehoben. Eine spätere
-Integer-Pipeline muss Inhalt und primitiven Anteil ausdrücklich behandeln und
-ihre rationale beziehungsweise modulare Arbeitsdomäne in der Evidence binden.
+`Z[x]` wird nicht stillschweigend nach `Q[x]` angehoben. Stattdessen erzeugt die
+Inhaltsnormalisierung für beide Quelldomänen eine explizite gemeinsame
+ganzzahlige Arbeitsform.
 
 ## Request-weite Strukturgrenzen
 
-`FactorizationRequest` bindet neben Kandidaten- und Arbeitsbudgets
-verpflichtend:
+`FactorizationRequest` bindet verpflichtend:
 
 - maximale Variablenzahl;
 - maximalen Gesamtgrad;
 - maximale Termzahl;
-- maximale Koeffizientenbitlänge.
+- maximale Koeffizientenbitlänge;
+- Kandidaten- und Arbeitsbudgets.
 
-Die Grenzen werden vom unabhängigen Verifier geprüft, bevor eine Engine den
+Der unabhängige Verifier prüft die Strukturgrenzen, bevor eine Engine den
 Ausdruck inspizieren darf. Eine Überschreitung führt zu
 `BUDGET_INCONCLUSIVE`, nicht zu „nicht faktorisierbar“ oder „irreduzibel“.
 
-Damit hängen Speicher- und Strukturkosten nicht nur von einem engine-internen,
-zurücksetzbaren Arbeitszähler ab. Die frühere Factory ohne explizite
-Strukturgrenzen wird nicht als Kompatibilitätsoberfläche weitergeführt.
+Algorithmen mit möglichem Zwischenwertwachstum ergänzen diese Quellgrenzen um
+eine eigene verpflichtende Zwischenkoeffizienten-Bitgrenze. Sie ist nicht als
+versteckter Faktor aus dem Quellbudget abgeleitet.
+
+## Inhalts- und Primitivteilnormalisierung
+
+`UnivariateContentNormalization` verarbeitet typisiert entweder ein Polynom in
+`Z[x]` oder ein Polynom in `Q[x]`. Beide Pfade erzeugen:
+
+```text
+source = scalar * primitivePart
+```
+
+Dabei gilt:
+
+- `scalar` ist eine exakte von null verschiedene rationale Zahl;
+- `primitivePart` liegt in `Z[x]`;
+- der Koeffizienten-GGT von `primitivePart` ist `1`;
+- sein Leitkoeffizient ist positiv;
+- Variablenreihenfolge und Monomordnung bleiben unverändert.
+
+Für rationale Quellen werden zunächst die Nenner durch ihr kleinstes
+gemeinsames Vielfaches beseitigt. Der positive ganzzahlige Inhalt wird danach
+aus den ganzzahligen Koeffizienten extrahiert. Das Vorzeichen des
+Leitkoeffizienten wird in den Skalar verschoben.
+
+Vor einem positiven Abschluss prüft der Algorithmus unabhängig:
+
+1. den GGT der primitiven Koeffizienten;
+2. den positiven Leitkoeffizienten;
+3. die unveränderte Monomunterstützung;
+4. die Rekonstruktion der ganzzahligen Zwischenform;
+5. die exakte Rekonstruktion des ursprünglichen `Z[x]`- oder
+   `Q[x]`-Polynoms.
+
+Die vollständige Konvention, Budgetsemantik und Beispiele stehen unter
+[Univariate Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md).
 
 ## Allgemeine univariate Operationen
 
@@ -115,21 +152,20 @@ Strukturgrenzen wird nicht als Kompatibilitätsoberfläche weitergeführt.
 
 Die öffentlichen Operationen können ohne Work-Erfassung verwendet werden oder
 einen `PolynomialWorkSink` erhalten. Der Core kennt dadurch keine konkrete
-Budget- oder Evidence-Implementierung. `regelsuche-math-algorithms` stellt den
-nicht zurücksetzbaren, nach Stufen getrennten Arbeitszähler bereit.
+Budget- oder Evidence-Implementierung.
 
-## Euklidischer Polynom-ggT
+## Euklidischer Polynom-GGT
 
-Die allgemeine ggT-Berechnung arbeitet über einem deklarierten exakten Feld,
-gibt einen monischen ggT zurück und behält eine deterministische Arbeitsbilanz
+Die allgemeine GGT-Berechnung arbeitet über einem deklarierten exakten Feld,
+gibt einen monischen GGT zurück und behält eine deterministische Arbeitsbilanz
 sowie ein content-adressiertes Zertifikat.
 
-Besondere Ausgänge bleiben fachlich getrennt:
+Besondere Ausgänge bleiben getrennt:
 
 - Ring- oder Formabweichung: `UNSUPPORTED_SHAPE`;
 - Koeffizientendomäne ohne exakte Felddivision: `UNSUPPORTED_DOMAIN`;
 - erschöpftes Arbeitsbudget: `BUDGET_INCONCLUSIVE`;
-- `gcd(0, 0)`: ausdrücklich undefiniert, nicht das Nullpolynom als Erfolg.
+- `gcd(0, 0)`: ausdrücklich undefiniert.
 
 Bei Budgeterschöpfung wird kein Teilresultat als mathematischer Abschluss
 ausgegeben.
@@ -143,36 +179,32 @@ wird eine Yun-artige Zerlegung ausgeführt. Beispielsweise wird
 (6/5) * (x - 1)^3 * (x + 2)^2 * (x^2 + 1)
 ```
 
-in den skalaren Anteil `6/5` und die drei monischen Faktoren mit den
+in den skalaren Anteil `6/5` und drei monische Faktoren mit den
 Multiplizitäten `3`, `2` und `1` zerlegt.
 
 Nach der Bildung werden unabhängig geprüft:
 
-1. Das Produkt aus Einheit und potenzierten Faktoren rekonstruiert exakt das
-   Quellpolynom.
-2. Jeder ausgegebene Faktor ist tatsächlich quadratfrei, also
-   `gcd(f, f') = 1`.
+1. Einheit und potenzierte Faktoren rekonstruieren exakt das Quellpolynom.
+2. Für jeden ausgegebenen Faktor gilt `gcd(f, f') = 1`.
 
-Das Zertifikat bindet Methode, Ring, Quellpolynom, Strukturgrenzen,
-Arbeitsbilanz, Einheit, Faktoren und Multiplizitäten. Die Resultatklasse ist
-issuer-owned; Aufrufer können keinen positiven Abschluss um fremde Faktoren
-konstruieren.
+Das Zertifikat bindet Methode, Ring, Quelle, Strukturgrenzen, Arbeitsbilanz,
+Einheit, Faktoren und Multiplizitäten. Öffentliche Aufrufer können keinen
+positiven Algorithmusabschluss mit fremden Faktoren konstruieren.
 
 ## Aussagegrenze
 
-Eine quadratfreie Zerlegung beweist keine Irreduzibilität. Insbesondere kann
-`x^2 + 1` je nach Koeffizientendomäne irreduzibel oder weiter zerlegbar sein.
-Diese Stufe meldet deshalb nur eine verifizierte quadratfreie Zerlegung.
+Eine Inhaltsnormalisierung beweist keine Reduzibilität. Eine quadratfreie
+Zerlegung beweist keine Irreduzibilität. Insbesondere kann `x^2 + 1` abhängig
+von der Koeffizientendomäne irreduzibel oder weiter zerlegbar sein.
 
 Noch offen bleiben:
 
-- Inhalt und primitiver Anteil für `Z[x]`;
 - Faktorisierung über endlichen Körpern;
-- geeignete Primzahlauswahl;
+- geeignete Primzahlauswahl mit dokumentierten Ablehnungsgründen;
 - Hensel-Lifting;
-- Zassenhaus- beziehungsweise spätere LLL-/van-Hoeij-Rekombination;
-- unabhängige Vollständigkeits- und Irreduzibilitätszertifikate;
-- rationale Reassemblierung hinter dem allgemeinen Engine-Vertrag.
+- Zassenhaus- und später gegebenenfalls LLL-/van-Hoeij-Rekombination;
+- rationale Faktorreassemblierung;
+- unabhängige Vollständigkeits- und Irreduzibilitätszertifikate.
 
 ## Prüfung
 
@@ -188,6 +220,7 @@ Allgemeine mathematische Algorithmen:
 
 ```bash
 ./gradlew :regelsuche-math-algorithms:test \
+  --tests de.regelsuche.math.algorithms.polynomial.UnivariateContentNormalizationTest \
   --tests de.regelsuche.math.algorithms.polynomial.UnivariatePolynomialAlgorithmsTest \
   --tests de.regelsuche.math.algorithms.polynomial.SquareFreeDecompositionTest
 ```
