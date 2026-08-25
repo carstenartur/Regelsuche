@@ -200,19 +200,30 @@ public final class SuitablePrimeSelection {
                     work);
 
             if (factorization.completed()) {
-                SuitablePrimeSelectionResult correspondenceFailure =
-                    verifySourceCorrespondence(
+                try {
+                    verifyModularSourceCorrespondence(
                         source,
                         field,
                         modularSource,
-                        factorization,
-                        work,
-                        workBefore,
+                        work);
+                } catch (PolynomialWorkBudget.LimitReached exception) {
+                    long attemptWork = total(work) - workBefore;
+                    attempts.add(SuitablePrimeSelectionResult.issueAttempt(
+                        prime,
+                        SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                            .TERMINAL_INCONCLUSIVE,
+                        "SOURCE_CORRESPONDENCE_WORK_BUDGET_EXCEEDED",
+                        modularSource,
+                        factorization.certificateHash(),
+                        attemptWork));
+                    return failure(
+                        SuitablePrimeSelectionResult.Status
+                            .BUDGET_INCONCLUSIVE,
+                        "SOURCE_CORRESPONDENCE_INCONCLUSIVE",
                         attempts,
+                        work.ledger(),
                         request,
                         policy);
-                if (correspondenceFailure != null) {
-                    return correspondenceFailure;
                 }
                 long attemptWork = total(work) - workBefore;
                 attempts.add(SuitablePrimeSelectionResult.issueAttempt(
@@ -223,34 +234,14 @@ public final class SuitablePrimeSelection {
                     modularSource,
                     factorization.certificateHash(),
                     attemptWork));
-                try {
-                    return SuitablePrimeSelectionResult.completed(
-                        attempts,
-                        prime,
-                        modularSource,
-                        factorization,
-                        work.ledger(),
-                        request,
-                        policy);
-                } catch (RuntimeException exception) {
-                    attempts.removeLast();
-                    attempts.add(SuitablePrimeSelectionResult.issueAttempt(
-                        prime,
-                        SuitablePrimeSelectionResult.PrimeAttempt.Disposition
-                            .TERMINAL_FAILURE,
-                        "RESULT_EVIDENCE_VALIDATION_FAILED",
-                        modularSource,
-                        factorization.certificateHash(),
-                        attemptWork));
-                    return failure(
-                        SuitablePrimeSelectionResult.Status
-                            .TECHNICAL_FAILURE,
-                        "RESULT_EVIDENCE_VALIDATION_FAILED",
-                        attempts,
-                        work.ledger(),
-                        request,
-                        policy);
-                }
+                return SuitablePrimeSelectionResult.completed(
+                    attempts,
+                    prime,
+                    modularSource,
+                    factorization,
+                    work.ledger(),
+                    request,
+                    policy);
             }
             long attemptWork = total(work) - workBefore;
             if (factorization.status()
@@ -313,59 +304,6 @@ public final class SuitablePrimeSelection {
             work.ledger(),
             request,
             policy);
-    }
-
-    private static SuitablePrimeSelectionResult verifySourceCorrespondence(
-        SparsePolynomial<BigInteger> source,
-        PrimeField field,
-        SparsePolynomial<BigInteger> modularSource,
-        FiniteFieldFactorizationResult factorization,
-        PolynomialWorkBudget work,
-        long workBefore,
-        ArrayList<SuitablePrimeSelectionResult.PrimeAttempt> attempts,
-        FactorizationRequest<BigInteger> request,
-        SuitablePrimeSelectionPolicy policy
-    ) {
-        try {
-            verifyModularSourceCorrespondence(
-                source,
-                field,
-                modularSource,
-                work);
-            return null;
-        } catch (PolynomialWorkBudget.LimitReached exception) {
-            attempts.add(SuitablePrimeSelectionResult.issueAttempt(
-                field.prime(),
-                SuitablePrimeSelectionResult.PrimeAttempt.Disposition
-                    .TERMINAL_INCONCLUSIVE,
-                "SOURCE_CORRESPONDENCE_WORK_BUDGET_EXCEEDED",
-                modularSource,
-                factorization.certificateHash(),
-                total(work) - workBefore));
-            return failure(
-                SuitablePrimeSelectionResult.Status.BUDGET_INCONCLUSIVE,
-                "SOURCE_CORRESPONDENCE_INCONCLUSIVE",
-                attempts,
-                work.ledger(),
-                request,
-                policy);
-        } catch (RuntimeException exception) {
-            attempts.add(SuitablePrimeSelectionResult.issueAttempt(
-                field.prime(),
-                SuitablePrimeSelectionResult.PrimeAttempt.Disposition
-                    .TERMINAL_FAILURE,
-                "SOURCE_CORRESPONDENCE_VERIFICATION_FAILED",
-                modularSource,
-                factorization.certificateHash(),
-                total(work) - workBefore));
-            return failure(
-                SuitablePrimeSelectionResult.Status.TECHNICAL_FAILURE,
-                "SOURCE_CORRESPONDENCE_CONTRACT_FAILURE",
-                attempts,
-                work.ledger(),
-                request,
-                policy);
-        }
     }
 
     private static boolean isCanonicalPrimitive(
