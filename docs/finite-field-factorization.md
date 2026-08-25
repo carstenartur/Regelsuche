@@ -4,58 +4,55 @@
 
 Diese Stufe faktorisiert ein quadratfreies univariates Polynom vollständig in
 der ausdrücklich deklarierten Domäne `F_p[x]`. Sie ist der erste vollständige
-Faktorisierungsschritt nach der Inhalts- und Primitivteilnormalisierung. Sie
-wählt noch keine geeignete Primzahl für ein ganzzahliges Polynom und hebt keine
-modularen Faktoren nach `Z[x]` zurück.
+Faktorisierungsschritt nach Inhaltsnormalisierung, exakter Polynomarithmetik und
+quadratfreier Zerlegung. Sie wählt noch keine geeignete Primzahl für ein
+Polynom aus `Z[x]` und hebt keine modularen Faktoren nach `Z[x]` zurück.
 
-## Position in der Gesamtpipeline
+## Position in der Faktorisierungspipeline
 
 ```text
 Z[x] oder Q[x]
   -> Inhalt und primitiver Teil
   -> quadratfreie Zerlegung
   -> geeignete Primzahl auswählen                 noch offen
-  -> primitive Faktoren nach F_p[x] abbilden
+  -> nach F_p[x] reduzieren
   -> deterministische Berlekamp-Faktorisierung    diese Stufe
   -> Hensel-Lifting                               noch offen
-  -> ganzzahlige Rekombination                    noch offen
+  -> ganzzahlige Faktorrekomposition              noch offen
   -> rationale Reassemblierung                    noch offen
-  -> unabhängige Source-Verifikation              noch offen
+  -> unabhängige Prüfung im ursprünglichen Ring   noch offen
 ```
 
-Ein vollständiges Resultat dieser Seite ist vollständig relativ zum Ring
-`F_p[x]`. Daraus folgt weder, dass die gewählte Primzahl für ein bestimmtes
-`Z[x]`-Polynom geeignet ist, noch dass die modularen Faktoren bereits Faktoren
-des ursprünglichen ganzzahligen Polynoms sind.
+Ein positives Resultat dieser Stufe ist vollständig **relativ zum gebundenen
+Ring `F_p[x]`**. Es sagt noch nichts darüber aus, ob `p` für ein bestimmtes
+ganzzahliges Polynom geeignet ist oder ob die modularen Faktoren bereits
+Faktoren des ursprünglichen Polynoms sind.
 
 ## Expliziter Primkörper
 
-`PrimeField` implementiert `ExactField<BigInteger>`. Die Java-Werte sind
-kanonische Residuen, aber ihre mathematische Identität wird durch die
-Koeffizientendomäne bestimmt:
+`PrimeField` implementiert `ExactField<BigInteger>`. Die gespeicherten
+`BigInteger`-Werte sind kanonische Residuen; ihre mathematische Identität wird
+durch die Koeffizientendomäne bestimmt:
 
 ```text
 regelsuche.coefficients.prime-field/v1/p=<prime>
 ```
 
-Damit sind beispielsweise Polynome über `F_5` und `F_7` auch dann verschiedene
-Ringelemente, wenn ihre gespeicherten Residuen dieselben `BigInteger`-Werte
-besitzen.
+Damit gehören dieselben Java-Zahlen in `F_5` und `F_7` zu verschiedenen
+Polynomringen. Die Implementierung:
 
-Die erste Implementierung:
-
-- akzeptiert positive Primzahlen im `int`-Bereich;
+- akzeptiert positive Primzahlen im unterstützten `int`-Bereich;
 - prüft die Primzahleigenschaft deterministisch;
-- kanonisiert jede ganze Zahl modulo `p`;
-- implementiert exakte Addition, Negation, Multiplikation und Division;
+- kanonisiert ganze Zahlen modulo `p`;
+- implementiert Addition, Negation, Multiplikation und exakte Division;
 - lehnt zusammengesetzte Moduli und Division durch null fail-closed ab;
-- bindet `p` in Ringidentität und Evidence ein.
+- bindet `p` an Domain-ID, Ringidentität und Evidence.
 
-Es gibt keine stillschweigende Interpretation eines
-`SparsePolynomial<BigInteger>` als Primkörperpolynom. Der Ring muss tatsächlich
+Ein gewöhnliches `SparsePolynomial<BigInteger>` über `Z` wird nicht
+stillschweigend als Primkörperpolynom interpretiert. Sein Ring muss tatsächlich
 eine `PrimeField`-Domäne besitzen.
 
-## Öffentlicher Aufrufvertrag
+## Öffentlicher Vertrag
 
 Der Einstieg lautet:
 
@@ -73,8 +70,7 @@ FiniteFieldFactorization.factorSquareFree(
 - das Kandidatenbudget;
 - das nicht zurücksetzbare Gesamtarbeitsbudget.
 
-Die Stufenpolitik ergänzt ausschließlich zwei algorithmusspezifische
-Ressourcengrenzen:
+Die Stufenpolitik ergänzt nur zwei algorithmusspezifische Ressourcengrenzen:
 
 ```java
 FiniteFieldFactorizationPolicy.deterministicBerlekamp(
@@ -82,91 +78,81 @@ FiniteFieldFactorizationPolicy.deterministicBerlekamp(
     maxMatrixCells)
 ```
 
-- `maxEnumeratedFieldElements` begrenzt die kanonische Residuenenumeration des
-  Splitters;
-- `maxMatrixCells` begrenzt die gemeinsame Zahl der Zellen der ursprünglichen
-  Berlekamp-Matrix und ihrer RREF-Arbeitskopie vor der ersten Allokation.
+`maxEnumeratedFieldElements` begrenzt die deterministische Enumeration von
+Körperresiduen beim Faktorsplitting. `maxMatrixCells` begrenzt den maximalen
+dichten Speicherbedarf der Berlekamp-Stufe vor der ersten großen Allokation.
+Sie duplizieren weder Source-Strukturgrenzen noch das Work-Budget.
 
-Die Matrixzellen-Grenze ist erforderlich, weil ein Work-Budget bereits
-materialisierten Speicher nicht rückwirkend begrenzen kann. Für Grad `n` prüft
-der Algorithmus deshalb vorab
+## Vorbedingungen und Fehlersemantik
 
-```text
-2 * n * n <= maxMatrixCells
-```
-
-Die Berechnung ist als `n * n <= maxMatrixCells / 2` formuliert und vermeidet
-damit auch bei extremen Requestwerten einen Überlauf. Die Policy darf weder
-Source-Strukturgrenzen noch das Gesamtarbeitsbudget duplizieren oder erweitern.
-
-## Vorbedingungen
-
-Die erste Stufe verlangt:
+Die erste Implementierung verlangt:
 
 - genau eine Polynomvariable;
-- eine deklarierte `PrimeField`-Koeffizientendomäne;
+- eine deklarierte `PrimeField`-Domäne;
 - ein nichtkonstantes Quellpolynom;
-- mindestens ein erlaubtes Faktorisierungsergebnis;
-- eine Primzahl innerhalb der expliziten Enumerationspolitik;
-- beide benötigten Berlekamp-Matrizen innerhalb der Zellenpolitik;
+- mindestens einen erlaubten Ergebniskandidaten;
+- eine Primzahl innerhalb der Enumerationspolitik;
+- einen Grad innerhalb der Matrixzellenpolitik;
 - ein quadratfreies Polynom.
 
-Die Quadratfreiheit wird nicht als Eingabeannahme übernommen. Nach monischer
+Die Quadratfreiheit wird nicht als fremde Behauptung übernommen. Nach monischer
 Normierung berechnet der Algorithmus exakt
 
 ```text
 gcd(f, f')
 ```
 
-und fährt nur fort, wenn das Ergebnis eins ist. Ein wiederholter Faktor oder
-eine in Charakteristik `p` verschwindende Ableitung führt zu
-`UNSUPPORTED_SHAPE` mit `REQUIRES_SQUARE_FREE_INPUT`.
+und setzt nur bei Ergebnis eins fort. Wiederholte Faktoren oder eine in
+Charakteristik `p` verschwindende Ableitung führen zu `UNSUPPORTED_SHAPE` mit
+`REQUIRES_SQUARE_FREE_INPUT`. Eine ausgeschöpfte Ressourcen- oder
+Arbeitsgrenze führt zu `BUDGET_INCONCLUSIVE`, nicht zu einem mathematischen
+Negativclaim.
 
 ## Deterministischer Berlekamp-Algorithmus
 
-Die erste Algorithmus-ID lautet:
+Die Algorithmus-ID lautet:
 
 ```text
 regelsuche.berlekamp-factorization/v1
 ```
 
-Für ein monisches quadratfreies Polynom `f` vom Grad `n` wird die lineare
+Für ein monisches quadratfreies Polynom `f` vom Grad `n` wird die Frobenius-
 Abbildung
 
 ```text
 g -> g^p mod f
 ```
 
-in der Basis `1, x, ..., x^(n-1)` dargestellt. Die Berlekamp-Matrix enthält die
-Spalten
+in der Basis `1, x, ..., x^(n-1)` dargestellt. Die Spalten der Berlekamp-Matrix
+sind
 
 ```text
 x^(p*j) mod f,  j = 0, ..., n-1
 ```
 
-und anschließend wird die Einheitsmatrix abgezogen.
+anschließend wird die Einheitsmatrix abgezogen.
 
-### Exakter Nullraum
+### Verifizierter Nullraum
 
 `BerlekampKernel` berechnet den Nullraum von `Q - I` durch deterministische
 Gauß-Jordan-Elimination im deklarierten Primkörper:
 
 - Pivotspalten werden von links nach rechts gewählt;
 - Pivotzeilen werden von oben nach unten gesucht;
-- jede Division erfolgt durch `PrimeField.divide`;
+- jede Division erfolgt im `PrimeField`;
 - freie Spalten werden in aufsteigender Reihenfolge zu Basisvektoren;
-- die Basis wird abschließend nach kanonischem Polynommaterial geordnet.
+- Basisvektoren werden nach kanonischem Polynommaterial geordnet.
 
 Die unveränderte Ausgangsmatrix bleibt für eine getrennte Prüfung erhalten,
-während die Arbeitskopie in RREF überführt wird. Jeder erzeugte Basisvektor wird
-gegen die Ausgangsmatrix multipliziert. Erst wenn jede Zeile exakt null ergibt,
-wird eine Kernel-Evidence ausgestellt.
+während eine Kopie in reduzierte Zeilenstufenform überführt wird. Jeder
+Basisvektor wird anschließend gegen die Ausgangsmatrix multipliziert. Erst wenn
+jede Zeile exakt null ergibt, wird die Kernel-Evidence ausgestellt.
 
 Für ein quadratfreies Polynom ist die Nullität gleich der Zahl seiner
-irreduziblen Faktoren über `F_p`. Das Faktorsplitting muss deshalb genau diese
-Faktorzahl erreichen.
+irreduziblen Faktoren in `F_p[x]`. Das Splitting muss genau diese Faktorzahl
+erreichen.
 
-### Deterministisches Faktorsplitting
+### Deterministisches Splitting
 
 Die nichtkonstanten Kernel-Basispolynome werden in kanonischer Reihenfolge
 verwendet. Für jedes Basispolynom `b` werden die Residuen
@@ -181,27 +167,26 @@ untersucht. Ein aktueller Faktor `h` wird durch
 gcd(h, b - a)
 ```
 
-geteilt, wenn der GGT weder eins noch `h` ist. Beide Teilfaktoren werden monisch
-normalisiert und erneut kanonisch sortiert.
+geteilt, wenn der GGT weder eins noch `h` ist. Die Teilfaktoren werden monisch
+normalisiert und erneut kanonisch geordnet.
 
-Die Stufe endet erst, wenn die Zahl der Faktoren der verifizierten
-Berlekamp-Nullität entspricht. Wird diese mathematische Invariante trotz
-vollständiger erlaubter Enumeration nicht erreicht, ist das ein
-`TECHNICAL_FAILURE`, kein gewöhnlicher Nichttreffer.
+Wird die verifizierte Nullität trotz vollständiger erlaubter Enumeration nicht
+erreicht, ist dies ein `TECHNICAL_FAILURE`. Ein interner Algorithmusfehler wird
+nicht in einen gewöhnlichen Nichttreffer umgedeutet.
 
 ## Unabhängige Abschlussprüfung
 
-Die Berlekamp-Zerlegung darf ihren eigenen Abschluss nicht allein autorisieren.
-Vor `COMPLETED` werden zusätzlich geprüft:
+Die Berlekamp-Zerlegung autorisiert ihren Abschluss nicht selbst. Vor
+`COMPLETED` wird zusätzlich geprüft:
 
-1. Der ursprüngliche Leitkoeffizient ist als separate Einheit erhalten.
+1. Der ursprüngliche Leitkoeffizient ist als separate Feldeinheit erhalten.
 2. Jeder ausgegebene Faktor ist monisch und nichtkonstant.
 3. Einheit und Faktoren rekonstruieren das Quellpolynom exakt.
 4. Je zwei verschiedene Faktoren sind teilerfremd.
-5. Jeder Faktor besteht den Rabin-/Frobenius-Irreduzibilitätstest.
-6. Die Faktorzahl entspricht der Berlekamp-Nullität.
+5. Jeder Faktor besteht einen unabhängigen Rabin-/Frobenius-Test.
+6. Die Faktorzahl entspricht der verifizierten Berlekamp-Nullität.
 
-### Rabin-/Frobenius-Test
+### Rabin-/Frobenius-Irreduzibilitätstest
 
 Für einen monischen Faktor `g` vom Grad `m` wird geprüft:
 
@@ -215,14 +200,14 @@ und für jeden Primteiler `q` von `m`:
 gcd(g, x^(p^(m/q)) - x) = 1
 ```
 
-Die benötigten Frobenius-Potenzen werden exakt und budgetiert modulo `g`
-berechnet. Jeder Faktor erhält ein eigenes deterministisches
-Irreduzibilitätszertifikat.
+Die Frobenius-Potenzen werden exakt und budgetiert modulo `g` berechnet. Jeder
+Faktor erhält ein eigenes deterministisches Irreduzibilitätszertifikat.
 
-## Work Accounting
+## Work- und Speichergrenzen
 
-Alle Stufen verwenden dasselbe `PolynomialWorkBudget`, das aus
-`FactorizationRequest.maxWorkUnits()` erzeugt wird:
+Alle arithmetischen und linearen Algebra-Schritte verwenden dasselbe
+`PolynomialWorkBudget`, das aus `FactorizationRequest.maxWorkUnits()` erzeugt
+wird. Stabile Stufen-IDs umfassen unter anderem:
 
 ```text
 finite-field.leading-normalization
@@ -234,29 +219,50 @@ berlekamp.split.*
 finite-field.verify.*
 ```
 
-Ein paketinterner Einstieg akzeptiert für spätere Orchestrierung dasselbe
-bereits belastete Budget. Eine abweichende Budgetautorität wird mit
-`FINITE_FIELD_WORK_BUDGET_AUTHORITY_MISMATCH` zurückgewiesen. Ein Folgeschritt
-kann verbrauchte Arbeit daher weder vergessen noch das Requestbudget erhöhen.
+Das Kopieren der Matrix für die RREF-Arbeit wird vor jeder Zeilenkopie als
+`berlekamp.rref.matrix-copy-cells` abgerechnet. Ein paketinterner Einstieg kann
+dasselbe bereits belastete Budget an spätere Orchestrierungsschritte
+weiterreichen. Eine abweichende Budgetautorität wird mit
+`FINITE_FIELD_WORK_BUDGET_AUTHORITY_MISMATCH` zurückgewiesen.
 
-Speicher- und Enumerationsgrenzen werden vor der jeweiligen Arbeit geprüft.
-Sie erscheinen deshalb mit null verbrauchten Work Units, wenn die Quelle bereits
-an der Policy-Grenze abgelehnt wird.
+Das Work-Budget begrenzt Rechenarbeit, aber nicht bereits materialisierten
+Speicher. Daher wird der dichte Spitzenbedarf getrennt vorab beschränkt. Für
+Grad `n` können gleichzeitig vorhanden sein:
 
-## Statussemantik
+1. die ursprüngliche `n x n`-Berlekamp-Matrix;
+2. ihre `n x n`-RREF-Arbeitskopie;
+3. bis zu `n x n` Koeffizientenzellen der Nullraumbasis.
+
+Die Policy prüft deshalb ohne Überlauf:
+
+```text
+n * n <= maxMatrixCells / 3
+```
+
+Eine Ablehnung an der Enumerations- oder Matrixzellenpolitik erfolgt vor der
+betroffenen Arbeit und besitzt daher null verbrauchte Work Units.
+
+## Resultat und Evidence
+
+`FiniteFieldFactorizationResult` besitzt keinen öffentlichen Konstruktor. Ein
+positiver Zustand kann nur von der Algorithmusstufe ausgestellt werden. Das
+abschließende Zertifikat bindet:
+
+- die vollständige `FactorizationRequest`;
+- die Algorithmus- und Ressourcenpolitik;
+- die Primkörper-Domain-ID;
+- die vollständige Arbeitsbilanz;
+- Feldeinheit und kanonisch geordnete Faktoren;
+- Berlekamp-Nullität und Kernel-Zertifikat;
+- die Irreduzibilitätszertifikate aller Faktoren.
 
 | Status | Bedeutung |
 | --- | --- |
-| `COMPLETED` | Vollständige, rekonstruierte und irreduzibel geprüfte Faktorisierung im deklarierten `F_p[x]`. |
+| `COMPLETED` | Vollständige, rekonstruierte und irreduzibel geprüfte Faktorisierung im gebundenen `F_p[x]`. |
 | `UNSUPPORTED_DOMAIN` | Der Ring verwendet keine deklarierte `PrimeField`-Domäne. |
 | `UNSUPPORTED_SHAPE` | Die Quelle ist nicht univariat, konstant oder nicht quadratfrei. |
-| `BUDGET_INCONCLUSIVE` | Struktur-, Kandidaten-, Feldenumerations-, Matrixzellen- oder Gesamtarbeitsgrenze wurde erreicht. |
-| `TECHNICAL_FAILURE` | Eine Algorithmus-, Matrix-, Rekonstruktions- oder Zertifikatsinvariante ist verletzt. |
-
-`FiniteFieldFactorizationResult` besitzt keinen öffentlichen Konstruktor.
-Request, Policy, Quelldomäne, Arbeitsbilanz, Einheit, Faktoren,
-Kernel-Zertifikat und Irreduzibilitätszertifikate werden in das abschließende
-SHA-256-Zertifikat gebunden.
+| `BUDGET_INCONCLUSIVE` | Struktur-, Kandidaten-, Enumerations-, Matrixzellen- oder Work-Grenze wurde erreicht. |
+| `TECHNICAL_FAILURE` | Eine Algorithmus-, Matrix-, Rekonstruktions- oder Evidence-Invariante ist verletzt. |
 
 ## Claim-Grenze
 
@@ -267,17 +273,15 @@ SHA-256-Zertifikat gebunden.
 
 Nicht autorisiert sind:
 
-- Eignung der Primzahl für ein gegebenes ganzzahliges Polynom;
-- Faktorisierung des ursprünglichen `Z[x]`- oder `Q[x]`-Polynoms;
+- die Eignung von `p` für ein gegebenes ganzzahliges Polynom;
+- die Faktorisierung des ursprünglichen `Z[x]`- oder `Q[x]`-Polynoms;
 - Hensel-Lifting;
 - Zassenhaus- oder LLL-/van-Hoeij-Rekombination;
-- allgemeine Faktorisierung über Erweiterungskörpern;
+- Faktorisierung über Erweiterungskörpern;
 - multivariate Faktorisierung;
 - eine allgemeine Überlegenheit gegenüber etablierten CAS.
 
 ## Prüfung
-
-Fokussierte Tests:
 
 ```bash
 ./gradlew :regelsuche-core:test \
@@ -285,26 +289,21 @@ Fokussierte Tests:
 
 ./gradlew :regelsuche-math-algorithms:test \
   --tests de.regelsuche.math.algorithms.polynomial.FiniteFieldFactorizationTest
-```
 
-Vollständiger Checkout-Vertrag:
-
-```bash
 ./gradlew --no-configuration-cache ciCheck
 mvn --batch-mode --no-transfer-progress -Pfull verify
 ```
 
-## Nächste Stufe
+## Nächster geschlossener Schritt
 
-Der nächste geschlossene Produktionsschritt ist eine deterministische oder
-seed-gebundene Auswahl geeigneter Primzahlen für primitive Polynome in `Z[x]`.
-Sie muss mindestens dokumentieren:
+Als Nächstes folgt die nachvollziehbare Auswahl geeigneter Primzahlen für
+primitive Polynome in `Z[x]`. Ihre Evidence muss mindestens binden:
 
-- betrachtete Primzahlen in kanonischer Reihenfolge;
+- alle betrachteten Primzahlen in kanonischer Reihenfolge;
 - Ablehnungen wegen verschwindendem Leitkoeffizienten;
 - Ablehnungen wegen nicht-quadratfreier modularer Reduktion;
 - verbrauchte Arbeit pro Kandidat;
-- die ausgewählte Primzahl und die gebundene modulare Faktorisierung.
+- die ausgewählte Primzahl und die zugehörige modulare Faktorisierung.
 
-Erst danach kann Hensel-Lifting auf einer nachvollziehbar geeigneten modularen
+Erst danach kann Hensel-Lifting auf einer nachweislich geeigneten modularen
 Zerlegung aufbauen.
