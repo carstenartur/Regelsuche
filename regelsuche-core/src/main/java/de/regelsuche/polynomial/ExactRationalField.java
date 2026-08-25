@@ -1,6 +1,7 @@
 package de.regelsuche.polynomial;
 
 import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
 import java.util.Objects;
 
 /** Authoritative exact rational coefficient field. */
@@ -17,6 +18,17 @@ public final class ExactRationalField
     @Override
     public String id() {
         return DOMAIN_ID;
+    }
+
+    @Override
+    public BigInteger characteristic() {
+        return BigInteger.ZERO;
+    }
+
+    @Override
+    public ExactRational fromInteger(BigInteger value) {
+        return ExactRational.integer(
+            Objects.requireNonNull(value, "value"));
     }
 
     @Override

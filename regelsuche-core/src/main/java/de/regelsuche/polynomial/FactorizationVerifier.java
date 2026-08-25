@@ -1,10 +1,6 @@
 package de.regelsuche.polynomial;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,11 +8,11 @@ import java.util.Objects;
 
 /**
  * Executes one factorization engine and issues trusted evidence only after
- * independent contract and product verification.
+ * request, engine-contract and exact-product verification.
  */
 public final class FactorizationVerifier {
     public static final String VERIFIER_ID =
-        "regelsuche.factorization-verifier/v1";
+        "regelsuche.factorization-verifier/v2";
 
     private FactorizationVerifier() {
     }
@@ -27,15 +23,29 @@ public final class FactorizationVerifier {
     ) {
         Objects.requireNonNull(engine, "engine");
         Objects.requireNonNull(request, "request");
+
+        String structuralViolation =
+            request.structuralViolation().orElse(null);
+        if (structuralViolation != null) {
+            return failure(
+                engine.engineId(),
+                Status.BUDGET_INCONCLUSIVE,
+                structuralViolation,
+                PolynomialWorkLedger.empty(),
+                ClaimStrength.NONE,
+                "",
+                request);
+        }
         if (!engine.coefficientDomainId().equals(
                 request.source().ring().coefficientDomain().id())) {
             return failure(
                 engine.engineId(),
                 Status.UNSUPPORTED_DOMAIN,
                 "ENGINE_COEFFICIENT_DOMAIN_MISMATCH",
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 ClaimStrength.NONE,
-                "");
+                "",
+                request);
         }
 
         FactorizationEngine.EngineResult<C> raw;
@@ -48,17 +58,18 @@ public final class FactorizationVerifier {
                 engine.engineId(),
                 Status.TECHNICAL_FAILURE,
                 technicalDetail(exception),
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 ClaimStrength.NONE,
-                "");
+                "",
+                request);
         }
 
-        Report<C> invalidContract = validateEngineContract(
+        Report<C> invalid = validateEngineContract(
             engine,
             request,
             raw);
-        if (invalidContract != null) {
-            return invalidContract;
+        if (invalid != null) {
+            return invalid;
         }
         return switch (raw.outcome()) {
             case CANDIDATES -> verifyCandidates(request, raw);
@@ -69,28 +80,32 @@ public final class FactorizationVerifier {
                 raw.detailCode(),
                 raw.work(),
                 ClaimStrength.NONE,
-                raw.engineResultHash());
+                raw.engineResultHash(),
+                request);
             case UNSUPPORTED_REQUEST -> failure(
                 raw.engineId(),
                 Status.UNSUPPORTED_REQUEST,
                 raw.detailCode(),
                 raw.work(),
                 ClaimStrength.NONE,
-                raw.engineResultHash());
+                raw.engineResultHash(),
+                request);
             case BUDGET_INCONCLUSIVE -> failure(
                 raw.engineId(),
                 Status.BUDGET_INCONCLUSIVE,
                 raw.detailCode(),
                 raw.work(),
                 ClaimStrength.NONE,
-                raw.engineResultHash());
+                raw.engineResultHash(),
+                request);
             case TECHNICAL_FAILURE -> failure(
                 raw.engineId(),
                 Status.TECHNICAL_FAILURE,
                 raw.detailCode(),
                 raw.work(),
                 ClaimStrength.NONE,
-                raw.engineResultHash());
+                raw.engineResultHash(),
+                request);
         };
     }
 
@@ -106,7 +121,8 @@ public final class FactorizationVerifier {
                 "ENGINE_RESULT_ID_MISMATCH",
                 raw.work(),
                 ClaimStrength.NONE,
-                raw.engineResultHash());
+                raw.engineResultHash(),
+                request);
         }
         if (!raw.work().within(request.maxWorkUnits())) {
             return failure(
@@ -115,7 +131,8 @@ public final class FactorizationVerifier {
                 "ENGINE_EXCEEDED_REQUEST_WORK_BUDGET",
                 raw.work(),
                 ClaimStrength.NONE,
-                raw.engineResultHash());
+                raw.engineResultHash(),
+                request);
         }
         if (raw.proposals().size() > request.maxCandidates()) {
             return failure(
@@ -124,7 +141,8 @@ public final class FactorizationVerifier {
                 "ENGINE_EXCEEDED_REQUEST_CANDIDATE_BUDGET",
                 raw.work(),
                 ClaimStrength.NONE,
-                raw.engineResultHash());
+                raw.engineResultHash(),
+                request);
         }
         return null;
     }
@@ -136,7 +154,7 @@ public final class FactorizationVerifier {
         long remaining = request.maxWorkUnits()
             - raw.work().totalWorkUnits();
         WorkCounter verificationWork = new WorkCounter(remaining);
-        List<VerifiedCandidate<C>> verified = new ArrayList<>();
+        List<VerifiedCandidate<C>> candidates = new ArrayList<>();
         for (FactorizationEngine.Proposal<C> proposal : raw.proposals()) {
             VerificationOutcome<C> outcome;
             try {
@@ -151,7 +169,8 @@ public final class FactorizationVerifier {
                     "INDEPENDENT_PRODUCT_VERIFICATION_BUDGET_EXCEEDED",
                     merge(raw.work(), verificationWork.ledger()),
                     ClaimStrength.NONE,
-                    raw.engineResultHash());
+                    raw.engineResultHash(),
+                    request);
             }
             if (!outcome.verified()) {
                 return failure(
@@ -160,15 +179,19 @@ public final class FactorizationVerifier {
                     outcome.detailCode(),
                     merge(raw.work(), verificationWork.ledger()),
                     ClaimStrength.NONE,
-                    raw.engineResultHash());
+                    raw.engineResultHash(),
+                    request);
             }
-            verified.add(issueVerifiedCandidate(
+            candidates.add(issueVerifiedCandidate(
                 proposal,
                 raw.backendClaim(),
                 outcome.reconstructed(),
                 request.source()));
         }
 
+        PolynomialWorkLedger combined =
+            merge(raw.work(), verificationWork.ledger());
+        ClaimStrength claim = claimFor(raw.backendClaim());
         if (request.evidenceRequirement()
                 == FactorizationRequest.EvidenceRequirement
                     .INDEPENDENT_COMPLETE) {
@@ -176,17 +199,18 @@ public final class FactorizationVerifier {
                 raw.engineId(),
                 Status.UNSUPPORTED_REQUEST,
                 "INDEPENDENT_COMPLETENESS_VERIFIER_REQUIRED",
-                merge(raw.work(), verificationWork.ledger()),
-                claimFor(raw.backendClaim()),
-                raw.engineResultHash());
+                combined,
+                claim,
+                raw.engineResultHash(),
+                request);
         }
         return success(
             raw.engineId(),
             Status.PARTIAL_FACTORIZATION,
             raw.detailCode(),
-            merge(raw.work(), verificationWork.ledger()),
-            claimFor(raw.backendClaim()),
-            verified,
+            combined,
+            claim,
+            candidates,
             raw.engineResultHash(),
             request);
     }
@@ -195,21 +219,23 @@ public final class FactorizationVerifier {
         FactorizationRequest<C> request,
         FactorizationEngine.EngineResult<C> raw
     ) {
-        ClaimStrength claim = raw.backendClaim()
-                == FactorizationEngine.BackendClaim.IRREDUCIBLE
-            ? ClaimStrength.BACKEND_CLAIMED_IRREDUCIBLE
-            : ClaimStrength.NONE;
+        ClaimStrength claim =
+            raw.backendClaim() == FactorizationEngine.BackendClaim.IRREDUCIBLE
+                ? ClaimStrength.BACKEND_CLAIMED_IRREDUCIBLE
+                : ClaimStrength.NONE;
         if (request.evidenceRequirement()
                 == FactorizationRequest.EvidenceRequirement
                     .INDEPENDENT_COMPLETE
-                && claim == ClaimStrength.BACKEND_CLAIMED_IRREDUCIBLE) {
+                && claim
+                    == ClaimStrength.BACKEND_CLAIMED_IRREDUCIBLE) {
             return failure(
                 raw.engineId(),
                 Status.UNSUPPORTED_REQUEST,
                 "INDEPENDENT_IRREDUCIBILITY_VERIFIER_REQUIRED",
                 raw.work(),
                 claim,
-                raw.engineResultHash());
+                raw.engineResultHash(),
+                request);
         }
         return failure(
             raw.engineId(),
@@ -217,7 +243,8 @@ public final class FactorizationVerifier {
             raw.detailCode(),
             raw.work(),
             claim,
-            raw.engineResultHash());
+            raw.engineResultHash(),
+            request);
     }
 
     private static <C> VerificationOutcome<C> verifyProposal(
@@ -242,9 +269,11 @@ public final class FactorizationVerifier {
             work.consume(
                 "verify.factor-power-multiplications",
                 powerMultiplications(factor.multiplicity()));
-            SparsePolynomial<C> powered = factor.polynomial().pow(
-                factor.multiplicity());
-            work.consume("verify.factor-product-multiplications", 1);
+            SparsePolynomial<C> powered =
+                factor.polynomial().pow(factor.multiplicity());
+            work.consume(
+                "verify.factor-product-multiplications",
+                1);
             reconstructed = reconstructed.multiply(powered);
         }
         if (!proposal.unresolvedRemainder().isOne()) {
@@ -286,15 +315,23 @@ public final class FactorizationVerifier {
         SparsePolynomial<C> reconstructed,
         SparsePolynomial<C> source
     ) {
-        String material = VERIFIER_ID
-            + "|source=" + source.canonicalMaterial()
-            + "|proposal=" + proposal.canonicalMaterial()
-            + "|backendClaim=" + backendClaim
-            + "|reconstructed=" + reconstructed.canonicalMaterial();
+        StringBuilder material = new StringBuilder(VERIFIER_ID);
+        PolynomialEvidence.append(
+            material,
+            source.canonicalMaterial());
+        PolynomialEvidence.append(
+            material,
+            proposal.canonicalMaterial());
+        PolynomialEvidence.append(
+            material,
+            backendClaim.name());
+        PolynomialEvidence.append(
+            material,
+            reconstructed.canonicalMaterial());
         return new VerifiedCandidate<>(
             proposal,
             backendClaim,
-            sha256(material));
+            PolynomialEvidence.sha256(material.toString()));
     }
 
     private static ClaimStrength claimFor(
@@ -306,33 +343,29 @@ public final class FactorizationVerifier {
             : ClaimStrength.VERIFIED_DECOMPOSITION;
     }
 
-    private static FactorizationEngine.WorkLedger merge(
-        FactorizationEngine.WorkLedger first,
-        FactorizationEngine.WorkLedger second
+    private static PolynomialWorkLedger merge(
+        PolynomialWorkLedger first,
+        PolynomialWorkLedger second
     ) {
-        Map<String, Long> merged = new LinkedHashMap<>(first.stages());
+        Map<String, Long> merged =
+            new LinkedHashMap<>(first.stages());
         second.stages().forEach((stage, units) -> merged.merge(
             stage,
             units,
             Math::addExact));
-        return new FactorizationEngine.WorkLedger(merged);
+        return new PolynomialWorkLedger(merged);
     }
 
     private static <C> Report<C> success(
         String engineId,
         Status status,
         String detailCode,
-        FactorizationEngine.WorkLedger work,
+        PolynomialWorkLedger work,
         ClaimStrength claimStrength,
         List<VerifiedCandidate<C>> candidates,
         String engineResultHash,
         FactorizationRequest<C> request
     ) {
-        if (status != Status.PARTIAL_FACTORIZATION
-                && status != Status.COMPLETE_FACTORIZATION) {
-            throw new IllegalArgumentException(
-                "factorization success status is invalid");
-        }
         String verificationHash = reportHash(
             engineId,
             status,
@@ -357,17 +390,20 @@ public final class FactorizationVerifier {
         String engineId,
         Status status,
         String detailCode,
-        FactorizationEngine.WorkLedger work,
+        PolynomialWorkLedger work,
         ClaimStrength claimStrength,
-        String engineResultHash
+        String engineResultHash,
+        FactorizationRequest<C> request
     ) {
-        String material = VERIFIER_ID
-            + "|engine=" + engineId
-            + "|status=" + status
-            + "|detail=" + detailCode
-            + "|work=" + work.canonicalMaterial()
-            + "|claim=" + claimStrength
-            + "|engineResult=" + engineResultHash;
+        String verificationHash = reportHash(
+            engineId,
+            status,
+            detailCode,
+            work,
+            claimStrength,
+            List.of(),
+            engineResultHash,
+            request);
         return new Report<>(
             engineId,
             status,
@@ -376,63 +412,47 @@ public final class FactorizationVerifier {
             claimStrength,
             List.of(),
             engineResultHash,
-            sha256(material));
+            verificationHash);
     }
 
     private static <C> String reportHash(
         String engineId,
         Status status,
         String detailCode,
-        FactorizationEngine.WorkLedger work,
+        PolynomialWorkLedger work,
         ClaimStrength claimStrength,
         List<VerifiedCandidate<C>> candidates,
         String engineResultHash,
         FactorizationRequest<C> request
     ) {
         StringBuilder material = new StringBuilder(VERIFIER_ID);
-        append(material, engineId);
-        append(material, status.name());
-        append(material, detailCode);
-        append(material, work.canonicalMaterial());
-        append(material, claimStrength.name());
-        append(material, engineResultHash);
-        append(material, request.source().canonicalMaterial());
-        append(material, request.evidenceRequirement().name());
-        append(material, Integer.toString(request.maxCandidates()));
-        append(material, Long.toString(request.maxWorkUnits()));
-        candidates.forEach(candidate -> append(
+        PolynomialEvidence.append(material, engineId);
+        PolynomialEvidence.append(material, status.name());
+        PolynomialEvidence.append(material, detailCode);
+        PolynomialEvidence.append(
             material,
-            candidate.canonicalMaterial()));
-        return sha256(material.toString());
+            work.canonicalMaterial());
+        PolynomialEvidence.append(
+            material,
+            claimStrength.name());
+        PolynomialEvidence.append(material, engineResultHash);
+        PolynomialEvidence.append(
+            material,
+            request.canonicalMaterial());
+        candidates.forEach(candidate ->
+            PolynomialEvidence.append(
+                material,
+                candidate.canonicalMaterial()));
+        return PolynomialEvidence.sha256(material.toString());
     }
 
-    private static String technicalDetail(RuntimeException exception) {
+    private static String technicalDetail(
+        RuntimeException exception
+    ) {
         String simple = exception.getClass().getSimpleName();
         return "ENGINE_EXCEPTION_" + (simple.isBlank()
             ? "RUNTIME"
             : simple.toUpperCase(java.util.Locale.ROOT));
-    }
-
-    private static void append(
-        StringBuilder target,
-        String value
-    ) {
-        target.append('|')
-            .append(value.length())
-            .append(':')
-            .append(value);
-    }
-
-    private static String sha256(String material) {
-        try {
-            return "sha256:" + HexFormat.of().formatHex(
-                MessageDigest.getInstance("SHA-256")
-                    .digest(material.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException(
-                "SHA-256 unavailable",
-                exception);
-        }
     }
 
     public enum Status {
@@ -499,25 +519,31 @@ public final class FactorizationVerifier {
 
         public String canonicalMaterial() {
             StringBuilder result = new StringBuilder();
-            append(
+            PolynomialEvidence.append(
                 result,
                 unresolvedRemainder().ring()
                     .coefficientDomain()
                     .canonicalText(unit()));
             factors().forEach(factor -> {
-                append(
+                PolynomialEvidence.append(
                     result,
                     Integer.toString(factor.multiplicity()));
-                append(
+                PolynomialEvidence.append(
                     result,
                     factor.polynomial().canonicalMaterial());
             });
-            append(
+            PolynomialEvidence.append(
                 result,
                 unresolvedRemainder().canonicalMaterial());
-            append(result, backendClaim().name());
-            append(result, engineCertificateHash());
-            append(result, verificationCertificateHash());
+            PolynomialEvidence.append(
+                result,
+                backendClaim().name());
+            PolynomialEvidence.append(
+                result,
+                engineCertificateHash());
+            PolynomialEvidence.append(
+                result,
+                verificationCertificateHash());
             return result.toString();
         }
 
@@ -574,7 +600,7 @@ public final class FactorizationVerifier {
             String engineId,
             Status status,
             String detailCode,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             ClaimStrength claimStrength,
             List<VerifiedCandidate<C>> candidates,
             String engineResultHash,
@@ -603,7 +629,7 @@ public final class FactorizationVerifier {
             return state.detailCode();
         }
 
-        public FactorizationEngine.WorkLedger work() {
+        public PolynomialWorkLedger work() {
             return state.work();
         }
 
@@ -649,7 +675,7 @@ public final class FactorizationVerifier {
             String engineId,
             Status status,
             String detailCode,
-            FactorizationEngine.WorkLedger work,
+            PolynomialWorkLedger work,
             ClaimStrength claimStrength,
             List<VerifiedCandidate<C>> candidates,
             String engineResultHash,
@@ -670,9 +696,9 @@ public final class FactorizationVerifier {
                         "factorization verification report is invalid");
                 }
                 candidates = List.copyOf(candidates);
-                boolean success = status
-                        == Status.PARTIAL_FACTORIZATION
-                    || status == Status.COMPLETE_FACTORIZATION;
+                boolean success =
+                    status == Status.PARTIAL_FACTORIZATION
+                        || status == Status.COMPLETE_FACTORIZATION;
                 if (success == candidates.isEmpty()) {
                     throw new IllegalArgumentException(
                         "factorization report candidate/status mismatch");
@@ -691,7 +717,8 @@ public final class FactorizationVerifier {
                     throw new IllegalArgumentException(
                         "irreducibility requires independent evidence");
                 }
-                if (!engineResultHash.isEmpty()
+                if (engineResultHash == null
+                        || !engineResultHash.isEmpty()
                         && !engineResultHash.matches(
                             "sha256:[0-9a-f]{64}")) {
                     throw new IllegalArgumentException(
@@ -710,7 +737,8 @@ public final class FactorizationVerifier {
 
     private static final class WorkCounter {
         private final long limit;
-        private final Map<String, Long> stages = new LinkedHashMap<>();
+        private final Map<String, Long> stages =
+            new LinkedHashMap<>();
         private long total;
 
         private WorkCounter(long limit) {
@@ -725,16 +753,20 @@ public final class FactorizationVerifier {
             if (units < 0 || total > limit - units) {
                 throw new WorkLimitReached();
             }
+            if (units == 0) {
+                return;
+            }
             total += units;
             stages.merge(stage, units, Math::addExact);
         }
 
-        private FactorizationEngine.WorkLedger ledger() {
-            return new FactorizationEngine.WorkLedger(stages);
+        private PolynomialWorkLedger ledger() {
+            return new PolynomialWorkLedger(stages);
         }
     }
 
     private static final class WorkLimitReached
             extends RuntimeException {
+        private static final long serialVersionUID = 1L;
     }
 }

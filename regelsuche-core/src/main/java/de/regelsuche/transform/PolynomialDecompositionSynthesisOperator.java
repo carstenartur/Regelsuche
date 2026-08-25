@@ -30,6 +30,13 @@ public final class PolynomialDecompositionSynthesisOperator
     private static final String LICENSE = "PROJECT";
     private static final int DEFAULT_MAX_CANDIDATES = 6;
     private static final long DEFAULT_MAX_WORK_UNITS = 4_096;
+    private static final FactorizationRequest.StructuralLimits
+        DEFAULT_STRUCTURAL_LIMITS =
+            new FactorizationRequest.StructuralLimits(
+                2,
+                4,
+                16,
+                4_096);
 
     private final PolynomialSemanticView semanticView;
     private final BinaryQuarticFactorizationEngine engine;
@@ -117,6 +124,7 @@ public final class PolynomialDecompositionSynthesisOperator
                 engine,
                 FactorizationRequest.verifiedDecomposition(
                     view.polynomial(),
+                    DEFAULT_STRUCTURAL_LIMITS,
                     maxCandidates,
                     maxWorkUnits));
         if (!factorization.successful()) {

@@ -1,7 +1,7 @@
 package de.regelsuche.transform;
 
-import de.regelsuche.polynomial.FactorizationEngine;
 import de.regelsuche.polynomial.FactorizationVerifier;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Objects;
@@ -12,7 +12,7 @@ public record ExpressionFactorizationReport(
     String detailCode,
     PolynomialSemanticView.Status semanticStatus,
     String sourcePolynomialMaterial,
-    FactorizationEngine.WorkLedger work,
+    PolynomialWorkLedger work,
     FactorizationVerifier.ClaimStrength claimStrength,
     String verificationHash,
     List<RenderedFactorization> candidates
@@ -63,7 +63,7 @@ public record ExpressionFactorizationReport(
             detailCode,
             semanticStatus,
             "",
-            FactorizationEngine.WorkLedger.empty(),
+            PolynomialWorkLedger.empty(),
             FactorizationVerifier.ClaimStrength.NONE,
             "",
             List.of());

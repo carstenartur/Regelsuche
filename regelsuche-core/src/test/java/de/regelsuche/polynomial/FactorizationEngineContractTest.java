@@ -18,10 +18,10 @@ class FactorizationEngineContractTest {
         reverseInsertionOrder.put("engine.enumeration", 5L);
         reverseInsertionOrder.put("engine.constraints", 2L);
 
-        FactorizationEngine.WorkLedger first =
-            new FactorizationEngine.WorkLedger(reverseInsertionOrder);
-        FactorizationEngine.WorkLedger second =
-            new FactorizationEngine.WorkLedger(Map.of(
+        PolynomialWorkLedger first =
+            new PolynomialWorkLedger(reverseInsertionOrder);
+        PolynomialWorkLedger second =
+            new PolynomialWorkLedger(Map.of(
                 "engine.constraints", 2L,
                 "verify.product", 3L,
                 "engine.enumeration", 5L));
@@ -44,7 +44,7 @@ class FactorizationEngineContractTest {
         overflowing.put("engine.maximum", Long.MAX_VALUE);
         overflowing.put("verify.one-more", 1L);
         assertThrows(IllegalArgumentException.class, () ->
-            new FactorizationEngine.WorkLedger(overflowing));
+            new PolynomialWorkLedger(overflowing));
     }
 
     @Test
@@ -85,7 +85,7 @@ class FactorizationEngineContractTest {
                 "test.factorization-engine/v1",
                 FactorizationEngine.Outcome.CANDIDATES,
                 "CONTRADICTORY_COMPLETE_RESULT",
-                FactorizationEngine.WorkLedger.empty(),
+                PolynomialWorkLedger.empty(),
                 List.of(proposal),
                 FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION,
                 "sha256:" + "c".repeat(64)));

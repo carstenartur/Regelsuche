@@ -1,13 +1,10 @@
 package de.regelsuche.polynomial;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
 
 /**
  * Backend-neutral factorization engine SPI.
@@ -129,73 +126,12 @@ public interface FactorizationEngine<C> {
         }
     }
 
-    /** Deterministic stage-separated algorithmic work accounting. */
-    record WorkLedger(Map<String, Long> stages) {
-        public WorkLedger {
-            Objects.requireNonNull(stages, "stages");
-            TreeMap<String, Long> canonical = new TreeMap<>();
-            stages.forEach((stage, units) -> {
-                if (stage == null
-                        || stage.isBlank()
-                        || units == null
-                        || units < 0) {
-                    throw new IllegalArgumentException(
-                        "factorization work ledger is invalid");
-                }
-                canonical.merge(stage, units, Math::addExact);
-            });
-            checkedTotal(canonical.values());
-            stages = Collections.unmodifiableMap(
-                new LinkedHashMap<>(canonical));
-        }
-
-        public long totalWorkUnits() {
-            return checkedTotal(stages.values());
-        }
-
-        public long units(String stage) {
-            return stages.getOrDefault(stage, 0L);
-        }
-
-        public boolean within(long maximum) {
-            return maximum >= 0 && totalWorkUnits() <= maximum;
-        }
-
-        public String canonicalMaterial() {
-            StringBuilder result = new StringBuilder();
-            stages.forEach((stage, units) -> {
-                append(result, stage);
-                append(result, Long.toString(units));
-            });
-            append(result, Long.toString(totalWorkUnits()));
-            return result.toString();
-        }
-
-        public static WorkLedger empty() {
-            return new WorkLedger(Map.of());
-        }
-
-        private static long checkedTotal(Iterable<Long> unitsByStage) {
-            try {
-                long total = 0;
-                for (long units : unitsByStage) {
-                    total = Math.addExact(total, units);
-                }
-                return total;
-            } catch (ArithmeticException exception) {
-                throw new IllegalArgumentException(
-                    "factorization work ledger total exceeds long range",
-                    exception);
-            }
-        }
-    }
-
     /** Complete raw engine output before independent verification. */
     record EngineResult<C>(
         String engineId,
         Outcome outcome,
         String detailCode,
-        WorkLedger work,
+        PolynomialWorkLedger work,
         List<Proposal<C>> proposals,
         BackendClaim backendClaim,
         String engineResultHash
