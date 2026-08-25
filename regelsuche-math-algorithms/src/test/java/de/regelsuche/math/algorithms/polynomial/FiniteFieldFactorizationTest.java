@@ -20,6 +20,8 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class FiniteFieldFactorizationTest {
+    private static final long TEST_MATRIX_CELLS = 1_000_000L;
+
     private final FactorizationRequest.StructuralLimits limits =
         new FactorizationRequest.StructuralLimits(
             1,
@@ -27,7 +29,9 @@ class FiniteFieldFactorizationTest {
             64,
             4_096);
     private final FiniteFieldFactorizationPolicy policy =
-        FiniteFieldFactorizationPolicy.deterministicBerlekamp(101);
+        FiniteFieldFactorizationPolicy.deterministicBerlekamp(
+            101,
+            TEST_MATRIX_CELLS);
 
     @Test
     void factorsAUnitTimesDistinctIrreducibleFactorsOverF5() {
@@ -156,7 +160,7 @@ class FiniteFieldFactorizationTest {
     }
 
     @Test
-    void structuralEnumerationAndWorkLimitsRemainInconclusive() {
+    void structuralEnumerationMatrixAndWorkLimitsRemainInconclusive() {
         PolynomialRing<BigInteger> ring = ring(7);
         SparsePolynomial<BigInteger> source =
             polynomial(ring, 1, 0, 1);
@@ -176,7 +180,14 @@ class FiniteFieldFactorizationTest {
             FiniteFieldFactorization.factorSquareFree(
                 request(source, 100_000),
                 FiniteFieldFactorizationPolicy
-                    .deterministicBerlekamp(5));
+                    .deterministicBerlekamp(
+                        5,
+                        TEST_MATRIX_CELLS));
+        FiniteFieldFactorizationResult matrix =
+            FiniteFieldFactorization.factorSquareFree(
+                request(source, 100_000),
+                FiniteFieldFactorizationPolicy
+                    .deterministicBerlekamp(101, 1));
         FiniteFieldFactorizationResult work =
             FiniteFieldFactorization.factorSquareFree(
                 request(source, 1),
@@ -193,6 +204,10 @@ class FiniteFieldFactorizationTest {
             "PRIME_FIELD_ENUMERATION_POLICY_EXCEEDED",
             enumeration.detailCode());
         assertEquals(0, enumeration.work().totalWorkUnits());
+        assertEquals(
+            "BERLEKAMP_MATRIX_CELL_POLICY_EXCEEDED",
+            matrix.detailCode());
+        assertEquals(0, matrix.work().totalWorkUnits());
         assertEquals(
             "FINITE_FIELD_FACTORIZATION_WORK_BUDGET_EXCEEDED",
             work.detailCode());
