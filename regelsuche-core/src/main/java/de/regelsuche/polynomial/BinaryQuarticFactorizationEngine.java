@@ -13,12 +13,12 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Bounded exact quadratic-by-quadratic decomposition engine for binary
- * homogeneous quartics.
+ * Bounded exact quadratic-by-quadratic proposal engine for binary homogeneous
+ * quartics.
  *
- * <p>This is one factorization engine, not the polynomial API. It proves exact
- * product reconstruction, but it does not prove that the emitted quadratic
- * factors are irreducible.</p>
+ * <p>The engine solves exact coefficient constraints. It does not issue trusted
+ * product, completeness or irreducibility evidence; that authority belongs to
+ * {@link FactorizationVerifier}.</p>
  */
 public final class BinaryQuarticFactorizationEngine
         implements FactorizationEngine<BigInteger> {
@@ -26,27 +26,27 @@ public final class BinaryQuarticFactorizationEngine
         "regelsuche.factorization.binary-quartic-2x2/v1";
 
     private static final int DEFAULT_MAX_COEFFICIENT_ABS = 32;
-    private static final long DEFAULT_MAX_FACTOR_CONFIGURATIONS = 4_096;
+    private static final long DEFAULT_MAX_ENGINE_WORK_UNITS = 4_096;
 
     private final int maxCoefficientAbs;
-    private final long maxFactorConfigurations;
+    private final long maxEngineWorkUnits;
 
     public BinaryQuarticFactorizationEngine() {
         this(
             DEFAULT_MAX_COEFFICIENT_ABS,
-            DEFAULT_MAX_FACTOR_CONFIGURATIONS);
+            DEFAULT_MAX_ENGINE_WORK_UNITS);
     }
 
     public BinaryQuarticFactorizationEngine(
         int maxCoefficientAbs,
-        long maxFactorConfigurations
+        long maxEngineWorkUnits
     ) {
-        if (maxCoefficientAbs < 1 || maxFactorConfigurations < 1) {
+        if (maxCoefficientAbs < 1 || maxEngineWorkUnits < 1) {
             throw new IllegalArgumentException(
                 "binary quartic factorization budget is invalid");
         }
         this.maxCoefficientAbs = maxCoefficientAbs;
-        this.maxFactorConfigurations = maxFactorConfigurations;
+        this.maxEngineWorkUnits = maxEngineWorkUnits;
     }
 
     @Override
@@ -60,122 +60,145 @@ public final class BinaryQuarticFactorizationEngine
     }
 
     @Override
-    public FactorizationReport<BigInteger> factor(
+    public EngineResult<BigInteger> propose(
         FactorizationRequest<BigInteger> request
     ) {
         Objects.requireNonNull(request, "request");
         SparsePolynomial<BigInteger> source = request.source();
-        FactorizationReport<BigInteger> unsupported =
-            validateRequest(request, source);
+        EngineResult<BigInteger> unsupported = validateRequest(
+            request,
+            source);
         if (unsupported != null) {
             return unsupported;
         }
 
-        Coefficients target = new Coefficients(
-            source.coefficient(4, 0),
-            source.coefficient(3, 1),
-            source.coefficient(2, 2),
-            source.coefficient(1, 3),
-            source.coefficient(0, 4));
         Work work = new Work(Math.min(
-            maxFactorConfigurations,
-            request.maxArithmeticSteps()));
-        Map<String, FactorizationCandidate<BigInteger>> candidates =
+            maxEngineWorkUnits,
+            request.maxWorkUnits()));
+        Map<String, Proposal<BigInteger>> proposals =
             new LinkedHashMap<>();
         try {
-            enumerateCandidates(
+            Coefficients target = coefficients(source);
+            List<BigInteger> leadingDivisors = divisors(
+                target.c40(),
+                work);
+            List<BigInteger> trailingDivisors = divisors(
+                target.c04(),
+                work);
+            enumerateProposals(
                 source,
                 target,
+                leadingDivisors,
+                trailingDivisors,
                 work,
-                candidates);
+                proposals);
         } catch (BudgetExceeded exception) {
-            return FactorizationReport.failure(
-                engineId(),
-                FactorizationStatus.BUDGET_INCONCLUSIVE,
-                exception.getMessage(),
-                work.considered());
-        } catch (InvalidCandidate exception) {
-            return FactorizationReport.failure(
-                engineId(),
-                FactorizationStatus.TECHNICAL_FAILURE,
-                exception.getMessage(),
-                work.considered());
+            return result(
+                request,
+                Outcome.BUDGET_INCONCLUSIVE,
+                "ENGINE_WORK_BUDGET_EXCEEDED",
+                work.ledger(),
+                List.of(),
+                BackendClaim.NONE);
         }
 
-        List<FactorizationCandidate<BigInteger>> ordered =
-            candidates.values().stream()
-                .sorted(Comparator.comparing(
-                    FactorizationCandidate::canonicalMaterial))
-                .limit(request.maxCandidates())
-                .toList();
+        List<Proposal<BigInteger>> ordered = proposals.values().stream()
+            .sorted(Comparator.comparing(Proposal::canonicalMaterial))
+            .limit(request.maxCandidates())
+            .toList();
         if (ordered.isEmpty()) {
-            return FactorizationReport.failure(
-                engineId(),
-                FactorizationStatus.NO_FACTORIZATION_FOUND,
+            return result(
+                request,
+                Outcome.NO_CANDIDATE,
                 "NO_BOUNDED_INTEGER_QUADRATIC_DECOMPOSITION",
-                work.considered());
+                work.ledger(),
+                List.of(),
+                BackendClaim.NONE);
         }
-        return new FactorizationReport<>(
-            engineId(),
-            FactorizationStatus.PARTIAL_FACTORIZATION,
-            "EXACT_PRODUCT_DECOMPOSITION_WITHOUT_IRREDUCIBILITY_CLAIM",
-            work.considered(),
-            ordered);
+        return result(
+            request,
+            Outcome.CANDIDATES,
+            "EXACT_QUADRATIC_DECOMPOSITION_PROPOSALS",
+            work.ledger(),
+            ordered,
+            BackendClaim.NONE);
     }
 
-    private FactorizationReport<BigInteger> validateRequest(
+    private EngineResult<BigInteger> validateRequest(
         FactorizationRequest<BigInteger> request,
         SparsePolynomial<BigInteger> source
     ) {
         if (!coefficientDomainId().equals(
                 source.ring().coefficientDomain().id())) {
-            return FactorizationReport.failure(
-                engineId(),
-                FactorizationStatus.UNSUPPORTED_DOMAIN,
+            return result(
+                request,
+                Outcome.UNSUPPORTED_DOMAIN,
                 "REQUIRES_EXACT_INTEGER_COEFFICIENT_DOMAIN",
-                0);
+                WorkLedger.empty(),
+                List.of(),
+                BackendClaim.NONE);
         }
-        if (!FactorizationCompleteness.DECOMPOSITION_ONLY.meets(
-                request.minimumCompleteness())) {
-            return FactorizationReport.failure(
-                engineId(),
-                FactorizationStatus.UNSUPPORTED_REQUEST,
+        if (request.evidenceRequirement()
+                == FactorizationRequest.EvidenceRequirement
+                    .INDEPENDENT_COMPLETE) {
+            return result(
+                request,
+                Outcome.UNSUPPORTED_REQUEST,
                 "ENGINE_DOES_NOT_CERTIFY_FACTOR_IRREDUCIBILITY",
-                0);
+                WorkLedger.empty(),
+                List.of(),
+                BackendClaim.NONE);
         }
         if (source.ring().variableCount() != 2
                 || !source.isHomogeneousOfDegree(4)
                 || source.coefficient(4, 0).signum() == 0
                 || source.coefficient(0, 4).signum() == 0) {
-            return FactorizationReport.failure(
-                engineId(),
-                FactorizationStatus.UNSUPPORTED_REQUEST,
+            return result(
+                request,
+                Outcome.UNSUPPORTED_REQUEST,
                 "REQUIRES_BINARY_HOMOGENEOUS_QUARTIC_WITH_NONZERO_EXTREME_TERMS",
-                0);
+                WorkLedger.empty(),
+                List.of(),
+                BackendClaim.NONE);
         }
         if (request.maxCandidates() == 0) {
-            return FactorizationReport.failure(
-                engineId(),
-                FactorizationStatus.BUDGET_INCONCLUSIVE,
+            return result(
+                request,
+                Outcome.BUDGET_INCONCLUSIVE,
                 "MAX_CANDIDATES_IS_ZERO",
-                0);
+                WorkLedger.empty(),
+                List.of(),
+                BackendClaim.NONE);
         }
         return null;
     }
 
-    private void enumerateCandidates(
+    private static Coefficients coefficients(
+        SparsePolynomial<BigInteger> source
+    ) {
+        return new Coefficients(
+            source.coefficient(4, 0),
+            source.coefficient(3, 1),
+            source.coefficient(2, 2),
+            source.coefficient(1, 3),
+            source.coefficient(0, 4));
+    }
+
+    private void enumerateProposals(
         SparsePolynomial<BigInteger> source,
         Coefficients target,
+        List<BigInteger> leadingDivisors,
+        List<BigInteger> trailingDivisors,
         Work work,
-        Map<String, FactorizationCandidate<BigInteger>> candidates
+        Map<String, Proposal<BigInteger>> proposals
     ) {
-        for (BigInteger a : divisors(target.c40())) {
+        for (BigInteger a : leadingDivisors) {
             BigInteger d = target.c40().divide(a);
             if (!withinBound(d)) {
                 continue;
             }
-            for (BigInteger c : divisors(target.c04())) {
-                work.consider();
+            for (BigInteger c : trailingDivisors) {
+                work.consume("engine.factor-pair-configurations", 1);
                 BigInteger f = target.c04().divide(c);
                 if (!withinBound(f)) {
                     continue;
@@ -185,92 +208,52 @@ public final class BinaryQuarticFactorizationEngine
                         d,
                         c,
                         f,
-                        target)) {
-                    retainCandidate(
+                        target,
+                        work)) {
+                    retainProposal(
                         source,
                         target,
-                        a,
-                        d,
-                        c,
-                        f,
-                        middle,
+                        new Quadratic(a, middle.b(), c),
+                        new Quadratic(d, middle.e(), f),
                         work,
-                        candidates);
+                        proposals);
                 }
             }
         }
     }
 
-    private void retainCandidate(
+    private void retainProposal(
         SparsePolynomial<BigInteger> source,
         Coefficients target,
-        BigInteger a,
-        BigInteger d,
-        BigInteger c,
-        BigInteger f,
-        MiddlePair middle,
+        Quadratic first,
+        Quadratic second,
         Work work,
-        Map<String, FactorizationCandidate<BigInteger>> candidates
+        Map<String, Proposal<BigInteger>> proposals
     ) {
-        if (!withinBound(middle.b())
-                || !withinBound(middle.e())) {
-            return;
-        }
-        BigInteger reconstructedMiddle = a.multiply(f)
-            .add(middle.b().multiply(middle.e()))
-            .add(c.multiply(d));
+        work.consume("engine.candidate-reconstructions", 1);
+        BigInteger reconstructedMiddle = first.a().multiply(second.c())
+            .add(first.b().multiply(second.b()))
+            .add(first.c().multiply(second.a()));
         if (!reconstructedMiddle.equals(target.c22())) {
             return;
         }
-        NormalizedFactorPair pair = normalize(
-            quadratic(source.ring(), a, middle.b(), c),
-            quadratic(source.ring(), d, middle.e(), f));
-        FactorizationCandidate<BigInteger> candidate = candidate(
+        NormalizedFactorPair normalized = normalize(
+            source.ring(),
+            first,
+            second);
+        String certificateMaterial = proposalCertificateMaterial(
             source,
-            pair,
-            work.considered());
-        FactorizationVerifier.Verification<BigInteger> verification =
-            FactorizationVerifier.verify(source, candidate);
-        if (!verification.verified()) {
-            throw new InvalidCandidate(verification.detailCode());
-        }
-        candidates.putIfAbsent(
-            candidate.canonicalMaterial(),
-            candidate);
-    }
-
-    private SparsePolynomial<BigInteger> quadratic(
-        PolynomialRing<BigInteger> ring,
-        BigInteger a,
-        BigInteger b,
-        BigInteger c
-    ) {
-        return new SparsePolynomial<>(
-            ring,
-            Map.of(
-                Monomial.of(2, 0), a,
-                Monomial.of(1, 1), b,
-                Monomial.of(0, 2), c));
-    }
-
-    private FactorizationCandidate<BigInteger> candidate(
-        SparsePolynomial<BigInteger> source,
-        NormalizedFactorPair pair,
-        long considered
-    ) {
-        List<PolynomialFactor<BigInteger>> factors = List.of(
-            new PolynomialFactor<>(pair.left(), 1),
-            new PolynomialFactor<>(pair.right(), 1));
-        String material = certificateMaterial(
-            source,
-            pair,
-            considered);
-        return new FactorizationCandidate<>(
-            pair.unit(),
-            factors,
+            normalized);
+        Proposal<BigInteger> proposal = new Proposal<>(
+            normalized.unit(),
+            List.of(
+                new PolynomialFactor<>(normalized.left(), 1),
+                new PolynomialFactor<>(normalized.right(), 1)),
             SparsePolynomial.one(source.ring()),
-            FactorizationCompleteness.DECOMPOSITION_ONLY,
-            sha256(material));
+            sha256(certificateMaterial));
+        proposals.putIfAbsent(
+            proposal.canonicalMaterial(),
+            proposal);
     }
 
     private List<MiddlePair> solveMiddle(
@@ -278,11 +261,13 @@ public final class BinaryQuarticFactorizationEngine
         BigInteger d,
         BigInteger c,
         BigInteger f,
-        Coefficients target
+        Coefficients target,
+        Work work
     ) {
         BigInteger determinant = d.multiply(c)
             .subtract(a.multiply(f));
         if (determinant.signum() != 0) {
+            work.consume("engine.middle-system-solves", 1);
             BigInteger bNumerator = target.c31().multiply(c)
                 .subtract(a.multiply(target.c13()));
             BigInteger eNumerator = d.multiply(target.c13())
@@ -300,6 +285,7 @@ public final class BinaryQuarticFactorizationEngine
         for (int value = -maxCoefficientAbs;
                 value <= maxCoefficientAbs;
                 value++) {
+            work.consume("engine.middle-system-solves", 1);
             BigInteger b = BigInteger.valueOf(value);
             BigInteger eNumerator = target.c31()
                 .subtract(d.multiply(b));
@@ -316,7 +302,10 @@ public final class BinaryQuarticFactorizationEngine
         return List.copyOf(result);
     }
 
-    private List<BigInteger> divisors(BigInteger value) {
+    private List<BigInteger> divisors(
+        BigInteger value,
+        Work work
+    ) {
         BigInteger absolute = value.abs();
         List<BigInteger> result = new ArrayList<>();
         for (int divisor = 1;
@@ -324,6 +313,7 @@ public final class BinaryQuarticFactorizationEngine
                     && BigInteger.valueOf(divisor)
                         .compareTo(absolute) <= 0;
                 divisor++) {
+            work.consume("engine.divisor-tests", 1);
             BigInteger candidate = BigInteger.valueOf(divisor);
             if (absolute.mod(candidate).signum() == 0) {
                 result.add(candidate);
@@ -334,6 +324,119 @@ public final class BinaryQuarticFactorizationEngine
             .distinct()
             .sorted()
             .toList();
+    }
+
+    private NormalizedFactorPair normalize(
+        PolynomialRing<BigInteger> ring,
+        Quadratic first,
+        Quadratic second
+    ) {
+        PrimitiveQuadratic left = primitive(first);
+        PrimitiveQuadratic right = primitive(second);
+        BigInteger unit = left.content().multiply(right.content());
+        Quadratic leftCoefficients = left.polynomial();
+        Quadratic rightCoefficients = right.polynomial();
+        if (leftCoefficients.a().signum() < 0) {
+            leftCoefficients = leftCoefficients.negate();
+            unit = unit.negate();
+        }
+        if (rightCoefficients.a().signum() < 0) {
+            rightCoefficients = rightCoefficients.negate();
+            unit = unit.negate();
+        }
+        SparsePolynomial<BigInteger> leftPolynomial = quadratic(
+            ring,
+            leftCoefficients);
+        SparsePolynomial<BigInteger> rightPolynomial = quadratic(
+            ring,
+            rightCoefficients);
+        return leftPolynomial.canonicalMaterial().compareTo(
+                rightPolynomial.canonicalMaterial()) <= 0
+            ? new NormalizedFactorPair(
+                unit,
+                leftPolynomial,
+                rightPolynomial)
+            : new NormalizedFactorPair(
+                unit,
+                rightPolynomial,
+                leftPolynomial);
+    }
+
+    private static PrimitiveQuadratic primitive(Quadratic polynomial) {
+        BigInteger content = polynomial.a().abs()
+            .gcd(polynomial.b().abs())
+            .gcd(polynomial.c().abs());
+        if (content.signum() == 0) {
+            throw new IllegalArgumentException(
+                "zero quadratic factor is invalid");
+        }
+        return new PrimitiveQuadratic(
+            content,
+            new Quadratic(
+                polynomial.a().divide(content),
+                polynomial.b().divide(content),
+                polynomial.c().divide(content)));
+    }
+
+    private static SparsePolynomial<BigInteger> quadratic(
+        PolynomialRing<BigInteger> ring,
+        Quadratic coefficients
+    ) {
+        return new SparsePolynomial<>(
+            ring,
+            Map.of(
+                Monomial.of(2, 0), coefficients.a(),
+                Monomial.of(1, 1), coefficients.b(),
+                Monomial.of(0, 2), coefficients.c()));
+    }
+
+    private EngineResult<BigInteger> result(
+        FactorizationRequest<BigInteger> request,
+        Outcome outcome,
+        String detailCode,
+        WorkLedger work,
+        List<Proposal<BigInteger>> proposals,
+        BackendClaim backendClaim
+    ) {
+        String resultMaterial = engineConfigurationMaterial()
+            + "|source=" + request.source().canonicalMaterial()
+            + "|evidence=" + request.evidenceRequirement()
+            + "|maxCandidates=" + request.maxCandidates()
+            + "|maxWorkUnits=" + request.maxWorkUnits()
+            + "|outcome=" + outcome
+            + "|detail=" + detailCode
+            + "|work=" + work.canonicalMaterial()
+            + "|backendClaim=" + backendClaim
+            + "|proposals=" + proposals.stream()
+                .map(Proposal::canonicalMaterial)
+                .sorted()
+                .toList();
+        return new EngineResult<>(
+            engineId(),
+            outcome,
+            detailCode,
+            work,
+            proposals,
+            backendClaim,
+            sha256(resultMaterial));
+    }
+
+    private String proposalCertificateMaterial(
+        SparsePolynomial<BigInteger> source,
+        NormalizedFactorPair pair
+    ) {
+        return engineConfigurationMaterial()
+            + "|source=" + source.canonicalMaterial()
+            + "|unit=" + pair.unit()
+            + "|left=" + pair.left().canonicalMaterial()
+            + "|right=" + pair.right().canonicalMaterial()
+            + "|remainder=one";
+    }
+
+    private String engineConfigurationMaterial() {
+        return ENGINE_ID
+            + "|maxCoefficientAbs=" + maxCoefficientAbs
+            + "|maxEngineWorkUnits=" + maxEngineWorkUnits;
     }
 
     private boolean withinBound(BigInteger value) {
@@ -347,40 +450,6 @@ public final class BinaryQuarticFactorizationEngine
     ) {
         return denominator.signum() != 0
             && numerator.remainder(denominator).signum() == 0;
-    }
-
-    private NormalizedFactorPair normalize(
-        SparsePolynomial<BigInteger> first,
-        SparsePolynomial<BigInteger> second
-    ) {
-        BigInteger unit = BigInteger.ONE;
-        if (first.leadingCoefficient().signum() < 0) {
-            first = first.negate();
-            unit = unit.negate();
-        }
-        if (second.leadingCoefficient().signum() < 0) {
-            second = second.negate();
-            unit = unit.negate();
-        }
-        return first.canonicalMaterial().compareTo(
-                second.canonicalMaterial()) <= 0
-            ? new NormalizedFactorPair(unit, first, second)
-            : new NormalizedFactorPair(unit, second, first);
-    }
-
-    private static String certificateMaterial(
-        SparsePolynomial<BigInteger> source,
-        NormalizedFactorPair pair,
-        long considered
-    ) {
-        return ENGINE_ID
-            + "|source=" + source.canonicalMaterial()
-            + "|unit=" + pair.unit()
-            + "|left=" + pair.left().canonicalMaterial()
-            + "|right=" + pair.right().canonicalMaterial()
-            + "|completeness="
-            + FactorizationCompleteness.DECOMPOSITION_ONLY
-            + "|work=" + considered;
     }
 
     private static String sha256(String value) {
@@ -410,6 +479,22 @@ public final class BinaryQuarticFactorizationEngine
     ) {
     }
 
+    private record Quadratic(
+        BigInteger a,
+        BigInteger b,
+        BigInteger c
+    ) {
+        private Quadratic negate() {
+            return new Quadratic(a.negate(), b.negate(), c.negate());
+        }
+    }
+
+    private record PrimitiveQuadratic(
+        BigInteger content,
+        Quadratic polynomial
+    ) {
+    }
+
     private record NormalizedFactorPair(
         BigInteger unit,
         SparsePolynomial<BigInteger> left,
@@ -419,36 +504,27 @@ public final class BinaryQuarticFactorizationEngine
 
     private static final class Work {
         private final long limit;
-        private long considered;
+        private final Map<String, Long> stages = new LinkedHashMap<>();
+        private long total;
 
         private Work(long limit) {
             this.limit = limit;
         }
 
-        private void consider() {
-            considered++;
-            if (considered > limit) {
-                throw new BudgetExceeded(
-                    "MAX_ARITHMETIC_STEPS_EXCEEDED");
+        private void consume(String stage, long units) {
+            if (units < 0 || units > limit - total) {
+                throw new BudgetExceeded();
             }
+            total += units;
+            stages.merge(stage, units, Math::addExact);
         }
 
-        private long considered() {
-            return considered;
+        private WorkLedger ledger() {
+            return new WorkLedger(stages);
         }
     }
 
     private static final class BudgetExceeded
             extends RuntimeException {
-        private BudgetExceeded(String detailCode) {
-            super(detailCode);
-        }
-    }
-
-    private static final class InvalidCandidate
-            extends RuntimeException {
-        private InvalidCandidate(String detailCode) {
-            super(detailCode);
-        }
     }
 }
