@@ -42,7 +42,7 @@ class PolynomialTheorySubsumptionClassifierTest {
         assertTrue(result.certificateHash().matches("sha256:[0-9a-f]{64}"));
         assertFalse(result.derivedExpression().isBlank());
         assertFalse(result.applicationKey().isBlank());
-        assertTrue(result.arithmeticSteps() > 0);
+        assertTrue(result.workUnits() > 0);
     }
 
     @Test
@@ -164,8 +164,8 @@ class PolynomialTheorySubsumptionClassifierTest {
             result.applicationKey(),
             secondLineage.lineages().get(1).applicationKey());
         assertEquals(
-            result.arithmeticSteps(),
-            secondLineage.lineages().get(1).arithmeticSteps());
+            result.workUnits(),
+            secondLineage.lineages().get(1).workUnits());
         assertEquals(
             PolynomialDerivedMacroCache.PURPOSE,
             secondLineage.purpose());
