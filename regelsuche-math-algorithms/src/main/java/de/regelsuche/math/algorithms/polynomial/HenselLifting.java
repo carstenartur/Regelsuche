@@ -185,6 +185,18 @@ public final class HenselLifting {
                 selection,
                 policy);
         }
+        String requestHash = AlgorithmEvidence.sha256(
+            request.canonicalMaterial());
+        if (!selection.sourceRequestHash().equals(requestHash)) {
+            return failure(
+                HenselLiftingResult.Status.TECHNICAL_FAILURE,
+                "HENSEL_SELECTION_SOURCE_MISMATCH",
+                List.of(),
+                work.ledger(),
+                request,
+                selection,
+                policy);
+        }
         if (selection.attempts().size() > request.maxCandidates()) {
             return failure(
                 HenselLiftingResult.Status.TECHNICAL_FAILURE,
