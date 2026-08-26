@@ -97,6 +97,44 @@ class MavenGradleDependencyParityContractTest {
   }
 
   @Test
+  void isolatedGraalpyNativeModulesBindTheirHostToolchain()
+      throws IOException {
+    Path root = repositoryRoot();
+    String runtime = Files.readString(root.resolve(
+        "regelsuche-math-sympy/src/main/java/de/regelsuche/math/sympy/"
+            + "GraalPySymPyRuntime.java"));
+
+    assertTrue(
+        runtime.contains(
+            ".option(\"python.IsolateNativeModules\", \"true\")"),
+        "the embedded runtime must isolate native modules before replacement");
+    assertTrue(
+        runtime.contains(".allowCreateProcess(true)"),
+        "GraalPy must be allowed to invoke patchelf for ELF relocation");
+
+    for (String workflow : List.of(
+        ".github/workflows/gradle.yml",
+        ".github/workflows/release.yml")) {
+      String content = Files.readString(root.resolve(workflow));
+      assertTrue(
+          content.contains("patchelf=0.14.3-1"),
+          () -> workflow
+              + " must provision the pinned Ubuntu 22.04 patchelf package");
+    }
+
+    String adapterDocumentation = Files.readString(
+        root.resolve("docs/sympy-factorization-adapter.md"));
+    String testingDocumentation = Files.readString(
+        root.resolve("docs/testing.md"));
+    assertTrue(
+        adapterDocumentation.contains("patchelf=0.14.3-1"),
+        "the adapter documentation must expose the native-isolation prerequisite");
+    assertTrue(
+        testingDocumentation.contains("patchelf=0.14.3-1"),
+        "the checkout testing documentation must expose the same prerequisite");
+  }
+
+  @Test
   void embeddedGraalpyLockIsSharedAndComplete()
       throws IOException {
     Path root = repositoryRoot();
