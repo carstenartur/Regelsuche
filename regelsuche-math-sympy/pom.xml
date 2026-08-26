@@ -52,6 +52,7 @@
         </executions>
         <configuration>
           <resourceDirectory>GRAALPY-VFS/de.regelsuche/regelsuche-math-sympy</resourceDirectory>
+          <graalPyLockFile>${project.basedir}/graalpy.lock</graalPyLockFile>
           <packages>
             <package>mpmath==1.3.0</package>
             <package>sympy==1.14.0</package>
