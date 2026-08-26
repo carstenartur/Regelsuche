@@ -290,12 +290,17 @@ final class GraalPySymPyRuntime implements AutoCloseable {
             VirtualFileSystem fileSystem = VirtualFileSystem.newBuilder()
                 .resourceDirectory(SymPyScript.RESOURCE_DIRECTORY)
                 .resourceLoadingClass(SymPyScript.class)
-                // GraalPy discovers its core and standard-library language
-                // home outside the application VFS. Permit only the reads
-                // required for that discovery at the polyglot filesystem
-                // layer; the pinned native modules still execute with the
-                // operating-system rights of the JVM process.
-                .allowHostIO(VirtualFileSystem.HostIO.READ)
+                // python.IsolateNativeModules copies each native extension to
+                // a context-private temporary file before loading it. GraalPy
+                // performs that copy through the context filesystem, so
+                // read/write host IO is a runtime prerequisite rather than an
+                // application feature. Only the checked-in adapter is
+                // evaluated and its request contract exposes neither paths nor
+                // Python source. Native extensions already execute with the
+                // operating-system rights of the JVM process; this embedded
+                // backend is therefore a trusted dependency boundary, not a
+                // security sandbox.
+                .allowHostIO(VirtualFileSystem.HostIO.READ_WRITE)
                 .build();
             Context context = Context.newBuilder()
                 .engine(engine)
