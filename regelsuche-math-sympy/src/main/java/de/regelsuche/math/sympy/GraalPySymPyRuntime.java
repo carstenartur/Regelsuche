@@ -282,14 +282,19 @@ final class GraalPySymPyRuntime implements AutoCloseable {
             VirtualFileSystem fileSystem = VirtualFileSystem.newBuilder()
                 .resourceDirectory(SymPyScript.RESOURCE_DIRECTORY)
                 .resourceLoadingClass(SymPyScript.class)
-                .allowHostIO(VirtualFileSystem.HostIO.NONE)
+                // GraalPy discovers its core and standard-library language
+                // home outside the application VFS. Permit only the reads
+                // required for that discovery; writes remain denied and the
+                // structured factorization payload contains no host path.
+                .allowHostIO(VirtualFileSystem.HostIO.READ)
                 .build();
-            Context context = GraalPyResources.contextBuilder(fileSystem)
+            Context context = Context.newBuilder()
                 .engine(engine)
                 .allowHostAccess(HostAccess.NONE)
                 .allowCreateThread(false)
                 .allowNativeAccess(false)
                 .allowPolyglotAccess(PolyglotAccess.NONE)
+                .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
                 .option("python.DontWriteBytecodeFlag", "true")
                 .build();
             try {
