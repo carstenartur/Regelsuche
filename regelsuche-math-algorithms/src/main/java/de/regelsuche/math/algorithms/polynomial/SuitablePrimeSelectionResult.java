@@ -97,6 +97,8 @@ public final class SuitablePrimeSelectionResult {
             .ring()
             .coefficientDomain()
             .id();
+        String sourceRequestHash = AlgorithmEvidence.sha256(
+            request.canonicalMaterial());
         if (status == Status.COMPLETED) {
             validateModularSourceCorrespondence(
                 request.source(),
@@ -140,6 +142,7 @@ public final class SuitablePrimeSelectionResult {
             status,
             detailCode,
             sourceDomainId,
+            sourceRequestHash,
             retainedAttempts,
             selectedPrime,
             modularSource,
@@ -243,6 +246,11 @@ public final class SuitablePrimeSelectionResult {
 
     public String sourceDomainId() {
         return state.sourceDomainId();
+    }
+
+    /** Hash of the complete request whose source and budgets were selected. */
+    public String sourceRequestHash() {
+        return state.sourceRequestHash();
     }
 
     public List<PrimeAttempt> attempts() {
@@ -444,6 +452,7 @@ public final class SuitablePrimeSelectionResult {
         Status status,
         String detailCode,
         String sourceDomainId,
+        String sourceRequestHash,
         List<PrimeAttempt> attempts,
         int selectedPrime,
         SparsePolynomial<BigInteger> modularSource,
@@ -457,6 +466,9 @@ public final class SuitablePrimeSelectionResult {
                     || detailCode.isBlank()
                     || sourceDomainId == null
                     || sourceDomainId.isBlank()
+                    || sourceRequestHash == null
+                    || !sourceRequestHash.matches(
+                        "sha256:[0-9a-f]{64}")
                     || attempts == null
                     || work == null
                     || certificateHash == null
