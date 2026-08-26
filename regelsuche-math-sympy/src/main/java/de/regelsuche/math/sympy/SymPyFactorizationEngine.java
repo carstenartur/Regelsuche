@@ -114,7 +114,10 @@ abstract class SymPyFactorizationEngine<C>
                 request.source().termCount());
             encoded = codec.encode(request);
         } catch (Work.LimitReached exception) {
-            return budgetFailure(request, work, "SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED");
+            return budgetFailure(
+                request,
+                work,
+                "SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED");
         } catch (RuntimeException exception) {
             return technicalFailure(
                 request,
@@ -123,6 +126,7 @@ abstract class SymPyFactorizationEngine<C>
                 "",
                 "");
         }
+        String inputHash = SymPyEvidence.sha256(encoded.payload());
         if (encoded.byteLength() > policy.maxInputBytes()) {
             return result(
                 request,
@@ -131,7 +135,7 @@ abstract class SymPyFactorizationEngine<C>
                 work.ledger(),
                 List.of(),
                 BackendClaim.NONE,
-                SymPyEvidence.sha256(encoded.payload()),
+                inputHash,
                 "");
         }
 
@@ -140,16 +144,18 @@ abstract class SymPyFactorizationEngine<C>
             work.consume("sympy.invoke.calls", 1);
             invocation = invoke(encoded.payload());
         } catch (Work.LimitReached exception) {
-            return budgetFailure(request, work, "SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED");
+            return budgetFailure(
+                request,
+                work,
+                "SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED");
         } catch (RuntimeException exception) {
             return technicalFailure(
                 request,
                 work,
                 "SYMPY_TRANSPORT_EXCEPTION",
-                SymPyEvidence.sha256(encoded.payload()),
+                inputHash,
                 "");
         }
-        String inputHash = SymPyEvidence.sha256(encoded.payload());
         if (invocation.status() != SymPyInvocation.Status.COMPLETED) {
             Outcome outcome = invocation.status()
                     == SymPyInvocation.Status.TIMEOUT
@@ -194,7 +200,10 @@ abstract class SymPyFactorizationEngine<C>
                 decoded.factorTerms());
             work.consume("sympy.issue.proposals", 1);
         } catch (Work.LimitReached exception) {
-            return budgetFailure(request, work, "SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED");
+            return budgetFailure(
+                request,
+                work,
+                "SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED");
         } catch (RuntimeException exception) {
             return technicalFailure(
                 request,
@@ -203,10 +212,18 @@ abstract class SymPyFactorizationEngine<C>
                 inputHash,
                 invocationMaterial(invocation));
         }
+
+        String rawOutputHash =
+            SymPyEvidence.sha256(invocation.output());
+        String semanticOutputHash = SymPyEvidence.sha256(
+            decoded.canonicalMaterial(request.source().ring()));
         lastMetrics.set(new SymPyExecutionMetrics(
             invocation.runtimeId(),
             invocation.runtimeVersion(),
             decoded.symPyVersion(),
+            inputHash,
+            rawOutputHash,
+            SymPyScript.sourceHash(),
             invocation.coldStart(),
             invocation.initializationNanos(),
             invocation.invocationNanos(),
@@ -222,12 +239,11 @@ abstract class SymPyFactorizationEngine<C>
                 invocationMaterial(invocation));
         }
 
-        String outputHash = SymPyEvidence.sha256(invocation.output());
         String certificate = proposalCertificate(
             request,
             decoded,
             inputHash,
-            outputHash,
+            semanticOutputHash,
             invocation);
         Proposal<C> proposal;
         try {
@@ -252,7 +268,10 @@ abstract class SymPyFactorizationEngine<C>
             List.of(proposal),
             BackendClaim.COMPLETE_FACTORIZATION,
             inputHash,
-            successMaterial(invocation, decoded, outputHash));
+            successMaterial(
+                invocation,
+                decoded,
+                semanticOutputHash));
     }
 
     abstract SymPyInvocation invoke(String payload);
@@ -327,7 +346,7 @@ abstract class SymPyFactorizationEngine<C>
         FactorizationRequest<C> request,
         SymPyFactorizationCodec.Decoded<C> decoded,
         String inputHash,
-        String outputHash,
+        String semanticOutputHash,
         SymPyInvocation invocation
     ) {
         StringBuilder material = new StringBuilder(engineId());
@@ -335,7 +354,7 @@ abstract class SymPyFactorizationEngine<C>
         SymPyEvidence.append(material, policy.canonicalMaterial());
         SymPyEvidence.append(material, SymPyScript.sourceHash());
         SymPyEvidence.append(material, inputHash);
-        SymPyEvidence.append(material, outputHash);
+        SymPyEvidence.append(material, semanticOutputHash);
         SymPyEvidence.append(material, invocation.runtimeId());
         SymPyEvidence.append(material, invocation.runtimeVersion());
         SymPyEvidence.append(
@@ -358,20 +377,21 @@ abstract class SymPyFactorizationEngine<C>
     private static <C> String successMaterial(
         SymPyInvocation invocation,
         SymPyFactorizationCodec.Decoded<C> decoded,
-        String outputHash
+        String semanticOutputHash
     ) {
         StringBuilder material = new StringBuilder(
             invocationMaterial(invocation));
         SymPyEvidence.append(material, decoded.symPyVersion());
         SymPyEvidence.append(material, decoded.pythonImplementation());
         SymPyEvidence.append(material, decoded.pythonVersion());
-        SymPyEvidence.append(material, outputHash);
+        SymPyEvidence.append(material, semanticOutputHash);
         return material.toString();
     }
 
     private static final class Work {
         private final long limit;
-        private final Map<String, Long> stages = new LinkedHashMap<>();
+        private final Map<String, Long> stages =
+            new LinkedHashMap<>();
         private long total;
 
         private Work(long limit) {
