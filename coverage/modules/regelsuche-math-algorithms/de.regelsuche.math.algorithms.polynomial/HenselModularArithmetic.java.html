@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HenselModularArithmetic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">HenselModularArithmetic.java</span></div><h1>HenselModularArithmetic.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Modular source, CRT and correction arithmetic for Hensel lifting. */
+final class HenselModularArithmetic {
+    private HenselModularArithmetic() {
+    }
+
+    static void verifySourceCorrespondence(
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        SparsePolynomial&lt;BigInteger&gt; modularSource,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L24">        UnivariatePolynomialView&lt;BigInteger&gt; reduced = reduce(</span>
+            source,
+<span class="fc" id="L26">            modularSource.ring(),</span>
+            field,
+            work,
+            &quot;hensel.verify.source-reduction&quot;);
+<span class="fc" id="L30">        work.consume(&quot;hensel.verify.source-reduction.comparisons&quot;, 1);</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (!reduced.toSparsePolynomial().equals(modularSource)) {</span>
+<span class="nc" id="L32">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_SELECTION_SOURCE_MISMATCH&quot;);
+        }
+<span class="fc" id="L35">    }</span>
+
+    static List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt;
+            anchoredModularFactors(
+        SuitablePrimeSelectionResult selection,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L43">        FiniteFieldFactorizationResult factorization =</span>
+<span class="fc" id="L44">            selection.modularFactorization();</span>
+<span class="fc" id="L45">        ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; result =</span>
+<span class="fc" id="L46">            new ArrayList&lt;&gt;(factorization.factors().size());</span>
+<span class="fc" id="L47">        for (int index = 0;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                index &lt; factorization.factors().size();</span>
+<span class="fc" id="L49">                index++) {</span>
+<span class="fc" id="L50">            PolynomialFactor&lt;BigInteger&gt; factor =</span>
+<span class="fc" id="L51">                factorization.factors().get(index);</span>
+<span class="fc" id="L52">            UnivariatePolynomialView&lt;BigInteger&gt; value =</span>
+<span class="fc" id="L53">                UnivariatePolynomialView.from(factor.polynomial());</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            result.add(index == 0</span>
+<span class="fc" id="L55">                ? value.scale(</span>
+<span class="fc" id="L56">                    factorization.unit(),</span>
+                    work,
+                    &quot;hensel.modular-anchor.scale&quot;)
+<span class="fc" id="L59">                : value);</span>
+        }
+<span class="fc" id="L61">        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; retained =</span>
+<span class="fc" id="L62">            List.copyOf(result);</span>
+<span class="fc" id="L63">        UnivariatePolynomialView&lt;BigInteger&gt; product =</span>
+<span class="fc" id="L64">            multiplyFieldFactors(</span>
+                retained,
+                work,
+                &quot;hensel.modular-anchor.product&quot;);
+<span class="fc" id="L68">        work.consume(&quot;hensel.modular-anchor.comparisons&quot;, 1);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (!product.toSparsePolynomial().equals(</span>
+<span class="fc" id="L70">                selection.modularSource())) {</span>
+<span class="nc" id="L71">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_MODULAR_FACTORIZATION_SOURCE_MISMATCH&quot;);
+        }
+<span class="fc" id="L74">        retained.forEach(value -&gt; requireField(value, field));</span>
+<span class="fc" id="L75">        return retained;</span>
+    }
+
+    static List&lt;CrtEntry&gt; precomputeCrt(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; factors,
+        PrimeField field,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L83">        ArrayList&lt;CrtEntry&gt; result = new ArrayList&lt;&gt;(factors.size());</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (int index = 0; index &lt; factors.size(); index++) {</span>
+<span class="fc" id="L85">            ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; others =</span>
+<span class="fc" id="L86">                new ArrayList&lt;&gt;(factors.size() - 1);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (int other = 0; other &lt; factors.size(); other++) {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                if (other != index) {</span>
+<span class="fc" id="L89">                    others.add(factors.get(other));</span>
+                }
+            }
+            UnivariatePolynomialView&lt;BigInteger&gt; cofactor =
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                others.isEmpty()</span>
+<span class="fc" id="L94">                    ? UnivariatePolynomialView.one(</span>
+<span class="fc" id="L95">                        factors.get(index).ring())</span>
+<span class="fc" id="L96">                    : multiplyFieldFactors(</span>
+                        others,
+                        work,
+                        &quot;hensel.crt.factor-&quot; + index + &quot;.cofactor&quot;);
+<span class="fc" id="L100">            UnivariatePolynomialView&lt;BigInteger&gt; inverse = inverseModulo(</span>
+                cofactor,
+<span class="fc" id="L102">                factors.get(index),</span>
+                field,
+                work,
+                &quot;hensel.crt.factor-&quot; + index + &quot;.inverse&quot;);
+<span class="fc" id="L106">            result.add(new CrtEntry(</span>
+<span class="fc" id="L107">                factors.get(index),</span>
+                cofactor,
+                inverse));
+        }
+<span class="fc" id="L111">        return List.copyOf(result);</span>
+    }
+
+    private static UnivariatePolynomialView&lt;BigInteger&gt; inverseModulo(
+        UnivariatePolynomialView&lt;BigInteger&gt; value,
+        UnivariatePolynomialView&lt;BigInteger&gt; modulus,
+        PrimeField field,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L121">        requireSameFieldRing(value, modulus, field);</span>
+<span class="fc" id="L122">        UnivariatePolynomialView&lt;BigInteger&gt; r0 = modulus;</span>
+<span class="fc" id="L123">        UnivariatePolynomialView&lt;BigInteger&gt; r1 =</span>
+<span class="fc" id="L124">            FiniteFieldPolynomialArithmetic.remainder(</span>
+                value,
+                modulus,
+                field,
+                work,
+                stage + &quot;.initial-remainder&quot;);
+<span class="fc" id="L130">        UnivariatePolynomialView&lt;BigInteger&gt; s0 =</span>
+<span class="fc" id="L131">            UnivariatePolynomialView.zero(value.ring());</span>
+<span class="fc" id="L132">        UnivariatePolynomialView&lt;BigInteger&gt; s1 =</span>
+<span class="fc" id="L133">            UnivariatePolynomialView.one(value.ring());</span>
+
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        while (!r1.isZero()) {</span>
+<span class="fc" id="L136">            UnivariatePolynomialView.DivisionResult&lt;BigInteger&gt; division =</span>
+<span class="fc" id="L137">                r0.divideAndRemainder(</span>
+                    r1,
+                    field,
+                    work,
+                    stage + &quot;.euclid&quot;);
+<span class="fc" id="L142">            UnivariatePolynomialView&lt;BigInteger&gt; nextS = s0.subtract(</span>
+<span class="fc" id="L143">                division.quotient().multiply(</span>
+                    s1,
+                    work,
+                    stage + &quot;.bezout.multiply&quot;),
+                work,
+                stage + &quot;.bezout.subtract&quot;);
+<span class="fc" id="L149">            r0 = r1;</span>
+<span class="fc" id="L150">            r1 = division.remainder();</span>
+<span class="fc" id="L151">            s0 = s1;</span>
+<span class="fc" id="L152">            s1 = nextS;</span>
+<span class="fc" id="L153">        }</span>
+<span class="fc" id="L154">        work.consume(stage + &quot;.gcd-tests&quot;, 1);</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (r0.degree() != 0) {</span>
+<span class="nc" id="L156">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_MODULAR_FACTORS_NOT_PAIRWISE_COPRIME&quot;);
+        }
+<span class="fc" id="L159">        BigInteger normalization = field.divide(</span>
+<span class="fc" id="L160">            field.one(),</span>
+<span class="fc" id="L161">            r0.coefficient(0));</span>
+<span class="fc" id="L162">        UnivariatePolynomialView&lt;BigInteger&gt; inverse =</span>
+<span class="fc" id="L163">            FiniteFieldPolynomialArithmetic.remainder(</span>
+<span class="fc" id="L164">                s0.scale(</span>
+                    normalization,
+                    work,
+                    stage + &quot;.normalize&quot;),
+                modulus,
+                field,
+                work,
+                stage + &quot;.reduce&quot;);
+<span class="fc" id="L172">        UnivariatePolynomialView&lt;BigInteger&gt; check =</span>
+<span class="fc" id="L173">            FiniteFieldPolynomialArithmetic.multiplyMod(</span>
+                value,
+                inverse,
+                modulus,
+                field,
+                work,
+                stage + &quot;.verify&quot;);
+<span class="fc" id="L180">        work.consume(stage + &quot;.verify.comparisons&quot;, 1);</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (!check.isOne()) {</span>
+<span class="nc" id="L182">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_CRT_INVERSE_VERIFICATION_FAILED&quot;);
+        }
+<span class="fc" id="L185">        return inverse;</span>
+    }
+
+    static List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; corrections(
+        UnivariatePolynomialView&lt;BigInteger&gt; error,
+        List&lt;CrtEntry&gt; entries,
+        PrimeField field,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L195">        ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; result =</span>
+<span class="fc" id="L196">            new ArrayList&lt;&gt;(entries.size());</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        for (int index = 0; index &lt; entries.size(); index++) {</span>
+<span class="fc" id="L198">            CrtEntry entry = entries.get(index);</span>
+<span class="fc" id="L199">            result.add(FiniteFieldPolynomialArithmetic.multiplyMod(</span>
+                error,
+<span class="fc" id="L201">                entry.inverse(),</span>
+<span class="fc" id="L202">                entry.factor(),</span>
+                field,
+                work,
+                stage + &quot;.factor-&quot; + index));
+        }
+<span class="fc" id="L207">        return List.copyOf(result);</span>
+    }
+
+    static void verifyCorrectionEquation(
+        UnivariatePolynomialView&lt;BigInteger&gt; error,
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; corrections,
+        List&lt;CrtEntry&gt; entries,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L217">        UnivariatePolynomialView&lt;BigInteger&gt; sum =</span>
+<span class="fc" id="L218">            UnivariatePolynomialView.zero(error.ring());</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        for (int index = 0; index &lt; corrections.size(); index++) {</span>
+<span class="fc" id="L220">            UnivariatePolynomialView&lt;BigInteger&gt; contribution =</span>
+<span class="fc" id="L221">                corrections.get(index).multiply(</span>
+<span class="fc" id="L222">                    entries.get(index).cofactor(),</span>
+                    work,
+                    stage + &quot;.factor-&quot; + index + &quot;.multiply&quot;);
+<span class="fc" id="L225">            sum = sum.add(</span>
+                contribution,
+                work,
+                stage + &quot;.factor-&quot; + index + &quot;.add&quot;);
+        }
+<span class="fc" id="L230">        work.consume(stage + &quot;.comparisons&quot;, 1);</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (!sum.equals(error)) {</span>
+<span class="nc" id="L232">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_CORRECTION_EQUATION_FAILED&quot;);
+        }
+<span class="fc" id="L235">    }</span>
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; reduce(
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        PolynomialRing&lt;BigInteger&gt; modularRing,
+        PrimeField field,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (!modularRing.coefficientDomain().id().equals(field.id())</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">                || !source.ring().variables().equals(</span>
+<span class="fc" id="L246">                    modularRing.variables())</span>
+<span class="fc" id="L247">                || source.ring().monomialOrder()</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                    != modularRing.monomialOrder()) {</span>
+<span class="nc" id="L249">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_REDUCTION_RING_MISMATCH&quot;);
+        }
+<span class="fc" id="L252">        ArrayList&lt;BigInteger&gt; coefficients =</span>
+<span class="fc" id="L253">            new ArrayList&lt;&gt;(source.coefficientCount());</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        for (BigInteger coefficient : source.coefficients()) {</span>
+<span class="fc" id="L255">            work.consume(stage + &quot;.coefficients&quot;, 1);</span>
+<span class="fc" id="L256">            coefficients.add(field.canonical(coefficient));</span>
+<span class="fc" id="L257">        }</span>
+<span class="fc" id="L258">        return UnivariatePolynomialView.of(</span>
+            modularRing,
+            coefficients);
+    }
+
+    private static UnivariatePolynomialView&lt;BigInteger&gt;
+            multiplyFieldFactors(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; factors,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">        if (factors.isEmpty()) {</span>
+<span class="nc" id="L270">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_FIELD_FACTOR_PRODUCT_REQUIRES_RING&quot;);
+        }
+<span class="fc" id="L273">        UnivariatePolynomialView&lt;BigInteger&gt; product =</span>
+<span class="fc" id="L274">            UnivariatePolynomialView.one(factors.getFirst().ring());</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        for (int index = 0; index &lt; factors.size(); index++) {</span>
+<span class="fc" id="L276">            product = product.multiply(</span>
+<span class="fc" id="L277">                factors.get(index),</span>
+                work,
+                stage + &quot;.factor-&quot; + index);
+        }
+<span class="fc" id="L281">        return product;</span>
+    }
+
+    private static void requireField(
+        UnivariatePolynomialView&lt;BigInteger&gt; value,
+        PrimeField field
+    ) {
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (!value.ring().coefficientDomain().id().equals(field.id())) {</span>
+<span class="nc" id="L289">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_PRIME_FIELD_MISMATCH&quot;);
+        }
+<span class="fc" id="L292">    }</span>
+
+    private static void requireSameFieldRing(
+        UnivariatePolynomialView&lt;BigInteger&gt; left,
+        UnivariatePolynomialView&lt;BigInteger&gt; right,
+        PrimeField field
+    ) {
+<span class="fc" id="L299">        requireField(left, field);</span>
+<span class="fc" id="L300">        requireField(right, field);</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (!left.ring().equals(right.ring())) {</span>
+<span class="nc" id="L302">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_PRIME_FIELD_RING_MISMATCH&quot;);
+        }
+<span class="fc" id="L305">    }</span>
+
+    record CrtEntry(
+        UnivariatePolynomialView&lt;BigInteger&gt; factor,
+        UnivariatePolynomialView&lt;BigInteger&gt; cofactor,
+        UnivariatePolynomialView&lt;BigInteger&gt; inverse
+    ) {
+<span class="fc" id="L312">        CrtEntry {</span>
+<span class="fc" id="L313">            Objects.requireNonNull(factor, &quot;factor&quot;);</span>
+<span class="fc" id="L314">            Objects.requireNonNull(cofactor, &quot;cofactor&quot;);</span>
+<span class="fc" id="L315">            Objects.requireNonNull(inverse, &quot;inverse&quot;);</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">            if (!factor.ring().equals(cofactor.ring())</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                    || !factor.ring().equals(inverse.ring())) {</span>
+<span class="nc" id="L318">                throw new IllegalArgumentException(</span>
+                    &quot;Hensel CRT entry ring mismatch&quot;);
+            }
+<span class="fc" id="L321">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

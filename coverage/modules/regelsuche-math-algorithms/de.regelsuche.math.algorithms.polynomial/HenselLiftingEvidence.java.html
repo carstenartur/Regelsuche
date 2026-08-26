@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HenselLiftingEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">HenselLiftingEvidence.java</span></div><h1>HenselLiftingEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.Monomial;
+import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+
+/** Independent result invariants for Hensel lifting. */
+final class HenselLiftingEvidence {
+    private HenselLiftingEvidence() {
+    }
+
+    static void validateCompleted(
+        BigInteger targetModulus,
+        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; factors,
+        List&lt;HenselLiftStep&gt; steps,
+        PolynomialWorkLedger work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingPolicy policy
+    ) {
+<span class="fc" id="L33">        String requestHash = AlgorithmEvidence.sha256(</span>
+<span class="fc" id="L34">            request.canonicalMaterial());</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (!selection.completed()</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">                || !selection.sourceRequestHash().equals(requestHash)</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">                || !(request.source().ring().coefficientDomain()</span>
+                    instanceof BigIntegerDomain)
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                || request.source().ring().variableCount() != 1</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">                || request.source().isConstant()</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                || !work.within(request.maxWorkUnits())</span>
+<span class="fc" id="L42">                || selection.attempts().size()</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">                    &gt; request.maxCandidates()</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">                || !extendsSelectionWork(work, selection.work())) {</span>
+<span class="fc" id="L45">            throw new IllegalArgumentException(</span>
+                &quot;completed Hensel input contract is invalid&quot;);
+        }
+<span class="fc" id="L48">        int prime = selection.selectedPrime();</span>
+<span class="fc" id="L49">        validateTargetBound(prime, policy);</span>
+<span class="fc" id="L50">        BigInteger expectedModulus = BigInteger.valueOf(prime)</span>
+<span class="fc" id="L51">            .pow(policy.targetExponent());</span>
+<span class="fc" id="L52">        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; expectedModularFactors =</span>
+<span class="fc" id="L53">            anchoredModularFactors(selection);</span>
+<span class="fc" id="L54">        if (!reduce(</span>
+<span class="fc" id="L55">                request.source(),</span>
+<span class="fc" id="L56">                selection.modularSource().ring())</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">                .equals(selection.modularSource())</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                || !expectedModulus.equals(targetModulus)</span>
+<span class="fc" id="L59">                || targetModulus.bitLength()</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">                    &gt; policy.maxModulusBitLength()</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                || factors.size() != expectedModularFactors.size()</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                || steps.size() != policy.targetExponent() - 1) {</span>
+<span class="fc" id="L63">            throw new IllegalArgumentException(</span>
+                &quot;completed Hensel target is invalid&quot;);
+        }
+<span class="fc" id="L66">        validateFactors(</span>
+            factors,
+            expectedModularFactors,
+            request,
+            selection,
+            policy);
+<span class="fc" id="L72">        SparsePolynomial&lt;BigInteger&gt; product =</span>
+<span class="fc" id="L73">            SparsePolynomial.one(request.source().ring());</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (SparsePolynomial&lt;BigInteger&gt; factor : factors) {</span>
+<span class="fc" id="L75">            product = product.multiply(factor);</span>
+<span class="fc" id="L76">        }</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (!congruent(request.source(), product, targetModulus)) {</span>
+<span class="nc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;completed Hensel factors do not reconstruct modulo target&quot;);
+        }
+<span class="fc" id="L81">    }</span>
+
+    private static void validateTargetBound(
+        int prime,
+        HenselLiftingPolicy policy
+    ) {
+<span class="fc" id="L87">        long minimumTargetBits = Math.addExact(</span>
+<span class="fc" id="L88">            Math.multiplyExact(</span>
+<span class="fc" id="L89">                (long) BigInteger.valueOf(prime).bitLength() - 1L,</span>
+<span class="fc" id="L90">                policy.targetExponent()),</span>
+            1L);
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (minimumTargetBits &gt; policy.maxModulusBitLength()) {</span>
+<span class="nc" id="L93">            throw new IllegalArgumentException(</span>
+                &quot;completed Hensel modulus exceeds the policy&quot;);
+        }
+<span class="fc" id="L96">    }</span>
+
+    private static void validateFactors(
+        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; factors,
+        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; expectedModularFactors,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingPolicy policy
+    ) {
+<span class="fc" id="L105">        PolynomialRing&lt;BigInteger&gt; integerRing = request.source().ring();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (int index = 0; index &lt; factors.size(); index++) {</span>
+<span class="fc" id="L107">            SparsePolynomial&lt;BigInteger&gt; factor = factors.get(index);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            boolean leadingCoefficientValid = index == 0</span>
+<span class="fc" id="L109">                ? factor.leadingCoefficient().equals(</span>
+<span class="fc" id="L110">                    request.source().leadingCoefficient())</span>
+<span class="fc" id="L111">                : BigInteger.ONE.equals(factor.leadingCoefficient());</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (!integerRing.equals(factor.ring())</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                    || factor.isConstant()</span>
+<span class="fc" id="L114">                    || factor.maxCoefficientBitLength()</span>
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">                        &gt; policy.maxIntermediateCoefficientBitLength()</span>
+                    || !leadingCoefficientValid
+<span class="fc" id="L117">                    || !reduce(</span>
+                        factor,
+<span class="fc" id="L119">                        selection.modularSource().ring())</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                        .equals(expectedModularFactors.get(index))) {</span>
+<span class="fc" id="L121">                throw new IllegalArgumentException(</span>
+                    &quot;completed Hensel factors are invalid&quot;);
+            }
+        }
+<span class="fc" id="L125">    }</span>
+
+    static void validateStepSequence(
+        List&lt;HenselLiftStep&gt; steps,
+        int prime,
+        int factorCount
+    ) {
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (steps.isEmpty()) {</span>
+<span class="fc" id="L133">            return;</span>
+        }
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">        if (prime &lt; 2 || factorCount &lt; 1) {</span>
+<span class="nc" id="L136">            throw new IllegalArgumentException(</span>
+                &quot;Hensel steps require a completed modular selection&quot;);
+        }
+<span class="fc" id="L139">        BigInteger expectedModulus = BigInteger.valueOf(prime);</span>
+<span class="fc" id="L140">        int expectedExponent = 1;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (HenselLiftStep step : steps) {</span>
+<span class="fc" id="L142">            BigInteger nextModulus = expectedModulus.multiply(</span>
+<span class="fc" id="L143">                BigInteger.valueOf(prime));</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (step.fromExponent() != expectedExponent</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                    || step.toExponent() != expectedExponent + 1</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                    || !step.fromModulus().equals(expectedModulus)</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                    || !step.toModulus().equals(nextModulus)</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                    || step.correctionPolynomialHashes().size()</span>
+                        != factorCount) {
+<span class="nc" id="L150">                throw new IllegalArgumentException(</span>
+                    &quot;Hensel lift steps are not consecutive&quot;);
+            }
+<span class="fc" id="L153">            expectedExponent++;</span>
+<span class="fc" id="L154">            expectedModulus = nextModulus;</span>
+<span class="fc" id="L155">        }</span>
+<span class="fc" id="L156">    }</span>
+
+    private static boolean extendsSelectionWork(
+        PolynomialWorkLedger work,
+        PolynomialWorkLedger selectionWork
+    ) {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (work.totalWorkUnits() &lt; selectionWork.totalWorkUnits()) {</span>
+<span class="nc" id="L163">            return false;</span>
+        }
+<span class="fc" id="L165">        return selectionWork.stages().entrySet().stream().allMatch(entry -&gt;</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            work.units(entry.getKey()) == entry.getValue());</span>
+    }
+
+    private static List&lt;SparsePolynomial&lt;BigInteger&gt;&gt;
+            anchoredModularFactors(
+        SuitablePrimeSelectionResult selection
+    ) {
+<span class="fc" id="L173">        FiniteFieldFactorizationResult factorization =</span>
+<span class="fc" id="L174">            selection.modularFactorization();</span>
+<span class="fc" id="L175">        ArrayList&lt;SparsePolynomial&lt;BigInteger&gt;&gt; result =</span>
+<span class="fc" id="L176">            new ArrayList&lt;&gt;(factorization.factors().size());</span>
+<span class="fc" id="L177">        for (int index = 0;</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                index &lt; factorization.factors().size();</span>
+<span class="fc" id="L179">                index++) {</span>
+<span class="fc" id="L180">            PolynomialFactor&lt;BigInteger&gt; factor =</span>
+<span class="fc" id="L181">                factorization.factors().get(index);</span>
+<span class="fc" id="L182">            SparsePolynomial&lt;BigInteger&gt; polynomial = factor.polynomial();</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            result.add(index == 0</span>
+<span class="fc" id="L184">                ? polynomial.scale(factorization.unit())</span>
+<span class="fc" id="L185">                : polynomial);</span>
+        }
+<span class="fc" id="L187">        return List.copyOf(result);</span>
+    }
+
+    private static SparsePolynomial&lt;BigInteger&gt; reduce(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        PolynomialRing&lt;BigInteger&gt; modularRing
+    ) {
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (!(modularRing.coefficientDomain()</span>
+<span class="fc" id="L195">                instanceof PrimeField field)) {</span>
+<span class="nc" id="L196">            throw new IllegalArgumentException(</span>
+                &quot;Hensel modular ring is not a prime field&quot;);
+        }
+<span class="fc" id="L199">        NavigableMap&lt;Monomial, BigInteger&gt; terms =</span>
+<span class="fc" id="L200">            new TreeMap&lt;&gt;(modularRing.monomialComparator());</span>
+        for (Map.Entry&lt;Monomial, BigInteger&gt; term
+<span class="fc bfc" id="L202" title="All 2 branches covered.">                : source.terms().entrySet()) {</span>
+<span class="fc" id="L203">            BigInteger coefficient = field.canonical(term.getValue());</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            if (!field.isZero(coefficient)) {</span>
+<span class="fc" id="L205">                terms.put(term.getKey(), coefficient);</span>
+            }
+<span class="fc" id="L207">        }</span>
+<span class="fc" id="L208">        return new SparsePolynomial&lt;&gt;(modularRing, terms);</span>
+    }
+
+    private static boolean congruent(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        SparsePolynomial&lt;BigInteger&gt; product,
+        BigInteger modulus
+    ) {
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (!source.ring().equals(product.ring())</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                || modulus.signum() &lt;= 0) {</span>
+<span class="nc" id="L218">            return false;</span>
+        }
+<span class="fc" id="L220">        UnivariatePolynomialView&lt;BigInteger&gt; left =</span>
+<span class="fc" id="L221">            UnivariatePolynomialView.from(source);</span>
+<span class="fc" id="L222">        UnivariatePolynomialView&lt;BigInteger&gt; right =</span>
+<span class="fc" id="L223">            UnivariatePolynomialView.from(product);</span>
+<span class="fc" id="L224">        int count = Math.max(</span>
+<span class="fc" id="L225">            left.coefficientCount(),</span>
+<span class="fc" id="L226">            right.coefficientCount());</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        for (int exponent = 0; exponent &lt; count; exponent++) {</span>
+<span class="fc" id="L228">            if (left.coefficient(exponent)</span>
+<span class="fc" id="L229">                    .subtract(right.coefficient(exponent))</span>
+<span class="fc" id="L230">                    .remainder(modulus)</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                    .signum() != 0) {</span>
+<span class="nc" id="L232">                return false;</span>
+            }
+        }
+<span class="fc" id="L235">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

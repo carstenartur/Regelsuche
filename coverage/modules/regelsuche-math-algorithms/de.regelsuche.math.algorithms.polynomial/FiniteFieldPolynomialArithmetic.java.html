@@ -73,7 +73,7 @@ final class FiniteFieldPolynomialArithmetic {
                 &quot;polynomial modulus must be nonconstant&quot;);
         }
 <span class="fc" id="L75">        work.consume(stage + &quot;.degree-comparisons&quot;, 1);</span>
-<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if (value.isZero() || value.degree() &lt; modulus.degree()) {</span>
+<span class="fc bfc" id="L76" title="All 4 branches covered.">        if (value.isZero() || value.degree() &lt; modulus.degree()) {</span>
 <span class="fc" id="L77">            return value;</span>
         }
 <span class="fc" id="L79">        return value.divideAndRemainder(</span>

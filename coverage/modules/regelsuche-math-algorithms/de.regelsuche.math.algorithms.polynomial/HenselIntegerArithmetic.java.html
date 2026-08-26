@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HenselIntegerArithmetic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">HenselIntegerArithmetic.java</span></div><h1>HenselIntegerArithmetic.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Integer, modulus and representation arithmetic for Hensel lifting. */
+final class HenselIntegerArithmetic {
+    private HenselIntegerArithmetic() {
+    }
+
+    static BigInteger targetModulus(
+        BigInteger prime,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L21">        BigInteger result = BigInteger.ONE;</span>
+<span class="fc" id="L22">        for (int exponent = 0;</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">                exponent &lt; policy.targetExponent();</span>
+<span class="fc" id="L24">                exponent++) {</span>
+<span class="fc" id="L25">            result = multiplyModulus(</span>
+                result,
+                prime,
+                policy,
+                work,
+                &quot;hensel.target-modulus&quot;);
+        }
+<span class="fc" id="L32">        return result;</span>
+    }
+
+    static BigInteger nextModulus(
+        BigInteger currentModulus,
+        BigInteger prime,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L42">        return multiplyModulus(</span>
+            currentModulus,
+            prime,
+            policy,
+            work,
+            stage);
+    }
+
+    private static BigInteger multiplyModulus(
+        BigInteger left,
+        BigInteger right,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L57">        work.consume(stage + &quot;.multiplications&quot;, 1);</span>
+<span class="fc" id="L58">        int guaranteedBits = left.bitLength() + right.bitLength() - 1;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (guaranteedBits &gt; policy.maxModulusBitLength()) {</span>
+<span class="fc" id="L60">            throw new HenselLifting.RepresentationLimitReached(</span>
+                &quot;HENSEL_MODULUS_BIT_LENGTH_POLICY_EXCEEDED&quot;);
+        }
+<span class="fc" id="L63">        BigInteger result = left.multiply(right);</span>
+<span class="fc" id="L64">        work.consume(stage + &quot;.bit-length-checks&quot;, 1);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (result.bitLength() &gt; policy.maxModulusBitLength()) {</span>
+<span class="nc" id="L66">            throw new HenselLifting.RepresentationLimitReached(</span>
+                &quot;HENSEL_MODULUS_BIT_LENGTH_POLICY_EXCEEDED&quot;);
+        }
+<span class="fc" id="L69">        return result;</span>
+    }
+
+    static List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt;
+            initialIntegerFactors(
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; modularFactors,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L79">        ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; result =</span>
+<span class="fc" id="L80">            new ArrayList&lt;&gt;(modularFactors.size());</span>
+<span class="fc" id="L81">        for (int index = 0;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                index &lt; modularFactors.size();</span>
+<span class="fc" id="L83">                index++) {</span>
+<span class="fc" id="L84">            UnivariatePolynomialView&lt;BigInteger&gt; modular =</span>
+<span class="fc" id="L85">                modularFactors.get(index);</span>
+<span class="fc" id="L86">            ArrayList&lt;BigInteger&gt; coefficients =</span>
+<span class="fc" id="L87">                new ArrayList&lt;&gt;(modular.coefficients());</span>
+<span class="fc" id="L88">            work.consume(</span>
+                &quot;hensel.initial-lift.coefficients&quot;,
+<span class="fc" id="L90">                coefficients.size());</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (index == 0) {</span>
+<span class="fc" id="L92">                coefficients.set(</span>
+<span class="fc" id="L93">                    coefficients.size() - 1,</span>
+<span class="fc" id="L94">                    source.leadingCoefficient());</span>
+            }
+<span class="fc" id="L96">            UnivariatePolynomialView&lt;BigInteger&gt; lifted =</span>
+<span class="fc" id="L97">                UnivariatePolynomialView.of(</span>
+<span class="fc" id="L98">                    source.ring(),</span>
+                    coefficients);
+<span class="fc" id="L100">            checkView(</span>
+                lifted,
+                policy,
+                work,
+                &quot;hensel.initial-lift.bounds&quot;);
+<span class="fc" id="L105">            result.add(lifted);</span>
+        }
+<span class="fc" id="L107">        return List.copyOf(result);</span>
+    }
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; errorPolynomial(
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        UnivariatePolynomialView&lt;BigInteger&gt; product,
+        BigInteger modulus,
+        PrimeField field,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L119">        UnivariatePolynomialView&lt;BigInteger&gt; difference =</span>
+<span class="fc" id="L120">            subtractInteger(</span>
+                source,
+                product,
+                policy,
+                work,
+                stage + &quot;.difference&quot;);
+<span class="fc" id="L126">        ArrayList&lt;BigInteger&gt; coefficients =</span>
+<span class="fc" id="L127">            new ArrayList&lt;&gt;(difference.coefficientCount());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (BigInteger coefficient : difference.coefficients()) {</span>
+<span class="fc" id="L129">            work.consume(stage + &quot;.exact-divisions&quot;, 1);</span>
+<span class="fc" id="L130">            BigInteger[] division = coefficient.divideAndRemainder(</span>
+                modulus);
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (division[1].signum() != 0) {</span>
+<span class="nc" id="L133">                throw new HenselLifting.AlgorithmFailure(</span>
+                    &quot;HENSEL_ERROR_NOT_DIVISIBLE_BY_CURRENT_MODULUS&quot;);
+            }
+<span class="fc" id="L136">            checkCoefficient(division[0], policy);</span>
+<span class="fc" id="L137">            work.consume(stage + &quot;.field-reductions&quot;, 1);</span>
+<span class="fc" id="L138">            coefficients.add(field.canonical(division[0]));</span>
+<span class="fc" id="L139">        }</span>
+<span class="fc" id="L140">        PolynomialRing&lt;BigInteger&gt; modularRing = new PolynomialRing&lt;&gt;(</span>
+            field,
+<span class="fc" id="L142">            source.ring().variables(),</span>
+<span class="fc" id="L143">            source.ring().monomialOrder());</span>
+<span class="fc" id="L144">        UnivariatePolynomialView&lt;BigInteger&gt; error =</span>
+<span class="fc" id="L145">            UnivariatePolynomialView.of(</span>
+                modularRing,
+                coefficients);
+<span class="fc" id="L148">        work.consume(stage + &quot;.degree-tests&quot;, 1);</span>
+<span class="pc bpc" id="L149" title="1 of 4 branches missed.">        if (!error.isZero() &amp;&amp; error.degree() &gt;= source.degree()) {</span>
+<span class="nc" id="L150">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_ERROR_DEGREE_NOT_REDUCED&quot;);
+        }
+<span class="fc" id="L153">        return error;</span>
+    }
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; applyCorrection(
+        UnivariatePolynomialView&lt;BigInteger&gt; factor,
+        UnivariatePolynomialView&lt;BigInteger&gt; correction,
+        BigInteger currentModulus,
+        BigInteger nextModulus,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (!correction.isZero()</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">                &amp;&amp; correction.degree() &gt;= factor.degree()) {</span>
+<span class="nc" id="L167">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_CORRECTION_DEGREE_EXCEEDED_FACTOR&quot;);
+        }
+<span class="fc" id="L170">        ArrayList&lt;BigInteger&gt; coefficients =</span>
+<span class="fc" id="L171">            new ArrayList&lt;&gt;(factor.coefficients());</span>
+<span class="fc" id="L172">        for (int exponent = 0;</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">                exponent &lt; factor.degree();</span>
+<span class="fc" id="L174">                exponent++) {</span>
+<span class="fc" id="L175">            BigInteger scaled = multiplyCoefficient(</span>
+                currentModulus,
+<span class="fc" id="L177">                correction.coefficient(exponent),</span>
+                policy,
+                work,
+                stage + &quot;.scale&quot;);
+<span class="fc" id="L181">            BigInteger updated = addCoefficient(</span>
+<span class="fc" id="L182">                factor.coefficient(exponent),</span>
+                scaled,
+                policy,
+                work,
+                stage + &quot;.add&quot;);
+<span class="fc" id="L187">            work.consume(stage + &quot;.centered-residues&quot;, 1);</span>
+<span class="fc" id="L188">            BigInteger centered = centeredResidue(</span>
+                updated,
+                nextModulus);
+<span class="fc" id="L191">            checkCoefficient(centered, policy);</span>
+<span class="fc" id="L192">            coefficients.set(exponent, centered);</span>
+        }
+<span class="fc" id="L194">        UnivariatePolynomialView&lt;BigInteger&gt; result =</span>
+<span class="fc" id="L195">            UnivariatePolynomialView.of(factor.ring(), coefficients);</span>
+<span class="fc" id="L196">        work.consume(stage + &quot;.leading-coefficient-tests&quot;, 1);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (!result.leadingCoefficient().equals(</span>
+<span class="fc" id="L198">                factor.leadingCoefficient())) {</span>
+<span class="nc" id="L199">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_LEADING_COEFFICIENT_CHANGED&quot;);
+        }
+<span class="fc" id="L202">        checkView(result, policy, work, stage + &quot;.bounds&quot;);</span>
+<span class="fc" id="L203">        return result;</span>
+    }
+
+    private static BigInteger centeredResidue(
+        BigInteger value,
+        BigInteger modulus
+    ) {
+<span class="fc" id="L210">        BigInteger residue = value.remainder(modulus);</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (residue.signum() &lt; 0) {</span>
+<span class="fc" id="L212">            residue = residue.add(modulus);</span>
+        }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        return residue.shiftLeft(1).compareTo(modulus) &gt; 0</span>
+<span class="fc" id="L215">            ? residue.subtract(modulus)</span>
+<span class="fc" id="L216">            : residue;</span>
+    }
+
+    static void verifyFixedReductions(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; lifted,
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; expected,
+        PrimeField field,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (lifted.size() != expected.size()) {</span>
+<span class="nc" id="L227">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_FACTOR_COUNT_CHANGED&quot;);
+        }
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        for (int index = 0; index &lt; lifted.size(); index++) {</span>
+<span class="fc" id="L231">            UnivariatePolynomialView&lt;BigInteger&gt; reduced =</span>
+<span class="fc" id="L232">                HenselModularArithmetic.reduce(</span>
+<span class="fc" id="L233">                    lifted.get(index),</span>
+<span class="fc" id="L234">                    expected.get(index).ring(),</span>
+                    field,
+                    work,
+                    stage + &quot;.factor-&quot; + index);
+<span class="fc" id="L238">            work.consume(stage + &quot;.comparisons&quot;, 1);</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">            if (!reduced.equals(expected.get(index))) {</span>
+<span class="nc" id="L240">                throw new HenselLifting.AlgorithmFailure(</span>
+                    &quot;HENSEL_FACTOR_REDUCTION_CHANGED&quot;);
+            }
+        }
+<span class="fc" id="L244">    }</span>
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; multiplyIntegerFactors(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; factors,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (factors.isEmpty()) {</span>
+<span class="nc" id="L253">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_REQUIRES_AT_LEAST_ONE_FACTOR&quot;);
+        }
+<span class="fc" id="L256">        UnivariatePolynomialView&lt;BigInteger&gt; product =</span>
+<span class="fc" id="L257">            UnivariatePolynomialView.one(factors.getFirst().ring());</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        for (int index = 0; index &lt; factors.size(); index++) {</span>
+<span class="fc" id="L259">            product = multiplyInteger(</span>
+                product,
+<span class="fc" id="L261">                factors.get(index),</span>
+                policy,
+                work,
+                stage + &quot;.factor-&quot; + index);
+        }
+<span class="fc" id="L266">        return product;</span>
+    }
+
+    private static UnivariatePolynomialView&lt;BigInteger&gt; multiplyInteger(
+        UnivariatePolynomialView&lt;BigInteger&gt; left,
+        UnivariatePolynomialView&lt;BigInteger&gt; right,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        if (!left.ring().equals(right.ring())) {</span>
+<span class="nc" id="L277">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_INTEGER_RING_MISMATCH&quot;);
+        }
+<span class="pc bpc" id="L280" title="2 of 4 branches missed.">        if (left.isZero() || right.isZero()) {</span>
+<span class="nc" id="L281">            return UnivariatePolynomialView.zero(left.ring());</span>
+        }
+<span class="fc" id="L283">        ArrayList&lt;BigInteger&gt; result = zeros(</span>
+<span class="fc" id="L284">            left.degree() + right.degree() + 1);</span>
+<span class="fc" id="L285">        for (int leftExponent = 0;</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">                leftExponent &lt; left.coefficientCount();</span>
+<span class="fc" id="L287">                leftExponent++) {</span>
+<span class="fc" id="L288">            for (int rightExponent = 0;</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">                    rightExponent &lt; right.coefficientCount();</span>
+<span class="fc" id="L290">                    rightExponent++) {</span>
+<span class="fc" id="L291">                BigInteger product = multiplyCoefficient(</span>
+<span class="fc" id="L292">                    left.coefficient(leftExponent),</span>
+<span class="fc" id="L293">                    right.coefficient(rightExponent),</span>
+                    policy,
+                    work,
+                    stage + &quot;.products&quot;);
+<span class="fc" id="L297">                int exponent = leftExponent + rightExponent;</span>
+<span class="fc" id="L298">                result.set(</span>
+                    exponent,
+<span class="fc" id="L300">                    addCoefficient(</span>
+<span class="fc" id="L301">                        result.get(exponent),</span>
+                        product,
+                        policy,
+                        work,
+                        stage + &quot;.sums&quot;));
+            }
+        }
+<span class="fc" id="L308">        return UnivariatePolynomialView.of(left.ring(), result);</span>
+    }
+
+    private static UnivariatePolynomialView&lt;BigInteger&gt; subtractInteger(
+        UnivariatePolynomialView&lt;BigInteger&gt; left,
+        UnivariatePolynomialView&lt;BigInteger&gt; right,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        if (!left.ring().equals(right.ring())) {</span>
+<span class="nc" id="L319">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_INTEGER_RING_MISMATCH&quot;);
+        }
+<span class="fc" id="L322">        int count = Math.max(</span>
+<span class="fc" id="L323">            left.coefficientCount(),</span>
+<span class="fc" id="L324">            right.coefficientCount());</span>
+<span class="fc" id="L325">        ArrayList&lt;BigInteger&gt; result = zeros(count);</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        for (int exponent = 0; exponent &lt; count; exponent++) {</span>
+<span class="fc" id="L327">            work.consume(stage + &quot;.subtractions&quot;, 1);</span>
+<span class="fc" id="L328">            BigInteger value = left.coefficient(exponent).subtract(</span>
+<span class="fc" id="L329">                right.coefficient(exponent));</span>
+<span class="fc" id="L330">            checkCoefficient(value, policy);</span>
+<span class="fc" id="L331">            result.set(exponent, value);</span>
+        }
+<span class="fc" id="L333">        return UnivariatePolynomialView.of(left.ring(), result);</span>
+    }
+
+    private static BigInteger multiplyCoefficient(
+        BigInteger left,
+        BigInteger right,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L343">        work.consume(stage, 1);</span>
+<span class="fc bfc" id="L344" title="All 4 branches covered.">        if (left.signum() == 0 || right.signum() == 0) {</span>
+<span class="fc" id="L345">            return BigInteger.ZERO;</span>
+        }
+<span class="fc" id="L347">        int guaranteedBits = left.abs().bitLength()</span>
+<span class="fc" id="L348">            + right.abs().bitLength() - 1;</span>
+<span class="fc" id="L349">        if (guaranteedBits</span>
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">                &gt; policy.maxIntermediateCoefficientBitLength()) {</span>
+<span class="nc" id="L351">            throw new HenselLifting.RepresentationLimitReached(</span>
+                &quot;HENSEL_INTERMEDIATE_COEFFICIENT_BIT_LENGTH_EXCEEDED&quot;);
+        }
+<span class="fc" id="L354">        BigInteger result = left.multiply(right);</span>
+<span class="fc" id="L355">        checkCoefficient(result, policy);</span>
+<span class="fc" id="L356">        return result;</span>
+    }
+
+    private static BigInteger addCoefficient(
+        BigInteger left,
+        BigInteger right,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L366">        work.consume(stage, 1);</span>
+<span class="fc" id="L367">        BigInteger result = left.add(right);</span>
+<span class="fc" id="L368">        checkCoefficient(result, policy);</span>
+<span class="fc" id="L369">        return result;</span>
+    }
+
+    static void verifyCongruence(
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        UnivariatePolynomialView&lt;BigInteger&gt; product,
+        BigInteger modulus,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (!source.ring().equals(product.ring())</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">                || modulus.signum() &lt;= 0) {</span>
+<span class="nc" id="L381">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_CONGRUENCE_RING_OR_MODULUS_MISMATCH&quot;);
+        }
+<span class="fc" id="L384">        int count = Math.max(</span>
+<span class="fc" id="L385">            source.coefficientCount(),</span>
+<span class="fc" id="L386">            product.coefficientCount());</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        for (int exponent = 0; exponent &lt; count; exponent++) {</span>
+<span class="fc" id="L388">            work.consume(stage + &quot;.coefficient-tests&quot;, 1);</span>
+<span class="fc" id="L389">            BigInteger difference = source.coefficient(exponent)</span>
+<span class="fc" id="L390">                .subtract(product.coefficient(exponent));</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">            if (difference.remainder(modulus).signum() != 0) {</span>
+<span class="nc" id="L392">                throw new HenselLifting.AlgorithmFailure(</span>
+                    &quot;HENSEL_PRODUCT_CONGRUENCE_FAILED&quot;);
+            }
+        }
+<span class="fc" id="L396">    }</span>
+
+    static void checkView(
+        UnivariatePolynomialView&lt;BigInteger&gt; value,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        for (BigInteger coefficient : value.coefficients()) {</span>
+<span class="fc" id="L405">            work.consume(stage + &quot;.coefficient-checks&quot;, 1);</span>
+<span class="fc" id="L406">            checkCoefficient(coefficient, policy);</span>
+<span class="fc" id="L407">        }</span>
+<span class="fc" id="L408">    }</span>
+
+    private static void checkCoefficient(
+        BigInteger coefficient,
+        HenselLiftingPolicy policy
+    ) {
+<span class="fc" id="L414">        if (coefficient.abs().bitLength()</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">                &gt; policy.maxIntermediateCoefficientBitLength()) {</span>
+<span class="fc" id="L416">            throw new HenselLifting.RepresentationLimitReached(</span>
+                &quot;HENSEL_INTERMEDIATE_COEFFICIENT_BIT_LENGTH_EXCEEDED&quot;);
+        }
+<span class="fc" id="L419">    }</span>
+
+    private static ArrayList&lt;BigInteger&gt; zeros(int count) {
+<span class="fc" id="L422">        ArrayList&lt;BigInteger&gt; result = new ArrayList&lt;&gt;(count);</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        for (int index = 0; index &lt; count; index++) {</span>
+<span class="fc" id="L424">            result.add(BigInteger.ZERO);</span>
+        }
+<span class="fc" id="L426">        return result;</span>
+    }
+
+    static List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; toSparse(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; factors
+    ) {
+<span class="fc" id="L432">        return factors.stream()</span>
+<span class="fc" id="L433">            .map(UnivariatePolynomialView::toSparsePolynomial)</span>
+<span class="fc" id="L434">            .toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

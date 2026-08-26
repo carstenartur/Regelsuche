@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HenselLiftExecution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">HenselLiftExecution.java</span></div><h1>HenselLiftExecution.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Core deterministic p-adic lift execution after contract validation. */
+final class HenselLiftExecution {
+    private HenselLiftExecution() {
+    }
+
+    static HenselLiftingResult execute(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingPolicy policy,
+        PolynomialWorkBudget work,
+        ArrayList&lt;HenselLiftStep&gt; steps
+    ) {
+<span class="fc" id="L22">        UnivariatePolynomialView&lt;BigInteger&gt; source =</span>
+<span class="fc" id="L23">            UnivariatePolynomialView.from(request.source());</span>
+<span class="fc" id="L24">        HenselIntegerArithmetic.checkView(</span>
+            source,
+            policy,
+            work,
+            &quot;hensel.source-bounds&quot;);
+
+<span class="fc" id="L30">        PrimeField field = PrimeField.of(selection.selectedPrime());</span>
+<span class="fc" id="L31">        BigInteger prime = field.modulus();</span>
+<span class="fc" id="L32">        BigInteger targetModulus =</span>
+<span class="fc" id="L33">            HenselIntegerArithmetic.targetModulus(</span>
+                prime,
+                policy,
+                work);
+<span class="fc" id="L37">        HenselModularArithmetic.verifySourceCorrespondence(</span>
+            source,
+<span class="fc" id="L39">            selection.modularSource(),</span>
+            field,
+            work);
+
+<span class="fc" id="L43">        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; modularFactors =</span>
+<span class="fc" id="L44">            HenselModularArithmetic.anchoredModularFactors(</span>
+                selection,
+                field,
+                work);
+<span class="fc" id="L48">        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; liftedFactors =</span>
+<span class="fc" id="L49">            HenselIntegerArithmetic.initialIntegerFactors(</span>
+                source,
+                modularFactors,
+                policy,
+                work);
+<span class="fc" id="L54">        HenselIntegerArithmetic.verifyFixedReductions(</span>
+            liftedFactors,
+            modularFactors,
+            field,
+            work,
+            &quot;hensel.verify.initial-reductions&quot;);
+<span class="fc" id="L60">        UnivariatePolynomialView&lt;BigInteger&gt; initialProduct =</span>
+<span class="fc" id="L61">            HenselIntegerArithmetic.multiplyIntegerFactors(</span>
+                liftedFactors,
+                policy,
+                work,
+                &quot;hensel.initial-product&quot;);
+<span class="fc" id="L66">        HenselIntegerArithmetic.verifyCongruence(</span>
+            source,
+            initialProduct,
+            prime,
+            work,
+            &quot;hensel.verify.mod-p-product&quot;);
+
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (policy.targetExponent() == 1) {</span>
+<span class="fc" id="L74">            return HenselLiftingResult.completed(</span>
+                targetModulus,
+<span class="fc" id="L76">                HenselIntegerArithmetic.toSparse(liftedFactors),</span>
+                steps,
+<span class="fc" id="L78">                work.ledger(),</span>
+                request,
+                selection,
+                policy);
+        }
+
+<span class="fc" id="L84">        List&lt;HenselModularArithmetic.CrtEntry&gt; crtEntries =</span>
+<span class="fc" id="L85">            HenselModularArithmetic.precomputeCrt(</span>
+                modularFactors,
+                field,
+                work);
+<span class="fc" id="L89">        BigInteger currentModulus = prime;</span>
+<span class="fc" id="L90">        int currentExponent = 1;</span>
+
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        while (currentExponent &lt; policy.targetExponent()) {</span>
+<span class="fc" id="L93">            long workBefore = total(work);</span>
+<span class="fc" id="L94">            String stage = &quot;hensel.step-&quot; + currentExponent;</span>
+<span class="fc" id="L95">            BigInteger nextModulus =</span>
+<span class="fc" id="L96">                HenselIntegerArithmetic.nextModulus(</span>
+                    currentModulus,
+                    prime,
+                    policy,
+                    work,
+                    stage + &quot;.modulus&quot;);
+<span class="fc" id="L102">            UnivariatePolynomialView&lt;BigInteger&gt; product =</span>
+<span class="fc" id="L103">                HenselIntegerArithmetic.multiplyIntegerFactors(</span>
+                    liftedFactors,
+                    policy,
+                    work,
+                    stage + &quot;.current-product&quot;);
+<span class="fc" id="L108">            HenselIntegerArithmetic.verifyCongruence(</span>
+                source,
+                product,
+                currentModulus,
+                work,
+                stage + &quot;.verify-current-product&quot;);
+<span class="fc" id="L114">            UnivariatePolynomialView&lt;BigInteger&gt; error =</span>
+<span class="fc" id="L115">                HenselIntegerArithmetic.errorPolynomial(</span>
+                    source,
+                    product,
+                    currentModulus,
+                    field,
+                    policy,
+                    work,
+                    stage + &quot;.error&quot;);
+<span class="fc" id="L123">            List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; corrections =</span>
+<span class="fc" id="L124">                HenselModularArithmetic.corrections(</span>
+                    error,
+                    crtEntries,
+                    field,
+                    work,
+                    stage + &quot;.corrections&quot;);
+<span class="fc" id="L130">            HenselModularArithmetic.verifyCorrectionEquation(</span>
+                error,
+                corrections,
+                crtEntries,
+                work,
+                stage + &quot;.verify-corrections&quot;);
+
+<span class="fc" id="L137">            ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; updated =</span>
+<span class="fc" id="L138">                new ArrayList&lt;&gt;(liftedFactors.size());</span>
+<span class="fc" id="L139">            for (int index = 0;</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                    index &lt; liftedFactors.size();</span>
+<span class="fc" id="L141">                    index++) {</span>
+<span class="fc" id="L142">                updated.add(HenselIntegerArithmetic.applyCorrection(</span>
+<span class="fc" id="L143">                    liftedFactors.get(index),</span>
+<span class="fc" id="L144">                    corrections.get(index),</span>
+                    currentModulus,
+                    nextModulus,
+                    policy,
+                    work,
+                    stage + &quot;.factor-&quot; + index));
+            }
+<span class="fc" id="L151">            liftedFactors = List.copyOf(updated);</span>
+<span class="fc" id="L152">            HenselIntegerArithmetic.verifyFixedReductions(</span>
+                liftedFactors,
+                modularFactors,
+                field,
+                work,
+                stage + &quot;.verify-reductions&quot;);
+<span class="fc" id="L158">            UnivariatePolynomialView&lt;BigInteger&gt; liftedProduct =</span>
+<span class="fc" id="L159">                HenselIntegerArithmetic.multiplyIntegerFactors(</span>
+                    liftedFactors,
+                    policy,
+                    work,
+                    stage + &quot;.lifted-product&quot;);
+<span class="fc" id="L164">            HenselIntegerArithmetic.verifyCongruence(</span>
+                source,
+                liftedProduct,
+                nextModulus,
+                work,
+                stage + &quot;.verify-lifted-product&quot;);
+
+<span class="fc" id="L171">            steps.add(HenselLiftStep.issue(</span>
+                currentExponent,
+                currentExponent + 1,
+                currentModulus,
+                nextModulus,
+<span class="fc" id="L176">                AlgorithmEvidence.sha256(error.canonicalMaterial()),</span>
+<span class="fc" id="L177">                corrections.stream()</span>
+<span class="fc" id="L178">                    .map(correction -&gt; AlgorithmEvidence.sha256(</span>
+<span class="fc" id="L179">                        correction.canonicalMaterial()))</span>
+<span class="fc" id="L180">                    .toList(),</span>
+<span class="fc" id="L181">                AlgorithmEvidence.sha256(</span>
+<span class="fc" id="L182">                    liftedProduct.canonicalMaterial()),</span>
+<span class="fc" id="L183">                total(work) - workBefore));</span>
+<span class="fc" id="L184">            currentExponent++;</span>
+<span class="fc" id="L185">            currentModulus = nextModulus;</span>
+<span class="fc" id="L186">        }</span>
+
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (!currentModulus.equals(targetModulus)) {</span>
+<span class="nc" id="L189">            throw new HenselLifting.AlgorithmFailure(</span>
+                &quot;HENSEL_TARGET_MODULUS_MISMATCH&quot;);
+        }
+<span class="fc" id="L192">        return HenselLiftingResult.completed(</span>
+            targetModulus,
+<span class="fc" id="L194">            HenselIntegerArithmetic.toSparse(liftedFactors),</span>
+            steps,
+<span class="fc" id="L196">            work.ledger(),</span>
+            request,
+            selection,
+            policy);
+    }
+
+    private static long total(PolynomialWorkBudget work) {
+<span class="fc" id="L203">        return work.ledger().totalWorkUnits();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
