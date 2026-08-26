@@ -306,11 +306,16 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 .engine(engine)
                 .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
                 .allowHostAccess(HostAccess.NONE)
-                // The checked-in adapter is the only evaluated Python code. Permit
-                // GraalPy's internal background-GC daemon required by its
-                // native-extension runtime; application requests remain
+                // The checked-in adapter is the only evaluated Python code.
+                // Permit GraalPy's internal background-GC daemon required by
+                // its native-extension runtime; application requests remain
                 // serialized on the dedicated platform-thread worker.
                 .allowCreateThread(true)
+                // IsolateNativeModules relocates ELF libraries by invoking the
+                // pinned host patchelf executable. The structured request
+                // cannot select commands or paths; this process authority is
+                // reserved for the trusted GraalPy runtime path.
+                .allowCreateProcess(true)
                 // GraalPy 25.1.3 loads the native _ctypes module while
                 // importing the pinned SymPy environment. Native access is
                 // therefore required even though no user-supplied Python is
