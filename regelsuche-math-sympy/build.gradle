@@ -17,6 +17,7 @@ java {
 
 graalPy {
     community = true
+    polyglotVersion = '25.1.3'
     packages = [
         'mpmath==1.3.0',
         'sympy==1.14.0'
@@ -28,9 +29,6 @@ dependencies {
     api project(':regelsuche-core')
 
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
-    implementation 'org.graalvm.polyglot:polyglot:25.1.3'
-    implementation 'org.graalvm.polyglot:python:25.1.3'
-    implementation 'org.graalvm.python:python-embedding:25.1.3'
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
