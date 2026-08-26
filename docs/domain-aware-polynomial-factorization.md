@@ -28,18 +28,21 @@ Unterscheidung ist Teil des öffentlichen Claim-Vertrags:
 | Inhalt und primitiver Teil für `Z[x]` und `Q[x]` | implementiert |
 | Euklidischer Polynom-GGT über einem exakten Feld | implementiert |
 | Quadratfreie Zerlegung in Charakteristik null | implementiert |
-| Eine vollständige Engine, die alle univariaten Stufen unter einem einzigen Request ausführt | **noch nicht implementiert** |
-| Faktorisierung über endlichen Körpern, Primzahlauswahl, Hensel-Lifting und Rekombination | **noch nicht implementiert** |
-| Unabhängige Vollständigkeits- und Irreduzibilitätsevidence | **noch nicht implementiert** |
+| Explizite Primkörperdomäne `F_p` | implementiert |
+| Vollständige Faktorisierung quadratfreier univariater Polynome in `F_p[x]` | implementiert |
+| Deterministische geeignete Primzahlauswahl mit bewahrten Ablehnungsgründen | implementiert |
+| Exakte, quellgebundene Reduktion eines primitiven `Z[x]`-Polynoms nach `F_p[x]` | implementiert |
+| Hensel-Lifting und ganzzahlige Rekombination | **noch nicht implementiert** |
+| Vollständige integrierte `Z[x]`-/`Q[x]`-Engine | **noch nicht implementiert** |
+| Unabhängige Vollständigkeitsevidence für die ursprüngliche `Z[x]`-/`Q[x]`-Quelle | **noch nicht implementiert** |
 
-Insbesondere sind GGT und quadratfreie Zerlegung bereits exakte, budgetierte
-Algorithmen. Ihre derzeitigen öffentlichen Einstiegspunkte laufen jedoch noch
-als eigenständig begrenzte Algorithmusaufrufe. Erst eine spätere vollständige
-univariate Engine wird Inhaltsnormalisierung, GGT, Quadratfreistellung,
-endliche Körper, Hensel-Lifting und Rekombination in einem einzigen
-request-weiten Ablauf zusammenführen.
+GGT, quadratfreie Zerlegung, Primkörperfaktorisierung und Primzahlauswahl sind
+exakte, budgetierte Algorithmen. Sie bilden jedoch noch keinen vollständigen
+End-to-End-Abschluss in `Q[x]`: Erst Hensel-Lifting, ganzzahlige Rekombination,
+rationale Reassemblierung und die abschließende Verifier-Integration verbinden
+die vorhandenen Stufen zu einer vollständigen Engine.
 
-## Bausteine und vorgesehener Gesamtfluss
+## Bausteine und Gesamtfluss
 
 ```text
 Quelltext und parsergebundene exakte Literale
@@ -52,37 +55,33 @@ Quelltext und parsergebundene exakte Literale
        -> Evidence-Anforderung
        -> Kandidaten- und Arbeitsbudget
 
-Bereits integrierter Engine-Pfad:
+Bereits integrierter begrenzter Engine-Pfad:
   FactorizationRequest
     -> BinaryQuarticFactorizationEngine
     -> untrusted Proposal / BackendClaim / Work Ledger
     -> FactorizationVerifier
     -> verifier-ausgestellte Kandidaten und Report-Evidence
 
-Bereits implementierte allgemeine Algorithmusbausteine:
-  FactorizationRequest
-    -> Inhalts- und Primitivteilnormalisierung für Z[x] und Q[x]
-       mit übergebbarem, nicht zurücksetzbarem Request-Budget
-  SparsePolynomial über exaktem Feld
-    -> Polynom-GGT mit eigenem explizitem Budget
-    -> quadratfreie Zerlegung mit eigenem explizitem Budget
-
-Noch offene Orchestrierung:
-  ein gemeinsamer univariater Engine-Ablauf
+Bereits implementierte allgemeine univariate Pipeline:
+  FactorizationRequest über Z[x] oder Q[x]
     -> Inhalt und primitiver Teil
-    -> Quadratfreistellung
-    -> Faktorisierung über endlichem Körper
-    -> geeignete Primzahlauswahl
+    -> Ableitung / GGT / quadratfreie Zerlegung
+    -> geeignete Primzahl aus gebundener Kandidatenfolge
+    -> exakte kanonische Reduktion nach F_p[x]
+    -> vollständige Berlekamp-Faktorisierung in F_p[x]
+    -> unabhängige modulare Rekonstruktion und Irreduzibilitätsevidence
+
+Noch offene Fortsetzung:
     -> Hensel-Lifting
     -> ganzzahlige Rekombination
     -> rationale Reassemblierung
-    -> unabhängige Vollständigkeitsprüfung
+    -> unabhängige Vollständigkeitsprüfung der ursprünglichen Quelle
     -> FactorizationVerifier
 ```
 
-Das Diagramm beschreibt sowohl implementierte Bausteine als auch die noch
-offene Verbindung zu einer vollständigen Engine. Die gestrichene Grenze darf
-nicht als bereits vorhandene vollständige `Q[x]`-Faktorisierung gelesen werden.
+Das Diagramm beschreibt implementierte Stufen und die noch offene Verbindung
+zu einer vollständigen Engine. Ein modularer Abschluss darf nicht als bereits
+vorhandene vollständige `Q[x]`-Faktorisierung gelesen werden.
 
 ## Getrennte Identitäten
 
@@ -96,8 +95,8 @@ Die Darstellung trennt vier Identitäten:
 3. **Backendprovenienz:** Engine-ID, Engine-Zertifikate, Rohresultat-Hash,
    Backend-Claim und ausgeführte Engine-Arbeit;
 4. **Regelsuche-Evidence:** vollständig gebundener Request, unabhängig
-   rekonstruierte Ergebnisse, Verifier-Zertifikat, Gesamtarbeit und
-   autorisierte Claim-Stärke.
+   rekonstruierte Ergebnisse, Verifier- oder Algorithmuszertifikat,
+   Gesamtarbeit und autorisierte Claim-Stärke.
 
 Eine andere Quellschreibweise verändert nicht automatisch das mathematische
 Polynom. Eine andere Koeffizientendomäne, Variablenordnung oder Monomordnung
@@ -121,20 +120,22 @@ Zusätzliche algebraische Fähigkeiten besitzen getrennte Verträge:
 - `ExactField<C>` für exakte Division durch Nichtnullwerte;
 - `GcdDomain<C>` für GGT und geprüfte exakte Division.
 
-Die erste Tranche enthält:
+Implementiert sind:
 
 ```text
 regelsuche.coefficients.integer/v1
 regelsuche.coefficients.rational/v1
+regelsuche.coefficients.prime-field/v1/p=<p>
 ```
 
 Die rationale Implementierung verwendet den autoritativen `ExactRational`-Typ.
 Es existiert keine zweite Brucharithmetik und kein `double`-Einstieg in die
 exakte Domäne.
 
-Künftige Primkörper, endliche Erweiterungskörper oder algebraische Zahlkörper
-werden als weitere Domänen hinter denselben Fähigkeiten ergänzt. Eine Engine
-muss ihre unterstützte Domain-ID ausdrücklich deklarieren.
+`PrimeField` speichert kanonische `BigInteger`-Restklassen und bindet die
+deterministisch geprüfte Primzahl in die Domain-ID. Ringe über unterschiedlichen
+Primzahlen sind daher nicht gleich. Endliche Erweiterungskörper und algebraische
+Zahlkörper bleiben spätere Domänen hinter denselben Fähigkeiten.
 
 ## Polynomring und kanonisches Sparse-Polynom
 
@@ -217,12 +218,12 @@ Die Strukturgrenzen umfassen:
 - maximale Termzahl;
 - maximale Koeffizientenbitlänge.
 
-`FactorizationVerifier` prüft diese Grenzen, bevor eine Engine das Quellpolynom
-inspizieren darf. Die Inhaltsnormalisierung verwendet denselben Request und
-kann einen bereits belasteten, request-autorisierten Work-Zähler übernehmen.
-Die bestehenden GGT- und Quadratfrei-Einstiegspunkte besitzen dagegen noch
-eigene explizite Budgets; ihre Integration in denselben Request-Zähler ist Teil
-der noch offenen vollständigen Engine-Orchestrierung.
+`FactorizationVerifier` und die issuer-owned Algorithmusstufen prüfen diese
+Grenzen vor einem positiven Abschluss. Die Inhaltsnormalisierung,
+Primzahlauswahl und verschachtelte Primkörperfaktorisierung können denselben
+bereits belasteten, request-autorisierten `PolynomialWorkBudget` übernehmen.
+Eine abweichende Budgetautorität wird als technischer Vertragsfehler
+zurückgewiesen.
 
 Ein Algorithmus mit zusätzlichem Zwischenwertwachstum darf eine eng begrenzte
 Stufenpolitik ergänzen, aber keine zweite Request-Oberfläche mit duplizierten
@@ -281,11 +282,7 @@ Leitvorzeichen in den Skalar verschoben.
 
 `UnivariateContentPolicy` ergänzt ausschließlich die Grenze für wachsende
 Zwischenkoeffizienten. Source-Struktur und Gesamtarbeit bleiben Eigentum des
-`FactorizationRequest`. Ein paketinterner Einstieg übernimmt einen bereits
-belasteten `PolynomialWorkBudget`. Er weist einen Zähler zurück, dessen
-Autoritätslimit nicht exakt dem Requestbudget entspricht. Dadurch kann eine
-spätere Engine den Zähler weder zurücksetzen noch durch Übergabe eines größeren
-Limits nachträglich erweitern.
+`FactorizationRequest`.
 
 Vor einem positiven Abschluss werden der primitive Koeffizienten-GGT, der
 Leitkoeffizient, die ganzzahlige Zwischenform und die vollständige
@@ -305,15 +302,71 @@ eine Yun-artige Zerlegung aus. Sie bewahrt Faktorvielfachheiten, rekonstruiert
 das Quellpolynom und prüft für jeden ausgegebenen Faktor
 `gcd(f, f') = 1`.
 
-Beide Komponenten besitzen derzeit eigenständige explizite Arbeitsbudgets.
-Diese Budgets sind nicht versteckt und nicht zurücksetzbar innerhalb des
-jeweiligen Algorithmusaufrufs. Die Übergabe eines gemeinsamen
-`PolynomialWorkBudget` aus einer vollständigen Engine ist jedoch noch nicht
-für alle Stufen implementiert.
-
 Quadratfrei bedeutet nicht irreduzibel. Weder ein GGT-Ergebnis noch eine
 quadratfreie Zerlegung autorisiert allein einen Vollständigkeits- oder
 Irreduzibilitätsclaim.
+
+## Vollständige Faktorisierung in `F_p[x]`
+
+`FiniteFieldFactorization` verarbeitet ein nichtkonstantes, quadratfreies
+univariates Polynom über einem ausdrücklich deklarierten `PrimeField`.
+
+Der deterministische Ablauf umfasst:
+
+1. Monisierung und bewahrte Feldeinheit;
+2. exakte Quadratfreiheitsprüfung;
+3. Aufbau der Berlekamp-Matrix `Q - I`;
+4. deterministische RREF- und Nullraumberechnung;
+5. unabhängige Prüfung jedes Nullraumvektors;
+6. deterministisches Splitting nach Basisreihenfolge und Restklassen;
+7. exakte Rekonstruktion der modularen Quelle;
+8. paarweise Koprimheitsprüfung;
+9. Rabin-/Frobenius-Irreduzibilitätsprüfung jedes Faktors;
+10. Abgleich von Faktoranzahl und Berlekamp-Nullität.
+
+Die Stufenpolitik begrenzt die enumerierten Feldelemente und prüft vor der
+Allokation die konservative Peak-Schranke
+
+```text
+3 * degree² <= maxMatrixCells
+```
+
+für Ausgangsmatrix, RREF-Kopie und Nullraumbasis. Alle Teilstufen teilen das
+nicht zurücksetzbare Requestbudget.
+
+`COMPLETED` bedeutet eine vollständige Faktorisierung im gebundenen `F_p[x]`.
+Dieser Claim gilt nicht automatisch im ursprünglichen `Z[x]` oder `Q[x]`.
+
+## Geeignete Primzahl und exakte modulare Reduktion
+
+`SuitablePrimeSelection` verarbeitet ein kanonisches primitives Polynom in
+`Z[x]` mit positivem Leitkoeffizienten. Die Policy bindet eine streng
+aufsteigende Kandidatenfolge und die vollständige
+`FiniteFieldFactorizationPolicy`.
+
+Für jede Primzahl wird die Quelle exakt nach `F_p[x]` reduziert. Die Stufe
+bewahrt:
+
+- Gradverlust durch einen verschwindenden Leitkoeffizienten;
+- nicht quadratfreie modulare Reduktionen;
+- terminale Ressourcen- oder Technikfehler;
+- Versuchskosten, Modularquellhash und verschachtelte Zertifikats-ID.
+
+Ausgewählt wird die erste gradtreue Primzahl mit quadratfreier und vollständig
+faktorisierter Reduktion. Ein ausgeschöpfter Kandidatenpräfix bleibt
+`BUDGET_INCONCLUSIVE` und ist kein Beweis, dass keine geeignete Primzahl
+existiert.
+
+Der positive Abschluss prüft drei getrennte Bindungen:
+
+1. der ausgewählte Versuch benennt die retained modulare Quelle;
+2. das verschachtelte Primkörperzertifikat wurde für genau diese Quelle
+   ausgestellt;
+3. die retained modulare Quelle ist tatsächlich die kanonische Reduktion der
+   gebundenen ganzzahligen Quelle modulo der ausgewählten Primzahl.
+
+Der Quellhash wird aus dem bereits vollständig request-gebundenen
+Primkörperzertifikat exponiert, ohne dessen v1-Zertifikatsidentität zu ändern.
 
 ## Untrusted Engine-SPI
 
@@ -358,8 +411,10 @@ content.integralization.multiplication
 content.verify.source-comparison
 gcd.division.coefficient-updates
 square-free.initial-gcd.iterations
-verify.factor-product-multiplications
-verify.product-comparisons
+berlekamp.matrix.frobenius-powers
+berlekamp.rref.eliminations
+finite-field.verify.product
+suitable-prime.modular-reduction
 ```
 
 Die Stage-Abbildung wird lexikographisch sortiert und danach als
@@ -371,15 +426,12 @@ Bereits request-weit zusammengeführt sind:
 
 - Engine- und Verifier-Arbeit im vorhandenen Faktorisierungsvertrag;
 - sämtliche Unterstufen der Inhaltsnormalisierung;
-- wiederholte Inhaltsnormalisierungsaufrufe, wenn eine spätere Orchestrierung
-den gleichen `PolynomialWorkBudget` weiterreicht.
+- Primzahlauswahl und verschachtelte Primkörperfaktorisierung;
+- wiederholte Aufrufe, wenn die Orchestrierung denselben
+  `PolynomialWorkBudget` weiterreicht.
 
-Noch nicht request-weit zusammengeführt sind die eigenständigen öffentlichen
-GGT- und Quadratfrei-Aufrufe. Ihre Ledgers besitzen bereits dasselbe kanonische
-Format, doch die vollständige Engine muss sie noch unter demselben
-Request-Zähler orchestrieren. Bis dahin darf aus der Existenz gleicher
-Stage-IDs keine bereits implementierte Gesamtbudgetierung der vollständigen
-univariaten Pipeline abgeleitet werden.
+Die vollständige `Z[x]`-/`Q[x]`-Engine muss die noch offenen Lift- und
+Rekombinationsstufen ebenfalls unter derselben Autorität ausführen.
 
 ## Unabhängiger Verifier
 
@@ -401,15 +453,14 @@ FactorizationVerifier.VerifiedCandidate<C>
 FactorizationVerifier.Report<C>
 ```
 
-Callers und Engines können deren positiven Zustand nicht über öffentliche
+Aufrufer und Engines können deren positiven Zustand nicht über öffentliche
 Konstruktoren herstellen. Der Verifier bindet Quellpolynom, vollständigen
 Request, Engineprovenienz, Work Ledger, rekonstruierte Faktoren,
 Backend-Claim und sein eigenes Zertifikat in das Report-Hashmaterial.
 
-Die issuer-owned Resultate von Inhaltsnormalisierung, GGT und
-Quadratfreistellung sind Algorithmusevidence. Sie werden erst dann Teil eines
-verifier-ausgestellten Faktorisierungsreports, wenn eine Engine sie in einem
-vollständigen Proposal-/Verifier-Ablauf verwendet.
+Die issuer-owned Resultate der allgemeinen Algorithmusstufen werden erst dann
+Teil eines verifier-ausgestellten vollständigen Faktorisierungsreports, wenn
+eine Engine sie in einem vollständigen Proposal-/Verifier-Ablauf verwendet.
 
 ## Status und Claim-Stärken
 
@@ -493,7 +544,7 @@ werden nicht als neue Kernelgesetze behandelt. Der Cache bindet das
 vollständige Work Ledger statt eines quartikspezifischen
 Konfigurationszählers.
 
-Die neue allgemeine Inhaltsnormalisierung ist noch nicht automatisch im
+Die allgemeine modulare Pipeline ist noch nicht automatisch im
 Workbench-Suchprofil aktiv. Ihre Nutzung durch eine vollständige univariate
 Engine und danach durch Suche beziehungsweise Replay ist ein eigener,
 qualifikationspflichtiger Integrationsschritt.
@@ -518,23 +569,23 @@ Q[x]
 ```
 
 mit beliebigem unterstützten Grad unter expliziten Budgets. Bereits
-implementiert sind die gemeinsame univariate Darstellung, Inhalt und
-primitiver Teil, Ableitung, exakte Division, Polynom-GGT und quadratfreie
-Zerlegung.
+implementiert sind gemeinsame univariate Darstellung, Inhalt und primitiver
+Teil, Ableitung, exakte Division, Polynom-GGT, quadratfreie Zerlegung,
+Primkörperfaktorisierung und geeignete Primzahlauswahl mit exakter modularer
+Reduktion.
 
 Die verbleibende native Pipeline umfasst:
 
-1. gemeinsame Orchestrierung der vorhandenen Vorstufen unter einem einzigen
-   `FactorizationRequest` und `PolynomialWorkBudget`;
-2. Faktorisierung über endlichen Körpern mit deterministischer oder
-   seed-gebundener Algorithmuswahl;
-3. geeignete Primzahlauswahl mit retained Ablehnungsgründen;
-4. Hensel-Lifting;
-5. ganzzahlige Faktorrekomposition, zunächst Zassenhaus;
-6. später LLL-/van-Hoeij-Rekombination, wenn qualifiziert;
-7. rationale Faktorreassemblierung;
-8. unabhängige Vollständigkeits- und Irreduzibilitätsprüfung;
-9. Übergabe der vollständigen Ergebnisse an `FactorizationVerifier`.
+1. Hensel-Lifting mit expliziter Liftpräzision, Zwischenwertgrenzen und
+   rekonstruiertem Produkt modulo `p^k`;
+2. ganzzahlige Faktorrekomposition, zunächst Zassenhaus;
+3. später LLL-/van-Hoeij-Rekombination, wenn qualifiziert;
+4. rationale Faktorreassemblierung;
+5. unabhängige Vollständigkeits- und Irreduzibilitätsprüfung der ursprünglichen
+   Quelle;
+6. Übergabe der vollständigen Ergebnisse an `FactorizationVerifier`;
+7. Integration in Suche, Vorbereitung, Replay und Lernen unter
+   informationserhaltenden Work-Budgets.
 
 Parallel kann ein externer Backendadapter dieselben Requests bedienen. Seine
 Ergebnisse bleiben Proposals, bis Regelsuche sie exakt rekonstruiert hat. Eine
@@ -555,7 +606,11 @@ Fokussierte Kern- und Algorithmusprüfungen:
 ./gradlew :regelsuche-math-algorithms:test \
   --tests de.regelsuche.math.algorithms.polynomial.UnivariateContentNormalizationTest \
   --tests de.regelsuche.math.algorithms.polynomial.UnivariatePolynomialAlgorithmsTest \
-  --tests de.regelsuche.math.algorithms.polynomial.SquareFreeDecompositionTest
+  --tests de.regelsuche.math.algorithms.polynomial.SquareFreeDecompositionTest \
+  --tests de.regelsuche.math.algorithms.polynomial.FiniteFieldFactorizationTest \
+  --tests de.regelsuche.math.algorithms.polynomial.FiniteFieldFactorizationHigherDegreeTest \
+  --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionTest \
+  --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionEvidenceTest
 ```
 
 Discovery-Integration:
@@ -575,7 +630,9 @@ mvn --batch-mode --no-transfer-progress -Pfull verify
 ## Aussagegrenze
 
 Der implementierte Stand belegt eine erweiterbare, exakte
-Faktorisierungsarchitektur, einen fail-closed Engine-/Verifier-Vertrag und die
-ersten allgemeinen univariaten Vorstufen. Er belegt noch keine integrierte
-vollständige Faktorisierung über `Q[x]`, keine multivariate Faktorisierung und
-keine Überlegenheit gegenüber etablierten Computer-Algebra-Systemen.
+Faktorisierungsarchitektur, einen fail-closed Engine-/Verifier-Vertrag,
+allgemeine univariate Vorstufen, vollständige quadratfreie
+Primkörperfaktorisierung und eine quellgebundene geeignete Primzahlauswahl. Er
+belegt noch keine integrierte vollständige Faktorisierung über `Q[x]`, keine
+multivariate Faktorisierung und keine Überlegenheit gegenüber etablierten
+Computer-Algebra-Systemen.

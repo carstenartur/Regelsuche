@@ -3,8 +3,11 @@
 **Implementierungsstand: 25. August 2026**
 
 Diese Stufe überführt einen typisierten Faktorisierungsrequest über `Z[x]` oder
-`Q[x]` in eine gemeinsame kanonische Form für die späteren modularen
-Faktorisierungsalgorithmen. Sie faktorisiert den primitiven Teil noch nicht.
+`Q[x]` in eine gemeinsame kanonische Form für die modularen
+Faktorisierungsalgorithmen. Sie faktorisiert den primitiven Teil nicht selbst.
+Die anschließende deterministische Primzahlauswahl und vollständige
+Faktorisierung einer quadratfreien Reduktion in `F_p[x]` sind inzwischen als
+separate, request- und evidence-gebundene Stufen implementiert.
 
 ## Position in der Faktorisierungspipeline
 
@@ -18,11 +21,15 @@ FactorizationRequest<BigInteger oder ExactRational>
   -> primitives SparsePolynomial<BigInteger>
   -> unabhängige Rekonstruktionsprüfung
   -> deterministische Evidence
-  -> spätere Faktorisierung über endlichen Körpern
+  -> geeignete Primzahl und exakte Reduktion nach F_p[x]   implementiert
+  -> vollständige quadratfreie Faktorisierung in F_p[x]   implementiert
+  -> Hensel-Lifting                                       noch offen
+  -> ganzzahlige Rekombination                            noch offen
+  -> rationale Reassemblierung                            noch offen
 ```
 
 Die Ausgabe ist für beide Quelldomänen gleich aufgebaut. Dadurch benötigen
-Primzahlauswahl, endliche Körper, Hensel-Lifting und ganzzahlige
+Primzahlauswahl, Primkörperfaktorisierung, Hensel-Lifting und ganzzahlige
 Faktorkombination keinen zweiten rationalen Polynomtyp.
 
 ## Kanonische Konvention
@@ -174,11 +181,12 @@ Alle GGT-, LCM-, Divisions-, Multiplikations-, Vorzeichen- und
 Verifikationsschritte laufen über `PolynomialWorkBudget`. Der öffentliche
 Einstieg initialisiert es exakt aus `FactorizationRequest.maxWorkUnits()`.
 
-Für die spätere vollständige Engine existiert zusätzlich ein paketinterner
-Einstieg, der denselben bereits verwendeten `PolynomialWorkBudget` an die
-Normalisierung weitergibt. Folgestufen können den Zähler deshalb nicht
-zurücksetzen. Ein eigener Test führt zwei Normalisierungen mit demselben Budget
-aus und weist nach, dass die zweite Stufe am verbliebenen Restbudget scheitert.
+Für die vollständige Engine-Orchestrierung existiert zusätzlich ein
+paketinterner Einstieg, der denselben bereits verwendeten
+`PolynomialWorkBudget` an die Normalisierung weitergibt. Folgestufen können den
+Zähler deshalb nicht zurücksetzen. Ein eigener Test führt zwei
+Normalisierungen mit demselben Budget aus und weist nach, dass die zweite Stufe
+am verbliebenen Restbudget scheitert.
 
 Bei Erschöpfung lautet der Status `BUDGET_INCONCLUSIVE` mit
 `CONTENT_NORMALIZATION_WORK_BUDGET_EXCEEDED`.
@@ -199,6 +207,31 @@ zusätzlich geprüft hat:
 Ein Fehler in diesen Invarianten wird nicht als mathematisches Negativergebnis,
 sondern als `TECHNICAL_FAILURE` ausgegeben.
 
+## Übergabe an die modulare Pipeline
+
+Der kanonische primitive Teil ist der Eingabevertrag für
+`SuitablePrimeSelection`. Diese Stufe:
+
+- verlangt den hier erzeugten positiven primitiven `Z[x]`-Zustand;
+- betrachtet eine vollständig gebundene Primzahlenfolge;
+- bewahrt Gradverlust und nicht quadratfreie Reduktionen mit typisierten
+  Gründen;
+- reduziert exakt nach `PrimeField(p)[x]`;
+- verwendet für die verschachtelte Primkörperfaktorisierung dasselbe nicht
+  zurücksetzbare Arbeitsbudget;
+- prüft, dass die retained modulare Quelle tatsächlich die Modulo-
+  `p`-Reduktion der ursprünglichen ganzzahligen Quelle ist.
+
+Die vollständige Primkörperfaktorisierung rekonstruiert das modulare Produkt,
+prüft paarweise Koprimheit und zertifiziert jeden Faktor mit dem
+Rabin-/Frobenius-Kriterium. Diese Evidence ist der Eingang für das noch offene
+Hensel-Lifting; sie ist noch keine Faktorisierung in `Z[x]` oder `Q[x]`.
+
+Siehe
+[Deterministische Auswahl einer geeigneten Primzahl](suitable-prime-selection.md)
+und
+[Deterministische Faktorisierung über Primkörpern](finite-field-factorization.md).
+
 ## Status- und Claim-Grenze
 
 | Status | Bedeutung |
@@ -209,9 +242,10 @@ sondern als `TECHNICAL_FAILURE` ausgegeben.
 | `BUDGET_INCONCLUSIVE` | Eine Struktur-, Zwischenwert- oder Arbeitsgrenze wurde erreicht. |
 | `TECHNICAL_FAILURE` | Eine interne exakte Invariante oder arithmetische Operation ist fehlgeschlagen. |
 
-`COMPLETED` bedeutet ausschließlich, dass die Normalisierung korrekt ist. Es
-beweist weder Reduzibilität noch Irreduzibilität und enthält noch keine
-vollständige Faktorisierung.
+`COMPLETED` dieser Stufe bedeutet ausschließlich, dass die Normalisierung
+korrekt ist. Es beweist weder Reduzibilität noch Irreduzibilität und enthält
+selbst noch keine Faktorisierung. Die nachfolgenden modularen Stufen besitzen
+eigene, engere Claim-Grenzen.
 
 ## Prüfung
 
@@ -231,10 +265,12 @@ mvn --batch-mode --no-transfer-progress -Pfull verify
 
 ## Nächste algorithmische Stufe
 
-Der kanonische primitive Teil ist die Eingabe für:
+Nach der inzwischen implementierten geeigneten Primzahlauswahl und
+Primkörperfaktorisierung verbleiben:
 
-1. deterministische oder seed-gebundene Faktorisierung über endlichen Körpern;
-2. Auswahl geeigneter Primzahlen mit dokumentierten Ablehnungsgründen;
-3. Hensel-Lifting;
-4. ganzzahlige Faktorkombination;
-5. exakte rationale Reassemblierung hinter der Engine-/Verifier-Grenze.
+1. präzisionsgebundenes Hensel-Lifting;
+2. ganzzahlige Faktorkombination, zunächst Zassenhaus;
+3. später gegebenenfalls LLL-/van-Hoeij-Rekombination;
+4. exakte rationale Reassemblierung;
+5. unabhängige vollständige `Z[x]`-/`Q[x]`-Evidence hinter der
+   Engine-/Verifier-Grenze.
