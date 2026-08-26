@@ -16,7 +16,9 @@ java {
 }
 
 graalPy {
-    community = true
+    // Since GraalVM 25 the canonical and -community language POMs are
+    // identical OSS artifacts; the -community aliases are deprecated.
+    community = false
     polyglotVersion = '25.1.3'
     packages = [
         'mpmath==1.3.0',
