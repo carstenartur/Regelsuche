@@ -9,14 +9,14 @@ Gradle, JUnit und den versionierten Skripten des Repositorys.
 
 | Ziel | Befehl | Typische Dauer und Voraussetzungen |
 | --- | --- | --- |
-| schneller Modultest | `./gradlew :<modul>:test` | JDK 25 |
+| schneller Modultest | `./gradlew :<modul>:test` | JDK 25; für `regelsuche-math-sympy` unter Linux zusätzlich `patchelf` |
 | Anwendungstests | `./gradlew :app:test` | JDK 25 |
 | Browserfluss | `./gradlew :app:e2eTest` | JDK 25, Chromium/Playwright |
 | Containerintegration | `./gradlew :app:dockerE2eTest` | JDK 25, Docker |
-| alle Gradle-Testschichten | `./gradlew test` | JDK 25, je nach Tests Docker/Tools |
-| Tests plus Vertragsprüfung | `./gradlew check` | JDK 25, Python-`venv` |
-| strikte Reproduktion | `./gradlew fullCheck` | zusätzlich Docker und externe Solver |
-| autoritativer CI-Lebenszyklus | `./gradlew --no-configuration-cache ciCheck` | vollständige CI-Toolchain |
+| alle Gradle-Testschichten | `./gradlew test` | JDK 25, je nach Tests Docker/Tools und unter Linux `patchelf` |
+| Tests plus Vertragsprüfung | `./gradlew check` | JDK 25, Python-`venv`, unter Linux `patchelf` |
+| strikte Reproduktion | `./gradlew fullCheck` | zusätzlich Docker, externe Solver und unter Linux `patchelf` |
+| autoritativer CI-Lebenszyklus | `./gradlew --no-configuration-cache ciCheck` | vollständige CI-Toolchain einschließlich `patchelf` |
 
 `allTests` ist ein expliziter Alias für `test`.
 
@@ -116,6 +116,28 @@ verändern.
 
 Dieser Task installiert Hostbibliotheken. Er definiert keine alternative
 Testsemantik.
+
+### GraalPy-Isolation nativer Module auf Linux
+
+Der eingebettete SymPy-Adapter setzt `python.IsolateNativeModules=true`, damit
+ein nach Timeout verworfener GraalPy-Context innerhalb derselben JVM sicher
+durch einen neuen Context ersetzt werden kann. GraalPy kopiert und relokiert
+dazu native ELF-Bibliotheken und startet hierfür das Hostwerkzeug `patchelf`.
+
+Unter Ubuntu 22.04 entspricht die von CI und Release verwendete Toolchain:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends \
+  patchelf=0.14.3-1 \
+  python3-venv \
+  z3=4.8.12-1
+```
+
+Diese Installation provisioniert nur die Hostwerkzeuge. Die Testauswahl,
+Erfolgsentscheidung und mathematische Prüfung bleiben vollständig im Checkout.
+Fehlt `patchelf`, muss der GraalPy-Bootstrap technisch fehlschlagen; der Fall
+darf nicht als mathematische Nichtzerlegbarkeit umgedeutet werden.
 
 ### Docker
 
