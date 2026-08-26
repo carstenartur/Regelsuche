@@ -245,6 +245,15 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 .factory());
     }
 
+    private static String hostExecutablePath() {
+        String path = System.getenv("PATH");
+        if (path == null || path.isBlank()) {
+            throw new IllegalStateException(
+                "PATH is required for GraalPy native-module isolation");
+        }
+        return path;
+    }
+
     private record InvocationAuthority(
         ExecutorService executor,
         long generation
@@ -306,6 +315,10 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 .engine(engine)
                 .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
                 .allowHostAccess(HostAccess.NONE)
+                // The Polyglot default exposes no process environment. GraalPy
+                // searches for patchelf through PATH, so provide only this one
+                // host variable rather than inheriting the complete environment.
+                .environment("PATH", hostExecutablePath())
                 // The checked-in adapter is the only evaluated Python code.
                 // Permit GraalPy's internal background-GC daemon required by
                 // its native-extension runtime; application requests remain
