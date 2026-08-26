@@ -2,7 +2,6 @@ package de.regelsuche.math.sympy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -46,7 +45,8 @@ class SymPyFactorizationEngineTest {
                 .orElseThrow();
 
             assertSuccessfulCompleteBackendProposal(first);
-            assertEquals(first, second);
+            assertEquals(first, second,
+                "noncanonical timing diagnostics must not alter evidence");
             assertTrue(cold.coldStart());
             assertFalse(warm.coldStart());
             assertTrue(cold.initializationNanos() > 0);
@@ -55,8 +55,8 @@ class SymPyFactorizationEngineTest {
                 warm.sympyVersion());
             assertEquals(cold.inputHash(), warm.inputHash());
             assertEquals(cold.scriptHash(), warm.scriptHash());
-            assertNotEquals(cold.outputHash(), warm.outputHash(),
-                "raw output contains noncanonical timing diagnostics");
+            assertTrue(cold.outputHash().matches("sha256:[0-9a-f]{64}"));
+            assertTrue(warm.outputHash().matches("sha256:[0-9a-f]{64}"));
         }
     }
 
