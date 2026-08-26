@@ -25,16 +25,20 @@ import org.graalvm.python.embedding.VirtualFileSystem;
  * One reusable GraalPy engine and one serialized worker context.
  *
  * <p>The context imports SymPy once and is reused across requests. A timeout
- * force-closes the active context and replaces the worker before another
- * request is accepted.</p>
+ * force-closes the active context and advances the runtime generation before
+ * another request is accepted. Tasks from an older generation cannot mutate
+ * or close a newer worker.</p>
  */
 final class GraalPySymPyRuntime implements AutoCloseable {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String RUNTIME_ID = "graalpy-embedded";
 
     private final Engine engine;
+    private final Object invocationLock = new Object();
+    private final Object stateLock = new Object();
     private ExecutorService executor;
-    private volatile Worker worker;
+    private Worker worker;
+    private long generation;
     private boolean closed;
 
     GraalPySymPyRuntime() {
@@ -44,109 +48,186 @@ final class GraalPySymPyRuntime implements AutoCloseable {
         executor = newExecutor();
     }
 
-    synchronized SymPyInvocation invoke(
+    SymPyInvocation invoke(
         String input,
         Duration timeout
     ) {
         Objects.requireNonNull(input, "input");
         Objects.requireNonNull(timeout, "timeout");
-        if (closed) {
-            return SymPyInvocation.failure(
-                SymPyInvocation.Status.UNAVAILABLE,
-                "GRAALPY_RUNTIME_CLOSED",
-                RUNTIME_ID,
-                0);
-        }
+        synchronized (invocationLock) {
+            InvocationAuthority authority = invocationAuthority();
+            if (authority == null) {
+                return SymPyInvocation.failure(
+                    SymPyInvocation.Status.UNAVAILABLE,
+                    "GRAALPY_RUNTIME_CLOSED",
+                    RUNTIME_ID,
+                    0);
+            }
 
-        long started = System.nanoTime();
-        Future<SymPyInvocation> future = executor.submit(() ->
-            execute(input));
-        try {
-            return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (TimeoutException exception) {
-            future.cancel(true);
-            resetWorker(true);
-            return SymPyInvocation.failure(
-                SymPyInvocation.Status.TIMEOUT,
-                "GRAALPY_FACTORIZATION_TIMEOUT",
-                RUNTIME_ID,
-                System.nanoTime() - started);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            future.cancel(true);
-            resetWorker(true);
-            return SymPyInvocation.failure(
-                SymPyInvocation.Status.UNAVAILABLE,
-                "GRAALPY_FACTORIZATION_INTERRUPTED",
-                RUNTIME_ID,
-                System.nanoTime() - started);
-        } catch (ExecutionException exception) {
-            resetWorker(true);
-            Throwable cause = exception.getCause() == null
-                ? exception
-                : exception.getCause();
-            return SymPyInvocation.failure(
-                SymPyInvocation.Status.TECHNICAL_FAILURE,
-                "GRAALPY_" + cause.getClass().getSimpleName()
-                    .toUpperCase(java.util.Locale.ROOT),
-                RUNTIME_ID,
-                System.nanoTime() - started);
+            long started = System.nanoTime();
+            Future<SymPyInvocation> future = authority.executor().submit(() ->
+                execute(input, authority.generation()));
+            try {
+                return future.get(
+                    timeout.toMillis(),
+                    TimeUnit.MILLISECONDS);
+            } catch (TimeoutException exception) {
+                future.cancel(true);
+                resetGeneration(authority.generation(), true);
+                return SymPyInvocation.failure(
+                    SymPyInvocation.Status.TIMEOUT,
+                    "GRAALPY_FACTORIZATION_TIMEOUT",
+                    RUNTIME_ID,
+                    System.nanoTime() - started);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                future.cancel(true);
+                resetGeneration(authority.generation(), true);
+                return SymPyInvocation.failure(
+                    SymPyInvocation.Status.UNAVAILABLE,
+                    "GRAALPY_FACTORIZATION_INTERRUPTED",
+                    RUNTIME_ID,
+                    System.nanoTime() - started);
+            } catch (ExecutionException exception) {
+                resetGeneration(authority.generation(), true);
+                Throwable cause = exception.getCause() == null
+                    ? exception
+                    : exception.getCause();
+                return SymPyInvocation.failure(
+                    SymPyInvocation.Status.TECHNICAL_FAILURE,
+                    "GRAALPY_" + cause.getClass().getSimpleName()
+                        .toUpperCase(java.util.Locale.ROOT),
+                    RUNTIME_ID,
+                    System.nanoTime() - started);
+            }
         }
     }
 
-    private SymPyInvocation execute(String input) {
-        boolean coldStart = worker == null;
-        long initializationNanos = 0;
+    private InvocationAuthority invocationAuthority() {
+        synchronized (stateLock) {
+            return closed
+                ? null
+                : new InvocationAuthority(executor, generation);
+        }
+    }
+
+    private SymPyInvocation execute(
+        String input,
+        long expectedGeneration
+    ) {
+        WorkerSnapshot snapshot = null;
         try {
-            if (worker == null) {
-                long initializationStarted = System.nanoTime();
-                worker = Worker.create(engine);
-                initializationNanos =
-                    System.nanoTime() - initializationStarted;
+            snapshot = workerFor(expectedGeneration);
+            if (snapshot == null) {
+                return SymPyInvocation.failure(
+                    SymPyInvocation.Status.UNAVAILABLE,
+                    "GRAALPY_INVOCATION_GENERATION_RETIRED",
+                    RUNTIME_ID,
+                    0);
             }
             long invocationStarted = System.nanoTime();
-            String output = worker.factor(input);
+            String output = snapshot.worker().factor(input);
             long invocationNanos =
                 System.nanoTime() - invocationStarted;
             return SymPyInvocation.completed(
                 output,
                 RUNTIME_ID,
-                worker.runtimeVersion(),
-                coldStart,
-                initializationNanos,
+                snapshot.worker().runtimeVersion(),
+                snapshot.coldStart(),
+                snapshot.initializationNanos(),
                 invocationNanos);
         } catch (PolyglotException | IllegalStateException exception) {
-            resetWorker(false);
+            resetGeneration(expectedGeneration, false);
             return SymPyInvocation.failure(
                 SymPyInvocation.Status.TECHNICAL_FAILURE,
                 "GRAALPY_" + exception.getClass().getSimpleName()
                     .toUpperCase(java.util.Locale.ROOT),
                 RUNTIME_ID,
-                initializationNanos);
+                snapshot == null
+                    ? 0
+                    : snapshot.initializationNanos());
         }
     }
 
-    private void resetWorker(boolean replaceExecutor) {
-        Worker current = worker;
-        worker = null;
-        if (current != null) {
-            current.close(true);
+    private WorkerSnapshot workerFor(long expectedGeneration) {
+        synchronized (stateLock) {
+            if (closed || generation != expectedGeneration) {
+                return null;
+            }
+            if (worker != null) {
+                return new WorkerSnapshot(worker, false, 0);
+            }
         }
-        if (replaceExecutor && !closed) {
-            executor.shutdownNow();
-            executor = newExecutor();
+
+        long initializationStarted = System.nanoTime();
+        Worker created = Worker.create(engine);
+        long initializationNanos =
+            System.nanoTime() - initializationStarted;
+        synchronized (stateLock) {
+            if (closed || generation != expectedGeneration) {
+                created.close(true);
+                return null;
+            }
+            if (worker == null) {
+                worker = created;
+                return new WorkerSnapshot(
+                    created,
+                    true,
+                    initializationNanos);
+            }
+            Worker current = worker;
+            created.close(true);
+            return new WorkerSnapshot(current, false, 0);
+        }
+    }
+
+    private void resetGeneration(
+        long expectedGeneration,
+        boolean replaceExecutor
+    ) {
+        Worker retiredWorker;
+        ExecutorService retiredExecutor = null;
+        synchronized (stateLock) {
+            if (generation != expectedGeneration) {
+                return;
+            }
+            generation = Math.incrementExact(generation);
+            retiredWorker = worker;
+            worker = null;
+            if (replaceExecutor && !closed) {
+                retiredExecutor = executor;
+                executor = newExecutor();
+            }
+        }
+        if (retiredWorker != null) {
+            retiredWorker.close(true);
+        }
+        if (retiredExecutor != null) {
+            retiredExecutor.shutdownNow();
         }
     }
 
     @Override
-    public synchronized void close() {
-        if (closed) {
-            return;
+    public void close() {
+        synchronized (invocationLock) {
+            Worker retiredWorker;
+            ExecutorService retiredExecutor;
+            synchronized (stateLock) {
+                if (closed) {
+                    return;
+                }
+                closed = true;
+                generation = Math.incrementExact(generation);
+                retiredWorker = worker;
+                worker = null;
+                retiredExecutor = executor;
+            }
+            if (retiredWorker != null) {
+                retiredWorker.close(true);
+            }
+            retiredExecutor.shutdownNow();
+            engine.close();
         }
-        closed = true;
-        resetWorker(false);
-        executor.shutdownNow();
-        engine.close();
     }
 
     private static ExecutorService newExecutor() {
@@ -154,6 +235,29 @@ final class GraalPySymPyRuntime implements AutoCloseable {
             Thread.ofVirtual()
                 .name("regelsuche-graalpy-sympy-", 0)
                 .factory());
+    }
+
+    private record InvocationAuthority(
+        ExecutorService executor,
+        long generation
+    ) {
+        private InvocationAuthority {
+            Objects.requireNonNull(executor, "executor");
+        }
+    }
+
+    private record WorkerSnapshot(
+        Worker worker,
+        boolean coldStart,
+        long initializationNanos
+    ) {
+        private WorkerSnapshot {
+            Objects.requireNonNull(worker, "worker");
+            if (initializationNanos < 0) {
+                throw new IllegalArgumentException(
+                    "GraalPy initialization duration must not be negative");
+            }
+        }
     }
 
     private static final class Worker {
