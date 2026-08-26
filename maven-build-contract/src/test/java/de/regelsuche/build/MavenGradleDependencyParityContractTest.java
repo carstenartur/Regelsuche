@@ -1,6 +1,5 @@
 package de.regelsuche.build;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -51,15 +50,17 @@ class MavenGradleDependencyParityContractTest {
     Path root = repositoryRoot();
     String version = mavenProperty(root, "graalpy.version");
     String buildFile = "regelsuche-math-sympy/build.gradle";
-
-    assertDependency(root, buildFile,
-        "org.graalvm.polyglot:python", version);
-    assertDependency(root, buildFile,
-        "org.graalvm.python:python-embedding", version);
     String content = Files.readString(root.resolve(buildFile));
+
     assertTrue(
         content.contains("id 'org.graalvm.python' version '" + version + "'"),
         () -> buildFile + " must pin the GraalPy plugin to " + version);
+    assertTrue(
+        content.contains("polyglotVersion = '" + version + "'"),
+        () -> buildFile + " must pin the injected runtime to " + version);
+    assertTrue(
+        content.contains("community = true"),
+        () -> buildFile + " must select one GraalPy edition explicitly");
     assertTrue(
         content.contains("'sympy==1.14.0'"),
         () -> buildFile + " must pin SymPy 1.14.0");
