@@ -61,6 +61,34 @@ class SymPyFactorizationEngineTest {
     }
 
     @Test
+    void aFailedCallDoesNotExposeThePreviousSuccessfulMetrics() {
+        FactorizationRequest<BigInteger> successful =
+            integerQuarticRequest();
+        FactorizationRequest<BigInteger> rejected =
+            FactorizationRequest.verifiedDecomposition(
+                successful.source(),
+                successful.structuralLimits(),
+                0,
+                successful.maxWorkUnits());
+
+        try (GraalPySymPyFactorizationEngine<BigInteger> engine =
+                GraalPySymPyFactorizationEngine.integers()) {
+            assertSuccessfulCompleteBackendProposal(
+                FactorizationVerifier.execute(engine, successful));
+            assertTrue(engine.lastExecutionMetrics().isPresent());
+
+            FactorizationVerifier.Report<BigInteger> report =
+                FactorizationVerifier.execute(engine, rejected);
+
+            assertEquals(
+                FactorizationVerifier.Status.BUDGET_INCONCLUSIVE,
+                report.status());
+            assertEquals("MAX_CANDIDATES_IS_ZERO", report.detailCode());
+            assertTrue(engine.lastExecutionMetrics().isEmpty());
+        }
+    }
+
+    @Test
     void embeddedRationalEnginePreservesExactFractions() {
         PolynomialRing<ExactRational> ring = new PolynomialRing<>(
             ExactRationalField.INSTANCE,
@@ -199,6 +227,7 @@ class SymPyFactorizationEngineTest {
             report.status());
         assertEquals("GRAALPY_RUNTIME_CLOSED", report.detailCode());
         assertTrue(report.candidates().isEmpty());
+        assertTrue(engine.lastExecutionMetrics().isEmpty());
     }
 
     private static FactorizationRequest<BigInteger>
