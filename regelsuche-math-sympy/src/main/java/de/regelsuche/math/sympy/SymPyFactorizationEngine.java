@@ -58,6 +58,7 @@ abstract class SymPyFactorizationEngine<C>
         FactorizationRequest<C> request
     ) {
         Objects.requireNonNull(request, "request");
+        lastMetrics.set(null);
         Work work = new Work(request.maxWorkUnits());
         String structuralViolation =
             request.structuralViolation().orElse(null);
