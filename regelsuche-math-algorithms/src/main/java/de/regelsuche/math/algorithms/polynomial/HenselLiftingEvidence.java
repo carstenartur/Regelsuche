@@ -30,7 +30,10 @@ final class HenselLiftingEvidence {
         SuitablePrimeSelectionResult selection,
         HenselLiftingPolicy policy
     ) {
+        String requestHash = AlgorithmEvidence.sha256(
+            request.canonicalMaterial());
         if (!selection.completed()
+                || !selection.sourceRequestHash().equals(requestHash)
                 || !(request.source().ring().coefficientDomain()
                     instanceof BigIntegerDomain)
                 || request.source().ring().variableCount() != 1
