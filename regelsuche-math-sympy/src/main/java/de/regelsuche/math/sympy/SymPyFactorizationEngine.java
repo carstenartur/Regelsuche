@@ -191,7 +191,7 @@ abstract class SymPyFactorizationEngine<C>
         try {
             decoded = codec.decode(
                 invocation.output(),
-                request.source().ring(),
+                request.source(),
                 policy);
             work.consume(
                 "sympy.decode.factors",

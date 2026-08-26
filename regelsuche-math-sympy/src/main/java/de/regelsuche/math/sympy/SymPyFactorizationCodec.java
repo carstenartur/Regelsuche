@@ -80,12 +80,18 @@ final class SymPyFactorizationCodec<C> {
 
     Decoded<C> decode(
         String output,
-        PolynomialRing<C> ring,
+        SparsePolynomial<C> source,
         SymPyFactorizationPolicy policy
     ) {
         Objects.requireNonNull(output, "output");
-        Objects.requireNonNull(ring, "ring");
+        Objects.requireNonNull(source, "source");
         Objects.requireNonNull(policy, "policy");
+        PolynomialRing<C> ring = source.ring();
+        int sourceTotalDegree = source.totalDegree();
+        int[] sourceVariableDegrees = new int[ring.variableCount()];
+        for (int index = 0; index < sourceVariableDegrees.length; index++) {
+            sourceVariableDegrees[index] = source.degree(index);
+        }
         JsonNode root;
         try {
             root = JSON.readTree(output);
@@ -110,6 +116,8 @@ final class SymPyFactorizationCodec<C> {
             "SymPy factor timing exceeds total timing");
 
         C unit = coefficient(root.get("unit"), policy);
+        require(!ring.coefficientDomain().isZero(unit),
+            "SymPy unit must be nonzero");
         JsonNode factorNodes = root.get("factors");
         require(factorNodes != null && factorNodes.isArray(),
             "SymPy factors must be an array");
@@ -120,6 +128,9 @@ final class SymPyFactorizationCodec<C> {
 
         ArrayList<PolynomialFactor<C>> factors = new ArrayList<>();
         int totalTerms = 0;
+        long representedTotalDegree = 0;
+        long[] representedVariableDegrees =
+            new long[ring.variableCount()];
         for (JsonNode factorNode : factorNodes) {
             require(factorNode.isObject(),
                 "SymPy factor must be an object");
@@ -141,7 +152,8 @@ final class SymPyFactorizationCodec<C> {
                     "SymPy term must be an object");
                 Monomial monomial = monomial(
                     termNode.get("exponents"),
-                    ring.variableCount());
+                    sourceVariableDegrees,
+                    sourceTotalDegree);
                 C coefficient = coefficient(termNode, policy);
                 require(!ring.coefficientDomain().isZero(coefficient),
                     "SymPy term coefficient must be nonzero");
@@ -150,7 +162,51 @@ final class SymPyFactorizationCodec<C> {
             }
             SparsePolynomial<C> polynomial =
                 new SparsePolynomial<>(ring, terms);
+            require(!polynomial.isConstant(),
+                "SymPy factor must be nonconstant");
+            try {
+                representedTotalDegree = Math.addExact(
+                    representedTotalDegree,
+                    Math.multiplyExact(
+                        (long) polynomial.totalDegree(),
+                        multiplicity));
+                for (int index = 0;
+                        index < representedVariableDegrees.length;
+                        index++) {
+                    representedVariableDegrees[index] = Math.addExact(
+                        representedVariableDegrees[index],
+                        Math.multiplyExact(
+                            (long) polynomial.degree(index),
+                            multiplicity));
+                }
+            } catch (ArithmeticException exception) {
+                throw new IllegalArgumentException(
+                    "SymPy represented factor degree overflow",
+                    exception);
+            }
+            require(representedTotalDegree <= sourceTotalDegree,
+                "SymPy represented factor degree exceeds source degree");
+            for (int index = 0;
+                    index < representedVariableDegrees.length;
+                    index++) {
+                require(
+                    representedVariableDegrees[index]
+                        <= sourceVariableDegrees[index],
+                    "SymPy represented factor variable degree exceeds "
+                        + "source degree");
+            }
             factors.add(new PolynomialFactor<>(polynomial, multiplicity));
+        }
+        require(representedTotalDegree == sourceTotalDegree,
+            "SymPy represented factor degree does not match source degree");
+        for (int index = 0;
+                index < representedVariableDegrees.length;
+                index++) {
+            require(
+                representedVariableDegrees[index]
+                    == sourceVariableDegrees[index],
+                "SymPy represented factor variable degree does not match "
+                    + "source degree");
         }
 
         return new Decoded<>(
@@ -170,8 +226,14 @@ final class SymPyFactorizationCodec<C> {
     ) {
         require(node != null && node.isObject(),
             "SymPy coefficient must be an object");
-        BigInteger numerator = integerText(node, "numerator");
-        BigInteger denominator = integerText(node, "denominator");
+        BigInteger numerator = integerText(
+            node,
+            "numerator",
+            policy.maxCoefficientBitLength());
+        BigInteger denominator = integerText(
+            node,
+            "denominator",
+            policy.maxCoefficientBitLength());
         require(denominator.signum() > 0,
             "SymPy denominator must be positive");
         int bitLength;
@@ -191,20 +253,35 @@ final class SymPyFactorizationCodec<C> {
 
     private static Monomial monomial(
         JsonNode node,
-        int variableCount
+        int[] sourceVariableDegrees,
+        int sourceTotalDegree
     ) {
         require(node != null && node.isArray(),
             "SymPy exponent vector must be an array");
-        require(node.size() == variableCount,
+        require(node.size() == sourceVariableDegrees.length,
             "SymPy exponent vector arity mismatch");
-        int[] exponents = new int[variableCount];
-        for (int index = 0; index < variableCount; index++) {
+        int[] exponents = new int[sourceVariableDegrees.length];
+        int totalDegree = 0;
+        for (int index = 0; index < exponents.length; index++) {
             JsonNode exponent = node.get(index);
             require(exponent.isIntegralNumber()
                     && exponent.canConvertToInt()
                     && exponent.intValue() >= 0,
                 "SymPy exponent is invalid");
             exponents[index] = exponent.intValue();
+            require(exponents[index] <= sourceVariableDegrees[index],
+                "SymPy factor exponent exceeds source degree");
+            try {
+                totalDegree = Math.addExact(
+                    totalDegree,
+                    exponents[index]);
+            } catch (ArithmeticException exception) {
+                throw new IllegalArgumentException(
+                    "SymPy factor exponent degree overflow",
+                    exception);
+            }
+            require(totalDegree <= sourceTotalDegree,
+                "SymPy factor exponent degree exceeds source degree");
         }
         return Monomial.of(exponents);
     }
@@ -217,8 +294,27 @@ final class SymPyFactorizationCodec<C> {
         return value.textValue();
     }
 
-    private static BigInteger integerText(JsonNode node, String field) {
+    private static BigInteger integerText(
+        JsonNode node,
+        String field,
+        int maxBitLength
+    ) {
         String value = text(node, field);
+        int offset = value.startsWith("-") ? 1 : 0;
+        int digits = value.length() - offset;
+        int maxDigits = maximumDecimalDigits(maxBitLength);
+        require(digits >= 1 && digits <= maxDigits,
+            "SymPy field " + field + " exceeds coefficient policy");
+        require(
+            offset == 0
+                ? digits == 1 || value.charAt(0) != '0'
+                : value.charAt(1) != '0',
+            "SymPy field " + field + " is not canonical integer text");
+        for (int index = offset; index < value.length(); index++) {
+            char character = value.charAt(index);
+            require(character >= '0' && character <= '9',
+                "SymPy field " + field + " is not an integer");
+        }
         try {
             return new BigInteger(value);
         } catch (NumberFormatException exception) {
@@ -226,6 +322,16 @@ final class SymPyFactorizationCodec<C> {
                 "SymPy field " + field + " is not an integer",
                 exception);
         }
+    }
+
+    private static int maximumDecimalDigits(int maxBitLength) {
+        // 30_103 / 100_000 is a conservative upper approximation of
+        // log10(2), so this rejects text that cannot satisfy the bit policy
+        // before BigInteger allocates storage for it.
+        long scaled = Math.multiplyExact((long) maxBitLength, 30_103L);
+        return Math.toIntExact(Math.max(
+            1,
+            Math.floorDiv(scaled + 99_999L, 100_000L)));
     }
 
     private static long nonNegativeLong(JsonNode node, String field) {
