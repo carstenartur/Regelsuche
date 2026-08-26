@@ -66,6 +66,44 @@ GRAALPY-VFS/de.regelsuche/regelsuche-math-sympy
 Dadurch kollidiert die Einbettung nicht mit einem späteren zweiten
 GraalPy-Consumer im selben Produkt.
 
+### Gemeinsamer Python-Dependency-Lock
+
+Direkte Versionsangaben allein reichen für reproduzierbare Python-Builds nicht
+aus, weil Python-Pakete ihre transitiven Abhängigkeiten typischerweise als
+Versionsbereiche deklarieren. Das Modul enthält deshalb den eingecheckten Lock:
+
+```text
+regelsuche-math-sympy/graalpy.lock
+```
+
+Gradle und Maven verweisen ausdrücklich auf dieselbe Datei. Der Lock bindet:
+
+```text
+GraalPy-Version       25.1.3
+angeforderte Pakete   mpmath==1.3.0, sympy==1.14.0
+aufgelöste Pakete     mpmath==1.3.0, sympy==1.14.0
+```
+
+Eine Änderung der Pakete oder ihrer Constraints ohne passenden Lock scheitert
+am GraalPy-Paketvertrag. Der Maven-/Gradle-Paritätstest prüft zusätzlich
+Dateipfad, GraalPy-Version, deklarierte Eingaben und die vollständige
+aufgelöste Paketliste.
+
+Der Lock wird nur bei einer bewussten Dependency-Änderung neu erzeugt:
+
+```bash
+./gradlew :regelsuche-math-sympy:graalPyLockPackages
+```
+
+oder aus dem Modulverzeichnis über den entsprechenden Maven-Goal:
+
+```bash
+mvn org.graalvm.python:graalpy-maven-plugin:lock-packages
+```
+
+Die resultierende Datei ist als Teil derselben Dependency-Änderung zu prüfen
+und einzuchecken. Ein normaler Build aktualisiert sie nicht selbsttätig.
+
 ## Strukturierter exakter Wire-Vertrag
 
 Der Adapter übergibt keine gerenderte mathematische Zeichenkette. Insbesondere
