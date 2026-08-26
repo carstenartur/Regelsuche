@@ -1,5 +1,6 @@
 package de.regelsuche.build;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,6 +15,7 @@ class MavenGradleDependencyParityContractTest {
       "regelsuche-core/build.gradle",
       "regelsuche-discovery/build.gradle",
       "regelsuche-learning/build.gradle",
+      "regelsuche-math-sympy/build.gradle",
       "regelsuche-quality/build.gradle",
       "regelsuche-release/build.gradle",
       "regelsuche-solver-ir/build.gradle");
@@ -41,6 +43,29 @@ class MavenGradleDependencyParityContractTest {
     assertDependency(root, "app/build.gradle",
         "org.graalvm.polyglot:polyglot",
         mavenProperty(root, "graalvm.polyglot.version"));
+  }
+
+  @Test
+  void embeddedGraalpyVersionStaysAlignedAcrossMavenAndGradle()
+      throws IOException {
+    Path root = repositoryRoot();
+    String version = mavenProperty(root, "graalpy.version");
+    String buildFile = "regelsuche-math-sympy/build.gradle";
+
+    assertDependency(root, buildFile,
+        "org.graalvm.polyglot:python", version);
+    assertDependency(root, buildFile,
+        "org.graalvm.python:python-embedding", version);
+    String content = Files.readString(root.resolve(buildFile));
+    assertTrue(
+        content.contains("id 'org.graalvm.python' version '" + version + "'"),
+        () -> buildFile + " must pin the GraalPy plugin to " + version);
+    assertTrue(
+        content.contains("'sympy==1.14.0'"),
+        () -> buildFile + " must pin SymPy 1.14.0");
+    assertTrue(
+        content.contains("'mpmath==1.3.0'"),
+        () -> buildFile + " must pin mpmath 1.3.0");
   }
 
   private static void assertDependency(
