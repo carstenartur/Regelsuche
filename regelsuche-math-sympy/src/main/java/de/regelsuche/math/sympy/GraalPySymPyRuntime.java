@@ -3,6 +3,11 @@ package de.regelsuche.math.sympy;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
@@ -30,12 +35,20 @@ import org.graalvm.python.embedding.VirtualFileSystem;
  * force-closes the active context and advances the runtime generation before
  * another request is accepted. Tasks from an older generation cannot mutate
  * or close a newer worker.</p>
+ *
+ * <p>The build keeps Python packages inside a module-specific virtual
+ * filesystem. At runtime they are extracted once into a private temporary
+ * directory. Native-module isolation creates, patches and deletes context-local
+ * library copies, which cannot be done inside GraalPy's read-only virtual
+ * filesystem. The extracted tree belongs to this runtime and is removed by
+ * {@link #close()}.</p>
  */
 final class GraalPySymPyRuntime implements AutoCloseable {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String RUNTIME_ID = "graalpy-embedded";
 
     private final Engine engine;
+    private final Path externalResourcesDirectory;
     private final Object invocationLock = new Object();
     private final Object stateLock = new Object();
     private ExecutorService executor;
@@ -44,10 +57,26 @@ final class GraalPySymPyRuntime implements AutoCloseable {
     private boolean closed;
 
     GraalPySymPyRuntime() {
-        engine = Engine.newBuilder("python")
-            .option("engine.WarnInterpreterOnly", "false")
-            .build();
-        executor = newExecutor();
+        Path extracted = extractResources();
+        Engine createdEngine = null;
+        try {
+            createdEngine = Engine.newBuilder("python")
+                .option("engine.WarnInterpreterOnly", "false")
+                .build();
+            executor = newExecutor();
+        } catch (RuntimeException exception) {
+            if (createdEngine != null) {
+                try {
+                    createdEngine.close();
+                } catch (RuntimeException closeFailure) {
+                    exception.addSuppressed(closeFailure);
+                }
+            }
+            deleteResources(extracted, exception);
+            throw exception;
+        }
+        externalResourcesDirectory = extracted;
+        engine = createdEngine;
     }
 
     SymPyInvocation invoke(
@@ -167,7 +196,9 @@ final class GraalPySymPyRuntime implements AutoCloseable {
         }
 
         long initializationStarted = System.nanoTime();
-        Worker created = Worker.create(engine);
+        Worker created = Worker.create(
+            engine,
+            externalResourcesDirectory);
         long initializationNanos =
             System.nanoTime() - initializationStarted;
         synchronized (stateLock) {
@@ -233,7 +264,25 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 retiredWorker.close(true);
             }
             retiredExecutor.shutdownNow();
-            engine.close();
+
+            RuntimeException failure = null;
+            try {
+                engine.close();
+            } catch (RuntimeException exception) {
+                failure = exception;
+            }
+            try {
+                deleteResources(externalResourcesDirectory);
+            } catch (RuntimeException exception) {
+                if (failure == null) {
+                    failure = exception;
+                } else {
+                    failure.addSuppressed(exception);
+                }
+            }
+            if (failure != null) {
+                throw failure;
+            }
         }
     }
 
@@ -243,6 +292,82 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 .daemon(true)
                 .name("regelsuche-graalpy-sympy-", 0)
                 .factory());
+    }
+
+    private static Path extractResources() {
+        Path directory;
+        try {
+            directory = Files.createTempDirectory(
+                "regelsuche-graalpy-sympy-");
+        } catch (IOException exception) {
+            throw new IllegalStateException(
+                "temporary GraalPy resource directory cannot be created",
+                exception);
+        }
+
+        try (VirtualFileSystem fileSystem =
+                VirtualFileSystem.newBuilder()
+                    .resourceDirectory(SymPyScript.RESOURCE_DIRECTORY)
+                    .resourceLoadingClass(SymPyScript.class)
+                    .build()) {
+            GraalPyResources.extractVirtualFileSystemResources(
+                fileSystem,
+                directory);
+            return directory;
+        } catch (IOException | RuntimeException exception) {
+            deleteResources(directory, exception);
+            throw new IllegalStateException(
+                "embedded GraalPy resources cannot be extracted",
+                exception);
+        }
+    }
+
+    private static void deleteResources(
+        Path directory,
+        Throwable authoritativeFailure
+    ) {
+        try {
+            deleteResources(directory);
+        } catch (RuntimeException cleanupFailure) {
+            authoritativeFailure.addSuppressed(cleanupFailure);
+        }
+    }
+
+    private static void deleteResources(Path directory) {
+        if (directory == null || !Files.exists(directory)) {
+            return;
+        }
+        try {
+            Files.walkFileTree(
+                directory,
+                new SimpleFileVisitor<>() {
+                    @Override
+                    public FileVisitResult visitFile(
+                        Path file,
+                        BasicFileAttributes attributes
+                    ) throws IOException {
+                        Files.deleteIfExists(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(
+                        Path visitedDirectory,
+                        IOException failure
+                    ) throws IOException {
+                        if (failure != null) {
+                            throw failure;
+                        }
+                        Files.deleteIfExists(visitedDirectory);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+        } catch (IOException exception) {
+            throw new IllegalStateException(
+                "temporary GraalPy resources cannot be deleted: "
+                    + directory,
+                exception);
+        }
     }
 
     private static String hostExecutablePath() {
@@ -278,44 +403,34 @@ final class GraalPySymPyRuntime implements AutoCloseable {
     }
 
     private static final class Worker {
-        private final VirtualFileSystem fileSystem;
         private final Context context;
         private final Value factorFunction;
         private final String runtimeVersion;
 
         private Worker(
-            VirtualFileSystem fileSystem,
             Context context,
             Value factorFunction,
             String runtimeVersion
         ) {
-            this.fileSystem = fileSystem;
             this.context = context;
             this.factorFunction = factorFunction;
             this.runtimeVersion = runtimeVersion;
         }
 
-        static Worker create(Engine engine) {
-            VirtualFileSystem fileSystem = VirtualFileSystem.newBuilder()
-                .resourceDirectory(SymPyScript.RESOURCE_DIRECTORY)
-                .resourceLoadingClass(SymPyScript.class)
-                // python.IsolateNativeModules copies each native extension to
-                // a context-private temporary file before loading it. GraalPy
-                // performs that copy through the context filesystem, so
-                // read/write host IO is a runtime prerequisite rather than an
-                // application feature. Only the checked-in adapter is
-                // evaluated and its request contract exposes neither paths nor
-                // Python source. Native extensions already execute with the
-                // operating-system rights of the JVM process; this embedded
-                // backend is therefore a trusted dependency boundary, not a
-                // security sandbox.
-                .allowHostIO(VirtualFileSystem.HostIO.READ_WRITE)
-                .build();
+        static Worker create(
+            Engine engine,
+            Path externalResourcesDirectory
+        ) {
             Context context = null;
             try {
                 context = Context.newBuilder()
                     .engine(engine)
-                    .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
+                    // IsolateNativeModules must create and delete context-local
+                    // copies next to the native libraries. GraalPy's embedded
+                    // VFS is read-only, so use the private extracted resource
+                    // tree through the supported external-directory adapter.
+                    .apply(GraalPyResources.forExternalDirectory(
+                        externalResourcesDirectory))
                     .allowHostAccess(HostAccess.NONE)
                     // The Polyglot default exposes no process environment.
                     // GraalPy searches for patchelf through PATH, so provide
@@ -337,6 +452,10 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                     // required even though no user-supplied Python is evaluated.
                     .allowNativeAccess(true)
                     .allowPolyglotAccess(PolyglotAccess.NONE)
+                    // Preserve the Java POSIX backend used by the embedded VFS
+                    // configuration. Only native extension loading and
+                    // isolation require native/process authority.
+                    .option("python.PosixModuleBackend", "java")
                     // Timeout recovery and cold-start measurements replace a
                     // context inside the same JVM. Every context in that
                     // process must isolate native modules before _ctypes can be
@@ -365,7 +484,6 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 String version = runtimeVersion(
                     runtimeInfo.execute().asString());
                 return new Worker(
-                    fileSystem,
                     context,
                     factorFunction,
                     version);
@@ -376,11 +494,6 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                     } catch (RuntimeException closeFailure) {
                         exception.addSuppressed(closeFailure);
                     }
-                }
-                try {
-                    fileSystem.close();
-                } catch (IOException closeFailure) {
-                    exception.addSuppressed(closeFailure);
                 }
                 throw new IllegalStateException(
                     "embedded GraalPy context initialization failed",
@@ -401,11 +514,6 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 context.close(cancel);
             } catch (RuntimeException ignored) {
                 // Closing a timed-out context is best-effort cleanup.
-            }
-            try {
-                fileSystem.close();
-            } catch (IOException ignored) {
-                // The runtime result is already terminal at this point.
             }
         }
 
