@@ -22,9 +22,11 @@ import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 
 /**
- * One reusable GraalPy engine and one serialized worker context.
+ * One reusable GraalPy engine and one serialized platform-thread worker.
  *
- * <p>The context imports SymPy once and is reused across requests. A timeout
+ * <p>The context imports SymPy once and is reused across requests. GraalPy
+ * native extensions cannot execute on Java virtual threads, so the worker is
+ * deliberately backed by one dedicated daemon platform thread. A timeout
  * force-closes the active context and advances the runtime generation before
  * another request is accepted. Tasks from an older generation cannot mutate
  * or close a newer worker.</p>
@@ -235,7 +237,8 @@ final class GraalPySymPyRuntime implements AutoCloseable {
 
     private static ExecutorService newExecutor() {
         return Executors.newSingleThreadExecutor(
-            Thread.ofVirtual()
+            Thread.ofPlatform()
+                .daemon(true)
                 .name("regelsuche-graalpy-sympy-", 0)
                 .factory());
     }
