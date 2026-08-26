@@ -1,5 +1,6 @@
 package de.regelsuche.build;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -67,6 +68,42 @@ class MavenGradleDependencyParityContractTest {
     assertTrue(
         content.contains("'mpmath==1.3.0'"),
         () -> buildFile + " must pin mpmath 1.3.0");
+  }
+
+  @Test
+  void embeddedGraalpyLockIsSharedAndComplete()
+      throws IOException {
+    Path root = repositoryRoot();
+    Path module = root.resolve("regelsuche-math-sympy");
+    String version = mavenProperty(root, "graalpy.version");
+    String gradle = Files.readString(module.resolve("build.gradle"));
+    String maven = Files.readString(module.resolve("pom.xml"));
+    Path lockPath = module.resolve("graalpy.lock");
+
+    assertTrue(
+        gradle.contains(
+            "graalPyLockFile = file(\"$projectDir/graalpy.lock\")"),
+        "Gradle must consume the committed module-local GraalPy lock");
+    assertTrue(
+        maven.contains(
+            "<graalPyLockFile>${project.basedir}/graalpy.lock</graalPyLockFile>"),
+        "Maven must consume the same committed GraalPy lock");
+    assertTrue(Files.isRegularFile(lockPath),
+        "the shared GraalPy lock must be committed");
+
+    String lock = Files.readString(lockPath);
+    assertTrue(lock.contains("# graalpy-version: " + version),
+        "the lock must bind the managed GraalPy version");
+    assertTrue(lock.contains(
+        "# input-packages: mpmath==1.3.0,sympy==1.14.0"),
+        "the lock must bind the configured direct Python packages");
+    assertEquals(
+        List.of("mpmath==1.3.0", "sympy==1.14.0"),
+        Files.readAllLines(lockPath).stream()
+            .map(String::trim)
+            .filter(line -> !line.isBlank() && !line.startsWith("#"))
+            .toList(),
+        "the lock must retain the exact resolved Python package closure");
   }
 
   private static void assertDependency(
