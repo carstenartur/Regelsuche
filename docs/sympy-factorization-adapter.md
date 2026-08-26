@@ -162,9 +162,13 @@ eine langlebige Polyglot Engine
   -> viele typisierte Anfragen
 ```
 
-Der Kontext erlaubt keinen Hostzugriff, keine nativen Zugriffe, keine
-Gast-Threads und keinen sprachübergreifenden Polyglot-Zugriff. Das virtuelle
-Dateisystem bleibt auf die eingebetteten Ressourcen begrenzt.
+Der Context erlaubt keinen Java-Host-Interop, keine nativen Zugriffe, keine
+Gast-Threads und keinen sprachübergreifenden Polyglot-Zugriff. Das
+anwendungseigene virtuelle Dateisystem delegiert außerhalb seines Mountpoints
+nur Lesezugriffe, weil GraalPy seinen Core und seine Standardbibliothek über das
+Sprach-Home des Runtime-Artefakts findet. Host-Schreibzugriffe bleiben verboten.
+Der feste Python-Adapter nimmt keine Dateipfade entgegen und führt keinen vom
+Payload gesteuerten Dateizugriff aus.
 
 Ein Context wird nicht gleichzeitig von mehreren Threads benutzt. Die Runtime
 serialisiert Aufrufe und ordnet jeden Task einer monotonen Generation zu. Nach
