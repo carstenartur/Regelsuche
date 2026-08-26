@@ -68,7 +68,9 @@ GRAALPY-VFS/de.regelsuche/regelsuche-math-sympy
 
 Dadurch benötigt das eingebettete Backend keine systemweite Python- oder
 SymPy-Installation und kollidiert nicht mit einem späteren zweiten
-GraalPy-Consumer.
+GraalPy-Consumer. Die Linux-spezifische Isolation nativer Module benötigt
+zusätzlich das Hostwerkzeug `patchelf`; es gehört nicht zum mathematischen
+Payload und wird nicht als Python-Abhängigkeit behandelt.
 
 ### Gemeinsamer Dependency-Lock
 
@@ -163,22 +165,28 @@ eine langlebige Polyglot Engine
 ```
 
 Der Context verweigert Java-Host-Interop und sprachübergreifenden
-Polyglot-Zugriff. Er erlaubt jedoch bewusst nativen Zugriff und von GraalPy
-erzeugte Gast-Threads: GraalPy 25.1.3 lädt beim Import der gepinnten Umgebung
-das native Modul `_ctypes`, und die Native-Extension-Runtime benötigt außerdem
-einen Background-GC-Thread. Der eingebettete Pfad ist deshalb eine
-vertrauenswürdige In-Process-Abhängigkeitsgrenze und ausdrücklich keine
-Sicherheitssandbox. Nativer Code läuft mit den Betriebssystemrechten des
-JVM-Prozesses und kann Einschränkungen des virtuellen Dateisystems umgehen.
+Polyglot-Zugriff. Er erlaubt jedoch bewusst nativen Zugriff, von GraalPy
+erzeugte Gast-Threads und das Starten eines Hostprozesses: GraalPy 25.1.3 lädt
+beim Import der gepinnten Umgebung das native Modul `_ctypes`, die
+Native-Extension-Runtime benötigt einen Background-GC-Thread und
+`python.IsolateNativeModules` ruft unter Linux `patchelf` zur Relokation der
+kontextprivaten ELF-Kopien auf.
 
-Das anwendungseigene virtuelle Dateisystem delegiert außerhalb seines
-Mountpoints nur Lesezugriffe, weil GraalPy seinen Core und seine
-Standardbibliothek über das Sprach-Home des Runtime-Artefakts findet.
-Host-Schreibzugriffe über die Polyglot-Dateisystemschnittstelle bleiben
-verboten. Der feste Python-Adapter nimmt keine Dateipfade entgegen und führt
-keinen vom Payload gesteuerten Dateizugriff aus. Diese Einschränkungen begrenzen
-den kontrollierten Java-/Python-Vertrag, ersetzen aber keine Isolation gegen
-nativen Bibliothekscode.
+Diese Autoritäten stehen ausschließlich dem fest eingecheckten Adapter und dem
+GraalPy-Runtimepfad zur Verfügung. Der strukturierte Faktor-Payload enthält
+weder Python-Code noch Kommandos oder Hostpfade. Trotzdem ist der eingebettete
+Pfad eine vertrauenswürdige In-Process-Abhängigkeitsgrenze und ausdrücklich
+keine Sicherheitssandbox. Nativer Code läuft mit den Betriebssystemrechten des
+JVM-Prozesses und kann Java-/Polyglot-Schutzgrenzen umgehen.
+
+Das anwendungseigene virtuelle Dateisystem darf außerhalb seines Mountpoints
+lesen und für die Isolation native Bibliothekskopien in temporäre Hostdateien
+schreiben. Diese Schreibmöglichkeit ist eine technische Voraussetzung von
+`python.IsolateNativeModules`, keine vom Request adressierbare Dateischnittstelle.
+Der feste Python-Adapter nimmt keine Dateipfade entgegen und führt keinen vom
+Payload gesteuerten Dateizugriff aus. Anwendungen mit einer stärkeren
+Isolationsanforderung müssen den separaten Prozesspfad zusätzlich durch
+Betriebssystem- oder Containergrenzen absichern.
 
 Jeder eingebettete Context setzt:
 
@@ -195,6 +203,16 @@ GraalPy derzeit nur auf Linux unterstützt und bleibt trotz der Isolation eine
 besonders zu prüfende Runtime-Grenze. Ein nicht möglicher Neuaufbau liefert
 einen technischen Fehler; Regelsuche fällt nicht unbemerkt auf einen anderen
 mathematischen Pfad zurück.
+
+Unter Ubuntu 22.04 verwenden CI und Release den distributionsgebundenen Pin:
+
+```text
+patchelf=0.14.3-1
+```
+
+Fehlt `patchelf`, ist der eingebettete GraalPy-Pfad technisch nicht verfügbar.
+Das wird nicht als irreduzibles Polynom oder als erfolglose mathematische Suche
+klassifiziert.
 
 Ein Context wird nicht gleichzeitig von mehreren Threads benutzt. Die Runtime
 serialisiert Aufrufe auf einem dedizierten Java-Platform-Thread und ordnet jeden
@@ -337,6 +355,17 @@ Laufzeit bleibt umgebungsbezogene Engineering-Diagnostik und kein
 mathematischer Qualitätsnachweis oder universeller CAS-Ranglistenwert.
 
 ## Reproduktion
+
+Unter Ubuntu 22.04 werden die für den vollständigen Checkout benötigten
+Hostwerkzeuge so installiert:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends \
+  patchelf=0.14.3-1 \
+  python3-venv \
+  z3=4.8.12-1
+```
 
 Fokussierte Tests:
 
