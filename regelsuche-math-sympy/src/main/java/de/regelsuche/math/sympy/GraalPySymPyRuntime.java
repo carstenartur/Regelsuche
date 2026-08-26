@@ -87,7 +87,8 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                     SymPyInvocation.Status.UNAVAILABLE,
                     "GRAALPY_FACTORIZATION_INTERRUPTED",
                     RUNTIME_ID,
-                    System.nanoTime() - started);
+                    System.nanoTime() - started,
+                    exception);
             } catch (ExecutionException exception) {
                 resetGeneration(authority.generation(), true);
                 Throwable cause = exception.getCause() == null
@@ -98,7 +99,8 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                     "GRAALPY_" + cause.getClass().getSimpleName()
                         .toUpperCase(java.util.Locale.ROOT),
                     RUNTIME_ID,
-                    System.nanoTime() - started);
+                    System.nanoTime() - started,
+                    cause);
             }
         }
     }
@@ -145,7 +147,8 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 RUNTIME_ID,
                 snapshot == null
                     ? 0
-                    : snapshot.initializationNanos());
+                    : snapshot.initializationNanos(),
+                exception);
         }
     }
 
@@ -284,17 +287,23 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 .resourceLoadingClass(SymPyScript.class)
                 // GraalPy discovers its core and standard-library language
                 // home outside the application VFS. Permit only the reads
-                // required for that discovery; writes remain denied and the
-                // structured factorization payload contains no host path.
+                // required for that discovery at the polyglot filesystem
+                // layer; the pinned native modules still execute with the
+                // operating-system rights of the JVM process.
                 .allowHostIO(VirtualFileSystem.HostIO.READ)
                 .build();
             Context context = Context.newBuilder()
                 .engine(engine)
+                .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
                 .allowHostAccess(HostAccess.NONE)
                 .allowCreateThread(false)
-                .allowNativeAccess(false)
+                // GraalPy 25.1.3 loads the native _ctypes module while
+                // importing the pinned SymPy environment. Native access is
+                // therefore required even though no user-supplied Python is
+                // evaluated. This in-process adapter is a trusted dependency
+                // boundary, not a security sandbox.
+                .allowNativeAccess(true)
                 .allowPolyglotAccess(PolyglotAccess.NONE)
-                .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
                 .option("python.DontWriteBytecodeFlag", "true")
                 .build();
             try {

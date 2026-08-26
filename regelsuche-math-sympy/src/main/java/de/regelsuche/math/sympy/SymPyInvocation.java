@@ -9,9 +9,16 @@ record SymPyInvocation(
     String runtimeVersion,
     boolean coldStart,
     long initializationNanos,
-    long invocationNanos
+    long invocationNanos,
+    String failureDiagnostic
 ) {
+    private static final int MAX_DIAGNOSTIC_CHARACTERS = 4_096;
+    private static final int MAX_DIAGNOSTIC_CAUSES = 8;
+
     SymPyInvocation {
+        failureDiagnostic = failureDiagnostic == null
+            ? ""
+            : failureDiagnostic.strip();
         if (status == null
                 || detailCode == null
                 || detailCode.isBlank()
@@ -27,6 +34,10 @@ record SymPyInvocation(
         if (status != Status.COMPLETED && !output.isEmpty()) {
             throw new IllegalArgumentException(
                 "failed SymPy invocation cannot expose output");
+        }
+        if (status == Status.COMPLETED && !failureDiagnostic.isEmpty()) {
+            throw new IllegalArgumentException(
+                "completed SymPy invocation cannot expose failure diagnostics");
         }
     }
 
@@ -46,7 +57,8 @@ record SymPyInvocation(
             runtimeVersion,
             coldStart,
             initializationNanos,
-            invocationNanos);
+            invocationNanos,
+            "");
     }
 
     static SymPyInvocation failure(
@@ -54,6 +66,36 @@ record SymPyInvocation(
         String detailCode,
         String runtimeId,
         long invocationNanos
+    ) {
+        return failure(
+            status,
+            detailCode,
+            runtimeId,
+            invocationNanos,
+            "");
+    }
+
+    static SymPyInvocation failure(
+        Status status,
+        String detailCode,
+        String runtimeId,
+        long invocationNanos,
+        Throwable failure
+    ) {
+        return failure(
+            status,
+            detailCode,
+            runtimeId,
+            invocationNanos,
+            diagnosticChain(failure));
+    }
+
+    static SymPyInvocation failure(
+        Status status,
+        String detailCode,
+        String runtimeId,
+        long invocationNanos,
+        String failureDiagnostic
     ) {
         if (status == Status.COMPLETED) {
             throw new IllegalArgumentException(
@@ -67,7 +109,48 @@ record SymPyInvocation(
             "",
             true,
             0,
-            Math.max(0, invocationNanos));
+            Math.max(0, invocationNanos),
+            boundedDiagnostic(failureDiagnostic));
+    }
+
+    private static String diagnosticChain(Throwable failure) {
+        if (failure == null) {
+            return "";
+        }
+        StringBuilder diagnostic = new StringBuilder();
+        Throwable current = failure;
+        int causes = 0;
+        while (current != null && causes < MAX_DIAGNOSTIC_CAUSES) {
+            if (causes > 0) {
+                diagnostic.append(" <- ");
+            }
+            diagnostic.append(current.getClass().getName());
+            String message = current.getMessage();
+            if (message != null && !message.isBlank()) {
+                diagnostic.append(": ")
+                    .append(message.replaceAll("\\s+", " ").strip());
+            }
+            current = current.getCause();
+            causes++;
+        }
+        if (current != null) {
+            diagnostic.append(" <- ...");
+        }
+        return boundedDiagnostic(diagnostic.toString());
+    }
+
+    private static String boundedDiagnostic(String diagnostic) {
+        if (diagnostic == null || diagnostic.isBlank()) {
+            return "";
+        }
+        String normalized = diagnostic
+            .replaceAll("\\s+", " ")
+            .strip();
+        if (normalized.length() <= MAX_DIAGNOSTIC_CHARACTERS) {
+            return normalized;
+        }
+        return normalized.substring(0, MAX_DIAGNOSTIC_CHARACTERS - 3)
+            + "...";
     }
 
     enum Status {
