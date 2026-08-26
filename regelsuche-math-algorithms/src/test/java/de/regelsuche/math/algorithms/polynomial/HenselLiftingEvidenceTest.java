@@ -137,6 +137,41 @@ class HenselLiftingEvidenceTest {
     }
 
     @Test
+    void issuerRejectsAnotherExactRequestWithTheSameModuloPSource() {
+        FactorizationRequest<BigInteger> firstRequest = request();
+        SuitablePrimeSelectionResult firstSelection =
+            selection(firstRequest);
+        FactorizationRequest<BigInteger> secondRequest =
+            FactorizationRequest.verifiedDecomposition(
+                integer(15, 2, 2),
+                limits,
+                16,
+                1_000_000);
+        SuitablePrimeSelectionResult secondSelection =
+            selection(secondRequest);
+        HenselLiftingPolicy policy = policy();
+        HenselLiftingResult secondLift = HenselLifting.lift(
+            secondRequest,
+            secondSelection,
+            policy);
+
+        assertTrue(secondLift.completed(), secondLift.toString());
+        assertEquals(
+            firstSelection.modularSource(),
+            secondSelection.modularSource(),
+            "the adversarial requests must be indistinguishable modulo 5");
+        assertThrows(IllegalArgumentException.class, () ->
+            HenselLiftingResult.completed(
+                secondLift.targetModulus(),
+                secondLift.factors(),
+                secondLift.steps(),
+                secondLift.work(),
+                secondRequest,
+                firstSelection,
+                policy));
+    }
+
+    @Test
     void issuerRejectsAChangedTargetOrIncompleteStepSequence() {
         FactorizationRequest<BigInteger> request = request();
         SuitablePrimeSelectionResult selection = selection(request);
