@@ -34,6 +34,7 @@ class MavenBuildContractTest {
         "regelsuche-validation",
         "regelsuche-math-algorithms",
         "regelsuche-math-jas",
+        "regelsuche-math-sympy",
         "regelsuche-persistence",
         "regelsuche-solver-ir",
         "regelsuche-solver-portfolio",
@@ -61,6 +62,7 @@ class MavenBuildContractTest {
         Map.entry("maven.minimum.version", "3.9.9"),
         Map.entry("maven.maximum.exclusive.version", "4.0.0"),
         Map.entry("junit.version", "6.1.3"),
+        Map.entry("graalpy.version", "25.1.3"),
         Map.entry("maven.clean.plugin.version", "3.5.0"),
         Map.entry("maven.resources.plugin.version", "3.5.0"),
         Map.entry("maven.compiler.plugin.version", "3.15.0"),
@@ -105,7 +107,10 @@ class MavenBuildContractTest {
                 "${maven.enforcer.plugin.version}"),
             Map.entry(
                 "org.jacoco:jacoco-maven-plugin",
-                "${jacoco.version}")
+                "${jacoco.version}"),
+            Map.entry(
+                "org.graalvm.python:graalpy-maven-plugin",
+                "${graalpy.version}")
         );
 
     @Test
