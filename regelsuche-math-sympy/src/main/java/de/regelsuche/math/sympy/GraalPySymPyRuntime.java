@@ -120,6 +120,7 @@ final class GraalPySymPyRuntime implements AutoCloseable {
         long expectedGeneration
     ) {
         WorkerSnapshot snapshot = null;
+        long invocationStarted = 0;
         try {
             snapshot = workerFor(expectedGeneration);
             if (snapshot == null) {
@@ -129,7 +130,7 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                     RUNTIME_ID,
                     0);
             }
-            long invocationStarted = System.nanoTime();
+            invocationStarted = System.nanoTime();
             String output = snapshot.worker().factor(input);
             long invocationNanos =
                 System.nanoTime() - invocationStarted;
@@ -142,14 +143,15 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 invocationNanos);
         } catch (PolyglotException | IllegalStateException exception) {
             resetGeneration(expectedGeneration, false);
+            long invocationNanos = invocationStarted == 0
+                ? 0
+                : System.nanoTime() - invocationStarted;
             return SymPyInvocation.failure(
                 SymPyInvocation.Status.TECHNICAL_FAILURE,
                 "GRAALPY_" + exception.getClass().getSimpleName()
                     .toUpperCase(java.util.Locale.ROOT),
                 RUNTIME_ID,
-                snapshot == null
-                    ? 0
-                    : snapshot.initializationNanos(),
+                invocationNanos,
                 exception);
         }
     }
@@ -311,6 +313,12 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 // boundary, not a security sandbox.
                 .allowNativeAccess(true)
                 .allowPolyglotAccess(PolyglotAccess.NONE)
+                // Timeout recovery and cold-start measurements replace a
+                // context inside the same JVM. GraalPy requires every context
+                // in that process to isolate native modules before a native
+                // extension such as _ctypes can be loaded again.
+                .allowExperimentalOptions(true)
+                .option("python.IsolateNativeModules", "true")
                 .option("python.DontWriteBytecodeFlag", "true")
                 .build();
             try {
