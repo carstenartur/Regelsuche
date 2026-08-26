@@ -162,19 +162,46 @@ eine langlebige Polyglot Engine
   -> viele typisierte Anfragen
 ```
 
-Der Context erlaubt keinen Java-Host-Interop, keine nativen Zugriffe, keine
-Gast-Threads und keinen sprachübergreifenden Polyglot-Zugriff. Das
-anwendungseigene virtuelle Dateisystem delegiert außerhalb seines Mountpoints
-nur Lesezugriffe, weil GraalPy seinen Core und seine Standardbibliothek über das
-Sprach-Home des Runtime-Artefakts findet. Host-Schreibzugriffe bleiben verboten.
-Der feste Python-Adapter nimmt keine Dateipfade entgegen und führt keinen vom
-Payload gesteuerten Dateizugriff aus.
+Der Context verweigert Java-Host-Interop und sprachübergreifenden
+Polyglot-Zugriff. Er erlaubt jedoch bewusst nativen Zugriff und von GraalPy
+erzeugte Gast-Threads: GraalPy 25.1.3 lädt beim Import der gepinnten Umgebung
+das native Modul `_ctypes`, und die Native-Extension-Runtime benötigt außerdem
+einen Background-GC-Thread. Der eingebettete Pfad ist deshalb eine
+vertrauenswürdige In-Process-Abhängigkeitsgrenze und ausdrücklich keine
+Sicherheitssandbox. Nativer Code läuft mit den Betriebssystemrechten des
+JVM-Prozesses und kann Einschränkungen des virtuellen Dateisystems umgehen.
+
+Das anwendungseigene virtuelle Dateisystem delegiert außerhalb seines
+Mountpoints nur Lesezugriffe, weil GraalPy seinen Core und seine
+Standardbibliothek über das Sprach-Home des Runtime-Artefakts findet.
+Host-Schreibzugriffe über die Polyglot-Dateisystemschnittstelle bleiben
+verboten. Der feste Python-Adapter nimmt keine Dateipfade entgegen und führt
+keinen vom Payload gesteuerten Dateizugriff aus. Diese Einschränkungen begrenzen
+den kontrollierten Java-/Python-Vertrag, ersetzen aber keine Isolation gegen
+nativen Bibliothekscode.
+
+Jeder eingebettete Context setzt:
+
+```text
+python.IsolateNativeModules=true
+```
+
+GraalPy isoliert damit native Erweiterungsmodule pro Context. Das ist nötig,
+weil Timeout-Recovery und Cold-Start-Messungen nach einem bereits geladenen
+`_ctypes` innerhalb derselben JVM einen neuen Context erzeugen. Nach der
+GraalPy-Dokumentation müssen alle GraalPy-Contexts des Prozesses dieselbe Option
+aktivieren. Der Multi-Context-Betrieb mit nativen Erweiterungen wird von
+GraalPy derzeit nur auf Linux unterstützt und bleibt trotz der Isolation eine
+besonders zu prüfende Runtime-Grenze. Ein nicht möglicher Neuaufbau liefert
+einen technischen Fehler; Regelsuche fällt nicht unbemerkt auf einen anderen
+mathematischen Pfad zurück.
 
 Ein Context wird nicht gleichzeitig von mehreren Threads benutzt. Die Runtime
-serialisiert Aufrufe und ordnet jeden Task einer monotonen Generation zu. Nach
-einem Timeout wird der betroffene Context zwangsweise geschlossen und die
-Generation ersetzt. Ein verspätet endender Task einer alten Generation darf
-einen neu erzeugten Warm-Context weder schließen noch zurücksetzen.
+serialisiert Aufrufe auf einem dedizierten Java-Platform-Thread und ordnet jeden
+Task einer monotonen Generation zu. Nach einem Timeout wird der betroffene
+Context zwangsweise geschlossen und die Generation ersetzt. Ein verspätet
+endender Task einer alten Generation darf einen neu erzeugten Warm-Context
+weder schließen noch zurücksetzen.
 
 `close()` beendet Worker, Executor und Polyglot Engine. Ein späterer Aufruf
 liefert einen expliziten terminalen Fehler statt eines teilweise gültigen
