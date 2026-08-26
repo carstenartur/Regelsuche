@@ -90,32 +90,28 @@ public final class ProcessSymPyFactorizationEngine<C>
             policy().maxOutputBytes(),
             policy().maxOutputBytes());
         if (!output.available()) {
-            return SymPyInvocation.failure(
+            return failure(
                 SymPyInvocation.Status.UNAVAILABLE,
                 "CPYTHON_PROCESS_UNAVAILABLE",
-                "cpython-one-shot",
-                output.endToEndNanos());
+                output);
         }
         if (output.timedOut()) {
-            return SymPyInvocation.failure(
+            return failure(
                 SymPyInvocation.Status.TIMEOUT,
                 "CPYTHON_FACTORIZATION_TIMEOUT",
-                "cpython-one-shot",
-                output.endToEndNanos());
+                output);
         }
         if (output.outputLimitExceeded()) {
-            return SymPyInvocation.failure(
+            return failure(
                 SymPyInvocation.Status.TECHNICAL_FAILURE,
                 "CPYTHON_OUTPUT_LIMIT_EXCEEDED",
-                "cpython-one-shot",
-                output.endToEndNanos());
+                output);
         }
         if (output.exitCode() != 0) {
-            return SymPyInvocation.failure(
+            return failure(
                 SymPyInvocation.Status.TECHNICAL_FAILURE,
                 "CPYTHON_FACTORIZATION_FAILED",
-                "cpython-one-shot",
-                output.endToEndNanos());
+                output);
         }
         return SymPyInvocation.completed(
             output.stdout(),
@@ -124,5 +120,46 @@ public final class ProcessSymPyFactorizationEngine<C>
             true,
             0,
             output.endToEndNanos());
+    }
+
+    @Override
+    String adapterProgramHash() {
+        return SymPyScript.processProgramHash();
+    }
+
+    private static SymPyInvocation failure(
+        SymPyInvocation.Status status,
+        String detailCode,
+        SymPyProcessRunner.Output output
+    ) {
+        return SymPyInvocation.failure(
+            status,
+            detailCode,
+            "cpython-one-shot",
+            output.endToEndNanos(),
+            processDiagnostic(output));
+    }
+
+    private static String processDiagnostic(
+        SymPyProcessRunner.Output output
+    ) {
+        StringBuilder diagnostic = new StringBuilder();
+        diagnostic.append("available=")
+            .append(output.available())
+            .append(", timedOut=")
+            .append(output.timedOut())
+            .append(", exitCode=")
+            .append(output.exitCode())
+            .append(", stdoutBytes=")
+            .append(output.stdoutBytes())
+            .append(", stderrBytes=")
+            .append(output.stderrBytes())
+            .append(", outputLimitExceeded=")
+            .append(output.outputLimitExceeded());
+        if (!output.stderr().isBlank()) {
+            diagnostic.append(", stderr=")
+                .append(output.stderr());
+        }
+        return diagnostic.toString();
     }
 }

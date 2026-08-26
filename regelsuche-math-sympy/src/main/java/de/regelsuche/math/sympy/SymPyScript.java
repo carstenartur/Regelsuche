@@ -18,6 +18,11 @@ final class SymPyScript {
         new String(SOURCE_BYTES, StandardCharsets.UTF_8);
     private static final String SOURCE_HASH =
         SymPyEvidence.sha256(SOURCE_BYTES);
+    private static final String PROCESS_PROGRAM = SOURCE
+        + "\nimport sys\n"
+        + "sys.stdout.write(factor_payload(sys.stdin.read()))\n";
+    private static final String PROCESS_PROGRAM_HASH =
+        SymPyEvidence.sha256(PROCESS_PROGRAM);
 
     private SymPyScript() {
     }
@@ -31,9 +36,11 @@ final class SymPyScript {
     }
 
     static String processProgram() {
-        return SOURCE
-            + "\nimport sys\n"
-            + "sys.stdout.write(factor_payload(sys.stdin.read()))\n";
+        return PROCESS_PROGRAM;
+    }
+
+    static String processProgramHash() {
+        return PROCESS_PROGRAM_HASH;
     }
 
     private static byte[] load() {

@@ -20,6 +20,8 @@ abstract class SymPyFactorizationEngine<C>
     private final SymPyFactorizationPolicy policy;
     private final AtomicReference<SymPyExecutionMetrics> lastMetrics =
         new AtomicReference<>();
+    private final AtomicReference<String> lastFailureDiagnostic =
+        new AtomicReference<>();
 
     SymPyFactorizationEngine(
         String engineId,
@@ -53,12 +55,18 @@ abstract class SymPyFactorizationEngine<C>
         return Optional.ofNullable(lastMetrics.get());
     }
 
+    /** Latest bounded, noncanonical adapter failure diagnostic. */
+    public final Optional<String> lastFailureDiagnostic() {
+        return Optional.ofNullable(lastFailureDiagnostic.get());
+    }
+
     @Override
     public final EngineResult<C> propose(
         FactorizationRequest<C> request
     ) {
         Objects.requireNonNull(request, "request");
         lastMetrics.set(null);
+        lastFailureDiagnostic.set(null);
         Work work = new Work(request.maxWorkUnits());
         String structuralViolation =
             request.structuralViolation().orElse(null);
@@ -120,6 +128,7 @@ abstract class SymPyFactorizationEngine<C>
                 work,
                 "SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED");
         } catch (RuntimeException exception) {
+            rememberFailureDiagnostic(exception);
             return technicalFailure(
                 request,
                 work,
@@ -150,6 +159,7 @@ abstract class SymPyFactorizationEngine<C>
                 work,
                 "SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED");
         } catch (RuntimeException exception) {
+            rememberFailureDiagnostic(exception);
             return technicalFailure(
                 request,
                 work,
@@ -157,6 +167,7 @@ abstract class SymPyFactorizationEngine<C>
                 inputHash,
                 "");
         }
+        rememberFailureDiagnostic(invocation.failureDiagnostic());
         if (invocation.status() != SymPyInvocation.Status.COMPLETED) {
             Outcome outcome = invocation.status()
                     == SymPyInvocation.Status.TIMEOUT
@@ -206,6 +217,7 @@ abstract class SymPyFactorizationEngine<C>
                 work,
                 "SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED");
         } catch (RuntimeException exception) {
+            rememberFailureDiagnostic(exception);
             return technicalFailure(
                 request,
                 work,
@@ -224,7 +236,7 @@ abstract class SymPyFactorizationEngine<C>
             decoded.symPyVersion(),
             inputHash,
             rawOutputHash,
-            SymPyScript.sourceHash(),
+            adapterProgramHash(),
             invocation.coldStart(),
             invocation.initializationNanos(),
             invocation.invocationNanos(),
@@ -254,6 +266,7 @@ abstract class SymPyFactorizationEngine<C>
                 SparsePolynomial.one(request.source().ring()),
                 certificate);
         } catch (RuntimeException exception) {
+            rememberFailureDiagnostic(exception);
             return technicalFailure(
                 request,
                 work,
@@ -276,6 +289,20 @@ abstract class SymPyFactorizationEngine<C>
     }
 
     abstract SymPyInvocation invoke(String payload);
+
+    String adapterProgramHash() {
+        return SymPyScript.sourceHash();
+    }
+
+    private void rememberFailureDiagnostic(Throwable failure) {
+        rememberFailureDiagnostic(SymPyInvocation.diagnostic(failure));
+    }
+
+    private void rememberFailureDiagnostic(String diagnostic) {
+        if (diagnostic != null && !diagnostic.isBlank()) {
+            lastFailureDiagnostic.set(diagnostic);
+        }
+    }
 
     private EngineResult<C> budgetFailure(
         FactorizationRequest<C> request,
@@ -324,7 +351,7 @@ abstract class SymPyFactorizationEngine<C>
         StringBuilder material = new StringBuilder(engineId());
         SymPyEvidence.append(material, request.canonicalMaterial());
         SymPyEvidence.append(material, policy.canonicalMaterial());
-        SymPyEvidence.append(material, SymPyScript.sourceHash());
+        SymPyEvidence.append(material, adapterProgramHash());
         SymPyEvidence.append(material, outcome.name());
         SymPyEvidence.append(material, detailCode);
         SymPyEvidence.append(material, work.canonicalMaterial());
@@ -353,7 +380,7 @@ abstract class SymPyFactorizationEngine<C>
         StringBuilder material = new StringBuilder(engineId());
         SymPyEvidence.append(material, request.canonicalMaterial());
         SymPyEvidence.append(material, policy.canonicalMaterial());
-        SymPyEvidence.append(material, SymPyScript.sourceHash());
+        SymPyEvidence.append(material, adapterProgramHash());
         SymPyEvidence.append(material, inputHash);
         SymPyEvidence.append(material, semanticOutputHash);
         SymPyEvidence.append(material, invocation.runtimeId());

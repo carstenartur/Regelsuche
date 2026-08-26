@@ -87,7 +87,7 @@ record SymPyInvocation(
             detailCode,
             runtimeId,
             invocationNanos,
-            diagnosticChain(failure));
+            diagnostic(failure));
     }
 
     static SymPyInvocation failure(
@@ -113,7 +113,7 @@ record SymPyInvocation(
             boundedDiagnostic(failureDiagnostic));
     }
 
-    private static String diagnosticChain(Throwable failure) {
+    static String diagnostic(Throwable failure) {
         if (failure == null) {
             return "";
         }
