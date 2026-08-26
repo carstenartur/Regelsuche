@@ -18,6 +18,7 @@ Verantwortung und darf keine abweichende zweite Dependency-Definition erzeugen.
 | `:regelsuche-validation` | Äquivalenz-, Validation- und Counterexample-Verträge | Core |
 | `:regelsuche-math-algorithms` | reine mathematische Algorithmen und interne Referenzverfahren | Core, Validation |
 | `:regelsuche-math-jas` | optional isolierte JAS-nahe Adapter | Validation |
+| `:regelsuche-math-sympy` | optionaler typisierter SymPy-Faktorisierungsadapter, eingebettete GraalPy-Runtime und CPython-Kontrolltransport | Core |
 | `:regelsuche-solver-ir` | solver-neutrale Obligationen, Übersetzungen, Ergebnisse und Executions | Core, Search, Validation, Math Algorithms |
 | `:regelsuche-solver-portfolio` | capability-aware Backend-Auswahl, Budgets, Cache und Konflikte | Solver IR |
 | `:regelsuche-learning` | Mining, Anti-Unification, Kandidaten und Rewrite-Program-Lernen | Core, Search, Validation, Solver IR |
@@ -39,13 +40,16 @@ flowchart TD
     app[app / Runtime Composition]
     release[Release / Autopilot / Benchmarks]
     capability[Learning / Discovery / Experiments / Persistence / Solver Portfolio]
+    adapter[Math Adapter: JAS / SymPy]
     foundation[Search / Validation / Solver IR / Math Algorithms]
     core[Core / E-Graph]
 
     app --> release
     app --> capability
+    app --> adapter
     release --> capability
     capability --> foundation
+    adapter --> core
     foundation --> core
 ```
 
@@ -56,12 +60,20 @@ Gradle-Kante. Verbindliche Richtungen stehen in
 ## Mathematischer Kern
 
 `:regelsuche-core` bildet die innerste Grenze. Es enthält keine
-Datenbanktreiber, Webserver, Containerlogik oder externen Prozessadapter.
+Datenbanktreiber, Webserver, Containerlogik, Polyglot-Runtime oder externen
+Prozessadapter.
 
 `:regelsuche-egraph`, `:regelsuche-search` und `:regelsuche-validation` bauen auf
 dieser Grundlage auf, ohne die äußere Runtime zu kennen. Dadurch können
 Suchsemantik und mathematische Regeln unabhängig von Web und Persistenz getestet
 werden.
+
+Reine allgemeine Verfahren liegen in `:regelsuche-math-algorithms`. Technische
+Mathematikadapter bleiben in eigenen Modulen. Insbesondere kapselt
+`:regelsuche-math-sympy` GraalPy, das eingebettete Python-Paket und den
+CPython-Kontrolltransport hinter dem im Core definierten
+`FactorizationEngine`-Vertrag. Details stehen unter
+[Eingebettete SymPy-Faktorisierung](sympy-factorization-adapter.md).
 
 ## Solver- und Benchmark-Grenze
 
@@ -73,6 +85,10 @@ Bestätigung bleibt an eine konkrete Solver Execution gebunden.
 `:regelsuche-benchmarks` darf Suchstrategien und externe Backends unter einem
 expliziten Parity-Vertrag verbinden. Es darf keine zweite Solver-IR und keinen
 universellen Capability-Score einführen.
+
+Ein externer oder eingebetteter CAS-Adapter darf Ergebnisse vorschlagen. Die
+issuer-eigene mathematische Evidence entsteht erst an der dafür zuständigen
+Verifier-Grenze.
 
 ## Learning, Discovery und Experimente
 
@@ -105,8 +121,11 @@ Neue Logik gehört in `app`, wenn sie tatsächlich eine der folgenden Rollen hat
 - HTTP- oder UI-Adapter;
 - konkrete CLI-Komposition;
 - Runtime-Konfiguration;
-- Prozess- oder Infrastrukturadapter;
+- Prozess- oder Infrastrukturadapter ohne eigenständige stabile Modulgrenze;
 - Bootstrap und Lifecycle-Wiring.
+
+Ein eigenständig nutzbarer technischer Mathematikadapter wie SymPy erhält
+dagegen ein eigenes Modul und bleibt für Verbraucher ausdrücklich opt-in.
 
 ## Noch nicht eigenständig modularisierte Bereiche
 

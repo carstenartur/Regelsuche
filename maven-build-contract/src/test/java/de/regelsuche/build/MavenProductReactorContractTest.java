@@ -30,6 +30,7 @@ class MavenProductReactorContractTest {
           "regelsuche-validation",
           "regelsuche-math-algorithms",
           "regelsuche-math-jas",
+          "regelsuche-math-sympy",
           "regelsuche-persistence",
           "regelsuche-solver-ir",
           "regelsuche-solver-portfolio",
