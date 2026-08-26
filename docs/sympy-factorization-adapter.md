@@ -1,41 +1,37 @@
 # Eingebettete SymPy-Faktorisierung über GraalPy
 
-**Implementierungsstand: 26. August 2026**
+**Implementierungsstand: 27. August 2026**
 
 Regelsuche stellt SymPy als optionales, typisiertes
-`FactorizationEngine`-Backend bereit. Der normale Pfad läuft mit eingebettetem
-GraalPy in derselben JVM; ein neuer CPython-Prozess pro Anfrage bleibt nur als
-separater Isolations- und Kompatibilitätsvergleich erhalten.
+`FactorizationEngine`-Backend bereit. Der primäre SymPy-Pfad läuft mit
+GraalPy in derselben JVM. Ein neuer CPython-Prozess pro Anfrage bleibt als
+getrennter Isolations-, Kompatibilitäts- und Cold-Start-Vergleich erhalten.
 
 ## Modulgrenze
 
-Die Implementierung liegt in:
+Die Implementierung liegt vollständig in:
 
 ```text
 :regelsuche-math-sympy
 ```
 
-Das Modul hängt fachlich nur von `:regelsuche-core` ab. Es kapselt:
+Das Modul hängt fachlich nur von `:regelsuche-core` ab und kapselt:
 
-- die Maven-/Gradle-verwaltete GraalPy-Runtime;
-- das eingebettete Python-Paket SymPy;
+- die von Maven und Gradle verwaltete GraalPy-Runtime;
+- die eingebetteten Python-Pakete SymPy und mpmath;
 - den exakten strukturierten Wire-Vertrag;
 - Integer- und Rational-Faktorisierungsengines;
 - den CPython-Einmalprozess als Kontrolltransport;
-- Runtime-, Repräsentations- und Evidence-Grenzen;
-- einen nach Betriebsmodus getrennten Performancevergleich.
+- Runtime-, Ressourcen-, Repräsentations- und Evidence-Grenzen;
+- den nach Betriebsmodus getrennten Performancevergleich.
 
 SymPy-Typen und `org.graalvm.polyglot.Value` verlassen das Modul nicht. Der
-mathematische Kern sieht weiterhin nur `PolynomialRing`, `SparsePolynomial`,
+mathematische Kern sieht nur `PolynomialRing`, `SparsePolynomial`,
 `FactorizationRequest`, `FactorizationEngine` und `FactorizationVerifier`.
+Das Backend wird ausdrücklich als Abhängigkeit ausgewählt; es wird weder
+heimlich zum globalen Standard noch zur mathematischen Autorität.
 
-Ein Verbraucher wählt das Backend ausdrücklich als Abhängigkeit. Es wird nicht
-heimlich zum globalen Standard jeder Suche und nicht als mathematische
-Autorität behandelt.
-
-## Verwaltete Runtime und Pakete
-
-Gepinnt sind:
+## Gepinnte Runtime und Abhängigkeiten
 
 ```text
 GraalPy / Polyglot  25.1.3
@@ -43,76 +39,69 @@ SymPy               1.14.0
 mpmath               1.3.0
 ```
 
-Seit GraalVM 25 sind die früheren `-community`-Sprachartefakte mit den
-kanonischen Artefakten identisch und veraltet. Gradle und Maven verwenden daher
-beide die kanonische OSS-Koordinate:
-
-```text
-org.graalvm.polyglot:python
-```
-
-Weitere Maven-Artefakte sind:
-
-```text
-org.graalvm.polyglot:polyglot
-org.graalvm.python:python-embedding
-org.graalvm.python:graalpy-maven-plugin
-```
-
-Das GraalPy-Plugin installiert die Python-Pakete in das modulspezifische
-virtuelle Dateisystem:
-
-```text
-GRAALPY-VFS/de.regelsuche/regelsuche-math-sympy
-```
-
-Dadurch benötigt das eingebettete Backend keine systemweite Python- oder
-SymPy-Installation und kollidiert nicht mit einem späteren zweiten
-GraalPy-Consumer. Die Linux-spezifische Isolation nativer Module benötigt
-zusätzlich das Hostwerkzeug `patchelf`; es gehört nicht zum mathematischen
-Payload und wird nicht als Python-Abhängigkeit behandelt.
-
-### Gemeinsamer Dependency-Lock
-
-Direkte Paketpins allein sichern die transitiven Python-Abhängigkeiten nicht
-vollständig. Deshalb konsumieren Gradle und Maven dieselbe eingecheckte Datei:
+Maven und Gradle verwenden dieselbe kanonische OSS-Koordinate
+`org.graalvm.polyglot:python` sowie dieselbe eingecheckte Lockdatei:
 
 ```text
 regelsuche-math-sympy/graalpy.lock
 ```
 
-Der Lock bindet:
-
-```text
-GraalPy-Version       25.1.3
-angeforderte Pakete   mpmath==1.3.0, sympy==1.14.0
-aufgelöste Pakete     mpmath==1.3.0, sympy==1.14.0
-```
-
-Ein Maven-/Gradle-Paritätstest prüft Pfad, GraalPy-Version, deklarierte Eingaben
-und vollständige aufgelöste Paketliste. Ein normaler Build verändert den Lock
+Die Lockdatei bindet GraalPy-Version, direkte Paketwünsche und die vollständig
+aufgelöste Python-Paketliste. Ein Maven-/Gradle-Paritätstest prüft Versionen,
+Pfade, Paketpins und Lockinhalt. Ein normaler Build verändert die Lockdatei
 nicht.
 
-Bei einer bewussten Python-Dependency-Änderung wird er neu erzeugt:
+Bei einer beabsichtigten Paketänderung wird sie mit einem der beiden
+checkout-eigenen Wege neu erzeugt und im selben Pull Request eingecheckt:
 
 ```bash
 ./gradlew :regelsuche-math-sympy:graalPyLockPackages
 ```
 
-oder aus dem Modulverzeichnis:
-
 ```bash
+cd regelsuche-math-sympy
 mvn org.graalvm.python:graalpy-maven-plugin:lock-packages
 ```
 
-Die Änderung am Lock gehört in denselben Pull Request wie die Paketänderung.
+## Verpackung und private Runtime-Extraktion
+
+Das GraalPy-Plugin verpackt die lock-gebundene Python-Umgebung zunächst unter:
+
+```text
+GRAALPY-VFS/de.regelsuche/regelsuche-math-sympy
+```
+
+Das ist die reproduzierbare Distributionsform im Klassenpfad. Die eingebettete
+Runtime führt native Module jedoch nicht direkt aus diesem virtuellen
+Dateisystem aus. Beim Erzeugen eines `GraalPySymPyRuntime` geschieht einmalig:
+
+```text
+lock-gebundene Klassenpfadressourcen
+  -> GraalPy VirtualFileSystem nur als Quelle
+  -> extractVirtualFileSystemResources(...)
+  -> privates temporäres Verzeichnis
+  -> forExternalDirectory(...)
+  -> wiederverwendete GraalPy-Contexts
+```
+
+Diese Extraktion ist notwendig, weil GraalPys VirtualFileSystem absichtlich
+schreibgeschützt ist. `python.IsolateNativeModules` muss dagegen neben einer
+nativen Bibliothek kontextprivate `.dupN`-Kopien anlegen, mit `patchelf`
+relokieren und wieder löschen. Mehr Host-I/O am VFS ändert dessen eigene
+Schreibschutzsemantik nicht; deshalb verwendet Regelsuche die von GraalPy
+dokumentierte External-Directory-Konfiguration.
+
+Das temporäre Ressourcenverzeichnis gehört genau einer Runtime-Instanz. Es wird
+nicht vom mathematischen Request adressiert und bei `close()` rekursiv entfernt.
+Auch fehlgeschlagene Konstruktion versucht die teilweise extrahierten Dateien
+zu bereinigen. Ein Fehler bei Extraktion, Context-Aufbau oder Bereinigung bleibt
+ein technischer Fehler und wird nicht als mathematisches Ergebnis ausgegeben.
 
 ## Exakter Wire-Vertrag
 
 Regelsuche übergibt keine gerenderte mathematische Zeichenkette. Die
-Trust-Grenze verwendet weder `parse_expr` noch `sympify` oder Python-`eval`.
-
-Der versionierte Payload enthält ausschließlich:
+Trust-Grenze verwendet weder `parse_expr`, `sympify` noch Python-`eval`.
+Ein Payload enthält ausschließlich:
 
 ```json
 {
@@ -138,119 +127,119 @@ Die Position im Exponentenvektor entspricht der bereits im `PolynomialRing`
 gebundenen Variablenreihenfolge. Variablennamen, Renderformat, Quellbereiche
 und Monomordnung überschreiten die Python-Grenze nicht.
 
-Der Python-Einstieg konstruiert daraus ein ausdrückliches `sympy.Poly` über
-`ZZ` oder `QQ` und ruft `factor_list` auf. Die Ausgabe enthält wieder nur:
+Der eingecheckte Python-Einstieg konstruiert ein ausdrückliches `sympy.Poly`
+über `ZZ` oder `QQ`, ruft `factor_list` auf und gibt wieder nur strukturierte
+exakte Daten aus:
 
 - Einheit;
 - Faktoren und Multiplizitäten;
 - Exponentenvektoren;
-- exakte Zähler-/Nennerpaare;
+- Zähler-/Nennerpaare;
 - Runtime- und SymPy-Version;
-- diagnostische Zeitanteile.
+- nichtkanonische Zeitanteile.
 
 Java materialisiert die Faktoren anschließend im ursprünglichen
 `PolynomialRing`.
 
 ## Primärer GraalPy-Betrieb
 
-`GraalPySymPyFactorizationEngine` verwendet:
-
 ```text
-eine langlebige Polyglot Engine
-  -> einen serialisierten Runtime-Worker
-  -> einen wiederverwendeten GraalPy Context
+private extrahierte Python-Umgebung
+  -> langlebige Polyglot Engine
+  -> serialisierter Java-Platform-Thread
+  -> wiederverwendeter GraalPy Context
   -> einmal importiertes SymPy
-  -> einmal geladene factor_payload-Funktion
   -> viele typisierte Anfragen
 ```
 
-Der Context verweigert Java-Host-Interop und sprachübergreifenden
-Polyglot-Zugriff. Er erlaubt jedoch bewusst nativen Zugriff, von GraalPy
-erzeugte Gast-Threads und das Starten eines Hostprozesses: GraalPy 25.1.3 lädt
-beim Import der gepinnten Umgebung das native Modul `_ctypes`, die
-Native-Extension-Runtime benötigt einen Background-GC-Thread und
-`python.IsolateNativeModules` ruft unter Linux `patchelf` zur Relokation der
-kontextprivaten ELF-Kopien auf.
+GraalPy native Extensions können nicht auf einem Java-Virtual-Thread ausgeführt
+werden. Deshalb verwendet die Runtime einen dedizierten Daemon-Platform-Thread
+und lässt nie zwei Anfragen gleichzeitig denselben Context verwenden.
 
-Der Context erbt nicht die vollständige Prozessumgebung. Polyglot erhält
-explizit nur `PATH`, damit GraalPy das provisionierte `patchelf` finden kann.
-Variablen wie Tokens, Home-Verzeichnisse oder sonstige CI-/Anwendungsparameter
-werden dem Gast nicht über die allgemeine Environment-Schnittstelle sichtbar
-gemacht.
-
-Diese Autoritäten stehen ausschließlich dem fest eingecheckten Adapter und dem
-GraalPy-Runtimepfad zur Verfügung. Der strukturierte Faktor-Payload enthält
-weder Python-Code noch Kommandos oder Hostpfade. Trotzdem ist der eingebettete
-Pfad eine vertrauenswürdige In-Process-Abhängigkeitsgrenze und ausdrücklich
-keine Sicherheitssandbox. Nativer Code läuft mit den Betriebssystemrechten des
-JVM-Prozesses und kann Java-/Polyglot-Schutzgrenzen umgehen.
-
-Das anwendungseigene virtuelle Dateisystem darf außerhalb seines Mountpoints
-lesen und für die Isolation native Bibliothekskopien in temporäre Hostdateien
-schreiben. Diese Schreibmöglichkeit ist eine technische Voraussetzung von
-`python.IsolateNativeModules`, keine vom Request adressierbare Dateischnittstelle.
-Der feste Python-Adapter nimmt keine Dateipfade entgegen und führt keinen vom
-Payload gesteuerten Dateizugriff aus. Anwendungen mit einer stärkeren
-Isolationsanforderung müssen den separaten Prozesspfad zusätzlich durch
-Betriebssystem- oder Containergrenzen absichern.
-
-Jeder eingebettete Context setzt:
+Jeder Context setzt:
 
 ```text
+python.PosixModuleBackend=java
 python.IsolateNativeModules=true
+python.DontWriteBytecodeFlag=true
 ```
 
-GraalPy isoliert damit native Erweiterungsmodule pro Context. Das ist nötig,
-weil Timeout-Recovery und Cold-Start-Messungen nach einem bereits geladenen
-`_ctypes` innerhalb derselben JVM einen neuen Context erzeugen. Nach der
-GraalPy-Dokumentation müssen alle GraalPy-Contexts des Prozesses dieselbe Option
-aktivieren. Der Multi-Context-Betrieb mit nativen Erweiterungen wird von
-GraalPy derzeit nur auf Linux unterstützt und bleibt trotz der Isolation eine
-besonders zu prüfende Runtime-Grenze. Ein nicht möglicher Neuaufbau liefert
-einen technischen Fehler; Regelsuche fällt nicht unbemerkt auf einen anderen
-mathematischen Pfad zurück.
+`python.IsolateNativeModules` ist für Context-Ersatz nach einem Timeout und für
+Cold-Start-Messungen erforderlich, nachdem `_ctypes` bereits in derselben JVM
+geladen wurde. Alle GraalPy-Contexts dieses Prozesses verwenden dieselbe Option.
+Der Multi-Context-Betrieb mit nativen Erweiterungen ist eine besonders zu
+prüfende Linux-Runtime-Grenze; ein unmöglicher Neuaufbau fällt geschlossen mit
+einem technischen Status aus.
 
-Unter Ubuntu 22.04 verwenden CI und Release den distributionsgebundenen Pin:
+## Autoritäten und Sicherheitsgrenze
+
+Der Context verweigert:
+
+- Java-Host-Interop;
+- sprachübergreifenden Polyglot-Zugriff;
+- die ungefilterte Übernahme der Hostprozessumgebung.
+
+Er erlaubt bewusst:
+
+- nativen Zugriff für `_ctypes` und weitere gepinnte native Module;
+- GraalPy-eigene Gast-Threads, unter anderem für Background-GC;
+- Hostprozessstart für GraalPys eigenen `patchelf`-Aufruf;
+- Dateizugriff auf das private extrahierte Ressourcenverzeichnis.
+
+Polyglot erhält explizit nur `PATH`, damit GraalPy das provisionierte
+`patchelf` finden kann. Tokens, Home-Verzeichnisse und sonstige CI- oder
+Anwendungsvariablen werden nicht pauschal geerbt. Unter Ubuntu 22.04 verwenden
+CI und Release den distributionsgebundenen Pin:
 
 ```text
 patchelf=0.14.3-1
 ```
 
-Fehlt `patchelf`, ist der eingebettete GraalPy-Pfad technisch nicht verfügbar.
-Das wird nicht als irreduzibles Polynom oder als erfolglose mathematische Suche
-klassifiziert.
+Der strukturierte Faktor-Payload enthält weder Python-Code noch Kommandos oder
+Hostpfade. Trotzdem ist der eingebettete Pfad ausdrücklich **keine
+Sicherheitssandbox**: nativer Code und der von GraalPy gestartete Hostprozess
+laufen mit den Betriebssystemrechten des JVM-Prozesses. Nur der eingecheckte
+Adapter und die lock-gebundenen Pakete dürfen in diesem Pfad ausgeführt werden.
+Für eine stärkere Ausführungsgrenze ist der separate Prozesspfad zusätzlich mit
+Betriebssystem- oder Containerisolation zu verwenden.
 
-Ein Context wird nicht gleichzeitig von mehreren Threads benutzt. Die Runtime
-serialisiert Aufrufe auf einem dedizierten Java-Platform-Thread und ordnet jeden
-Task einer monotonen Generation zu. Nach einem Timeout wird der betroffene
-Context zwangsweise geschlossen und die Generation ersetzt. Ein verspätet
-endender Task einer alten Generation darf einen neu erzeugten Warm-Context
-weder schließen noch zurücksetzen.
+## Timeout, Generationen und Lebenszyklus
 
-`close()` beendet Worker, Executor und Polyglot Engine. Ein späterer Aufruf
-liefert einen expliziten terminalen Fehler statt eines teilweise gültigen
-Ergebnisses.
+Jede Anforderung ist an eine monotone Runtime-Generation gebunden. Bei Timeout:
+
+1. wird der laufende Task abgebrochen;
+2. der betroffene Context zwangsweise geschlossen;
+3. die Generation erhöht;
+4. ein neuer Platform-Thread-Executor und später ein neuer Context erzeugt.
+
+Ein verspätet endender Task einer alten Generation darf den wiederhergestellten
+Warm-Context nicht schließen oder zurücksetzen. `close()` beendet Worker,
+Executor und Polyglot Engine und entfernt danach das private temporäre
+Ressourcenverzeichnis. Ein späterer Aufruf liefert einen expliziten terminalen
+Fehler.
 
 ## CPython-Kontrollpfad
 
-`ProcessSymPyFactorizationEngine` startet für jede Anfrage:
+`ProcessSymPyFactorizationEngine` startet je Anfrage:
 
 ```text
 python -I -c <gebundenes Adapterprogramm>
 ```
 
 Eingabe, Ausgabe, Fehlerausgabe und Laufzeit sind begrenzt. Bei Timeout wird der
-Prozess beendet. Dieser Pfad ist absichtlich nicht die normale
-Regelsuche-Schnittstelle. Er dient als:
+Prozess beendet. Dieser Pfad dient als:
 
 - CPython-/GraalPy-Kompatibilitätskontrolle;
-- starke Prozessisolationsbaseline;
+- Prozessisolationsbaseline;
 - echter Einmalprozess-Cold-Start;
 - unabhängiger Transport über denselben exakten Wire-Vertrag.
 
+Er ist nicht der normale In-Process-Pfad und wird nicht still als Fallback
+verwendet.
+
 ## Trust Flow
 
-Beide Transporte folgen demselben fachlichen Ablauf:
+Beide Transporte folgen derselben fachlichen Grenze:
 
 ```text
 FactorizationRequest
@@ -264,33 +253,29 @@ FactorizationRequest
   -> verifier-ausgestellte Evidence
 ```
 
-SymPy darf `COMPLETE_FACTORIZATION` als Backend-Claim ausgeben. Nach einer
-korrekten Produktrückprüfung bleibt die Claim-Stärke dennoch zunächst:
+SymPy darf `COMPLETE_FACTORIZATION` als Backend-Claim ausgeben. Nach korrekter
+Produktrückprüfung bleibt die Claim-Stärke dennoch:
 
 ```text
 BACKEND_CLAIMED_COMPLETE
 ```
 
-Sie wird nicht allein aufgrund des SymPy-Ergebnisses zu
+Sie wird nicht allein durch die SymPy-Ausgabe zu
 `INDEPENDENTLY_CERTIFIED_COMPLETE` oder zu einem unabhängigen
 Irreduzibilitätsbeweis.
 
 ## Ressourcen- und Fehlersemantik
 
-`SymPyFactorizationPolicy` bindet unter anderem:
+`SymPyFactorizationPolicy` begrenzt unter anderem:
 
-- erwartete SymPy-Version;
-- Timeout;
-- maximale Eingabe-, Ausgabe- und Fehlerausgabebytes;
-- maximale Faktorzahl;
-- maximale Termzahl je Faktor;
-- maximale gesamte Ausgabetermzahl;
-- maximale Koeffizientenbitlänge.
+- erwartete SymPy-Version und Timeout;
+- Eingabe-, Ausgabe- und Fehlerausgabebytes;
+- Faktorzahl und Termzahl je Faktor;
+- gesamte Ausgabetermzahl;
+- Koeffiziententext und Koeffizientenbitlänge.
 
 Zusätzlich gelten Struktur-, Kandidaten- und Work-Grenzen des ursprünglichen
-`FactorizationRequest`.
-
-Der kanonische Work-Ledger zählt nur beobachtbare Adapterarbeit:
+`FactorizationRequest`. Der Work-Ledger zählt nur beobachtbare Adapterarbeit:
 
 ```text
 sympy.encode.source-terms
@@ -301,16 +286,15 @@ sympy.issue.proposals
 ```
 
 Regelsuche erfindet keine SymPy-internen Work Units. Timeout, fehlende Runtime,
-I/O-Fehler und Repräsentationsgrenzen bleiben von mathematischer
+I/O-, Extraktions- und Repräsentationsfehler bleiben von mathematischer
 Nichtzerlegbarkeit getrennt.
 
 ## Evidence und Diagnostik
 
 Kanonische Evidence bindet:
 
-- den vollständigen `FactorizationRequest`;
-- die vollständige SymPy-Policy;
-- Hash des festen Python-Adapters;
+- vollständigen `FactorizationRequest` und Policy;
+- Hash des tatsächlich ausgeführten Adapterprogramms;
 - exakten Inputhash;
 - Runtime- und SymPy-Version;
 - kanonischen semantischen Faktoroutput;
@@ -322,17 +306,18 @@ Nichtkanonische `SymPyExecutionMetrics` bewahren getrennt:
 - Aufruf- und Rücktransportzeit;
 - von Python gemessene `factor_list`-Zeit;
 - gesamte Python-Funktionszeit;
-- Raw-Input-, Raw-Output- und Skripthashes;
+- Raw-Input-, Raw-Output- und Programmhashes;
 - Cold-/Warm-Kennzeichen.
 
-Wandzeiten und Raw-Outputhash verändern den mathematischen Zertifikatshash
-nicht. Inhaltlich gleiche Cold- und Warm-Läufe erzeugen daher dieselbe
-Regelsuche-Evidence.
+Bootstrap-, Extraktions- und Transportfehler behalten zusätzlich eine
+whitespace-normalisierte, begrenzte Ursachenfolge. Diese Diagnose verändert
+keine mathematische Evidence. Wandzeiten und Raw-Outputhash verändern den
+Zertifikatshash ebenfalls nicht; semantisch gleiche Cold- und Warm-Läufe
+besitzen daher dieselbe Evidence.
 
 ## Performancevergleich
 
-JMH verwendet dieselbe kanonische Quartik-Anfrage und denselben Verifier für
-alle vergleichbaren Spuren:
+JMH verwendet dieselbe kanonische Quartik-Anfrage und denselben Verifier:
 
 | Spur | Runtimezustand | Verifier |
 | --- | --- | --- |
@@ -340,30 +325,23 @@ alle vergleichbaren Spuren:
 | `nativeEndToEndWarm` | JVM und native Engine warm | ja |
 | `graalPyBackendWarm` | GraalPy und SymPy warm | nein |
 | `graalPyEndToEndWarm` | GraalPy und SymPy warm | ja |
-| `graalPyEndToEndCold` | Engine, Context und Import je Operation | ja |
+| `graalPyEndToEndCold` | Extraktion, Engine, Context und Import je Operation | ja |
 | `cpythonOneShotEndToEnd` | Prozess, Interpreter und Import je Operation | ja |
 
-Damit werden getrennt beantwortet:
-
-1. Wie teuer ist die Backendausführung bei vorhandener Runtime?
-2. Wie teuer ist eine vollständige Anfrage einschließlich gemeinsamer
-   Abschlussprüfung?
-3. Wie hoch sind eingebetteter und externer Cold-Start?
-
-Der Bericht prüft vollständige Track-Matrix und `ms/op`-Einheiten, besitzt aber
-bewusst kein relatives Winner-Gate:
+Die Cold-Spur enthält bewusst die Runtime-Konstruktion einschließlich privater
+Ressourcenextraktion. Der Bericht validiert die vollständige Track-Matrix und
+`ms/op`, besitzt aber kein relatives Winner-Gate:
 
 ```text
 DIAGNOSTIC_TRACKS_NO_RELATIVE_WINNER_GATE
 ```
 
-Laufzeit bleibt umgebungsbezogene Engineering-Diagnostik und kein
-mathematischer Qualitätsnachweis oder universeller CAS-Ranglistenwert.
+Wandzeit bleibt umgebungsbezogene Engineering-Diagnostik und kein
+mathematischer Qualitätsnachweis.
 
 ## Reproduktion
 
-Unter Ubuntu 22.04 werden die für den vollständigen Checkout benötigten
-Hostwerkzeuge so installiert:
+Unter Ubuntu 22.04:
 
 ```bash
 sudo apt-get update
@@ -379,13 +357,11 @@ Fokussierte Tests:
 ./gradlew :regelsuche-math-sympy:test
 ```
 
-Getrennter Vergleich:
+Benchmark und validierter Bericht:
 
 ```bash
 ./gradlew :regelsuche-math-sympy:verifySymPyFactorizationBenchmark
 ```
-
-Validierte Berichte:
 
 ```text
 public/dev/bench/sympy-factorization.json
@@ -406,7 +382,8 @@ Nicht implementiert oder nicht behauptet sind:
 - automatische Auswahl von SymPy für jede Suchanfrage;
 - unabhängige Vollständigkeit allein aus einer SymPy-Ausgabe;
 - SymPy-Objekte als öffentliche Regelsuche-Datentypen;
-- paralleler Pool mehrerer GraalPy-Kontexte;
+- paralleler Pool mehrerer GraalPy-Contexts;
+- plattformunabhängiger nativer Multi-Context-Betrieb;
 - langlebiger externer CPython-Worker;
-- universelle Performanceaussage jenseits des gemeinsamen Benchmarkfragments;
+- eine universelle Performanceaussage jenseits des gemeinsamen Fragments;
 - Gleichsetzung von Wandzeit und kanonischen Work Units.

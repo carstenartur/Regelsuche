@@ -118,6 +118,23 @@ class MavenGradleDependencyParityContractTest {
     assertTrue(
         !runtime.contains(".allowEnvironmentAccess("),
         "the embedded adapter must not inherit the complete host environment");
+    assertTrue(
+        runtime.contains(
+            "GraalPyResources.extractVirtualFileSystemResources("),
+        "the lock-bound VFS resources must be extracted before native isolation");
+    assertTrue(
+        runtime.contains("GraalPyResources.forExternalDirectory("),
+        "replacement contexts must use GraalPy's writable external-directory configuration");
+    assertTrue(
+        runtime.contains("Files.createTempDirectory("),
+        "each embedded runtime must own a private extracted resource tree");
+    assertTrue(
+        runtime.contains("deleteResources(externalResourcesDirectory)"),
+        "closing the runtime must remove its private extracted resources");
+    assertTrue(
+        !runtime.contains(
+            ".apply(GraalPyResources.forVirtualFileSystem(fileSystem))"),
+        "native isolation must not run directly inside the read-only VFS");
 
     for (String workflow : List.of(
         ".github/workflows/gradle.yml",
@@ -136,6 +153,13 @@ class MavenGradleDependencyParityContractTest {
     assertTrue(
         adapterDocumentation.contains("patchelf=0.14.3-1"),
         "the adapter documentation must expose the native-isolation prerequisite");
+    assertTrue(
+        adapterDocumentation.contains(
+            "extractVirtualFileSystemResources"),
+        "the adapter documentation must explain the writable extraction boundary");
+    assertTrue(
+        adapterDocumentation.contains("forExternalDirectory"),
+        "the adapter documentation must name the supported runtime configuration");
     assertTrue(
         testingDocumentation.contains("patchelf=0.14.3-1"),
         "the checkout testing documentation must expose the same prerequisite");
