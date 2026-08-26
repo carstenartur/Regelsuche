@@ -4,10 +4,16 @@
 
 Diese Stufe erweitert den domänenbewussten Polynomkern um allgemeine
 univariate Algorithmen, die nicht an eine Quartikschablone gebunden sind. Sie
-stellt jetzt die gemeinsame Darstellung, Inhaltsnormalisierung, exakte
+stellt die gemeinsame Darstellung, Inhaltsnormalisierung, exakte
 Polynomarithmetik, den euklidischen Polynom-GGT und die quadratfreie Zerlegung
-bereit. Eine vollständige Zerlegung in irreduzible Faktoren ist noch nicht
-implementiert.
+bereit.
+
+Auf dieser Grundlage sind inzwischen zusätzlich eine vollständige
+Faktorisierung quadratfreier univariater Polynome in einem ausdrücklich
+deklarierten `F_p[x]` sowie eine deterministische geeignete Primzahlauswahl für
+ein kanonisches primitives Polynom in `Z[x]` implementiert. Eine vollständige
+integrierte Faktorisierung des ursprünglichen Polynoms in `Z[x]` oder `Q[x]`
+folgt daraus noch nicht; Hensel-Lifting und ganzzahlige Rekombination fehlen.
 
 ## Verantwortungs- und Modulgrenze
 
@@ -16,7 +22,8 @@ Rückabhängigkeit:
 
 ```text
 regelsuche-core
-  CoefficientDomain / ExactField
+  CoefficientDomain / ExactField / GcdDomain
+  BigIntegerDomain / ExactRationalField / PrimeField
   PolynomialRing / SparsePolynomial
   UnivariatePolynomialView
   PolynomialWorkSink
@@ -28,6 +35,8 @@ regelsuche-math-algorithms
   Inhalt und primitiver Teil für Z[x] und Q[x]
   euklidischer Polynom-GGT
   quadratfreie Zerlegung
+  vollständige quadratfreie Faktorisierung in F_p[x]
+  geeignete Primzahlauswahl mit modularer Auditspur
   algorithmische Evidence
 ```
 
@@ -48,9 +57,12 @@ SparsePolynomial<BigInteger oder ExactRational>
   -> kanonischer Skalar + primitiver Teil in Z[x]
   -> Ableitung / exakte Division / euklidischer GGT
   -> charakteristik-0-quadratfreie Zerlegung
-  -> spätere Faktorisierung über endlichen Körpern
-  -> Hensel-Lifting und ganzzahlige Rekombination
-  -> exakte Rekonstruktion und Verifier-Evidence
+  -> deterministische geeignete Primzahl und exakte Reduktion nach F_p[x]
+  -> vollständige Faktorisierung der quadratfreien modularen Quelle
+  -> Hensel-Lifting                                    noch offen
+  -> ganzzahlige Rekombination                         noch offen
+  -> rationale Reassemblierung                         noch offen
+  -> exakte Rekonstruktion und Verifier-Evidence       noch offen
 ```
 
 `SparsePolynomial` bleibt die kanonische mathematische Identität. Die
@@ -73,10 +85,10 @@ Sie ist kein zweites unabhängiges Polynommodell. Die Projektion bindet denselbe
 - die kanonische Einbettung ganzer Zahlen;
 - exakte Arithmetik und kanonische Textdarstellung.
 
-Ableitungs-, Feld- und spätere endliche-Körper-Algorithmen dürfen diese
-Eigenschaften nicht aus einem Java-Wertetyp erraten.
+Ableitungs-, Feld- und Primkörperalgorithmen dürfen diese Eigenschaften nicht
+aus einem Java-Wertetyp erraten.
 
-Die gegenwärtige quadratfreie Implementierung verlangt:
+Die quadratfreie Implementierung in Charakteristik null verlangt:
 
 - genau eine Polynomvariable;
 - eine exakte Koeffizientenfeld-Implementierung;
@@ -84,7 +96,16 @@ Die gegenwärtige quadratfreie Implementierung verlangt:
 
 `Z[x]` wird nicht stillschweigend nach `Q[x]` angehoben. Stattdessen erzeugt die
 Inhaltsnormalisierung für beide Quelldomänen eine explizite gemeinsame
-ganzzahlige Arbeitsform.
+primitive ganzzahlige Arbeitsform.
+
+Die modulare Folgestufe verwendet `PrimeField(p)` mit der stabilen Domain-ID
+
+```text
+regelsuche.coefficients.prime-field/v1/p=<p>
+```
+
+und kanonischen `BigInteger`-Restklassen. Der Ringwechsel von `Z[x]` nach
+`F_p[x]` ist damit ausdrücklich im Typ, im Ring und in der Evidence sichtbar.
 
 ## Request-weite Strukturgrenzen
 
@@ -96,13 +117,14 @@ ganzzahlige Arbeitsform.
 - maximale Koeffizientenbitlänge;
 - Kandidaten- und Arbeitsbudgets.
 
-Der unabhängige Verifier prüft die Strukturgrenzen, bevor eine Engine den
-Ausdruck inspizieren darf. Eine Überschreitung führt zu
-`BUDGET_INCONCLUSIVE`, nicht zu „nicht faktorisierbar“ oder „irreduzibel“.
+Der unabhängige Verifier beziehungsweise die jeweilige issuer-owned
+Algorithmusstufe prüft die Strukturgrenzen, bevor ein positiver Abschluss
+ausgegeben werden kann. Eine Überschreitung führt zu `BUDGET_INCONCLUSIVE`,
+nicht zu „nicht faktorisierbar“ oder „irreduzibel“.
 
 Algorithmen mit möglichem Zwischenwertwachstum ergänzen diese Quellgrenzen um
-eine eigene verpflichtende Zwischenkoeffizienten-Bitgrenze. Sie ist nicht als
-versteckter Faktor aus dem Quellbudget abgeleitet.
+eine eigene verpflichtende Zwischenkoeffizienten- oder Repräsentationsgrenze.
+Sie wird nicht als versteckter Faktor aus dem Quellbudget abgeleitet.
 
 ## Inhalts- und Primitivteilnormalisierung
 
@@ -191,20 +213,54 @@ Das Zertifikat bindet Methode, Ring, Quelle, Strukturgrenzen, Arbeitsbilanz,
 Einheit, Faktoren und Multiplizitäten. Öffentliche Aufrufer können keinen
 positiven Algorithmusabschluss mit fremden Faktoren konstruieren.
 
+## Modulare Folgestufen
+
+`SuitablePrimeSelection` verarbeitet ein kanonisches primitives Polynom in
+`Z[x]` und eine explizite, streng aufsteigende Kandidatenfolge. Jeder Versuch
+wird exakt nach `F_p[x]` reduziert. Gradverlust und nicht quadratfreie
+Reduktionen werden mit typisierten Gründen bewahrt; die erste geeignete
+Primzahl wird ausgewählt.
+
+Die ausgewählte modulare Quelle wird mit dem gleichen nicht zurücksetzbaren
+`PolynomialWorkBudget` durch `FiniteFieldFactorization` vollständig
+faktorisiert. Der Berlekamp-Pfad rekonstruiert das Quellprodukt, prüft
+paarweise Koprimheit und zertifiziert jeden Faktor mit dem
+Rabin-/Frobenius-Kriterium.
+
+Der äußere Abschluss prüft zusätzlich:
+
+- Versuchshash und retained modulare Quelle stimmen überein;
+- das verschachtelte Zertifikat wurde für genau diese modulare Quelle
+  ausgestellt;
+- die modulare Quelle ist tatsächlich die kanonische Reduktion der
+  ursprünglichen ganzzahligen Quelle modulo der ausgewählten Primzahl.
+
+Details stehen unter
+[Deterministische Faktorisierung über Primkörpern](finite-field-factorization.md)
+und
+[Deterministische Auswahl einer geeigneten Primzahl](suitable-prime-selection.md).
+
 ## Aussagegrenze
 
 Eine Inhaltsnormalisierung beweist keine Reduzibilität. Eine quadratfreie
 Zerlegung beweist keine Irreduzibilität. Insbesondere kann `x^2 + 1` abhängig
 von der Koeffizientendomäne irreduzibel oder weiter zerlegbar sein.
 
+Ein `COMPLETED`-Resultat der Primkörperfaktorisierung ist vollständig relativ
+zum gebundenen `F_p[x]`. Es ist kein Vollständigkeits- oder
+Irreduzibilitätsbeweis für die ursprüngliche Quelle in `Z[x]` oder `Q[x]`.
+Auch die Auswahl einer geeigneten Primzahl hebt die modularen Faktoren noch
+nicht in den ganzzahligen Ring zurück.
+
 Noch offen bleiben:
 
-- Faktorisierung über endlichen Körpern;
-- geeignete Primzahlauswahl mit dokumentierten Ablehnungsgründen;
-- Hensel-Lifting;
+- Hensel-Lifting mit expliziter Präzisions- und Zwischenwertgrenze;
 - Zassenhaus- und später gegebenenfalls LLL-/van-Hoeij-Rekombination;
 - rationale Faktorreassemblierung;
-- unabhängige Vollständigkeits- und Irreduzibilitätszertifikate.
+- die gemeinsame vollständige Engine-Orchestrierung;
+- unabhängige Vollständigkeits- und Irreduzibilitätsevidence für die
+  ursprüngliche `Z[x]`-/`Q[x]`-Quelle;
+- multivariate Faktorisierung.
 
 ## Prüfung
 
@@ -213,16 +269,21 @@ Core-Repräsentation und Verifier-Grenze:
 ```bash
 ./gradlew :regelsuche-core:test \
   --tests de.regelsuche.polynomial.UnivariatePolynomialViewTest \
-  --tests de.regelsuche.polynomial.FactorizationStructuralLimitsTest
+  --tests de.regelsuche.polynomial.FactorizationStructuralLimitsTest \
+  --tests de.regelsuche.polynomial.PrimeFieldTest
 ```
 
-Allgemeine mathematische Algorithmen:
+Allgemeine und modulare mathematische Algorithmen:
 
 ```bash
 ./gradlew :regelsuche-math-algorithms:test \
   --tests de.regelsuche.math.algorithms.polynomial.UnivariateContentNormalizationTest \
   --tests de.regelsuche.math.algorithms.polynomial.UnivariatePolynomialAlgorithmsTest \
-  --tests de.regelsuche.math.algorithms.polynomial.SquareFreeDecompositionTest
+  --tests de.regelsuche.math.algorithms.polynomial.SquareFreeDecompositionTest \
+  --tests de.regelsuche.math.algorithms.polynomial.FiniteFieldFactorizationTest \
+  --tests de.regelsuche.math.algorithms.polynomial.FiniteFieldFactorizationHigherDegreeTest \
+  --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionTest \
+  --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionEvidenceTest
 ```
 
 Der vollständige Checkout-Vertrag bleibt:
