@@ -60,8 +60,9 @@ class MavenGradleDependencyParityContractTest {
         content.contains("polyglotVersion = '" + version + "'"),
         () -> buildFile + " must pin the injected runtime to " + version);
     assertTrue(
-        content.contains("community = true"),
-        () -> buildFile + " must select one GraalPy edition explicitly");
+        content.contains("community = false"),
+        () -> buildFile
+            + " must select the canonical OSS GraalPy artifact used by Maven");
     assertTrue(
         content.contains("'sympy==1.14.0'"),
         () -> buildFile + " must pin SymPy 1.14.0");
