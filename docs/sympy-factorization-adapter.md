@@ -172,6 +172,12 @@ Native-Extension-Runtime benötigt einen Background-GC-Thread und
 `python.IsolateNativeModules` ruft unter Linux `patchelf` zur Relokation der
 kontextprivaten ELF-Kopien auf.
 
+Der Context erbt nicht die vollständige Prozessumgebung. Polyglot erhält
+explizit nur `PATH`, damit GraalPy das provisionierte `patchelf` finden kann.
+Variablen wie Tokens, Home-Verzeichnisse oder sonstige CI-/Anwendungsparameter
+werden dem Gast nicht über die allgemeine Environment-Schnittstelle sichtbar
+gemacht.
+
 Diese Autoritäten stehen ausschließlich dem fest eingecheckten Adapter und dem
 GraalPy-Runtimepfad zur Verfügung. Der strukturierte Faktor-Payload enthält
 weder Python-Code noch Kommandos oder Hostpfade. Trotzdem ist der eingebettete
