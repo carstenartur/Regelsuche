@@ -311,40 +311,40 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 // security sandbox.
                 .allowHostIO(VirtualFileSystem.HostIO.READ_WRITE)
                 .build();
-            Context context = Context.newBuilder()
-                .engine(engine)
-                .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
-                .allowHostAccess(HostAccess.NONE)
-                // The Polyglot default exposes no process environment. GraalPy
-                // searches for patchelf through PATH, so provide only this one
-                // host variable rather than inheriting the complete environment.
-                .environment("PATH", hostExecutablePath())
-                // The checked-in adapter is the only evaluated Python code.
-                // Permit GraalPy's internal background-GC daemon required by
-                // its native-extension runtime; application requests remain
-                // serialized on the dedicated platform-thread worker.
-                .allowCreateThread(true)
-                // IsolateNativeModules relocates ELF libraries by invoking the
-                // pinned host patchelf executable. The structured request
-                // cannot select commands or paths; this process authority is
-                // reserved for the trusted GraalPy runtime path.
-                .allowCreateProcess(true)
-                // GraalPy 25.1.3 loads the native _ctypes module while
-                // importing the pinned SymPy environment. Native access is
-                // therefore required even though no user-supplied Python is
-                // evaluated. This in-process adapter is a trusted dependency
-                // boundary, not a security sandbox.
-                .allowNativeAccess(true)
-                .allowPolyglotAccess(PolyglotAccess.NONE)
-                // Timeout recovery and cold-start measurements replace a
-                // context inside the same JVM. GraalPy requires every context
-                // in that process to isolate native modules before a native
-                // extension such as _ctypes can be loaded again.
-                .allowExperimentalOptions(true)
-                .option("python.IsolateNativeModules", "true")
-                .option("python.DontWriteBytecodeFlag", "true")
-                .build();
+            Context context = null;
             try {
+                context = Context.newBuilder()
+                    .engine(engine)
+                    .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
+                    .allowHostAccess(HostAccess.NONE)
+                    // The Polyglot default exposes no process environment.
+                    // GraalPy searches for patchelf through PATH, so provide
+                    // only this one host variable rather than inheriting the
+                    // complete environment.
+                    .environment("PATH", hostExecutablePath())
+                    // The checked-in adapter is the only evaluated Python
+                    // code. Permit GraalPy's internal background-GC daemon
+                    // required by its native-extension runtime; application
+                    // requests remain serialized on the dedicated worker.
+                    .allowCreateThread(true)
+                    // IsolateNativeModules relocates ELF libraries by invoking
+                    // the pinned host patchelf executable. The structured
+                    // request cannot select commands or paths; this process
+                    // authority is reserved for the trusted GraalPy path.
+                    .allowCreateProcess(true)
+                    // GraalPy 25.1.3 loads the native _ctypes module while
+                    // importing the pinned SymPy environment. Native access is
+                    // required even though no user-supplied Python is evaluated.
+                    .allowNativeAccess(true)
+                    .allowPolyglotAccess(PolyglotAccess.NONE)
+                    // Timeout recovery and cold-start measurements replace a
+                    // context inside the same JVM. Every context in that
+                    // process must isolate native modules before _ctypes can be
+                    // loaded again.
+                    .allowExperimentalOptions(true)
+                    .option("python.IsolateNativeModules", "true")
+                    .option("python.DontWriteBytecodeFlag", "true")
+                    .build();
                 Source source = Source.newBuilder(
                     "python",
                     SymPyScript.source(),
@@ -370,14 +370,17 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                     factorFunction,
                     version);
             } catch (IOException | RuntimeException exception) {
-                try {
-                    context.close(true);
-                } finally {
+                if (context != null) {
                     try {
-                        fileSystem.close();
-                    } catch (IOException ignored) {
-                        // The original initialization failure is authoritative.
+                        context.close(true);
+                    } catch (RuntimeException closeFailure) {
+                        exception.addSuppressed(closeFailure);
                     }
+                }
+                try {
+                    fileSystem.close();
+                } catch (IOException closeFailure) {
+                    exception.addSuppressed(closeFailure);
                 }
                 throw new IllegalStateException(
                     "embedded GraalPy context initialization failed",
