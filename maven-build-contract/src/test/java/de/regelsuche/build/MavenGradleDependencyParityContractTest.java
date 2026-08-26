@@ -111,6 +111,13 @@ class MavenGradleDependencyParityContractTest {
     assertTrue(
         runtime.contains(".allowCreateProcess(true)"),
         "GraalPy must be allowed to invoke patchelf for ELF relocation");
+    assertTrue(
+        runtime.contains(
+            ".environment(\"PATH\", hostExecutablePath())"),
+        "the context must expose only its explicit executable search path");
+    assertTrue(
+        !runtime.contains(".allowEnvironmentAccess("),
+        "the embedded adapter must not inherit the complete host environment");
 
     for (String workflow : List.of(
         ".github/workflows/gradle.yml",
