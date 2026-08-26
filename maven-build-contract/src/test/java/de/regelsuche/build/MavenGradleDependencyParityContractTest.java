@@ -118,6 +118,9 @@ class MavenGradleDependencyParityContractTest {
     assertTrue(
         !runtime.contains(".allowEnvironmentAccess("),
         "the embedded adapter must not inherit the complete host environment");
+
+    // GraalPy's VFS rejects writes and deletes even when host IO is enabled.
+    // IsolateNativeModules therefore needs the supported writable extraction path.
     assertTrue(
         runtime.contains(
             "GraalPyResources.extractVirtualFileSystemResources("),
