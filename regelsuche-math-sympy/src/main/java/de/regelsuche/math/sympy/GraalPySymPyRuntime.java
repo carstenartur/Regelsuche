@@ -299,7 +299,11 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 .engine(engine)
                 .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
                 .allowHostAccess(HostAccess.NONE)
-                .allowCreateThread(false)
+                // The checked-in adapter is the only evaluated Python code. Permit
+                // GraalPy's internal background-GC daemon required by its
+                // native-extension runtime; application requests remain
+                // serialized on the dedicated platform-thread worker.
+                .allowCreateThread(true)
                 // GraalPy 25.1.3 loads the native _ctypes module while
                 // importing the pinned SymPy environment. Native access is
                 // therefore required even though no user-supplied Python is
@@ -316,16 +320,16 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                     "<regelsuche-sympy-adapter>")
                     .internal(true)
                     .build();
-                context.eval(source);
-                Value bindings = context.getBindings("python");
-                Value factorFunction = bindings.getMember("factor_payload");
-                Value runtimeInfo = bindings.getMember("runtime_info");
-                if (factorFunction == null
+                Value adapter = context.eval(source);
+                Value factorFunction = adapter.getMember("factor_payload");
+                Value runtimeInfo = adapter.getMember("runtime_info");
+                if (!adapter.hasMembers()
+                        || factorFunction == null
                         || !factorFunction.canExecute()
                         || runtimeInfo == null
                         || !runtimeInfo.canExecute()) {
                     throw new IllegalStateException(
-                        "embedded SymPy adapter functions are unavailable");
+                        "embedded SymPy adapter export object is unavailable");
                 }
                 String version = runtimeVersion(
                     runtimeInfo.execute().asString());
