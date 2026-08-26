@@ -1,0 +1,88 @@
+plugins {
+    id 'java-library'
+    id 'jacoco'
+    id 'me.champeau.jmh' version '0.7.3'
+    id 'org.graalvm.python' version '25.1.3'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+graalPy {
+    community = true
+    packages = [
+        'mpmath==1.3.0',
+        'sympy==1.14.0'
+    ]
+    resourceDirectory = 'GRAALPY-VFS/de.regelsuche/regelsuche-math-sympy'
+}
+
+dependencies {
+    api project(':regelsuche-core')
+
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
+    implementation 'org.graalvm.polyglot:polyglot:25.1.3'
+    implementation 'org.graalvm.python:python-embedding:25.1.3'
+
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+def verificationPython = rootProject.layout.buildDirectory.file(
+    System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+        ? 'verification-venv/Scripts/python.exe'
+        : 'verification-venv/bin/python')
+
+def configureProcessBaseline = { task ->
+    task.dependsOn rootProject.tasks.named('prepareVerificationEnvironment')
+    task.doFirst {
+        environment 'REGELSUCHE_SYMPY_PYTHON',
+            verificationPython.get().asFile.absolutePath
+    }
+}
+
+tasks.named('test') { task ->
+    useJUnitPlatform()
+    finalizedBy tasks.named('jacocoTestReport')
+    configureProcessBaseline(task)
+}
+
+jmh {
+    resultFormat = 'JSON'
+    resultsFile = layout.buildDirectory.file(
+        'reports/jmh/sympy-factorization.json')
+    fork = 1
+    warmupIterations = 2
+    iterations = 3
+    timeOnIteration = '1s'
+    warmup = '1s'
+    failOnError = true
+}
+
+tasks.named('jmh') { task ->
+    configureProcessBaseline(task)
+}
+
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestReport')
+}
