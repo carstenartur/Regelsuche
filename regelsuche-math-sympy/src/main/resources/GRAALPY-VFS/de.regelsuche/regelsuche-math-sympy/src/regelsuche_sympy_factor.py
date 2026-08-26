@@ -133,3 +133,16 @@ def factor_payload(payload_json: str) -> str:
         "unit": _pair(unit),
     }
     return json.dumps(result, separators=(",", ":"), sort_keys=True)
+
+
+# A GraalPy source evaluation returns its final expression. Return a named
+# object instead of assuming that Python module globals become language
+# bindings; the Polyglot API can then retain the exact executable functions.
+type(
+    "_RegelsucheSymPyAdapter",
+    (object,),
+    {
+        "factor_payload": staticmethod(factor_payload),
+        "runtime_info": staticmethod(runtime_info),
+    },
+)()

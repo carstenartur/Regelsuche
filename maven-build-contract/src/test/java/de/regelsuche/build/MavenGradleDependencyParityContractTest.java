@@ -72,6 +72,31 @@ class MavenGradleDependencyParityContractTest {
   }
 
   @Test
+  void embeddedGraalpyNativeAccessIsExplicitInBothReactors()
+      throws IOException {
+    Path root = repositoryRoot();
+    String gradle = Files.readString(
+        root.resolve("regelsuche-math-sympy/build.gradle"));
+    String maven = Files.readString(
+        root.resolve("regelsuche-math-sympy/pom.xml"));
+    String argument = "--enable-native-access=ALL-UNNAMED";
+
+    assertTrue(
+        gradle.contains("def nativeAccessArgument = '" + argument + "'"),
+        "Gradle must name the required classpath native-access authority");
+    assertTrue(
+        gradle.contains("jvmArgs nativeAccessArgument"),
+        "Gradle tests must authorize the pinned native Python modules");
+    assertTrue(
+        gradle.contains("jvmArgs = [nativeAccessArgument]"),
+        "Gradle JMH forks must authorize the same native modules");
+    assertTrue(
+        maven.contains(
+            "<argLine>@{argLine} " + argument + "</argLine>"),
+        "Maven tests must preserve JaCoCo and authorize native access");
+  }
+
+  @Test
   void embeddedGraalpyLockIsSharedAndComplete()
       throws IOException {
     Path root = repositoryRoot();

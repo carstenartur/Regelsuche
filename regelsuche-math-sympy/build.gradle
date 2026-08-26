@@ -37,6 +37,8 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+def nativeAccessArgument = '--enable-native-access=ALL-UNNAMED'
+
 def verificationPython = rootProject.layout.buildDirectory.file(
     System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
         ? 'verification-venv/Scripts/python.exe'
@@ -52,6 +54,7 @@ def configureProcessBaseline = { task ->
 
 tasks.named('test') { task ->
     useJUnitPlatform()
+    jvmArgs nativeAccessArgument
     finalizedBy tasks.named('jacocoTestReport')
     configureProcessBaseline(task)
 }
@@ -66,6 +69,7 @@ jmh {
     timeOnIteration = '1s'
     warmup = '1s'
     failOnError = true
+    jvmArgs = [nativeAccessArgument]
 }
 
 tasks.named('jmh') { task ->
