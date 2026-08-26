@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SuitablePrimeSelection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">SuitablePrimeSelection.java</span></div><h1>SuitablePrimeSelection.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.Monomial;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.SparsePolynomial;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/**
+ * Deterministically selects the first suitable modular prime for one canonical
+ * primitive polynomial in {@code Z[x]} and retains every rejection reason.
+ */
+public final class SuitablePrimeSelection {
+    public static final String METHOD_ID =
+        &quot;regelsuche.suitable-prime-selection/v1&quot;;
+
+    private SuitablePrimeSelection() {
+    }
+
+    public static SuitablePrimeSelectionResult selectAndFactor(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionPolicy policy
+    ) {
+<span class="fc" id="L32">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L33">        return selectAndFactor(</span>
+            request,
+            policy,
+<span class="fc" id="L36">            new PolynomialWorkBudget(request.maxWorkUnits()));</span>
+    }
+
+    static SuitablePrimeSelectionResult selectAndFactor(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L44">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L45">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L46">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L47">        ArrayList&lt;SuitablePrimeSelectionResult.PrimeAttempt&gt; attempts =</span>
+            new ArrayList&lt;&gt;();
+
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (work.limit() != request.maxWorkUnits()) {</span>
+<span class="fc" id="L51">            return failure(</span>
+                SuitablePrimeSelectionResult.Status.TECHNICAL_FAILURE,
+                &quot;SUITABLE_PRIME_WORK_BUDGET_AUTHORITY_MISMATCH&quot;,
+                attempts,
+<span class="fc" id="L55">                work.ledger(),</span>
+                request,
+                policy);
+        }
+<span class="fc" id="L59">        SuitablePrimeSelectionResult rejected = rejectInput(</span>
+            request,
+            policy,
+            attempts,
+<span class="fc" id="L63">            work.ledger());</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (rejected != null) {</span>
+<span class="fc" id="L65">            return rejected;</span>
+        }
+
+        try {
+<span class="fc" id="L69">            return execute(request, policy, work, attempts);</span>
+<span class="fc" id="L70">        } catch (PolynomialWorkBudget.LimitReached exception) {</span>
+<span class="fc" id="L71">            return failure(</span>
+                SuitablePrimeSelectionResult.Status.BUDGET_INCONCLUSIVE,
+                &quot;SUITABLE_PRIME_SELECTION_WORK_BUDGET_EXCEEDED&quot;,
+                attempts,
+<span class="fc" id="L75">                work.ledger(),</span>
+                request,
+                policy);
+<span class="nc" id="L78">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L79">            return failure(</span>
+                SuitablePrimeSelectionResult.Status.TECHNICAL_FAILURE,
+                &quot;SUITABLE_PRIME_EXACT_ARITHMETIC_FAILED&quot;,
+                attempts,
+<span class="nc" id="L83">                work.ledger(),</span>
+                request,
+                policy);
+<span class="nc" id="L86">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L87">            return failure(</span>
+                SuitablePrimeSelectionResult.Status.TECHNICAL_FAILURE,
+                &quot;SUITABLE_PRIME_&quot;
+<span class="nc" id="L90">                    + exception.getClass().getSimpleName()</span>
+<span class="nc" id="L91">                        .toUpperCase(java.util.Locale.ROOT),</span>
+                attempts,
+<span class="nc" id="L93">                work.ledger(),</span>
+                request,
+                policy);
+        }
+    }
+
+    private static SuitablePrimeSelectionResult rejectInput(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionPolicy policy,
+        ArrayList&lt;SuitablePrimeSelectionResult.PrimeAttempt&gt; attempts,
+        PolynomialWorkLedger work
+    ) {
+<span class="fc" id="L105">        String structuralViolation =</span>
+<span class="fc" id="L106">            request.structuralViolation().orElse(null);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (structuralViolation != null) {</span>
+<span class="fc" id="L108">            return failure(</span>
+                SuitablePrimeSelectionResult.Status.BUDGET_INCONCLUSIVE,
+                structuralViolation,
+                attempts,
+                work,
+                request,
+                policy);
+        }
+<span class="fc" id="L116">        SparsePolynomial&lt;BigInteger&gt; source = request.source();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (!(source.ring().coefficientDomain()</span>
+                instanceof BigIntegerDomain)) {
+<span class="fc" id="L119">            return failure(</span>
+                SuitablePrimeSelectionResult.Status.UNSUPPORTED_DOMAIN,
+                &quot;REQUIRES_EXACT_INTEGER_COEFFICIENT_DOMAIN&quot;,
+                attempts,
+                work,
+                request,
+                policy);
+        }
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (source.ring().variableCount() != 1</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                || source.isConstant()) {</span>
+<span class="nc" id="L129">            return failure(</span>
+                SuitablePrimeSelectionResult.Status.UNSUPPORTED_SHAPE,
+                &quot;REQUIRES_NONCONSTANT_UNIVARIATE_INTEGER_POLYNOMIAL&quot;,
+                attempts,
+                work,
+                request,
+                policy);
+        }
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (request.maxCandidates() == 0) {</span>
+<span class="nc" id="L138">            return failure(</span>
+                SuitablePrimeSelectionResult.Status.BUDGET_INCONCLUSIVE,
+                &quot;MAX_CANDIDATES_IS_ZERO&quot;,
+                attempts,
+                work,
+                request,
+                policy);
+        }
+<span class="fc" id="L146">        return null;</span>
+    }
+
+    private static SuitablePrimeSelectionResult execute(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionPolicy policy,
+        PolynomialWorkBudget work,
+        ArrayList&lt;SuitablePrimeSelectionResult.PrimeAttempt&gt; attempts
+    ) {
+<span class="fc" id="L155">        SparsePolynomial&lt;BigInteger&gt; source = request.source();</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (!isCanonicalPrimitive(source, work)) {</span>
+<span class="fc" id="L157">            return failure(</span>
+                SuitablePrimeSelectionResult.Status.UNSUPPORTED_SHAPE,
+                &quot;REQUIRES_CANONICAL_PRIMITIVE_INTEGER_INPUT&quot;,
+                attempts,
+<span class="fc" id="L161">                work.ledger(),</span>
+                request,
+                policy);
+        }
+
+<span class="fc" id="L166">        int consideredPrimes = 0;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int prime : policy.candidatePrimes()) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (consideredPrimes &gt;= request.maxCandidates()) {</span>
+<span class="fc" id="L169">                return failure(</span>
+                    SuitablePrimeSelectionResult.Status
+                        .BUDGET_INCONCLUSIVE,
+                    &quot;PRIME_CANDIDATE_BUDGET_EXHAUSTED&quot;,
+                    attempts,
+<span class="fc" id="L174">                    work.ledger(),</span>
+                    request,
+                    policy);
+            }
+<span class="fc" id="L178">            consideredPrimes++;</span>
+<span class="fc" id="L179">            long workBefore = total(work);</span>
+<span class="fc" id="L180">            PrimeField field = PrimeField.of(prime);</span>
+<span class="fc" id="L181">            SparsePolynomial&lt;BigInteger&gt; modularSource = reduce(</span>
+                source,
+                field,
+                work,
+                &quot;suitable-prime.reduction.coefficients&quot;);
+<span class="fc" id="L186">            work.consume(</span>
+                &quot;suitable-prime.leading-coefficient-tests&quot;,
+                1);
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (field.isZero(source.leadingCoefficient())) {</span>
+<span class="fc" id="L190">                attempts.add(SuitablePrimeSelectionResult.issueAttempt(</span>
+                    prime,
+                    SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                        .REJECTED,
+                    &quot;LEADING_COEFFICIENT_VANISHES_MOD_PRIME&quot;,
+                    modularSource,
+                    null,
+<span class="fc" id="L197">                    total(work) - workBefore));</span>
+<span class="fc" id="L198">                continue;</span>
+            }
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            if (modularSource.isZero()</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                    || modularSource.degree(0) != source.degree(0)) {</span>
+<span class="nc" id="L202">                throw new IllegalStateException(</span>
+                    &quot;modular reduction changed degree without a vanishing leading coefficient&quot;);
+            }
+
+<span class="fc" id="L206">            FactorizationRequest&lt;BigInteger&gt; modularRequest =</span>
+<span class="fc" id="L207">                modularRequest(request, modularSource, field);</span>
+<span class="fc" id="L208">            FiniteFieldFactorizationResult factorization =</span>
+<span class="fc" id="L209">                FiniteFieldFactorization.factorSquareFree(</span>
+                    modularRequest,
+<span class="fc" id="L211">                    policy.factorizationPolicy(),</span>
+                    work);
+
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (factorization.completed()) {</span>
+                try {
+<span class="fc" id="L216">                    verifyModularSourceCorrespondence(</span>
+                        source,
+                        field,
+                        modularSource,
+                        work);
+<span class="fc" id="L221">                } catch (PolynomialWorkBudget.LimitReached exception) {</span>
+<span class="fc" id="L222">                    long attemptWork = total(work) - workBefore;</span>
+<span class="fc" id="L223">                    attempts.add(SuitablePrimeSelectionResult.issueAttempt(</span>
+                        prime,
+                        SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                            .TERMINAL_INCONCLUSIVE,
+                        &quot;SOURCE_CORRESPONDENCE_WORK_BUDGET_EXCEEDED&quot;,
+                        modularSource,
+<span class="fc" id="L229">                        factorization.certificateHash(),</span>
+                        attemptWork));
+<span class="fc" id="L231">                    return failure(</span>
+                        SuitablePrimeSelectionResult.Status
+                            .BUDGET_INCONCLUSIVE,
+                        &quot;SOURCE_CORRESPONDENCE_INCONCLUSIVE&quot;,
+                        attempts,
+<span class="fc" id="L236">                        work.ledger(),</span>
+                        request,
+                        policy);
+<span class="fc" id="L239">                }</span>
+<span class="fc" id="L240">                long attemptWork = total(work) - workBefore;</span>
+                ArrayList&lt;SuitablePrimeSelectionResult.PrimeAttempt&gt;
+<span class="fc" id="L242">                    completedAttempts = new ArrayList&lt;&gt;(attempts);</span>
+<span class="fc" id="L243">                completedAttempts.add(</span>
+<span class="fc" id="L244">                    SuitablePrimeSelectionResult.issueAttempt(</span>
+                        prime,
+                        SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                            .SELECTED,
+                        &quot;SUITABLE_PRIME_SELECTED&quot;,
+                        modularSource,
+<span class="fc" id="L250">                        factorization.certificateHash(),</span>
+                        attemptWork));
+<span class="fc" id="L252">                return SuitablePrimeSelectionResult.completed(</span>
+                    completedAttempts,
+                    prime,
+                    modularSource,
+                    factorization,
+<span class="fc" id="L257">                    work.ledger(),</span>
+                    request,
+                    policy);
+            }
+<span class="fc" id="L261">            long attemptWork = total(work) - workBefore;</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            if (factorization.status()</span>
+                    == FiniteFieldFactorizationResult.Status
+                        .UNSUPPORTED_SHAPE
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                    &amp;&amp; &quot;REQUIRES_SQUARE_FREE_INPUT&quot;.equals(</span>
+<span class="fc" id="L266">                        factorization.detailCode())) {</span>
+<span class="fc" id="L267">                attempts.add(SuitablePrimeSelectionResult.issueAttempt(</span>
+                    prime,
+                    SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                        .REJECTED,
+                    &quot;MODULAR_REDUCTION_NOT_SQUARE_FREE&quot;,
+                    modularSource,
+<span class="fc" id="L273">                    factorization.certificateHash(),</span>
+                    attemptWork));
+<span class="fc" id="L275">                continue;</span>
+            }
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">            if (factorization.status()</span>
+                    == FiniteFieldFactorizationResult.Status
+                        .BUDGET_INCONCLUSIVE) {
+<span class="fc" id="L280">                attempts.add(SuitablePrimeSelectionResult.issueAttempt(</span>
+                    prime,
+                    SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                        .TERMINAL_INCONCLUSIVE,
+<span class="fc" id="L284">                    factorization.detailCode(),</span>
+                    modularSource,
+<span class="fc" id="L286">                    factorization.certificateHash(),</span>
+                    attemptWork));
+<span class="fc" id="L288">                return failure(</span>
+                    SuitablePrimeSelectionResult.Status
+                        .BUDGET_INCONCLUSIVE,
+                    &quot;MODULAR_FACTORIZATION_INCONCLUSIVE&quot;,
+                    attempts,
+<span class="fc" id="L293">                    work.ledger(),</span>
+                    request,
+                    policy);
+            }
+
+<span class="nc" id="L298">            attempts.add(SuitablePrimeSelectionResult.issueAttempt(</span>
+                prime,
+                SuitablePrimeSelectionResult.PrimeAttempt.Disposition
+                    .TERMINAL_FAILURE,
+<span class="nc" id="L302">                factorization.detailCode(),</span>
+                modularSource,
+<span class="nc" id="L304">                factorization.certificateHash(),</span>
+                attemptWork));
+<span class="nc" id="L306">            return failure(</span>
+                SuitablePrimeSelectionResult.Status.TECHNICAL_FAILURE,
+                &quot;MODULAR_FACTORIZATION_CONTRACT_FAILURE&quot;,
+                attempts,
+<span class="nc" id="L310">                work.ledger(),</span>
+                request,
+                policy);
+        }
+
+<span class="fc" id="L315">        return failure(</span>
+            SuitablePrimeSelectionResult.Status.BUDGET_INCONCLUSIVE,
+            &quot;NO_SUITABLE_PRIME_WITHIN_POLICY&quot;,
+            attempts,
+<span class="fc" id="L319">            work.ledger(),</span>
+            request,
+            policy);
+    }
+
+    private static boolean isCanonicalPrimitive(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L328">        work.consume(&quot;suitable-prime.leading-sign-tests&quot;, 1);</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        if (source.leadingCoefficient().signum() &lt;= 0) {</span>
+<span class="fc" id="L330">            return false;</span>
+        }
+<span class="fc" id="L332">        BigInteger gcd = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        for (BigInteger coefficient : source.terms().values()) {</span>
+<span class="fc" id="L334">            work.consume(&quot;suitable-prime.primitive-gcd&quot;, 1);</span>
+<span class="fc" id="L335">            gcd = gcd.gcd(coefficient.abs());</span>
+<span class="fc" id="L336">        }</span>
+<span class="fc" id="L337">        work.consume(&quot;suitable-prime.primitive-comparisons&quot;, 1);</span>
+<span class="fc" id="L338">        return BigInteger.ONE.equals(gcd);</span>
+    }
+
+    private static SparsePolynomial&lt;BigInteger&gt; reduce(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        PrimeField field,
+        PolynomialWorkBudget work,
+        String workStage
+    ) {
+<span class="fc" id="L347">        PolynomialRing&lt;BigInteger&gt; modularRing = new PolynomialRing&lt;&gt;(</span>
+            field,
+<span class="fc" id="L349">            source.ring().variables(),</span>
+<span class="fc" id="L350">            source.ring().monomialOrder());</span>
+<span class="fc" id="L351">        NavigableMap&lt;Monomial, BigInteger&gt; terms =</span>
+<span class="fc" id="L352">            new TreeMap&lt;&gt;(modularRing.monomialComparator());</span>
+        for (Map.Entry&lt;Monomial, BigInteger&gt; term
+<span class="fc bfc" id="L354" title="All 2 branches covered.">                : source.terms().entrySet()) {</span>
+<span class="fc" id="L355">            work.consume(workStage, 1);</span>
+<span class="fc" id="L356">            BigInteger coefficient = field.canonical(term.getValue());</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            if (!field.isZero(coefficient)) {</span>
+<span class="fc" id="L358">                terms.put(term.getKey(), coefficient);</span>
+            }
+<span class="fc" id="L360">        }</span>
+<span class="fc" id="L361">        return new SparsePolynomial&lt;&gt;(modularRing, terms);</span>
+    }
+
+    private static void verifyModularSourceCorrespondence(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        PrimeField field,
+        SparsePolynomial&lt;BigInteger&gt; modularSource,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L370">        SparsePolynomial&lt;BigInteger&gt; independentlyReduced = reduce(</span>
+            source,
+            field,
+            work,
+            &quot;suitable-prime.verify.source-reduction.coefficients&quot;);
+<span class="fc" id="L375">        work.consume(</span>
+            &quot;suitable-prime.verify.source-reduction.comparisons&quot;,
+            1);
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">        if (!independentlyReduced.equals(modularSource)) {</span>
+<span class="nc" id="L379">            throw new IllegalStateException(</span>
+                &quot;selected modular source does not reduce the integer source&quot;);
+        }
+<span class="fc" id="L382">    }</span>
+
+    private static FactorizationRequest&lt;BigInteger&gt; modularRequest(
+        FactorizationRequest&lt;BigInteger&gt; sourceRequest,
+        SparsePolynomial&lt;BigInteger&gt; modularSource,
+        PrimeField field
+    ) {
+<span class="fc" id="L389">        FactorizationRequest.StructuralLimits sourceLimits =</span>
+<span class="fc" id="L390">            sourceRequest.structuralLimits();</span>
+<span class="fc" id="L391">        int maximumResidueBits = field.modulus()</span>
+<span class="fc" id="L392">            .subtract(BigInteger.ONE)</span>
+<span class="fc" id="L393">            .bitLength();</span>
+<span class="fc" id="L394">        FactorizationRequest.StructuralLimits modularLimits =</span>
+            new FactorizationRequest.StructuralLimits(
+<span class="fc" id="L396">                sourceLimits.maxVariables(),</span>
+<span class="fc" id="L397">                sourceLimits.maxTotalDegree(),</span>
+<span class="fc" id="L398">                sourceLimits.maxTerms(),</span>
+<span class="fc" id="L399">                Math.max(</span>
+<span class="fc" id="L400">                    sourceLimits.maxCoefficientBitLength(),</span>
+                    maximumResidueBits));
+<span class="fc" id="L402">        return new FactorizationRequest&lt;&gt;(</span>
+            modularSource,
+<span class="fc" id="L404">            sourceRequest.evidenceRequirement(),</span>
+            modularLimits,
+<span class="fc" id="L406">            sourceRequest.maxCandidates(),</span>
+<span class="fc" id="L407">            sourceRequest.maxWorkUnits());</span>
+    }
+
+    private static long total(PolynomialWorkBudget work) {
+<span class="fc" id="L411">        return work.ledger().totalWorkUnits();</span>
+    }
+
+    private static SuitablePrimeSelectionResult failure(
+        SuitablePrimeSelectionResult.Status status,
+        String detailCode,
+        ArrayList&lt;SuitablePrimeSelectionResult.PrimeAttempt&gt; attempts,
+        PolynomialWorkLedger work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionPolicy policy
+    ) {
+<span class="fc" id="L422">        return SuitablePrimeSelectionResult.failure(</span>
+            status,
+            detailCode,
+            attempts,
+            work,
+            request,
+            policy);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

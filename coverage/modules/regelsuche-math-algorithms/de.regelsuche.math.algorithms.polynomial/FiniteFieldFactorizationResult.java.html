@@ -87,59 +87,62 @@ public final class FiniteFieldFactorizationResult {
 <span class="fc" id="L87">            .ring()</span>
 <span class="fc" id="L88">            .coefficientDomain()</span>
 <span class="fc" id="L89">            .id();</span>
-<span class="fc bfc" id="L90" title="All 2 branches covered.">        int prime = status == Status.COMPLETED</span>
-<span class="fc" id="L91">            ? Objects.requireNonNull(field, &quot;field&quot;).prime()</span>
-<span class="fc" id="L92">            : 0;</span>
-<span class="fc" id="L93">        List&lt;PolynomialFactor&lt;BigInteger&gt;&gt; ordered =</span>
-<span class="fc" id="L94">            List.copyOf(factors);</span>
-<span class="fc" id="L95">        List&lt;String&gt; irreducibilityHashes =</span>
-<span class="fc" id="L96">            List.copyOf(irreducibilityCertificateHashes);</span>
+<span class="fc" id="L90">        String sourcePolynomialHash = AlgorithmEvidence.sha256(</span>
+<span class="fc" id="L91">            request.source().canonicalMaterial());</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        int prime = status == Status.COMPLETED</span>
+<span class="fc" id="L93">            ? Objects.requireNonNull(field, &quot;field&quot;).prime()</span>
+<span class="fc" id="L94">            : 0;</span>
+<span class="fc" id="L95">        List&lt;PolynomialFactor&lt;BigInteger&gt;&gt; ordered =</span>
+<span class="fc" id="L96">            List.copyOf(factors);</span>
+<span class="fc" id="L97">        List&lt;String&gt; irreducibilityHashes =</span>
+<span class="fc" id="L98">            List.copyOf(irreducibilityCertificateHashes);</span>
 
-<span class="fc" id="L98">        StringBuilder material = new StringBuilder(</span>
+<span class="fc" id="L100">        StringBuilder material = new StringBuilder(</span>
             FiniteFieldFactorization.METHOD_ID);
-<span class="fc" id="L100">        AlgorithmEvidence.append(material, sourceDomainId);</span>
-<span class="fc" id="L101">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L102">        AlgorithmEvidence.append(material, sourceDomainId);</span>
+<span class="fc" id="L103">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc" id="L103">            request.canonicalMaterial());</span>
-<span class="fc" id="L104">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L105">            request.canonicalMaterial());</span>
+<span class="fc" id="L106">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc" id="L106">            policy.canonicalMaterial());</span>
-<span class="fc" id="L107">        AlgorithmEvidence.append(material, status.name());</span>
-<span class="fc" id="L108">        AlgorithmEvidence.append(material, detailCode);</span>
-<span class="fc" id="L109">        AlgorithmEvidence.append(material, Integer.toString(prime));</span>
-<span class="fc" id="L110">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L108">            policy.canonicalMaterial());</span>
+<span class="fc" id="L109">        AlgorithmEvidence.append(material, status.name());</span>
+<span class="fc" id="L110">        AlgorithmEvidence.append(material, detailCode);</span>
+<span class="fc" id="L111">        AlgorithmEvidence.append(material, Integer.toString(prime));</span>
+<span class="fc" id="L112">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc" id="L112">            work.canonicalMaterial());</span>
-<span class="fc" id="L113">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L114">            work.canonicalMaterial());</span>
+<span class="fc" id="L115">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            unit == null ? &quot;&quot; : unit.toString());</span>
-<span class="fc" id="L116">        AlgorithmEvidence.append(</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            unit == null ? &quot;&quot; : unit.toString());</span>
+<span class="fc" id="L118">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc" id="L118">            Integer.toString(berlekampNullity));</span>
-<span class="fc" id="L119">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L120">            Integer.toString(berlekampNullity));</span>
+<span class="fc" id="L121">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc bfc" id="L121" title="All 2 branches covered.">            kernelCertificateHash == null</span>
-<span class="fc" id="L122">                ? &quot;&quot;</span>
-<span class="fc" id="L123">                : kernelCertificateHash);</span>
-<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (int index = 0; index &lt; ordered.size(); index++) {</span>
-<span class="fc" id="L125">            PolynomialFactor&lt;BigInteger&gt; factor = ordered.get(index);</span>
-<span class="fc" id="L126">            AlgorithmEvidence.append(</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            kernelCertificateHash == null</span>
+<span class="fc" id="L124">                ? &quot;&quot;</span>
+<span class="fc" id="L125">                : kernelCertificateHash);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (int index = 0; index &lt; ordered.size(); index++) {</span>
+<span class="fc" id="L127">            PolynomialFactor&lt;BigInteger&gt; factor = ordered.get(index);</span>
+<span class="fc" id="L128">            AlgorithmEvidence.append(</span>
                 material,
-<span class="fc" id="L128">                Integer.toString(factor.multiplicity()));</span>
-<span class="fc" id="L129">            AlgorithmEvidence.append(</span>
+<span class="fc" id="L130">                Integer.toString(factor.multiplicity()));</span>
+<span class="fc" id="L131">            AlgorithmEvidence.append(</span>
                 material,
-<span class="fc" id="L131">                factor.polynomial().canonicalMaterial());</span>
-<span class="fc" id="L132">            AlgorithmEvidence.append(</span>
+<span class="fc" id="L133">                factor.polynomial().canonicalMaterial());</span>
+<span class="fc" id="L134">            AlgorithmEvidence.append(</span>
                 material,
-<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                index &lt; irreducibilityHashes.size()</span>
-<span class="fc" id="L135">                    ? irreducibilityHashes.get(index)</span>
-<span class="nc" id="L136">                    : &quot;&quot;);</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                index &lt; irreducibilityHashes.size()</span>
+<span class="fc" id="L137">                    ? irreducibilityHashes.get(index)</span>
+<span class="nc" id="L138">                    : &quot;&quot;);</span>
         }
 
-<span class="fc" id="L139">        return new FiniteFieldFactorizationResult(new State(</span>
+<span class="fc" id="L141">        return new FiniteFieldFactorizationResult(new State(</span>
             status,
             detailCode,
             sourceDomainId,
+            sourcePolynomialHash,
             prime,
             unit,
             ordered,
@@ -147,97 +150,102 @@ public final class FiniteFieldFactorizationResult {
             kernelCertificateHash,
             irreducibilityHashes,
             work,
-<span class="fc" id="L150">            AlgorithmEvidence.sha256(material.toString())));</span>
+<span class="fc" id="L153">            AlgorithmEvidence.sha256(material.toString())));</span>
     }
 
     public Status status() {
-<span class="fc" id="L154">        return state.status();</span>
+<span class="fc" id="L157">        return state.status();</span>
     }
 
     public String detailCode() {
-<span class="fc" id="L158">        return state.detailCode();</span>
+<span class="fc" id="L161">        return state.detailCode();</span>
     }
 
     public String sourceDomainId() {
-<span class="nc" id="L162">        return state.sourceDomainId();</span>
+<span class="nc" id="L165">        return state.sourceDomainId();</span>
+    }
+
+    public String sourcePolynomialHash() {
+<span class="fc" id="L169">        return state.sourcePolynomialHash();</span>
     }
 
     public int prime() {
-<span class="fc" id="L166">        requireCompleted();</span>
-<span class="fc" id="L167">        return state.prime();</span>
+<span class="fc" id="L173">        requireCompleted();</span>
+<span class="fc" id="L174">        return state.prime();</span>
     }
 
     public BigInteger unit() {
-<span class="fc" id="L171">        requireCompleted();</span>
-<span class="fc" id="L172">        return state.unit();</span>
+<span class="fc" id="L178">        requireCompleted();</span>
+<span class="fc" id="L179">        return state.unit();</span>
     }
 
     public List&lt;PolynomialFactor&lt;BigInteger&gt;&gt; factors() {
-<span class="fc" id="L176">        return state.factors();</span>
+<span class="fc" id="L183">        return state.factors();</span>
     }
 
     public int berlekampNullity() {
-<span class="fc" id="L180">        requireCompleted();</span>
-<span class="fc" id="L181">        return state.berlekampNullity();</span>
+<span class="fc" id="L187">        requireCompleted();</span>
+<span class="fc" id="L188">        return state.berlekampNullity();</span>
     }
 
     public String kernelCertificateHash() {
-<span class="fc" id="L185">        requireCompleted();</span>
-<span class="fc" id="L186">        return state.kernelCertificateHash();</span>
+<span class="fc" id="L192">        requireCompleted();</span>
+<span class="fc" id="L193">        return state.kernelCertificateHash();</span>
     }
 
     public List&lt;String&gt; irreducibilityCertificateHashes() {
-<span class="fc" id="L190">        return state.irreducibilityCertificateHashes();</span>
+<span class="fc" id="L197">        return state.irreducibilityCertificateHashes();</span>
     }
 
     public PolynomialWorkLedger work() {
-<span class="fc" id="L194">        return state.work();</span>
+<span class="fc" id="L201">        return state.work();</span>
     }
 
     public String certificateHash() {
-<span class="fc" id="L198">        return state.certificateHash();</span>
+<span class="fc" id="L205">        return state.certificateHash();</span>
     }
 
     public boolean completed() {
-<span class="fc bfc" id="L202" title="All 2 branches covered.">        return status() == Status.COMPLETED;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        return status() == Status.COMPLETED;</span>
     }
 
     private void requireCompleted() {
-<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (!completed()) {</span>
-<span class="fc" id="L207">            throw new IllegalStateException(</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (!completed()) {</span>
+<span class="fc" id="L214">            throw new IllegalStateException(</span>
                 &quot;failed finite-field factorization has no exact output&quot;);
         }
-<span class="fc" id="L210">    }</span>
+<span class="fc" id="L217">    }</span>
 
     @Override
     public boolean equals(Object other) {
-<span class="fc" id="L214">        return this == other</span>
-<span class="pc bpc" id="L215" title="2 of 4 branches missed.">            || other instanceof FiniteFieldFactorizationResult result</span>
-<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                &amp;&amp; state.equals(result.state);</span>
+<span class="fc" id="L221">        return this == other</span>
+<span class="pc bpc" id="L222" title="2 of 4 branches missed.">            || other instanceof FiniteFieldFactorizationResult result</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">                &amp;&amp; state.equals(result.state);</span>
     }
 
     @Override
     public int hashCode() {
-<span class="nc" id="L221">        return state.hashCode();</span>
+<span class="nc" id="L228">        return state.hashCode();</span>
     }
 
     @Override
     public String toString() {
-<span class="fc" id="L226">        return &quot;FiniteFieldFactorizationResult[&quot; + state + ']';</span>
+<span class="fc" id="L233">        return &quot;FiniteFieldFactorizationResult[&quot; + state + ']';</span>
     }
 
-<span class="fc" id="L229">    public enum Status {</span>
-<span class="fc" id="L230">        COMPLETED,</span>
-<span class="fc" id="L231">        UNSUPPORTED_DOMAIN,</span>
-<span class="fc" id="L232">        UNSUPPORTED_SHAPE,</span>
-<span class="fc" id="L233">        BUDGET_INCONCLUSIVE,</span>
-<span class="fc" id="L234">        TECHNICAL_FAILURE</span>
+<span class="fc" id="L236">    public enum Status {</span>
+<span class="fc" id="L237">        COMPLETED,</span>
+<span class="fc" id="L238">        UNSUPPORTED_DOMAIN,</span>
+<span class="fc" id="L239">        UNSUPPORTED_SHAPE,</span>
+<span class="fc" id="L240">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L241">        TECHNICAL_FAILURE</span>
     }
 
     private record State(
         Status status,
         String detailCode,
         String sourceDomainId,
+        String sourcePolynomialHash,
         int prime,
         BigInteger unit,
         List&lt;PolynomialFactor&lt;BigInteger&gt;&gt; factors,
@@ -247,40 +255,43 @@ public final class FiniteFieldFactorizationResult {
         PolynomialWorkLedger work,
         String certificateHash
     ) {
-<span class="fc" id="L250">        private State {</span>
-<span class="fc" id="L251">            Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (detailCode == null</span>
-<span class="pc bpc" id="L253" title="2 of 4 branches missed.">                    || detailCode.isBlank()</span>
+<span class="fc" id="L258">        private State {</span>
+<span class="fc" id="L259">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (detailCode == null</span>
+<span class="pc bpc" id="L261" title="2 of 4 branches missed.">                    || detailCode.isBlank()</span>
                     || sourceDomainId == null
-<span class="pc bpc" id="L255" title="3 of 6 branches missed.">                    || sourceDomainId.isBlank()</span>
+<span class="pc bpc" id="L263" title="2 of 4 branches missed.">                    || sourceDomainId.isBlank()</span>
+                    || sourcePolynomialHash == null
+<span class="pc bpc" id="L265" title="3 of 6 branches missed.">                    || !sourcePolynomialHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)
                     || work == null
                     || certificateHash == null
-<span class="pc bpc" id="L258" title="1 of 2 branches missed.">                    || !certificateHash.matches(</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                    || !certificateHash.matches(</span>
                         &quot;sha256:[0-9a-f]{64}&quot;)) {
-<span class="nc" id="L260">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L271">                throw new IllegalArgumentException(</span>
                     &quot;finite-field factorization result is invalid&quot;);
             }
-<span class="fc" id="L263">            factors = List.copyOf(factors);</span>
-<span class="fc" id="L264">            irreducibilityCertificateHashes =</span>
-<span class="fc" id="L265">                List.copyOf(irreducibilityCertificateHashes);</span>
-<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (status == Status.COMPLETED) {</span>
-<span class="fc" id="L267">                validateCompleted(</span>
+<span class="fc" id="L274">            factors = List.copyOf(factors);</span>
+<span class="fc" id="L275">            irreducibilityCertificateHashes =</span>
+<span class="fc" id="L276">                List.copyOf(irreducibilityCertificateHashes);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            if (status == Status.COMPLETED) {</span>
+<span class="fc" id="L278">                validateCompleted(</span>
                     prime,
                     unit,
                     factors,
                     berlekampNullity,
                     kernelCertificateHash,
                     irreducibilityCertificateHashes);
-<span class="pc bpc" id="L274" title="2 of 4 branches missed.">            } else if (prime != 0</span>
+<span class="pc bpc" id="L285" title="2 of 4 branches missed.">            } else if (prime != 0</span>
                     || unit != null
-<span class="pc bpc" id="L276" title="3 of 6 branches missed.">                    || !factors.isEmpty()</span>
+<span class="pc bpc" id="L287" title="3 of 6 branches missed.">                    || !factors.isEmpty()</span>
                     || berlekampNullity != 0
                     || kernelCertificateHash != null
-<span class="pc bpc" id="L279" title="1 of 2 branches missed.">                    || !irreducibilityCertificateHashes.isEmpty()) {</span>
-<span class="nc" id="L280">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">                    || !irreducibilityCertificateHashes.isEmpty()) {</span>
+<span class="nc" id="L291">                throw new IllegalArgumentException(</span>
                     &quot;failed finite-field result cannot expose factors&quot;);
             }
-<span class="fc" id="L283">        }</span>
+<span class="fc" id="L294">        }</span>
 
         private static void validateCompleted(
             int prime,
@@ -290,43 +301,43 @@ public final class FiniteFieldFactorizationResult {
             String kernelCertificateHash,
             List&lt;String&gt; irreducibilityCertificateHashes
         ) {
-<span class="fc" id="L293">            Objects.requireNonNull(unit, &quot;unit&quot;);</span>
-<span class="pc bpc" id="L294" title="1 of 2 branches missed.">            if (prime &lt; 2</span>
-<span class="pc bpc" id="L295" title="1 of 2 branches missed.">                    || unit.signum() == 0</span>
-<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                    || factors.isEmpty()</span>
-<span class="pc bpc" id="L297" title="2 of 4 branches missed.">                    || berlekampNullity != factors.size()</span>
+<span class="fc" id="L304">            Objects.requireNonNull(unit, &quot;unit&quot;);</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            if (prime &lt; 2</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">                    || unit.signum() == 0</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">                    || factors.isEmpty()</span>
+<span class="pc bpc" id="L308" title="2 of 4 branches missed.">                    || berlekampNullity != factors.size()</span>
                     || kernelCertificateHash == null
-<span class="pc bpc" id="L299" title="1 of 2 branches missed.">                    || !kernelCertificateHash.matches(</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">                    || !kernelCertificateHash.matches(</span>
                         &quot;sha256:[0-9a-f]{64}&quot;)
-<span class="fc" id="L301">                    || irreducibilityCertificateHashes.size()</span>
-<span class="pc bpc" id="L302" title="1 of 2 branches missed.">                        != factors.size()</span>
-<span class="fc" id="L303">                    || irreducibilityCertificateHashes.stream()</span>
-<span class="pc bpc" id="L304" title="2 of 4 branches missed.">                        .anyMatch(hash -&gt; hash == null</span>
-<span class="pc bpc" id="L305" title="1 of 2 branches missed.">                            || !hash.matches(</span>
+<span class="fc" id="L312">                    || irreducibilityCertificateHashes.size()</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">                        != factors.size()</span>
+<span class="fc" id="L314">                    || irreducibilityCertificateHashes.stream()</span>
+<span class="pc bpc" id="L315" title="2 of 4 branches missed.">                        .anyMatch(hash -&gt; hash == null</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                            || !hash.matches(</span>
                                 &quot;sha256:[0-9a-f]{64}&quot;))) {
-<span class="nc" id="L307">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L318">                throw new IllegalArgumentException(</span>
                     &quot;completed finite-field result is invalid&quot;);
             }
-<span class="fc" id="L310">            String expectedDomain = PrimeField.of(prime).id();</span>
-<span class="fc" id="L311">            String previousMaterial = null;</span>
-<span class="fc bfc" id="L312" title="All 2 branches covered.">            for (PolynomialFactor&lt;BigInteger&gt; factor : factors) {</span>
-<span class="fc" id="L313">                String material =</span>
-<span class="fc" id="L314">                    factor.polynomial().canonicalMaterial();</span>
-<span class="pc bpc" id="L315" title="1 of 2 branches missed.">                if (factor.multiplicity() != 1</span>
-<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                        || !expectedDomain.equals(</span>
-<span class="fc" id="L317">                            factor.polynomial().ring()</span>
-<span class="fc" id="L318">                                .coefficientDomain().id())</span>
-<span class="pc bpc" id="L319" title="1 of 4 branches missed.">                        || !BigInteger.ONE.equals(</span>
-<span class="fc" id="L320">                            factor.polynomial()</span>
-<span class="fc" id="L321">                                .leadingCoefficient())</span>
+<span class="fc" id="L321">            String expectedDomain = PrimeField.of(prime).id();</span>
+<span class="fc" id="L322">            String previousMaterial = null;</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            for (PolynomialFactor&lt;BigInteger&gt; factor : factors) {</span>
+<span class="fc" id="L324">                String material =</span>
+<span class="fc" id="L325">                    factor.polynomial().canonicalMaterial();</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                if (factor.multiplicity() != 1</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                        || !expectedDomain.equals(</span>
+<span class="fc" id="L328">                            factor.polynomial().ring()</span>
+<span class="fc" id="L329">                                .coefficientDomain().id())</span>
+<span class="pc bpc" id="L330" title="1 of 4 branches missed.">                        || !BigInteger.ONE.equals(</span>
+<span class="fc" id="L331">                            factor.polynomial()</span>
+<span class="fc" id="L332">                                .leadingCoefficient())</span>
                         || previousMaterial != null
-<span class="pc bpc" id="L323" title="1 of 2 branches missed.">                            &amp;&amp; previousMaterial.compareTo(material) &gt;= 0) {</span>
-<span class="nc" id="L324">                    throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                            &amp;&amp; previousMaterial.compareTo(material) &gt;= 0) {</span>
+<span class="nc" id="L335">                    throw new IllegalArgumentException(</span>
                         &quot;finite-field factors are not canonical&quot;);
                 }
-<span class="fc" id="L327">                previousMaterial = material;</span>
-<span class="fc" id="L328">            }</span>
-<span class="fc" id="L329">        }</span>
+<span class="fc" id="L338">                previousMaterial = material;</span>
+<span class="fc" id="L339">            }</span>
+<span class="fc" id="L340">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SuitablePrimeSelectionPolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">SuitablePrimeSelectionPolicy.java</span></div><h1>SuitablePrimeSelectionPolicy.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.PrimeField;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Ordered prime candidates and the retained modular factorization policy.
+ *
+ * &lt;p&gt;The candidate sequence is part of the evidence contract. It is strictly
+ * increasing, contains only supported prime moduli and cannot exceed the
+ * finite-field enumeration authority.&lt;/p&gt;
+ */
+public record SuitablePrimeSelectionPolicy(
+    Algorithm algorithm,
+    List&lt;Integer&gt; candidatePrimes,
+    FiniteFieldFactorizationPolicy factorizationPolicy
+) {
+    public static final int MAX_CANDIDATE_PRIMES = 4_096;
+    public static final int MAX_CANDIDATE_VALUE =
+        FiniteFieldFactorizationPolicy.MAX_FIELD_ELEMENTS;
+
+<span class="fc" id="L24">    public SuitablePrimeSelectionPolicy {</span>
+<span class="fc" id="L25">        Objects.requireNonNull(algorithm, &quot;algorithm&quot;);</span>
+<span class="fc" id="L26">        Objects.requireNonNull(candidatePrimes, &quot;candidatePrimes&quot;);</span>
+<span class="fc" id="L27">        Objects.requireNonNull(</span>
+            factorizationPolicy,
+            &quot;factorizationPolicy&quot;);
+<span class="fc" id="L30">        candidatePrimes = List.copyOf(candidatePrimes);</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (candidatePrimes.isEmpty()</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">                || candidatePrimes.size() &gt; MAX_CANDIDATE_PRIMES) {</span>
+<span class="nc" id="L33">            throw new IllegalArgumentException(</span>
+                &quot;suitable-prime candidate sequence is invalid&quot;);
+        }
+
+<span class="fc" id="L37">        int previous = 1;</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (Integer candidateValue : candidatePrimes) {</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            if (candidateValue == null) {</span>
+<span class="nc" id="L40">                throw new IllegalArgumentException(</span>
+                    &quot;suitable-prime candidate must not be null&quot;);
+            }
+<span class="fc" id="L43">            int candidate = candidateValue;</span>
+<span class="pc bpc" id="L44" title="1 of 4 branches missed.">            if (candidate &lt;= previous</span>
+                    || candidate &gt; MAX_CANDIDATE_VALUE
+                    || candidate
+                        &gt; factorizationPolicy
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                            .maxEnumeratedFieldElements()</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                    || !PrimeField.isPrimeModulus(candidate)) {</span>
+<span class="fc" id="L50">                throw new IllegalArgumentException(</span>
+                    &quot;suitable-prime candidates must be increasing prime moduli within bounds&quot;);
+            }
+<span class="fc" id="L53">            previous = candidate;</span>
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">    }</span>
+
+    public static SuitablePrimeSelectionPolicy deterministicAscending(
+        int maximumPrime,
+        int maximumPrimes,
+        FiniteFieldFactorizationPolicy factorizationPolicy
+    ) {
+<span class="fc" id="L62">        Objects.requireNonNull(</span>
+            factorizationPolicy,
+            &quot;factorizationPolicy&quot;);
+<span class="pc bpc" id="L65" title="2 of 4 branches missed.">        if (maximumPrime &lt; 2</span>
+                || maximumPrime &gt; MAX_CANDIDATE_VALUE
+                || maximumPrime
+                    &gt; factorizationPolicy
+<span class="pc bpc" id="L69" title="3 of 6 branches missed.">                        .maxEnumeratedFieldElements()</span>
+                || maximumPrimes &lt; 1
+                || maximumPrimes &gt; MAX_CANDIDATE_PRIMES) {
+<span class="nc" id="L72">            throw new IllegalArgumentException(</span>
+                &quot;deterministic suitable-prime bounds are invalid&quot;);
+        }
+
+<span class="fc" id="L76">        ArrayList&lt;Integer&gt; primes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L77">        for (int candidate = 2;</span>
+                candidate &lt;= maximumPrime
+<span class="pc bpc" id="L79" title="1 of 4 branches missed.">                    &amp;&amp; primes.size() &lt; maximumPrimes;</span>
+<span class="fc" id="L80">                candidate++) {</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (PrimeField.isPrimeModulus(candidate)) {</span>
+<span class="fc" id="L82">                primes.add(candidate);</span>
+            }
+        }
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (primes.isEmpty()) {</span>
+<span class="nc" id="L86">            throw new IllegalArgumentException(</span>
+                &quot;deterministic suitable-prime policy has no candidates&quot;);
+        }
+<span class="fc" id="L89">        return new SuitablePrimeSelectionPolicy(</span>
+            Algorithm.DETERMINISTIC_ASCENDING_PRIMES_V1,
+            primes,
+            factorizationPolicy);
+    }
+
+    public String canonicalMaterial() {
+<span class="fc" id="L96">        StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L97">        AlgorithmEvidence.append(result, algorithm.id());</span>
+<span class="fc" id="L98">        AlgorithmEvidence.append(</span>
+            result,
+            FiniteFieldFactorization.METHOD_ID);
+<span class="fc" id="L101">        AlgorithmEvidence.append(</span>
+            result,
+<span class="fc" id="L103">            factorizationPolicy.canonicalMaterial());</span>
+<span class="fc" id="L104">        AlgorithmEvidence.append(</span>
+            result,
+<span class="fc" id="L106">            Integer.toString(candidatePrimes.size()));</span>
+<span class="fc" id="L107">        candidatePrimes.forEach(candidate -&gt;</span>
+<span class="fc" id="L108">            AlgorithmEvidence.append(</span>
+                result,
+<span class="fc" id="L110">                Integer.toString(candidate)));</span>
+<span class="fc" id="L111">        return result.toString();</span>
+    }
+
+<span class="fc" id="L114">    public enum Algorithm {</span>
+<span class="fc" id="L115">        DETERMINISTIC_ASCENDING_PRIMES_V1(</span>
+            &quot;regelsuche.suitable-prime-selection.ascending/v1&quot;);
+
+        private final String id;
+
+<span class="fc" id="L120">        Algorithm(String id) {</span>
+<span class="fc" id="L121">            this.id = id;</span>
+<span class="fc" id="L122">        }</span>
+
+        public String id() {
+<span class="fc" id="L125">            return id;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

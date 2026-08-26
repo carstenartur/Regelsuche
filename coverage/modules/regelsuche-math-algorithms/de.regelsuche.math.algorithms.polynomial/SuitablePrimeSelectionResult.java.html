@@ -1,0 +1,532 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SuitablePrimeSelectionResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">SuitablePrimeSelectionResult.java</span></div><h1>SuitablePrimeSelectionResult.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.Monomial;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.SparsePolynomial;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/**
+ * Issuer-owned evidence for one bounded suitable-prime selection campaign.
+ *
+ * &lt;p&gt;Rejected primes remain visible with their exact terminal reason and work.
+ * A completed result additionally retains the selected modular source and its
+ * independently verified finite-field factorization.&lt;/p&gt;
+ */
+public final class SuitablePrimeSelectionResult {
+    private final State state;
+
+<span class="fc" id="L27">    private SuitablePrimeSelectionResult(State state) {</span>
+<span class="fc" id="L28">        this.state = state;</span>
+<span class="fc" id="L29">    }</span>
+
+    static SuitablePrimeSelectionResult completed(
+        List&lt;PrimeAttempt&gt; attempts,
+        int selectedPrime,
+        SparsePolynomial&lt;BigInteger&gt; modularSource,
+        FiniteFieldFactorizationResult modularFactorization,
+        PolynomialWorkLedger work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionPolicy policy
+    ) {
+<span class="fc" id="L40">        return create(</span>
+            Status.COMPLETED,
+            &quot;SUITABLE_PRIME_AND_MODULAR_FACTORIZATION_VERIFIED&quot;,
+            attempts,
+            selectedPrime,
+            modularSource,
+            modularFactorization,
+            work,
+            request,
+            policy);
+    }
+
+    static SuitablePrimeSelectionResult failure(
+        Status status,
+        String detailCode,
+        List&lt;PrimeAttempt&gt; attempts,
+        PolynomialWorkLedger work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionPolicy policy
+    ) {
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (status == Status.COMPLETED) {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(</span>
+                &quot;completed suitable-prime result requires a selected prime&quot;);
+        }
+<span class="fc" id="L64">        return create(</span>
+            status,
+            detailCode,
+            attempts,
+            0,
+            null,
+            null,
+            work,
+            request,
+            policy);
+    }
+
+    private static SuitablePrimeSelectionResult create(
+        Status status,
+        String detailCode,
+        List&lt;PrimeAttempt&gt; attempts,
+        int selectedPrime,
+        SparsePolynomial&lt;BigInteger&gt; modularSource,
+        FiniteFieldFactorizationResult modularFactorization,
+        PolynomialWorkLedger work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionPolicy policy
+    ) {
+<span class="fc" id="L87">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L88">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L89">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L90">        List&lt;PrimeAttempt&gt; retainedAttempts = List.copyOf(attempts);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (retainedAttempts.size() &gt; request.maxCandidates()) {</span>
+<span class="fc" id="L92">            throw new IllegalArgumentException(</span>
+                &quot;suitable-prime attempts exceed the request candidate budget&quot;);
+        }
+<span class="fc" id="L95">        validateAttemptSequence(retainedAttempts, policy);</span>
+<span class="fc" id="L96">        String sourceDomainId = request.source()</span>
+<span class="fc" id="L97">            .ring()</span>
+<span class="fc" id="L98">            .coefficientDomain()</span>
+<span class="fc" id="L99">            .id();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (status == Status.COMPLETED) {</span>
+<span class="fc" id="L101">            validateModularSourceCorrespondence(</span>
+<span class="fc" id="L102">                request.source(),</span>
+                selectedPrime,
+                modularSource);
+        }
+
+<span class="fc" id="L107">        StringBuilder material = new StringBuilder(</span>
+            SuitablePrimeSelection.METHOD_ID);
+<span class="fc" id="L109">        AlgorithmEvidence.append(material, sourceDomainId);</span>
+<span class="fc" id="L110">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L112">            request.canonicalMaterial());</span>
+<span class="fc" id="L113">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L115">            policy.canonicalMaterial());</span>
+<span class="fc" id="L116">        AlgorithmEvidence.append(material, status.name());</span>
+<span class="fc" id="L117">        AlgorithmEvidence.append(material, detailCode);</span>
+<span class="fc" id="L118">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L120">            work.canonicalMaterial());</span>
+<span class="fc" id="L121">        retainedAttempts.forEach(attempt -&gt;</span>
+<span class="fc" id="L122">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L124">                attempt.canonicalMaterial()));</span>
+<span class="fc" id="L125">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L127">            Integer.toString(selectedPrime));</span>
+<span class="fc" id="L128">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            modularSource == null</span>
+<span class="fc" id="L131">                ? &quot;&quot;</span>
+<span class="fc" id="L132">                : modularSource.canonicalMaterial());</span>
+<span class="fc" id="L133">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            modularFactorization == null</span>
+<span class="fc" id="L136">                ? &quot;&quot;</span>
+<span class="fc" id="L137">                : modularFactorization.certificateHash());</span>
+
+<span class="fc" id="L139">        return new SuitablePrimeSelectionResult(new State(</span>
+            status,
+            detailCode,
+            sourceDomainId,
+            retainedAttempts,
+            selectedPrime,
+            modularSource,
+            modularFactorization,
+            work,
+<span class="fc" id="L148">            AlgorithmEvidence.sha256(material.toString())));</span>
+    }
+
+    private static void validateAttemptSequence(
+        List&lt;PrimeAttempt&gt; attempts,
+        SuitablePrimeSelectionPolicy policy
+    ) {
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (attempts.size() &gt; policy.candidatePrimes().size()) {</span>
+<span class="nc" id="L156">            throw new IllegalArgumentException(</span>
+                &quot;suitable-prime attempts exceed the policy sequence&quot;);
+        }
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (int index = 0; index &lt; attempts.size(); index++) {</span>
+<span class="fc" id="L160">            PrimeAttempt attempt = attempts.get(index);</span>
+<span class="fc" id="L161">            if (attempt.prime()</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                    != policy.candidatePrimes().get(index)) {</span>
+<span class="fc" id="L163">                throw new IllegalArgumentException(</span>
+                    &quot;suitable-prime attempts do not follow the policy sequence&quot;);
+            }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (index + 1 &lt; attempts.size()</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                    &amp;&amp; attempt.disposition()</span>
+                        != PrimeAttempt.Disposition.REJECTED) {
+<span class="nc" id="L169">                throw new IllegalArgumentException(</span>
+                    &quot;only the final suitable-prime attempt may be terminal&quot;);
+            }
+        }
+<span class="fc" id="L173">    }</span>
+
+    private static void validateModularSourceCorrespondence(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        int selectedPrime,
+        SparsePolynomial&lt;BigInteger&gt; modularSource
+    ) {
+<span class="fc" id="L180">        Objects.requireNonNull(modularSource, &quot;modularSource&quot;);</span>
+<span class="fc" id="L181">        PrimeField field = PrimeField.of(selectedPrime);</span>
+<span class="fc" id="L182">        PolynomialRing&lt;BigInteger&gt; expectedRing = new PolynomialRing&lt;&gt;(</span>
+            field,
+<span class="fc" id="L184">            source.ring().variables(),</span>
+<span class="fc" id="L185">            source.ring().monomialOrder());</span>
+<span class="fc" id="L186">        NavigableMap&lt;Monomial, BigInteger&gt; expectedTerms =</span>
+<span class="fc" id="L187">            new TreeMap&lt;&gt;(expectedRing.monomialComparator());</span>
+        for (Map.Entry&lt;Monomial, BigInteger&gt; term
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                : source.terms().entrySet()) {</span>
+<span class="fc" id="L190">            BigInteger coefficient = field.canonical(term.getValue());</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (!field.isZero(coefficient)) {</span>
+<span class="fc" id="L192">                expectedTerms.put(term.getKey(), coefficient);</span>
+            }
+<span class="fc" id="L194">        }</span>
+<span class="fc" id="L195">        SparsePolynomial&lt;BigInteger&gt; expected =</span>
+            new SparsePolynomial&lt;&gt;(expectedRing, expectedTerms);
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (!expected.equals(modularSource)) {</span>
+<span class="fc" id="L198">            throw new IllegalArgumentException(</span>
+                &quot;selected modular source does not reduce the integer source&quot;);
+        }
+<span class="fc" id="L201">    }</span>
+
+    static PrimeAttempt issueAttempt(
+        int prime,
+        PrimeAttempt.Disposition disposition,
+        String detailCode,
+        SparsePolynomial&lt;BigInteger&gt; modularSource,
+        String modularFactorizationCertificateHash,
+        long workUnits
+    ) {
+<span class="fc" id="L211">        Objects.requireNonNull(modularSource, &quot;modularSource&quot;);</span>
+<span class="fc" id="L212">        String modularSourceHash = AlgorithmEvidence.sha256(</span>
+<span class="fc" id="L213">            modularSource.canonicalMaterial());</span>
+        String factorizationHash =
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            modularFactorizationCertificateHash == null</span>
+<span class="fc" id="L216">                ? &quot;&quot;</span>
+<span class="fc" id="L217">                : modularFactorizationCertificateHash;</span>
+<span class="fc" id="L218">        StringBuilder material = new StringBuilder(</span>
+            SuitablePrimeSelection.METHOD_ID);
+<span class="fc" id="L220">        AlgorithmEvidence.append(material, Integer.toString(prime));</span>
+<span class="fc" id="L221">        AlgorithmEvidence.append(material, disposition.name());</span>
+<span class="fc" id="L222">        AlgorithmEvidence.append(material, detailCode);</span>
+<span class="fc" id="L223">        AlgorithmEvidence.append(material, modularSourceHash);</span>
+<span class="fc" id="L224">        AlgorithmEvidence.append(material, factorizationHash);</span>
+<span class="fc" id="L225">        AlgorithmEvidence.append(material, Long.toString(workUnits));</span>
+<span class="fc" id="L226">        return new PrimeAttempt(</span>
+            prime,
+            disposition,
+            detailCode,
+            modularSourceHash,
+            factorizationHash,
+            workUnits,
+<span class="fc" id="L233">            AlgorithmEvidence.sha256(material.toString()));</span>
+    }
+
+    public Status status() {
+<span class="fc" id="L237">        return state.status();</span>
+    }
+
+    public String detailCode() {
+<span class="fc" id="L241">        return state.detailCode();</span>
+    }
+
+    public String sourceDomainId() {
+<span class="nc" id="L245">        return state.sourceDomainId();</span>
+    }
+
+    public List&lt;PrimeAttempt&gt; attempts() {
+<span class="fc" id="L249">        return state.attempts();</span>
+    }
+
+    public int selectedPrime() {
+<span class="fc" id="L253">        requireCompleted();</span>
+<span class="fc" id="L254">        return state.selectedPrime();</span>
+    }
+
+    public SparsePolynomial&lt;BigInteger&gt; modularSource() {
+<span class="fc" id="L258">        requireCompleted();</span>
+<span class="fc" id="L259">        return state.modularSource();</span>
+    }
+
+    public FiniteFieldFactorizationResult modularFactorization() {
+<span class="fc" id="L263">        requireCompleted();</span>
+<span class="fc" id="L264">        return state.modularFactorization();</span>
+    }
+
+    public PolynomialWorkLedger work() {
+<span class="fc" id="L268">        return state.work();</span>
+    }
+
+    public String certificateHash() {
+<span class="fc" id="L272">        return state.certificateHash();</span>
+    }
+
+    public boolean completed() {
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        return status() == Status.COMPLETED;</span>
+    }
+
+    private void requireCompleted() {
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        if (!completed()) {</span>
+<span class="fc" id="L281">            throw new IllegalStateException(</span>
+                &quot;failed suitable-prime selection has no selected output&quot;);
+        }
+<span class="fc" id="L284">    }</span>
+
+    @Override
+    public boolean equals(Object other) {
+<span class="fc" id="L288">        return this == other</span>
+<span class="pc bpc" id="L289" title="2 of 4 branches missed.">            || other instanceof SuitablePrimeSelectionResult result</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">                &amp;&amp; state.equals(result.state);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L295">        return state.hashCode();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L300">        return &quot;SuitablePrimeSelectionResult[&quot; + state + ']';</span>
+    }
+
+<span class="fc" id="L303">    public enum Status {</span>
+<span class="fc" id="L304">        COMPLETED,</span>
+<span class="fc" id="L305">        UNSUPPORTED_DOMAIN,</span>
+<span class="fc" id="L306">        UNSUPPORTED_SHAPE,</span>
+<span class="fc" id="L307">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L308">        TECHNICAL_FAILURE</span>
+    }
+
+    /** One package-issued prime attempt in canonical policy order. */
+    public static final class PrimeAttempt {
+        private final AttemptState state;
+
+        private PrimeAttempt(
+            int prime,
+            Disposition disposition,
+            String detailCode,
+            String modularSourceHash,
+            String modularFactorizationCertificateHash,
+            long workUnits,
+            String certificateHash
+<span class="fc" id="L323">        ) {</span>
+<span class="fc" id="L324">            state = new AttemptState(</span>
+                prime,
+                disposition,
+                detailCode,
+                modularSourceHash,
+                modularFactorizationCertificateHash,
+                workUnits,
+                certificateHash);
+<span class="fc" id="L332">        }</span>
+
+        public int prime() {
+<span class="fc" id="L335">            return state.prime();</span>
+        }
+
+        public Disposition disposition() {
+<span class="fc" id="L339">            return state.disposition();</span>
+        }
+
+        public String detailCode() {
+<span class="fc" id="L343">            return state.detailCode();</span>
+        }
+
+        public String modularSourceHash() {
+<span class="fc" id="L347">            return state.modularSourceHash();</span>
+        }
+
+        public String modularFactorizationCertificateHash() {
+<span class="fc" id="L351">            return state.modularFactorizationCertificateHash();</span>
+        }
+
+        public long workUnits() {
+<span class="fc" id="L355">            return state.workUnits();</span>
+        }
+
+        public String certificateHash() {
+<span class="fc" id="L359">            return state.certificateHash();</span>
+        }
+
+        private String canonicalMaterial() {
+<span class="fc" id="L363">            StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L364">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L366">                Integer.toString(prime()));</span>
+<span class="fc" id="L367">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L369">                disposition().name());</span>
+<span class="fc" id="L370">            AlgorithmEvidence.append(material, detailCode());</span>
+<span class="fc" id="L371">            AlgorithmEvidence.append(material, modularSourceHash());</span>
+<span class="fc" id="L372">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L374">                modularFactorizationCertificateHash());</span>
+<span class="fc" id="L375">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L377">                Long.toString(workUnits()));</span>
+<span class="fc" id="L378">            AlgorithmEvidence.append(material, certificateHash());</span>
+<span class="fc" id="L379">            return material.toString();</span>
+        }
+
+        @Override
+        public boolean equals(Object other) {
+<span class="fc" id="L384">            return this == other</span>
+<span class="pc bpc" id="L385" title="2 of 4 branches missed.">                || other instanceof PrimeAttempt attempt</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">                    &amp;&amp; state.equals(attempt.state);</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L391">            return state.hashCode();</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="fc" id="L396">            return &quot;PrimeAttempt[&quot; + state + ']';</span>
+        }
+
+<span class="fc" id="L399">        public enum Disposition {</span>
+<span class="fc" id="L400">            REJECTED,</span>
+<span class="fc" id="L401">            SELECTED,</span>
+<span class="fc" id="L402">            TERMINAL_INCONCLUSIVE,</span>
+<span class="fc" id="L403">            TERMINAL_FAILURE</span>
+        }
+
+        private record AttemptState(
+            int prime,
+            Disposition disposition,
+            String detailCode,
+            String modularSourceHash,
+            String modularFactorizationCertificateHash,
+            long workUnits,
+            String certificateHash
+        ) {
+<span class="fc" id="L415">            private AttemptState {</span>
+<span class="fc" id="L416">                Objects.requireNonNull(disposition, &quot;disposition&quot;);</span>
+<span class="pc bpc" id="L417" title="2 of 4 branches missed.">                if (prime &lt; 2</span>
+                        || detailCode == null
+<span class="pc bpc" id="L419" title="2 of 4 branches missed.">                        || detailCode.isBlank()</span>
+                        || modularSourceHash == null
+<span class="pc bpc" id="L421" title="2 of 4 branches missed.">                        || !modularSourceHash.matches(</span>
+                            &quot;sha256:[0-9a-f]{64}&quot;)
+                        || modularFactorizationCertificateHash == null
+<span class="fc bfc" id="L424" title="All 2 branches covered.">                        || !modularFactorizationCertificateHash.isEmpty()</span>
+<span class="pc bpc" id="L425" title="3 of 6 branches missed.">                            &amp;&amp; !modularFactorizationCertificateHash.matches(</span>
+                                &quot;sha256:[0-9a-f]{64}&quot;)
+                        || workUnits &lt; 0
+                        || certificateHash == null
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">                        || !certificateHash.matches(</span>
+                            &quot;sha256:[0-9a-f]{64}&quot;)) {
+<span class="nc" id="L431">                    throw new IllegalArgumentException(</span>
+                        &quot;suitable-prime attempt is invalid&quot;);
+                }
+<span class="fc bfc" id="L434" title="All 2 branches covered.">                if (disposition != Disposition.REJECTED</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">                        &amp;&amp; modularFactorizationCertificateHash.isEmpty()) {</span>
+<span class="nc" id="L436">                    throw new IllegalArgumentException(</span>
+                        &quot;terminal prime attempt requires factorization evidence&quot;);
+                }
+<span class="fc" id="L439">            }</span>
+        }
+    }
+
+    private record State(
+        Status status,
+        String detailCode,
+        String sourceDomainId,
+        List&lt;PrimeAttempt&gt; attempts,
+        int selectedPrime,
+        SparsePolynomial&lt;BigInteger&gt; modularSource,
+        FiniteFieldFactorizationResult modularFactorization,
+        PolynomialWorkLedger work,
+        String certificateHash
+    ) {
+<span class="fc" id="L454">        private State {</span>
+<span class="fc" id="L455">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">            if (detailCode == null</span>
+<span class="pc bpc" id="L457" title="2 of 4 branches missed.">                    || detailCode.isBlank()</span>
+                    || sourceDomainId == null
+<span class="pc bpc" id="L459" title="4 of 8 branches missed.">                    || sourceDomainId.isBlank()</span>
+                    || attempts == null
+                    || work == null
+                    || certificateHash == null
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">                    || !certificateHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)) {
+<span class="nc" id="L465">                throw new IllegalArgumentException(</span>
+                    &quot;suitable-prime selection result is invalid&quot;);
+            }
+<span class="fc" id="L468">            attempts = List.copyOf(attempts);</span>
+<span class="fc" id="L469">            long selectedAttempts = attempts.stream()</span>
+<span class="fc bfc" id="L470" title="All 2 branches covered.">                .filter(attempt -&gt; attempt.disposition()</span>
+                    == PrimeAttempt.Disposition.SELECTED)
+<span class="fc" id="L472">                .count();</span>
+<span class="fc bfc" id="L473" title="All 2 branches covered.">            if (status == Status.COMPLETED) {</span>
+<span class="fc" id="L474">                validateCompleted(</span>
+                    sourceDomainId,
+                    attempts,
+                    selectedAttempts,
+                    selectedPrime,
+                    modularSource,
+                    modularFactorization);
+<span class="pc bpc" id="L481" title="4 of 8 branches missed.">            } else if (selectedPrime != 0</span>
+                    || modularSource != null
+                    || modularFactorization != null
+                    || selectedAttempts != 0) {
+<span class="nc" id="L485">                throw new IllegalArgumentException(</span>
+                    &quot;failed suitable-prime result cannot expose selected output&quot;);
+            }
+<span class="fc" id="L488">        }</span>
+
+        private static void validateCompleted(
+            String sourceDomainId,
+            List&lt;PrimeAttempt&gt; attempts,
+            long selectedAttempts,
+            int selectedPrime,
+            SparsePolynomial&lt;BigInteger&gt; modularSource,
+            FiniteFieldFactorizationResult modularFactorization
+        ) {
+<span class="fc" id="L498">            Objects.requireNonNull(modularSource, &quot;modularSource&quot;);</span>
+<span class="fc" id="L499">            Objects.requireNonNull(</span>
+                modularFactorization,
+                &quot;modularFactorization&quot;);
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">            PrimeAttempt selectedAttempt = attempts.isEmpty()</span>
+<span class="nc" id="L503">                ? null</span>
+<span class="fc" id="L504">                : attempts.getLast();</span>
+<span class="fc" id="L505">            String modularSourceHash = AlgorithmEvidence.sha256(</span>
+<span class="fc" id="L506">                modularSource.canonicalMaterial());</span>
+<span class="pc bpc" id="L507" title="4 of 8 branches missed.">            if (!BigIntegerDomain.DOMAIN_ID.equals(sourceDomainId)</span>
+                    || selectedPrime &lt; 2
+                    || selectedAttempt == null
+                    || selectedAttempts != 1
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">                    || selectedAttempt.disposition()</span>
+                        != PrimeAttempt.Disposition.SELECTED
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">                    || selectedAttempt.prime() != selectedPrime</span>
+<span class="fc" id="L514">                    || !selectedAttempt.modularSourceHash()</span>
+<span class="fc bfc" id="L515" title="All 2 branches covered.">                        .equals(modularSourceHash)</span>
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">                    || !(modularSource.ring().coefficientDomain()</span>
+<span class="fc" id="L517">                        instanceof PrimeField field)</span>
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">                    || field.prime() != selectedPrime</span>
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">                    || !modularFactorization.completed()</span>
+<span class="fc" id="L520">                    || !modularFactorization.sourcePolynomialHash()</span>
+<span class="fc bfc" id="L521" title="All 2 branches covered.">                        .equals(modularSourceHash)</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">                    || modularFactorization.prime() != selectedPrime</span>
+                    || !selectedAttempt
+<span class="fc" id="L524">                        .modularFactorizationCertificateHash()</span>
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">                        .equals(modularFactorization.certificateHash())) {</span>
+<span class="fc" id="L526">                throw new IllegalArgumentException(</span>
+                    &quot;completed suitable-prime selection is invalid&quot;);
+            }
+<span class="fc" id="L529">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
