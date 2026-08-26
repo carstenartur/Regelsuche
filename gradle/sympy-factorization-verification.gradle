@@ -1,0 +1,10 @@
+/*
+ * Embedded SymPy qualification lifecycle.
+ *
+ * The module owns the JMH execution and report validator. The root lifecycle
+ * only declares that a full checkout qualification must include that task.
+ */
+
+tasks.matching { candidate -> candidate.name == 'fullCheck' }.configureEach {
+    dependsOn ':regelsuche-math-sympy:verifySymPyFactorizationBenchmark'
+}

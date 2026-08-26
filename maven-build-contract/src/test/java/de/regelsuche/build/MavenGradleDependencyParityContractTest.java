@@ -1,5 +1,6 @@
 package de.regelsuche.build;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,6 +15,7 @@ class MavenGradleDependencyParityContractTest {
       "regelsuche-core/build.gradle",
       "regelsuche-discovery/build.gradle",
       "regelsuche-learning/build.gradle",
+      "regelsuche-math-sympy/build.gradle",
       "regelsuche-quality/build.gradle",
       "regelsuche-release/build.gradle",
       "regelsuche-solver-ir/build.gradle");
@@ -41,6 +43,93 @@ class MavenGradleDependencyParityContractTest {
     assertDependency(root, "app/build.gradle",
         "org.graalvm.polyglot:polyglot",
         mavenProperty(root, "graalvm.polyglot.version"));
+  }
+
+  @Test
+  void embeddedGraalpyVersionStaysAlignedAcrossMavenAndGradle()
+      throws IOException {
+    Path root = repositoryRoot();
+    String version = mavenProperty(root, "graalpy.version");
+    String buildFile = "regelsuche-math-sympy/build.gradle";
+    String content = Files.readString(root.resolve(buildFile));
+
+    assertTrue(
+        content.contains("id 'org.graalvm.python' version '" + version + "'"),
+        () -> buildFile + " must pin the GraalPy plugin to " + version);
+    assertTrue(
+        content.contains("polyglotVersion = '" + version + "'"),
+        () -> buildFile + " must pin the injected runtime to " + version);
+    assertTrue(
+        content.contains("community = false"),
+        () -> buildFile
+            + " must select the canonical OSS GraalPy artifact used by Maven");
+    assertTrue(
+        content.contains("'sympy==1.14.0'"),
+        () -> buildFile + " must pin SymPy 1.14.0");
+    assertTrue(
+        content.contains("'mpmath==1.3.0'"),
+        () -> buildFile + " must pin mpmath 1.3.0");
+  }
+
+  @Test
+  void embeddedGraalpyNativeAccessIsExplicitInBothReactors()
+      throws IOException {
+    Path root = repositoryRoot();
+    String gradle = Files.readString(
+        root.resolve("regelsuche-math-sympy/build.gradle"));
+    String maven = Files.readString(
+        root.resolve("regelsuche-math-sympy/pom.xml"));
+    String argument = "--enable-native-access=ALL-UNNAMED";
+
+    assertTrue(
+        gradle.contains("def nativeAccessArgument = '" + argument + "'"),
+        "Gradle must name the required classpath native-access authority");
+    assertTrue(
+        gradle.contains("jvmArgs nativeAccessArgument"),
+        "Gradle tests must authorize the pinned native Python modules");
+    assertTrue(
+        gradle.contains("jvmArgs = [nativeAccessArgument]"),
+        "Gradle JMH forks must authorize the same native modules");
+    assertTrue(
+        maven.contains(
+            "<argLine>@{argLine} " + argument + "</argLine>"),
+        "Maven tests must preserve JaCoCo and authorize native access");
+  }
+
+  @Test
+  void embeddedGraalpyLockIsSharedAndComplete()
+      throws IOException {
+    Path root = repositoryRoot();
+    Path module = root.resolve("regelsuche-math-sympy");
+    String version = mavenProperty(root, "graalpy.version");
+    String gradle = Files.readString(module.resolve("build.gradle"));
+    String maven = Files.readString(module.resolve("pom.xml"));
+    Path lockPath = module.resolve("graalpy.lock");
+
+    assertTrue(
+        gradle.contains(
+            "graalPyLockFile = file(\"$projectDir/graalpy.lock\")"),
+        "Gradle must consume the committed module-local GraalPy lock");
+    assertTrue(
+        maven.contains(
+            "<graalPyLockFile>${project.basedir}/graalpy.lock</graalPyLockFile>"),
+        "Maven must consume the same committed GraalPy lock");
+    assertTrue(Files.isRegularFile(lockPath),
+        "the shared GraalPy lock must be committed");
+
+    String lock = Files.readString(lockPath);
+    assertTrue(lock.contains("# graalpy-version: " + version),
+        "the lock must bind the managed GraalPy version");
+    assertTrue(lock.contains(
+        "# input-packages: mpmath==1.3.0,sympy==1.14.0"),
+        "the lock must bind the configured direct Python packages");
+    assertEquals(
+        List.of("mpmath==1.3.0", "sympy==1.14.0"),
+        Files.readAllLines(lockPath).stream()
+            .map(String::trim)
+            .filter(line -> !line.isBlank() && !line.startsWith("#"))
+            .toList(),
+        "the lock must retain the exact resolved Python package closure");
   }
 
   private static void assertDependency(
