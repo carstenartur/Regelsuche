@@ -44,9 +44,9 @@ public final class NativeUnivariateIntegerFactorizationEngine
     public EngineResult<BigInteger> propose(
         FactorizationRequest<BigInteger> request
     ) {
-        return NativeUnivariateFactorizationPipeline.factorInteger(
+        return NativeUnivariateFactorizationPipeline.factor(
             request,
             policy,
-            ENGINE_ID);
+            NativeCoefficientAdapter.IntegerAdapter.INSTANCE);
     }
 }
