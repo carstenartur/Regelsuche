@@ -38,6 +38,8 @@ dependencies {
 }
 
 def nativeAccessArgument = '--enable-native-access=ALL-UNNAMED'
+def embeddedRuntimeInitialHeap = '512m'
+def embeddedRuntimeMaximumHeap = '2g'
 
 def verificationPython = rootProject.layout.buildDirectory.file(
     System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
@@ -55,6 +57,13 @@ def configureProcessBaseline = { task ->
 tasks.named('test') { task ->
     useJUnitPlatform()
     jvmArgs nativeAccessArgument
+    // GraalPy's language runtime and native-extension metadata remain live for
+    // the lifetime of a test JVM. Keep unrelated lifecycle scenarios in fresh
+    // workers and make the heap requirement explicit instead of depending on
+    // Gradle's smaller generic test-worker default.
+    minHeapSize = embeddedRuntimeInitialHeap
+    maxHeapSize = embeddedRuntimeMaximumHeap
+    forkEvery = 1
     finalizedBy tasks.named('jacocoTestReport')
     configureProcessBaseline(task)
 }
@@ -69,7 +78,13 @@ jmh {
     timeOnIteration = '1s'
     warmup = '1s'
     failOnError = true
-    jvmArgs = [nativeAccessArgument]
+    // The cold track intentionally creates several complete embedded runtimes
+    // in one JMH fork. Use the same bounded heap contract as qualification.
+    jvmArgs = [
+        nativeAccessArgument,
+        "-Xms${embeddedRuntimeInitialHeap}",
+        "-Xmx${embeddedRuntimeMaximumHeap}"
+    ]
 }
 
 tasks.named('jmh') { task ->
