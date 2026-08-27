@@ -372,6 +372,7 @@ public final class ZassenhausRecombination {
         IntegerPolynomialArithmetic.verifyProduct(
             request.source(),
             orderedFactors,
+            policy,
             work);
         return ZassenhausRecombinationResult.completed(
             coefficientBound,
