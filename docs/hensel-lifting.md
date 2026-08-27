@@ -1,13 +1,14 @@
 # Deterministisches multifaktorielles Hensel-Lifting
 
-**Implementierungsstand: 26. August 2026**
+**Implementierungsstand: 28. August 2026**
 
 Diese Stufe hebt die bereits vollständig geprüfte Faktorisierung eines
 primitiven ganzzahligen Polynoms modulo einer ausgewählten Primzahl `p`
 deterministisch von `p` auf ein ausdrücklich gebundenes Zielmodul `p^k`.
-Sie liefert noch keine ganzzahlige Faktorisierung: Die gehobenen Faktoren
-rekonstruieren die Quelle nur modulo `p^k` und bilden den Eingang für die
-nachfolgende ganzzahlige Faktorrekomposition.
+Sie liefert für sich allein noch keine ganzzahlige Faktorisierung: Die
+gehobenen Faktoren rekonstruieren die Quelle nur modulo `p^k` und bilden den
+Eingang für die nachgelagerte, inzwischen implementierte
+Zassenhaus-Rekombination.
 
 ## Position in der Faktorisierungspipeline
 
@@ -18,9 +19,9 @@ Z[x] oder Q[x]
   -> geeignete Primzahl mit Auditspur
   -> vollständige Faktorisierung in F_p[x]
   -> multifaktorielles Hensel-Lifting nach p^k       diese Stufe
-  -> ganzzahlige Faktorrekomposition                 noch offen
-  -> rationale Reassemblierung                       noch offen
-  -> unabhängige Vollständigkeitsprüfung in Q[x]      noch offen
+  -> ganzzahlige Zassenhaus-Rekombination            implementiert
+  -> rationale Reassemblierung                       implementiert
+  -> unabhängige Vollständigkeitsprüfung in Q[x]     noch offen
 ```
 
 ## Öffentlicher Vertrag
@@ -149,7 +150,8 @@ Die Auswahlkampagne und alle eingebetteten Primkörperprüfungen haben bereits
 Arbeit verbraucht. Der öffentliche Hensel-Einstieg rekonstruiert deshalb einen
 Zähler mit exakt demselben Requestlimit und übernimmt jede bestehende
 Stage-Buchung unverändert. Ein paketinterner Einstieg akzeptiert nur einen
-Zähler, dessen Limit und Ledger exakt mit `selection.work()` übereinstimmen.
+Zähler, dessen Limit und Ledger beim Eintritt exakt mit `selection.work()`
+übereinstimmen.
 
 Ein leerer oder größerer neuer Zähler wird mit
 
@@ -159,6 +161,16 @@ HENSEL_WORK_BUDGET_AUTHORITY_MISMATCH
 
 als technischer Vertragsfehler abgelehnt. Die Stufe kann weder frühere Arbeit
 vergessen noch das Budget erweitern.
+
+Die allgemeine native Engine kann mehrere nichtlineare quadratfreie Schichten
+unter derselben Request-Autorität nacheinander bearbeiten. In diesem Fall kann
+das Auswahlledger einer späteren Schicht bereits abgeschlossene
+`hensel.*`-Buchungen einer früheren Schicht enthalten. Während des aktuellen
+Lifts dürfen ausschließlich solche bereits vorhandenen `hensel.*`-Stages
+monoton wachsen. Auswahl-, Berlekamp-, Zassenhaus- und alle anderen
+Präfixbuchungen müssen gegenüber `selection.work()` exakt unverändert bleiben.
+Damit werden ehrliche wiederholte Lifts zugelassen, ohne fremde Arbeit
+nachträglich dem Hensel-Lifting zuschlagen zu können.
 
 Neue Arbeit wird unter stabilen Präfixen gebucht, darunter:
 
@@ -227,7 +239,8 @@ Die Ergebnisprüfung rekonstruiert unabhängig:
 4. die Leitkoeffizientenkonvention;
 5. die aufeinanderfolgenden Moduli `p, p^2, ..., p^k`;
 6. die Produktkongruenz am Zielmodul;
-7. die unveränderte Übernahme des Auswahlledgers.
+7. die exakte Übernahme aller Nicht-Hensel-Auswahlbuchungen und ausschließlich
+   monotones Wachstum bereits vorhandener `hensel.*`-Stages.
 
 ## Terminale Ergebnisse
 
@@ -248,17 +261,22 @@ Die Ergebnisprüfung rekonstruiert unabhängig:
 > Leitkoeffizienten und rekonstruieren das ursprüngliche primitive
 > ganzzahlige Polynom modulo dem ausdrücklich gebundenen Zielmodul `p^k`.
 
-Nicht autorisiert sind:
+Durch dieses Hensel-Ergebnis allein nicht autorisiert sind:
 
 - eine Zerlegung in tatsächliche Faktoren über `Z[x]`;
 - die Behauptung, ein einzelner gehobener Faktor teile die Quelle in `Z[x]`;
-- eine abgeschlossene Zassenhaus-, LLL- oder van-Hoeij-Rekombination;
-- eine bereits ausreichende Rekonstruktionspräzision für jeden künftigen
+- ein Abschlussclaim der nachgelagerten Zassenhaus-, LLL- oder
+  van-Hoeij-Rekombination;
+- eine bereits ausreichende Rekonstruktionspräzision für jeden denkbaren
   Koeffizientenbound;
 - rationale Faktorreassemblierung;
 - unabhängige Vollständigkeit oder Irreduzibilität der ursprünglichen
   `Z[x]`- oder `Q[x]`-Quelle;
 - multivariate Faktorisierung.
+
+Die allgemeine native Engine darf diese engeren Grenzen erst durch die
+separaten, nachgelagerten Rekombinations-, Reassemblierungs- und
+Produktprüfungsverträge erweitern.
 
 ## Prüfung
 
@@ -277,10 +295,16 @@ Vollständiger Checkout-Vertrag:
 mvn --batch-mode --no-transfer-progress -Pfull verify
 ```
 
-## Nächste Stufe
+## Nachgelagerte Stufe
 
-Die gehobenen Faktoren müssen nun unter einer expliziten ganzzahligen
-Koeffizientenschranke rekombiniert werden. Die erste Rekombinationsstufe soll
-Zassenhaus verwenden, Teilmengen deterministisch ordnen, exakte Teilbarkeit in
-`Z[x]` prüfen, sämtliche Kandidaten- und Arbeitsgrenzen binden und einen zu
-kleinen Liftmodulus als inconclusive statt als Irreduzibilität behandeln.
+Die implementierte allgemeine native Engine übergibt das abgeschlossene
+Hensel-Ergebnis an die gebundene deterministische Zassenhaus-Rekombination.
+Diese leitet eine ganzzahlige Koeffizientenschranke her, verlangt ein dafür
+ausreichendes Zielmodul, enumeriert Faktorpartitionen in stabiler Reihenfolge
+und akzeptiert Kandidaten ausschließlich nach exakter Teilbarkeit in `Z[x]`.
+Erst diese nachgelagerte Stufe darf tatsächliche ganzzahlige Faktoren ausgeben.
+Die rationale Engine reassembliert anschließend Einheit und Faktoren exakt in
+`Q[x]`.
+
+Siehe [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md)
+für den vollständigen Pipeline- und Claim-Vertrag.
