@@ -120,6 +120,7 @@ class ZassenhausRecombinationTest {
                     .DETERMINISTIC_SUBSET_SEARCH_V1,
                 0,
                 1,
+                1,
                 128,
                 8,
                 128));

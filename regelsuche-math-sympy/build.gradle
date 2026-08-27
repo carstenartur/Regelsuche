@@ -33,6 +33,10 @@ dependencies {
 
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
 
+    // The production SymPy adapter remains independent of the native engine.
+    // Only the capability-matched JMH source set sees the native implementation.
+    jmhImplementation project(':regelsuche-math-algorithms')
+
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
@@ -73,16 +77,14 @@ jmh {
     resultFormat = 'JSON'
     resultsFile = layout.buildDirectory.file(
         'reports/jmh/sympy-factorization.json')
-    fork = 1
-    warmupIterations = 2
-    iterations = 3
-    timeOnIteration = '1s'
-    warmup = '1s'
     failOnError = true
-    // The cold track intentionally creates several complete embedded runtimes
-    // in one JMH fork. Use the same bounded heap contract as qualification.
-    // JMHTask is not an Exec task and cannot receive environment(...); pass the
-    // pinned CPython control executable to the benchmark fork as a JVM property.
+    // Fork, warmup and measurement counts live on each benchmark class. This
+    // preserves the inexpensive specialist/startup control while requiring a
+    // stronger multi-fork contract for the general capability-matched corpus.
+    // The cold track intentionally creates complete embedded runtimes. Use the
+    // same bounded heap contract as qualification. JMHTask is not an Exec task
+    // and cannot receive environment(...); pass the pinned CPython executable
+    // to the benchmark fork as a JVM property.
     jvmArgs = [
         nativeAccessArgument,
         "-Xms${embeddedRuntimeInitialHeap}",
@@ -106,7 +108,7 @@ tasks.named('jmh') { task ->
 def verifySymPyFactorizationBenchmark = tasks.register(
     'verifySymPyFactorizationBenchmark', Exec) {
     group = 'verification'
-    description = 'Validates warm, cold and one-shot SymPy factorization measurements.'
+    description = 'Validates specialist controls and the capability-matched general factorization matrix.'
     dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
         tasks.named('jmh')
     workingDir rootProject.projectDir

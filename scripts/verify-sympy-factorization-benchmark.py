@@ -1,172 +1,185 @@
 #!/usr/bin/env python3
-"""Validate and render native/GraalPy/CPython factorization measurements."""
-
+"""Validate the specialist control and capability-matched factorization JMH matrix."""
 from __future__ import annotations
 
-import argparse
-import html
-import json
-import math
+import argparse, html, json, math
 from pathlib import Path
 from typing import Any
 
-PREFIX = "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks."
-EXPECTED = {
-    PREFIX + "nativeBackendWarm": "native-backend-warm",
-    PREFIX + "nativeEndToEndWarm": "native-end-to-end-warm",
-    PREFIX + "graalPyBackendWarm": "graalpy-backend-warm",
-    PREFIX + "graalPyEndToEndWarm": "graalpy-end-to-end-warm",
-    PREFIX + "graalPyEndToEndCold": "graalpy-end-to-end-cold",
-    PREFIX + "cpythonOneShotEndToEnd": "cpython-one-shot-end-to-end",
+SP = "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks."
+S = {
+    "nativeBackendWarm": "native-backend-warm",
+    "nativeEndToEndWarm": "native-end-to-end-warm",
+    "graalPyBackendWarm": "graalpy-backend-warm",
+    "graalPyEndToEndWarm": "graalpy-end-to-end-warm",
+    "graalPyEndToEndCold": "graalpy-end-to-end-cold",
+    "cpythonOneShotEndToEnd": "cpython-one-shot-end-to-end",
+}
+GP = "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks."
+G = {
+    "nativeGeneralBackendWarm": "native-general-backend-warm",
+    "nativeGeneralEndToEndWarm": "native-general-end-to-end-warm",
+    "graalPyGeneralBackendWarm": "graalpy-general-backend-warm",
+    "graalPyGeneralEndToEndWarm": "graalpy-general-end-to-end-warm",
+}
+C = {
+    "z-linear-pair-degree2": ("Z[x]", 2, "dense", "small-integer", "reducible", "square-free"),
+    "z-content-mixed-degree4": ("Z[x]", 4, "dense", "integer-content", "reducible", "square-free"),
+    "z-large-coefficient-degree4": ("Z[x]", 4, "dense", "larger-integer", "reducible", "square-free"),
+    "z-eisenstein-irreducible-degree5": ("Z[x]", 5, "sparse", "small-integer", "irreducible", "square-free"),
+    "z-repeated-degree6": ("Z[x]", 6, "dense", "small-integer", "reducible", "repeated"),
+    "z-sparse-cyclotomic-degree6": ("Z[x]", 6, "sparse", "small-integer", "reducible", "square-free"),
+    "q-linear-pair-degree2": ("Q[x]", 2, "dense", "rational-content", "reducible", "square-free"),
+    "q-eisenstein-irreducible-degree4": ("Q[x]", 4, "sparse", "rational", "irreducible", "square-free"),
+    "q-repeated-degree5": ("Q[x]", 5, "dense", "rational-content", "reducible", "repeated"),
 }
 
 
-def fail(message: str) -> None:
-    raise SystemExit(f"SymPy factorization benchmark invalid: {message}")
+def req(ok: bool, message: str) -> None:
+    if not ok:
+        raise SystemExit("SymPy factorization benchmark invalid: " + message)
 
 
-def require(condition: bool, message: str) -> None:
-    if not condition:
-        fail(message)
+def num(value: Any, label: str) -> float:
+    req(isinstance(value, (int, float)) and not isinstance(value, bool), label + " must be numeric")
+    value = float(value)
+    req(math.isfinite(value) and value >= 0, label + " must be finite and nonnegative")
+    return value
 
 
-def number(value: Any, label: str) -> float:
-    require(
-        isinstance(value, (int, float)) and not isinstance(value, bool),
-        f"{label} must be numeric",
-    )
-    result = float(value)
-    require(math.isfinite(result) and result >= 0.0,
-            f"{label} must be finite and nonnegative")
-    return result
+def integer(value: Any, label: str) -> int:
+    req(isinstance(value, int) and not isinstance(value, bool), label + " must be an integer")
+    return value
 
 
-def load(path: Path) -> Any:
-    require(path.is_file(), f"missing JMH result: {path}")
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        fail(f"cannot read {path}: {error}")
-
-
-def measurements(result: Any) -> dict[str, dict[str, Any]]:
-    require(isinstance(result, list) and result,
-            "top-level JMH result must be a nonempty array")
-    retained: dict[str, dict[str, Any]] = {}
-    for index, entry in enumerate(result):
-        require(isinstance(entry, dict), f"entry {index} must be an object")
-        benchmark = entry.get("benchmark")
-        require(benchmark in EXPECTED,
-                f"undeclared benchmark identity: {benchmark!r}")
-        require(benchmark not in retained,
-                f"duplicate benchmark identity: {benchmark}")
-        require(entry.get("mode") == "avgt",
-                f"{benchmark} must use average time")
-        require(entry.get("threads") == 1,
-                f"{benchmark} must use one thread")
-        metric = entry.get("primaryMetric")
-        require(isinstance(metric, dict),
-                f"{benchmark} has no primaryMetric")
-        require(metric.get("scoreUnit") == "ms/op",
-                f"{benchmark} must report ms/op")
-        retained[benchmark] = {
-            "id": EXPECTED[benchmark],
-            "benchmark": benchmark,
-            "scoreMillis": number(metric.get("score"), benchmark + ".score"),
-            "scoreErrorMillis": number(
-                metric.get("scoreError"), benchmark + ".scoreError"),
-            "forks": entry.get("forks"),
-            "warmupIterations": entry.get("warmupIterations"),
-            "measurementIterations": entry.get("measurementIterations"),
-            "warmupTime": entry.get("warmupTime"),
-            "measurementTime": entry.get("measurementTime"),
-        }
-    require(set(retained) == set(EXPECTED),
-            "benchmark matrix is incomplete")
-    return retained
-
-
-def ratio(numerator: float, denominator: float) -> float | None:
-    return None if denominator == 0.0 else numerator / denominator
-
-
-def summary(retained: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    by_id = {entry["id"]: entry for entry in retained.values()}
-    native_backend = by_id["native-backend-warm"]["scoreMillis"]
-    native_e2e = by_id["native-end-to-end-warm"]["scoreMillis"]
-    graal_backend = by_id["graalpy-backend-warm"]["scoreMillis"]
-    graal_e2e = by_id["graalpy-end-to-end-warm"]["scoreMillis"]
-    graal_cold = by_id["graalpy-end-to-end-cold"]["scoreMillis"]
-    cpython = by_id["cpython-one-shot-end-to-end"]["scoreMillis"]
+def item(entry: dict[str, Any], identity: str) -> dict[str, Any]:
+    req(entry.get("mode") == "avgt" and entry.get("threads") == 1, identity + " must use one-thread AverageTime")
+    metric = entry.get("primaryMetric")
+    req(isinstance(metric, dict) and metric.get("scoreUnit") == "ms/op", identity + " must report ms/op")
     return {
-        "schema": "regelsuche.sympy-factorization-performance/v1",
-        "claimPolicy": "DIAGNOSTIC_TRACKS_NO_RELATIVE_WINNER_GATE",
-        "sharedCase": "binary-homogeneous-quartic-x4-plus-4y4",
-        "measurements": sorted(by_id.values(), key=lambda item: item["id"]),
-        "ratios": {
-            "graalpyWarmToNativeWarmEndToEnd": ratio(graal_e2e, native_e2e),
-            "graalpyColdToWarmEndToEnd": ratio(graal_cold, graal_e2e),
-            "cpythonOneShotToGraalpyWarmEndToEnd": ratio(cpython, graal_e2e),
-            "nativeVerifierInclusiveToBackend": ratio(native_e2e, native_backend),
-            "graalpyVerifierInclusiveToBackend": ratio(graal_e2e, graal_backend),
-        },
-        "interpretation": [
-            "warm embedded measurements reuse an initialized GraalPy context",
-            "cold embedded measurements include context creation and SymPy import",
-            "CPython one-shot measurements include process and interpreter startup",
-            "backend tracks exclude the common Regelsuche product verifier",
-            "end-to-end tracks include the same FactorizationVerifier boundary",
-            "timings are environment-specific engineering diagnostics, not mathematical evidence",
-        ],
+        "id": identity,
+        "benchmark": entry["benchmark"],
+        "scoreMillis": num(metric.get("score"), identity + ".score"),
+        "scoreErrorMillis": num(metric.get("scoreError"), identity + ".scoreError"),
+        "forks": integer(entry.get("forks"), identity + ".forks"),
+        "warmupIterations": integer(entry.get("warmupIterations"), identity + ".warmups"),
+        "measurementIterations": integer(entry.get("measurementIterations"), identity + ".measurements"),
     }
 
 
-def render(report: dict[str, Any], output: Path) -> None:
-    rows = []
-    for item in report["measurements"]:
-        rows.append(
-            "<tr>"
-            f"<td><code>{html.escape(item['id'])}</code></td>"
-            f"<td>{item['scoreMillis']:.6g}</td>"
-            f"<td>{item['scoreErrorMillis']:.3g}</td>"
-            "</tr>"
-        )
-    ratio_rows = []
-    for name, value in report["ratios"].items():
-        rendered = "n/a" if value is None else f"{value:.6g}×"
-        ratio_rows.append(
-            "<tr>"
-            f"<td><code>{html.escape(name)}</code></td>"
-            f"<td>{rendered}</td>"
-            "</tr>"
-        )
-    notes = "".join(
-        f"<li>{html.escape(note)}</li>"
-        for note in report["interpretation"]
+def parse(raw: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    req(isinstance(raw, list) and raw, "JMH result must be a nonempty array")
+    specialist: dict[str, Any] = {}
+    general: dict[str, Any] = {case: {} for case in C}
+    seen: set[tuple[str, str | None]] = set()
+    for entry in raw:
+        req(isinstance(entry, dict) and isinstance(entry.get("benchmark"), str), "invalid JMH entry")
+        benchmark = entry["benchmark"]
+        if benchmark.startswith(SP):
+            method = benchmark.removeprefix(SP)
+            req(method in S, "undeclared specialist track: " + benchmark)
+            key = (benchmark, None)
+            value = item(entry, S[method])
+            req((value["forks"], value["warmupIterations"], value["measurementIterations"]) == (1, 2, 3),
+                benchmark + " changed the specialist sampling contract")
+            specialist[method] = value
+        elif benchmark.startswith(GP):
+            method = benchmark.removeprefix(GP)
+            req(method in G, "undeclared general track: " + benchmark)
+            params = entry.get("params")
+            req(isinstance(params, dict) and set(params) == {"caseId"}, benchmark + " must declare only caseId")
+            case = params["caseId"]
+            req(case in C, "undeclared general case: " + str(case))
+            key = (benchmark, str(case))
+            value = item(entry, G[method])
+            req(value["forks"] >= 3 and value["warmupIterations"] >= 3 and value["measurementIterations"] >= 5,
+                benchmark + "/" + str(case) + " misses the general sampling floor")
+            general[str(case)][method] = value
+        else:
+            req(False, "undeclared benchmark: " + benchmark)
+        req(key not in seen, "duplicate benchmark/case: " + str(key))
+        seen.add(key)
+    req(set(specialist) == set(S), "specialist matrix is incomplete")
+    for case, tracks in general.items():
+        req(set(tracks) == set(G), "general matrix is incomplete for " + case)
+    return specialist, general
+
+
+def ratio(a: float, b: float) -> float | None:
+    return None if b == 0 else a / b
+
+
+def report(specialist: dict[str, Any], general: dict[str, Any]) -> dict[str, Any]:
+    sb = {v["id"]: v for v in specialist.values()}
+    sratio = {
+        "graalpyWarmToNativeWarmEndToEnd": ratio(sb["graalpy-end-to-end-warm"]["scoreMillis"], sb["native-end-to-end-warm"]["scoreMillis"]),
+        "graalpyColdToWarmEndToEnd": ratio(sb["graalpy-end-to-end-cold"]["scoreMillis"], sb["graalpy-end-to-end-warm"]["scoreMillis"]),
+        "cpythonOneShotToGraalpyWarmEndToEnd": ratio(sb["cpython-one-shot-end-to-end"]["scoreMillis"], sb["graalpy-end-to-end-warm"]["scoreMillis"]),
+    }
+    cases = []
+    for case, metadata in C.items():
+        by_id = {v["id"]: v for v in general[case].values()}
+        nb, ne = by_id["native-general-backend-warm"]["scoreMillis"], by_id["native-general-end-to-end-warm"]["scoreMillis"]
+        gb, ge = by_id["graalpy-general-backend-warm"]["scoreMillis"], by_id["graalpy-general-end-to-end-warm"]["scoreMillis"]
+        domain, degree, density, coefficients, reducibility, multiplicity = metadata
+        cases.append({
+            "caseId": case, "domain": domain, "degree": degree, "density": density,
+            "coefficientClass": coefficients, "reducibility": reducibility, "multiplicity": multiplicity,
+            "measurements": sorted(by_id.values(), key=lambda x: x["id"]),
+            "ratios": {
+                "graalpyToNativeWarmBackend": ratio(gb, nb),
+                "graalpyToNativeWarmEndToEnd": ratio(ge, ne),
+                "nativeVerifierInclusiveToBackend": ratio(ne, nb),
+                "graalpyVerifierInclusiveToBackend": ratio(ge, gb),
+            },
+        })
+    return {
+        "schema": "regelsuche.sympy-factorization-performance/v2",
+        "claimPolicy": "DIAGNOSTIC_TRACKS_NO_RELATIVE_WINNER_GATE",
+        "specialistControl": {
+            "classification": "SPECIALIZED_BINARY_QUARTIC_CONTROL",
+            "sharedCase": "binary-homogeneous-quartic-A4-plus-4B4",
+            "measurements": sorted(sb.values(), key=lambda x: x["id"]),
+            "ratios": sratio,
+            "claimBoundary": "Operational specialist control only; not representative of general factorization.",
+        },
+        "generalComparison": {
+            "classification": "GENERAL_UNIVARIATE_CAPABILITY_MATCHED",
+            "corpusId": "regelsuche-general-univariate-factorization-v1",
+            "caseCount": len(cases),
+            "cases": cases,
+            "claimBoundary": "Track-scoped engineering claims over this exact Z[x]/Q[x] corpus; no universal CAS ranking.",
+        },
+    }
+
+
+def rows(values: list[dict[str, Any]]) -> str:
+    return "".join(
+        f"<tr><td><code>{html.escape(v['id'])}</code></td><td>{v['scoreMillis']:.6g}</td>"
+        f"<td>{v['scoreErrorMillis']:.3g}</td><td>{v['forks']}</td>"
+        f"<td>{v['warmupIterations']}</td><td>{v['measurementIterations']}</td></tr>"
+        for v in values
     )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
-        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-        "<title>Regelsuche SymPy factorization performance</title>"
-        "<style>body{font-family:system-ui,sans-serif;margin:2rem;max-width:1200px}"
-        "table{border-collapse:collapse;width:100%;margin-bottom:2rem}"
-        "td,th{border:1px solid #ddd;padding:.5rem;text-align:left}"
-        "th{background:#f6f8fa}code{font-size:.9em}</style></head><body>"
-        "<h1>Regelsuche SymPy factorization performance</h1>"
-        "<p>One exact shared quartic request, separated by runtime and verifier boundary. "
-        "No relative winner threshold is enforced.</p>"
-        "<h2>Measurements</h2><table><thead><tr><th>Track</th>"
-        "<th>ms/op</th><th>error</th></tr></thead><tbody>"
-        + "\n".join(rows)
-        + "</tbody></table><h2>Ratios</h2><table><thead><tr>"
-        "<th>Ratio</th><th>Value</th></tr></thead><tbody>"
-        + "\n".join(ratio_rows)
-        + "</tbody></table><h2>Interpretation boundary</h2><ul>"
-        + notes
-        + "</ul></body></html>\n",
-        encoding="utf-8",
-    )
+
+
+def render(data: dict[str, Any], path: Path) -> None:
+    sections = []
+    for case in data["generalComparison"]["cases"]:
+        sections.append(
+            f"<h3><code>{html.escape(case['caseId'])}</code></h3>"
+            "<table><tr><th>track</th><th>ms/op</th><th>error</th><th>forks</th><th>warmups</th><th>measurements</th></tr>"
+            + rows(case["measurements"]) + "</table>"
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "<!doctype html><meta charset='utf-8'><title>Regelsuche factorization performance</title>"
+        "<style>body{font-family:system-ui;margin:2rem;max-width:1200px}table{border-collapse:collapse;width:100%;margin-bottom:1rem}"
+        "td,th{border:1px solid #ddd;padding:.4rem;text-align:left}th{background:#f6f8fa}</style>"
+        "<h1>Polynomial factorization performance</h1><p>No relative winner gate.</p>"
+        "<h2>General capability-matched comparison</h2>" + "".join(sections)
+        + "<h2>Specialized binary-quartic control</h2><table><tr><th>track</th><th>ms/op</th><th>error</th>"
+        "<th>forks</th><th>warmups</th><th>measurements</th></tr>"
+        + rows(data["specialistControl"]["measurements"]) + "</table>", encoding="utf-8")
 
 
 def main() -> int:
@@ -175,17 +188,15 @@ def main() -> int:
     parser.add_argument("--summary-output", required=True, type=Path)
     parser.add_argument("--report-output", required=True, type=Path)
     args = parser.parse_args()
-
-    report = summary(measurements(load(args.result)))
+    req(args.result.is_file(), "missing JMH result: " + str(args.result))
+    try:
+        raw = json.loads(args.result.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        req(False, f"cannot read {args.result}: {error}")
+    data = report(*parse(raw))
     args.summary_output.parent.mkdir(parents=True, exist_ok=True)
-    args.summary_output.write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    render(report, args.report_output)
-    print(f"sympyFactorizationBenchmark={args.result}")
-    print(f"sympyFactorizationSummary={args.summary_output}")
-    print(f"sympyFactorizationReport={args.report_output}")
+    args.summary_output.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    render(data, args.report_output)
     print("sympy-factorization-benchmark-contract=valid")
     return 0
 

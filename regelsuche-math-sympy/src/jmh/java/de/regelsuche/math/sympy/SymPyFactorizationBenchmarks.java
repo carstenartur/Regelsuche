@@ -14,16 +14,24 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
+import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
+import org.openjdk.jmh.annotations.Warmup;
 
 /**
- * Factorization comparison over one exactly shared quartic request.
+ * Specialist-control comparison over one exactly shared quartic request.
+ *
+ * <p>This class intentionally measures the historic binary-quartic fast path,
+ * not the general native univariate factorization engine. It remains useful
+ * for runtime-boundary diagnostics but must not be interpreted as a general
+ * Regelsuche-versus-SymPy performance claim.</p>
  *
  * <p>Each track owns only the runtime state it measures. Native and CPython
  * tracks never initialize GraalPy. Warm embedded tracks reuse one initialized
@@ -33,6 +41,9 @@ import org.openjdk.jmh.annotations.TearDown;
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
+@Fork(1)
+@Warmup(iterations = 2, time = 1, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
 public class SymPyFactorizationBenchmarks {
     @State(Scope.Benchmark)
     public static class NativeState {
