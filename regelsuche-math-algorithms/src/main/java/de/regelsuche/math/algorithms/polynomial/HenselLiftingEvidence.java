@@ -163,7 +163,7 @@ final class HenselLiftingEvidence {
             return false;
         }
         return selectionWork.stages().entrySet().stream().allMatch(entry ->
-            work.units(entry.getKey()) == entry.getValue());
+            work.units(entry.getKey()) >= entry.getValue());
     }
 
     private static List<SparsePolynomial<BigInteger>>
