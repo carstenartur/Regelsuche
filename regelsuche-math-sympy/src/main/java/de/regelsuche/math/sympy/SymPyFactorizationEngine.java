@@ -2,6 +2,7 @@ package de.regelsuche.math.sympy;
 
 import de.regelsuche.polynomial.FactorizationEngine;
 import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialFactor;
 import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.polynomial.SparsePolynomial;
 import java.nio.charset.StandardCharsets;
@@ -210,7 +211,6 @@ abstract class SymPyFactorizationEngine<C>
             work.consume(
                 "sympy.decode.factor-terms",
                 decoded.factorTerms());
-            work.consume("sympy.issue.proposals", 1);
         } catch (Work.LimitReached exception) {
             return budgetFailure(
                 request,
@@ -252,6 +252,30 @@ abstract class SymPyFactorizationEngine<C>
                 invocationMaterial(invocation));
         }
 
+        String completedMaterial = successMaterial(
+            invocation,
+            decoded,
+            semanticOutputHash);
+        try {
+            if (isTrivialAssociate(request, decoded, work)) {
+                return result(
+                    request,
+                    Outcome.NO_CANDIDATE,
+                    "SYMPY_IRREDUCIBLE_FACTOR_LIST",
+                    work.ledger(),
+                    List.of(),
+                    BackendClaim.IRREDUCIBLE,
+                    inputHash,
+                    completedMaterial);
+            }
+            work.consume("sympy.issue.proposals", 1);
+        } catch (Work.LimitReached exception) {
+            return budgetFailure(
+                request,
+                work,
+                "SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED");
+        }
+
         String certificate = proposalCertificate(
             request,
             decoded,
@@ -282,16 +306,36 @@ abstract class SymPyFactorizationEngine<C>
             List.of(proposal),
             BackendClaim.COMPLETE_FACTORIZATION,
             inputHash,
-            successMaterial(
-                invocation,
-                decoded,
-                semanticOutputHash));
+            completedMaterial);
     }
 
     abstract SymPyInvocation invoke(String payload);
 
     String adapterProgramHash() {
         return SymPyScript.sourceHash();
+    }
+
+    private static <C> boolean isTrivialAssociate(
+        FactorizationRequest<C> request,
+        SymPyFactorizationCodec.Decoded<C> decoded,
+        Work work
+    ) {
+        if (decoded.factors().size() != 1) {
+            return false;
+        }
+        PolynomialFactor<C> factor = decoded.factors().getFirst();
+        if (factor.multiplicity() != 1) {
+            return false;
+        }
+        work.consume(
+            "sympy.classify.trivial-associate-terms",
+            factor.polynomial().termCount());
+        work.consume(
+            "sympy.classify.trivial-associate-comparisons",
+            1);
+        return factor.polynomial()
+            .scale(decoded.unit())
+            .equals(request.source());
     }
 
     private void rememberFailureDiagnostic(Throwable failure) {

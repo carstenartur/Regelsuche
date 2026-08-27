@@ -341,3 +341,40 @@
   evidenceTypes:
     - diagnostic-evidence
   tags: [historical-rediscovery, reachability, diagnostics, reproducibility]
+
+- id: polynomial-factorization
+  label: "Exact polynomial factorization"
+  description: "Provides bounded exact univariate factorization over Z[x] and Q[x] through content normalization, square-free decomposition, finite-field factorization, suitable-prime selection, Hensel lifting, Zassenhaus recombination, independent product verification and a typed SymPy comparison backend."
+  modules: [regelsuche-core, regelsuche-math-algorithms, regelsuche-math-sympy]
+  ownerModules: [regelsuche-math-algorithms]
+  packages:
+    - de.regelsuche.polynomial
+    - de.regelsuche.math.algorithms.polynomial
+    - de.regelsuche.math.sympy
+  typePatterns:
+    - '*Factorization*'
+    - '*Zassenhaus*'
+    - '*Hensel*'
+    - 'SuitablePrime*'
+    - 'UnivariateContent*'
+    - 'SquareFreeDecomposition'
+  testPatterns:
+    - '*Factorization*Test'
+    - '*Zassenhaus*Test'
+    - '*Hensel*Test'
+    - 'SuitablePrime*Test'
+    - 'UnivariateContent*Test'
+    - 'SquareFreeDecompositionTest'
+  docPatterns:
+    - docs/domain-aware-polynomial-factorization.md
+    - docs/univariate-polynomial-foundation.md
+    - docs/univariate-content-normalization.md
+    - docs/finite-field-factorization.md
+    - docs/suitable-prime-selection.md
+    - docs/hensel-lifting.md
+    - docs/sympy-factorization-adapter.md
+  evidenceTypes:
+    - validation-evidence
+  jmhPatterns:
+    - regelsuche-math-sympy/src/jmh/**/*Factorization*
+  tags: [polynomial, factorization, hensel, zassenhaus, sympy]

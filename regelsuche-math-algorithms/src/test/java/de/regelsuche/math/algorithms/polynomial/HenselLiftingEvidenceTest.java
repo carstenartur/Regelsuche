@@ -20,6 +20,9 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class HenselLiftingEvidenceTest {
+    private static final String REUSED_HENSEL_STAGE =
+        "hensel.target-modulus.multiplications";
+
     private final PolynomialRing<BigInteger> integerRing =
         new PolynomialRing<>(
             BigIntegerDomain.INSTANCE,
@@ -67,6 +70,45 @@ class HenselLiftingEvidenceTest {
                 && step.correctionPolynomialHashes().stream()
                     .allMatch(hash -> hash.matches(
                         "sha256:[0-9a-f]{64}"))));
+    }
+
+    @Test
+    void sharedAuthorityMayMonotonicallyReuseHenselStageNames() {
+        FactorizationRequest<BigInteger> request = request();
+        PolynomialWorkBudget work = new PolynomialWorkBudget(
+            request.maxWorkUnits());
+
+        SuitablePrimeSelectionResult firstSelection =
+            SuitablePrimeSelection.selectAndFactor(
+                request,
+                selectionPolicy(),
+                work);
+        assertTrue(firstSelection.completed(), firstSelection.toString());
+        HenselLiftingResult first = HenselLifting.lift(
+            request,
+            firstSelection,
+            policy(),
+            work);
+        assertTrue(first.completed(), first.toString());
+
+        SuitablePrimeSelectionResult secondSelection =
+            SuitablePrimeSelection.selectAndFactor(
+                request,
+                selectionPolicy(),
+                work);
+        assertTrue(secondSelection.completed(), secondSelection.toString());
+        long retainedUnits = secondSelection.work().units(
+            REUSED_HENSEL_STAGE);
+        assertTrue(retainedUnits > 0);
+
+        HenselLiftingResult second = HenselLifting.lift(
+            request,
+            secondSelection,
+            policy(),
+            work);
+
+        assertTrue(second.completed(), second.toString());
+        assertTrue(second.work().units(REUSED_HENSEL_STAGE) > retainedUnits);
     }
 
     @Test
@@ -203,7 +245,7 @@ class HenselLiftingEvidenceTest {
     }
 
     @Test
-    void issuerRejectsWorkThatDoesNotExtendTheSelectionLedger() {
+    void issuerRejectsInflatedNonHenselSelectionWork() {
         FactorizationRequest<BigInteger> request = request();
         SuitablePrimeSelectionResult selection = selection(request);
         HenselLiftingPolicy policy = policy();
@@ -215,8 +257,10 @@ class HenselLiftingEvidenceTest {
 
         Map<String, Long> forgedStages = new LinkedHashMap<>(
             valid.work().stages());
-        String selectionStage = selection.work().stages()
-            .keySet().iterator().next();
+        String selectionStage = selection.work().stages().keySet().stream()
+            .filter(stage -> !stage.startsWith("hensel."))
+            .findFirst()
+            .orElseThrow();
         forgedStages.put(
             selectionStage,
             selection.work().units(selectionStage) + 1);
@@ -269,16 +313,20 @@ class HenselLiftingEvidenceTest {
     private SuitablePrimeSelectionResult selection(
         FactorizationRequest<BigInteger> request
     ) {
-        SuitablePrimeSelectionPolicy policy =
-            new SuitablePrimeSelectionPolicy(
-                SuitablePrimeSelectionPolicy.Algorithm
-                    .DETERMINISTIC_ASCENDING_PRIMES_V1,
-                List.of(5),
-                finiteFieldPolicy);
         SuitablePrimeSelectionResult result =
-            SuitablePrimeSelection.selectAndFactor(request, policy);
+            SuitablePrimeSelection.selectAndFactor(
+                request,
+                selectionPolicy());
         assertTrue(result.completed(), result.toString());
         return result;
+    }
+
+    private SuitablePrimeSelectionPolicy selectionPolicy() {
+        return new SuitablePrimeSelectionPolicy(
+            SuitablePrimeSelectionPolicy.Algorithm
+                .DETERMINISTIC_ASCENDING_PRIMES_V1,
+            List.of(5),
+            finiteFieldPolicy);
     }
 
     private static HenselLiftingPolicy policy() {
