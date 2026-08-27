@@ -56,6 +56,10 @@ class ZassenhausRecombinationTest {
                 policy);
 
         assertTrue(first.completed(), first.toString());
+        assertTrue(
+            first.work().units("zassenhaus.bound.sum")
+                > prefix.lifting().work().units(
+                    "zassenhaus.bound.sum"));
         assertEquals(3, first.factors().size());
         assertEquals(first, second);
         assertEquals(
