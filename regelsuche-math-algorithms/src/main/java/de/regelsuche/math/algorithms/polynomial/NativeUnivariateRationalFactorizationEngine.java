@@ -44,9 +44,9 @@ public final class NativeUnivariateRationalFactorizationEngine
     public EngineResult<ExactRational> propose(
         FactorizationRequest<ExactRational> request
     ) {
-        return NativeUnivariateFactorizationPipeline.factorRational(
+        return NativeUnivariateFactorizationPipeline.factor(
             request,
             policy,
-            ENGINE_ID);
+            NativeCoefficientAdapter.RationalAdapter.INSTANCE);
     }
 }
