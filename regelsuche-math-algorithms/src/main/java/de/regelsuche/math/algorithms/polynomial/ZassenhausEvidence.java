@@ -152,7 +152,7 @@ final class ZassenhausEvidence {
             return false;
         }
         return prefix.stages().entrySet().stream().allMatch(entry ->
-            work.units(entry.getKey()) == entry.getValue());
+            work.units(entry.getKey()) >= entry.getValue());
     }
 
     private static void fail(String detailCode) {
