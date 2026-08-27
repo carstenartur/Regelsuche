@@ -54,6 +54,27 @@ public class GeneralUnivariateFactorizationBenchmarks {
     private static final Map<String, CaseSpec> CASES = cases();
 
     public abstract static class BaseState {
+        private Invocation invocation;
+
+        abstract Invocation create(CaseSpec specification);
+
+        final Invocation invocation() {
+            return invocation;
+        }
+
+        final void initialize(String caseId) {
+            CaseSpec specification = specification(caseId);
+            invocation = create(specification);
+            qualify(specification, invocation.verify());
+        }
+
+        final void closeInvocation() {
+            invocation.close();
+        }
+    }
+
+    @State(Scope.Benchmark)
+    public static class NativeState extends BaseState {
         @Param({
             "z-linear-pair-degree2",
             "z-content-mixed-degree4",
@@ -67,29 +88,16 @@ public class GeneralUnivariateFactorizationBenchmarks {
         })
         public String caseId;
 
-        private Invocation invocation;
-
-        abstract Invocation create(CaseSpec specification);
-
-        final Invocation invocation() {
-            return invocation;
-        }
-
         @Setup(Level.Trial)
         public void setup() {
-            CaseSpec specification = specification(caseId);
-            invocation = create(specification);
-            qualify(specification, invocation.verify());
+            initialize(caseId);
         }
 
         @TearDown(Level.Trial)
         public void tearDown() {
-            invocation.close();
+            closeInvocation();
         }
-    }
 
-    @State(Scope.Benchmark)
-    public static class NativeState extends BaseState {
         @Override
         Invocation create(CaseSpec specification) {
             return specification.nativeFactory().get();
@@ -98,6 +106,29 @@ public class GeneralUnivariateFactorizationBenchmarks {
 
     @State(Scope.Benchmark)
     public static class GraalPyState extends BaseState {
+        @Param({
+            "z-linear-pair-degree2",
+            "z-content-mixed-degree4",
+            "z-large-coefficient-degree4",
+            "z-eisenstein-irreducible-degree5",
+            "z-repeated-degree6",
+            "z-sparse-cyclotomic-degree6",
+            "q-linear-pair-degree2",
+            "q-eisenstein-irreducible-degree4",
+            "q-repeated-degree5"
+        })
+        public String caseId;
+
+        @Setup(Level.Trial)
+        public void setup() {
+            initialize(caseId);
+        }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            closeInvocation();
+        }
+
         @Override
         Invocation create(CaseSpec specification) {
             return specification.graalPyFactory().get();
