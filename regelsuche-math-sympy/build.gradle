@@ -91,6 +91,14 @@ jmh {
     ]
 }
 
+// The JMH plugin builds an uber JAR by unpacking the runtime dependencies.
+// Truffle ships version-specific implementations under META-INF/versions and
+// rejects the repackaged archive unless the aggregate manifest retains the
+// standard multi-release marker.
+tasks.named('jmhJar') { task ->
+    task.manifest.attributes 'Multi-Release': 'true'
+}
+
 tasks.named('jmh') { task ->
     task.dependsOn rootProject.tasks.named('prepareVerificationEnvironment')
 }
