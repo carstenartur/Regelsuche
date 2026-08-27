@@ -87,16 +87,40 @@ public final class ProcessSymPyFactorizationEngine<C>
             System.getenv(PYTHON_EXECUTABLE_ENVIRONMENT));
     }
 
+    /**
+     * Returns whether the caller explicitly selected the CPython control
+     * interpreter. Qualification tests use this distinction so a standalone
+     * Maven reactor without the Gradle-prepared verification environment can
+     * skip the optional control transport instead of silently using an
+     * unpinned system installation.
+     */
+    public static boolean hasConfiguredPythonExecutable() {
+        return hasConfiguredPythonExecutable(
+            System.getProperty(PYTHON_EXECUTABLE_PROPERTY),
+            System.getenv(PYTHON_EXECUTABLE_ENVIRONMENT));
+    }
+
     static String resolvePythonExecutable(
         String property,
         String environment
     ) {
-        if (property != null && !property.isBlank()) {
+        if (hasText(property)) {
             return property.trim();
         }
-        return environment == null || environment.isBlank()
-            ? "python3"
-            : environment.trim();
+        return hasText(environment)
+            ? environment.trim()
+            : "python3";
+    }
+
+    static boolean hasConfiguredPythonExecutable(
+        String property,
+        String environment
+    ) {
+        return hasText(property) || hasText(environment);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     @Override
