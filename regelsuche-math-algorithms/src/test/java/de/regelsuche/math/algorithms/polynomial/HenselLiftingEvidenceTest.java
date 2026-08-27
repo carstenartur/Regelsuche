@@ -245,7 +245,7 @@ class HenselLiftingEvidenceTest {
     }
 
     @Test
-    void issuerRejectsWorkThatFallsBehindTheSelectionLedger() {
+    void issuerRejectsInflatedNonHenselSelectionWork() {
         FactorizationRequest<BigInteger> request = request();
         SuitablePrimeSelectionResult selection = selection(request);
         HenselLiftingPolicy policy = policy();
@@ -257,11 +257,13 @@ class HenselLiftingEvidenceTest {
 
         Map<String, Long> forgedStages = new LinkedHashMap<>(
             valid.work().stages());
-        String selectionStage = selection.work().stages()
-            .keySet().iterator().next();
+        String selectionStage = selection.work().stages().keySet().stream()
+            .filter(stage -> !stage.startsWith("hensel."))
+            .findFirst()
+            .orElseThrow();
         forgedStages.put(
             selectionStage,
-            selection.work().units(selectionStage) - 1);
+            selection.work().units(selectionStage) + 1);
         PolynomialWorkLedger forgedWork =
             new PolynomialWorkLedger(forgedStages);
 
