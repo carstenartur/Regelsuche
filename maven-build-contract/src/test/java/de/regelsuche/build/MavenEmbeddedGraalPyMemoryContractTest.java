@@ -88,6 +88,26 @@ class MavenEmbeddedGraalPyMemoryContractTest {
         "the benchmark fork property must take part in executable resolution");
   }
 
+  @Test
+  void jmhUberJarRetainsTruffleMultiReleaseSemantics()
+      throws IOException {
+    Path root = repositoryRoot();
+    String gradle = Files.readString(
+        root.resolve("regelsuche-math-sympy/build.gradle"));
+
+    assertTrue(
+        gradle.contains("tasks.named('jmhJar') { task ->"),
+        "the repackaged JMH runtime must configure its aggregate manifest");
+    assertTrue(
+        gradle.contains(
+            "task.manifest.attributes 'Multi-Release': 'true'"),
+        "Truffle's META-INF/versions classes require the standard multi-release marker");
+    assertTrue(
+        gradle.contains(
+            "Truffle ships version-specific implementations under META-INF/versions"),
+        "the non-obvious uber-JAR requirement must remain documented next to the build fix");
+  }
+
   private static Path repositoryRoot() {
     String configured = System.getProperty("regelsuche.repositoryRoot");
     assertNotNull(
