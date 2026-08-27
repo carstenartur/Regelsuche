@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymPyProcessRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-sympy</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.sympy</a> &gt; <span class="el_source">SymPyProcessRunner.java</span></div><h1>SymPyProcessRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.sympy;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+/** Package-local bounded external-process transport for the control backend. */
+final class SymPyProcessRunner {
+    private SymPyProcessRunner() {
+    }
+
+    static Output run(
+        List&lt;String&gt; command,
+        byte[] input,
+        Duration timeout,
+        int maxStdoutBytes,
+        int maxStderrBytes
+    ) {
+<span class="fc" id="L27">        long started = System.nanoTime();</span>
+        Process process;
+        try {
+<span class="fc" id="L30">            process = new ProcessBuilder(command).start();</span>
+<span class="nc" id="L31">        } catch (IOException exception) {</span>
+<span class="nc" id="L32">            return Output.unavailable(</span>
+<span class="nc" id="L33">                exception.getClass().getSimpleName() + &quot;: &quot;</span>
+<span class="nc" id="L34">                    + message(exception),</span>
+<span class="nc" id="L35">                System.nanoTime() - started);</span>
+<span class="fc" id="L36">        }</span>
+
+        try (ExecutorService executor =
+<span class="fc" id="L39">                Executors.newVirtualThreadPerTaskExecutor()) {</span>
+<span class="fc" id="L40">            Future&lt;BoundedBytes&gt; stdout = executor.submit(() -&gt;</span>
+<span class="fc" id="L41">                readBounded(process.getInputStream(), maxStdoutBytes));</span>
+<span class="fc" id="L42">            Future&lt;BoundedBytes&gt; stderr = executor.submit(() -&gt;</span>
+<span class="fc" id="L43">                readBounded(process.getErrorStream(), maxStderrBytes));</span>
+<span class="fc" id="L44">            Future&lt;Void&gt; writer = executor.submit(() -&gt; {</span>
+<span class="fc" id="L45">                try (var target = process.getOutputStream()) {</span>
+<span class="fc" id="L46">                    target.write(input);</span>
+                }
+<span class="fc" id="L48">                return null;</span>
+            });
+
+<span class="fc" id="L51">            boolean finished = process.waitFor(</span>
+<span class="fc" id="L52">                timeout.toMillis(),</span>
+                TimeUnit.MILLISECONDS);
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (!finished) {</span>
+<span class="nc" id="L55">                process.destroyForcibly();</span>
+<span class="nc" id="L56">                process.waitFor(5, TimeUnit.SECONDS);</span>
+            }
+            try {
+<span class="fc" id="L59">                writer.get();</span>
+<span class="nc" id="L60">            } catch (ExecutionException exception) {</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">                if (finished) {</span>
+<span class="nc" id="L62">                    throw exception;</span>
+                }
+<span class="fc" id="L64">            }</span>
+<span class="fc" id="L65">            BoundedBytes capturedStdout = stdout.get();</span>
+<span class="fc" id="L66">            BoundedBytes capturedStderr = stderr.get();</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">            return new Output(</span>
+                true,
+                !finished,
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                finished ? process.exitValue() : -1,</span>
+<span class="fc" id="L71">                capturedStdout.text(),</span>
+<span class="fc" id="L72">                capturedStderr.text(),</span>
+<span class="fc" id="L73">                capturedStdout.totalBytes(),</span>
+<span class="fc" id="L74">                capturedStderr.totalBytes(),</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">                capturedStdout.truncated() || capturedStderr.truncated(),</span>
+<span class="fc" id="L76">                System.nanoTime() - started);</span>
+<span class="nc" id="L77">        } catch (InterruptedException exception) {</span>
+<span class="nc" id="L78">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L79">            process.destroyForcibly();</span>
+<span class="nc" id="L80">            return Output.unavailable(</span>
+                &quot;InterruptedException&quot;,
+<span class="nc" id="L82">                System.nanoTime() - started);</span>
+<span class="nc" id="L83">        } catch (ExecutionException exception) {</span>
+<span class="nc" id="L84">            process.destroyForcibly();</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            Throwable cause = exception.getCause() != null</span>
+<span class="nc" id="L86">                ? exception.getCause()</span>
+<span class="nc" id="L87">                : exception;</span>
+<span class="nc" id="L88">            return Output.unavailable(</span>
+<span class="nc" id="L89">                cause.getClass().getSimpleName() + &quot;: &quot; + message(cause),</span>
+<span class="nc" id="L90">                System.nanoTime() - started);</span>
+        }
+    }
+
+    private static BoundedBytes readBounded(
+        InputStream source,
+        int maximum
+    ) throws IOException {
+<span class="fc" id="L98">        ByteArrayOutputStream retained = new ByteArrayOutputStream(</span>
+<span class="fc" id="L99">            Math.min(maximum, 16 * 1024));</span>
+<span class="fc" id="L100">        byte[] buffer = new byte[8 * 1024];</span>
+<span class="fc" id="L101">        int total = 0;</span>
+<span class="fc" id="L102">        boolean truncated = false;</span>
+        int read;
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        while ((read = source.read(buffer)) &gt;= 0) {</span>
+<span class="fc" id="L105">            total = Math.addExact(total, read);</span>
+<span class="fc" id="L106">            int remaining = maximum - retained.size();</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            if (remaining &gt; 0) {</span>
+<span class="fc" id="L108">                retained.write(buffer, 0, Math.min(remaining, read));</span>
+            }
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (total &gt; maximum) {</span>
+<span class="nc" id="L111">                truncated = true;</span>
+            }
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">        return new BoundedBytes(</span>
+<span class="fc" id="L115">            retained.toString(StandardCharsets.UTF_8),</span>
+            total,
+            truncated);
+    }
+
+    private static String message(Throwable throwable) {
+<span class="nc" id="L121">        String value = throwable.getMessage();</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        return value == null ? &quot;&quot; : value.replaceAll(&quot;\\s+&quot;, &quot; &quot;).strip();</span>
+    }
+
+    record Output(
+        boolean available,
+        boolean timedOut,
+        int exitCode,
+        String stdout,
+        String stderr,
+        int stdoutBytes,
+        int stderrBytes,
+        boolean outputLimitExceeded,
+        long endToEndNanos
+    ) {
+<span class="fc" id="L136">        Output {</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            stdout = stdout == null ? &quot;&quot; : stdout;</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            stderr = stderr == null ? &quot;&quot; : stderr;</span>
+<span class="pc bpc" id="L139" title="4 of 8 branches missed.">            if (exitCode &lt; -1</span>
+                    || stdoutBytes &lt; 0
+                    || stderrBytes &lt; 0
+                    || endToEndNanos &lt; 0) {
+<span class="nc" id="L143">                throw new IllegalArgumentException(</span>
+                    &quot;SymPy process output is invalid&quot;);
+            }
+<span class="fc" id="L146">        }</span>
+
+        static Output unavailable(String detail, long elapsed) {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            String checked = detail == null ? &quot;&quot; : detail;</span>
+<span class="nc" id="L150">            return new Output(</span>
+                false,
+                false,
+                -1,
+                &quot;&quot;,
+                checked,
+                0,
+<span class="nc" id="L157">                checked.getBytes(StandardCharsets.UTF_8).length,</span>
+                false,
+<span class="nc" id="L159">                Math.max(0, elapsed));</span>
+        }
+    }
+
+<span class="fc" id="L163">    private record BoundedBytes(</span>
+        String text,
+        int totalBytes,
+        boolean truncated
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

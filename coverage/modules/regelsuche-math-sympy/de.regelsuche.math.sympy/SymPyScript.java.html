@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymPyScript.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-sympy</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.sympy</a> &gt; <span class="el_source">SymPyScript.java</span></div><h1>SymPyScript.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.sympy;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+
+/** Immutable access to the versioned Python adapter source. */
+final class SymPyScript {
+    static final String PROTOCOL =
+        &quot;regelsuche.sympy-factorization/v1&quot;;
+    static final String RESOURCE_DIRECTORY =
+        &quot;GRAALPY-VFS/de.regelsuche/regelsuche-math-sympy&quot;;
+    static final String RESOURCE_PATH = RESOURCE_DIRECTORY
+        + &quot;/src/regelsuche_sympy_factor.py&quot;;
+
+<span class="fc" id="L16">    private static final byte[] SOURCE_BYTES = load();</span>
+<span class="fc" id="L17">    private static final String SOURCE =</span>
+        new String(SOURCE_BYTES, StandardCharsets.UTF_8);
+<span class="fc" id="L19">    private static final String SOURCE_HASH =</span>
+<span class="fc" id="L20">        SymPyEvidence.sha256(SOURCE_BYTES);</span>
+<span class="fc" id="L21">    private static final String PROCESS_PROGRAM = SOURCE</span>
+        + &quot;\nimport sys\n&quot;
+        + &quot;sys.stdout.write(factor_payload(sys.stdin.read()))\n&quot;;
+<span class="fc" id="L24">    private static final String PROCESS_PROGRAM_HASH =</span>
+<span class="fc" id="L25">        SymPyEvidence.sha256(PROCESS_PROGRAM);</span>
+
+    private SymPyScript() {
+    }
+
+    static String source() {
+<span class="fc" id="L31">        return SOURCE;</span>
+    }
+
+    static String sourceHash() {
+<span class="fc" id="L35">        return SOURCE_HASH;</span>
+    }
+
+    static String processProgram() {
+<span class="fc" id="L39">        return PROCESS_PROGRAM;</span>
+    }
+
+    static String processProgramHash() {
+<span class="fc" id="L43">        return PROCESS_PROGRAM_HASH;</span>
+    }
+
+    private static byte[] load() {
+<span class="fc" id="L47">        ClassLoader loader = SymPyScript.class.getClassLoader();</span>
+<span class="fc" id="L48">        try (InputStream input = loader.getResourceAsStream(RESOURCE_PATH)) {</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (input == null) {</span>
+<span class="nc" id="L50">                throw new IllegalStateException(</span>
+                    &quot;embedded SymPy adapter source is missing: &quot;
+                        + RESOURCE_PATH);
+            }
+<span class="fc" id="L54">            return input.readAllBytes();</span>
+<span class="nc" id="L55">        } catch (IOException exception) {</span>
+<span class="nc" id="L56">            throw new IllegalStateException(</span>
+                &quot;embedded SymPy adapter source cannot be read&quot;,
+                exception);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

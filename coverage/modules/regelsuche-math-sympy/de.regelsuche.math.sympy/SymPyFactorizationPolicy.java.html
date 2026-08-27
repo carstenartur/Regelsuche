@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymPyFactorizationPolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-sympy</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.sympy</a> &gt; <span class="el_source">SymPyFactorizationPolicy.java</span></div><h1>SymPyFactorizationPolicy.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.sympy;
+
+import java.time.Duration;
+import java.util.Objects;
+
+/**
+ * Semantic version pin and explicit resource limits shared by embedded and
+ * process-based SymPy factorization adapters.
+ */
+public record SymPyFactorizationPolicy(
+    String expectedSymPyVersion,
+    Duration timeout,
+    int maxInputBytes,
+    int maxOutputBytes,
+    int maxFactors,
+    int maxTermsPerFactor,
+    int maxTotalFactorTerms,
+    int maxCoefficientBitLength
+) {
+    public static final String PINNED_SYMPY_VERSION = &quot;1.14.0&quot;;
+    public static final int MAX_IO_BYTES = 16 * 1024 * 1024;
+    public static final int MAX_FACTORS = 4_096;
+    public static final int MAX_TERMS = 1_000_000;
+    public static final int MAX_COEFFICIENT_BITS = 1_000_000;
+
+<span class="fc" id="L26">    public SymPyFactorizationPolicy {</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (expectedSymPyVersion == null</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">                || expectedSymPyVersion.isBlank()) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(</span>
+                &quot;expectedSymPyVersion must not be blank&quot;);
+        }
+<span class="fc" id="L32">        Objects.requireNonNull(timeout, &quot;timeout&quot;);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (timeout.compareTo(Duration.ofMillis(100)) &lt; 0</span>
+<span class="pc bpc" id="L34" title="13 of 26 branches missed.">                || timeout.compareTo(Duration.ofMinutes(5)) &gt; 0</span>
+                || maxInputBytes &lt; 256
+                || maxInputBytes &gt; MAX_IO_BYTES
+                || maxOutputBytes &lt; 256
+                || maxOutputBytes &gt; MAX_IO_BYTES
+                || maxFactors &lt; 1
+                || maxFactors &gt; MAX_FACTORS
+                || maxTermsPerFactor &lt; 1
+                || maxTermsPerFactor &gt; MAX_TERMS
+                || maxTotalFactorTerms &lt; maxTermsPerFactor
+                || maxTotalFactorTerms &gt; MAX_TERMS
+                || maxCoefficientBitLength &lt; 1
+                || maxCoefficientBitLength &gt; MAX_COEFFICIENT_BITS) {
+<span class="nc" id="L47">            throw new IllegalArgumentException(</span>
+                &quot;SymPy factorization policy is invalid&quot;);
+        }
+<span class="fc" id="L50">        expectedSymPyVersion = expectedSymPyVersion.trim();</span>
+<span class="fc" id="L51">    }</span>
+
+    public static SymPyFactorizationPolicy pinned() {
+<span class="fc" id="L54">        return new SymPyFactorizationPolicy(</span>
+            PINNED_SYMPY_VERSION,
+<span class="fc" id="L56">            Duration.ofSeconds(60),</span>
+            2 * 1024 * 1024,
+            8 * 1024 * 1024,
+            1_024,
+            100_000,
+            250_000,
+            4_096);
+    }
+
+    String canonicalMaterial() {
+<span class="fc" id="L66">        StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L67">        SymPyEvidence.append(result, expectedSymPyVersion);</span>
+<span class="fc" id="L68">        SymPyEvidence.append(result, Long.toString(timeout.toMillis()));</span>
+<span class="fc" id="L69">        SymPyEvidence.append(result, Integer.toString(maxInputBytes));</span>
+<span class="fc" id="L70">        SymPyEvidence.append(result, Integer.toString(maxOutputBytes));</span>
+<span class="fc" id="L71">        SymPyEvidence.append(result, Integer.toString(maxFactors));</span>
+<span class="fc" id="L72">        SymPyEvidence.append(result, Integer.toString(maxTermsPerFactor));</span>
+<span class="fc" id="L73">        SymPyEvidence.append(result, Integer.toString(maxTotalFactorTerms));</span>
+<span class="fc" id="L74">        SymPyEvidence.append(result, Integer.toString(maxCoefficientBitLength));</span>
+<span class="fc" id="L75">        return result.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

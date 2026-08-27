@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymPyFactorizationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-sympy</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.sympy</a> &gt; <span class="el_source">SymPyFactorizationEngine.java</span></div><h1>SymPyFactorizationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.sympy;
+
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.SparsePolynomial;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+
+/** Common exact proposal and evidence mapping for all SymPy transports. */
+abstract class SymPyFactorizationEngine&lt;C&gt;
+        implements FactorizationEngine&lt;C&gt; {
+    private final String engineId;
+    private final SymPyFactorizationCodec&lt;C&gt; codec;
+    private final SymPyFactorizationPolicy policy;
+<span class="fc" id="L21">    private final AtomicReference&lt;SymPyExecutionMetrics&gt; lastMetrics =</span>
+        new AtomicReference&lt;&gt;();
+<span class="fc" id="L23">    private final AtomicReference&lt;String&gt; lastFailureDiagnostic =</span>
+        new AtomicReference&lt;&gt;();
+
+    SymPyFactorizationEngine(
+        String engineId,
+        SymPyFactorizationCodec&lt;C&gt; codec,
+        SymPyFactorizationPolicy policy
+<span class="fc" id="L30">    ) {</span>
+<span class="pc bpc" id="L31" title="2 of 4 branches missed.">        if (engineId == null || engineId.isBlank()) {</span>
+<span class="nc" id="L32">            throw new IllegalArgumentException(</span>
+                &quot;SymPy engineId must not be blank&quot;);
+        }
+<span class="fc" id="L35">        this.engineId = engineId;</span>
+<span class="fc" id="L36">        this.codec = Objects.requireNonNull(codec, &quot;codec&quot;);</span>
+<span class="fc" id="L37">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L38">    }</span>
+
+    @Override
+    public final String engineId() {
+<span class="fc" id="L42">        return engineId;</span>
+    }
+
+    @Override
+    public final String coefficientDomainId() {
+<span class="fc" id="L47">        return codec.coefficientDomainId();</span>
+    }
+
+    public final SymPyFactorizationPolicy policy() {
+<span class="fc" id="L51">        return policy;</span>
+    }
+
+    public final Optional&lt;SymPyExecutionMetrics&gt; lastExecutionMetrics() {
+<span class="fc" id="L55">        return Optional.ofNullable(lastMetrics.get());</span>
+    }
+
+    /** Latest bounded, noncanonical adapter failure diagnostic. */
+    public final Optional&lt;String&gt; lastFailureDiagnostic() {
+<span class="fc" id="L60">        return Optional.ofNullable(lastFailureDiagnostic.get());</span>
+    }
+
+    @Override
+    public final EngineResult&lt;C&gt; propose(
+        FactorizationRequest&lt;C&gt; request
+    ) {
+<span class="fc" id="L67">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L68">        lastMetrics.set(null);</span>
+<span class="fc" id="L69">        lastFailureDiagnostic.set(null);</span>
+<span class="fc" id="L70">        Work work = new Work(request.maxWorkUnits());</span>
+<span class="fc" id="L71">        String structuralViolation =</span>
+<span class="fc" id="L72">            request.structuralViolation().orElse(null);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (structuralViolation != null) {</span>
+<span class="nc" id="L74">            return result(</span>
+                request,
+                Outcome.BUDGET_INCONCLUSIVE,
+                structuralViolation,
+<span class="nc" id="L78">                work.ledger(),</span>
+<span class="nc" id="L79">                List.of(),</span>
+                BackendClaim.NONE,
+                &quot;&quot;,
+                &quot;&quot;);
+        }
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (!coefficientDomainId().equals(</span>
+<span class="fc" id="L85">                request.source().ring().coefficientDomain().id())) {</span>
+<span class="nc" id="L86">            return result(</span>
+                request,
+                Outcome.UNSUPPORTED_DOMAIN,
+<span class="nc" id="L89">                &quot;REQUIRES_&quot; + coefficientDomainId(),</span>
+<span class="nc" id="L90">                work.ledger(),</span>
+<span class="nc" id="L91">                List.of(),</span>
+                BackendClaim.NONE,
+                &quot;&quot;,
+                &quot;&quot;);
+        }
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (request.source().isConstant()) {</span>
+<span class="nc" id="L97">            return result(</span>
+                request,
+                Outcome.UNSUPPORTED_REQUEST,
+                &quot;SYMPY_REQUIRES_NONCONSTANT_POLYNOMIAL&quot;,
+<span class="nc" id="L101">                work.ledger(),</span>
+<span class="nc" id="L102">                List.of(),</span>
+                BackendClaim.NONE,
+                &quot;&quot;,
+                &quot;&quot;);
+        }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (request.maxCandidates() == 0) {</span>
+<span class="fc" id="L108">            return result(</span>
+                request,
+                Outcome.BUDGET_INCONCLUSIVE,
+                &quot;MAX_CANDIDATES_IS_ZERO&quot;,
+<span class="fc" id="L112">                work.ledger(),</span>
+<span class="fc" id="L113">                List.of(),</span>
+                BackendClaim.NONE,
+                &quot;&quot;,
+                &quot;&quot;);
+        }
+
+        SymPyFactorizationCodec.Encoded encoded;
+        try {
+<span class="fc" id="L121">            work.consume(</span>
+                &quot;sympy.encode.source-terms&quot;,
+<span class="fc" id="L123">                request.source().termCount());</span>
+<span class="fc" id="L124">            encoded = codec.encode(request);</span>
+<span class="nc" id="L125">        } catch (Work.LimitReached exception) {</span>
+<span class="nc" id="L126">            return budgetFailure(</span>
+                request,
+                work,
+                &quot;SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED&quot;);
+<span class="nc" id="L130">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L131">            rememberFailureDiagnostic(exception);</span>
+<span class="nc" id="L132">            return technicalFailure(</span>
+                request,
+                work,
+                &quot;SYMPY_INPUT_ENCODING_FAILED&quot;,
+                &quot;&quot;,
+                &quot;&quot;);
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        String inputHash = SymPyEvidence.sha256(encoded.payload());</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (encoded.byteLength() &gt; policy.maxInputBytes()) {</span>
+<span class="nc" id="L141">            return result(</span>
+                request,
+                Outcome.BUDGET_INCONCLUSIVE,
+                &quot;SYMPY_INPUT_SIZE_POLICY_EXCEEDED&quot;,
+<span class="nc" id="L145">                work.ledger(),</span>
+<span class="nc" id="L146">                List.of(),</span>
+                BackendClaim.NONE,
+                inputHash,
+                &quot;&quot;);
+        }
+
+        SymPyInvocation invocation;
+        try {
+<span class="fc" id="L154">            work.consume(&quot;sympy.invoke.calls&quot;, 1);</span>
+<span class="fc" id="L155">            invocation = invoke(encoded.payload());</span>
+<span class="nc" id="L156">        } catch (Work.LimitReached exception) {</span>
+<span class="nc" id="L157">            return budgetFailure(</span>
+                request,
+                work,
+                &quot;SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED&quot;);
+<span class="nc" id="L161">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L162">            rememberFailureDiagnostic(exception);</span>
+<span class="nc" id="L163">            return technicalFailure(</span>
+                request,
+                work,
+                &quot;SYMPY_TRANSPORT_EXCEPTION&quot;,
+                inputHash,
+                &quot;&quot;);
+<span class="fc" id="L169">        }</span>
+<span class="fc" id="L170">        rememberFailureDiagnostic(invocation.failureDiagnostic());</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (invocation.status() != SymPyInvocation.Status.COMPLETED) {</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            Outcome outcome = invocation.status()</span>
+<span class="fc" id="L173">                    == SymPyInvocation.Status.TIMEOUT</span>
+<span class="nc" id="L174">                ? Outcome.BUDGET_INCONCLUSIVE</span>
+<span class="fc" id="L175">                : Outcome.TECHNICAL_FAILURE;</span>
+<span class="fc" id="L176">            return result(</span>
+                request,
+                outcome,
+<span class="fc" id="L179">                invocation.detailCode(),</span>
+<span class="fc" id="L180">                work.ledger(),</span>
+<span class="fc" id="L181">                List.of(),</span>
+                BackendClaim.NONE,
+                inputHash,
+<span class="fc" id="L184">                invocationMaterial(invocation));</span>
+        }
+
+<span class="fc" id="L187">        int outputBytes = invocation.output()</span>
+<span class="fc" id="L188">            .getBytes(StandardCharsets.UTF_8).length;</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (outputBytes &gt; policy.maxOutputBytes()) {</span>
+<span class="nc" id="L190">            return result(</span>
+                request,
+                Outcome.BUDGET_INCONCLUSIVE,
+                &quot;SYMPY_OUTPUT_SIZE_POLICY_EXCEEDED&quot;,
+<span class="nc" id="L194">                work.ledger(),</span>
+<span class="nc" id="L195">                List.of(),</span>
+                BackendClaim.NONE,
+                inputHash,
+<span class="nc" id="L198">                invocationMaterial(invocation));</span>
+        }
+
+        SymPyFactorizationCodec.Decoded&lt;C&gt; decoded;
+        try {
+<span class="fc" id="L203">            decoded = codec.decode(</span>
+<span class="fc" id="L204">                invocation.output(),</span>
+<span class="fc" id="L205">                request.source(),</span>
+                policy);
+<span class="fc" id="L207">            work.consume(</span>
+                &quot;sympy.decode.factors&quot;,
+<span class="fc" id="L209">                decoded.factors().size());</span>
+<span class="fc" id="L210">            work.consume(</span>
+                &quot;sympy.decode.factor-terms&quot;,
+<span class="fc" id="L212">                decoded.factorTerms());</span>
+<span class="fc" id="L213">            work.consume(&quot;sympy.issue.proposals&quot;, 1);</span>
+<span class="nc" id="L214">        } catch (Work.LimitReached exception) {</span>
+<span class="nc" id="L215">            return budgetFailure(</span>
+                request,
+                work,
+                &quot;SYMPY_ADAPTER_WORK_BUDGET_EXCEEDED&quot;);
+<span class="fc" id="L219">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L220">            rememberFailureDiagnostic(exception);</span>
+<span class="fc" id="L221">            return technicalFailure(</span>
+                request,
+                work,
+                &quot;SYMPY_OUTPUT_DECODING_FAILED&quot;,
+                inputHash,
+<span class="fc" id="L226">                invocationMaterial(invocation));</span>
+<span class="fc" id="L227">        }</span>
+
+<span class="fc" id="L229">        String rawOutputHash =</span>
+<span class="fc" id="L230">            SymPyEvidence.sha256(invocation.output());</span>
+<span class="fc" id="L231">        String semanticOutputHash = SymPyEvidence.sha256(</span>
+<span class="fc" id="L232">            decoded.canonicalMaterial(request.source().ring()));</span>
+<span class="fc" id="L233">        lastMetrics.set(new SymPyExecutionMetrics(</span>
+<span class="fc" id="L234">            invocation.runtimeId(),</span>
+<span class="fc" id="L235">            invocation.runtimeVersion(),</span>
+<span class="fc" id="L236">            decoded.symPyVersion(),</span>
+            inputHash,
+            rawOutputHash,
+<span class="fc" id="L239">            adapterProgramHash(),</span>
+<span class="fc" id="L240">            invocation.coldStart(),</span>
+<span class="fc" id="L241">            invocation.initializationNanos(),</span>
+<span class="fc" id="L242">            invocation.invocationNanos(),</span>
+<span class="fc" id="L243">            decoded.factorNanos(),</span>
+<span class="fc" id="L244">            decoded.totalNanos()));</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (!policy.expectedSymPyVersion().equals(</span>
+<span class="fc" id="L246">                decoded.symPyVersion())) {</span>
+<span class="nc" id="L247">            return technicalFailure(</span>
+                request,
+                work,
+                &quot;SYMPY_VERSION_MISMATCH&quot;,
+                inputHash,
+<span class="nc" id="L252">                invocationMaterial(invocation));</span>
+        }
+
+<span class="fc" id="L255">        String certificate = proposalCertificate(</span>
+            request,
+            decoded,
+            inputHash,
+            semanticOutputHash,
+            invocation);
+        Proposal&lt;C&gt; proposal;
+        try {
+<span class="fc" id="L263">            proposal = new Proposal&lt;&gt;(</span>
+<span class="fc" id="L264">                decoded.unit(),</span>
+<span class="fc" id="L265">                decoded.factors(),</span>
+<span class="fc" id="L266">                SparsePolynomial.one(request.source().ring()),</span>
+                certificate);
+<span class="nc" id="L268">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L269">            rememberFailureDiagnostic(exception);</span>
+<span class="nc" id="L270">            return technicalFailure(</span>
+                request,
+                work,
+                &quot;SYMPY_PROPOSAL_CONTRACT_FAILED&quot;,
+                inputHash,
+<span class="nc" id="L275">                invocationMaterial(invocation));</span>
+<span class="fc" id="L276">        }</span>
+<span class="fc" id="L277">        return result(</span>
+            request,
+            Outcome.CANDIDATES,
+            &quot;SYMPY_EXACT_FACTORIZATION_PROPOSAL&quot;,
+<span class="fc" id="L281">            work.ledger(),</span>
+<span class="fc" id="L282">            List.of(proposal),</span>
+            BackendClaim.COMPLETE_FACTORIZATION,
+            inputHash,
+<span class="fc" id="L285">            successMaterial(</span>
+                invocation,
+                decoded,
+                semanticOutputHash));
+    }
+
+    abstract SymPyInvocation invoke(String payload);
+
+    String adapterProgramHash() {
+<span class="fc" id="L294">        return SymPyScript.sourceHash();</span>
+    }
+
+    private void rememberFailureDiagnostic(Throwable failure) {
+<span class="fc" id="L298">        rememberFailureDiagnostic(SymPyInvocation.diagnostic(failure));</span>
+<span class="fc" id="L299">    }</span>
+
+    private void rememberFailureDiagnostic(String diagnostic) {
+<span class="pc bpc" id="L302" title="1 of 4 branches missed.">        if (diagnostic != null &amp;&amp; !diagnostic.isBlank()) {</span>
+<span class="fc" id="L303">            lastFailureDiagnostic.set(diagnostic);</span>
+        }
+<span class="fc" id="L305">    }</span>
+
+    private EngineResult&lt;C&gt; budgetFailure(
+        FactorizationRequest&lt;C&gt; request,
+        Work work,
+        String detailCode
+    ) {
+<span class="nc" id="L312">        return result(</span>
+            request,
+            Outcome.BUDGET_INCONCLUSIVE,
+            detailCode,
+<span class="nc" id="L316">            work.ledger(),</span>
+<span class="nc" id="L317">            List.of(),</span>
+            BackendClaim.NONE,
+            &quot;&quot;,
+            &quot;&quot;);
+    }
+
+    private EngineResult&lt;C&gt; technicalFailure(
+        FactorizationRequest&lt;C&gt; request,
+        Work work,
+        String detailCode,
+        String inputHash,
+        String transportMaterial
+    ) {
+<span class="fc" id="L330">        return result(</span>
+            request,
+            Outcome.TECHNICAL_FAILURE,
+            detailCode,
+<span class="fc" id="L334">            work.ledger(),</span>
+<span class="fc" id="L335">            List.of(),</span>
+            BackendClaim.NONE,
+            inputHash,
+            transportMaterial);
+    }
+
+    private EngineResult&lt;C&gt; result(
+        FactorizationRequest&lt;C&gt; request,
+        Outcome outcome,
+        String detailCode,
+        PolynomialWorkLedger work,
+        List&lt;Proposal&lt;C&gt;&gt; proposals,
+        BackendClaim claim,
+        String inputHash,
+        String transportMaterial
+    ) {
+<span class="fc" id="L351">        StringBuilder material = new StringBuilder(engineId());</span>
+<span class="fc" id="L352">        SymPyEvidence.append(material, request.canonicalMaterial());</span>
+<span class="fc" id="L353">        SymPyEvidence.append(material, policy.canonicalMaterial());</span>
+<span class="fc" id="L354">        SymPyEvidence.append(material, adapterProgramHash());</span>
+<span class="fc" id="L355">        SymPyEvidence.append(material, outcome.name());</span>
+<span class="fc" id="L356">        SymPyEvidence.append(material, detailCode);</span>
+<span class="fc" id="L357">        SymPyEvidence.append(material, work.canonicalMaterial());</span>
+<span class="fc" id="L358">        SymPyEvidence.append(material, claim.name());</span>
+<span class="fc" id="L359">        SymPyEvidence.append(material, inputHash);</span>
+<span class="fc" id="L360">        SymPyEvidence.append(material, transportMaterial);</span>
+<span class="fc" id="L361">        proposals.forEach(proposal -&gt;</span>
+<span class="fc" id="L362">            SymPyEvidence.append(material, proposal.canonicalMaterial()));</span>
+<span class="fc" id="L363">        return new EngineResult&lt;&gt;(</span>
+<span class="fc" id="L364">            engineId(),</span>
+            outcome,
+            detailCode,
+            work,
+            proposals,
+            claim,
+<span class="fc" id="L370">            SymPyEvidence.sha256(material.toString()));</span>
+    }
+
+    private String proposalCertificate(
+        FactorizationRequest&lt;C&gt; request,
+        SymPyFactorizationCodec.Decoded&lt;C&gt; decoded,
+        String inputHash,
+        String semanticOutputHash,
+        SymPyInvocation invocation
+    ) {
+<span class="fc" id="L380">        StringBuilder material = new StringBuilder(engineId());</span>
+<span class="fc" id="L381">        SymPyEvidence.append(material, request.canonicalMaterial());</span>
+<span class="fc" id="L382">        SymPyEvidence.append(material, policy.canonicalMaterial());</span>
+<span class="fc" id="L383">        SymPyEvidence.append(material, adapterProgramHash());</span>
+<span class="fc" id="L384">        SymPyEvidence.append(material, inputHash);</span>
+<span class="fc" id="L385">        SymPyEvidence.append(material, semanticOutputHash);</span>
+<span class="fc" id="L386">        SymPyEvidence.append(material, invocation.runtimeId());</span>
+<span class="fc" id="L387">        SymPyEvidence.append(material, invocation.runtimeVersion());</span>
+<span class="fc" id="L388">        SymPyEvidence.append(</span>
+            material,
+<span class="fc" id="L390">            decoded.canonicalMaterial(request.source().ring()));</span>
+<span class="fc" id="L391">        return SymPyEvidence.sha256(material.toString());</span>
+    }
+
+    private static String invocationMaterial(
+        SymPyInvocation invocation
+    ) {
+<span class="fc" id="L397">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L398">        SymPyEvidence.append(material, invocation.runtimeId());</span>
+<span class="fc" id="L399">        SymPyEvidence.append(material, invocation.runtimeVersion());</span>
+<span class="fc" id="L400">        SymPyEvidence.append(material, invocation.status().name());</span>
+<span class="fc" id="L401">        SymPyEvidence.append(material, invocation.detailCode());</span>
+<span class="fc" id="L402">        return material.toString();</span>
+    }
+
+    private static &lt;C&gt; String successMaterial(
+        SymPyInvocation invocation,
+        SymPyFactorizationCodec.Decoded&lt;C&gt; decoded,
+        String semanticOutputHash
+    ) {
+<span class="fc" id="L410">        StringBuilder material = new StringBuilder(</span>
+<span class="fc" id="L411">            invocationMaterial(invocation));</span>
+<span class="fc" id="L412">        SymPyEvidence.append(material, decoded.symPyVersion());</span>
+<span class="fc" id="L413">        SymPyEvidence.append(material, decoded.pythonImplementation());</span>
+<span class="fc" id="L414">        SymPyEvidence.append(material, decoded.pythonVersion());</span>
+<span class="fc" id="L415">        SymPyEvidence.append(material, semanticOutputHash);</span>
+<span class="fc" id="L416">        return material.toString();</span>
+    }
+
+    private static final class Work {
+        private final long limit;
+<span class="fc" id="L421">        private final Map&lt;String, Long&gt; stages =</span>
+            new LinkedHashMap&lt;&gt;();
+        private long total;
+
+<span class="fc" id="L425">        private Work(long limit) {</span>
+<span class="fc" id="L426">            this.limit = limit;</span>
+<span class="fc" id="L427">        }</span>
+
+        private void consume(String stage, long units) {
+<span class="pc bpc" id="L430" title="2 of 4 branches missed.">            if (units &lt; 0 || total &gt; limit - units) {</span>
+<span class="nc" id="L431">                throw new LimitReached();</span>
+            }
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">            if (units == 0) {</span>
+<span class="nc" id="L434">                return;</span>
+            }
+<span class="fc" id="L436">            total += units;</span>
+<span class="fc" id="L437">            stages.merge(stage, units, Math::addExact);</span>
+<span class="fc" id="L438">        }</span>
+
+        private PolynomialWorkLedger ledger() {
+<span class="fc" id="L441">            return new PolynomialWorkLedger(stages);</span>
+        }
+
+        private static final class LimitReached
+                extends RuntimeException {
+            private static final long serialVersionUID = 1L;
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

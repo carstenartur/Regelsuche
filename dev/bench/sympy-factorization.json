@@ -1,0 +1,88 @@
+{
+  "claimPolicy": "DIAGNOSTIC_TRACKS_NO_RELATIVE_WINNER_GATE",
+  "interpretation": [
+    "warm embedded measurements reuse an initialized GraalPy context",
+    "cold embedded measurements include context creation and SymPy import",
+    "CPython one-shot measurements include process and interpreter startup",
+    "backend tracks exclude the common Regelsuche product verifier",
+    "end-to-end tracks include the same FactorizationVerifier boundary",
+    "timings are environment-specific engineering diagnostics, not mathematical evidence"
+  ],
+  "measurements": [
+    {
+      "benchmark": "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.cpythonOneShotEndToEnd",
+      "forks": 1,
+      "id": "cpython-one-shot-end-to-end",
+      "measurementIterations": 3,
+      "measurementTime": "1 s",
+      "scoreErrorMillis": 39.76505889181227,
+      "scoreMillis": 268.1166645,
+      "warmupIterations": 2,
+      "warmupTime": "1 s"
+    },
+    {
+      "benchmark": "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.graalPyBackendWarm",
+      "forks": 1,
+      "id": "graalpy-backend-warm",
+      "measurementIterations": 3,
+      "measurementTime": "1 s",
+      "scoreErrorMillis": 38.67594878578517,
+      "scoreMillis": 17.27060715230465,
+      "warmupIterations": 2,
+      "warmupTime": "1 s"
+    },
+    {
+      "benchmark": "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.graalPyEndToEndCold",
+      "forks": 1,
+      "id": "graalpy-end-to-end-cold",
+      "measurementIterations": 3,
+      "measurementTime": "1 s",
+      "scoreErrorMillis": 5404.420883096848,
+      "scoreMillis": 4141.998915333334,
+      "warmupIterations": 2,
+      "warmupTime": "1 s"
+    },
+    {
+      "benchmark": "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.graalPyEndToEndWarm",
+      "forks": 1,
+      "id": "graalpy-end-to-end-warm",
+      "measurementIterations": 3,
+      "measurementTime": "1 s",
+      "scoreErrorMillis": 12.36520961579769,
+      "scoreMillis": 16.420402244891335,
+      "warmupIterations": 2,
+      "warmupTime": "1 s"
+    },
+    {
+      "benchmark": "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.nativeBackendWarm",
+      "forks": 1,
+      "id": "native-backend-warm",
+      "measurementIterations": 3,
+      "measurementTime": "1 s",
+      "scoreErrorMillis": 0.4903011497402846,
+      "scoreMillis": 0.13026471893030808,
+      "warmupIterations": 2,
+      "warmupTime": "1 s"
+    },
+    {
+      "benchmark": "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.nativeEndToEndWarm",
+      "forks": 1,
+      "id": "native-end-to-end-warm",
+      "measurementIterations": 3,
+      "measurementTime": "1 s",
+      "scoreErrorMillis": 0.3740935768506048,
+      "scoreMillis": 0.13702993535597172,
+      "warmupIterations": 2,
+      "warmupTime": "1 s"
+    }
+  ],
+  "ratios": {
+    "cpythonOneShotToGraalpyWarmEndToEnd": 16.328264101046347,
+    "graalpyColdToWarmEndToEnd": 252.2471041549533,
+    "graalpyVerifierInclusiveToBackend": 0.9507715681379586,
+    "graalpyWarmToNativeWarmEndToEnd": 119.83076692136628,
+    "nativeVerifierInclusiveToBackend": 1.0519343724165484
+  },
+  "schema": "regelsuche.sympy-factorization-performance/v1",
+  "sharedCase": "binary-homogeneous-quartic-x4-plus-4y4"
+}
