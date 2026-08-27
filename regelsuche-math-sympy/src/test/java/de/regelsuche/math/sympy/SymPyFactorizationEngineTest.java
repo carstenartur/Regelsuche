@@ -3,6 +3,7 @@ package de.regelsuche.math.sympy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import de.regelsuche.polynomial.BigIntegerDomain;
 import de.regelsuche.polynomial.ExactRationalField;
@@ -191,6 +192,10 @@ class SymPyFactorizationEngineTest {
 
     @Test
     void oneShotCpythonControlUsesTheSameVerifierBoundary() {
+        assumeTrue(
+            ProcessSymPyFactorizationEngine
+                .hasConfiguredPythonExecutable(),
+            "qualification must explicitly pin the CPython control runtime");
         ProcessSymPyFactorizationEngine<BigInteger> engine =
             ProcessSymPyFactorizationEngine.integers(
                 ProcessSymPyFactorizationEngine
