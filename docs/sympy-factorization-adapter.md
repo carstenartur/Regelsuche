@@ -255,9 +255,9 @@ FactorizationRequest
   -> GraalPy oder CPython
   -> strukturierte exakte SymPy-Ausgabe
   -> Policy- und Repräsentationsprüfung
-  -> untrusted FactorizationEngine.Proposal
+  -> untrusted FactorizationEngine.Proposal oder Backend-Claim
   -> FactorizationVerifier
-  -> unabhängige Produktrekonstruktion
+  -> unabhängige Produktrekonstruktion für Proposals
   -> verifier-ausgestellte Evidence
 ```
 
@@ -268,9 +268,23 @@ Produktrückprüfung bleibt die Claim-Stärke dennoch:
 BACKEND_CLAIMED_COMPLETE
 ```
 
-Sie wird nicht allein durch die SymPy-Ausgabe zu
-`INDEPENDENTLY_CERTIFIED_COMPLETE` oder zu einem unabhängigen
-Irreduzibilitätsbeweis.
+Gibt `factor_list` genau einen Faktor mit Multiplizität eins zurück und ist
+dieser Faktor nach Multiplikation mit der ausgegebenen Einheit exakt das
+Quellpolynom, normalisiert der Adapter diese triviale Faktorliste zu:
+
+```text
+Outcome.NO_CANDIDATE
+BackendClaim.IRREDUCIBLE
+ClaimStrength.BACKEND_CLAIMED_IRREDUCIBLE
+```
+
+Die Associate-Beziehung wird in Java exakt geprüft und unter dem gemeinsamen
+Request-Work-Budget abgerechnet. Der Claim besagt dennoch nur, dass das
+gebundene SymPy-Backend innerhalb seiner deklarierten Domäne keine echte
+Zerlegung ausgegeben und Irreduzibilität behauptet hat. Weder der
+Vollständigkeits- noch der Irreduzibilitätsclaim wird allein durch die
+SymPy-Ausgabe zu `INDEPENDENTLY_CERTIFIED_COMPLETE` beziehungsweise
+`INDEPENDENTLY_CERTIFIED_IRREDUCIBLE`.
 
 ## Ressourcen- und Fehlersemantik
 
@@ -290,12 +304,16 @@ sympy.encode.source-terms
 sympy.invoke.calls
 sympy.decode.factors
 sympy.decode.factor-terms
+sympy.classify.trivial-associate-terms
+sympy.classify.trivial-associate-comparisons
 sympy.issue.proposals
 ```
 
-Regelsuche erfindet keine SymPy-internen Work Units. Timeout, fehlende Runtime,
-I/O-, Extraktions- und Repräsentationsfehler bleiben von mathematischer
-Nichtzerlegbarkeit getrennt.
+Die beiden `sympy.classify.*`-Stufen entstehen nur bei einer einteiligen
+Faktorliste; `sympy.issue.proposals` entsteht nur, wenn anschließend tatsächlich
+ein Proposal ausgestellt wird. Regelsuche erfindet keine SymPy-internen Work
+Units. Timeout, fehlende Runtime, I/O-, Extraktions- und
+Repräsentationsfehler bleiben von mathematischer Nichtzerlegbarkeit getrennt.
 
 ## Evidence und Diagnostik
 
