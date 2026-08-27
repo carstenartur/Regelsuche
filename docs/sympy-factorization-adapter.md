@@ -2,10 +2,16 @@
 
 **Implementierungsstand: 27. August 2026**
 
-Regelsuche stellt SymPy als optionales, typisiertes
-`FactorizationEngine`-Backend bereit. Der primäre SymPy-Pfad läuft mit
-GraalPy in derselben JVM. Ein neuer CPython-Prozess pro Anfrage bleibt als
-getrennter Isolations-, Kompatibilitäts- und Cold-Start-Vergleich erhalten.
+Regelsuche stellt SymPy als optionales typisiertes
+`FactorizationEngine`-Backend bereit. Der primäre SymPy-Pfad läuft mit GraalPy
+in derselben JVM. Ein neuer CPython-Prozess pro Anfrage bleibt als getrennter
+Isolations-, Kompatibilitäts- und Cold-Start-Vergleich erhalten.
+
+Die allgemeine Performancequalifikation vergleicht SymPy nicht länger mit
+einem fachlich engeren Quartik-Spezialoperator. Native Regelsuche und SymPy
+erhalten einen eingefrorenen gemeinsamen Korpus aus exakt denselben
+univariaten `Z[x]`- und `Q[x]`-Requests. Der alte Quartikfall bleibt nur als
+ausdrücklich gekennzeichneter Spezialkontrollpfad erhalten.
 
 ## Modulgrenze
 
@@ -15,7 +21,9 @@ Die Implementierung liegt vollständig in:
 :regelsuche-math-sympy
 ```
 
-Das Modul hängt fachlich nur von `:regelsuche-core` ab und kapselt:
+Das Modul hängt fachlich von `:regelsuche-core` ab. Der allgemeine
+JMH-Vergleich verwendet zusätzlich die öffentliche native Engine aus
+`:regelsuche-math-algorithms`. Das SymPy-Modul kapselt:
 
 - die von Maven und Gradle verwaltete GraalPy-Runtime;
 - die eingebetteten Python-Pakete SymPy und mpmath;
@@ -23,13 +31,13 @@ Das Modul hängt fachlich nur von `:regelsuche-core` ab und kapselt:
 - Integer- und Rational-Faktorisierungsengines;
 - den CPython-Einmalprozess als Kontrolltransport;
 - Runtime-, Ressourcen-, Repräsentations- und Evidence-Grenzen;
-- den nach Betriebsmodus getrennten Performancevergleich.
+- den nach Capability und Betriebsmodus getrennten Performancevergleich.
 
 SymPy-Typen und `org.graalvm.polyglot.Value` verlassen das Modul nicht. Der
 mathematische Kern sieht nur `PolynomialRing`, `SparsePolynomial`,
 `FactorizationRequest`, `FactorizationEngine` und `FactorizationVerifier`.
-Das Backend wird ausdrücklich als Abhängigkeit ausgewählt; es wird weder
-heimlich zum globalen Standard noch zur mathematischen Autorität.
+Das Backend wird ausdrücklich ausgewählt; es wird weder heimlich zum globalen
+Standard noch zur mathematischen Autorität.
 
 ## Gepinnte Runtime und Abhängigkeiten
 
@@ -86,36 +94,36 @@ lock-gebundene Klassenpfadressourcen
 
 Diese Extraktion ist notwendig, weil GraalPys VirtualFileSystem absichtlich
 schreibgeschützt ist. `python.IsolateNativeModules` muss dagegen neben einer
-nativen Bibliothek kontextprivate `.dupN`-Kopien anlegen, mit `patchelf`
-relokieren und wieder löschen. Mehr Host-I/O am VFS ändert dessen eigene
-Schreibschutzsemantik nicht; deshalb verwendet Regelsuche die von GraalPy
-dokumentierte External-Directory-Konfiguration.
+nativen Bibliothek kontextprivate Kopien anlegen, mit `patchelf` relokieren und
+wieder löschen. Regelsuche verwendet deshalb die dokumentierte
+External-Directory-Konfiguration.
 
-Das temporäre Ressourcenverzeichnis gehört genau einer Runtime-Instanz. Es wird
-nicht vom mathematischen Request adressiert und bei `close()` rekursiv entfernt.
-Auch fehlgeschlagene Konstruktion versucht die teilweise extrahierten Dateien
-zu bereinigen. Ein Fehler bei Extraktion, Context-Aufbau oder Bereinigung bleibt
-ein technischer Fehler und wird nicht als mathematisches Ergebnis ausgegeben.
+Das temporäre Ressourcenverzeichnis gehört genau einer Runtime-Instanz. Es
+wird nicht vom mathematischen Request adressiert und bei `close()` rekursiv
+entfernt. Auch fehlgeschlagene Konstruktion versucht die teilweise
+extrahierten Dateien zu bereinigen. Ein Fehler bei Extraktion, Context-Aufbau
+oder Bereinigung bleibt ein technischer Fehler und wird nicht als
+mathematisches Ergebnis ausgegeben.
 
 ## Exakter Wire-Vertrag
 
 Regelsuche übergibt keine gerenderte mathematische Zeichenkette. Die
 Trust-Grenze verwendet weder `parse_expr`, `sympify` noch Python-`eval`.
-Ein Payload enthält ausschließlich:
+Ein Payload enthält ausschließlich strukturierte exakte Daten:
 
 ```json
 {
   "protocol": "regelsuche.sympy-factorization/v1",
   "domain": "ZZ",
-  "variableCount": 2,
+  "variableCount": 1,
   "terms": [
     {
-      "exponents": [4, 0],
+      "exponents": [4],
       "numerator": "1",
       "denominator": "1"
     },
     {
-      "exponents": [0, 4],
+      "exponents": [0],
       "numerator": "4",
       "denominator": "1"
     }
@@ -152,9 +160,10 @@ private extrahierte Python-Umgebung
   -> viele typisierte Anfragen
 ```
 
-GraalPy native Extensions können nicht auf einem Java-Virtual-Thread ausgeführt
-werden. Deshalb verwendet die Runtime einen dedizierten Daemon-Platform-Thread
-und lässt nie zwei Anfragen gleichzeitig denselben Context verwenden.
+GraalPy native Extensions können nicht auf einem Java-Virtual-Thread
+ausgeführt werden. Deshalb verwendet die Runtime einen dedizierten
+Daemon-Platform-Thread und lässt nie zwei Anfragen gleichzeitig denselben
+Context verwenden.
 
 Jeder Context setzt:
 
@@ -166,10 +175,9 @@ python.DontWriteBytecodeFlag=true
 
 `python.IsolateNativeModules` ist für Context-Ersatz nach einem Timeout und für
 Cold-Start-Messungen erforderlich, nachdem `_ctypes` bereits in derselben JVM
-geladen wurde. Alle GraalPy-Contexts dieses Prozesses verwenden dieselbe Option.
-Der Multi-Context-Betrieb mit nativen Erweiterungen ist eine besonders zu
-prüfende Linux-Runtime-Grenze; ein unmöglicher Neuaufbau fällt geschlossen mit
-einem technischen Status aus.
+geladen wurde. Alle GraalPy-Contexts dieses Prozesses verwenden dieselbe
+Option. Ein unmöglicher Neuaufbau fällt geschlossen mit einem technischen
+Status aus.
 
 ## Autoritäten und Sicherheitsgrenze
 
@@ -182,7 +190,7 @@ Der Context verweigert:
 Er erlaubt bewusst:
 
 - nativen Zugriff für `_ctypes` und weitere gepinnte native Module;
-- GraalPy-eigene Gast-Threads, unter anderem für Background-GC;
+- GraalPy-eigene Gast-Threads;
 - Hostprozessstart für GraalPys eigenen `patchelf`-Aufruf;
 - Dateizugriff auf das private extrahierte Ressourcenverzeichnis.
 
@@ -197,15 +205,15 @@ patchelf=0.14.3-1
 
 Der strukturierte Faktor-Payload enthält weder Python-Code noch Kommandos oder
 Hostpfade. Trotzdem ist der eingebettete Pfad ausdrücklich **keine
-Sicherheitssandbox**: nativer Code und der von GraalPy gestartete Hostprozess
-laufen mit den Betriebssystemrechten des JVM-Prozesses. Nur der eingecheckte
-Adapter und die lock-gebundenen Pakete dürfen in diesem Pfad ausgeführt werden.
-Für eine stärkere Ausführungsgrenze ist der separate Prozesspfad zusätzlich mit
-Betriebssystem- oder Containerisolation zu verwenden.
+Sicherheitssandbox**: Nativer Code und der von GraalPy gestartete Hostprozess
+laufen mit den Betriebssystemrechten des JVM-Prozesses. Für eine stärkere
+Ausführungsgrenze ist der separate Prozesspfad zusätzlich mit Betriebssystem-
+oder Containerisolation zu verwenden.
 
 ## Timeout, Generationen und Lebenszyklus
 
-Jede Anforderung ist an eine monotone Runtime-Generation gebunden. Bei Timeout:
+Jede Anforderung ist an eine monotone Runtime-Generation gebunden. Bei
+Timeout:
 
 1. wird der laufende Task abgebrochen;
 2. der betroffene Context zwangsweise geschlossen;
@@ -226,8 +234,8 @@ Fehler.
 python -I -c <gebundenes Adapterprogramm>
 ```
 
-Eingabe, Ausgabe, Fehlerausgabe und Laufzeit sind begrenzt. Bei Timeout wird der
-Prozess beendet. Dieser Pfad dient als:
+Eingabe, Ausgabe, Fehlerausgabe und Laufzeit sind begrenzt. Bei Timeout wird
+der Prozess beendet. Dieser Pfad dient als:
 
 - CPython-/GraalPy-Kompatibilitätskontrolle;
 - Prozessisolationsbaseline;
@@ -317,27 +325,115 @@ besitzen daher dieselbe Evidence.
 
 ## Performancevergleich
 
-JMH verwendet dieselbe kanonische Quartik-Anfrage und denselben Verifier:
+### Allgemeiner capability-matched Vergleich
+
+`GeneralUnivariateFactorizationBenchmarks` verwendet neun eingefrorene
+gemeinsame Fälle:
+
+| Domäne | Fälle | Abdeckung |
+| --- | ---: | --- |
+| `Z[x]` | 6 | Grad 2 bis 6, dicht/dünn, Content, größere Koeffizienten, irreduzibel, wiederholt |
+| `Q[x]` | 3 | rationale Einheit und Koeffizienten, irreduzibel, wiederholt |
+
+Der genaue Korpus enthält:
+
+```text
+z-linear-pair-degree2
+z-content-mixed-degree4
+z-large-coefficient-degree4
+z-eisenstein-irreducible-degree5
+z-repeated-degree6
+z-sparse-cyclotomic-degree6
+q-linear-pair-degree2
+q-eisenstein-irreducible-degree4
+q-repeated-degree5
+```
+
+Jeder Fall wird unverändert an beide allgemeinen Engines übergeben:
+
+- `NativeUnivariateFactorizationEngine`;
+- `GraalPySymPyFactorizationEngine`.
+
+Gemessen werden vier fachlich gleiche Spuren:
+
+| Spur | Engine | Verifier |
+| --- | --- | --- |
+| `nativeGeneralBackendWarm` | native allgemeine Engine | nein |
+| `nativeGeneralEndToEndWarm` | native allgemeine Engine | ja |
+| `graalPyGeneralBackendWarm` | warmes SymPy/GraalPy | nein |
+| `graalPyGeneralEndToEndWarm` | warmes SymPy/GraalPy | ja |
+
+Die allgemeinen Warmspuren verwenden mindestens:
+
+```text
+3 Forks
+3 Warm-up-Iterationen je Fork
+5 Messiterationen je Fork
+1 Thread
+AverageTime
+ms/op
+```
+
+Die Setup-Phase führt für jede Engine und jeden Fall eine fachliche
+Qualifikation aus. Reduzierbare Fälle müssen genau ein erfolgreich
+produktverifiziertes Proposal mit der erwarteten Zahl verschiedener Faktoren
+liefern. Irreduzible Fälle müssen ohne Kandidat und mit explizitem
+Backend-Irreduzibilitätsclaim enden. Ein Laufzeitwert wird nicht behalten,
+wenn diese Qualifikation scheitert.
+
+### Spezialkontrolle und Betriebsdiagnostik
+
+`SymPyFactorizationBenchmarks` bewahrt den historischen binären homogenen
+Quartikfall ausschließlich als:
+
+```text
+SPECIALIZED_BINARY_QUARTIC_CONTROL
+```
+
+Seine Spuren sind:
 
 | Spur | Runtimezustand | Verifier |
 | --- | --- | --- |
-| `nativeBackendWarm` | JVM und native Engine warm | nein |
-| `nativeEndToEndWarm` | JVM und native Engine warm | ja |
+| `nativeBackendWarm` | JVM und Quartik-Spezialengine warm | nein |
+| `nativeEndToEndWarm` | JVM und Quartik-Spezialengine warm | ja |
 | `graalPyBackendWarm` | GraalPy und SymPy warm | nein |
 | `graalPyEndToEndWarm` | GraalPy und SymPy warm | ja |
-| `graalPyEndToEndCold` | Extraktion, Engine, Context und Import je Operation | ja |
+| `graalPyEndToEndCold` | Extraktion, Context und Import je Operation | ja |
 | `cpythonOneShotEndToEnd` | Prozess, Interpreter und Import je Operation | ja |
 
-Die Cold-Spur enthält bewusst die Runtime-Konstruktion einschließlich privater
-Ressourcenextraktion. Der Bericht validiert die vollständige Track-Matrix und
-`ms/op`, besitzt aber kein relatives Winner-Gate:
+Dieser Kontrollfall vergleicht nicht zwei allgemein gleich mächtige
+Faktorisierungsalgorithmen. Er ist nur eine Spezial- und Betriebsdiagnostik.
+
+### Publikationsvertrag
+
+`scripts/verify-sympy-factorization-benchmark.py` akzeptiert den JMH-Output nur,
+wenn:
+
+- sämtliche sechs Spezialspuren vorhanden und eindeutig sind;
+- für jeden der neun allgemeinen Fälle sämtliche vier Spuren vorhanden sind;
+- keine undeclared Benchmarks oder Fälle auftreten;
+- Modus, Threadzahl und Einheit stimmen;
+- das Spezialprofil unverändert bleibt;
+- die allgemeinen Spuren die Fork-/Warm-up-/Messuntergrenzen erfüllen;
+- alle Scores endlich und nichtnegativ sind.
+
+Der Bericht trennt:
+
+```text
+GENERAL_UNIVARIATE_CAPABILITY_MATCHED
+SPECIALIZED_BINARY_QUARTIC_CONTROL
+```
+
+und veröffentlicht die Claim-Grenzen:
 
 ```text
 DIAGNOSTIC_TRACKS_NO_RELATIVE_WINNER_GATE
+Track-scoped engineering claims over this exact Z[x]/Q[x] corpus
 ```
 
-Wandzeit bleibt umgebungsbezogene Engineering-Diagnostik und kein
-mathematischer Qualitätsnachweis.
+Es gibt kein relatives Winner-Gate. Wandzeit bleibt umgebungsbezogene
+Engineering-Diagnostik und ist kein mathematischer Qualitätsnachweis. Der
+Korpus autorisiert keine universelle Rangfolge von Computer-Algebra-Systemen.
 
 ## Reproduktion
 
@@ -363,6 +459,8 @@ Benchmark und validierter Bericht:
 ./gradlew :regelsuche-math-sympy:verifySymPyFactorizationBenchmark
 ```
 
+Die Aufgabe erzeugt:
+
 ```text
 public/dev/bench/sympy-factorization.json
 public/dev/bench/sympy-factorization.html
@@ -386,4 +484,5 @@ Nicht implementiert oder nicht behauptet sind:
 - plattformunabhängiger nativer Multi-Context-Betrieb;
 - langlebiger externer CPython-Worker;
 - eine universelle Performanceaussage jenseits des gemeinsamen Fragments;
-- Gleichsetzung von Wandzeit und kanonischen Work Units.
+- Gleichsetzung von Wandzeit und kanonischen Work Units;
+- ein relativer Laufzeitsieger als Merge- oder Korrektheitsgate.

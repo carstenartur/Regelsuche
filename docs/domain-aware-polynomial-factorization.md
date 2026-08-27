@@ -1,48 +1,48 @@
 # Domänenbewusste Polynomfaktorisierung
 
-**Implementierungsstand: 25. August 2026**
+**Implementierungsstand: 27. August 2026**
 
-Regelsuche behandelt Polynomfaktorisierung nicht mehr als Eigenschaft eines
-einzelnen Quartikoperators. Der mathematische Kern trennt
-Koeffizientendomänen, Polynomringe, kanonische Polynome, allgemeine
-univariate Algorithmen, Faktorisierungsanfragen, untrusted Engine-Ausgaben und
-unabhängig ausgestellte Evidence.
+Regelsuche behandelt Polynomfaktorisierung nicht als Sonderfall eines einzelnen
+Quartikoperators. Der mathematische Kern trennt Koeffizientendomänen,
+Polynomringe, kanonische Polynome, allgemeine univariate Algorithmen,
+Faktorisierungsanfragen, untrusted Engine-Ausgaben und von Regelsuche
+ausgestellte Evidence.
 
 Die Architektur ist absichtlich nicht rückwärtskompatibel zu den früheren
-verschachtelten Polynom- und Kandidatentypen. Es gibt keine externen Nutzer,
-deren Quell- oder Binärkompatibilität parallele Alt-APIs rechtfertigen würde.
-Historische Evidence behält ihre eingefrorenen Identitäten; aktuelle Java-APIs
-werden nach mathematischer Verantwortung gestaltet.
+verschachtelten Polynom- und Kandidatentypen. Historische Evidence behält ihre
+eingefrorenen Identitäten; aktuelle Java-APIs werden nach mathematischer
+Verantwortung gestaltet.
 
 ## Aktueller Integrationsstand
-
-Die verfügbaren Bausteine sind unterschiedlich weit integriert. Diese
-Unterscheidung ist Teil des öffentlichen Claim-Vertrags:
 
 | Baustein | Stand |
 | --- | --- |
 | Domänen, Polynomringe und kanonische Sparse-Polynome | implementiert |
 | Backendneutrale Engine-/Verifier-Grenze | implementiert |
-| Begrenzte binäre Quartikengine mit gemeinsamer Request-/Verifier-Arbeit | implementiert |
-| Verlustfreie univariate Koeffizientenansicht und exakte Grundoperationen | implementiert |
+| Begrenzte binäre Quartikengine | implementiert |
+| Verlustfreie univariate Koeffizientenansicht | implementiert |
 | Inhalt und primitiver Teil für `Z[x]` und `Q[x]` | implementiert |
 | Euklidischer Polynom-GGT über einem exakten Feld | implementiert |
 | Quadratfreie Zerlegung in Charakteristik null | implementiert |
 | Explizite Primkörperdomäne `F_p` | implementiert |
-| Vollständige Faktorisierung quadratfreier univariater Polynome in `F_p[x]` | implementiert |
-| Deterministische geeignete Primzahlauswahl mit bewahrten Ablehnungsgründen | implementiert |
-| Exakte, quellgebundene Reduktion eines primitiven `Z[x]`-Polynoms nach `F_p[x]` | implementiert |
-| Hensel-Lifting und ganzzahlige Rekombination | **noch nicht implementiert** |
-| Vollständige integrierte `Z[x]`-/`Q[x]`-Engine | **noch nicht implementiert** |
-| Unabhängige Vollständigkeitsevidence für die ursprüngliche `Z[x]`-/`Q[x]`-Quelle | **noch nicht implementiert** |
+| Vollständige Faktorisierung quadratfreier Polynome in `F_p[x]` | implementiert |
+| Deterministische geeignete Primzahlauswahl | implementiert |
+| Lineares Multifaktor-Hensel-Lifting bis zu einem expliziten `p^k` | implementiert |
+| Begrenzte deterministische Zassenhaus-Rekombination in `Z[x]` | implementiert |
+| Integrierte native allgemeine Engine für `Z[x]` und `Q[x]` | implementiert |
+| Exakte Produktrückprüfung durch `FactorizationVerifier` | implementiert |
+| Unabhängige Vollständigkeits-/Irreduzibilitätszertifikate | noch offen |
+| LLL-/van-Hoeij-Rekombination für größere Fälle | noch offen |
+| Automatische Integration der allgemeinen Engine in Suche und Workbench | noch offen |
 
-GGT, quadratfreie Zerlegung, Primkörperfaktorisierung und Primzahlauswahl sind
-exakte, budgetierte Algorithmen. Sie bilden jedoch noch keinen vollständigen
-End-to-End-Abschluss in `Q[x]`: Erst Hensel-Lifting, ganzzahlige Rekombination,
-rationale Reassemblierung und die abschließende Verifier-Integration verbinden
-die vorhandenen Stufen zu einer vollständigen Engine.
+Die native Engine liefert damit eine vollständige **Backend-Zerlegung** im
+begrenzten unterstützten Fragment. Regelsuche rekonstruiert jedes ausgegebene
+Produkt exakt. Der allgemeine `FactorizationVerifier` beweist jedoch nicht
+unabhängig, dass die Faktoren irreduzibel sind oder dass kein weiterer Faktor
+existiert. Deshalb bleiben positive Vollständigkeits- und
+Irreduzibilitätsaussagen als Backend-Claims sichtbar.
 
-## Bausteine und Gesamtfluss
+## Gesamtfluss
 
 ```text
 Quelltext und parsergebundene exakte Literale
@@ -55,33 +55,24 @@ Quelltext und parsergebundene exakte Literale
        -> Evidence-Anforderung
        -> Kandidaten- und Arbeitsbudget
 
-Bereits integrierter begrenzter Engine-Pfad:
-  FactorizationRequest
-    -> BinaryQuarticFactorizationEngine
-    -> untrusted Proposal / BackendClaim / Work Ledger
-    -> FactorizationVerifier
-    -> verifier-ausgestellte Kandidaten und Report-Evidence
-
-Bereits implementierte allgemeine univariate Pipeline:
-  FactorizationRequest über Z[x] oder Q[x]
-    -> Inhalt und primitiver Teil
-    -> Ableitung / GGT / quadratfreie Zerlegung
-    -> geeignete Primzahl aus gebundener Kandidatenfolge
-    -> exakte kanonische Reduktion nach F_p[x]
-    -> vollständige Berlekamp-Faktorisierung in F_p[x]
-    -> unabhängige modulare Rekonstruktion und Irreduzibilitätsevidence
-
-Noch offene Fortsetzung:
-    -> Hensel-Lifting
-    -> ganzzahlige Rekombination
-    -> rationale Reassemblierung
-    -> unabhängige Vollständigkeitsprüfung der ursprünglichen Quelle
-    -> FactorizationVerifier
+NativeUnivariateFactorizationEngine für Z[x] oder Q[x]
+  -> Inhalt und primitiver Teil
+  -> Ableitung / GGT / quadratfreie Zerlegung
+  -> geeignete Primzahl aus gebundener Kandidatenfolge
+  -> exakte kanonische Reduktion nach F_p[x]
+  -> vollständige Berlekamp-Faktorisierung in F_p[x]
+  -> lineares Multifaktor-Hensel-Lifting bis p^k
+  -> deterministische Zassenhaus-Rekombination in Z[x]
+  -> exakte rationale Reassemblierung für Q[x]
+  -> untrusted Proposal / BackendClaim / Work Ledger
+  -> FactorizationVerifier
+  -> exakte Produktrückprüfung und verifier-ausgestellte Evidence
 ```
 
-Das Diagramm beschreibt implementierte Stufen und die noch offene Verbindung
-zu einer vollständigen Engine. Ein modularer Abschluss darf nicht als bereits
-vorhandene vollständige `Q[x]`-Faktorisierung gelesen werden.
+Alle Stufen werden unter derselben Request-Autorität ausgeführt. Ein
+erschöpftes Kandidaten-, Präzisions-, Repräsentations- oder Arbeitsbudget
+bleibt `BUDGET_INCONCLUSIVE` und wird nie zu einer Irreduzibilitätsaussage
+umgedeutet.
 
 ## Getrennte Identitäten
 
@@ -94,9 +85,9 @@ Die Darstellung trennt vier Identitäten:
    Terme;
 3. **Backendprovenienz:** Engine-ID, Engine-Zertifikate, Rohresultat-Hash,
    Backend-Claim und ausgeführte Engine-Arbeit;
-4. **Regelsuche-Evidence:** vollständig gebundener Request, unabhängig
-   rekonstruierte Ergebnisse, Verifier- oder Algorithmuszertifikat,
-   Gesamtarbeit und autorisierte Claim-Stärke.
+4. **Regelsuche-Evidence:** vollständig gebundener Request, rekonstruierte
+   Ergebnisse, Verifier- oder Algorithmuszertifikat, Gesamtarbeit und
+   autorisierte Claim-Stärke.
 
 Eine andere Quellschreibweise verändert nicht automatisch das mathematische
 Polynom. Eine andere Koeffizientendomäne, Variablenordnung oder Monomordnung
@@ -128,14 +119,15 @@ regelsuche.coefficients.rational/v1
 regelsuche.coefficients.prime-field/v1/p=<p>
 ```
 
-Die rationale Implementierung verwendet den autoritativen `ExactRational`-Typ.
-Es existiert keine zweite Brucharithmetik und kein `double`-Einstieg in die
-exakte Domäne.
+Die rationale Implementierung verwendet den autoritativen
+`ExactRational`-Typ. Es existiert keine zweite Brucharithmetik und kein
+`double`-Einstieg in die exakte Domäne.
 
 `PrimeField` speichert kanonische `BigInteger`-Restklassen und bindet die
-deterministisch geprüfte Primzahl in die Domain-ID. Ringe über unterschiedlichen
-Primzahlen sind daher nicht gleich. Endliche Erweiterungskörper und algebraische
-Zahlkörper bleiben spätere Domänen hinter denselben Fähigkeiten.
+deterministisch geprüfte Primzahl in die Domain-ID. Ringe über
+unterschiedlichen Primzahlen sind daher nicht gleich. Endliche
+Erweiterungskörper und algebraische Zahlkörper bleiben spätere Domänen hinter
+denselben Fähigkeiten.
 
 ## Polynomring und kanonisches Sparse-Polynom
 
@@ -219,19 +211,19 @@ Die Strukturgrenzen umfassen:
 - maximale Koeffizientenbitlänge.
 
 `FactorizationVerifier` und die issuer-owned Algorithmusstufen prüfen diese
-Grenzen vor einem positiven Abschluss. Die Inhaltsnormalisierung,
-Primzahlauswahl und verschachtelte Primkörperfaktorisierung können denselben
-bereits belasteten, request-autorisierten `PolynomialWorkBudget` übernehmen.
-Eine abweichende Budgetautorität wird als technischer Vertragsfehler
-zurückgewiesen.
+Grenzen vor einem positiven Abschluss. Inhaltsnormalisierung,
+quadratfreie Zerlegung, Primzahlauswahl, Primkörperfaktorisierung,
+Hensel-Lifting und Rekombination teilen dieselbe bereits belastete
+`PolynomialWorkBudget`-Autorität.
 
 Ein Algorithmus mit zusätzlichem Zwischenwertwachstum darf eine eng begrenzte
 Stufenpolitik ergänzen, aber keine zweite Request-Oberfläche mit duplizierten
 Struktur- oder Arbeitsbudgets einführen.
 
 Ein Backend-Claim erfüllt `INDEPENDENT_COMPLETE` niemals allein. Eine Engine,
-die keine unabhängige Vollständigkeits- oder Irreduzibilitätsevidence liefern
-kann, muss einen solchen Request als nicht unterstützt behandeln.
+die keine algorithmisch unabhängige Vollständigkeits- oder
+Irreduzibilitätsevidence liefern kann, muss einen solchen Request als nicht
+unterstützt behandeln.
 
 ## Allgemeine univariate Darstellung
 
@@ -280,15 +272,11 @@ Rationale Nenner werden exakt über ihr kleinstes gemeinsames Vielfaches
 beseitigt. Danach wird der positive ganzzahlige Inhalt extrahiert und das
 Leitvorzeichen in den Skalar verschoben.
 
-`UnivariateContentPolicy` ergänzt ausschließlich die Grenze für wachsende
-Zwischenkoeffizienten. Source-Struktur und Gesamtarbeit bleiben Eigentum des
-`FactorizationRequest`.
-
 Vor einem positiven Abschluss werden der primitive Koeffizienten-GGT, der
 Leitkoeffizient, die ganzzahlige Zwischenform und die vollständige
-`Z[x]`- beziehungsweise `Q[x]`-Quelle unabhängig rekonstruiert. Das
-issuer-owned Resultat bindet Request, Stufenpolitik, Work Ledger und exakte
-Ausgabe in ein deterministisches Zertifikat.
+`Z[x]`- beziehungsweise `Q[x]`-Quelle rekonstruiert. Das issuer-owned Resultat
+bindet Request, Stufenpolitik, Work Ledger und exakte Ausgabe in ein
+deterministisches Zertifikat.
 
 ## Polynom-GGT und quadratfreie Zerlegung
 
@@ -299,8 +287,7 @@ technischer Fehler sind getrennte Ausgänge.
 
 `SquareFreeDecomposition` führt über einem exakten Feld der Charakteristik null
 eine Yun-artige Zerlegung aus. Sie bewahrt Faktorvielfachheiten, rekonstruiert
-das Quellpolynom und prüft für jeden ausgegebenen Faktor
-`gcd(f, f') = 1`.
+das Quellpolynom und prüft für jeden ausgegebenen Faktor `gcd(f, f') = 1`.
 
 Quadratfrei bedeutet nicht irreduzibel. Weder ein GGT-Ergebnis noch eine
 quadratfreie Zerlegung autorisiert allein einen Vollständigkeits- oder
@@ -365,23 +352,110 @@ Der positive Abschluss prüft drei getrennte Bindungen:
 3. die retained modulare Quelle ist tatsächlich die kanonische Reduktion der
    gebundenen ganzzahligen Quelle modulo der ausgewählten Primzahl.
 
-Der Quellhash wird aus dem bereits vollständig request-gebundenen
-Primkörperzertifikat exponiert, ohne dessen v1-Zertifikatsidentität zu ändern.
+## Lineares Multifaktor-Hensel-Lifting
 
-## Untrusted Engine-SPI
+`HenselLifting` hebt die vollständig faktorisierten, paarweise koprimen
+modularen Faktoren von `p` bis zu einem expliziten `p^k`.
+
+Der Ablauf:
+
+1. bindet Quelle, geeignete Primzahl und modulare Faktorzerlegung;
+2. verankert die modulare Einheit am ersten Faktor;
+3. berechnet die CRT-Kofaktoren und ihre geprüften modularen Inversen;
+4. rekonstruiert in jedem Schritt das durch den aktuellen Modulus teilbare
+   Fehlerpolynom;
+5. berechnet und prüft die Korrekturgleichung;
+6. hält die Leitkoeffizienten der Liftfaktoren fest;
+7. zentriert die Koeffizienten modulo des jeweils nächsten Modulus;
+8. prüft nach jedem Schritt Quellkongruenz und feste Reduktionen modulo `p`;
+9. bewahrt eine Folge issuer-owned `HenselLiftStep`-Zertifikate.
+
+Der Zielmodulus wird nicht heuristisch gewählt. Die Zassenhaus-Stufe berechnet
+eine explizite ganzzahlige Faktor-Koeffizientenschranke `B`, und die Pipeline
+fordert
+
+```text
+p^k > 2 * B
+```
+
+bevor zentrierte Restklassen eindeutig als ganzzahlige Koeffizienten
+interpretiert werden.
+
+Modulusbitlänge, Zwischenkoeffizienten und Gesamtarbeit sind explizit
+begrenzt. Unzureichende Präzision bleibt `BUDGET_INCONCLUSIVE`.
+
+## Deterministische Zassenhaus-Rekombination
+
+`ZassenhausRecombination` verarbeitet genau eine primitive, quadratfreie
+ganzzahlige Schicht.
+
+Die Stufe:
+
+- normalisiert die Hensel-Faktoren modulo `p^k` auf monische Faktoren;
+- enumeriert echte Teilmengen in stabiler Größen- und lexikographischer
+  Reihenfolge;
+- überspringt bei gleich großen Komplementen die doppelte Hälfte;
+- enumeriert positive Teiler des aktuellen Leitkoeffizienten;
+- bildet zentrierte ganzzahlige Kandidaten modulo `p^k`;
+- verwirft Konstanten, das Gesamtpolynom, nichtprimitive Kandidaten und
+  Kandidaten außerhalb der Koeffizientenschranke;
+- akzeptiert einen Kandidaten erst nach exakter Langdivision in `Z[x]`;
+- setzt die Suche auf Quotient und verbleibenden modularen Gruppen fort;
+- bewahrt Faktorpartitionen und einen deterministischen Candidate-Audit-Hash.
+
+Vor Ausgabe werden unabhängig innerhalb der Stufe geprüft:
+
+- vollständige und disjunkte Zuordnung der modularen Faktoren;
+- Übereinstimmung jedes ganzzahligen Faktors mit seiner modularen Partition;
+- Primitivität und positiver Leitkoeffizient;
+- exakte Rekonstruktion der gebundenen `Z[x]`-Quelle.
+
+Die Suchmenge wächst exponentiell mit der Zahl modularer Faktoren. Daher
+begrenzen Policy und Request Teilmengenkandidaten, Teiler, Faktorzahl,
+Modulusbitlänge, Zwischenkoeffizienten und Work Units. Ein erschöpfter
+Präfix ist keine Irreduzibilitätsevidence.
+
+## Integrierte native Engine für `Z[x]` und `Q[x]`
+
+`NativeUnivariateFactorizationEngine` besitzt typisierte Fabriken:
+
+```text
+NativeUnivariateFactorizationEngine.boundedIntegers()
+NativeUnivariateFactorizationEngine.boundedRationals()
+```
+
+Die gemeinsame Pipeline:
+
+1. normalisiert die Quelle nach `scalar * primitivePart`;
+2. zerlegt den primitiven Teil quadratfrei in Charakteristik null;
+3. überführt jede Schicht wieder kanonisch nach `Z[x]`;
+4. faktorisiert lineare Schichten direkt;
+5. faktorisiert höhere Schichten über Primzahlauswahl, Hensel-Lifting und
+   Zassenhaus-Rekombination;
+6. bewahrt die quadratfreien Multiplizitäten;
+7. führt alle skalaren Einheiten exakt zusammen;
+8. materialisiert die Faktoren im ursprünglichen Integer- oder Rationalring;
+9. gibt genau ein vollständiges Proposal oder einen fail-closed Ausgang aus.
+
+Ein Resultat, das nur einen zur Quelle assoziierten Faktor enthält, wird nicht
+als Zerlegung ausgegeben. Die Engine bewahrt dann einen
+`BACKEND_CLAIMED_IRREDUCIBLE`-Claim; der Verifier macht daraus ohne
+unabhängiges Zertifikat keinen `IRREDUCIBLE`-Status.
+
+## Untrusted Engine-SPI und unabhängiger Verifier
 
 `FactorizationEngine<C>` arbeitet ausschließlich auf dem mathematischen
-Polynom. Parser, AST und Benutzeranzeige gehören nicht zur Engine-Schnittstelle.
-Dadurch können native Algorithmen und spätere externe Backendadapter dieselben
-Requests bedienen.
+Polynom. Parser, AST und Benutzeranzeige gehören nicht zur
+Engine-Schnittstelle. Native Algorithmen und externe Backendadapter können
+dadurch dieselben Requests bedienen.
 
-Eine Engine gibt ein `EngineResult<C>` mit folgenden Bestandteilen zurück:
+Eine Engine gibt ein `EngineResult<C>` zurück mit:
 
 - `Outcome`;
 - `detailCode`;
-- stage-getrenntes `PolynomialWorkLedger`;
-- null oder mehrere `Proposal<C>`;
-- optionaler `BackendClaim`;
+- stage-getrenntem `PolynomialWorkLedger`;
+- null oder mehreren `Proposal<C>`;
+- optionalem `BackendClaim`;
 - Engine-Result-Hash.
 
 Ein `Proposal<C>` enthält:
@@ -391,52 +465,7 @@ Ein `Proposal<C>` enthält:
 - einen optionalen nichtkonstanten ungelösten Rest oder exakt eins;
 - ein Engine-Zertifikat.
 
-Konstante Restfaktoren sind nicht zulässig: Sie müssen in die skalare Einheit
-verschoben werden. Gleiche Faktoren werden zusammengeführt. Ein Backend darf
-`COMPLETE_FACTORIZATION` nicht gleichzeitig mit einem ungelösten Rest ungleich
-eins behaupten. Widersprüchliche Rohresultate werden als ungültige
-Engineausgabe abgelehnt.
-
-Diese Konstruktorinvarianten machen das Objekt strukturell wohldefiniert. Sie
-machen seine mathematische Produktbehauptung oder seinen Backend-Claim noch
-nicht vertrauenswürdig.
-
-## Kanonisches Work Accounting
-
-`PolynomialWorkLedger` trennt Arbeit nach stabilen Stage-IDs, beispielsweise:
-
-```text
-content.denominator-lcm.gcd
-content.integralization.multiplication
-content.verify.source-comparison
-gcd.division.coefficient-updates
-square-free.initial-gcd.iterations
-berlekamp.matrix.frobenius-powers
-berlekamp.rref.eliminations
-finite-field.verify.product
-suitable-prime.modular-reduction
-```
-
-Die Stage-Abbildung wird lexikographisch sortiert und danach als
-reihenfolgeerhaltende unveränderliche Map gespeichert. Das kanonische
-Hashmaterial hängt damit nicht von einer nicht spezifizierten
-Map-Iterationsreihenfolge ab.
-
-Bereits request-weit zusammengeführt sind:
-
-- Engine- und Verifier-Arbeit im vorhandenen Faktorisierungsvertrag;
-- sämtliche Unterstufen der Inhaltsnormalisierung;
-- Primzahlauswahl und verschachtelte Primkörperfaktorisierung;
-- wiederholte Aufrufe, wenn die Orchestrierung denselben
-  `PolynomialWorkBudget` weiterreicht.
-
-Die vollständige `Z[x]`-/`Q[x]`-Engine muss die noch offenen Lift- und
-Rekombinationsstufen ebenfalls unter derselben Autorität ausführen.
-
-## Unabhängiger Verifier
-
-`FactorizationVerifier.execute` ist die autoritative Grenze für
-Engine-Ergebnisse. Er prüft mindestens:
+`FactorizationVerifier.execute` prüft mindestens:
 
 - request-weite Strukturgrenzen vor dem Engine-Aufruf;
 - Übereinstimmung von Engine- und Koeffizientendomänen-ID;
@@ -453,28 +482,17 @@ FactorizationVerifier.VerifiedCandidate<C>
 FactorizationVerifier.Report<C>
 ```
 
-Aufrufer und Engines können deren positiven Zustand nicht über öffentliche
-Konstruktoren herstellen. Der Verifier bindet Quellpolynom, vollständigen
-Request, Engineprovenienz, Work Ledger, rekonstruierte Faktoren,
-Backend-Claim und sein eigenes Zertifikat in das Report-Hashmaterial.
-
-Die issuer-owned Resultate der allgemeinen Algorithmusstufen werden erst dann
-Teil eines verifier-ausgestellten vollständigen Faktorisierungsreports, wenn
-eine Engine sie in einem vollständigen Proposal-/Verifier-Ablauf verwendet.
-
 ## Status und Claim-Stärken
-
-Terminale `FactorizationVerifier.Status` sind getrennt:
 
 | Status | Bedeutung |
 | --- | --- |
 | `COMPLETE_FACTORIZATION` | vollständige Faktorisierung mit unabhängig autorisierter Evidence |
 | `IRREDUCIBLE` | unabhängig autorisierte Irreduzibilität im deklarierten Ring |
-| `PARTIAL_FACTORIZATION` | Produktgleichheit geprüft, Vollständigkeit oder Irreduzibilität nicht unabhängig belegt |
-| `NO_FACTORIZATION_FOUND` | kein Kandidat innerhalb des Enginevertrags; kein automatischer Irreduzibilitätsbeweis |
+| `PARTIAL_FACTORIZATION` | Produktgleichheit geprüft, Vollständigkeit nicht unabhängig belegt |
+| `NO_FACTORIZATION_FOUND` | kein Kandidat innerhalb des Enginevertrags |
 | `UNSUPPORTED_DOMAIN` | Koeffizientendomäne nicht unterstützt |
 | `UNSUPPORTED_REQUEST` | Form oder verlangte Evidenzstärke nicht unterstützt |
-| `BUDGET_INCONCLUSIVE` | Struktur- oder Gesamtbudget reicht nicht aus |
+| `BUDGET_INCONCLUSIVE` | Struktur-, Kandidaten- oder Arbeitsbudget reicht nicht aus |
 | `TECHNICAL_FAILURE` | Vertragsverletzung, ungültige Engineausgabe oder technischer Fehler |
 
 Die Claim-Stärke bleibt separat sichtbar:
@@ -488,14 +506,38 @@ INDEPENDENTLY_CERTIFIED_COMPLETE
 INDEPENDENTLY_CERTIFIED_IRREDUCIBLE
 ```
 
-`BACKEND_CLAIMED_COMPLETE` bedeutet nur: Das Backend hat Vollständigkeit
-behauptet und Regelsuche hat das ausgegebene Produkt exakt rekonstruiert. Es
-autorisiert weder `COMPLETE_FACTORIZATION` noch einen
-`INDEPENDENT_COMPLETE`-Request.
+`BACKEND_CLAIMED_COMPLETE` bedeutet: Das Backend hat Vollständigkeit behauptet
+und Regelsuche hat das ausgegebene Produkt exakt rekonstruiert. Es autorisiert
+weder `COMPLETE_FACTORIZATION` noch einen `INDEPENDENT_COMPLETE`-Request.
 
-## Erste Engine: binäre homogene Quartiken
+## Kanonisches Work Accounting
 
-Die erste Engine besitzt die ID:
+`PolynomialWorkLedger` trennt Arbeit nach stabilen Stage-IDs, unter anderem:
+
+```text
+content.denominator-lcm.gcd
+square-free.initial-gcd.iterations
+berlekamp.matrix.frobenius-powers
+suitable-prime.modular-reduction
+hensel.step-<n>.corrections
+zassenhaus.candidate.attempts
+verify.factor-product-multiplications
+```
+
+Die Stage-Abbildung wird kanonisch sortiert. Verschachtelte Stufen übernehmen
+den bereits belasteten Ledger. Ein Prefix muss monoton erhalten bleiben:
+Wenn eine spätere Stufe unter derselben Stage-ID weitere Arbeit ausführt, darf
+deren Zähler steigen, aber nie sinken. Diese Regel ist insbesondere relevant,
+wenn die Zassenhaus-Koeffizientenschranke vor dem Lift bestimmt und am
+öffentlichen Rekombinationseinstieg erneut geprüft wird.
+
+Work Units sind deterministische algorithmische Zähler. Sie sind weder
+Wandzeit noch CPU-Zyklen und dürfen nicht als plattformübergreifender
+Performancewert interpretiert werden.
+
+## Erste Spezialengine: binäre homogene Quartiken
+
+Die ältere Spezialengine besitzt die ID:
 
 ```text
 regelsuche.factorization.binary-quartic-2x2/v1
@@ -510,18 +552,14 @@ quadratisch-mal-quadratisch-Zerlegung binärer homogener Quartiken:
 (d*A^2 + e*A*B + f*B^2)
 ```
 
-Sie enumeriert begrenzte Teiler der äußeren Koeffizienten und löst die
-verbleibenden linearen Bedingungen exakt. Konkrete Identitäten wie
-Sophie-Germain sind nicht gespeichert.
+Die Engine bleibt als spezialisierter Kontrollpfad und für bestehende
+Suchintegration erhalten. Ihr Performancewert ist kein Stellvertreter für die
+allgemeine native univariate Engine.
 
-Die Engine gibt `BackendClaim.NONE` aus. Der Verifier erzeugt bei einem
-korrekten Produkt `PARTIAL_FACTORIZATION` mit
-`ClaimStrength.VERIFIED_DECOMPOSITION`. Obwohl der ungelöste Rest eins ist,
-beweist die Engine nicht die Irreduzibilität jedes quadratischen Faktors.
+## Ausdrucksadapter, Suche und Workbench
 
-## Ausdrucksadapter und Suche
-
-`PolynomialDecompositionSynthesisOperator` ist ein Integrationsadapter:
+`PolynomialDecompositionSynthesisOperator` integriert aktuell weiterhin die
+binäre Quartikengine in den Ausdrucks- und Suchpfad:
 
 ```text
 String
@@ -533,64 +571,57 @@ String
   -> gerenderter Transformationstext
 ```
 
-Er besitzt keine eigene Koeffizientenlösung und kein paralleles
-Polynomdatenmodell. Große exakte Faktorkoeffizienten werden beim Rendern nicht
-über `NumberExpr(int/double)` geleitet.
-
 `PolynomialTheorySubsumptionClassifier` klassifiziert gefundene Identitäten
 gegen verifier-ausgestellte Faktorisierungsevidence. Positiv subsumierte
 Instanzen können nur in den begrenzten `PolynomialDerivedMacroCache`; sie
-werden nicht als neue Kernelgesetze behandelt. Der Cache bindet das
-vollständige Work Ledger statt eines quartikspezifischen
-Konfigurationszählers.
+werden nicht als neue Kernelgesetze behandelt.
 
-Die allgemeine modulare Pipeline ist noch nicht automatisch im
-Workbench-Suchprofil aktiv. Ihre Nutzung durch eine vollständige univariate
-Engine und danach durch Suche beziehungsweise Replay ist ein eigener,
-qualifikationspflichtiger Integrationsschritt.
+Die allgemeine native Engine ist als Java-Engine implementiert und
+qualifiziert, aber noch nicht automatisch im Workbench-Suchprofil aktiv. Die
+Integration in Vorbereitung, Suche, Replay und Lernen benötigt eine
+gesonderte Auswahl- und Explainability-Policy, damit teure algebraische
+Makrooperationen nicht unkontrolliert jede Suchfront erweitern.
 
-## Keine unnötige Rückwärtskompatibilität
+## Capability-matched Vergleich mit SymPy
 
-Entfernt beziehungsweise ersetzt wurden insbesondere die früheren
-verschachtelten Polynom-, Kandidaten- und Reporttypen. Es gibt keine deprecated
-Duplikate und keine Adapter, die den neuen Kern wieder auf die alte
-Quartikoberfläche reduzieren.
+Das Modul `regelsuche-math-sympy` stellt dieselben typisierten
+`FactorizationRequest`s einem eingebetteten SymPy/GraalPy-Backend zur
+Verfügung.
 
-Ein Adapter wird künftig nur beibehalten, wenn ein konkretes externes
-Serialisierungsformat oder ein unveränderliches historisches Experiment ihn
-benötigt und dieser Eigentümer ausdrücklich dokumentiert ist.
+Der primäre allgemeine Benchmark verwendet einen eingefrorenen gemeinsamen
+Korpus über `Z[x]` und `Q[x]` mit:
+
+- dichten und dünn besetzten Polynomen;
+- kleinen und größeren Koeffizienten;
+- ganzzahligem und rationalem Content;
+- reduzierbaren und irreduziblen Fällen;
+- quadratfreien und wiederholten Faktoren;
+- Graden 2 bis 6.
+
+Native und SymPy erhalten pro Fall denselben Request. Backend-only- und
+End-to-End-Spuren trennen Enginearbeit von der gemeinsamen
+Produktrückprüfung. Der frühere binäre Quartikfall bleibt ausdrücklich nur
+`SPECIALIZED_BINARY_QUARTIC_CONTROL`.
+
+Laufzeiten sind umgebungsbezogene Engineering-Diagnostik. Es gibt kein
+relatives Winner-Gate und keine universelle Aussage über Computer-Algebra-
+Systeme.
 
 ## Nächste Ausbaustufen
 
-Issue #763 verfolgt als erste vollständige Qualifikationsdomäne:
+Issue #763 verfolgt nach dem ersten integrierten nativen Abschluss insbesondere:
 
-```text
-Q[x]
-```
-
-mit beliebigem unterstützten Grad unter expliziten Budgets. Bereits
-implementiert sind gemeinsame univariate Darstellung, Inhalt und primitiver
-Teil, Ableitung, exakte Division, Polynom-GGT, quadratfreie Zerlegung,
-Primkörperfaktorisierung und geeignete Primzahlauswahl mit exakter modularer
-Reduktion.
-
-Die verbleibende native Pipeline umfasst:
-
-1. Hensel-Lifting mit expliziter Liftpräzision, Zwischenwertgrenzen und
-   rekonstruiertem Produkt modulo `p^k`;
-2. ganzzahlige Faktorrekomposition, zunächst Zassenhaus;
-3. später LLL-/van-Hoeij-Rekombination, wenn qualifiziert;
-4. rationale Faktorreassemblierung;
-5. unabhängige Vollständigkeits- und Irreduzibilitätsprüfung der ursprünglichen
-   Quelle;
-6. Übergabe der vollständigen Ergebnisse an `FactorizationVerifier`;
-7. Integration in Suche, Vorbereitung, Replay und Lernen unter
-   informationserhaltenden Work-Budgets.
-
-Parallel kann ein externer Backendadapter dieselben Requests bedienen. Seine
-Ergebnisse bleiben Proposals, bis Regelsuche sie exakt rekonstruiert hat. Eine
-spätere multivariate Pipeline nutzt denselben Domain-, Ring-, Engine- und
-Verifiervertrag, erweitert aber die algorithmische Implementierung.
+1. algorithmisch unabhängige Vollständigkeits- und
+   Irreduzibilitätszertifikate für `Z[x]` und `Q[x]`;
+2. stärkere Rekombination, zunächst LLL-/van-Hoeij-artig, für Fälle mit vielen
+   modularen Faktoren;
+3. breitere gehaltene und adversarielle Korpora mit abgestuften Budgets;
+4. Integration der allgemeinen Engine in Suche, Vorbereitung, Replay und
+   Lernen;
+5. dokumentierte Auswahl zwischen nativer Engine, SymPy und späteren
+   Backendportfolios;
+6. spätere multivariate und algebraische Koeffizientendomänen hinter
+   demselben Domain-, Ring-, Engine- und Verifiervertrag.
 
 ## Prüfung aus dem Checkout
 
@@ -608,16 +639,16 @@ Fokussierte Kern- und Algorithmusprüfungen:
   --tests de.regelsuche.math.algorithms.polynomial.UnivariatePolynomialAlgorithmsTest \
   --tests de.regelsuche.math.algorithms.polynomial.SquareFreeDecompositionTest \
   --tests de.regelsuche.math.algorithms.polynomial.FiniteFieldFactorizationTest \
-  --tests de.regelsuche.math.algorithms.polynomial.FiniteFieldFactorizationHigherDegreeTest \
   --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionTest \
-  --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionEvidenceTest
+  --tests de.regelsuche.math.algorithms.polynomial.HenselLiftingTest \
+  --tests de.regelsuche.math.algorithms.polynomial.ZassenhausRecombinationTest \
+  --tests de.regelsuche.math.algorithms.polynomial.NativeUnivariateFactorizationEngineTest
 ```
 
-Discovery-Integration:
+Capability-matched Benchmark und validierter Bericht:
 
 ```bash
-./gradlew :app:test \
-  --tests de.regelsuche.docs.PolynomialDecompositionDiscoveryIntegrationTest
+./gradlew :regelsuche-math-sympy:verifySymPyFactorizationBenchmark
 ```
 
 Vollständiger Repositoryvertrag:
@@ -629,10 +660,12 @@ mvn --batch-mode --no-transfer-progress -Pfull verify
 
 ## Aussagegrenze
 
-Der implementierte Stand belegt eine erweiterbare, exakte
-Faktorisierungsarchitektur, einen fail-closed Engine-/Verifier-Vertrag,
-allgemeine univariate Vorstufen, vollständige quadratfreie
-Primkörperfaktorisierung und eine quellgebundene geeignete Primzahlauswahl. Er
-belegt noch keine integrierte vollständige Faktorisierung über `Q[x]`, keine
-multivariate Faktorisierung und keine Überlegenheit gegenüber etablierten
+Der implementierte Stand belegt eine erweiterbare exakte
+Faktorisierungsarchitektur, eine begrenzte native allgemeine univariate Engine
+für `Z[x]` und `Q[x]`, vollständige interne Modular-, Lift- und
+Rekombinationsinvarianten sowie exakte Produktrückprüfung.
+
+Er belegt noch keine algorithmisch unabhängige Vollständigkeit oder
+Irreduzibilität in `Z[x]` beziehungsweise `Q[x]`, keine multivariate
+Faktorisierung und keine universelle Überlegenheit gegenüber etablierten
 Computer-Algebra-Systemen.
