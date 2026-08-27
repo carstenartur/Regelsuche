@@ -1,5 +1,6 @@
 package de.regelsuche.build;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -106,6 +107,41 @@ class MavenEmbeddedGraalPyMemoryContractTest {
         gradle.contains(
             "Truffle ships version-specific implementations under META-INF/versions"),
         "the non-obvious uber-JAR requirement must remain documented next to the build fix");
+  }
+
+  @Test
+  void benchmarkTracksOwnOnlyTheirDeclaredRuntimeState()
+      throws IOException {
+    Path root = repositoryRoot();
+    String benchmark = Files.readString(root.resolve(
+        "regelsuche-math-sympy/src/jmh/java/de/regelsuche/math/sympy/"
+            + "SymPyFactorizationBenchmarks.java"));
+
+    for (String state : new String[] {
+        "public static class NativeState",
+        "public static class EmbeddedWarmState",
+        "public static class EmbeddedColdState",
+        "public static class ProcessState"
+    }) {
+      assertTrue(
+          benchmark.contains(state),
+          () -> "the benchmark must retain independent runtime state: " + state);
+    }
+    assertTrue(
+        benchmark.contains("nativeBackendWarm(NativeState state)"),
+        "native backend timing must not initialize GraalPy or CPython");
+    assertTrue(
+        benchmark.contains("graalPyBackendWarm(EmbeddedWarmState state)"),
+        "warm GraalPy timing must reuse only its embedded runtime");
+    assertTrue(
+        benchmark.contains("graalPyEndToEndCold(EmbeddedColdState state)"),
+        "cold GraalPy timing must start without a retained warm context");
+    assertTrue(
+        benchmark.contains("cpythonOneShotEndToEnd(ProcessState state)"),
+        "the process timing must not initialize GraalPy");
+    assertFalse(
+        benchmark.contains("@State(Scope.Benchmark)\npublic class"),
+        "one outer state must not couple unrelated benchmark transports");
   }
 
   private static Path repositoryRoot() {
