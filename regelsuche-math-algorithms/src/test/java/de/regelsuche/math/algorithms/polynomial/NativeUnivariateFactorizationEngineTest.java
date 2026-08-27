@@ -107,6 +107,44 @@ class NativeUnivariateFactorizationEngineTest {
     }
 
     @Test
+    void factorsRepeatedNonlinearIntegerLayersUnderOneWorkAuthority() {
+        SparsePolynomial<BigInteger> xMinusOne = integer(-1, 1);
+        SparsePolynomial<BigInteger> xPlusTwo = integer(2, 1);
+        SparsePolynomial<BigInteger> xSquaredPlusOne =
+            integer(1, 0, 1);
+        SparsePolynomial<BigInteger> source = xMinusOne.pow(2)
+            .multiply(xPlusTwo.pow(2))
+            .multiply(xSquaredPlusOne);
+
+        FactorizationVerifier.Report<BigInteger> report =
+            FactorizationVerifier.execute(
+                NativeUnivariateFactorizationEngine.boundedIntegers(),
+                request(source));
+
+        assertTrue(report.successful(), report.toString());
+        assertEquals(
+            FactorizationVerifier.ClaimStrength.BACKEND_CLAIMED_COMPLETE,
+            report.claimStrength());
+        assertEquals(1, report.candidates().size());
+        assertEquals(
+            List.of(1, 2, 2),
+            report.candidates().getFirst().factors().stream()
+                .map(PolynomialFactor::multiplicity)
+                .sorted()
+                .toList());
+        assertEquals(
+            List.of(xMinusOne, xPlusTwo, xSquaredPlusOne).stream()
+                .map(SparsePolynomial::canonicalMaterial)
+                .sorted()
+                .toList(),
+            report.candidates().getFirst().factors().stream()
+                .map(PolynomialFactor::polynomial)
+                .map(SparsePolynomial::canonicalMaterial)
+                .sorted()
+                .toList());
+    }
+
+    @Test
     void exhaustivelyRetainsIrreducibilityOnlyAsBackendClaim() {
         SparsePolynomial<BigInteger> source = integer(1, 0, 1);
 
