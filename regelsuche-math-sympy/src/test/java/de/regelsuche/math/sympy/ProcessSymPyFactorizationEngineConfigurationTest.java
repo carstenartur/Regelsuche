@@ -1,6 +1,8 @@
 package de.regelsuche.math.sympy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +19,9 @@ class ProcessSymPyFactorizationEngineConfigurationTest {
                 "/tmp/pinned-sympy-python",
                 ProcessSymPyFactorizationEngine
                     .configuredPythonExecutable());
+            assertTrue(
+                ProcessSymPyFactorizationEngine
+                    .hasConfiguredPythonExecutable());
         } finally {
             if (previous == null) {
                 System.clearProperty(property);
@@ -48,5 +53,30 @@ class ProcessSymPyFactorizationEngineConfigurationTest {
             ProcessSymPyFactorizationEngine.resolvePythonExecutable(
                 "  ",
                 "  "));
+    }
+
+    @Test
+    void explicitConfigurationDetectionCoversBothSources() {
+        assertTrue(
+            ProcessSymPyFactorizationEngine
+                .hasConfiguredPythonExecutable(
+                    " /tmp/property-python ",
+                    null));
+        assertTrue(
+            ProcessSymPyFactorizationEngine
+                .hasConfiguredPythonExecutable(
+                    null,
+                    " /tmp/environment-python "));
+        assertTrue(
+            ProcessSymPyFactorizationEngine
+                .hasConfiguredPythonExecutable(
+                    " ",
+                    " /tmp/environment-python "));
+        assertFalse(
+            ProcessSymPyFactorizationEngine
+                .hasConfiguredPythonExecutable(null, null));
+        assertFalse(
+            ProcessSymPyFactorizationEngine
+                .hasConfiguredPythonExecutable(" ", " "));
     }
 }
