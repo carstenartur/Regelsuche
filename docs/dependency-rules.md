@@ -16,6 +16,7 @@ flowchart TD
     app --> persistenceHibernate
     app --> portfolio
     app --> search
+    app --> mathSympy
 
     release --> autopilot
     autopilot --> experiments
@@ -41,6 +42,7 @@ flowchart TD
     solverIr --> validation
     solverIr --> math
 
+    mathSympy --> core
     search --> egraph
     search --> core
     egraph --> core
@@ -58,17 +60,30 @@ rein testbezogenen Build-Eintrag.
 
 - `:regelsuche-core` besitzt keine Projektabhängigkeiten.
 - Core enthält keine Hibernate-/JPA-, Web-, Docker-, Neo4j-, SymPy-, Z3- oder
-  GraalVM-Prozessintegration.
+  GraalPy-/Polyglot-Integration.
 - `:regelsuche-egraph` baut nur auf Core auf.
 - `:regelsuche-search` verwendet Core und E-Graph; technische Persistenz- und
   Prozessadapter bleiben außerhalb.
 - `:regelsuche-validation` definiert fachliche Validation-Verträge auf Basis
   des Core.
 
-### Mathematische Algorithmen und Solver
+### Mathematische Algorithmen und Adapter
 
 - `:regelsuche-math-algorithms` enthält reine oder klar begrenzte mathematische
   Verfahren und keine Campaign-Entscheidungen.
+- `:regelsuche-math-jas` und `:regelsuche-math-sympy` sind technische
+  Mathematikadapter und dürfen von den stabilen inneren Verträgen abhängen.
+- `:regelsuche-math-sympy` darf GraalPy, Polyglot, eingebettete Python-Pakete
+  und den CPython-Kontrolltransport kapseln; Core, Search und Validation dürfen
+  nicht von diesem Modul abhängen.
+- SymPy-Ergebnisse bleiben `FactorizationEngine`-Proposals. Nur der im Core
+  definierte `FactorizationVerifier` darf daraus Regelsuche-Evidence für die
+  exakte Produktrekonstruktion ausstellen.
+- Das Adaptermodul darf Laufzeiten diagnostisch messen, aber keine
+  umgebungsabhängige Wandzeit in mathematische Zertifikatsidentitäten aufnehmen.
+
+### Solver
+
 - `:regelsuche-solver-ir` definiert Obligation, strukturierte Annahmen,
   Übersetzung, Resultat und Execution.
 - `:regelsuche-solver-portfolio` darf Backends auswählen, budgetieren,
@@ -103,7 +118,8 @@ rein testbezogenen Build-Eintrag.
 
 - `:regelsuche-cli` bleibt frei von Fachmodulabhängigkeiten und stellt
   wiederverwendbare Parsing-/Command-Primitiven bereit.
-- `:app` ist die äußere Composition Root und darf produktive Module verdrahten.
+- `:app` ist die äußere Composition Root und darf produktive Module sowie
+  ausdrücklich ausgewählte optionale Adapter verdrahten.
 - `app` darf nicht als Ablage für neue Kernsemantik verwendet werden, wenn eine
   fachliche Capability-Grenze existiert.
 
@@ -122,6 +138,22 @@ Ein Status wie `UNKNOWN`, `UNAVAILABLE`, Timeout oder technischer Fehler bleibt
 von `CONFIRMED`, `REFUTED` oder formaler Proof-Evidence getrennt. Kein äußerer
 Report darf diese Bedeutung überschreiben.
 
+## Faktorisierungsinvariante
+
+Der autoritative Adapterfluss lautet:
+
+```text
+FactorizationRequest
+  → Backend-spezifische exakte Translation
+  → untrusted FactorizationEngine.Proposal
+  → FactorizationVerifier
+  → verifier-ausgestellte Evidence
+```
+
+Ein eingebettetes CAS darf weder den ursprünglichen Ringvertrag ersetzen noch
+einen Backend-Claim selbst zu unabhängiger Vollständigkeit oder
+Irreduzibilität hochstufen.
+
 ## Benchmark-Regeln
 
 Vergleichende Benchmarks sind nach Capability und Informationsregime getrennt.
@@ -129,14 +161,17 @@ Ein Benchmark darf:
 
 - Suchstrategien unter identischen Inputs, Targets, Inventaren und Budgets
   ausführen;
-- externe CAS-, SMT- oder Prover-Adapter auf einem ausdrücklich gemeinsamen
-  Fragment vergleichen;
+- externe oder eingebettete CAS-, SMT- oder Prover-Adapter auf einem
+  ausdrücklich gemeinsamen Fragment vergleichen;
+- Backend-only, verifier-inclusive, Warm- und Cold-Start als getrennte Spuren
+  messen;
 - Wandzeit und Durchsatz als nichtkanonische Diagnostik erfassen;
-- ungemessene oder unsupported Bereiche als Coverage Gaps retainen.
+- ungemessene oder unsupported Bereiche als Coverage Gaps bewahren.
 
 Ein Benchmark darf nicht:
 
 - zielgerichtete Suche und targetfreie Discovery in einem Score vermischen;
+- Prozess-/Interpreterstart als algebraische Kernlaufzeit bezeichnen;
 - Validation als Candidate Formation zählen;
 - Search-Erfolg als Proof darstellen;
 - fehlende, übersprungene, unsupported oder inconclusive Fälle entfernen;
@@ -170,7 +205,8 @@ Technische Adapter liegen außerhalb der mathematischen Grundlage:
 
 - HTTP und UI in `app`;
 - Hibernate/JPA in `:regelsuche-persistence-hibernate`;
-- externe Prozessadapter in Solver-, Benchmark- oder App-Schichten;
+- wiederverwendbare CAS-Runtimeadapter in eigenen `regelsuche-math-*`-Modulen;
+- sonstige externe Prozessadapter in Solver-, Benchmark- oder App-Schichten;
 - Docker- und Testcontainers-Wiring in äußeren Modulen und Testquellen;
 - GitHub Actions ausschließlich als Plattformadapter.
 
@@ -190,8 +226,9 @@ neuen Implementierung sind mindestens zu klären:
 6. Test- und Migrationsstrategie.
 
 Beispiele bestehender Portfamilien sind Regelindex, Search Trace Store,
-Counterexample Search, Polynomial Equivalence, Completion, Critical Pairs,
-Numeric Relations, Hypothesis Repository und Discovery Experiment Runner.
+Counterexample Search, Polynomial Equivalence, Factorization Engine,
+Completion, Critical Pairs, Numeric Relations, Hypothesis Repository und
+Discovery Experiment Runner.
 
 ## Prüfung bei Änderungen
 

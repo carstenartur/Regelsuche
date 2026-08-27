@@ -38,7 +38,9 @@ class MavenDependencyManagementContractTest {
           "org.glassfish:jakarta.el",
           "jakarta.persistence:jakarta.persistence-api",
           "org.neo4j.driver:neo4j-java-driver",
-          "org.graalvm.polyglot:polyglot");
+          "org.graalvm.polyglot:polyglot",
+          "org.graalvm.polyglot:python",
+          "org.graalvm.python:python-embedding");
 
   private static final Set<String> MANAGED_REACTOR_DEPENDENCIES =
       Set.of(
@@ -48,6 +50,7 @@ class MavenDependencyManagementContractTest {
           "de.regelsuche:regelsuche-validation",
           "de.regelsuche:regelsuche-math-algorithms",
           "de.regelsuche:regelsuche-math-jas",
+          "de.regelsuche:regelsuche-math-sympy",
           "de.regelsuche:regelsuche-persistence",
           "de.regelsuche:regelsuche-persistence-hibernate",
           "de.regelsuche:regelsuche-solver-ir",
@@ -77,7 +80,8 @@ class MavenDependencyManagementContractTest {
           "org.apache.maven.plugins:maven-deploy-plugin",
           "org.apache.maven.plugins:maven-site-plugin",
           "org.apache.maven.plugins:maven-enforcer-plugin",
-          "org.jacoco:jacoco-maven-plugin");
+          "org.jacoco:jacoco-maven-plugin",
+          "org.graalvm.python:graalpy-maven-plugin");
 
   @Test
   void parentOwnsExternalReactorAndPluginVersions() throws Exception {

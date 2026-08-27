@@ -1,0 +1,153 @@
+plugins {
+    id 'java-library'
+    id 'jacoco'
+    id 'me.champeau.jmh' version '0.7.3'
+    id 'org.graalvm.python' version '25.1.3'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+graalPy {
+    // Since GraalVM 25 the canonical and -community language POMs are
+    // identical OSS artifacts; the -community aliases are deprecated.
+    community = false
+    polyglotVersion = '25.1.3'
+    packages = [
+        'mpmath==1.3.0',
+        'sympy==1.14.0'
+    ]
+    graalPyLockFile = file("$projectDir/graalpy.lock")
+    resourceDirectory = 'GRAALPY-VFS/de.regelsuche/regelsuche-math-sympy'
+}
+
+dependencies {
+    api project(':regelsuche-core')
+
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
+
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+def nativeAccessArgument = '--enable-native-access=ALL-UNNAMED'
+def embeddedRuntimeInitialHeap = '512m'
+def embeddedRuntimeMaximumHeap = '2g'
+def symPyPythonProperty = 'regelsuche.sympy.python'
+
+def verificationPython = rootProject.layout.buildDirectory.file(
+    System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+        ? 'verification-venv/Scripts/python.exe'
+        : 'verification-venv/bin/python')
+
+def configureTestProcessBaseline = { task ->
+    task.dependsOn rootProject.tasks.named('prepareVerificationEnvironment')
+    task.doFirst {
+        environment 'REGELSUCHE_SYMPY_PYTHON',
+            verificationPython.get().asFile.absolutePath
+    }
+}
+
+tasks.named('test') { task ->
+    useJUnitPlatform()
+    jvmArgs nativeAccessArgument
+    // GraalPy's language runtime and native-extension metadata remain live for
+    // the lifetime of a test JVM. Keep unrelated lifecycle scenarios in fresh
+    // workers and make the heap requirement explicit instead of depending on
+    // Gradle's smaller generic test-worker default.
+    minHeapSize = embeddedRuntimeInitialHeap
+    maxHeapSize = embeddedRuntimeMaximumHeap
+    forkEvery = 1
+    finalizedBy tasks.named('jacocoTestReport')
+    configureTestProcessBaseline(task)
+}
+
+jmh {
+    resultFormat = 'JSON'
+    resultsFile = layout.buildDirectory.file(
+        'reports/jmh/sympy-factorization.json')
+    fork = 1
+    warmupIterations = 2
+    iterations = 3
+    timeOnIteration = '1s'
+    warmup = '1s'
+    failOnError = true
+    // The cold track intentionally creates several complete embedded runtimes
+    // in one JMH fork. Use the same bounded heap contract as qualification.
+    // JMHTask is not an Exec task and cannot receive environment(...); pass the
+    // pinned CPython control executable to the benchmark fork as a JVM property.
+    jvmArgs = [
+        nativeAccessArgument,
+        "-Xms${embeddedRuntimeInitialHeap}",
+        "-Xmx${embeddedRuntimeMaximumHeap}",
+        "-D${symPyPythonProperty}=${verificationPython.get().asFile.absolutePath}"
+    ]
+}
+
+// The JMH plugin builds an uber JAR by unpacking the runtime dependencies.
+// Truffle ships version-specific implementations under META-INF/versions and
+// rejects the repackaged archive unless the aggregate manifest retains the
+// standard multi-release marker.
+tasks.named('jmhJar') { task ->
+    task.manifest.attributes 'Multi-Release': 'true'
+}
+
+tasks.named('jmh') { task ->
+    task.dependsOn rootProject.tasks.named('prepareVerificationEnvironment')
+}
+
+def verifySymPyFactorizationBenchmark = tasks.register(
+    'verifySymPyFactorizationBenchmark', Exec) {
+    group = 'verification'
+    description = 'Validates warm, cold and one-shot SymPy factorization measurements.'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
+        tasks.named('jmh')
+    workingDir rootProject.projectDir
+    inputs.file rootProject.file(
+        'scripts/verify-sympy-factorization-benchmark.py')
+    inputs.file layout.buildDirectory.file(
+        'reports/jmh/sympy-factorization.json')
+    outputs.file rootProject.file(
+        'public/dev/bench/sympy-factorization.json')
+    outputs.file rootProject.file(
+        'public/dev/bench/sympy-factorization.html')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().asFile.absolutePath,
+            'scripts/verify-sympy-factorization-benchmark.py',
+            '--result', layout.buildDirectory.file(
+                'reports/jmh/sympy-factorization.json').get()
+                .asFile.absolutePath,
+            '--summary-output', rootProject.file(
+                'public/dev/bench/sympy-factorization.json')
+                .absolutePath,
+            '--report-output', rootProject.file(
+                'public/dev/bench/sympy-factorization.html')
+                .absolutePath
+    }
+}
+
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestReport'),
+        verifySymPyFactorizationBenchmark
+}
