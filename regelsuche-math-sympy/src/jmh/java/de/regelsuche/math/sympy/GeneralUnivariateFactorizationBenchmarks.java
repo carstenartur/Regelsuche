@@ -71,6 +71,10 @@ public class GeneralUnivariateFactorizationBenchmarks {
 
         abstract Invocation create(CaseSpec specification);
 
+        final Invocation invocation() {
+            return invocation;
+        }
+
         @Setup(Level.Trial)
         public void setup() {
             CaseSpec specification = specification(caseId);
@@ -102,22 +106,22 @@ public class GeneralUnivariateFactorizationBenchmarks {
 
     @Benchmark
     public String nativeGeneralBackendWarm(NativeState state) {
-        return state.invocation.backend();
+        return state.invocation().backend();
     }
 
     @Benchmark
     public String nativeGeneralEndToEndWarm(NativeState state) {
-        return state.invocation.endToEnd();
+        return state.invocation().endToEnd();
     }
 
     @Benchmark
     public String graalPyGeneralBackendWarm(GraalPyState state) {
-        return state.invocation.backend();
+        return state.invocation().backend();
     }
 
     @Benchmark
     public String graalPyGeneralEndToEndWarm(GraalPyState state) {
-        return state.invocation.endToEnd();
+        return state.invocation().endToEnd();
     }
 
     private static CaseSpec specification(String id) {
