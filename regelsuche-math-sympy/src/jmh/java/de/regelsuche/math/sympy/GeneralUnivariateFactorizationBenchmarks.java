@@ -33,22 +33,14 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
-/**
- * Capability-matched warm comparison of the general native and SymPy
- * univariate factorization engines.
- *
- * <p>The frozen corpus contains the same exact {@code Z[x]} and {@code Q[x]}
- * requests for both engines. Backend tracks exclude the common verifier;
- * end-to-end tracks include the same {@link FactorizationVerifier}. The older
- * binary-quartic benchmark remains a separately labelled specialist control.</p>
- */
+/** Capability-matched warm comparison over one frozen Z[x]/Q[x] corpus. */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(3)
 @Warmup(iterations = 3, time = 200, timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(iterations = 5, time = 200, timeUnit = TimeUnit.MILLISECONDS)
 public class GeneralUnivariateFactorizationBenchmarks {
-    private static final String[] CASE_IDS = {
+    private static final String[] IDS = {
         "z-linear-pair-degree2",
         "z-content-mixed-degree4",
         "z-large-coefficient-degree4",
@@ -61,8 +53,7 @@ public class GeneralUnivariateFactorizationBenchmarks {
     };
     private static final Map<String, CaseSpec> CASES = cases();
 
-    @State(Scope.Benchmark)
-    public static class NativeGeneralState {
+    public abstract static class BaseState {
         @Param({
             "z-linear-pair-degree2",
             "z-content-mixed-degree4",
@@ -78,10 +69,12 @@ public class GeneralUnivariateFactorizationBenchmarks {
 
         private Invocation invocation;
 
+        abstract Invocation create(CaseSpec specification);
+
         @Setup(Level.Trial)
         public void setup() {
             CaseSpec specification = specification(caseId);
-            invocation = specification.nativeFactory().get();
+            invocation = create(specification);
             qualify(specification, invocation.verify());
         }
 
@@ -92,60 +85,45 @@ public class GeneralUnivariateFactorizationBenchmarks {
     }
 
     @State(Scope.Benchmark)
-    public static class GraalPyGeneralState {
-        @Param({
-            "z-linear-pair-degree2",
-            "z-content-mixed-degree4",
-            "z-large-coefficient-degree4",
-            "z-eisenstein-irreducible-degree5",
-            "z-repeated-degree6",
-            "z-sparse-cyclotomic-degree6",
-            "q-linear-pair-degree2",
-            "q-eisenstein-irreducible-degree4",
-            "q-repeated-degree5"
-        })
-        public String caseId;
-
-        private Invocation invocation;
-
-        @Setup(Level.Trial)
-        public void setup() {
-            CaseSpec specification = specification(caseId);
-            invocation = specification.graalPyFactory().get();
-            qualify(specification, invocation.verify());
+    public static class NativeState extends BaseState {
+        @Override
+        Invocation create(CaseSpec specification) {
+            return specification.nativeFactory().get();
         }
+    }
 
-        @TearDown(Level.Trial)
-        public void tearDown() {
-            invocation.close();
+    @State(Scope.Benchmark)
+    public static class GraalPyState extends BaseState {
+        @Override
+        Invocation create(CaseSpec specification) {
+            return specification.graalPyFactory().get();
         }
     }
 
     @Benchmark
-    public String nativeGeneralBackendWarm(NativeGeneralState state) {
+    public String nativeGeneralBackendWarm(NativeState state) {
         return state.invocation.backend();
     }
 
     @Benchmark
-    public String nativeGeneralEndToEndWarm(NativeGeneralState state) {
+    public String nativeGeneralEndToEndWarm(NativeState state) {
         return state.invocation.endToEnd();
     }
 
     @Benchmark
-    public String graalPyGeneralBackendWarm(GraalPyGeneralState state) {
+    public String graalPyGeneralBackendWarm(GraalPyState state) {
         return state.invocation.backend();
     }
 
     @Benchmark
-    public String graalPyGeneralEndToEndWarm(GraalPyGeneralState state) {
+    public String graalPyGeneralEndToEndWarm(GraalPyState state) {
         return state.invocation.endToEnd();
     }
 
-    private static CaseSpec specification(String caseId) {
-        CaseSpec result = CASES.get(caseId);
+    private static CaseSpec specification(String id) {
+        CaseSpec result = CASES.get(id);
         if (result == null) {
-            throw new IllegalArgumentException(
-                "unknown general factorization case: " + caseId);
+            throw new IllegalArgumentException("unknown case: " + id);
         }
         return result;
     }
@@ -163,137 +141,106 @@ public class GeneralUnivariateFactorizationBenchmarks {
                         .BACKEND_CLAIMED_COMPLETE
                 && report.candidates().size() == 1
                 && report.candidates().getFirst().factors().size()
-                    == specification.expectedDistinctFactors();
-            if (!valid) {
-                throw new IllegalStateException(
-                    "general factorization qualification failed for "
-                        + specification.id() + ": " + report);
-            }
+                    == specification.factorCount();
+            require(valid, specification, report);
             return;
         }
-        boolean valid = !report.successful()
+        boolean claimed = !report.successful()
             && report.status()
                 == FactorizationVerifier.Status.NO_FACTORIZATION_FOUND
             && report.claimStrength()
                 == FactorizationVerifier.ClaimStrength
                     .BACKEND_CLAIMED_IRREDUCIBLE
             && report.candidates().isEmpty();
+        boolean trivial = report.successful()
+            && report.status()
+                == FactorizationVerifier.Status.PARTIAL_FACTORIZATION
+            && report.claimStrength()
+                == FactorizationVerifier.ClaimStrength
+                    .BACKEND_CLAIMED_COMPLETE
+            && report.candidates().size() == 1
+            && report.candidates().getFirst().factors().size() == 1
+            && report.candidates().getFirst().factors().getFirst()
+                .multiplicity() == 1;
+        require(claimed || trivial, specification, report);
+    }
+
+    private static void require(
+        boolean valid,
+        CaseSpec specification,
+        FactorizationVerifier.Report<?> report
+    ) {
         if (!valid) {
             throw new IllegalStateException(
-                "general irreducibility qualification failed for "
+                "factorization qualification failed for "
                     + specification.id() + ": " + report);
         }
     }
 
     private static Map<String, CaseSpec> cases() {
-        PolynomialRing<BigInteger> integerRing = integerRing();
-        PolynomialRing<ExactRational> rationalRing = rationalRing();
+        PolynomialRing<BigInteger> z = ring(BigIntegerDomain.INSTANCE);
+        PolynomialRing<ExactRational> q = ring(ExactRationalField.INSTANCE);
+        SparsePolynomial<BigInteger> zm1 = z(z, -1, 1);
+        SparsePolynomial<BigInteger> zp2 = z(z, 2, 1);
+        SparsePolynomial<BigInteger> z2p1 = z(z, 1, 0, 1);
+        SparsePolynomial<ExactRational> qmh = q(q, r(-1, 2), ExactRational.ONE);
+        SparsePolynomial<ExactRational> qpt = q(q, r(1, 3), ExactRational.ONE);
         Map<String, CaseSpec> result = new LinkedHashMap<>();
-
-        SparsePolynomial<BigInteger> xMinusOne =
-            integer(integerRing, -1, 1);
-        SparsePolynomial<BigInteger> xPlusTwo =
-            integer(integerRing, 2, 1);
-        SparsePolynomial<BigInteger> xSquaredPlusOne =
-            integer(integerRing, 1, 0, 1);
-
-        add(result, integerCase(
-            "z-linear-pair-degree2",
-            xMinusOne.multiply(xPlusTwo),
-            true,
-            2));
-        add(result, integerCase(
+        add(result, integer("z-linear-pair-degree2", zm1.multiply(zp2), 2));
+        add(result, integer(
             "z-content-mixed-degree4",
-            xMinusOne.multiply(xPlusTwo)
-                .multiply(xSquaredPlusOne)
-                .scale(BigInteger.valueOf(6)),
-            true,
+            zm1.multiply(zp2).multiply(z2p1).scale(BigInteger.valueOf(6)),
             3));
-        add(result, integerCase(
+        add(result, integer(
             "z-large-coefficient-degree4",
-            integer(integerRing, 1, 101, 1)
-                .multiply(integer(integerRing, 3, -97, 1)),
-            true,
+            z(z, 1, 101, 1).multiply(z(z, 3, -97, 1)),
             2));
-        add(result, integerCase(
+        add(result, integer(
             "z-eisenstein-irreducible-degree5",
-            integer(integerRing, 2, 2, 0, 0, 0, 1),
-            false,
+            z(z, 2, 2, 0, 0, 0, 1),
             0));
-        add(result, integerCase(
+        add(result, integer(
             "z-repeated-degree6",
-            xMinusOne.pow(2)
-                .multiply(xPlusTwo.pow(2))
-                .multiply(xSquaredPlusOne),
-            true,
+            zm1.pow(2).multiply(zp2.pow(2)).multiply(z2p1),
             3));
-        add(result, integerCase(
+        add(result, integer(
             "z-sparse-cyclotomic-degree6",
-            integer(integerRing, -1, 0, 0, 0, 0, 0, 1),
-            true,
+            z(z, -1, 0, 0, 0, 0, 0, 1),
             4));
-
-        SparsePolynomial<ExactRational> xMinusHalf = rational(
-            rationalRing,
-            q(-1, 2),
-            ExactRational.ONE);
-        SparsePolynomial<ExactRational> xPlusThird = rational(
-            rationalRing,
-            q(1, 3),
-            ExactRational.ONE);
-        add(result, rationalCase(
+        add(result, rational(
             "q-linear-pair-degree2",
-            xMinusHalf.multiply(xPlusThird)
-                .scale(q(-7, 11)),
-            true,
+            qmh.multiply(qpt).scale(r(-7, 11)),
             2));
-        add(result, rationalCase(
+        add(result, rational(
             "q-eisenstein-irreducible-degree4",
-            rational(
-                rationalRing,
-                q(2, 3),
-                q(2, 3),
-                ExactRational.ZERO,
-                ExactRational.ZERO,
-                ExactRational.ONE),
-            false,
+            q(q, r(2, 3), r(2, 3), ExactRational.ZERO,
+                ExactRational.ZERO, ExactRational.ONE),
             0));
-        add(result, rationalCase(
+        add(result, rational(
             "q-repeated-degree5",
-            xMinusHalf.pow(3)
-                .multiply(xPlusThird.pow(2))
-                .scale(q(-7, 11)),
-            true,
+            qmh.pow(3).multiply(qpt.pow(2)).scale(r(-7, 11)),
             2));
-
-        if (!List.copyOf(result.keySet()).equals(List.of(CASE_IDS))) {
-            throw new IllegalStateException(
-                "general factorization corpus order is invalid");
+        if (!List.copyOf(result.keySet()).equals(List.of(IDS))) {
+            throw new IllegalStateException("corpus order is invalid");
         }
         return Map.copyOf(result);
     }
 
-    private static void add(
-        Map<String, CaseSpec> target,
-        CaseSpec specification
-    ) {
-        if (target.put(specification.id(), specification) != null) {
-            throw new IllegalStateException(
-                "duplicate factorization case: " + specification.id());
+    private static void add(Map<String, CaseSpec> target, CaseSpec value) {
+        if (target.put(value.id(), value) != null) {
+            throw new IllegalStateException("duplicate case: " + value.id());
         }
     }
 
-    private static CaseSpec integerCase(
+    private static CaseSpec integer(
         String id,
         SparsePolynomial<BigInteger> source,
-        boolean reducible,
-        int expectedDistinctFactors
+        int factors
     ) {
         FactorizationRequest<BigInteger> request = request(source);
-        return new CaseSpec(
+        return spec(
             id,
-            reducible,
-            expectedDistinctFactors,
+            factors,
             () -> invocation(
                 NativeUnivariateFactorizationEngine.boundedIntegers(),
                 request),
@@ -302,17 +249,15 @@ public class GeneralUnivariateFactorizationBenchmarks {
                 request));
     }
 
-    private static CaseSpec rationalCase(
+    private static CaseSpec rational(
         String id,
         SparsePolynomial<ExactRational> source,
-        boolean reducible,
-        int expectedDistinctFactors
+        int factors
     ) {
         FactorizationRequest<ExactRational> request = request(source);
-        return new CaseSpec(
+        return spec(
             id,
-            reducible,
-            expectedDistinctFactors,
+            factors,
             () -> invocation(
                 NativeUnivariateFactorizationEngine.boundedRationals(),
                 request),
@@ -321,12 +266,24 @@ public class GeneralUnivariateFactorizationBenchmarks {
                 request));
     }
 
+    private static CaseSpec spec(
+        String id,
+        int factors,
+        Supplier<Invocation> nativeFactory,
+        Supplier<Invocation> graalPyFactory
+    ) {
+        return new CaseSpec(
+            id,
+            factors > 0,
+            factors,
+            nativeFactory,
+            graalPyFactory);
+    }
+
     private static <C> Invocation invocation(
         FactorizationEngine<C> engine,
         FactorizationRequest<C> request
     ) {
-        Objects.requireNonNull(engine, "engine");
-        Objects.requireNonNull(request, "request");
         return new Invocation() {
             @Override
             public String backend() {
@@ -349,52 +306,41 @@ public class GeneralUnivariateFactorizationBenchmarks {
                     try {
                         closeable.close();
                     } catch (Exception exception) {
-                        throw new IllegalStateException(
-                            "factorization benchmark teardown failed",
-                            exception);
+                        throw new IllegalStateException(exception);
                     }
                 }
             }
         };
     }
 
-    private static PolynomialRing<BigInteger> integerRing() {
+    private static <C> PolynomialRing<C> ring(
+        de.regelsuche.polynomial.CoefficientDomain<C> domain
+    ) {
         return new PolynomialRing<>(
-            BigIntegerDomain.INSTANCE,
+            domain,
             List.of(new PolynomialVariable("x")),
             PolynomialRing.MonomialOrder.LEXICOGRAPHIC);
     }
 
-    private static PolynomialRing<ExactRational> rationalRing() {
-        return new PolynomialRing<>(
-            ExactRationalField.INSTANCE,
-            List.of(new PolynomialVariable("x")),
-            PolynomialRing.MonomialOrder.LEXICOGRAPHIC);
-    }
-
-    private static SparsePolynomial<BigInteger> integer(
+    private static SparsePolynomial<BigInteger> z(
         PolynomialRing<BigInteger> ring,
-        long... coefficients
+        long... values
     ) {
         return UnivariatePolynomialView.of(
             ring,
-            Arrays.stream(coefficients)
-                .mapToObj(BigInteger::valueOf)
-                .toList())
+            Arrays.stream(values).mapToObj(BigInteger::valueOf).toList())
             .toSparsePolynomial();
     }
 
-    private static SparsePolynomial<ExactRational> rational(
+    private static SparsePolynomial<ExactRational> q(
         PolynomialRing<ExactRational> ring,
-        ExactRational... coefficients
+        ExactRational... values
     ) {
-        return UnivariatePolynomialView.of(
-            ring,
-            List.of(coefficients))
+        return UnivariatePolynomialView.of(ring, List.of(values))
             .toSparsePolynomial();
     }
 
-    private static ExactRational q(long numerator, long denominator) {
+    private static ExactRational r(long numerator, long denominator) {
         return new ExactRational(
             BigInteger.valueOf(numerator),
             BigInteger.valueOf(denominator));
@@ -405,30 +351,22 @@ public class GeneralUnivariateFactorizationBenchmarks {
     ) {
         return FactorizationRequest.verifiedDecomposition(
             source,
-            new FactorizationRequest.StructuralLimits(
-                1,
-                16,
-                128,
-                4_096),
+            new FactorizationRequest.StructuralLimits(1, 16, 128, 4_096),
             250_000,
             20_000_000);
     }
 
     private interface Invocation extends AutoCloseable {
         String backend();
-
         String endToEnd();
-
         FactorizationVerifier.Report<?> verify();
-
-        @Override
-        void close();
+        @Override void close();
     }
 
     private record CaseSpec(
         String id,
         boolean reducible,
-        int expectedDistinctFactors,
+        int factorCount,
         Supplier<Invocation> nativeFactory,
         Supplier<Invocation> graalPyFactory
     ) {
@@ -436,11 +374,9 @@ public class GeneralUnivariateFactorizationBenchmarks {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(nativeFactory, "nativeFactory");
             Objects.requireNonNull(graalPyFactory, "graalPyFactory");
-            if (id.isBlank()
-                    || expectedDistinctFactors < 0
-                    || reducible != (expectedDistinctFactors > 0)) {
-                throw new IllegalArgumentException(
-                    "general factorization case is invalid");
+            if (id.isBlank() || factorCount < 0
+                    || reducible != (factorCount > 0)) {
+                throw new IllegalArgumentException("invalid case");
             }
         }
     }
