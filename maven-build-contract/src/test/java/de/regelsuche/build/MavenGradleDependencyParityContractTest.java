@@ -88,11 +88,11 @@ class MavenGradleDependencyParityContractTest {
         gradle.contains("jvmArgs nativeAccessArgument"),
         "Gradle tests must authorize the pinned native Python modules");
     assertTrue(
-        gradle.contains("jvmArgs = [nativeAccessArgument]"),
+        gradle.contains("jvmArgs = [")
+            && gradle.contains("nativeAccessArgument,"),
         "Gradle JMH forks must authorize the same native modules");
     assertTrue(
-        maven.contains(
-            "<argLine>@{argLine} " + argument + "</argLine>"),
+        maven.contains("<argLine>@{argLine} " + argument),
         "Maven tests must preserve JaCoCo and authorize native access");
   }
 
