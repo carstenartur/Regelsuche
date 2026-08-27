@@ -47,8 +47,7 @@ final class ZassenhausEvidence {
                 || factors.size() != partitions.size()
                 || !work.within(request.maxWorkUnits())
                 || !extendsLedger(work, lifting.work())) {
-            throw new IllegalArgumentException(
-                "completed Zassenhaus contract is invalid");
+            fail("ZASSENHAUS_COMPLETED_CONTRACT_INVALID");
         }
 
         int modularFactorCount =
@@ -62,16 +61,14 @@ final class ZassenhausEvidence {
                     || factor.maxCoefficientBitLength()
                         > policy.maxIntermediateCoefficientBitLength()
                     || !primitive(factor)) {
-                throw new IllegalArgumentException(
-                    "completed Zassenhaus factor is invalid");
+                fail("ZASSENHAUS_COMPLETED_FACTOR_INVALID");
             }
             List<Integer> partition = partitions.get(index);
             for (int modularIndex : partition) {
                 if (modularIndex < 0
                         || modularIndex >= assigned.length
                         || assigned[modularIndex]) {
-                    throw new IllegalArgumentException(
-                        "Zassenhaus modular partition is invalid");
+                    fail("ZASSENHAUS_MODULAR_PARTITION_INVALID");
                 }
                 assigned[modularIndex] = true;
             }
@@ -79,8 +76,7 @@ final class ZassenhausEvidence {
         }
         for (boolean present : assigned) {
             if (!present) {
-                throw new IllegalArgumentException(
-                    "Zassenhaus modular partition is incomplete");
+                fail("ZASSENHAUS_MODULAR_PARTITION_INCOMPLETE");
             }
         }
 
@@ -90,8 +86,7 @@ final class ZassenhausEvidence {
             product = product.multiply(factor);
         }
         if (!request.source().equals(product)) {
-            throw new IllegalArgumentException(
-                "Zassenhaus factors do not reconstruct source");
+            fail("ZASSENHAUS_FACTOR_PRODUCT_MISMATCH");
         }
     }
 
@@ -117,8 +112,7 @@ final class ZassenhausEvidence {
         SparsePolynomial<BigInteger> actual =
             reduce(factor, modularRing, field);
         if (!expected.equals(actual)) {
-            throw new IllegalArgumentException(
-                "integer factor does not match its modular partition");
+            fail("ZASSENHAUS_FACTOR_MODULAR_PARTITION_MISMATCH");
         }
     }
 
@@ -159,5 +153,9 @@ final class ZassenhausEvidence {
         }
         return prefix.stages().entrySet().stream().allMatch(entry ->
             work.units(entry.getKey()) == entry.getValue());
+    }
+
+    private static void fail(String detailCode) {
+        throw new IntegerPolynomialArithmetic.AlgorithmFailure(detailCode);
     }
 }
