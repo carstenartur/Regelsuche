@@ -25,80 +25,113 @@ import org.openjdk.jmh.annotations.TearDown;
 /**
  * Factorization comparison over one exactly shared quartic request.
  *
- * <p>Warm embedded methods reuse an already initialized GraalPy context. Cold
- * embedded and CPython methods retain their initialization boundary by design.
- * Backend-only methods exclude the common Regelsuche product verifier;
- * end-to-end methods include it for both implementations.</p>
+ * <p>Each track owns only the runtime state it measures. Native and CPython
+ * tracks never initialize GraalPy. Warm embedded tracks reuse one initialized
+ * context, while the cold embedded track constructs and closes a complete
+ * runtime per operation. Backend-only methods exclude the common Regelsuche
+ * product verifier; end-to-end methods include it.</p>
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@State(Scope.Benchmark)
 public class SymPyFactorizationBenchmarks {
-    private FactorizationRequest<BigInteger> request;
-    private BinaryQuarticFactorizationEngine nativeEngine;
-    private GraalPySymPyFactorizationEngine<BigInteger> embeddedEngine;
-    private ProcessSymPyFactorizationEngine<BigInteger> processEngine;
+    @State(Scope.Benchmark)
+    public static class NativeState {
+        private FactorizationRequest<BigInteger> request;
+        private BinaryQuarticFactorizationEngine engine;
 
-    @Setup(Level.Trial)
-    public void setup() {
-        request = request();
-        nativeEngine = new BinaryQuarticFactorizationEngine();
-        embeddedEngine = GraalPySymPyFactorizationEngine.integers();
-        processEngine = ProcessSymPyFactorizationEngine.integers(
-            ProcessSymPyFactorizationEngine
-                .configuredPythonExecutable());
-        FactorizationVerifier.Report<BigInteger> warmup =
-            FactorizationVerifier.execute(embeddedEngine, request);
-        if (!warmup.successful()) {
-            throw new IllegalStateException(
-                "embedded SymPy warmup failed: " + warmup);
+        @Setup(Level.Trial)
+        public void setup() {
+            request = request();
+            engine = new BinaryQuarticFactorizationEngine();
         }
     }
 
-    @TearDown(Level.Trial)
-    public void tearDown() {
-        embeddedEngine.close();
+    @State(Scope.Benchmark)
+    public static class EmbeddedWarmState {
+        private FactorizationRequest<BigInteger> request;
+        private GraalPySymPyFactorizationEngine<BigInteger> engine;
+
+        @Setup(Level.Trial)
+        public void setup() {
+            request = request();
+            engine = GraalPySymPyFactorizationEngine.integers();
+            FactorizationVerifier.Report<BigInteger> warmup =
+                FactorizationVerifier.execute(engine, request);
+            if (!warmup.successful()) {
+                throw new IllegalStateException(
+                    "embedded SymPy warmup failed: " + warmup);
+            }
+        }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            engine.close();
+        }
+    }
+
+    @State(Scope.Benchmark)
+    public static class EmbeddedColdState {
+        private FactorizationRequest<BigInteger> request;
+
+        @Setup(Level.Trial)
+        public void setup() {
+            request = request();
+        }
+    }
+
+    @State(Scope.Benchmark)
+    public static class ProcessState {
+        private FactorizationRequest<BigInteger> request;
+        private ProcessSymPyFactorizationEngine<BigInteger> engine;
+
+        @Setup(Level.Trial)
+        public void setup() {
+            request = request();
+            engine = ProcessSymPyFactorizationEngine.integers(
+                ProcessSymPyFactorizationEngine
+                    .configuredPythonExecutable());
+        }
     }
 
     @Benchmark
-    public String nativeBackendWarm() {
-        return nativeEngine.propose(request).engineResultHash();
+    public String nativeBackendWarm(NativeState state) {
+        return state.engine.propose(state.request).engineResultHash();
     }
 
     @Benchmark
-    public String nativeEndToEndWarm() {
+    public String nativeEndToEndWarm(NativeState state) {
         return FactorizationVerifier.execute(
-            nativeEngine,
-            request).verificationHash();
+            state.engine,
+            state.request).verificationHash();
     }
 
     @Benchmark
-    public String graalPyBackendWarm() {
-        return embeddedEngine.propose(request).engineResultHash();
+    public String graalPyBackendWarm(EmbeddedWarmState state) {
+        return state.engine.propose(state.request).engineResultHash();
     }
 
     @Benchmark
-    public String graalPyEndToEndWarm() {
+    public String graalPyEndToEndWarm(EmbeddedWarmState state) {
         return FactorizationVerifier.execute(
-            embeddedEngine,
-            request).verificationHash();
+            state.engine,
+            state.request).verificationHash();
     }
 
     @Benchmark
-    public String graalPyEndToEndCold() {
+    public String graalPyEndToEndCold(EmbeddedColdState state) {
         try (GraalPySymPyFactorizationEngine<BigInteger> cold =
                 GraalPySymPyFactorizationEngine.integers()) {
             return FactorizationVerifier.execute(
                 cold,
-                request).verificationHash();
+                state.request).verificationHash();
         }
     }
 
     @Benchmark
-    public String cpythonOneShotEndToEnd() {
+    public String cpythonOneShotEndToEnd(ProcessState state) {
         return FactorizationVerifier.execute(
-            processEngine,
-            request).verificationHash();
+            state.engine,
+            state.request).verificationHash();
     }
 
     private static FactorizationRequest<BigInteger> request() {
