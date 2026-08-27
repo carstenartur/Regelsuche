@@ -52,6 +52,42 @@ class MavenEmbeddedGraalPyMemoryContractTest {
         "Maven must preserve one JaCoCo-complete worker with the enlarged heap");
   }
 
+  @Test
+  void jmhReceivesThePinnedControlInterpreterWithoutExecTaskApis()
+      throws IOException {
+    Path root = repositoryRoot();
+    String gradle = Files.readString(
+        root.resolve("regelsuche-math-sympy/build.gradle"));
+    String processEngine = Files.readString(root.resolve(
+        "regelsuche-math-sympy/src/main/java/de/regelsuche/math/sympy/"
+            + "ProcessSymPyFactorizationEngine.java"));
+
+    assertTrue(
+        gradle.contains("def symPyPythonProperty = 'regelsuche.sympy.python'"),
+        "Gradle must name the JVM property shared with the process engine");
+    assertTrue(
+        gradle.contains(
+            "\"-D${symPyPythonProperty}=${verificationPython.get().asFile.absolutePath}\""),
+        "the JMH fork must receive the prepared CPython executable as a JVM property");
+    assertTrue(
+        gradle.contains("tasks.named('jmh') { task ->")
+            && gradle.contains(
+                "task.dependsOn rootProject.tasks.named('prepareVerificationEnvironment')"),
+        "JMH must prepare the pinned verification environment before it starts");
+    assertTrue(
+        !gradle.contains(
+            "tasks.named('jmh') { task ->\n    configureTestProcessBaseline(task)"),
+        "JMHTask must not be configured through the unsupported environment method");
+    assertTrue(
+        processEngine.contains(
+            "public static final String PYTHON_EXECUTABLE_PROPERTY ="),
+        "the process control backend must expose the shared property contract");
+    assertTrue(
+        processEngine.contains(
+            "System.getProperty(PYTHON_EXECUTABLE_PROPERTY)"),
+        "the benchmark fork property must take part in executable resolution");
+  }
+
   private static Path repositoryRoot() {
     String configured = System.getProperty("regelsuche.repositoryRoot");
     assertNotNull(

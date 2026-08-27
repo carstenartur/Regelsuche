@@ -40,13 +40,14 @@ dependencies {
 def nativeAccessArgument = '--enable-native-access=ALL-UNNAMED'
 def embeddedRuntimeInitialHeap = '512m'
 def embeddedRuntimeMaximumHeap = '2g'
+def symPyPythonProperty = 'regelsuche.sympy.python'
 
 def verificationPython = rootProject.layout.buildDirectory.file(
     System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
         ? 'verification-venv/Scripts/python.exe'
         : 'verification-venv/bin/python')
 
-def configureProcessBaseline = { task ->
+def configureTestProcessBaseline = { task ->
     task.dependsOn rootProject.tasks.named('prepareVerificationEnvironment')
     task.doFirst {
         environment 'REGELSUCHE_SYMPY_PYTHON',
@@ -65,7 +66,7 @@ tasks.named('test') { task ->
     maxHeapSize = embeddedRuntimeMaximumHeap
     forkEvery = 1
     finalizedBy tasks.named('jacocoTestReport')
-    configureProcessBaseline(task)
+    configureTestProcessBaseline(task)
 }
 
 jmh {
@@ -80,15 +81,18 @@ jmh {
     failOnError = true
     // The cold track intentionally creates several complete embedded runtimes
     // in one JMH fork. Use the same bounded heap contract as qualification.
+    // JMHTask is not an Exec task and cannot receive environment(...); pass the
+    // pinned CPython control executable to the benchmark fork as a JVM property.
     jvmArgs = [
         nativeAccessArgument,
         "-Xms${embeddedRuntimeInitialHeap}",
-        "-Xmx${embeddedRuntimeMaximumHeap}"
+        "-Xmx${embeddedRuntimeMaximumHeap}",
+        "-D${symPyPythonProperty}=${verificationPython.get().asFile.absolutePath}"
     ]
 }
 
 tasks.named('jmh') { task ->
-    configureProcessBaseline(task)
+    task.dependsOn rootProject.tasks.named('prepareVerificationEnvironment')
 }
 
 def verifySymPyFactorizationBenchmark = tasks.register(

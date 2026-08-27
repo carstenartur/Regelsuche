@@ -16,6 +16,10 @@ public final class ProcessSymPyFactorizationEngine<C>
         "regelsuche.factorization.sympy-cpython-process.integer/v1";
     public static final String RATIONAL_ENGINE_ID =
         "regelsuche.factorization.sympy-cpython-process.rational/v1";
+    public static final String PYTHON_EXECUTABLE_PROPERTY =
+        "regelsuche.sympy.python";
+    public static final String PYTHON_EXECUTABLE_ENVIRONMENT =
+        "REGELSUCHE_SYMPY_PYTHON";
 
     private final String pythonExecutable;
 
@@ -71,10 +75,21 @@ public final class ProcessSymPyFactorizationEngine<C>
             pythonExecutable);
     }
 
+    /**
+     * Resolves the explicitly pinned control interpreter for tests and JMH.
+     * A JVM property is used by benchmark forks, which cannot inherit a Gradle
+     * task environment through the JMH plugin. The environment variable remains
+     * the normal test and command-line configuration. Both override `python3`.
+     */
     public static String configuredPythonExecutable() {
-        return System.getenv().getOrDefault(
-            "REGELSUCHE_SYMPY_PYTHON",
-            "python3");
+        String property = System.getProperty(PYTHON_EXECUTABLE_PROPERTY);
+        if (property != null && !property.isBlank()) {
+            return property.trim();
+        }
+        String environment = System.getenv(PYTHON_EXECUTABLE_ENVIRONMENT);
+        return environment == null || environment.isBlank()
+            ? "python3"
+            : environment.trim();
     }
 
     @Override
