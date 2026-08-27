@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 class MavenEmbeddedGraalPyMemoryContractTest {
   @Test
-  void nativeRuntimeQualificationUsesTheSameBoundedHeapAndForkPolicy()
+  void nativeRuntimeQualificationUsesBoundedHeapAndExplicitForkPolicies()
       throws IOException {
     Path root = repositoryRoot();
     String gradle = Files.readString(
@@ -32,7 +32,7 @@ class MavenEmbeddedGraalPyMemoryContractTest {
         "Gradle tests must use the declared maximum heap");
     assertTrue(
         gradle.contains("forkEvery = 1"),
-        "native runtime lifecycle test classes must not share one worker indefinitely");
+        "Gradle must retire native runtime state between lifecycle test classes");
     assertTrue(
         gradle.contains("\"-Xms${embeddedRuntimeInitialHeap}\""),
         "JMH must use the same initial heap contract");
@@ -48,8 +48,8 @@ class MavenEmbeddedGraalPyMemoryContractTest {
         maven.contains("<forkCount>1</forkCount>"),
         "Maven must use one bounded test fork at a time");
     assertTrue(
-        maven.contains("<reuseForks>false</reuseForks>"),
-        "Maven must retire native runtime state between test classes");
+        maven.contains("<reuseForks>true</reuseForks>"),
+        "Maven must preserve one JaCoCo-complete worker with the enlarged heap");
   }
 
   private static Path repositoryRoot() {
