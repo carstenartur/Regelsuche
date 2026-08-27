@@ -162,8 +162,12 @@ final class HenselLiftingEvidence {
         if (work.totalWorkUnits() < selectionWork.totalWorkUnits()) {
             return false;
         }
-        return selectionWork.stages().entrySet().stream().allMatch(entry ->
-            work.units(entry.getKey()) >= entry.getValue());
+        return selectionWork.stages().entrySet().stream().allMatch(entry -> {
+            long retainedUnits = work.units(entry.getKey());
+            return entry.getKey().startsWith("hensel.")
+                ? retainedUnits >= entry.getValue()
+                : retainedUnits == entry.getValue();
+        });
     }
 
     private static List<SparsePolynomial<BigInteger>>
