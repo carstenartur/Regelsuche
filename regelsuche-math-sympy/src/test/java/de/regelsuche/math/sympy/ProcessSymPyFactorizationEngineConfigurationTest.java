@@ -25,4 +25,28 @@ class ProcessSymPyFactorizationEngineConfigurationTest {
             }
         }
     }
+
+    @Test
+    void resolverCoversEnvironmentAndDefaultFallbacks() {
+        assertEquals(
+            "/tmp/environment-python",
+            ProcessSymPyFactorizationEngine.resolvePythonExecutable(
+                null,
+                "  /tmp/environment-python  "));
+        assertEquals(
+            "/tmp/environment-python",
+            ProcessSymPyFactorizationEngine.resolvePythonExecutable(
+                "  ",
+                "  /tmp/environment-python  "));
+        assertEquals(
+            "python3",
+            ProcessSymPyFactorizationEngine.resolvePythonExecutable(
+                null,
+                null));
+        assertEquals(
+            "python3",
+            ProcessSymPyFactorizationEngine.resolvePythonExecutable(
+                "  ",
+                "  "));
+    }
 }

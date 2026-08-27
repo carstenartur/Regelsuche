@@ -82,11 +82,18 @@ public final class ProcessSymPyFactorizationEngine<C>
      * the normal test and command-line configuration. Both override `python3`.
      */
     public static String configuredPythonExecutable() {
-        String property = System.getProperty(PYTHON_EXECUTABLE_PROPERTY);
+        return resolvePythonExecutable(
+            System.getProperty(PYTHON_EXECUTABLE_PROPERTY),
+            System.getenv(PYTHON_EXECUTABLE_ENVIRONMENT));
+    }
+
+    static String resolvePythonExecutable(
+        String property,
+        String environment
+    ) {
         if (property != null && !property.isBlank()) {
             return property.trim();
         }
-        String environment = System.getenv(PYTHON_EXECUTABLE_ENVIRONMENT);
         return environment == null || environment.isBlank()
             ? "python3"
             : environment.trim();
