@@ -67,6 +67,9 @@ class ExactFactorizationTransformationPipelineTest {
                 "transform.exact-reparse-input-code-units") > 0);
         assertTrue(
             result.totalWork().units(
+                "transform.structural-change-comparison") > 0);
+        assertTrue(
+            result.totalWork().units(
                 "exact-parsed-view.ast-visits")
                 > factorization.totalWork().units(
                     "exact-parsed-view.ast-visits"));
@@ -116,7 +119,7 @@ class ExactFactorizationTransformationPipelineTest {
     @Test
     void transformsAPartialFactorizationWithAnExactUnresolvedRemainder() {
         ExactParsedTerm source = parser.parseExactTerm(
-            "(x - 1) * (x^2 + 1)");
+            "x^3 - x^2 + x - 1");
         var factorization = factor(
             source,
             partialEngine(),
@@ -140,6 +143,36 @@ class ExactFactorizationTransformationPipelineTest {
             factorization.request().orElseThrow().source(),
             result.reconstruction().orElseThrow()
                 .polynomial().orElseThrow());
+    }
+
+    @Test
+    void rejectsStructurallyIdenticalRenderedSyntaxAsNoChange() {
+        ExactParsedTerm source = parser.parseExactTerm(
+            "(x - 1) * (x^2 + 1)");
+        var factorization = factor(
+            source,
+            partialEngine(),
+            1_000_000);
+
+        var result = new ExactFactorizationTransformationPipeline()
+            .transformRoot(source, factorization);
+
+        assertFalse(result.transformed());
+        assertEquals(
+            ExactFactorizationTransformationPipeline.Status.NO_CHANGE,
+            result.status());
+        assertEquals(
+            "RENDERED_EXPRESSION_STRUCTURALLY_IDENTICAL_TO_SOURCE",
+            result.detailCode());
+        assertEquals(
+            "(x - 1) * (x ^ 2 + 1)",
+            result.renderedExpression().orElseThrow());
+        assertTrue(result.reparsed().isPresent());
+        assertTrue(result.reconstruction().orElseThrow().supported());
+        assertTrue(result.transformedExpression().isEmpty());
+        assertTrue(
+            result.totalWork().units(
+                "transform.structural-change-comparison") > 0);
     }
 
     @Test
