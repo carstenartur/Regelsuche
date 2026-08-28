@@ -40,6 +40,9 @@ class ExactFactorizationTransformationPipelineTest {
         assertTrue(result.transformed(), result.detailCode());
         assertTrue(result.occurrence().isRoot());
         assertEquals(
+            factorization.extraction().certificateHash(),
+            result.occurrence().sourceEvidenceHash());
+        assertEquals(
             ExactFactorizationTransformationPipeline.Kind
                 .VERIFIED_DECOMPOSITION_WITH_COMPLETE_BACKEND_CLAIM,
             result.kind());
@@ -53,6 +56,12 @@ class ExactFactorizationTransformationPipelineTest {
         assertEquals(
             FactorizationVerifier.ClaimStrength.BACKEND_CLAIMED_COMPLETE,
             factorization.report().orElseThrow().claimStrength());
+        assertTrue(
+            result.totalWork().units(
+                "transform.source-evidence-text-validation") > 0);
+        assertTrue(
+            result.totalWork().units(
+                "transform.source-evidence-literal-validation") > 0);
         assertTrue(
             result.totalWork().units(
                 "transform.exact-reparse-input-code-units") > 0);
@@ -92,6 +101,9 @@ class ExactFactorizationTransformationPipelineTest {
             implicit.detailCode());
         assertTrue(implicit.candidateIndex().isEmpty());
         assertTrue(implicit.rendering().isEmpty());
+        assertTrue(
+            implicit.totalWork().totalWorkUnits()
+                > factorization.totalWork().totalWorkUnits());
 
         assertTrue(explicit.transformed(), explicit.detailCode());
         assertEquals(0, explicit.candidateIndex().orElseThrow());
@@ -153,9 +165,12 @@ class ExactFactorizationTransformationPipelineTest {
             "SOURCE_TEXT_DOES_NOT_MATCH_FACTORIZATION_EVIDENCE",
             result.detailCode());
         assertTrue(result.rendering().isEmpty());
-        assertEquals(
-            factorization.totalWork(),
-            result.totalWork());
+        assertTrue(
+            result.totalWork().totalWorkUnits()
+                > factorization.totalWork().totalWorkUnits());
+        assertTrue(
+            result.totalWork().units(
+                "transform.source-evidence-text-validation") > 0);
     }
 
     @Test
@@ -242,6 +257,36 @@ class ExactFactorizationTransformationPipelineTest {
     }
 
     @Test
+    void doesNotStartSourceValidationWithoutOriginalAuthority() {
+        String sourceText = " ".repeat(5_000)
+            + "1/3*x^2 - 2/3*x + 1/3";
+        ExactParsedTerm source = parser.parseExactTerm(sourceText);
+        var factorization = factor(
+            source,
+            squareEngine(),
+            20_000);
+        assertTrue(factorization.report().orElseThrow().successful());
+
+        var result = new ExactFactorizationTransformationPipeline()
+            .transformRoot(source, factorization);
+
+        assertFalse(result.transformed());
+        assertEquals(
+            ExactFactorizationTransformationPipeline.Status
+                .BUDGET_INCONCLUSIVE,
+            result.status());
+        assertEquals(
+            "SOURCE_EVIDENCE_VALIDATION_AUTHORITY_INSUFFICIENT",
+            result.detailCode());
+        assertEquals(factorization.totalWork(), result.totalWork());
+        assertEquals(
+            0,
+            result.totalWork().units(
+                "transform.source-evidence-text-validation"));
+        assertTrue(result.rendering().isEmpty());
+    }
+
+    @Test
     void refusesToResetTheOriginalAuthorityForRenderingAndReparse() {
         ExactParsedTerm source = parser.parseExactTerm(
             "1/3*x^2 - 2/3*x + 1/3");
@@ -262,7 +307,12 @@ class ExactFactorizationTransformationPipelineTest {
         assertEquals(
             "INSUFFICIENT_REMAINING_TRANSFORMATION_AUTHORITY",
             result.detailCode());
-        assertEquals(factorization.totalWork(), result.totalWork());
+        assertTrue(
+            result.totalWork().totalWorkUnits()
+                > factorization.totalWork().totalWorkUnits());
+        assertTrue(
+            result.totalWork().units(
+                "transform.source-evidence-literal-validation") > 0);
         assertTrue(result.rendering().isEmpty());
     }
 
