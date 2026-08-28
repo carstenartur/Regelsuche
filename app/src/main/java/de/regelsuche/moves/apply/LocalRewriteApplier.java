@@ -10,26 +10,7 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.List;
 
-/**
- * Applies tree-local candidate moves to a full root expression.
- *
- * <p>The applier is intentionally framework-free: it depends only on the AST,
- * move enumeration/realization infrastructure and parser/formatter. Navigation
- * and replacement are delegated to {@link TreeExpressionEditor}, the shared
- * structural authority for stable child-index paths. Strings are used only at
- * the parser/formatter boundary and in the returned {@link LocalRewriteResult}.</p>
- *
- * <p>Two entry-point families are provided:
- * <ul>
- *   <li><b>String-based</b> ({@code apply(String, ...)}) — parses the root
- *       expression first, then delegates to the {@code Expr}-based path.</li>
- *   <li><b>Expr-based</b> ({@code apply(Expr, ...)}) — accepts an already-parsed
- *       AST root and skips the parse step. Prefer this overload when the caller
- *       already holds the parsed tree to avoid redundant round-trips through the
- *       parser.</li>
- * </ul>
- * Both families return the same {@link LocalRewriteResult} record.</p>
- */
+/** Applies tree-local moves through the shared {@link TreePosition} path contract. */
 public final class LocalRewriteApplier {
 
     private final MoveRealizer realizer;
@@ -44,55 +25,46 @@ public final class LocalRewriteApplier {
         this.parser = parser == null ? new ExpressionParser() : parser;
     }
 
-    // ── String-based entry points ─────────────────────────────────────────────
-
-    /**
-     * Applies a single candidate move to the subtree at {@code position} within
-     * {@code rootExpression}.
-     */
     public LocalRewriteResult apply(
-        String rootExpression,
-        TreePosition position,
-        CandidateMove candidate
-    ) {
+            String rootExpression,
+            TreePosition position,
+            CandidateMove candidate) {
         return apply(
-            rootExpression,
-            position,
-            candidate == null ? List.of() : List.of(candidate));
-    }
-
-    /** Applies one logical candidate group at a selected subtree position. */
-    public LocalRewriteResult apply(
-        String rootExpression,
-        TreePosition position,
-        List<CandidateMove> candidates
-    ) {
-        List<CandidateMove> source = candidates == null
-            ? List.of()
-            : List.copyOf(candidates);
-        if (rootExpression == null || rootExpression.isBlank()) {
-            return failure(
                 rootExpression,
                 position,
-                source,
-                "",
-                "root expression is blank");
+                candidate == null ? List.of() : List.of(candidate));
+    }
+
+    public LocalRewriteResult apply(
+            String rootExpression,
+            TreePosition position,
+            List<CandidateMove> candidates) {
+        List<CandidateMove> source = candidates == null
+                ? List.of()
+                : List.copyOf(candidates);
+        if (rootExpression == null || rootExpression.isBlank()) {
+            return failure(
+                    rootExpression,
+                    position,
+                    source,
+                    "",
+                    "root expression is blank");
         }
         if (position == null) {
             return failure(
-                rootExpression,
-                null,
-                source,
-                "",
-                "position is missing");
+                    rootExpression,
+                    null,
+                    source,
+                    "",
+                    "position is missing");
         }
         if (source.isEmpty()) {
             return failure(
-                rootExpression,
-                position,
-                source,
-                "",
-                "candidate move is missing");
+                    rootExpression,
+                    position,
+                    source,
+                    "",
+                    "candidate move is missing");
         }
 
         Expr root;
@@ -100,224 +72,202 @@ public final class LocalRewriteApplier {
             root = parser.parseTerm(rootExpression);
         } catch (RuntimeException exception) {
             return failure(
-                rootExpression,
-                position,
-                source,
-                "",
-                "root expression is not parseable");
+                    rootExpression,
+                    position,
+                    source,
+                    "",
+                    "root expression is not parseable");
         }
         return applyToExpr(root, rootExpression, position, source);
     }
 
-    // ── Expr-based entry points ────────────────────────────────────────────────
-
-    /** Applies a single candidate move to an already parsed root AST. */
     public LocalRewriteResult apply(
-        Expr root,
-        TreePosition position,
-        CandidateMove candidate
-    ) {
+            Expr root,
+            TreePosition position,
+            CandidateMove candidate) {
         return apply(
-            root,
-            position,
-            candidate == null ? List.of() : List.of(candidate));
+                root,
+                position,
+                candidate == null ? List.of() : List.of(candidate));
     }
 
-    /** Applies one logical candidate group to an already parsed root AST. */
     public LocalRewriteResult apply(
-        Expr root,
-        TreePosition position,
-        List<CandidateMove> candidates
-    ) {
+            Expr root,
+            TreePosition position,
+            List<CandidateMove> candidates) {
         List<CandidateMove> source = candidates == null
-            ? List.of()
-            : List.copyOf(candidates);
+                ? List.of()
+                : List.copyOf(candidates);
         if (root == null) {
             return failure(
-                null,
-                position,
-                source,
-                "",
-                "root expression is missing");
+                    null,
+                    position,
+                    source,
+                    "",
+                    "root expression is missing");
         }
+        String formattedRoot = ExpressionFormatter.format(root);
         if (position == null) {
             return failure(
-                ExpressionFormatter.format(root),
-                null,
-                source,
-                "",
-                "position is missing");
+                    formattedRoot,
+                    null,
+                    source,
+                    "",
+                    "position is missing");
         }
         if (source.isEmpty()) {
             return failure(
-                ExpressionFormatter.format(root),
-                position,
-                source,
-                "",
-                "candidate move is missing");
+                    formattedRoot,
+                    position,
+                    source,
+                    "",
+                    "candidate move is missing");
         }
-
-        String rootExpression = ExpressionFormatter.format(root);
-        return applyToExpr(root, rootExpression, position, source);
+        return applyToExpr(root, formattedRoot, position, source);
     }
 
-    // ── Core implementation ───────────────────────────────────────────────────
-
     private LocalRewriteResult applyToExpr(
-        Expr root,
-        String rootExpression,
-        TreePosition position,
-        List<CandidateMove> source
-    ) {
-        Expr subtree = TreeExpressionEditor.subtreeAt(
-            root,
-            position.path()).orElse(null);
+            Expr root,
+            String rootExpression,
+            TreePosition position,
+            List<CandidateMove> candidates) {
+        Expr subtree = position.subtreeAt(root).orElse(null);
         if (subtree == null) {
             return failure(
-                rootExpression,
-                position,
-                source,
-                "",
-                "position is not present in expression");
+                    rootExpression,
+                    position,
+                    candidates,
+                    "",
+                    "position is not present in expression");
         }
         String subtreeBefore = ExpressionFormatter.format(subtree);
         if (!subtreeBefore.equals(position.text())) {
             return failure(
-                rootExpression,
-                position,
-                source,
-                subtreeBefore,
-                "position is stale");
+                    rootExpression,
+                    position,
+                    candidates,
+                    subtreeBefore,
+                    "position is stale");
         }
 
         MoveCandidateTransformationEngine.MoveBackedTransformation realized =
-            selectRealizedMove(subtreeBefore, source);
+                selectRealizedMove(subtreeBefore, candidates);
         if (realized == null) {
             return failure(
-                rootExpression,
-                position,
-                source,
-                subtreeBefore,
-                "candidate could not be realized");
+                    rootExpression,
+                    position,
+                    candidates,
+                    subtreeBefore,
+                    "candidate could not be realized");
         }
 
         String subtreeAfter =
-            realized.transformation().transformedExpression();
+                realized.transformation().transformedExpression();
         Expr replacement;
         try {
             replacement = parser.parseTerm(subtreeAfter);
         } catch (RuntimeException exception) {
             return failure(
-                rootExpression,
-                position,
-                source,
-                subtreeBefore,
-                "realized subtree is not parseable");
+                    rootExpression,
+                    position,
+                    candidates,
+                    subtreeBefore,
+                    "realized subtree is not parseable");
         }
 
-        TreeExpressionEditor.ReplacementResult replacementResult =
-            TreeExpressionEditor.replaceAt(
-                root,
-                position.path(),
-                replacement);
+        TreePosition.ReplacementResult replacementResult =
+                position.replaceAt(root, replacement);
         if (!replacementResult.success()) {
             return failure(
+                    rootExpression,
+                    position,
+                    candidates,
+                    subtreeBefore,
+                    "position is not present in expression");
+        }
+        String expressionAfter = ExpressionFormatter.format(
+                replacementResult.rewrittenRoot().orElseThrow());
+        CandidateMove first = candidates.getFirst();
+        return new LocalRewriteResult(
                 rootExpression,
                 position,
-                source,
                 subtreeBefore,
-                "position is not present in expression");
-        }
-        Expr rewrittenRoot = replacementResult.rewrittenRoot().orElseThrow();
-        String expressionAfter = ExpressionFormatter.format(rewrittenRoot);
-        CandidateMove first = source.getFirst();
-        return new LocalRewriteResult(
-            rootExpression,
-            position,
-            subtreeBefore,
-            subtreeAfter,
-            expressionAfter,
-            first.kind().name(),
-            bindings(source),
-            true,
-            "");
+                subtreeAfter,
+                expressionAfter,
+                first.kind().name(),
+                bindings(candidates),
+                true,
+                "");
     }
 
     private MoveCandidateTransformationEngine.MoveBackedTransformation
             selectRealizedMove(
-        String subtreeBefore,
-        List<CandidateMove> candidates
-    ) {
+                    String subtreeBefore,
+                    List<CandidateMove> candidates) {
         List<MoveCandidateTransformationEngine.MoveBackedTransformation>
-            realized = realizer.realize(subtreeBefore, candidates);
+                realized = realizer.realize(subtreeBefore, candidates);
         CandidateMove first = candidates.getFirst();
         List<String> values = candidates.stream()
-            .filter(candidate -> candidate.parameter() != null)
-            .map(candidate -> candidate.parameter().value())
-            .toList();
+                .filter(candidate -> candidate.parameter() != null)
+                .map(candidate -> candidate.parameter().value())
+                .toList();
         return realized.stream()
-            .filter(candidate -> candidate.move().kind() == first.kind())
-            .filter(candidate -> values.isEmpty()
-                || values.stream().allMatch(value ->
-                    candidate.move().parameters().stream()
-                        .anyMatch(parameter ->
-                            value.equals(parameter.value()))))
-            .findFirst()
-            .orElse(null);
+                .filter(candidate -> candidate.move().kind() == first.kind())
+                .filter(candidate -> values.isEmpty()
+                        || values.stream().allMatch(value ->
+                                candidate.move().parameters().stream()
+                                        .anyMatch(parameter ->
+                                                value.equals(parameter.value()))))
+                .findFirst()
+                .orElse(null);
     }
 
     private static List<MoveParameter> bindings(
-        List<CandidateMove> candidates
-    ) {
+            List<CandidateMove> candidates) {
         return candidates.stream()
-            .map(CandidateMove::parameter)
-            .filter(parameter -> parameter != null)
-            .toList();
+                .map(CandidateMove::parameter)
+                .filter(parameter -> parameter != null)
+                .toList();
     }
 
     private static LocalRewriteResult failure(
-        String rootExpression,
-        TreePosition position,
-        List<CandidateMove> candidates,
-        String subtreeBefore,
-        String reason
-    ) {
+            String rootExpression,
+            TreePosition position,
+            List<CandidateMove> candidates,
+            String subtreeBefore,
+            String reason) {
         CandidateMove first = candidates == null || candidates.isEmpty()
-            ? null
-            : candidates.getFirst();
+                ? null
+                : candidates.getFirst();
         return new LocalRewriteResult(
-            rootExpression == null ? "" : rootExpression,
-            position,
-            subtreeBefore == null ? "" : subtreeBefore,
-            null,
-            null,
-            first == null ? "" : first.kind().name(),
-            candidates == null ? List.of() : bindings(candidates),
-            false,
-            reason == null ? "" : reason);
+                rootExpression == null ? "" : rootExpression,
+                position,
+                subtreeBefore == null ? "" : subtreeBefore,
+                null,
+                null,
+                first == null ? "" : first.kind().name(),
+                candidates == null ? List.of() : bindings(candidates),
+                false,
+                reason == null ? "" : reason);
     }
 
-    /** Result of a local rewrite attempt. */
     public record LocalRewriteResult(
-        String originalExpression,
-        TreePosition position,
-        String subtreeBefore,
-        String subtreeAfter,
-        String expressionAfter,
-        String kind,
-        List<MoveParameter> bindings,
-        boolean success,
-        String failureReason
-    ) {
+            String originalExpression,
+            TreePosition position,
+            String subtreeBefore,
+            String subtreeAfter,
+            String expressionAfter,
+            String kind,
+            List<MoveParameter> bindings,
+            boolean success,
+            String failureReason) {
         public LocalRewriteResult {
             originalExpression = originalExpression == null
-                ? ""
-                : originalExpression;
+                    ? ""
+                    : originalExpression;
             subtreeBefore = subtreeBefore == null ? "" : subtreeBefore;
             kind = kind == null ? "" : kind;
-            bindings = bindings == null
-                ? List.of()
-                : List.copyOf(bindings);
+            bindings = bindings == null ? List.of() : List.copyOf(bindings);
             failureReason = failureReason == null ? "" : failureReason;
         }
     }

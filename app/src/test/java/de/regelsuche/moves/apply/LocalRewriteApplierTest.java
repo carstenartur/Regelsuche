@@ -3,9 +3,13 @@ package de.regelsuche.moves.apply;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.moves.RewriteMoveKind;
 import de.regelsuche.moves.apply.LocalRewriteApplier.LocalRewriteResult;
 import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
@@ -13,20 +17,22 @@ import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator;
 import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class LocalRewriteApplierTest {
 
-    private final TreeLocalMoveEnumerator enumerator = new TreeLocalMoveEnumerator();
+    private final TreeLocalMoveEnumerator enumerator =
+            new TreeLocalMoveEnumerator();
     private final LocalRewriteApplier applier = new LocalRewriteApplier();
     private final ExpressionParser parser = new ExpressionParser();
 
-    // ── String-based API ──────────────────────────────────────────────────────
-
     @Test
     void appliesRootRewriteToFullExpression() {
-        LocalRewriteResult result = applyCompleteSquare("x^2 + 6*x + 5", "root");
+        LocalRewriteResult result = applyCompleteSquare(
+                "x^2 + 6*x + 5",
+                "root");
 
         assertTrue(result.success(), result.failureReason());
         assertEquals("x ^ 2 + 6 * x + 5", result.subtreeBefore());
@@ -74,13 +80,19 @@ class LocalRewriteApplierTest {
 
     @Test
     void stalePositionReturnsFailure() {
-        List<TreeLocalMoveEnumerator.LocalCandidateMove> moves = enumerator.enumerate("sin(x^2 + 6*x + 5)");
+        List<TreeLocalMoveEnumerator.LocalCandidateMove> moves =
+                enumerator.enumerate("sin(x^2 + 6*x + 5)");
         TreeLocalMoveEnumerator.LocalCandidateMove nested = moves.stream()
-                .filter(candidate -> "000".equals(candidate.position().pathKey()))
-                .filter(candidate -> candidate.move().kind() == RewriteMoveKind.COMPLETE_SQUARE)
+                .filter(candidate ->
+                        "000".equals(candidate.position().pathKey()))
+                .filter(candidate ->
+                        candidate.move().kind()
+                                == RewriteMoveKind.COMPLETE_SQUARE)
                 .findFirst()
                 .orElseThrow();
-        TreePosition stale = new TreePosition(List.of(1), nested.position().text());
+        TreePosition stale = new TreePosition(
+                List.of(1),
+                nested.position().text());
 
         LocalRewriteResult result = applier.apply(
                 "sin(x^2 + 6*x + 5)",
@@ -89,27 +101,24 @@ class LocalRewriteApplierTest {
 
         assertFalse(result.success());
         assertNotNull(result.failureReason());
-        assertTrue(result.expressionAfter() == null || result.expressionAfter().isBlank());
+        assertTrue(result.expressionAfter() == null
+                || result.expressionAfter().isBlank());
     }
-
-    // ── Expr-based API ────────────────────────────────────────────────────────
 
     @Test
     void exprApiAppliesRootRewrite() {
         Expr root = parser.parseTerm("x^2 + 6*x + 5");
-        List<TreeLocalMoveEnumerator.LocalCandidateMove> matches = enumerator.enumerate("x^2 + 6*x + 5")
-                .stream()
-                .filter(c -> "root".equals(c.position().pathKey()))
-                .filter(c -> c.move().kind() == RewriteMoveKind.COMPLETE_SQUARE)
-                .toList();
-        assertFalse(matches.isEmpty(), "no COMPLETE_SQUARE matches at root");
-
+        List<TreeLocalMoveEnumerator.LocalCandidateMove> matches =
+                completeSquareMatches("x^2 + 6*x + 5", "root");
         TreePosition position = matches.getFirst().position();
         List<CandidateMove> candidates = matches.stream()
                 .map(TreeLocalMoveEnumerator.LocalCandidateMove::move)
                 .toList();
 
-        LocalRewriteResult result = applier.apply(root, position, candidates);
+        LocalRewriteResult result = applier.apply(
+                root,
+                position,
+                candidates);
 
         assertTrue(result.success(), result.failureReason());
         assertEquals("(x + 3) ^ 2 - 4", result.expressionAfter());
@@ -119,55 +128,167 @@ class LocalRewriteApplierTest {
     @Test
     void exprApiAppliesNestedRewriteInsideSin() {
         Expr root = parser.parseTerm("sin(x^2 + 6*x + 5)");
-        List<TreeLocalMoveEnumerator.LocalCandidateMove> matches = enumerator.enumerate("sin(x^2 + 6*x + 5)")
-                .stream()
-                .filter(c -> "000".equals(c.position().pathKey()))
-                .filter(c -> c.move().kind() == RewriteMoveKind.COMPLETE_SQUARE)
-                .toList();
-        assertFalse(matches.isEmpty(), "no COMPLETE_SQUARE matches at 000");
-
+        List<TreeLocalMoveEnumerator.LocalCandidateMove> matches =
+                completeSquareMatches(
+                        "sin(x^2 + 6*x + 5)",
+                        "000");
         TreePosition position = matches.getFirst().position();
         List<CandidateMove> candidates = matches.stream()
                 .map(TreeLocalMoveEnumerator.LocalCandidateMove::move)
                 .toList();
 
-        LocalRewriteResult result = applier.apply(root, position, candidates);
+        LocalRewriteResult result = applier.apply(
+                root,
+                position,
+                candidates);
 
         assertTrue(result.success(), result.failureReason());
-        assertEquals("sin((x + 3) ^ 2 - 4)", result.expressionAfter());
+        assertEquals(
+                "sin((x + 3) ^ 2 - 4)",
+                result.expressionAfter());
         assertRoundTrips(result);
     }
 
     @Test
     void exprApiNullRootReturnsFailure() {
         List<TreeLocalMoveEnumerator.LocalCandidateMove> matches =
-                enumerator.enumerate("x^2 + 6*x + 5").stream()
-                        .filter(c -> "root".equals(c.position().pathKey()))
-                        .filter(c -> c.move().kind() == RewriteMoveKind.COMPLETE_SQUARE)
-                        .toList();
-        TreePosition pos = matches.getFirst().position();
+                completeSquareMatches("x^2 + 6*x + 5", "root");
+        TreePosition position = matches.getFirst().position();
         List<CandidateMove> candidates = matches.stream()
-                .map(TreeLocalMoveEnumerator.LocalCandidateMove::move).toList();
+                .map(TreeLocalMoveEnumerator.LocalCandidateMove::move)
+                .toList();
 
-        LocalRewriteResult result = applier.apply((Expr) null, pos, candidates);
+        LocalRewriteResult result = applier.apply(
+                (Expr) null,
+                position,
+                candidates);
 
         assertFalse(result.success());
         assertNotNull(result.failureReason());
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
+    @Test
+    void treePositionReplacesTheRootWithoutCopyingAnAncestor() {
+        Expr root = parser.parseTerm("x + 1");
+        Expr replacement = new VariableExpr("y");
+        TreePosition position = new TreePosition(List.of(), "x + 1");
 
-    private LocalRewriteResult applyCompleteSquare(String expression, String pathKey) {
-        List<TreeLocalMoveEnumerator.LocalCandidateMove> matches = enumerator.enumerate(expression).stream()
-                .filter(candidate -> pathKey.equals(candidate.position().pathKey()))
-                .filter(candidate -> candidate.move().kind() == RewriteMoveKind.COMPLETE_SQUARE)
-                .toList();
-        assertFalse(matches.isEmpty(), () -> "no COMPLETE_SQUARE matches at " + pathKey);
+        TreePosition.ReplacementResult result = position.replaceAt(
+                root,
+                replacement);
+
+        assertTrue(result.success());
+        assertSame(root, result.selectedSubtree().orElseThrow());
+        assertSame(replacement, result.rewrittenRoot().orElseThrow());
+        assertEquals(0, result.copiedAncestors());
+    }
+
+    @Test
+    void treePositionPreservesUntouchedReferences() {
+        FunctionExpr root = (FunctionExpr) parser.parseTerm("f(x + y, z)");
+        BinaryExpr originalSum = (BinaryExpr) root.arguments().getFirst();
+        Expr untouchedLeft = originalSum.left();
+        Expr untouchedSecondArgument = root.arguments().get(1);
+        Expr replacement = new VariableExpr("t");
+        TreePosition position = new TreePosition(
+                List.of(0, 1),
+                "y");
+
+        TreePosition.ReplacementResult result = position.replaceAt(
+                root,
+                replacement);
+
+        assertTrue(result.success());
+        assertSame(
+                originalSum.right(),
+                result.selectedSubtree().orElseThrow());
+        assertEquals(2, result.copiedAncestors());
+        FunctionExpr rewritten = (FunctionExpr) result.rewrittenRoot()
+                .orElseThrow();
+        BinaryExpr rewrittenSum = (BinaryExpr) rewritten.arguments()
+                .getFirst();
+        assertSame(untouchedLeft, rewrittenSum.left());
+        assertSame(replacement, rewrittenSum.right());
+        assertSame(
+                untouchedSecondArgument,
+                rewritten.arguments().get(1));
+        assertEquals("f(x + t, z)", ExpressionFormatter.format(rewritten));
+    }
+
+    @Test
+    void treePositionDistinguishesInvalidAndMissingPaths() {
+        Expr root = parser.parseTerm("x + 1");
+        Expr replacement = new VariableExpr("y");
+        TreePosition invalidPosition = new TreePosition(
+                List.of(-1),
+                "invalid");
+        TreePosition missingPosition = new TreePosition(
+                List.of(2),
+                "missing");
+
+        TreePosition.ReplacementResult invalid =
+                invalidPosition.replaceAt(root, replacement);
+        TreePosition.ReplacementResult missing =
+                missingPosition.replaceAt(root, replacement);
+
+        assertFalse(invalid.success());
+        assertEquals(TreePosition.Status.INVALID_PATH, invalid.status());
+        assertFalse(missing.success());
+        assertEquals(
+                TreePosition.Status.POSITION_NOT_PRESENT,
+                missing.status());
+        assertTrue(missingPosition.subtreeAt(root).isEmpty());
+    }
+
+    @Test
+    void treePositionHandlesDeepPathsIteratively() {
+        int depth = 8_000;
+        Expr root = new VariableExpr("x");
+        List<Integer> path = new ArrayList<>(depth);
+        for (int index = 0; index < depth; index++) {
+            root = new FunctionExpr("f", List.of(root));
+            path.add(0);
+        }
+        Expr replacement = new VariableExpr("y");
+        TreePosition position = new TreePosition(path, "x");
+
+        TreePosition.ReplacementResult result = position.replaceAt(
+                root,
+                replacement);
+
+        assertTrue(result.success());
+        assertEquals(depth, result.copiedAncestors());
+        assertSame(
+                replacement,
+                position.subtreeAt(result.rewrittenRoot().orElseThrow())
+                        .orElseThrow());
+    }
+
+    private LocalRewriteResult applyCompleteSquare(
+            String expression,
+            String pathKey) {
+        List<TreeLocalMoveEnumerator.LocalCandidateMove> matches =
+                completeSquareMatches(expression, pathKey);
         TreePosition position = matches.getFirst().position();
         List<CandidateMove> candidates = matches.stream()
                 .map(TreeLocalMoveEnumerator.LocalCandidateMove::move)
                 .toList();
         return applier.apply(expression, position, candidates);
+    }
+
+    private List<TreeLocalMoveEnumerator.LocalCandidateMove>
+            completeSquareMatches(String expression, String pathKey) {
+        List<TreeLocalMoveEnumerator.LocalCandidateMove> matches =
+                enumerator.enumerate(expression).stream()
+                        .filter(candidate -> pathKey.equals(
+                                candidate.position().pathKey()))
+                        .filter(candidate -> candidate.move().kind()
+                                == RewriteMoveKind.COMPLETE_SQUARE)
+                        .toList();
+        assertFalse(
+                matches.isEmpty(),
+                () -> "no COMPLETE_SQUARE matches at " + pathKey);
+        return matches;
     }
 
     private void assertRoundTrips(LocalRewriteResult result) {
@@ -179,6 +300,8 @@ class LocalRewriteApplierTest {
         Expr reparsedAfter = parser.parseTerm(renderedAfter);
 
         assertEquals(parsedAfter, reparsedAfter);
-        assertEquals(renderedAfter, ExpressionFormatter.format(reparsedAfter));
+        assertEquals(
+                renderedAfter,
+                ExpressionFormatter.format(reparsedAfter));
     }
 }
