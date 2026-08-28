@@ -411,7 +411,7 @@ public final class ExactFactorizationTransformationPipeline {
                 report.claimStrength()
                     == FactorizationVerifier.ClaimStrength
                         .BACKEND_CLAIMED_IRREDUCIBLE
-                    ? Status.IRREDUCIBLE
+                    ? Status.BACKEND_CLAIMED_IRREDUCIBLE
                     : Status.NO_CANDIDATE;
             case BUDGET_INCONCLUSIVE -> Status.BUDGET_INCONCLUSIVE;
             case UNSUPPORTED_DOMAIN, UNSUPPORTED_REQUEST ->
@@ -502,6 +502,7 @@ public final class ExactFactorizationTransformationPipeline {
     public enum Status {
         TRANSFORMED,
         NO_CANDIDATE,
+        BACKEND_CLAIMED_IRREDUCIBLE,
         IRREDUCIBLE,
         UNSUPPORTED,
         BUDGET_INCONCLUSIVE,
@@ -766,9 +767,23 @@ public final class ExactFactorizationTransformationPipeline {
             return rendering;
         }
 
-        public Optional<String> transformedExpression() {
+        /**
+         * Returns parser-compatible syntax produced by the renderer even when
+         * the later reparse or reconstruction stage rejected it.
+         */
+        public Optional<String> renderedExpression() {
             return rendering.flatMap(
                 ExactFactorizationExpressionRenderer.Result::expression);
+        }
+
+        /**
+         * Returns a replacement expression only after the complete exact
+         * reparse and reconstruction boundary issued a transformation.
+         */
+        public Optional<String> transformedExpression() {
+            return transformed()
+                ? renderedExpression()
+                : Optional.empty();
         }
 
         public Optional<ExactParsedTerm> reparsed() {
