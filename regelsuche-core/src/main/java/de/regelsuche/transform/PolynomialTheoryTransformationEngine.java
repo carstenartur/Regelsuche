@@ -55,7 +55,10 @@ public final class PolynomialTheoryTransformationEngine
         this.policy = Objects.requireNonNull(policy, "policy");
         this.factorization = Objects.requireNonNull(factorization, "factorization");
         this.cache = Objects.requireNonNull(cache, "cache");
-        this.classifier = new PolynomialTheorySubsumptionClassifier();
+        this.classifier = new PolynomialTheorySubsumptionClassifier(
+            factorization,
+            canonicalizer,
+            parser);
     }
 
     @Override
