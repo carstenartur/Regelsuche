@@ -49,7 +49,7 @@ Version 1 zielt bewusst zunächst auf das Wurzelvorkommen. Die
 
 - den leeren Wurzelpfad;
 - den unveränderten ursprünglichen Quelltext;
-- das Inhaltzertifikat der exakten Extraktion, das Quelltext, Literalbelege,
+- das Inhaltszertifikat der exakten Extraktion, das Quelltext, Literalbelege,
   Polynomdarstellung und Extraktionsarbeit bindet.
 
 Vor dem Rendering werden der aktuelle `ExactParsedTerm` und die bereits in der
