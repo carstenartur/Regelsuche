@@ -156,15 +156,22 @@ maxWorkUnits          = 200000
 
 Grenzverletzungen werden als `BUDGET_INCONCLUSIVE` berichtet. Ein zu großer
 Ausdruck wird weder abgeschnitten noch teilweise als Transformation ausgegeben.
+Das kumulative Termlimit wird vor der Traversierung des jeweils nächsten
+Polynoms geprüft. Ein bereits erkennbar zu großes Polynom wird daher nicht erst
+vollständig durchlaufen.
 
 Der Renderer führt ein stufenspezifisches `PolynomialWorkLedger`, unter anderem
 für:
 
+- inspizierte Koeffizienten und Polynomterme;
 - Faktorrecords;
 - Einheit und unresolved remainder;
-- Polynomterme;
+- ausgegebene Polynomterme;
 - Monom- und Faktorexponenten;
 - ausgegebene Codeeinheiten.
+
+Damit gehört auch die Validierung vor dem eigentlichen Textaufbau zur
+nicht zurücksetzbaren Ressourcenautorität.
 
 ## Ein nicht zurücksetzbares Gesamtbudget
 
@@ -195,7 +202,7 @@ Bei erfolgreicher Ausführung gilt:
 extraction work
 + factorization engine work
 + independent product verification work
-+ rendering work
++ rendering validation and output work
 + exact-parser input work
 + reconstruction work
 <= original pipeline maxTotalWorkUnits
@@ -222,6 +229,11 @@ Eine Transformation wird nur ausgestellt, wenn:
 Parser-, Ring- oder Koeffizientendrift wird als technischer Invariantenfehler
 sichtbar und nicht als erfolgreiche Faktorisierung behandelt.
 
+Ein fehlgeschlagener späterer Reparse- oder Rekonstruktionsschritt kann den
+Renderertext zu Diagnosezwecken über `renderedExpression()` behalten.
+`transformedExpression()` bleibt in diesem Fall jedoch leer. Nur ein
+`TRANSFORMED`-Ergebnis darf eine autorisierte Ersatzdarstellung ausgeben.
+
 ## Ergebnisarten
 
 Die Transformationspipeline unterscheidet:
@@ -229,12 +241,19 @@ Die Transformationspipeline unterscheidet:
 ```text
 TRANSFORMED
 NO_CANDIDATE
+BACKEND_CLAIMED_IRREDUCIBLE
 IRREDUCIBLE
 UNSUPPORTED
 BUDGET_INCONCLUSIVE
 TECHNICAL_FAILURE
 SOURCE_EVIDENCE_MISMATCH
 ```
+
+`BACKEND_CLAIMED_IRREDUCIBLE` bewahrt ausdrücklich nur den vom Backend
+berichteten Claim. `IRREDUCIBLE` bleibt einem vom `FactorizationVerifier` als
+unabhängig zertifiziert ausgegebenen Irreduzibilitätsergebnis vorbehalten. Die
+Transformationspipeline wertet einen Backend-Claim niemals zu diesem Status
+auf.
 
 Insbesondere gilt:
 
@@ -271,10 +290,15 @@ Die fokussierten Tests decken ab:
 - negative Vorzeichen;
 - nichtmonische Faktoren;
 - wiederholte Faktoren und Multiplizitäten;
+- vollständige und partielle Zerlegungen mit unresolved remainder;
 - deterministische Render- und Transformationszertifikate;
 - exaktes Reparse und Gleichheit des rekonstruierten Polynoms;
 - Ablehnung ersetzter Quellbelege;
-- sichtbare Irreduzibilitätsclaims ohne erfundene Transformation;
+- getrennte No-Candidate-, Backend-Claim- und unabhängig zertifizierte
+  Irreduzibilitätsgrenzen;
+- diagnostisch vorhandener Renderertext ohne Ausgabe einer abgelehnten
+  `transformedExpression`;
+- frühzeitige Termgrenzen und abgerechnete Validierungsarbeit;
 - Ausgabe- und Fortsetzungsbudgeterschöpfung;
 - Ablehnung multivariater Kandidaten;
 - den vollständigen nativen `Q[x]`-Pfad vom Quelltext bis zur rekonstruierten
