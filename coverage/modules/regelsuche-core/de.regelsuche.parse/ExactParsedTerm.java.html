@@ -1,87 +1,347 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactParsedTerm.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.parse</a> &gt; <span class="el_source">ExactParsedTerm.java</span></div><h1>ExactParsedTerm.java</h1><pre class="source lang-java linenums">package de.regelsuche.parse;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.scalar.ExactRationalEvidenceVerifier;
 import de.regelsuche.scalar.ExactRationalParseEvidence;
+import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
- * One parsed term together with source-bound exact evidence for every numeric
- * token that produced a {@link NumberExpr} leaf.
+ * One parsed term together with source-bound exact evidence for numeric tokens
+ * and parser-issued source ranges for concrete AST nodes.
  *
- * &lt;p&gt;The ordinary AST remains unchanged: literal spelling is deliberately not
- * part of {@code NumberExpr.equals}, canonical search identity or historical
- * evidence. Consumers that need exact source coefficients must retain this
- * parser-issued companion object and resolve occurrences by node identity.&lt;/p&gt;
+ * &lt;p&gt;The ordinary AST remains unchanged: literal spelling and source layout are
+ * deliberately not part of {@code Expr.equals}, canonical search identity or
+ * historical evidence. Consumers that need exact source coefficients or one
+ * exact subtree occurrence must retain this parser-issued companion object and
+ * resolve data by node identity.&lt;/p&gt;
+ *
+ * &lt;p&gt;Every source-backed node receives one range. The provenance-free zero node
+ * synthesized for unary minus has no source range because no source token
+ * created it.&lt;/p&gt;
  */
 public final class ExactParsedTerm {
     private final String source;
     private final Expr expression;
     private final List&lt;LiteralOccurrence&gt; literals;
     private final Map&lt;NumberExpr, LiteralOccurrence&gt; literalsByNode;
+    private final Map&lt;Expr, SourceRange&gt; sourceRangesByNode;
 
     ExactParsedTerm(
         String source,
         Expr expression,
-        List&lt;LiteralOccurrence&gt; literals
-<span class="fc" id="L34">    ) {</span>
-<span class="fc" id="L35">        this.source = Objects.requireNonNull(source, &quot;source&quot;);</span>
-<span class="fc" id="L36">        this.expression = Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L37">        this.literals = List.copyOf(</span>
-<span class="fc" id="L38">            Objects.requireNonNull(literals, &quot;literals&quot;));</span>
-<span class="fc" id="L39">        this.literalsByNode = validateAndIndex();</span>
-<span class="fc" id="L40">    }</span>
+        List&lt;LiteralOccurrence&gt; literals,
+        Map&lt;Expr, SourceRange&gt; sourceRanges
+<span class="fc" id="L47">    ) {</span>
+<span class="fc" id="L48">        this.source = Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L49">        this.expression = Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L50">        this.literals = List.copyOf(</span>
+<span class="fc" id="L51">            Objects.requireNonNull(literals, &quot;literals&quot;));</span>
+<span class="fc" id="L52">        this.literalsByNode = validateAndIndexLiterals();</span>
+<span class="fc" id="L53">        this.sourceRangesByNode = copyAndValidateSourceRanges(</span>
+<span class="fc" id="L54">            Objects.requireNonNull(sourceRanges, &quot;sourceRanges&quot;));</span>
+<span class="fc" id="L55">    }</span>
 
-    private Map&lt;NumberExpr, LiteralOccurrence&gt; validateAndIndex() {
-<span class="fc" id="L43">        Map&lt;NumberExpr, LiteralOccurrence&gt; occurrences =</span>
+    private Map&lt;NumberExpr, LiteralOccurrence&gt; validateAndIndexLiterals() {
+<span class="fc" id="L58">        Map&lt;NumberExpr, LiteralOccurrence&gt; occurrences =</span>
             new IdentityHashMap&lt;&gt;();
-<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (LiteralOccurrence literal : literals) {</span>
-<span class="fc" id="L46">            Objects.requireNonNull(literal, &quot;literal&quot;);</span>
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            if (occurrences.put(literal.node(), literal) != null) {</span>
-<span class="nc" id="L48">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (LiteralOccurrence literal : literals) {</span>
+<span class="fc" id="L61">            Objects.requireNonNull(literal, &quot;literal&quot;);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if (occurrences.put(literal.node(), literal) != null) {</span>
+<span class="nc" id="L63">                throw new IllegalArgumentException(</span>
                     &quot;numeric literal node occurs more than once&quot;);
             }
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            if (literal.startInclusive() &lt; 0</span>
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                    || literal.endExclusive() &lt;= literal.startInclusive()</span>
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                    || literal.endExclusive() &gt; source.length()</span>
-<span class="fc" id="L54">                    || !source.substring(</span>
-<span class="fc" id="L55">                        literal.startInclusive(),</span>
-<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                        literal.endExclusive()).equals(</span>
-<span class="fc" id="L57">                            literal.sourceLexeme())) {</span>
-<span class="nc" id="L58">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (literal.startInclusive() &lt; 0</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                    || literal.endExclusive() &lt;= literal.startInclusive()</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                    || literal.endExclusive() &gt; source.length()</span>
+<span class="fc" id="L69">                    || !source.substring(</span>
+<span class="fc" id="L70">                        literal.startInclusive(),</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                        literal.endExclusive()).equals(</span>
+<span class="fc" id="L72">                            literal.sourceLexeme())) {</span>
+<span class="nc" id="L73">                throw new IllegalArgumentException(</span>
                     &quot;numeric literal source range is invalid&quot;);
             }
-<span class="fc" id="L61">            ExactRationalParseEvidence evidence = literal.evidence();</span>
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if (!evidence.exact()</span>
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                    || !literal.sourceLexeme().equals(</span>
-<span class="fc" id="L64">                        evidence.sourceLiteral())</span>
-<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                    || evidence.verify().status()</span>
+<span class="fc" id="L76">            ExactRationalParseEvidence evidence = literal.evidence();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (!evidence.exact()</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                    || !literal.sourceLexeme().equals(</span>
+<span class="fc" id="L79">                        evidence.sourceLiteral())</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                    || evidence.verify().status()</span>
                         != ExactRationalEvidenceVerifier.Status
                             .VERIFIED_EXACT) {
-<span class="nc" id="L68">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L83">                throw new IllegalArgumentException(</span>
                     &quot;numeric literal lacks verified exact evidence&quot;);
             }
-<span class="fc" id="L71">        }</span>
-<span class="fc" id="L72">        return Collections.unmodifiableMap(occurrences);</span>
+<span class="fc" id="L86">        }</span>
+<span class="fc" id="L87">        return Collections.unmodifiableMap(occurrences);</span>
+    }
+
+    private Map&lt;Expr, SourceRange&gt; copyAndValidateSourceRanges(
+        Map&lt;Expr, SourceRange&gt; sourceRanges
+    ) {
+<span class="fc" id="L93">        IdentityHashMap&lt;Expr, SourceRange&gt; ranges =</span>
+            new IdentityHashMap&lt;&gt;();
+<span class="fc" id="L95">        sourceRanges.forEach((node, range) -&gt; {</span>
+<span class="fc" id="L96">            Objects.requireNonNull(node, &quot;source range node&quot;);</span>
+<span class="fc" id="L97">            Objects.requireNonNull(range, &quot;source range&quot;);</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if (range.endExclusive() &gt; source.length()) {</span>
+<span class="nc" id="L99">                throw new IllegalArgumentException(</span>
+                    &quot;AST source range exceeds parsed source&quot;);
+            }
+<span class="fc" id="L102">            ranges.put(node, range);</span>
+<span class="fc" id="L103">        });</span>
+<span class="fc" id="L104">        SourceRange rootRange = ranges.get(expression);</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (rootRange == null) {</span>
+<span class="nc" id="L106">            throw new IllegalArgumentException(</span>
+                &quot;parsed root expression lacks a source range&quot;);
+        }
+<span class="fc" id="L109">        validateRootCoverage(rootRange);</span>
+<span class="fc" id="L110">        literals.forEach(literal -&gt; {</span>
+<span class="fc" id="L111">            SourceRange nodeRange = ranges.get(literal.node());</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (nodeRange == null</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                    || !nodeRange.contains(</span>
+<span class="fc" id="L114">                        literal.startInclusive(),</span>
+<span class="fc" id="L115">                        literal.endExclusive())) {</span>
+<span class="nc" id="L116">                throw new IllegalArgumentException(</span>
+                    &quot;numeric literal is outside its AST source range&quot;);
+            }
+<span class="fc" id="L119">        });</span>
+<span class="fc" id="L120">        Set&lt;Expr&gt; visitedNodes = validateUniqueNodeIdentities();</span>
+<span class="fc" id="L121">        validateTreeRangesIteratively(ranges);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (Expr rangedNode : ranges.keySet()) {</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (!visitedNodes.contains(rangedNode)) {</span>
+<span class="fc" id="L124">                throw new IllegalArgumentException(</span>
+                    &quot;AST source range belongs to a node outside the parsed tree&quot;);
+            }
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">        return Collections.unmodifiableMap(ranges);</span>
+    }
+
+    private Set&lt;Expr&gt; validateUniqueNodeIdentities() {
+<span class="fc" id="L132">        Set&lt;Expr&gt; visitedNodes = Collections.newSetFromMap(</span>
+            new IdentityHashMap&lt;&gt;());
+<span class="fc" id="L134">        Deque&lt;Expr&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L135">        pending.push(expression);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L137">            Expr node = pending.pop();</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (!visitedNodes.add(node)) {</span>
+<span class="fc" id="L139">                throw new IllegalArgumentException(</span>
+                    &quot;AST node identity occurs more than once in the parsed tree&quot;);
+            }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (node instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L143">                pending.push(binary.right());</span>
+<span class="fc" id="L144">                pending.push(binary.left());</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            } else if (node instanceof FunctionExpr function) {</span>
+<span class="fc" id="L146">                List&lt;Expr&gt; arguments = function.arguments();</span>
+<span class="fc" id="L147">                for (int index = arguments.size() - 1;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                        index &gt;= 0;</span>
+<span class="fc" id="L149">                        index--) {</span>
+<span class="fc" id="L150">                    pending.push(arguments.get(index));</span>
+                }
+            }
+<span class="fc" id="L153">        }</span>
+<span class="fc" id="L154">        return visitedNodes;</span>
+    }
+
+    private void validateRootCoverage(SourceRange rootRange) {
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (Character.isWhitespace(source.charAt(rootRange.startInclusive()))</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                || Character.isWhitespace(</span>
+<span class="fc" id="L160">                    source.charAt(rootRange.endExclusive() - 1))) {</span>
+<span class="nc" id="L161">            throw new IllegalArgumentException(</span>
+                &quot;root AST source range includes outer whitespace&quot;);
+        }
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (int index = 0; index &lt; rootRange.startInclusive(); index++) {</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            if (!Character.isWhitespace(source.charAt(index))) {</span>
+<span class="nc" id="L166">                throw new IllegalArgumentException(</span>
+                    &quot;root AST source range omits source syntax&quot;);
+            }
+        }
+<span class="fc" id="L170">        for (int index = rootRange.endExclusive();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                index &lt; source.length();</span>
+<span class="fc" id="L172">                index++) {</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (!Character.isWhitespace(source.charAt(index))) {</span>
+<span class="fc" id="L174">                throw new IllegalArgumentException(</span>
+                    &quot;root AST source range omits source syntax&quot;);
+            }
+        }
+<span class="fc" id="L178">    }</span>
+
+    private void validateTreeRangesIteratively(
+        Map&lt;Expr, SourceRange&gt; ranges
+    ) {
+<span class="fc" id="L183">        Deque&lt;RangeFrame&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L184">        pending.push(new RangeFrame(expression, null, false));</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L186">            RangeFrame frame = pending.pop();</span>
+<span class="fc" id="L187">            Expr node = frame.node();</span>
+<span class="fc" id="L188">            SourceRange range = ranges.get(node);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            NumberExpr number = node instanceof NumberExpr numeric</span>
+<span class="fc" id="L190">                ? numeric</span>
+<span class="fc" id="L191">                : null;</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            boolean numericWithoutLiteral = number != null</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                &amp;&amp; !literalsByNode.containsKey(number);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            boolean syntheticUnaryZero = numericWithoutLiteral</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                &amp;&amp; frame.allowSyntheticUnaryZero()</span>
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">                &amp;&amp; number.value() == 0.0d</span>
+                &amp;&amp; range == null;
+<span class="fc bfc" id="L198" title="All 4 branches covered.">            if (numericWithoutLiteral &amp;&amp; !syntheticUnaryZero) {</span>
+<span class="fc" id="L199">                throw new IllegalArgumentException(</span>
+                    &quot;numeric AST node lacks verified exact literal evidence&quot;);
+            }
+<span class="pc bpc" id="L202" title="1 of 4 branches missed.">            if (range == null &amp;&amp; !syntheticUnaryZero) {</span>
+<span class="nc" id="L203">                throw new IllegalArgumentException(</span>
+                    &quot;source-backed AST node lacks a source range&quot;);
+            }
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            if (range != null</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                    &amp;&amp; frame.parentRange() != null</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                    &amp;&amp; !frame.parentRange().contains(range)) {</span>
+<span class="nc" id="L209">                throw new IllegalArgumentException(</span>
+                    &quot;child AST source range escapes its parent range&quot;);
+            }
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            SourceRange effectiveParent = range == null</span>
+<span class="fc" id="L213">                ? frame.parentRange()</span>
+<span class="fc" id="L214">                : range;</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            if (node instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L216">                boolean unaryMinus = isParserUnaryMinus(</span>
+                    binary,
+                    range,
+                    ranges);
+<span class="fc" id="L220">                validateBinaryChildOrder(binary, unaryMinus, ranges);</span>
+<span class="fc" id="L221">                pending.push(new RangeFrame(</span>
+<span class="fc" id="L222">                    binary.right(),</span>
+                    effectiveParent,
+                    false));
+<span class="fc" id="L225">                pending.push(new RangeFrame(</span>
+<span class="fc" id="L226">                    binary.left(),</span>
+                    effectiveParent,
+                    unaryMinus));
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            } else if (node instanceof FunctionExpr function) {</span>
+<span class="fc" id="L230">                validateFunctionArgumentOrder(function, ranges);</span>
+<span class="fc" id="L231">                List&lt;Expr&gt; arguments = function.arguments();</span>
+<span class="fc" id="L232">                for (int index = arguments.size() - 1;</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                        index &gt;= 0;</span>
+<span class="fc" id="L234">                        index--) {</span>
+<span class="fc" id="L235">                    pending.push(new RangeFrame(</span>
+<span class="fc" id="L236">                        arguments.get(index),</span>
+                        effectiveParent,
+                        false));
+                }
+            }
+<span class="fc" id="L241">        }</span>
+<span class="fc" id="L242">    }</span>
+
+    private static void validateBinaryChildOrder(
+        BinaryExpr binary,
+        boolean unaryMinus,
+        Map&lt;Expr, SourceRange&gt; ranges
+    ) {
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if (unaryMinus) {</span>
+<span class="fc" id="L250">            return;</span>
+        }
+<span class="fc" id="L252">        SourceRange left = ranges.get(binary.left());</span>
+<span class="fc" id="L253">        SourceRange right = ranges.get(binary.right());</span>
+<span class="pc bpc" id="L254" title="1 of 4 branches missed.">        if (left != null</span>
+                &amp;&amp; right != null
+<span class="fc bfc" id="L256" title="All 2 branches covered.">                &amp;&amp; left.endExclusive() &gt; right.startInclusive()) {</span>
+<span class="fc" id="L257">            throw new IllegalArgumentException(</span>
+                &quot;binary AST source ranges overlap or are out of order&quot;);
+        }
+<span class="fc" id="L260">    }</span>
+
+    private static void validateFunctionArgumentOrder(
+        FunctionExpr function,
+        Map&lt;Expr, SourceRange&gt; ranges
+    ) {
+<span class="fc" id="L266">        int previousEnd = -1;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L268">            SourceRange range = ranges.get(argument);</span>
+<span class="pc bpc" id="L269" title="1 of 4 branches missed.">            if (range != null &amp;&amp; previousEnd &gt; range.startInclusive()) {</span>
+<span class="fc" id="L270">                throw new IllegalArgumentException(</span>
+                    &quot;function argument source ranges overlap or are out of order&quot;);
+            }
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">            if (range != null) {</span>
+<span class="fc" id="L274">                previousEnd = range.endExclusive();</span>
+            }
+<span class="fc" id="L276">        }</span>
+<span class="fc" id="L277">    }</span>
+
+    private boolean isParserUnaryMinus(
+        BinaryExpr binary,
+        SourceRange binaryRange,
+        Map&lt;Expr, SourceRange&gt; ranges
+    ) {
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (binary.operator() != BinaryOperator.SUB</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">                || !(binary.left() instanceof NumberExpr zero)</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">                || zero.value() != 0.0d</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                || literalsByNode.containsKey(zero)</span>
+<span class="pc bpc" id="L288" title="1 of 4 branches missed.">                || ranges.containsKey(zero)</span>
+                || binaryRange == null) {
+<span class="fc" id="L290">            return false;</span>
+        }
+<span class="fc" id="L292">        SourceRange operandRange = ranges.get(binary.right());</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        return operandRange != null</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">            &amp;&amp; binaryRange.contains(operandRange)</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            &amp;&amp; hasUnaryGroupingShape(binaryRange, operandRange);</span>
+    }
+
+    private boolean hasUnaryGroupingShape(
+        SourceRange binaryRange,
+        SourceRange operandRange
+    ) {
+<span class="fc" id="L302">        int openingGroups = 0;</span>
+<span class="fc" id="L303">        boolean sawMinus = false;</span>
+<span class="fc" id="L304">        for (int index = binaryRange.startInclusive();</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">                index &lt; operandRange.startInclusive();</span>
+<span class="fc" id="L306">                index++) {</span>
+<span class="fc" id="L307">            char character = source.charAt(index);</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">            if (Character.isWhitespace(character)) {</span>
+<span class="nc" id="L309">                continue;</span>
+            }
+<span class="fc bfc" id="L311" title="All 4 branches covered.">            if (!sawMinus &amp;&amp; character == '(') {</span>
+<span class="fc" id="L312">                openingGroups++;</span>
+<span class="fc bfc" id="L313" title="All 4 branches covered.">            } else if (!sawMinus &amp;&amp; character == '-') {</span>
+<span class="fc" id="L314">                sawMinus = true;</span>
+            } else {
+<span class="fc" id="L316">                return false;</span>
+            }
+        }
+<span class="fc" id="L319">        int closingGroups = 0;</span>
+<span class="fc" id="L320">        for (int index = operandRange.endExclusive();</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">                index &lt; binaryRange.endExclusive();</span>
+<span class="fc" id="L322">                index++) {</span>
+<span class="fc" id="L323">            char character = source.charAt(index);</span>
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            if (Character.isWhitespace(character)) {</span>
+<span class="nc" id="L325">                continue;</span>
+            }
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">            if (character != ')') {</span>
+<span class="nc" id="L328">                return false;</span>
+            }
+<span class="fc" id="L330">            closingGroups++;</span>
+        }
+<span class="pc bpc" id="L332" title="1 of 4 branches missed.">        return sawMinus &amp;&amp; openingGroups == closingGroups;</span>
     }
 
     public String source() {
-<span class="fc" id="L76">        return source;</span>
+<span class="fc" id="L336">        return source;</span>
     }
 
     public Expr expression() {
-<span class="fc" id="L80">        return expression;</span>
+<span class="fc" id="L340">        return expression;</span>
     }
 
     public List&lt;LiteralOccurrence&gt; literals() {
-<span class="fc" id="L84">        return literals;</span>
+<span class="fc" id="L344">        return literals;</span>
     }
 
     /**
@@ -89,8 +349,62 @@ public final class ExactParsedTerm {
      * nodes created later do not inherit source provenance.
      */
     public Optional&lt;LiteralOccurrence&gt; literalFor(NumberExpr node) {
-<span class="fc" id="L92">        Objects.requireNonNull(node, &quot;node&quot;);</span>
-<span class="fc" id="L93">        return Optional.ofNullable(literalsByNode.get(node));</span>
+<span class="fc" id="L352">        Objects.requireNonNull(node, &quot;node&quot;);</span>
+<span class="fc" id="L353">        return Optional.ofNullable(literalsByNode.get(node));</span>
+    }
+
+    /**
+     * Returns the parser-issued source range for this concrete node instance.
+     * A value-equal foreign node and the synthetic unary-minus zero have none.
+     */
+    public Optional&lt;SourceRange&gt; sourceRangeFor(Expr node) {
+<span class="fc" id="L361">        Objects.requireNonNull(node, &quot;node&quot;);</span>
+<span class="fc" id="L362">        return Optional.ofNullable(sourceRangesByNode.get(node));</span>
+    }
+
+    /** Returns the exact source substring owned by one concrete AST node. */
+    public Optional&lt;String&gt; sourceTextFor(Expr node) {
+<span class="fc" id="L367">        return sourceRangeFor(node).map(range -&gt; range.textFrom(source));</span>
+    }
+
+    /** The non-whitespace source range that produced the root AST node. */
+    public SourceRange rootSourceRange() {
+<span class="fc" id="L372">        return sourceRangeFor(expression).orElseThrow();</span>
+    }
+
+    /** Parser-issued half-open source interval. */
+    public record SourceRange(
+        int startInclusive,
+        int endExclusive
+    ) {
+<span class="fc" id="L380">        public SourceRange {</span>
+<span class="pc bpc" id="L381" title="2 of 4 branches missed.">            if (startInclusive &lt; 0 || endExclusive &lt;= startInclusive) {</span>
+<span class="nc" id="L382">                throw new IllegalArgumentException(</span>
+                    &quot;AST source range is invalid&quot;);
+            }
+<span class="fc" id="L385">        }</span>
+
+        public boolean contains(SourceRange other) {
+<span class="fc" id="L388">            Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc" id="L389">            return contains(other.startInclusive, other.endExclusive);</span>
+        }
+
+        public boolean contains(int start, int end) {
+<span class="pc bpc" id="L393" title="2 of 4 branches missed.">            return startInclusive &lt;= start &amp;&amp; end &lt;= endExclusive;</span>
+        }
+
+        public String textFrom(String source) {
+<span class="fc" id="L397">            Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            if (endExclusive &gt; source.length()) {</span>
+<span class="nc" id="L399">                throw new IllegalArgumentException(</span>
+                    &quot;AST source range exceeds supplied source&quot;);
+            }
+<span class="fc" id="L402">            return source.substring(startInclusive, endExclusive);</span>
+        }
+
+        public String canonicalMaterial() {
+<span class="nc" id="L406">            return startInclusive + &quot;:&quot; + endExclusive;</span>
+        }
     }
 
     /** Parser-issued occurrence; construction is restricted to this package. */
@@ -107,39 +421,49 @@ public final class ExactParsedTerm {
             int endExclusive,
             String sourceLexeme,
             ExactRationalParseEvidence evidence
-<span class="fc" id="L110">        ) {</span>
-<span class="fc" id="L111">            this.node = Objects.requireNonNull(node, &quot;node&quot;);</span>
-<span class="fc" id="L112">            this.startInclusive = startInclusive;</span>
-<span class="fc" id="L113">            this.endExclusive = endExclusive;</span>
-<span class="fc" id="L114">            this.sourceLexeme = Objects.requireNonNull(</span>
+<span class="fc" id="L424">        ) {</span>
+<span class="fc" id="L425">            this.node = Objects.requireNonNull(node, &quot;node&quot;);</span>
+<span class="fc" id="L426">            this.startInclusive = startInclusive;</span>
+<span class="fc" id="L427">            this.endExclusive = endExclusive;</span>
+<span class="fc" id="L428">            this.sourceLexeme = Objects.requireNonNull(</span>
                 sourceLexeme,
                 &quot;sourceLexeme&quot;);
-<span class="fc" id="L117">            this.evidence = Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
-<span class="fc" id="L118">        }</span>
+<span class="fc" id="L431">            this.evidence = Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L432">        }</span>
 
         public NumberExpr node() {
-<span class="fc" id="L121">            return node;</span>
+<span class="fc" id="L435">            return node;</span>
         }
 
         public int startInclusive() {
-<span class="fc" id="L125">            return startInclusive;</span>
+<span class="fc" id="L439">            return startInclusive;</span>
         }
 
         public int endExclusive() {
-<span class="fc" id="L129">            return endExclusive;</span>
+<span class="fc" id="L443">            return endExclusive;</span>
         }
 
         public String sourceLexeme() {
-<span class="fc" id="L133">            return sourceLexeme;</span>
+<span class="fc" id="L447">            return sourceLexeme;</span>
         }
 
         public ExactRationalParseEvidence evidence() {
-<span class="fc" id="L137">            return evidence;</span>
+<span class="fc" id="L451">            return evidence;</span>
         }
 
         public ExactRational exactValue() {
-<span class="fc" id="L141">            return evidence.value().orElseThrow();</span>
+<span class="fc" id="L455">            return evidence.value().orElseThrow();</span>
         }
+    }
+
+    private record RangeFrame(
+        Expr node,
+        SourceRange parentRange,
+        boolean allowSyntheticUnaryZero
+    ) {
+<span class="fc" id="L464">        private RangeFrame {</span>
+<span class="fc" id="L465">            Objects.requireNonNull(node, &quot;node&quot;);</span>
+<span class="fc" id="L466">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
