@@ -1,0 +1,29 @@
+plugins {
+    id 'base'
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Keep this version identical to the Playwright dependencies in app/build.gradle.
+// MavenPlaywrightBootstrapContractTest fails closed when either side drifts.
+def playwrightVersion = '1.60.0'
+def playwrightCoordinate =
+    "com.microsoft.playwright:playwright:${playwrightVersion}"
+
+configurations {
+    playwrightCli
+}
+
+dependencies {
+    playwrightCli playwrightCoordinate
+}
+
+tasks.register('installPlaywrightHostDependencies', JavaExec) {
+    description = 'Installs Linux host libraries required by Playwright Chromium without configuring or compiling the main reactor.'
+    group = 'verification'
+    classpath = configurations.playwrightCli
+    mainClass = 'com.microsoft.playwright.CLI'
+    args 'install-deps', 'chromium'
+}

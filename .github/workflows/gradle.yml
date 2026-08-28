@@ -41,7 +41,9 @@ jobs:
             patchelf=0.14.3-1 \
             python3-venv \
             z3=4.8.12-1
-          ./gradlew --no-daemon :app:installPlaywrightHostDependencies --console=plain
+          # Resolve only the pinned Playwright CLI. The independent bootstrap
+          # avoids configuring and compiling the complete production reactor.
+          ./gradlew --no-daemon -p playwright-bootstrap installPlaywrightHostDependencies --console=plain
       - name: Run the checkout-owned CI lifecycle
         run: |
           set -o pipefail
