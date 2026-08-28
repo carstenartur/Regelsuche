@@ -14,7 +14,7 @@ sind bewusst von Handbüchern und Architekturtexten getrennt.
 | verstehen, wie fast passende Regeln vorbereitet werden | [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md) und [Rule-directed Preparation Planning](rule-directed-preparation-planning.md) |
 | die Grenze für selbst gelernte Regeln verstehen | [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md) und [Evolutionäre Suche](evolutionary-search.md) |
 | einen generationenbasierten Mining-Lauf reproduzieren | [Generationenbasiertes Regelmining](generational-rule-mining.md) |
-| die Polynom- und Faktorisierungsarchitektur verstehen | [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md), [univariate Polynomgrundlage](univariate-polynomial-foundation.md), [Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md), [Primkörperfaktorisierung](finite-field-factorization.md), [Primzahlauswahl](suitable-prime-selection.md) und [quartische Zerlegungsengine](polynomial-decomposition-synthesis.md) |
+| die Polynom- und Faktorisierungsarchitektur verstehen | [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md), [parsergebundene exakte Faktorisierung](exact-parsed-factorization-pipeline.md), [verifizierte Faktorisierungstransformation](exact-factorization-transformation-pipeline.md), [univariate Polynomgrundlage](univariate-polynomial-foundation.md), [Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md), [Primkörperfaktorisierung](finite-field-factorization.md), [Primzahlauswahl](suitable-prime-selection.md) und [quartische Zerlegungsengine](polynomial-decomposition-synthesis.md) |
 | den aktuellen Forschungsstand verstehen | [Discovery- und Forschungsstand](discovery-status.md) |
 | Claims und Evidence korrekt einordnen | [Capability-Status](generated/capability-status.md), [Glossar](glossary.md) und [Release Readiness](release-readiness.md) |
 | die Architektur verstehen oder Code ändern | [Architektur](architecture.md) und [Developer Guide](developer-guide.md) |
@@ -91,6 +91,12 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 - [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md) —
   exakte Koeffizientendomänen, Polynomringe, kanonische Sparse-Polynome,
   untrusted Engine-Proposals und verifier-ausgestellte Evidence.
+- [Exakte Parser-zu-Faktorisierungs-Pipeline](exact-parsed-factorization-pipeline.md) —
+  parsergebundene Literalprovenienz, direkte `Q[x]`-Extraktion und ein
+  nicht zurücksetzbares Request-/Verifier-Arbeitsbudget.
+- [Exakte Faktorisierungs-Transformationspipeline](exact-factorization-transformation-pipeline.md) —
+  deterministisches Bruch- und Faktorenrendering, erneutes exaktes Parsen,
+  Ringrekonstruktion und occurrence-gebundene Transformationsevidence.
 - [Univariate Polynomgrundlage, Inhalt und quadratfreie Zerlegung](univariate-polynomial-foundation.md) —
   verlustfreie univariate Projektion, exakte Arithmetik, allgemeine
   charakteristik-0-Algorithmen und ihre Claim-Grenzen.

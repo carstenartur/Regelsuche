@@ -220,8 +220,8 @@ public final class FactorizationVerifier {
         FactorizationEngine.EngineResult&lt;C&gt; raw
     ) {
         ClaimStrength claim =
-<span class="pc bpc" id="L223" title="1 of 2 branches missed.">            raw.backendClaim() == FactorizationEngine.BackendClaim.IRREDUCIBLE</span>
-<span class="nc" id="L224">                ? ClaimStrength.BACKEND_CLAIMED_IRREDUCIBLE</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            raw.backendClaim() == FactorizationEngine.BackendClaim.IRREDUCIBLE</span>
+<span class="fc" id="L224">                ? ClaimStrength.BACKEND_CLAIMED_IRREDUCIBLE</span>
 <span class="fc" id="L225">                : ClaimStrength.NONE;</span>
 <span class="pc bpc" id="L226" title="3 of 4 branches missed.">        if (request.evidenceRequirement()</span>
                 == FactorizationRequest.EvidenceRequirement
@@ -276,10 +276,10 @@ public final class FactorizationVerifier {
                 1);
 <span class="fc" id="L277">            reconstructed = reconstructed.multiply(powered);</span>
 <span class="fc" id="L278">        }</span>
-<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        if (!proposal.unresolvedRemainder().isOne()) {</span>
-<span class="nc" id="L280">            work.consume(&quot;verify.remainder-multiplications&quot;, 1);</span>
-<span class="nc" id="L281">            reconstructed = reconstructed.multiply(</span>
-<span class="nc" id="L282">                proposal.unresolvedRemainder());</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (!proposal.unresolvedRemainder().isOne()) {</span>
+<span class="fc" id="L280">            work.consume(&quot;verify.remainder-multiplications&quot;, 1);</span>
+<span class="fc" id="L281">            reconstructed = reconstructed.multiply(</span>
+<span class="fc" id="L282">                proposal.unresolvedRemainder());</span>
         }
 <span class="fc" id="L284">        work.consume(&quot;verify.product-comparisons&quot;, 1);</span>
 <span class="fc bfc" id="L285" title="All 2 branches covered.">        if (!source.equals(reconstructed)) {</span>
@@ -298,12 +298,12 @@ public final class FactorizationVerifier {
 <span class="fc" id="L298">        int remaining = exponent;</span>
 <span class="fc" id="L299">        long result = 0;</span>
 <span class="fc bfc" id="L300" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
-<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            if ((remaining &amp; 1) == 1) {</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">            if ((remaining &amp; 1) == 1) {</span>
 <span class="fc" id="L302">                result++;</span>
             }
 <span class="fc" id="L304">            remaining &gt;&gt;&gt;= 1;</span>
-<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            if (remaining &gt; 0) {</span>
-<span class="nc" id="L306">                result++;</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (remaining &gt; 0) {</span>
+<span class="fc" id="L306">                result++;</span>
             }
         }
 <span class="fc" id="L309">        return result;</span>

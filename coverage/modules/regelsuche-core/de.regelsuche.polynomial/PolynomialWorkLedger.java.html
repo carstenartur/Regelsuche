@@ -42,7 +42,7 @@ public record PolynomialWorkLedger(Map&lt;String, Long&gt; stages) {
     }
 
     public boolean within(long maximum) {
-<span class="pc bpc" id="L45" title="2 of 4 branches missed.">        return maximum &gt;= 0 &amp;&amp; totalWorkUnits() &lt;= maximum;</span>
+<span class="pc bpc" id="L45" title="1 of 4 branches missed.">        return maximum &gt;= 0 &amp;&amp; totalWorkUnits() &lt;= maximum;</span>
     }
 
     public String canonicalMaterial() {

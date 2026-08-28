@@ -177,17 +177,17 @@ public final class SparsePolynomial&lt;C&gt; {
     }
 
     public SparsePolynomial&lt;C&gt; scale(C scalar) {
-<span class="nc" id="L180">        C checked = ring.coefficientDomain().canonical(scalar);</span>
-<span class="nc bnc" id="L181" title="All 4 branches missed.">        if (ring.coefficientDomain().isZero(checked) || isZero()) {</span>
+<span class="fc" id="L180">        C checked = ring.coefficientDomain().canonical(scalar);</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">        if (ring.coefficientDomain().isZero(checked) || isZero()) {</span>
 <span class="nc" id="L182">            return zero(ring);</span>
         }
-<span class="nc" id="L184">        TreeMap&lt;Monomial, C&gt; result = newTermMap(ring);</span>
-<span class="nc" id="L185">        terms.forEach((monomial, coefficient) -&gt; result.put(</span>
+<span class="fc" id="L184">        TreeMap&lt;Monomial, C&gt; result = newTermMap(ring);</span>
+<span class="fc" id="L185">        terms.forEach((monomial, coefficient) -&gt; result.put(</span>
             monomial,
-<span class="nc" id="L187">            ring.coefficientDomain().multiply(</span>
+<span class="fc" id="L187">            ring.coefficientDomain().multiply(</span>
                 coefficient,
                 checked)));
-<span class="nc" id="L190">        return new SparsePolynomial&lt;&gt;(ring, result);</span>
+<span class="fc" id="L190">        return new SparsePolynomial&lt;&gt;(ring, result);</span>
     }
 
     public SparsePolynomial&lt;C&gt; multiply(
@@ -221,12 +221,12 @@ public final class SparsePolynomial&lt;C&gt; {
 <span class="fc" id="L221">        SparsePolynomial&lt;C&gt; factor = this;</span>
 <span class="fc" id="L222">        int remaining = exponent;</span>
 <span class="fc bfc" id="L223" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
-<span class="pc bpc" id="L224" title="1 of 2 branches missed.">            if ((remaining &amp; 1) == 1) {</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            if ((remaining &amp; 1) == 1) {</span>
 <span class="fc" id="L225">                result = result.multiply(factor);</span>
             }
 <span class="fc" id="L227">            remaining &gt;&gt;&gt;= 1;</span>
-<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (remaining &gt; 0) {</span>
-<span class="nc" id="L229">                factor = factor.multiply(factor);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            if (remaining &gt; 0) {</span>
+<span class="fc" id="L229">                factor = factor.multiply(factor);</span>
             }
         }
 <span class="fc" id="L232">        return result;</span>

@@ -1,0 +1,617 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactFactorizationExpressionRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">ExactFactorizationExpressionRenderer.java</span></div><h1>ExactFactorizationExpressionRenderer.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.scalar.ExactRationalDomain;
+import java.math.BigInteger;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Deterministically renders one verifier-issued exact-rational factorization
+ * candidate as parser-compatible expression syntax.
+ *
+ * &lt;p&gt;The renderer is not a mathematical authority. It accepts only
+ * {@link FactorizationVerifier.VerifiedCandidate} values issued by the
+ * verifier, retains their certificate identity and accounts every emitted code
+ * unit under an explicit work and representation policy.&lt;/p&gt;
+ */
+public final class ExactFactorizationExpressionRenderer {
+    public static final String RENDERER_ID =
+        &quot;regelsuche.exact-factorization-expression-renderer/v1&quot;;
+    public static final int MAX_FACTORS = 4_096;
+    public static final int MAX_POLYNOMIAL_TERMS = 65_536;
+    public static final int MAX_EXPONENT = 1_000_000;
+    public static final int MAX_COEFFICIENT_BITS = 1_000_000;
+    public static final int MAX_OUTPUT_CODE_UNITS = 1_000_000;
+    public static final long MAX_WORK_UNITS = 5_000_000L;
+<span class="fc" id="L29">    private static final BigInteger MAX_PARSER_LITERAL_MAGNITUDE =</span>
+<span class="fc" id="L30">        BigInteger.TEN.pow(ExactRationalDomain.MAX_DIGITS)</span>
+<span class="fc" id="L31">            .subtract(BigInteger.ONE);</span>
+<span class="fc" id="L32">    private static final int MAX_PARSER_LITERAL_BITS =</span>
+<span class="fc" id="L33">        MAX_PARSER_LITERAL_MAGNITUDE.bitLength();</span>
+
+    private final Policy policy;
+
+    public ExactFactorizationExpressionRenderer() {
+<span class="fc" id="L38">        this(Policy.boundedDefaults());</span>
+<span class="fc" id="L39">    }</span>
+
+<span class="fc" id="L41">    public ExactFactorizationExpressionRenderer(Policy policy) {</span>
+<span class="fc" id="L42">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L43">    }</span>
+
+    public Policy policy() {
+<span class="fc" id="L46">        return policy;</span>
+    }
+
+    public Result render(
+        FactorizationVerifier.VerifiedCandidate&lt;ExactRational&gt; candidate
+    ) {
+<span class="fc" id="L52">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L53">        Work work = new Work(policy.maxWorkUnits());</span>
+        try {
+<span class="fc" id="L55">            PolynomialRing&lt;ExactRational&gt; ring =</span>
+<span class="fc" id="L56">                candidate.unresolvedRemainder().ring();</span>
+<span class="fc" id="L57">            requireSupportedRing(ring);</span>
+<span class="fc" id="L58">            requireCandidateWithinRepresentationLimits(candidate, work);</span>
+
+<span class="fc" id="L60">            BoundedText output = new BoundedText(policy, work);</span>
+<span class="fc" id="L61">            int components = 0;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (!candidate.unit().isOne()) {</span>
+<span class="fc" id="L63">                appendComponentSeparator(output, components++);</span>
+<span class="fc" id="L64">                output.append(renderRational(candidate.unit()));</span>
+<span class="fc" id="L65">                work.consume(&quot;render.unit-components&quot;, 1);</span>
+            }
+            for (PolynomialFactor&lt;ExactRational&gt; factor
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                    : candidate.factors()) {</span>
+<span class="fc" id="L69">                appendComponentSeparator(output, components++);</span>
+<span class="fc" id="L70">                renderFactor(output, factor, ring, work);</span>
+<span class="fc" id="L71">            }</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (!candidate.unresolvedRemainder().isOne()) {</span>
+<span class="fc" id="L73">                appendComponentSeparator(output, components++);</span>
+<span class="fc" id="L74">                renderPolynomialFactor(</span>
+                    output,
+<span class="fc" id="L76">                    candidate.unresolvedRemainder(),</span>
+                    1,
+                    ring,
+                    work);
+<span class="fc" id="L80">                work.consume(&quot;render.unresolved-remainders&quot;, 1);</span>
+            }
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            if (components == 0) {</span>
+<span class="nc" id="L83">                throw new IllegalStateException(</span>
+                    &quot;verified candidate rendered no expression component&quot;);
+            }
+<span class="fc" id="L86">            return Result.rendered(</span>
+                policy,
+                candidate,
+<span class="fc" id="L89">                output.toString(),</span>
+<span class="fc" id="L90">                work.ledger());</span>
+<span class="fc" id="L91">        } catch (RepresentationLimitReached exception) {</span>
+<span class="fc" id="L92">            return Result.failure(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L94">                exception.getMessage(),</span>
+                policy,
+                candidate,
+<span class="fc" id="L97">                work.ledger());</span>
+<span class="fc" id="L98">        } catch (UnsupportedCandidate exception) {</span>
+<span class="fc" id="L99">            return Result.failure(</span>
+                Status.UNSUPPORTED,
+<span class="fc" id="L101">                exception.getMessage(),</span>
+                policy,
+                candidate,
+<span class="fc" id="L104">                work.ledger());</span>
+        }
+    }
+
+    private void requireSupportedRing(
+        PolynomialRing&lt;ExactRational&gt; ring
+    ) {
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (!ExactRationalField.DOMAIN_ID.equals(</span>
+<span class="fc" id="L112">                ring.coefficientDomain().id())) {</span>
+<span class="nc" id="L113">            throw unsupported(&quot;RENDERER_REQUIRES_EXACT_RATIONAL_DOMAIN&quot;);</span>
+        }
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (ring.variableCount() != 1) {</span>
+<span class="fc" id="L116">            throw unsupported(&quot;RENDERER_REQUIRES_UNIVARIATE_RING&quot;);</span>
+        }
+<span class="fc" id="L118">        String variable = ring.variables().getFirst().id();</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (!isParserIdentifier(variable)) {</span>
+<span class="nc" id="L120">            throw unsupported(</span>
+                &quot;POLYNOMIAL_VARIABLE_IS_NOT_PARSER_COMPATIBLE&quot;);
+        }
+<span class="fc" id="L123">    }</span>
+
+    private void requireCandidateWithinRepresentationLimits(
+        FactorizationVerifier.VerifiedCandidate&lt;ExactRational&gt; candidate,
+        Work work
+    ) {
+<span class="fc" id="L129">        int factors = candidate.factors().size();</span>
+<span class="fc" id="L130">        boolean hasRemainder =</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            !candidate.unresolvedRemainder().isOne();</span>
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">        if (factors &gt; policy.maxFactors()</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                || hasRemainder &amp;&amp; factors &gt;= policy.maxFactors()) {</span>
+<span class="nc" id="L134">            throw representationLimit(&quot;MAX_FACTORS_EXCEEDED&quot;);</span>
+        }
+<span class="fc" id="L136">        checkCoefficient(candidate.unit(), work);</span>
+<span class="fc" id="L137">        int terms = 0;</span>
+        for (PolynomialFactor&lt;ExactRational&gt; factor
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                : candidate.factors()) {</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            if (factor.multiplicity() &gt; policy.maxExponent()) {</span>
+<span class="nc" id="L141">                throw representationLimit(&quot;MAX_EXPONENT_EXCEEDED&quot;);</span>
+            }
+<span class="fc" id="L143">            terms = addTermCount(</span>
+                terms,
+<span class="fc" id="L145">                checkedTermCount(factor.polynomial()));</span>
+<span class="fc" id="L146">            checkPolynomial(factor.polynomial(), work);</span>
+<span class="fc" id="L147">            work.consume(&quot;render.factor-records&quot;, 1);</span>
+<span class="fc" id="L148">        }</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (hasRemainder) {</span>
+<span class="fc" id="L150">            terms = addTermCount(</span>
+                terms,
+<span class="fc" id="L152">                checkedTermCount(candidate.unresolvedRemainder()));</span>
+<span class="fc" id="L153">            checkPolynomial(candidate.unresolvedRemainder(), work);</span>
+        }
+<span class="fc" id="L155">    }</span>
+
+    private int addTermCount(int current, int additional) {
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (additional &gt; policy.maxPolynomialTerms() - current) {</span>
+<span class="fc" id="L159">            throw representationLimit(</span>
+                &quot;MAX_POLYNOMIAL_TERMS_EXCEEDED&quot;);
+        }
+<span class="fc" id="L162">        return current + additional;</span>
+    }
+
+    private int checkedTermCount(
+        SparsePolynomial&lt;ExactRational&gt; polynomial
+    ) {
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (polynomial.isZero()) {</span>
+<span class="nc" id="L169">            throw unsupported(&quot;ZERO_POLYNOMIAL_CANNOT_BE_RENDERED&quot;);</span>
+        }
+<span class="fc" id="L171">        return polynomial.termCount();</span>
+    }
+
+    private void checkPolynomial(
+        SparsePolynomial&lt;ExactRational&gt; polynomial,
+        Work work
+    ) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (polynomial.ring().variableCount() != 1</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                || !ExactRationalField.DOMAIN_ID.equals(</span>
+<span class="fc" id="L180">                    polynomial.ring().coefficientDomain().id())) {</span>
+<span class="nc" id="L181">            throw unsupported(&quot;FACTORIZATION_CANDIDATE_RING_MISMATCH&quot;);</span>
+        }
+        for (Map.Entry&lt;Monomial, ExactRational&gt; term
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                : polynomial.terms().entrySet()) {</span>
+<span class="fc" id="L185">            work.consume(&quot;render.inspected-polynomial-terms&quot;, 1);</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            if (term.getKey().exponent(0) &gt; policy.maxExponent()) {</span>
+<span class="nc" id="L187">                throw representationLimit(&quot;MAX_EXPONENT_EXCEEDED&quot;);</span>
+            }
+<span class="fc" id="L189">            checkCoefficient(term.getValue(), work);</span>
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">    }</span>
+
+    private void checkCoefficient(
+        ExactRational coefficient,
+        Work work
+    ) {
+<span class="fc" id="L197">        work.consume(&quot;render.inspected-coefficients&quot;, 1);</span>
+<span class="fc" id="L198">        if (ExactRationalField.INSTANCE.bitLength(coefficient)</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                &gt; policy.maxCoefficientBits()) {</span>
+<span class="nc" id="L200">            throw representationLimit(</span>
+                &quot;MAX_COEFFICIENT_BIT_LENGTH_EXCEEDED&quot;);
+        }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (exceedsExactParserDigitLimit(</span>
+<span class="fc" id="L204">                    coefficient.numerator().abs())</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                || exceedsExactParserDigitLimit(</span>
+<span class="fc" id="L206">                    coefficient.denominator())) {</span>
+<span class="fc" id="L207">            throw representationLimit(</span>
+                &quot;MAX_COEFFICIENT_DIGITS_EXCEEDED&quot;);
+        }
+<span class="fc" id="L210">    }</span>
+
+    private static boolean exceedsExactParserDigitLimit(
+        BigInteger value
+    ) {
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        return value.bitLength() &gt; MAX_PARSER_LITERAL_BITS</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            || value.compareTo(MAX_PARSER_LITERAL_MAGNITUDE) &gt; 0;</span>
+    }
+
+    private void renderFactor(
+        BoundedText output,
+        PolynomialFactor&lt;ExactRational&gt; factor,
+        PolynomialRing&lt;ExactRational&gt; expectedRing,
+        Work work
+    ) {
+<span class="fc" id="L225">        renderPolynomialFactor(</span>
+            output,
+<span class="fc" id="L227">            factor.polynomial(),</span>
+<span class="fc" id="L228">            factor.multiplicity(),</span>
+            expectedRing,
+            work);
+<span class="fc" id="L231">    }</span>
+
+    private void renderPolynomialFactor(
+        BoundedText output,
+        SparsePolynomial&lt;ExactRational&gt; polynomial,
+        int multiplicity,
+        PolynomialRing&lt;ExactRational&gt; expectedRing,
+        Work work
+    ) {
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        if (!expectedRing.equals(polynomial.ring())) {</span>
+<span class="nc" id="L241">            throw unsupported(&quot;FACTORIZATION_CANDIDATE_RING_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L243">        output.append(&quot;(&quot;);</span>
+<span class="fc" id="L244">        renderPolynomial(output, polynomial, work);</span>
+<span class="fc" id="L245">        output.append(&quot;)&quot;);</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        if (multiplicity &gt; 1) {</span>
+<span class="fc" id="L247">            output.append(&quot; ^ &quot;);</span>
+<span class="fc" id="L248">            output.append(Integer.toString(multiplicity));</span>
+<span class="fc" id="L249">            work.consume(&quot;render.factor-exponents&quot;, 1);</span>
+        }
+<span class="fc" id="L251">    }</span>
+
+    private void renderPolynomial(
+        BoundedText output,
+        SparsePolynomial&lt;ExactRational&gt; polynomial,
+        Work work
+    ) {
+<span class="fc" id="L258">        String variable = polynomial.ring().variables().getFirst().id();</span>
+<span class="fc" id="L259">        boolean first = true;</span>
+        for (Map.Entry&lt;Monomial, ExactRational&gt; entry
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                : polynomial.terms().entrySet()) {</span>
+<span class="fc" id="L262">            ExactRational coefficient = entry.getValue();</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            boolean negative = coefficient.signum() &lt; 0;</span>
+<span class="fc" id="L264">            ExactRational magnitude = coefficient.abs();</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            if (first) {</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                if (negative) {</span>
+<span class="nc" id="L267">                    output.append(&quot;-&quot;);</span>
+                }
+<span class="fc" id="L269">                first = false;</span>
+            } else {
+<span class="fc bfc" id="L271" title="All 2 branches covered.">                output.append(negative ? &quot; - &quot; : &quot; + &quot;);</span>
+            }
+<span class="fc" id="L273">            renderTerm(</span>
+                output,
+                magnitude,
+<span class="fc" id="L276">                entry.getKey().exponent(0),</span>
+                variable,
+                work);
+<span class="fc" id="L279">            work.consume(&quot;render.polynomial-terms&quot;, 1);</span>
+<span class="fc" id="L280">        }</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (first) {</span>
+<span class="nc" id="L282">            throw unsupported(&quot;ZERO_POLYNOMIAL_CANNOT_BE_RENDERED&quot;);</span>
+        }
+<span class="fc" id="L284">    }</span>
+
+    private void renderTerm(
+        BoundedText output,
+        ExactRational coefficient,
+        int exponent,
+        String variable,
+        Work work
+    ) {
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (exponent == 0) {</span>
+<span class="fc" id="L294">            output.append(renderRational(coefficient));</span>
+<span class="fc" id="L295">            return;</span>
+        }
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (!coefficient.isOne()) {</span>
+<span class="fc" id="L298">            output.append(renderRational(coefficient));</span>
+<span class="fc" id="L299">            output.append(&quot; * &quot;);</span>
+        }
+<span class="fc" id="L301">        output.append(variable);</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (exponent &gt; 1) {</span>
+<span class="fc" id="L303">            output.append(&quot; ^ &quot;);</span>
+<span class="fc" id="L304">            output.append(Integer.toString(exponent));</span>
+<span class="fc" id="L305">            work.consume(&quot;render.monomial-exponents&quot;, 1);</span>
+        }
+<span class="fc" id="L307">    }</span>
+
+    private static String renderRational(ExactRational value) {
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (value.isInteger()) {</span>
+<span class="fc" id="L311">            return value.numerator().toString();</span>
+        }
+<span class="fc" id="L313">        return &quot;(&quot;</span>
+<span class="fc" id="L314">            + value.numerator()</span>
+            + &quot; / &quot;
+<span class="fc" id="L316">            + value.denominator()</span>
+            + &quot;)&quot;;
+    }
+
+    private static void appendComponentSeparator(
+        BoundedText output,
+        int existingComponents
+    ) {
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (existingComponents &gt; 0) {</span>
+<span class="fc" id="L325">            output.append(&quot; * &quot;);</span>
+        }
+<span class="fc" id="L327">    }</span>
+
+    private static boolean isParserIdentifier(String value) {
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (value == null</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">                || value.isEmpty()</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">                || !Character.isLetter(value.charAt(0))) {</span>
+<span class="nc" id="L333">            return false;</span>
+        }
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">        for (int index = 1; index &lt; value.length(); index++) {</span>
+<span class="nc" id="L336">            char character = value.charAt(index);</span>
+<span class="nc bnc" id="L337" title="All 4 branches missed.">            if (!Character.isLetterOrDigit(character)</span>
+                    &amp;&amp; character != '_') {
+<span class="nc" id="L339">                return false;</span>
+            }
+        }
+<span class="fc" id="L342">        return true;</span>
+    }
+
+    private static UnsupportedCandidate unsupported(String detailCode) {
+<span class="fc" id="L346">        return new UnsupportedCandidate(detailCode);</span>
+    }
+
+    private static RepresentationLimitReached representationLimit(
+        String detailCode
+    ) {
+<span class="fc" id="L352">        return new RepresentationLimitReached(detailCode);</span>
+    }
+
+<span class="fc" id="L355">    public enum Status {</span>
+<span class="fc" id="L356">        RENDERED,</span>
+<span class="fc" id="L357">        UNSUPPORTED,</span>
+<span class="fc" id="L358">        BUDGET_INCONCLUSIVE</span>
+    }
+
+    /** Explicit representation and work bounds for one rendered candidate. */
+    public record Policy(
+        int maxFactors,
+        int maxPolynomialTerms,
+        int maxExponent,
+        int maxCoefficientBits,
+        int maxOutputCodeUnits,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L370">        public Policy {</span>
+<span class="pc bpc" id="L371" title="12 of 24 branches missed.">            if (maxFactors &lt; 1</span>
+                    || maxFactors &gt; MAX_FACTORS
+                    || maxPolynomialTerms &lt; 1
+                    || maxPolynomialTerms &gt; MAX_POLYNOMIAL_TERMS
+                    || maxExponent &lt; 1
+                    || maxExponent &gt; MAX_EXPONENT
+                    || maxCoefficientBits &lt; 1
+                    || maxCoefficientBits &gt; MAX_COEFFICIENT_BITS
+                    || maxOutputCodeUnits &lt; 1
+                    || maxOutputCodeUnits &gt; MAX_OUTPUT_CODE_UNITS
+                    || maxWorkUnits &lt; maxOutputCodeUnits
+                    || maxWorkUnits &gt; MAX_WORK_UNITS) {
+<span class="nc" id="L383">                throw new IllegalArgumentException(</span>
+                    &quot;exact factorization renderer policy is invalid&quot;);
+            }
+<span class="fc" id="L386">        }</span>
+
+        public static Policy boundedDefaults() {
+<span class="fc" id="L389">            return new Policy(</span>
+                256,
+                4_096,
+                ExactParsedUnivariatePolynomialView.MAX_DEGREE,
+                ExactParsedUnivariatePolynomialView
+                    .MAX_COEFFICIENT_BITS,
+                100_000,
+                200_000);
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L400">            return maxFactors + &quot;:&quot;</span>
+                + maxPolynomialTerms + &quot;:&quot;
+                + maxExponent + &quot;:&quot;
+                + maxCoefficientBits + &quot;:&quot;
+                + maxOutputCodeUnits + &quot;:&quot;
+                + maxWorkUnits;
+        }
+    }
+
+    /** Content-addressed rendering result bound to verifier evidence. */
+    public static final class Result {
+        private final Status status;
+        private final String detailCode;
+        private final Policy policy;
+        private final String candidateCertificateHash;
+        private final Optional&lt;String&gt; expression;
+        private final PolynomialWorkLedger work;
+        private final String certificateHash;
+
+        private Result(
+            Status status,
+            String detailCode,
+            Policy policy,
+            String candidateCertificateHash,
+            Optional&lt;String&gt; expression,
+            PolynomialWorkLedger work
+<span class="fc" id="L426">        ) {</span>
+<span class="fc" id="L427">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L428" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L429">                throw new IllegalArgumentException(</span>
+                    &quot;renderer detail code must not be blank&quot;);
+            }
+<span class="fc" id="L432">            this.detailCode = detailCode;</span>
+<span class="fc" id="L433">            this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">            if (candidateCertificateHash == null</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">                    || !candidateCertificateHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)) {
+<span class="nc" id="L437">                throw new IllegalArgumentException(</span>
+                    &quot;renderer candidate certificate is invalid&quot;);
+            }
+<span class="fc" id="L440">            this.candidateCertificateHash = candidateCertificateHash;</span>
+<span class="fc" id="L441">            this.expression = Objects.requireNonNull(</span>
+                expression,
+                &quot;expression&quot;);
+<span class="fc" id="L444">            this.work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L445" title="1 of 4 branches missed.">            if ((status == Status.RENDERED) != expression.isPresent()) {</span>
+<span class="nc" id="L446">                throw new IllegalArgumentException(</span>
+                    &quot;renderer status/payload mismatch&quot;);
+            }
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">            if (!work.within(policy.maxWorkUnits())) {</span>
+<span class="nc" id="L450">                throw new IllegalArgumentException(</span>
+                    &quot;renderer work exceeds policy&quot;);
+            }
+<span class="fc" id="L453">            this.certificateHash = PolynomialEvidence.sha256(</span>
+<span class="fc" id="L454">                evidenceMaterial());</span>
+<span class="fc" id="L455">        }</span>
+
+        private static Result rendered(
+            Policy policy,
+            FactorizationVerifier.VerifiedCandidate&lt;ExactRational&gt; candidate,
+            String expression,
+            PolynomialWorkLedger work
+        ) {
+<span class="fc" id="L463">            return new Result(</span>
+                Status.RENDERED,
+                &quot;EXACT_FACTORIZATION_RENDERED&quot;,
+                policy,
+<span class="fc" id="L467">                candidate.verificationCertificateHash(),</span>
+<span class="fc" id="L468">                Optional.of(expression),</span>
+                work);
+        }
+
+        private static Result failure(
+            Status status,
+            String detailCode,
+            Policy policy,
+            FactorizationVerifier.VerifiedCandidate&lt;ExactRational&gt; candidate,
+            PolynomialWorkLedger work
+        ) {
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">            if (status == Status.RENDERED) {</span>
+<span class="nc" id="L480">                throw new IllegalArgumentException(</span>
+                    &quot;rendered status requires expression syntax&quot;);
+            }
+<span class="fc" id="L483">            return new Result(</span>
+                status,
+                detailCode,
+                policy,
+<span class="fc" id="L487">                candidate.verificationCertificateHash(),</span>
+<span class="fc" id="L488">                Optional.empty(),</span>
+                work);
+        }
+
+        public Status status() {
+<span class="fc" id="L493">            return status;</span>
+        }
+
+        public String detailCode() {
+<span class="fc" id="L497">            return detailCode;</span>
+        }
+
+        public Policy policy() {
+<span class="nc" id="L501">            return policy;</span>
+        }
+
+        public String candidateCertificateHash() {
+<span class="nc" id="L505">            return candidateCertificateHash;</span>
+        }
+
+        public Optional&lt;String&gt; expression() {
+<span class="fc" id="L509">            return expression;</span>
+        }
+
+        public PolynomialWorkLedger work() {
+<span class="fc" id="L513">            return work;</span>
+        }
+
+        public String certificateHash() {
+<span class="fc" id="L517">            return certificateHash;</span>
+        }
+
+        public boolean rendered() {
+<span class="fc bfc" id="L521" title="All 2 branches covered.">            return status == Status.RENDERED;</span>
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L525">            StringBuilder result = new StringBuilder(evidenceMaterial());</span>
+<span class="fc" id="L526">            PolynomialEvidence.append(result, certificateHash);</span>
+<span class="fc" id="L527">            return result.toString();</span>
+        }
+
+        private String evidenceMaterial() {
+<span class="fc" id="L531">            StringBuilder result = new StringBuilder(RENDERER_ID);</span>
+<span class="fc" id="L532">            PolynomialEvidence.append(result, status.name());</span>
+<span class="fc" id="L533">            PolynomialEvidence.append(result, detailCode);</span>
+<span class="fc" id="L534">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L536">                policy.canonicalMaterial());</span>
+<span class="fc" id="L537">            PolynomialEvidence.append(</span>
+                result,
+                candidateCertificateHash);
+<span class="fc" id="L540">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L542">                expression.orElse(&quot;&quot;));</span>
+<span class="fc" id="L543">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L545">                work.canonicalMaterial());</span>
+<span class="fc" id="L546">            return result.toString();</span>
+        }
+    }
+
+    private static final class BoundedText {
+        private final Policy policy;
+        private final Work work;
+<span class="fc" id="L553">        private final StringBuilder value = new StringBuilder();</span>
+
+<span class="fc" id="L555">        private BoundedText(Policy policy, Work work) {</span>
+<span class="fc" id="L556">            this.policy = policy;</span>
+<span class="fc" id="L557">            this.work = work;</span>
+<span class="fc" id="L558">        }</span>
+
+        private void append(String text) {
+<span class="fc" id="L561">            Objects.requireNonNull(text, &quot;text&quot;);</span>
+<span class="fc" id="L562">            if (value.length()</span>
+<span class="fc bfc" id="L563" title="All 2 branches covered.">                    &gt; policy.maxOutputCodeUnits() - text.length()) {</span>
+<span class="fc" id="L564">                throw representationLimit(</span>
+                    &quot;MAX_OUTPUT_CODE_UNITS_EXCEEDED&quot;);
+            }
+<span class="fc" id="L567">            work.consume(&quot;render.output-code-units&quot;, text.length());</span>
+<span class="fc" id="L568">            value.append(text);</span>
+<span class="fc" id="L569">        }</span>
+
+        @Override
+        public String toString() {
+<span class="fc" id="L573">            return value.toString();</span>
+        }
+    }
+
+    private static final class Work {
+        private final long limit;
+<span class="fc" id="L579">        private final Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
+        private long total;
+
+<span class="fc" id="L582">        private Work(long limit) {</span>
+<span class="fc" id="L583">            this.limit = limit;</span>
+<span class="fc" id="L584">        }</span>
+
+        private void consume(String stage, long units) {
+<span class="pc bpc" id="L587" title="2 of 4 branches missed.">            if (units &lt; 0 || total &gt; limit - units) {</span>
+<span class="nc" id="L588">                throw representationLimit(</span>
+                    &quot;RENDERER_WORK_BUDGET_EXCEEDED&quot;);
+            }
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">            if (units == 0) {</span>
+<span class="nc" id="L592">                return;</span>
+            }
+<span class="fc" id="L594">            total += units;</span>
+<span class="fc" id="L595">            stages.merge(stage, units, Math::addExact);</span>
+<span class="fc" id="L596">        }</span>
+
+        private PolynomialWorkLedger ledger() {
+<span class="fc" id="L599">            return new PolynomialWorkLedger(stages);</span>
+        }
+    }
+
+    private static final class UnsupportedCandidate
+            extends RuntimeException {
+        private UnsupportedCandidate(String message) {
+<span class="fc" id="L606">            super(message);</span>
+<span class="fc" id="L607">        }</span>
+    }
+
+    private static final class RepresentationLimitReached
+            extends RuntimeException {
+        private RepresentationLimitReached(String message) {
+<span class="fc" id="L613">            super(message);</span>
+<span class="fc" id="L614">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
