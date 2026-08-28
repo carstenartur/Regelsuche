@@ -12,7 +12,9 @@ import de.regelsuche.input.InputType;
 import de.regelsuche.scalar.ExactRationalDomain;
 import de.regelsuche.scalar.ExactRationalParseEvidence;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public class ExpressionParser {
@@ -48,7 +50,8 @@ public class ExpressionParser {
 
     /**
      * Parses one term through the allocation-minimal legacy AST path.
-     * Exact source certificates are created only by {@link #parseExactTerm}.
+     * Exact source certificates and node ranges are created only by
+     * {@link #parseExactTerm}.
      */
     public Expr parseTerm(String term) {
         String source = Objects.requireNonNull(term, "term");
@@ -60,7 +63,8 @@ public class ExpressionParser {
 
     /**
      * Parses one term and retains source positions plus exact evidence for each
-     * integer or finite-decimal token. The ordinary AST remains the same
+     * integer or finite-decimal token. Every source-backed AST node also receives
+     * a parser-issued half-open source range. The ordinary AST remains the same
      * legacy {@link NumberExpr} tree.
      */
     public ExactParsedTerm parseExactTerm(String term) {
@@ -68,7 +72,11 @@ public class ExpressionParser {
         Cursor cursor = Cursor.exact(source);
         Expr expr = parseExpression(cursor);
         requireEnd(cursor);
-        return new ExactParsedTerm(source, expr, cursor.exactLiterals());
+        return new ExactParsedTerm(
+            source,
+            expr,
+            cursor.exactLiterals(),
+            cursor.exactSourceRanges());
     }
 
     private static void requireEnd(Cursor cursor) {
@@ -99,15 +107,25 @@ public class ExpressionParser {
         while (true) {
             cursor.skipWhitespace();
             if (cursor.consume('+')) {
-                result = new BinaryExpr(
+                Expr right = parseTermInternal(cursor);
+                BinaryExpr combined = new BinaryExpr(
                     result,
                     BinaryOperator.ADD,
-                    parseTermInternal(cursor));
+                    right);
+                result = cursor.retainCombinedRange(
+                    combined,
+                    result,
+                    right);
             } else if (cursor.consume('-')) {
-                result = new BinaryExpr(
+                Expr right = parseTermInternal(cursor);
+                BinaryExpr combined = new BinaryExpr(
                     result,
                     BinaryOperator.SUB,
-                    parseTermInternal(cursor));
+                    right);
+                result = cursor.retainCombinedRange(
+                    combined,
+                    result,
+                    right);
             } else {
                 return result;
             }
@@ -119,15 +137,25 @@ public class ExpressionParser {
         while (true) {
             cursor.skipWhitespace();
             if (cursor.consume('*')) {
-                result = new BinaryExpr(
+                Expr right = parseUnary(cursor);
+                BinaryExpr combined = new BinaryExpr(
                     result,
                     BinaryOperator.MUL,
-                    parseUnary(cursor));
+                    right);
+                result = cursor.retainCombinedRange(
+                    combined,
+                    result,
+                    right);
             } else if (cursor.consume('/')) {
-                result = new BinaryExpr(
+                Expr right = parseUnary(cursor);
+                BinaryExpr combined = new BinaryExpr(
                     result,
                     BinaryOperator.DIV,
-                    parseUnary(cursor));
+                    right);
+                result = cursor.retainCombinedRange(
+                    combined,
+                    result,
+                    right);
             } else {
                 return result;
             }
@@ -136,11 +164,17 @@ public class ExpressionParser {
 
     private Expr parseUnary(Cursor cursor) {
         cursor.skipWhitespace();
+        int start = cursor.position();
         if (cursor.consume('-')) {
-            return new BinaryExpr(
+            Expr operand = parseUnary(cursor);
+            BinaryExpr unary = new BinaryExpr(
                 new NumberExpr(0),
                 BinaryOperator.SUB,
-                parseUnary(cursor));
+                operand);
+            return cursor.retainRange(
+                unary,
+                start,
+                cursor.rangeEnd(operand));
         }
         return parsePower(cursor);
     }
@@ -149,16 +183,21 @@ public class ExpressionParser {
         Expr left = parsePrimary(cursor);
         cursor.skipWhitespace();
         if (cursor.consume('^')) {
-            return new BinaryExpr(
+            Expr right = parseUnary(cursor);
+            return cursor.retainCombinedRange(
+                new BinaryExpr(
+                    left,
+                    BinaryOperator.POW,
+                    right),
                 left,
-                BinaryOperator.POW,
-                parseUnary(cursor));
+                right);
         }
         return left;
     }
 
     private Expr parsePrimary(Cursor cursor) {
         cursor.skipWhitespace();
+        int start = cursor.position();
         if (cursor.consume('(')) {
             Expr inner = parseExpression(cursor);
             cursor.skipWhitespace();
@@ -166,7 +205,7 @@ public class ExpressionParser {
                 throw new IllegalArgumentException(
                     "Missing closing ')' at position " + cursor.position());
             }
-            return inner;
+            return cursor.retainRange(inner, start, cursor.position());
         }
         if (cursor.peek('.')) {
             throw new IllegalArgumentException(
@@ -204,7 +243,10 @@ public class ExpressionParser {
         int end = cursor.position();
         String sourceLexeme = cursor.slice(start, end);
         if (!cursor.retainsExactLiterals()) {
-            return new NumberExpr(parseFiniteLegacyValue(sourceLexeme, start));
+            return cursor.retainRange(
+                new NumberExpr(parseFiniteLegacyValue(sourceLexeme, start)),
+                start,
+                end);
         }
 
         ExactRationalParseEvidence evidence =
@@ -223,7 +265,10 @@ public class ExpressionParser {
                     + "legacy AST at position " + start);
         }
 
-        NumberExpr number = new NumberExpr(legacyValue);
+        NumberExpr number = cursor.retainRange(
+            new NumberExpr(legacyValue),
+            start,
+            end);
         cursor.retainExactLiteral(
             number,
             start,
@@ -259,7 +304,8 @@ public class ExpressionParser {
         while (cursor.peekLetterOrDigitOrUnderscore()) {
             cursor.advance();
         }
-        String name = cursor.slice(start, cursor.position());
+        int nameEnd = cursor.position();
+        String name = cursor.slice(start, nameEnd);
         cursor.skipWhitespace();
         if (cursor.peek('(')) {
             cursor.advance();
@@ -278,20 +324,30 @@ public class ExpressionParser {
                     "Missing closing ')' after function arguments at position "
                         + cursor.position());
             }
-            return new FunctionExpr(name, arguments);
+            return cursor.retainRange(
+                new FunctionExpr(name, arguments),
+                start,
+                cursor.position());
         }
-        return new VariableExpr(name);
+        return cursor.retainRange(
+            new VariableExpr(name),
+            start,
+            nameEnd);
     }
 
     private static final class Cursor {
         private final String value;
         private final List<ExactParsedTerm.LiteralOccurrence> exactLiterals;
+        private final Map<Expr, ExactParsedTerm.SourceRange> exactSourceRanges;
         private int position;
 
-        private Cursor(String value, boolean retainExactLiterals) {
+        private Cursor(String value, boolean retainExactEvidence) {
             this.value = value;
-            this.exactLiterals = retainExactLiterals
+            this.exactLiterals = retainExactEvidence
                 ? new ArrayList<>()
+                : null;
+            this.exactSourceRanges = retainExactEvidence
+                ? new IdentityHashMap<>()
                 : null;
             this.position = 0;
         }
@@ -361,6 +417,58 @@ public class ExpressionParser {
             return exactLiterals != null;
         }
 
+        private <T extends Expr> T retainRange(
+            T node,
+            int startInclusive,
+            int endExclusive
+        ) {
+            if (exactSourceRanges == null) {
+                return node;
+            }
+            ExactParsedTerm.SourceRange range =
+                new ExactParsedTerm.SourceRange(
+                    startInclusive,
+                    endExclusive);
+            ExactParsedTerm.SourceRange previous =
+                exactSourceRanges.put(node, range);
+            if (previous != null && !range.contains(previous)) {
+                throw new IllegalStateException(
+                    "AST source range replacement must retain the prior range");
+            }
+            return node;
+        }
+
+        private BinaryExpr retainCombinedRange(
+            BinaryExpr node,
+            Expr left,
+            Expr right
+        ) {
+            if (exactSourceRanges == null) {
+                return node;
+            }
+            ExactParsedTerm.SourceRange leftRange = requireRange(left);
+            ExactParsedTerm.SourceRange rightRange = requireRange(right);
+            return retainRange(
+                node,
+                leftRange.startInclusive(),
+                rightRange.endExclusive());
+        }
+
+        private int rangeEnd(Expr node) {
+            return exactSourceRanges == null
+                ? position
+                : requireRange(node).endExclusive();
+        }
+
+        private ExactParsedTerm.SourceRange requireRange(Expr node) {
+            ExactParsedTerm.SourceRange range = exactSourceRanges.get(node);
+            if (range == null) {
+                throw new IllegalStateException(
+                    "source-backed AST node lacks a parser range");
+            }
+            return range;
+        }
+
         private void retainExactLiteral(
             NumberExpr node,
             int startInclusive,
@@ -388,6 +496,16 @@ public class ExpressionParser {
             // ExactParsedTerm performs the single defensive copy at the
             // ownership boundary.
             return exactLiterals;
+        }
+
+        private Map<Expr, ExactParsedTerm.SourceRange> exactSourceRanges() {
+            if (exactSourceRanges == null) {
+                throw new IllegalStateException(
+                    "legacy parser path has no AST source ranges");
+            }
+            // ExactParsedTerm performs the single identity-preserving copy at
+            // the ownership boundary.
+            return exactSourceRanges;
         }
     }
 }
