@@ -4,97 +4,47 @@
 
 ## Zweck
 
-`TreePosition` definiert bereits den stabilen Kindindexpfad für lokale
-Transformationen. Die zugehörige Navigation und Ersetzung war bisher jedoch als
-private Implementierung in `LocalRewriteApplier` eingeschlossen. Der
-verschachtelte exakte Faktorisierungspfad aus #763 darf keine zweite, leicht
-abweichende Pfadsemantik einführen.
-
-`TreeExpressionEditor` ist deshalb die gemeinsame strukturelle Autorität für:
+`TreeExpressionEditor` macht den von `TreePosition` definierten Kindindexpfad
+zur gemeinsamen strukturellen Autorität für lokale Regeln und den kommenden
+verschachtelten Faktorisierungspfad aus #763:
 
 ```text
-Expr-Wurzel
-  + TreePosition.path
+Expr-Wurzel + Pfad
   -> konkretes Teilvorkommen
-  -> Ersetzung genau dieses Vorkommens
-  -> Neuaufbau ausschließlich der Vorfahrenkette
+  -> Ersetzung
+  -> Neuaufbau nur der Vorfahrenkette
 ```
 
-`LocalRewriteApplier` verwendet dieselbe Komponente. Die folgende
-Faktorisierungsintegration kann damit auf identische Navigation und identische
-Teilbaumersetzung zurückgreifen.
+`LocalRewriteApplier` delegiert Auswahl und Ersetzung an diese Komponente.
 
-## Pfadvertrag
+## Vertrag
 
-- der leere Pfad bezeichnet die Wurzel;
-- bei `BinaryExpr` bezeichnet `0` den linken und `1` den rechten Operanden;
-- bei `FunctionExpr` bezeichnet der Index das Argument;
-- negative oder `null`-Indizes sind ungültig;
-- ein Index außerhalb des Knotens oder ein Abstieg durch ein Blatt ergibt
-  `POSITION_NOT_PRESENT`;
-- Pfade und Ergebnislisten werden unveränderlich kopiert.
+- Der leere Pfad bezeichnet die Wurzel.
+- Bei `BinaryExpr` adressieren `0` und `1` die Operanden.
+- Bei `FunctionExpr` adressiert der Index ein Argument.
+- Negative oder `null`-Indizes sind `INVALID_PATH`; ein nicht vorhandener
+  Abstieg ist `POSITION_NOT_PRESENT`.
+- Navigation und Neuaufbau sind iterativ und verbrauchen bei tiefen Pfaden
+  keinen rekursiven Java-Aufrufstapel.
+- Nur Vorfahren des Ersatzes werden neu erzeugt. Alle unberührten Geschwister
+  bleiben dieselben Objektinstanzen.
+- Das Ergebnis bindet ausgewählten Teilbaum, neue Wurzel und Zahl der kopierten
+  Vorfahren.
 
-Die Komponente verarbeitet ausschließlich AST-Objekte. `TreePosition.text`
-bleibt beim Aufrufer und dient weiterhin als Anzeige- und Stalenessschutz. Text
-autorisiert keine mathematischen Werte und wird von `TreeExpressionEditor`
-weder geparst noch formatiert.
-
-## Iterative Ersetzung
-
-Navigation und Neuaufbau sind iterativ. Während der Navigation wird für jede
-Pfadkante nur der Elternknoten mit dem ausgewählten Kindindex festgehalten.
-Anschließend wird die Vorfahrenkette in umgekehrter Reihenfolge aufgebaut.
-Dadurch benötigt ein tiefer Pfad keinen rekursiven Java-Aufrufstapel.
-
-Für jeden neu aufgebauten Vorfahren gilt:
-
-- nur das Kind auf dem ausgewählten Pfad wird ersetzt;
-- alle nicht betroffenen Geschwister bleiben dieselben Objektinstanzen;
-- Funktionsargumentlisten werden nur für die betroffenen Vorfahren kopiert;
-- bei einer Wurzelersetzung wird kein Vorfahr kopiert.
-
-Das Ergebnis bewahrt das ursprüngliche Teilvorkommen, die neue Wurzel und die
-Zahl der kopierten Vorfahren. Fehlende und syntaktisch ungültige Pfade bleiben
-getrennte Zustände.
-
-## Abgrenzung
-
-Die Komponente:
-
-- realisiert keine Regel;
-- prüft keine mathematische Äquivalenz;
-- parst und formatiert keinen Ausdruck;
-- erzeugt kein Faktorisierungs- oder Beweiszertifikat;
-- entscheidet nicht, ob ein ausgewählter `TreePosition` veraltet ist.
-
-Diese Verantwortungen bleiben bei den jeweiligen Pipelines. Der Editor liefert
-nur die eine wiederverwendbare strukturelle Operation, auf die deren Evidence
-verweisen kann.
+Der Editor verarbeitet ausschließlich `Expr`-Objekte. `TreePosition.text`
+bleibt beim Aufrufer als Anzeige- und Stalenessschutz; der Editor parst oder
+formatiert keinen Text und autorisiert keine mathematische Transformation.
 
 ## Qualifikation
 
-Die Tests charakterisieren:
+Die Tests decken Wurzel- und verschachtelte Ersetzung, erhaltene
+Geschwisteridentitäten, ungültige und fehlende Pfade sowie einen 8.000 Kanten
+tiefen Pfad ab. Die bestehende `LocalRewriteApplierTest`-Suite bleibt für die
+String- und AST-Einstiegspunkte verbindlich.
 
-- Wurzelersetzung ohne kopierten Vorfahren;
-- verschachtelte Ersetzung durch Funktions- und Binärknoten;
-- Erhalt unberührter Geschwisterinstanzen;
-- getrennte ungültige und nicht vorhandene Pfade;
-- einen 8.000 Kanten tiefen Pfad ohne rekursive Ersetzung;
-- unverändertes Verhalten der bestehenden String- und AST-APIs von
-  `LocalRewriteApplier`.
+## Folgeintegration
 
-## Nächster Schritt
-
-Der nächste #763-Slice kann nun dieselbe Komponente verwenden:
-
-```text
-ExactParsedSubtermProjector.Result
-  -> exakte Faktorisierung und Rekonstruktion
-  -> TreeExpressionEditor.replaceAt
-  -> erneute Pfad- und Replayprüfung
-  -> occurrence-gebundene Transformationsevidence
-```
-
-Die dort verbrauchte Navigations-, Projektions-, Faktorisierungs-, Ersetzungs-
-und Replayarbeit muss weiterhin in einer nicht zurücksetzbaren Gesamtbilanz
-geführt werden.
+Der nächste Slice verwendet denselben Pfadvertrag für
+`ExactParsedSubtermProjector`, exakte Faktorisierung, `replaceAt` und Replay.
+Projektions-, Faktorisierungs-, Ersetzungs- und Replayarbeit müssen dabei in
+einer nicht zurücksetzbaren Gesamtbilanz bleiben.
