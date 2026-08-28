@@ -1,6 +1,8 @@
 package de.regelsuche.polynomial;
 
 import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.scalar.ExactRationalDomain;
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -24,6 +26,11 @@ public final class ExactFactorizationExpressionRenderer {
     public static final int MAX_COEFFICIENT_BITS = 1_000_000;
     public static final int MAX_OUTPUT_CODE_UNITS = 1_000_000;
     public static final long MAX_WORK_UNITS = 5_000_000L;
+    private static final BigInteger MAX_PARSER_LITERAL_MAGNITUDE =
+        BigInteger.TEN.pow(ExactRationalDomain.MAX_DIGITS)
+            .subtract(BigInteger.ONE);
+    private static final int MAX_PARSER_LITERAL_BITS =
+        MAX_PARSER_LITERAL_MAGNITUDE.bitLength();
 
     private final Policy policy;
 
@@ -193,6 +200,20 @@ public final class ExactFactorizationExpressionRenderer {
             throw representationLimit(
                 "MAX_COEFFICIENT_BIT_LENGTH_EXCEEDED");
         }
+        if (exceedsExactParserDigitLimit(
+                    coefficient.numerator().abs())
+                || exceedsExactParserDigitLimit(
+                    coefficient.denominator())) {
+            throw representationLimit(
+                "MAX_COEFFICIENT_DIGITS_EXCEEDED");
+        }
+    }
+
+    private static boolean exceedsExactParserDigitLimit(
+        BigInteger value
+    ) {
+        return value.bitLength() > MAX_PARSER_LITERAL_BITS
+            || value.compareTo(MAX_PARSER_LITERAL_MAGNITUDE) > 0;
     }
 
     private void renderFactor(
