@@ -138,6 +138,19 @@ public final class ExactNestedFactorizationTransformationPipeline {
             throw new IllegalArgumentException(
                 "tree position text must not be blank");
         }
+        if (position.path().stream().anyMatch(
+                index -> index == null || index < 0)) {
+            return failure(
+                Status.UNSUPPORTED,
+                "INVALID_TREE_POSITION_PATH",
+                position,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                PolynomialWorkLedger.empty());
+        }
         if (position.path().size() > policy.maxPathDepth()) {
             return failure(
                 Status.BUDGET_INCONCLUSIVE,
@@ -158,6 +171,17 @@ public final class ExactNestedFactorizationTransformationPipeline {
                 policy.maxRootNodes(),
                 preflight,
                 "nested.root-preflight-node-visits");
+        } catch (WorkLimitReached exception) {
+            return failure(
+                Status.BUDGET_INCONCLUSIVE,
+                exception.getMessage(),
+                position,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                preflight.ledger());
         } catch (RepresentationLimitReached exception) {
             return failure(
                 Status.BUDGET_INCONCLUSIVE,
@@ -918,13 +942,25 @@ public final class ExactNestedFactorizationTransformationPipeline {
                     "rewrittenStructuralHash"));
             this.totalWork = Objects.requireNonNull(totalWork, "totalWork");
             boolean transformed = status == Status.TRANSFORMED;
-            if (transformed != rewrittenRoot.isPresent()
-                    || transformed != rewrittenStructuralHash.isPresent()
-                    || transformed != projection.isPresent()
-                    || transformed != factorization.isPresent()
-                    || transformed != transformation.isPresent()) {
+            if (transformed) {
+                if (rewrittenRoot.isEmpty()
+                        || rewrittenStructuralHash.isEmpty()
+                        || projection.isEmpty()
+                        || factorization.isEmpty()
+                        || transformation.isEmpty()) {
+                    throw new IllegalArgumentException(
+                        "successful nested transformation lacks evidence");
+                }
+            } else if (rewrittenRoot.isPresent()
+                    || rewrittenStructuralHash.isPresent()) {
                 throw new IllegalArgumentException(
-                    "nested transformation status/payload mismatch");
+                    "failed nested transformation retained rewritten output");
+            }
+            if (factorization.isPresent() && projection.isEmpty()
+                    || transformation.isPresent()
+                        && factorization.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "nested upstream evidence ordering is invalid");
             }
             if (!totalWork.within(policy.maxTotalWorkUnits())) {
                 throw new IllegalArgumentException(
@@ -1047,7 +1083,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
                 throw new IllegalArgumentException(
                     "nested work entry is invalid");
             }
-            if (total > limit - units) {
+            if (units > limit - total) {
                 throw new WorkLimitReached(
                     "NESTED_REPLACEMENT_REPLAY_WORK_BUDGET_EXCEEDED");
             }
@@ -1079,7 +1115,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
         private void append(String value) {
             byte[] bytes = Objects.requireNonNull(value, "value")
                 .getBytes(StandardCharsets.UTF_8);
-            byte[] length = Integer.toString(bytes.length())
+            byte[] length = Integer.toString(bytes.length)
                 .getBytes(StandardCharsets.US_ASCII);
             digest.update(length);
             digest.update((byte) ':');
