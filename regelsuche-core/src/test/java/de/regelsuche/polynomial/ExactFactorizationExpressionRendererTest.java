@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.scalar.ExactRationalDomain;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
@@ -140,6 +141,37 @@ class ExactFactorizationExpressionRendererTest {
         assertEquals(
             1,
             result.work().units("render.inspected-coefficients"));
+        assertTrue(result.expression().isEmpty());
+    }
+
+    @Test
+    void rejectsCoefficientsThatTheExactParserCannotReparse() {
+        SparsePolynomial<ExactRational> factor = polynomial("x - 1");
+        ExactRational oversized = new ExactRational(
+            BigInteger.TEN.pow(ExactRationalDomain.MAX_DIGITS),
+            BigInteger.ONE);
+        SparsePolynomial<ExactRational> source = factor.scale(oversized);
+        var candidate = verifiedCandidate(
+            source,
+            oversized,
+            List.of(new PolynomialFactor<>(factor, 1)),
+            SparsePolynomial.one(source.ring()),
+            FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION);
+        var renderer = new ExactFactorizationExpressionRenderer();
+
+        assertTrue(
+            ExactRationalField.INSTANCE.bitLength(oversized)
+                <= renderer.policy().maxCoefficientBits());
+
+        var result = renderer.render(candidate);
+
+        assertFalse(result.rendered());
+        assertEquals(
+            ExactFactorizationExpressionRenderer.Status.BUDGET_INCONCLUSIVE,
+            result.status());
+        assertEquals(
+            "MAX_COEFFICIENT_DIGITS_EXCEEDED",
+            result.detailCode());
         assertTrue(result.expression().isEmpty());
     }
 
