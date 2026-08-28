@@ -107,6 +107,7 @@ public final class ExactFactorizationTransformationPipeline {
                 authorization.totalWork());
         }
         return transformSelected(
+            source,
             factorization,
             report,
             0,
@@ -161,6 +162,7 @@ public final class ExactFactorizationTransformationPipeline {
                 authorization.totalWork());
         }
         return transformSelected(
+            source,
             factorization,
             report,
             candidateIndex,
@@ -168,6 +170,7 @@ public final class ExactFactorizationTransformationPipeline {
     }
 
     private Result transformSelected(
+        ExactParsedTerm source,
         ExactParsedFactorizationPipeline.Result factorization,
         FactorizationVerifier.Report<ExactRational> report,
         int candidateIndex,
@@ -177,7 +180,7 @@ public final class ExactFactorizationTransformationPipeline {
             report.candidates().get(candidateIndex);
         String candidateCertificate =
             candidate.verificationCertificateHash();
-        long continuationCeiling = continuationCeiling();
+        long continuationCeiling = continuationCeiling(factorization);
         long remaining = factorization.policy().maxTotalWorkUnits()
             - authorization.totalWork().totalWorkUnits();
         if (remaining < continuationCeiling) {
@@ -347,6 +350,42 @@ public final class ExactFactorizationTransformationPipeline {
                 Optional.of(reconstruction),
                 totalWork);
         }
+        long comparisonUnits = Math.addExact(
+            (long) factorization.extraction().work().visitedNodes(),
+            reconstruction.work().visitedNodes());
+        PolynomialWorkLedger comparisonWork =
+            new PolynomialWorkLedger(Map.of(
+                "transform.structural-change-comparison",
+                comparisonUnits));
+        PolynomialWorkLedger afterComparison = merge(
+            totalWork,
+            comparisonWork);
+        if (!withinOriginalAuthority(factorization, afterComparison)) {
+            return Result.failure(
+                Status.BUDGET_INCONCLUSIVE,
+                "STRUCTURAL_CHANGE_COMPARISON_EXCEEDED_ORIGINAL_WORK_AUTHORITY",
+                authorization.occurrence(),
+                factorization,
+                candidateIndex,
+                candidateCertificate,
+                Optional.of(rendering),
+                Optional.of(reparsed),
+                Optional.of(reconstruction),
+                afterComparison);
+        }
+        if (source.expression().equals(reparsed.expression())) {
+            return Result.failure(
+                Status.NO_CHANGE,
+                "RENDERED_EXPRESSION_STRUCTURALLY_IDENTICAL_TO_SOURCE",
+                authorization.occurrence(),
+                factorization,
+                candidateIndex,
+                candidateCertificate,
+                Optional.of(rendering),
+                Optional.of(reparsed),
+                Optional.of(reconstruction),
+                afterComparison);
+        }
 
         Kind kind = candidate.backendClaim()
                 == FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION
@@ -361,7 +400,7 @@ public final class ExactFactorizationTransformationPipeline {
             rendering,
             reparsed,
             reconstruction,
-            totalWork);
+            afterComparison);
     }
 
     private static SourceAuthorization authorizeSource(
@@ -452,7 +491,9 @@ public final class ExactFactorizationTransformationPipeline {
         };
     }
 
-    private long continuationCeiling() {
+    private long continuationCeiling(
+        ExactParsedFactorizationPipeline.Result factorization
+    ) {
         long result = renderer.policy().maxWorkUnits();
         result = Math.addExact(
             result,
@@ -460,9 +501,15 @@ public final class ExactFactorizationTransformationPipeline {
         result = Math.addExact(
             result,
             reparseView.budget().maxVisitedNodes());
-        return Math.addExact(
+        result = Math.addExact(
             result,
             reparseView.budget().maxArithmeticOperations());
+        result = Math.addExact(
+            result,
+            factorization.extraction().budget().maxVisitedNodes());
+        return Math.addExact(
+            result,
+            reparseView.budget().maxVisitedNodes());
     }
 
     private static boolean withinOriginalAuthority(
@@ -600,6 +647,7 @@ public final class ExactFactorizationTransformationPipeline {
 
     public enum Status {
         TRANSFORMED,
+        NO_CHANGE,
         NO_CANDIDATE,
         BACKEND_CLAIMED_IRREDUCIBLE,
         IRREDUCIBLE,
