@@ -109,10 +109,11 @@ für unendlich viele konkrete Ausdrücke stehen.
   experimentelle Regeln werden erst nach Abschluss einer Generation in ein
   eingefrorenes Schatteninventar der nächsten Generation übernommen. Gleichzeitiges
   Lernen und Nutzen innerhalb derselben Generation ist ausgeschlossen.
-- **Mathematische Darstellungen und Faktorisierungen synthetisieren:** Exakte
-  semantische Views erzeugen kanonische Polynome in expliziten Ringen. Engines
-  liefern zunächst untrusted Vorschläge; erst unabhängige Vertrags- und
-  Produktprüfung autorisiert eine Suchkante.
+- **Mathematische Darstellungen und Faktorisierungen synthetisieren:** Der
+  exakte Parser erzeugt source-gebundene Literalprovenienz und kanonische
+  Polynome in expliziten Ringen. Native und optionale externe Engines liefern
+  zunächst untrusted Vorschläge; Produktrückprüfung, exaktes Rendering und
+  erneute Ringrekonstruktion bleiben getrennte, budgetierte Evidenzstufen.
 - **Beweisobligationen erzeugen:** Proof-Backends erhalten versionierte
   Obligationen. Ein formaler Status wird nur aus tatsächlich bestätigter
   Proof-Evidence abgeleitet.
@@ -230,44 +231,57 @@ Details: [Generational Rule Mining](docs/generational-rule-mining.md).
 
 ## Domänenbewusste Polynomfaktorisierung
 
-Der allgemeine Polynomkern trennt mathematische Identität, Backend-Vorschläge
-und Evidence:
+Der Polynomkern trennt Quellvorkommen, mathematische Identität,
+Backend-Vorschläge und Regelsuche-Evidence:
 
 ```text
-parsergebundene exakte Literale
-  -> CoefficientDomain
-  -> PolynomialRing mit expliziter Monomordnung
-  -> SparsePolynomial
+ExpressionParser.parseExactTerm
+  -> ExactParsedTerm mit node-identischer Literalprovenienz
+  -> ExactParsedUnivariatePolynomialView
+  -> PolynomialRing<ExactRational>
+  -> SparsePolynomial<ExactRational>
   -> FactorizationRequest
   -> FactorizationEngine: untrusted Proposals und Backend-Claims
-  -> FactorizationVerifier: Vertrags- und Produktprüfung
-  -> verifier-ausgestellte Kandidaten und Suchkante
+  -> FactorizationVerifier: Vertrags- und exakte Produktprüfung
+  -> verifier-ausgestellter Kandidat
+  -> deterministisches exaktes Faktorenrendering
+  -> erneutes parseExactTerm und Polynomrekonstruktion
+  -> autorisierte Wurzel-Transformation
 ```
 
-`PolynomialSemanticView` bindet vollständige AST-Teilbäume wie `x + 1` oder
-`sin(t)` als strukturelle Atome an ein kanonisches Polynom. Display-Syntax und
-konkrete AST-Vorkommen bleiben außerhalb der mathematischen Koeffizienten- und
-Ringoperationen. Numerische Koeffizienten und Exponenten stammen ausschließlich
-aus parserausgestellter exakter Provenienz, nicht aus `NumberExpr(double)`.
+Die native allgemeine univariate Engine verarbeitet das deklarierte begrenzte
+`Z[x]`-/`Q[x]`-Fragment. Ihr deterministischer Pfad umfasst Inhalt und
+Primitivteil, Ableitung/GGT und quadratfreie Zerlegung, geeignete
+Primzahlauswahl, vollständige Berlekamp-Faktorisierung in `F_p[x]`,
+Multifaktor-Hensel-Lifting, begrenzte Zassenhaus-Rekombination in `Z[x]` und
+exakte rationale Reassemblierung. Ein optionaler GraalPy/SymPy-Adapter liefert
+Vorschläge hinter derselben typisierten Engine-/Verifier-Grenze.
 
-Die derzeit integrierte `BinaryQuarticFactorizationEngine` löst exakt eine
-begrenzte quadratisch-mal-quadratische Zerlegung binärer homogener Quartiken.
-Univariate Quartiken können über eine explizite strukturelle Einheit
-homogenisiert werden. Der historische Sophie-Germain-Fall und weitere
-Quartikfamilien entstehen aus derselben Koeffizientenschablone; ein benannter
-Spezial-Bridge bleibt nur als deaktivierter Kontrollpfad erhalten.
+Die `BinaryQuarticFactorizationEngine` bleibt als spezialisierter historischer
+Kontrollpfad erhalten. Der Sophie-Germain-Fall und weitere Quartikfamilien
+entstehen dort aus einer allgemeinen Koeffizientenbedingung; ein benannter
+Spezial-Bridge bleibt nur zur Reproduktion und Ablation deaktiviert erhalten.
 
-Jede positive Zerlegung wird durch `FactorizationVerifier` unabhängig im
-Quellring zurückmultipliziert. Ein Engine-Miss ist kein Irreduzibilitätsbeweis,
-ein Backend-Claim keine unabhängig zertifizierte Vollständigkeit. Vollständige
-allgemeine Faktorisierung über `Z[x]` oder `Q[x]`, endliche Körper,
-Hensel-Lifting und multivariate Verfahren sind Folgearbeiten unter demselben
-Vertrag.
+Jede positive Zerlegung wird durch `FactorizationVerifier` im Quellring exakt
+zurückmultipliziert. Der neue Wurzelpfad prüft zusätzlich Quell-/Literalbindung,
+rendert rationale Faktoren ohne `double`, parst die Ersatzdarstellung erneut
+exakt und verlangt Gleichheit im ursprünglichen Ring. Ein Backend-Miss ist kein
+Irreduzibilitätsbeweis, ein Backend-Claim keine unabhängig zertifizierte
+Vollständigkeit oder Irreduzibilität.
+
+Der Wurzel-Transformationspfad ist implementiert und charakterisiert, aber noch
+nicht als allgemeines Such- oder Workbench-Defaultprofil aktiviert.
+Verschachtelte Vorkommen müssen als nächste Stufe die vorhandene
+`TreePosition`-/Stalenessschutz- und Local-Rewrite-Infrastruktur
+wiederverwenden. Multivariate Faktorisierung und algorithmisch unabhängige
+Vollständigkeits-/Irreduzibilitätszertifikate bleiben offen.
 
 Details:
 
 - [Domänenbewusste Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md)
-- [Semantische Polynomansicht und quartische Zerlegungsengine](docs/polynomial-decomposition-synthesis.md)
+- [Exakte Parser-zu-Faktorisierungs-Pipeline](docs/exact-parsed-factorization-pipeline.md)
+- [Exakte Faktorisierungs-Transformationspipeline](docs/exact-factorization-transformation-pipeline.md)
+- [Semantische Polynomansicht und quartische Kontrollengine](docs/polynomial-decomposition-synthesis.md)
 - [ADR: Domänenbewusster Polynomkern statt Quartik-API](docs/adr/domain-aware-polynomial-factorization.md)
 
 ## Aktueller Stand
@@ -287,10 +301,15 @@ Der gegenwärtige Stand ist bewusst mehrstufig:
 5. Eine generationengetrennte Kampagne demonstriert proof-gated Regelbildung
    und kumulative Wiederverwendung in content-addressed Schatteninventaren,
    ohne das Produktionsinventar zu verändern.
-6. Der domänenbewusste Polynom-, Engine- und Verifier-Kern ist implementiert;
-   die erste integrierte Engine bleibt bewusst auf binäre homogene Quartiken
-   und begrenzte univariate Homogenisierung beschränkt.
-7. Das stärkere Flagship-Experiment zur proof-carrying Selbstverbesserung ist
+6. Die begrenzte native allgemeine univariate `Z[x]`-/`Q[x]`-Engine,
+   der optionale SymPy-Vorschlagsadapter und der exakte Parser-/Verifierpfad
+   sind implementiert. Verifier-ausgestellte Faktoren können am
+   Wurzelvorkommen deterministisch gerendert, exakt erneut geparst und im
+   ursprünglichen Ring rekonstruiert werden.
+7. Verschachtelte Vorkommen, Such-/Workbench-Aktivierung und der eingefrorene
+   On-Demand-/Cache-/No-Factorization-Vergleich bleiben offene
+   Produktqualifikationen.
+8. Das stärkere Flagship-Experiment zur proof-carrying Selbstverbesserung ist
    technisch vorbereitet, aber noch nicht mit realem VALIDATION- und
    FINAL-TEST-Material ausgeführt.
 
@@ -403,7 +422,9 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
   [Promotion gelernter Pattern-Regeln](docs/learned-pattern-rule-promotion.md),
   [Generational Rule Mining](docs/generational-rule-mining.md),
   [Domänenbewusste Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md),
-  [quartische Zerlegungsengine](docs/polynomial-decomposition-synthesis.md),
+  [Exakte Parser-zu-Faktorisierungs-Pipeline](docs/exact-parsed-factorization-pipeline.md),
+  [Exakte Faktorisierungs-Transformationspipeline](docs/exact-factorization-transformation-pipeline.md),
+  [quartische Kontrollengine](docs/polynomial-decomposition-synthesis.md),
   [Benchmarks](docs/discovery-benchmarks.md),
   [Scientific Reproducibility](docs/scientific-reproducibility.md)
 - **Entwicklung:** [Architektur](docs/architecture.md),
