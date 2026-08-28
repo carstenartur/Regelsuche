@@ -181,7 +181,7 @@ class ExactFactorizationTransformationPipelineTest {
     }
 
     @Test
-    void retainsAnIrreducibilityClaimWithoutInventingATransformation() {
+    void retainsABackendIrreducibilityClaimWithoutPromotingIt() {
         ExactParsedTerm source = parser.parseExactTerm("x^2 + 1");
         var factorization = factor(
             source,
@@ -193,14 +193,52 @@ class ExactFactorizationTransformationPipelineTest {
 
         assertFalse(result.transformed());
         assertEquals(
-            ExactFactorizationTransformationPipeline.Status.IRREDUCIBLE,
+            ExactFactorizationTransformationPipeline.Status
+                .BACKEND_CLAIMED_IRREDUCIBLE,
             result.status());
+        assertFalse(
+            result.status()
+                == ExactFactorizationTransformationPipeline.Status.IRREDUCIBLE);
         assertEquals(
             FactorizationVerifier.ClaimStrength
                 .BACKEND_CLAIMED_IRREDUCIBLE,
             factorization.report().orElseThrow().claimStrength());
         assertTrue(result.transformedExpression().isEmpty());
         assertTrue(result.rendering().isEmpty());
+    }
+
+    @Test
+    void doesNotExposeRejectedRenderedSyntaxAsATransformation() {
+        ExactParsedTerm source = parser.parseExactTerm(
+            "1/3*x^2 - 2/3*x + 1/3");
+        var factorization = factor(
+            source,
+            squareEngine(),
+            1_000_000);
+        var narrowReparseView = new ExactParsedUnivariatePolynomialView(
+            new ExactParsedUnivariatePolynomialView.Budget(
+                1,
+                4_096,
+                512,
+                10_000));
+        var pipeline = new ExactFactorizationTransformationPipeline(
+            new ExactFactorizationExpressionRenderer(),
+            parser,
+            narrowReparseView);
+
+        var result = pipeline.transformRoot(source, factorization);
+
+        assertFalse(result.transformed());
+        assertEquals(
+            ExactFactorizationTransformationPipeline.Status
+                .BUDGET_INCONCLUSIVE,
+            result.status());
+        assertEquals("MAX_DEGREE_EXCEEDED", result.detailCode());
+        assertTrue(result.rendering().orElseThrow().rendered());
+        assertEquals(
+            "(1 / 3) * (x - 1) ^ 2",
+            result.renderedExpression().orElseThrow());
+        assertTrue(result.transformedExpression().isEmpty());
     }
 
     @Test
