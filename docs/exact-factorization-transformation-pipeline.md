@@ -17,8 +17,11 @@ der Integration muss zusätzlich belegt werden, dass
   überführt wurden;
 - der gerenderte Ausdruck nach erneutem exaktem Parsen dasselbe Polynom im
   selben Ring ergibt;
-- Quellprüfung, Faktorisierung, Rendering und Rekonstruktion unter einer
-  einzigen nicht zurückgesetzten Arbeitsautorität ausgeführt wurden.
+- die reparste Ersatzsyntax strukturell vom ursprünglichen AST abweicht und
+  damit keine Identitätskante erzeugt;
+- Quellprüfung, Faktorisierung, Rendering, Rekonstruktion und
+  Strukturvergleich unter einer einzigen nicht zurückgesetzten
+  Arbeitsautorität ausgeführt wurden.
 
 Der autoritative Fluss lautet:
 
@@ -31,12 +34,13 @@ ExactParsedTerm des ausgewählten Quellvorkommens
   -> ExpressionParser.parseExactTerm
   -> ExactParsedUnivariatePolynomialView
   -> exakte Ring- und Polynomgleichheit
+  -> abgerechneter struktureller AST-Vergleich
   -> ExactFactorizationTransformationPipeline.Result
 ```
 
 Der gerenderte Text ist dabei niemals mathematische Autorität. Erst die
 unabhängige Rekonstruktion im ursprünglichen `PolynomialRing<ExactRational>`
-autorisiert die Transformationskante.
+und eine tatsächlich geänderte Syntax autorisieren die Transformationskante.
 
 ## Quell- und Vorkommensbindung
 
@@ -188,6 +192,19 @@ maxOutputCodeUnits    = 100000
 maxWorkUnits          = 200000
 ```
 
+Die Bitgrenze allein garantiert noch nicht, dass der exakte Parser das später
+gerenderte Zahlenlexem akzeptiert. `ExactRationalDomain` erlaubt höchstens 1024
+Ziffern je Ganzzahlliteral. Deshalb prüft der Renderer zusätzlich Zähler und
+Nenner jedes rationalen Koeffizienten gegen genau diese Parsergrenze. Die
+Prüfung verwendet zunächst die Bitlänge und danach nur im Grenzbereich einen
+beschränkten `BigInteger`-Vergleich; sie erzeugt keinen unbeschränkt großen
+Dezimaltext. Ein nur nach Bitlänge zulässiger, aber nicht exakt reparsbarer
+Koeffizient endet mit:
+
+```text
+MAX_COEFFICIENT_DIGITS_EXCEEDED
+```
+
 Grenzverletzungen werden als `BUDGET_INCONCLUSIVE` berichtet. Ein zu großer
 Ausdruck wird weder abgeschnitten noch teilweise als Transformation ausgegeben.
 Das kumulative Termlimit wird vor der Traversierung des jeweils nächsten
@@ -221,6 +238,8 @@ max renderer work
 + max parser input code units
 + max exact reparse AST visits
 + max exact reparse arithmetic operations
++ max source AST visits für den Strukturvergleich
++ max reparsed AST visits für den Strukturvergleich
 <= remaining original work authority
 ```
 
@@ -240,12 +259,15 @@ extraction work
 + rendering validation and output work
 + exact-parser input work
 + reconstruction work
++ structural change comparison work
 <= original pipeline maxTotalWorkUnits
 ```
 
-Es gibt keinen Budgetreset zwischen den Stufen.
+Der Strukturvergleich wird unter der eigenen Stufe
+`transform.structural-change-comparison` abgerechnet. Es gibt keinen
+Budgetreset zwischen den Stufen.
 
-## Exaktes Reparse und Rekonstruktion
+## Exaktes Reparse, Rekonstruktion und Änderungsnachweis
 
 Der vollständige gerenderte Ausdruck wird durch
 `ExpressionParser.parseExactTerm` erneut geparst. Anschließend extrahiert eine
@@ -259,15 +281,31 @@ Eine Transformation wird nur ausgestellt, wenn:
 - der rekonstruierte Ring dem Ring des ursprünglichen Requests exakt gleicht;
 - das rekonstruierte `SparsePolynomial<ExactRational>` dem ursprünglichen
   Request-Polynom exakt gleicht;
-- die zusammengeführte Arbeit innerhalb der ursprünglichen Autorität bleibt.
+- der erneut geparste AST strukturell nicht mit dem ursprünglichen AST
+  identisch ist;
+- die zusammengeführte Arbeit einschließlich Strukturvergleich innerhalb der
+  ursprünglichen Autorität bleibt.
 
 Parser-, Ring- oder Koeffizientendrift wird als technischer Invariantenfehler
-sichtbar und nicht als erfolgreiche Faktorisierung behandelt.
+sichtbar und nicht als erfolgreiche Faktorisierung behandelt. Eine
+mathematisch gültige Zerlegung, deren kanonisches Rendering strukturell bereits
+der Quellsyntax entspricht, endet dagegen ausdrücklich mit:
 
-Ein fehlgeschlagener späterer Reparse- oder Rekonstruktionsschritt kann den
-Renderertext zu Diagnosezwecken über `renderedExpression()` behalten.
-`transformedExpression()` bleibt in diesem Fall jedoch leer. Nur ein
-`TRANSFORMED`-Ergebnis darf eine autorisierte Ersatzdarstellung ausgeben.
+```text
+NO_CHANGE
+RENDERED_EXPRESSION_STRUCTURALLY_IDENTICAL_TO_SOURCE
+```
+
+Dieses Ergebnis behält Renderer-, Reparse- und Rekonstruktionsevidence für die
+Diagnose, stellt aber keine Suchkante aus. Damit kann ein bereits faktorisierter
+Ausdruck nicht als Identitätstransformation erneut in den Suchraum eingestellt
+werden.
+
+Ein fehlgeschlagener späterer Reparse-, Rekonstruktions- oder
+Änderungsnachweisschritt kann den Renderertext zu Diagnosezwecken über
+`renderedExpression()` behalten. `transformedExpression()` bleibt in diesem
+Fall jedoch leer. Nur ein `TRANSFORMED`-Ergebnis darf eine autorisierte
+Ersatzdarstellung ausgeben.
 
 ## Ergebnisarten
 
@@ -275,6 +313,7 @@ Die Transformationspipeline unterscheidet:
 
 ```text
 TRANSFORMED
+NO_CHANGE
 NO_CANDIDATE
 BACKEND_CLAIMED_IRREDUCIBLE
 IRREDUCIBLE
@@ -293,6 +332,7 @@ auf.
 Insbesondere gilt:
 
 - ein Backend-Irreduzibilitätsclaim erzeugt keine Identitätstransformation;
+- eine bereits identische Faktorsyntax erzeugt keine Identitätskante;
 - ein leeres Kandidatenergebnis erzeugt keine erfundene Faktorisierung;
 - ein Budgetende wird nicht als Irreduzibilität interpretiert;
 - ein technischer Rendering- oder Reparsefehler bleibt ein technischer Fehler.
@@ -309,7 +349,8 @@ Ein erfolgreicher `Result` bindet:
 - Renderer-Zertifikat und gerenderten Ausdruck;
 - erneut geparsten Quelltext;
 - Zertifikat der unabhängigen Polynomrekonstruktion;
-- vollständiges zusammengeführtes Work-Ledger;
+- vollständiges zusammengeführtes Work-Ledger einschließlich
+  Strukturvergleich;
 - einen eigenen SHA-256-Zertifikatshash.
 
 Workbench, Graph- und Replay-Oberflächen können damit später zwischen
@@ -330,12 +371,15 @@ Die fokussierten Tests decken ab:
 - exaktes Reparse und Gleichheit des rekonstruierten Polynoms;
 - Ablehnung ersetzter Quellbelege;
 - getrennte No-Candidate- und Backend-Irreduzibilitätsclaim-Grenzen;
+- Ablehnung einer strukturell bereits identischen Faktorsyntax als `NO_CHANGE`;
+- Ablehnung eines Koeffizienten, dessen Bitlänge zulässig ist, dessen Ziffernzahl
+  aber die exakte Parsergrenze überschreitet;
 - diagnostisch vorhandener Renderertext ohne Ausgabe einer abgelehnten
   `transformedExpression`;
 - vorautorisierte und abgerechnete Quell-/Literalprüfung einschließlich eines
   whitespace-aufgeblähten Eingangs ohne ausreichende Restautorität;
 - frühzeitige Termgrenzen und abgerechnete Renderer-Validierungsarbeit;
-- Ausgabe- und Fortsetzungsbudgeterschöpfung;
+- Ausgabe-, Strukturvergleichs- und Fortsetzungsbudgeterschöpfung;
 - Ablehnung multivariater Kandidaten;
 - den vollständigen nativen `Q[x]`-Pfad vom Quelltext bis zur rekonstruierten
   Faktorisierungsdarstellung.
@@ -376,8 +420,8 @@ Nach diesem Slice bleiben insbesondere offen:
 
 Die Pipeline belegt, dass ein verifier-ausgestellter exakter
 Faktorisierungskandidat deterministisch in Parser-Syntax überführt und durch
-eine unabhängige exakte Ringrekonstruktion als Ausdruckstransformation
-autorisiert werden kann.
+eine unabhängige exakte Ringrekonstruktion als tatsächlich geänderte
+Ausdruckstransformation autorisiert werden kann.
 
 Sie belegt nicht:
 
