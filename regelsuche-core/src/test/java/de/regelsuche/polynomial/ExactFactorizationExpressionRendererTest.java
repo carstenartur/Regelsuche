@@ -77,6 +77,33 @@ class ExactFactorizationExpressionRendererTest {
     }
 
     @Test
+    void rendersAnExactUnresolvedRemainderWithoutClaimingCompleteness() {
+        SparsePolynomial<ExactRational> factor = polynomial("x - 1");
+        SparsePolynomial<ExactRational> remainder = polynomial("x^2 + 1");
+        SparsePolynomial<ExactRational> source = factor.multiply(remainder);
+        var candidate = verifiedCandidate(
+            source,
+            ExactRational.ONE,
+            List.of(new PolynomialFactor<>(factor, 1)),
+            remainder,
+            FactorizationEngine.BackendClaim.NONE);
+
+        var result = new ExactFactorizationExpressionRenderer()
+            .render(candidate);
+
+        assertTrue(result.rendered(), result.detailCode());
+        assertEquals(
+            "(x - 1) * (x ^ 2 + 1)",
+            result.expression().orElseThrow());
+        assertEquals(
+            1,
+            result.work().units("render.unresolved-remainders"));
+        var reconstructed = view.analyze(
+            parser.parseExactTerm(result.expression().orElseThrow()));
+        assertEquals(source, reconstructed.polynomial().orElseThrow());
+    }
+
+    @Test
     void failsClosedWhenTheOutputRepresentationLimitIsExceeded() {
         SparsePolynomial<ExactRational> factor = polynomial("x - 1");
         SparsePolynomial<ExactRational> source = factor.pow(2).scale(
