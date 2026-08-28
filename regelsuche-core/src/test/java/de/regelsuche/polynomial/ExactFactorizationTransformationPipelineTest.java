@@ -69,6 +69,39 @@ class ExactFactorizationTransformationPipelineTest {
     }
 
     @Test
+    void requiresExplicitSelectionWhenSeveralCandidatesAreVerified() {
+        ExactParsedTerm source = parser.parseExactTerm("x^2 - 1");
+        var factorization = factor(
+            source,
+            multipleCandidateEngine(),
+            1_000_000);
+        var pipeline = new ExactFactorizationTransformationPipeline();
+
+        var implicit = pipeline.transformRoot(source, factorization);
+        var explicit = pipeline.transformRoot(source, factorization, 0);
+
+        assertEquals(
+            2,
+            factorization.report().orElseThrow().candidates().size());
+        assertFalse(implicit.transformed());
+        assertEquals(
+            ExactFactorizationTransformationPipeline.Status.UNSUPPORTED,
+            implicit.status());
+        assertEquals(
+            "MULTIPLE_CANDIDATES_REQUIRE_EXPLICIT_SELECTION",
+            implicit.detailCode());
+        assertTrue(implicit.candidateIndex().isEmpty());
+        assertTrue(implicit.rendering().isEmpty());
+
+        assertTrue(explicit.transformed(), explicit.detailCode());
+        assertEquals(0, explicit.candidateIndex().orElseThrow());
+        assertEquals(
+            factorization.request().orElseThrow().source(),
+            explicit.reconstruction().orElseThrow()
+                .polynomial().orElseThrow());
+    }
+
+    @Test
     void rejectsSubstitutedSourceEvidenceBeforeRendering() {
         ExactParsedTerm authorized = parser.parseExactTerm(
             "1/3*x^2 - 2/3*x + 1/3");
@@ -198,6 +231,68 @@ class ExactFactorizationTransformationPipelineTest {
                         SparsePolynomial.one(ring),
                         ENGINE_CERTIFICATE)),
                     BackendClaim.COMPLETE_FACTORIZATION,
+                    RESULT_HASH);
+            }
+        };
+    }
+
+    private static FactorizationEngine<ExactRational>
+            multipleCandidateEngine() {
+        return new FactorizationEngine<>() {
+            @Override
+            public String engineId() {
+                return ENGINE_ID;
+            }
+
+            @Override
+            public String coefficientDomainId() {
+                return ExactRationalField.DOMAIN_ID;
+            }
+
+            @Override
+            public EngineResult<ExactRational> propose(
+                FactorizationRequest<ExactRational> request
+            ) {
+                PolynomialRing<ExactRational> ring = request.source().ring();
+                SparsePolynomial<ExactRational> xMinusOne =
+                    new SparsePolynomial<>(
+                        ring,
+                        Map.of(
+                            Monomial.of(1), ExactRational.ONE,
+                            Monomial.of(0), ExactRational.NEGATIVE_ONE));
+                SparsePolynomial<ExactRational> xPlusOne =
+                    new SparsePolynomial<>(
+                        ring,
+                        Map.of(
+                            Monomial.of(1), ExactRational.ONE,
+                            Monomial.of(0), ExactRational.ONE));
+                SparsePolynomial<ExactRational> oneMinusX =
+                    new SparsePolynomial<>(
+                        ring,
+                        Map.of(
+                            Monomial.of(1), ExactRational.NEGATIVE_ONE,
+                            Monomial.of(0), ExactRational.ONE));
+                return new EngineResult<>(
+                    ENGINE_ID,
+                    Outcome.CANDIDATES,
+                    "TEST_MULTIPLE_EQUIVALENT_FACTORIZATIONS",
+                    new PolynomialWorkLedger(Map.of("test.engine", 1L)),
+                    List.of(
+                        new Proposal<>(
+                            ExactRational.ONE,
+                            List.of(
+                                new PolynomialFactor<>(xMinusOne, 1),
+                                new PolynomialFactor<>(xPlusOne, 1)),
+                            SparsePolynomial.one(ring),
+                            ENGINE_CERTIFICATE),
+                        new Proposal<>(
+                            ExactRational.NEGATIVE_ONE,
+                            List.of(
+                                new PolynomialFactor<>(oneMinusX, 1),
+                                new PolynomialFactor<>(xPlusOne, 1)),
+                            SparsePolynomial.one(ring),
+                            ENGINE_CERTIFICATE)),
+                    BackendClaim.NONE,
                     RESULT_HASH);
             }
         };
