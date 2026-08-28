@@ -7,70 +7,171 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
+import java.util.Objects;
 
 public final class ExpressionFormatter {
     private ExpressionFormatter() {
     }
 
     public static String format(Expr expr) {
-<span class="fc" id="L16">        return format(expr, 0);</span>
+<span class="fc" id="L20">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L21">        append(</span>
+<span class="fc" id="L22">            Objects.requireNonNull(expr, &quot;expr&quot;),</span>
+            0,
+            builder);
+<span class="fc" id="L25">        return builder.toString();</span>
     }
 
     public static String format(Equation equation) {
-<span class="fc" id="L20">        return format(equation.left()) + &quot; = &quot; + format(equation.right());</span>
+<span class="fc" id="L29">        Objects.requireNonNull(equation, &quot;equation&quot;);</span>
+<span class="fc" id="L30">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L31">        append(equation.left(), 0, builder);</span>
+<span class="fc" id="L32">        builder.append(&quot; = &quot;);</span>
+<span class="fc" id="L33">        append(equation.right(), 0, builder);</span>
+<span class="fc" id="L34">        return builder.toString();</span>
     }
 
-    private static String format(Expr expr, int parentPrecedence) {
-<span class="fc bfc" id="L24" title="All 2 branches covered.">        if (expr instanceof NumberExpr numberExpr) {</span>
-            String formatted;
-<span class="fc bfc" id="L26" title="All 2 branches covered.">            if (Math.rint(numberExpr.value()) == numberExpr.value()) {</span>
-<span class="fc" id="L27">                formatted = Long.toString((long) numberExpr.value());</span>
+    private static void append(
+        Expr expression,
+        int parentPrecedence,
+        StringBuilder builder
+    ) {
+<span class="fc" id="L42">        Deque&lt;Action&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L43">        pending.push(new FormatExpression(</span>
+            expression,
+            parentPrecedence));
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L47">            Action action = pending.pop();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (action instanceof AppendText text) {</span>
+<span class="fc" id="L49">                builder.append(text.value());</span>
             } else {
-<span class="fc" id="L29">                formatted = Double.toString(numberExpr.value());</span>
+<span class="fc" id="L51">                FormatExpression format = (FormatExpression) action;</span>
+<span class="fc" id="L52">                schedule(</span>
+<span class="fc" id="L53">                    format.expression(),</span>
+<span class="fc" id="L54">                    format.parentPrecedence(),</span>
+                    pending,
+                    builder);
             }
-<span class="pc bpc" id="L31" title="1 of 4 branches missed.">            if (numberExpr.value() &lt; 0 &amp;&amp; parentPrecedence &gt; 0) {</span>
-<span class="nc" id="L32">                return &quot;(&quot; + formatted + &quot;)&quot;;</span>
-            }
-<span class="fc" id="L34">            return formatted;</span>
-        }
-<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (expr instanceof VariableExpr variableExpr) {</span>
-<span class="fc" id="L37">            return variableExpr.name();</span>
-        }
-<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (expr instanceof FunctionExpr functionExpr) {</span>
-<span class="fc" id="L40">            StringBuilder builder = new StringBuilder(functionExpr.name());</span>
-<span class="fc" id="L41">            builder.append('(');</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">            for (int i = 0; i &lt; functionExpr.arguments().size(); i++) {</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">                if (i &gt; 0) {</span>
-<span class="fc" id="L44">                    builder.append(&quot;, &quot;);</span>
-                }
-<span class="fc" id="L46">                builder.append(format(functionExpr.arguments().get(i), 0));</span>
-            }
-<span class="fc" id="L48">            builder.append(')');</span>
-<span class="fc" id="L49">            return builder.toString();</span>
-        }
-<span class="fc" id="L51">        BinaryExpr binaryExpr = (BinaryExpr) expr;</span>
-<span class="fc" id="L52">        BinaryOperator operator = binaryExpr.operator();</span>
-<span class="fc" id="L53">        int precedence = operator.precedence();</span>
+<span class="fc" id="L58">        }</span>
+<span class="fc" id="L59">    }</span>
 
-<span class="fc bfc" id="L55" title="All 2 branches covered.">        int leftAdjust = (operator == BinaryOperator.POW) ? 1 : 0;</span>
-        // Right side needs an extra precedence level for left-associative,
-        // non-commutative operators (DIV, SUB) so that `(a/b)/c` and `a/(b/c)`
-        // round-trip safely through parse → format → parse. POW is
-        // right-associative, so the right side can share the same precedence
-        // without parens. ADD/MUL are commutative-associative, so omitting
-        // parens on the right does not change the value.
-<span class="fc bfc" id="L62" title="All 3 branches covered.">        int rightAdjust = switch (operator) {</span>
-<span class="fc" id="L63">            case POW -&gt; -1;</span>
-<span class="fc" id="L64">            case DIV, SUB -&gt; 1;</span>
-<span class="fc" id="L65">            default -&gt; 0;</span>
-        };
-<span class="fc" id="L67">        String left = format(binaryExpr.left(), precedence + leftAdjust);</span>
-<span class="fc" id="L68">        String right = format(binaryExpr.right(), precedence + rightAdjust);</span>
-<span class="fc" id="L69">        String value = left + &quot; &quot; + operator.symbol() + &quot; &quot; + right;</span>
-<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (precedence &lt; parentPrecedence) {</span>
-<span class="fc" id="L71">            return &quot;(&quot; + value + &quot;)&quot;;</span>
+    private static void schedule(
+        Expr expression,
+        int parentPrecedence,
+        Deque&lt;Action&gt; pending,
+        StringBuilder builder
+    ) {
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L68">            appendNumber(number, parentPrecedence, builder);</span>
+<span class="fc" id="L69">            return;</span>
         }
-<span class="fc" id="L73">        return value;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L72">            builder.append(variable.name());</span>
+<span class="fc" id="L73">            return;</span>
+        }
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L76">            scheduleFunction(function, pending, builder);</span>
+<span class="fc" id="L77">            return;</span>
+        }
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L80">            scheduleBinary(binary, parentPrecedence, pending, builder);</span>
+<span class="fc" id="L81">            return;</span>
+        }
+<span class="nc" id="L83">        throw new IllegalArgumentException(</span>
+            &quot;unsupported expression type: &quot;
+<span class="nc" id="L85">                + expression.getClass().getName());</span>
+    }
+
+    private static void appendNumber(
+        NumberExpr number,
+        int parentPrecedence,
+        StringBuilder builder
+    ) {
+        String formatted;
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (Math.rint(number.value()) == number.value()) {</span>
+<span class="fc" id="L95">            formatted = Long.toString((long) number.value());</span>
+        } else {
+<span class="fc" id="L97">            formatted = Double.toString(number.value());</span>
+        }
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        if (number.value() &lt; 0 &amp;&amp; parentPrecedence &gt; 0) {</span>
+<span class="nc" id="L100">            builder.append('(')</span>
+<span class="nc" id="L101">                .append(formatted)</span>
+<span class="nc" id="L102">                .append(')');</span>
+        } else {
+<span class="fc" id="L104">            builder.append(formatted);</span>
+        }
+<span class="fc" id="L106">    }</span>
+
+    private static void scheduleFunction(
+        FunctionExpr function,
+        Deque&lt;Action&gt; pending,
+        StringBuilder builder
+    ) {
+<span class="fc" id="L113">        builder.append(function.name()).append('(');</span>
+<span class="fc" id="L114">        pending.push(new AppendText(&quot;)&quot;));</span>
+<span class="fc" id="L115">        List&lt;Expr&gt; arguments = function.arguments();</span>
+<span class="fc" id="L116">        for (int index = arguments.size() - 1;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                index &gt;= 0;</span>
+<span class="fc" id="L118">                index--) {</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            if (index &lt; arguments.size() - 1) {</span>
+<span class="fc" id="L120">                pending.push(new AppendText(&quot;, &quot;));</span>
+            }
+<span class="fc" id="L122">            pending.push(new FormatExpression(</span>
+<span class="fc" id="L123">                arguments.get(index),</span>
+                0));
+        }
+<span class="fc" id="L126">    }</span>
+
+    private static void scheduleBinary(
+        BinaryExpr binary,
+        int parentPrecedence,
+        Deque&lt;Action&gt; pending,
+        StringBuilder builder
+    ) {
+<span class="fc" id="L134">        BinaryOperator operator = binary.operator();</span>
+<span class="fc" id="L135">        int precedence = operator.precedence();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        boolean parenthesized = precedence &lt; parentPrecedence;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (parenthesized) {</span>
+<span class="fc" id="L138">            builder.append('(');</span>
+<span class="fc" id="L139">            pending.push(new AppendText(&quot;)&quot;));</span>
+        }
+
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        int leftAdjust = operator == BinaryOperator.POW ? 1 : 0;</span>
+<span class="fc bfc" id="L143" title="All 3 branches covered.">        int rightAdjust = switch (operator) {</span>
+<span class="fc" id="L144">            case POW -&gt; -1;</span>
+<span class="fc" id="L145">            case DIV, SUB -&gt; 1;</span>
+<span class="fc" id="L146">            default -&gt; 0;</span>
+        };
+<span class="fc" id="L148">        pending.push(new FormatExpression(</span>
+<span class="fc" id="L149">            binary.right(),</span>
+            precedence + rightAdjust));
+<span class="fc" id="L151">        pending.push(new AppendText(</span>
+<span class="fc" id="L152">            &quot; &quot; + operator.symbol() + &quot; &quot;));</span>
+<span class="fc" id="L153">        pending.push(new FormatExpression(</span>
+<span class="fc" id="L154">            binary.left(),</span>
+            precedence + leftAdjust));
+<span class="fc" id="L156">    }</span>
+
+    private sealed interface Action
+            permits AppendText, FormatExpression {
+    }
+
+    private record AppendText(String value) implements Action {
+<span class="fc" id="L163">        private AppendText {</span>
+<span class="fc" id="L164">            Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L165">        }</span>
+    }
+
+    private record FormatExpression(
+        Expr expression,
+        int parentPrecedence
+    ) implements Action {
+<span class="fc" id="L172">        private FormatExpression {</span>
+<span class="fc" id="L173">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L174">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

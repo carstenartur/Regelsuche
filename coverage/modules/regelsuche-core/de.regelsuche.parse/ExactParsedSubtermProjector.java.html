@@ -1,0 +1,896 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactParsedSubtermProjector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.parse</a> &gt; <span class="el_source">ExactParsedSubtermProjector.java</span></div><h1>ExactParsedSubtermProjector.java</h1><pre class="source lang-java linenums">package de.regelsuche.parse;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Deque;
+import java.util.HexFormat;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.TreeMap;
+
+/**
+ * Projects one source-bound AST occurrence from an {@link ExactParsedTerm}
+ * into a new exact parsed-term companion without formatting or reparsing values.
+ *
+ * &lt;p&gt;The selected expression nodes and exact literal evidence remain the
+ * parser-issued instances. Only source and literal ranges are shifted from the
+ * original root coordinate system to the selected occurrence. A formatted
+ * subtree snapshot may be checked as a staleness guard, but it never authorizes
+ * a coefficient or exponent.&lt;/p&gt;
+ */
+public final class ExactParsedSubtermProjector {
+    public static final String PROJECTOR_ID =
+        &quot;regelsuche.exact-parsed-subterm-projector/v1&quot;;
+    public static final int MAX_PATH_DEPTH = 4_096;
+    public static final int MAX_ROOT_SOURCE_CODE_UNITS = 1_000_000;
+    public static final int MAX_SUBTREE_NODES = 65_536;
+    public static final int MAX_SUBTREE_SOURCE_CODE_UNITS = 1_000_000;
+    public static final int MAX_FORMATTED_CODE_UNITS = 1_000_000;
+    public static final long MAX_WORK_UNITS = 50_000_000L;
+
+    private final Policy policy;
+
+    public ExactParsedSubtermProjector() {
+<span class="fc" id="L48">        this(Policy.boundedDefaults());</span>
+<span class="fc" id="L49">    }</span>
+
+<span class="fc" id="L51">    public ExactParsedSubtermProjector(Policy policy) {</span>
+<span class="fc" id="L52">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L53">    }</span>
+
+    public Policy policy() {
+<span class="fc" id="L56">        return policy;</span>
+    }
+
+    /**
+     * Projects the occurrence at {@code path} after checking the formatter text
+     * captured by the caller when that path was selected.
+     */
+    public Result project(
+        ExactParsedTerm root,
+        List&lt;Integer&gt; path,
+        String expectedFormattedText
+    ) {
+<span class="fc" id="L68">        Objects.requireNonNull(root, &quot;root&quot;);</span>
+<span class="fc" id="L69">        List&lt;Integer&gt; stablePath = validatePath(path);</span>
+<span class="fc" id="L70">        String expected = Objects.requireNonNull(</span>
+            expectedFormattedText,
+            &quot;expectedFormattedText&quot;);
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (expected.isBlank()) {</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(</span>
+                &quot;expected subtree text must not be blank&quot;);
+        }
+
+<span class="fc" id="L78">        Work work = new Work(policy.maxWorkUnits());</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (stablePath.size() &gt; policy.maxPathDepth()) {</span>
+<span class="fc" id="L80">            return failure(</span>
+                Status.BUDGET_INCONCLUSIVE,
+                &quot;MAX_PATH_DEPTH_EXCEEDED&quot;,
+                stablePath,
+                expected,
+                &quot;&quot;,
+<span class="fc" id="L86">                Optional.empty(),</span>
+<span class="fc" id="L87">                Optional.empty(),</span>
+                &quot;&quot;,
+                &quot;&quot;,
+                work);
+        }
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (root.source().length() &gt; policy.maxRootSourceCodeUnits()) {</span>
+<span class="nc" id="L93">            return failure(</span>
+                Status.BUDGET_INCONCLUSIVE,
+                &quot;MAX_ROOT_SOURCE_CODE_UNITS_EXCEEDED&quot;,
+                stablePath,
+                expected,
+                &quot;&quot;,
+<span class="nc" id="L99">                Optional.empty(),</span>
+<span class="nc" id="L100">                Optional.empty(),</span>
+                &quot;&quot;,
+                &quot;&quot;,
+                work);
+        }
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (expected.length() &gt; policy.maxFormattedCodeUnits()) {</span>
+<span class="nc" id="L106">            return failure(</span>
+                Status.BUDGET_INCONCLUSIVE,
+                &quot;MAX_EXPECTED_FORMATTED_CODE_UNITS_EXCEEDED&quot;,
+                stablePath,
+                expected,
+                &quot;&quot;,
+<span class="nc" id="L112">                Optional.empty(),</span>
+<span class="nc" id="L113">                Optional.empty(),</span>
+                &quot;&quot;,
+                &quot;&quot;,
+                work);
+        }
+
+<span class="fc" id="L119">        String rootSourceHash = &quot;&quot;;</span>
+        try {
+<span class="fc" id="L121">            work.consume(</span>
+                &quot;projection.root-source-hash-code-units&quot;,
+<span class="fc" id="L123">                Math.multiplyExact(4L, root.source().length()));</span>
+<span class="fc" id="L124">            rootSourceHash = sha256(root.source());</span>
+
+<span class="fc" id="L126">            Expr selected = navigate(root.expression(), stablePath, work);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (selected == null) {</span>
+<span class="fc" id="L128">                return failure(</span>
+                    Status.POSITION_NOT_PRESENT,
+                    &quot;SELECTED_PATH_IS_NOT_PRESENT&quot;,
+                    stablePath,
+                    expected,
+                    rootSourceHash,
+<span class="fc" id="L134">                    Optional.empty(),</span>
+<span class="fc" id="L135">                    Optional.empty(),</span>
+                    &quot;&quot;,
+                    &quot;&quot;,
+                    work);
+            }
+
+<span class="fc" id="L141">            Optional&lt;ExactParsedTerm.SourceRange&gt; selectedRange =</span>
+<span class="fc" id="L142">                root.sourceRangeFor(selected);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (selectedRange.isEmpty()) {</span>
+<span class="fc" id="L144">                return failure(</span>
+                    Status.UNSUPPORTED,
+                    &quot;SELECTED_OCCURRENCE_HAS_NO_SOURCE_RANGE&quot;,
+                    stablePath,
+                    expected,
+                    rootSourceHash,
+<span class="fc" id="L150">                    Optional.empty(),</span>
+<span class="fc" id="L151">                    Optional.empty(),</span>
+                    &quot;&quot;,
+                    &quot;&quot;,
+                    work);
+            }
+<span class="fc" id="L156">            ExactParsedTerm.SourceRange occurrenceRange =</span>
+<span class="fc" id="L157">                selectedRange.orElseThrow();</span>
+<span class="fc" id="L158">            int selectedSourceLength = occurrenceRange.endExclusive()</span>
+<span class="fc" id="L159">                - occurrenceRange.startInclusive();</span>
+<span class="fc" id="L160">            if (selectedSourceLength</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                    &gt; policy.maxSubtreeSourceCodeUnits()) {</span>
+<span class="nc" id="L162">                throw limit(&quot;MAX_SUBTREE_SOURCE_CODE_UNITS_EXCEEDED&quot;);</span>
+            }
+
+<span class="fc" id="L165">            Scan scan = scan(</span>
+                root,
+                selected,
+                occurrenceRange,
+                work);
+<span class="fc" id="L170">            work.consume(</span>
+                &quot;projection.staleness-format-node-visits&quot;,
+<span class="fc" id="L172">                scan.nodeCount());</span>
+<span class="fc" id="L173">            String actual = ExpressionFormatter.format(selected);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (actual.length() &gt; policy.maxFormattedCodeUnits()) {</span>
+<span class="nc" id="L175">                throw limit(&quot;MAX_ACTUAL_FORMATTED_CODE_UNITS_EXCEEDED&quot;);</span>
+            }
+<span class="fc" id="L177">            work.consume(</span>
+                &quot;projection.staleness-format-code-units&quot;,
+<span class="fc" id="L179">                actual.length());</span>
+<span class="fc" id="L180">            work.consume(</span>
+                &quot;projection.staleness-text-comparison&quot;,
+<span class="fc" id="L182">                Math.addExact(</span>
+<span class="fc" id="L183">                    (long) expected.length(),</span>
+<span class="fc" id="L184">                    actual.length()));</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (!expected.equals(actual)) {</span>
+<span class="fc" id="L186">                return failure(</span>
+                    Status.POSITION_STALE,
+                    &quot;SELECTED_POSITION_TEXT_IS_STALE&quot;,
+                    stablePath,
+                    expected,
+                    rootSourceHash,
+<span class="fc" id="L192">                    Optional.of(actual),</span>
+<span class="fc" id="L193">                    Optional.of(occurrenceRange),</span>
+<span class="fc" id="L194">                    scan.rangeCommitmentHash(),</span>
+                    &quot;&quot;,
+                    work);
+            }
+
+<span class="fc" id="L199">            work.consume(</span>
+                &quot;projection.selected-source-code-units&quot;,
+                selectedSourceLength);
+<span class="fc" id="L202">            String selectedSource = occurrenceRange.textFrom(root.source());</span>
+<span class="fc" id="L203">            long literalLexemeUnits = scan.literals().stream()</span>
+<span class="fc" id="L204">                .mapToLong(literal -&gt; literal.sourceLexeme().length())</span>
+<span class="fc" id="L205">                .sum();</span>
+<span class="fc" id="L206">            work.consume(</span>
+                &quot;projection.revalidation-node-visits&quot;,
+<span class="fc" id="L208">                scan.nodeCount());</span>
+<span class="fc" id="L209">            work.consume(</span>
+                &quot;projection.revalidation-range-bindings&quot;,
+<span class="fc" id="L211">                scan.shiftedRanges().size());</span>
+<span class="fc" id="L212">            work.consume(</span>
+                &quot;projection.revalidation-literal-bindings&quot;,
+<span class="fc" id="L214">                scan.literals().size());</span>
+<span class="fc" id="L215">            work.consume(</span>
+                &quot;projection.revalidation-literal-code-units&quot;,
+<span class="fc" id="L217">                Math.addExact(</span>
+<span class="fc" id="L218">                    Math.multiplyExact(4L, literalLexemeUnits),</span>
+<span class="fc" id="L219">                    Math.multiplyExact(512L, scan.literals().size())));</span>
+
+            ExactParsedTerm projected;
+            try {
+<span class="fc" id="L223">                projected = new ExactParsedTerm(</span>
+                    selectedSource,
+                    selected,
+<span class="fc" id="L226">                    scan.literals(),</span>
+<span class="fc" id="L227">                    scan.shiftedRanges());</span>
+<span class="nc" id="L228">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L229">                return failure(</span>
+                    Status.TECHNICAL_FAILURE,
+                    &quot;PROJECTED_TERM_REVALIDATION_FAILED&quot;,
+                    stablePath,
+                    expected,
+                    rootSourceHash,
+<span class="nc" id="L235">                    Optional.of(actual),</span>
+<span class="nc" id="L236">                    Optional.of(occurrenceRange),</span>
+<span class="nc" id="L237">                    scan.rangeCommitmentHash(),</span>
+                    &quot;&quot;,
+                    work);
+<span class="fc" id="L240">            }</span>
+<span class="fc" id="L241">            return success(</span>
+                stablePath,
+                expected,
+                actual,
+                rootSourceHash,
+                occurrenceRange,
+<span class="fc" id="L247">                scan.rangeCommitmentHash(),</span>
+                projected,
+                work);
+<span class="fc" id="L250">        } catch (ProjectionLimitReached exception) {</span>
+<span class="fc" id="L251">            return failure(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L253">                exception.getMessage(),</span>
+                stablePath,
+                expected,
+                rootSourceHash,
+<span class="fc" id="L257">                Optional.empty(),</span>
+<span class="fc" id="L258">                Optional.empty(),</span>
+                &quot;&quot;,
+                &quot;&quot;,
+                work);
+<span class="nc" id="L262">        } catch (ProjectionInvariantFailure exception) {</span>
+<span class="nc" id="L263">            return failure(</span>
+                Status.TECHNICAL_FAILURE,
+<span class="nc" id="L265">                exception.getMessage(),</span>
+                stablePath,
+                expected,
+                rootSourceHash,
+<span class="nc" id="L269">                Optional.empty(),</span>
+<span class="nc" id="L270">                Optional.empty(),</span>
+                &quot;&quot;,
+                &quot;&quot;,
+                work);
+        }
+    }
+
+    private Scan scan(
+        ExactParsedTerm root,
+        Expr selected,
+        ExactParsedTerm.SourceRange selectedRange,
+        Work work
+    ) {
+<span class="fc" id="L283">        Deque&lt;Expr&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L284">        pending.push(selected);</span>
+<span class="fc" id="L285">        IdentityHashMap&lt;Expr, Boolean&gt; visited = new IdentityHashMap&lt;&gt;();</span>
+<span class="fc" id="L286">        IdentityHashMap&lt;Expr, ExactParsedTerm.SourceRange&gt; shiftedRanges =</span>
+            new IdentityHashMap&lt;&gt;();
+<span class="fc" id="L288">        List&lt;ExactParsedTerm.LiteralOccurrence&gt; literals =</span>
+            new ArrayList&lt;&gt;();
+<span class="fc" id="L290">        EvidenceDigest commitment = new EvidenceDigest();</span>
+<span class="fc" id="L291">        int nodeCount = 0;</span>
+
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L294">            Expr node = pending.pop();</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">            if (visited.put(node, Boolean.TRUE) != null) {</span>
+<span class="nc" id="L296">                throw invariant(&quot;PROJECTED_SUBTREE_REUSES_NODE_IDENTITY&quot;);</span>
+            }
+<span class="fc" id="L298">            nodeCount++;</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">            if (nodeCount &gt; policy.maxSubtreeNodes()) {</span>
+<span class="nc" id="L300">                throw limit(&quot;MAX_SUBTREE_NODES_EXCEEDED&quot;);</span>
+            }
+<span class="fc" id="L302">            work.consume(&quot;projection.subtree-node-visits&quot;, 1);</span>
+<span class="fc" id="L303">            commitNodeKind(commitment, node, work);</span>
+
+<span class="fc" id="L305">            Optional&lt;ExactParsedTerm.SourceRange&gt; sourceRange =</span>
+<span class="fc" id="L306">                root.sourceRangeFor(node);</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            if (sourceRange.isPresent()) {</span>
+<span class="fc" id="L308">                ExactParsedTerm.SourceRange absolute =</span>
+<span class="fc" id="L309">                    sourceRange.orElseThrow();</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">                if (!selectedRange.contains(absolute)) {</span>
+<span class="nc" id="L311">                    throw invariant(</span>
+                        &quot;SUBTREE_NODE_RANGE_ESCAPES_SELECTED_OCCURRENCE&quot;);
+                }
+<span class="fc" id="L314">                ExactParsedTerm.SourceRange shifted =</span>
+                    new ExactParsedTerm.SourceRange(
+<span class="fc" id="L316">                        absolute.startInclusive()</span>
+<span class="fc" id="L317">                            - selectedRange.startInclusive(),</span>
+<span class="fc" id="L318">                        absolute.endExclusive()</span>
+<span class="fc" id="L319">                            - selectedRange.startInclusive());</span>
+<span class="fc" id="L320">                shiftedRanges.put(node, shifted);</span>
+<span class="fc" id="L321">                work.consume(&quot;projection.shifted-range-bindings&quot;, 1);</span>
+<span class="fc" id="L322">                commit(commitment, shifted.canonicalMaterial(), work);</span>
+<span class="fc" id="L323">            } else {</span>
+<span class="nc" id="L324">                commit(commitment, &quot;NO_SOURCE_RANGE&quot;, work);</span>
+            }
+
+<span class="fc bfc" id="L327" title="All 2 branches covered.">            if (node instanceof NumberExpr number) {</span>
+<span class="fc" id="L328">                Optional&lt;ExactParsedTerm.LiteralOccurrence&gt; literal =</span>
+<span class="fc" id="L329">                    root.literalFor(number);</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">                if (literal.isPresent()) {</span>
+<span class="fc" id="L331">                    ExactParsedTerm.LiteralOccurrence absolute =</span>
+<span class="fc" id="L332">                        literal.orElseThrow();</span>
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">                    if (!selectedRange.contains(</span>
+<span class="fc" id="L334">                            absolute.startInclusive(),</span>
+<span class="fc" id="L335">                            absolute.endExclusive())) {</span>
+<span class="nc" id="L336">                        throw invariant(</span>
+                            &quot;SUBTREE_LITERAL_ESCAPES_SELECTED_OCCURRENCE&quot;);
+                    }
+<span class="fc" id="L339">                    ExactParsedTerm.LiteralOccurrence shifted =</span>
+                        new ExactParsedTerm.LiteralOccurrence(
+                            number,
+<span class="fc" id="L342">                            absolute.startInclusive()</span>
+<span class="fc" id="L343">                                - selectedRange.startInclusive(),</span>
+<span class="fc" id="L344">                            absolute.endExclusive()</span>
+<span class="fc" id="L345">                                - selectedRange.startInclusive(),</span>
+<span class="fc" id="L346">                            absolute.sourceLexeme(),</span>
+<span class="fc" id="L347">                            absolute.evidence());</span>
+<span class="fc" id="L348">                    literals.add(shifted);</span>
+<span class="fc" id="L349">                    work.consume(&quot;projection.shifted-literal-bindings&quot;, 1);</span>
+<span class="fc" id="L350">                    commit(</span>
+                        commitment,
+<span class="fc" id="L352">                        absolute.evidence().certificateHash(),</span>
+                        work);
+<span class="fc" id="L354">                } else {</span>
+<span class="nc" id="L355">                    commit(commitment, &quot;SYNTHETIC_NUMBER&quot;, work);</span>
+                }
+            }
+
+<span class="fc bfc" id="L359" title="All 2 branches covered.">            if (node instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L360">                pending.push(binary.right());</span>
+<span class="fc" id="L361">                pending.push(binary.left());</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">            } else if (node instanceof FunctionExpr function) {</span>
+<span class="nc" id="L363">                List&lt;Expr&gt; arguments = function.arguments();</span>
+<span class="nc" id="L364">                for (int index = arguments.size() - 1;</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">                        index &gt;= 0;</span>
+<span class="nc" id="L366">                        index--) {</span>
+<span class="nc" id="L367">                    pending.push(arguments.get(index));</span>
+                }
+            }
+<span class="fc" id="L370">        }</span>
+
+<span class="fc" id="L372">        literals.sort(Comparator.comparingInt(</span>
+            ExactParsedTerm.LiteralOccurrence::startInclusive));
+<span class="fc" id="L374">        return new Scan(</span>
+            nodeCount,
+            shiftedRanges,
+<span class="fc" id="L377">            List.copyOf(literals),</span>
+<span class="fc" id="L378">            commitment.finish());</span>
+    }
+
+    private static Expr navigate(
+        Expr root,
+        List&lt;Integer&gt; path,
+        Work work
+    ) {
+<span class="fc" id="L386">        Expr current = root;</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        for (int index : path) {</span>
+<span class="fc" id="L388">            work.consume(&quot;projection.path-navigation-steps&quot;, 1);</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">            if (current instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L390" title="All 3 branches covered.">                current = switch (index) {</span>
+<span class="fc" id="L391">                    case 0 -&gt; binary.left();</span>
+<span class="fc" id="L392">                    case 1 -&gt; binary.right();</span>
+<span class="fc" id="L393">                    default -&gt; null;</span>
+<span class="fc" id="L394">                };</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">            } else if (current instanceof FunctionExpr function) {</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">                current = index &lt; function.arguments().size()</span>
+<span class="fc" id="L397">                    ? function.arguments().get(index)</span>
+<span class="pc" id="L398">                    : null;</span>
+            } else {
+<span class="nc" id="L400">                current = null;</span>
+            }
+<span class="fc bfc" id="L402" title="All 2 branches covered.">            if (current == null) {</span>
+<span class="fc" id="L403">                return null;</span>
+            }
+<span class="fc" id="L405">        }</span>
+<span class="fc" id="L406">        return current;</span>
+    }
+
+    private static List&lt;Integer&gt; validatePath(List&lt;Integer&gt; path) {
+<span class="fc" id="L410">        List&lt;Integer&gt; stable = List.copyOf(</span>
+<span class="fc" id="L411">            Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="pc bpc" id="L412" title="3 of 6 branches missed.">        if (stable.stream().anyMatch(index -&gt; index == null || index &lt; 0)) {</span>
+<span class="nc" id="L413">            throw new IllegalArgumentException(</span>
+                &quot;subterm projection path is invalid&quot;);
+        }
+<span class="fc" id="L416">        return stable;</span>
+    }
+
+    private static void commitNodeKind(
+        EvidenceDigest commitment,
+        Expr node,
+        Work work
+    ) {
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        if (node instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L425">            commit(commitment, &quot;BINARY&quot;, work);</span>
+<span class="fc" id="L426">            commit(commitment, binary.operator().name(), work);</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        } else if (node instanceof FunctionExpr function) {</span>
+<span class="nc" id="L428">            commit(commitment, &quot;FUNCTION&quot;, work);</span>
+<span class="nc" id="L429">            commit(commitment, function.name(), work);</span>
+<span class="nc" id="L430">            commit(</span>
+                commitment,
+<span class="nc" id="L432">                Integer.toString(function.arguments().size()),</span>
+                work);
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        } else if (node instanceof VariableExpr variable) {</span>
+<span class="fc" id="L435">            commit(commitment, &quot;VARIABLE&quot;, work);</span>
+<span class="fc" id="L436">            commit(commitment, variable.name(), work);</span>
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">        } else if (node instanceof NumberExpr) {</span>
+<span class="fc" id="L438">            commit(commitment, &quot;NUMBER&quot;, work);</span>
+        } else {
+<span class="nc" id="L440">            throw invariant(&quot;UNSUPPORTED_AST_NODE_IN_PROJECTION&quot;);</span>
+        }
+<span class="fc" id="L442">    }</span>
+
+    private static void commit(
+        EvidenceDigest digest,
+        String value,
+        Work work
+    ) {
+<span class="fc" id="L449">        work.consume(</span>
+            &quot;projection.range-commitment-code-units&quot;,
+<span class="fc" id="L451">            Math.multiplyExact(4L, value.length()));</span>
+<span class="fc" id="L452">        digest.append(value);</span>
+<span class="fc" id="L453">    }</span>
+
+    private Result success(
+        List&lt;Integer&gt; path,
+        String expected,
+        String actual,
+        String rootSourceHash,
+        ExactParsedTerm.SourceRange selectedRange,
+        String rangeCommitmentHash,
+        ExactParsedTerm projected,
+        Work work
+    ) {
+<span class="fc" id="L465">        return new Result(</span>
+            Status.PROJECTED,
+            &quot;EXACT_SUBTERM_PROJECTED&quot;,
+            policy,
+            path,
+            expected,
+<span class="fc" id="L471">            Optional.of(actual),</span>
+<span class="fc" id="L472">            Optional.of(rootSourceHash),</span>
+<span class="fc" id="L473">            Optional.of(selectedRange),</span>
+<span class="fc" id="L474">            Optional.of(rangeCommitmentHash),</span>
+<span class="fc" id="L475">            Optional.of(projected),</span>
+<span class="fc" id="L476">            work.ledger());</span>
+    }
+
+    private Result failure(
+        Status status,
+        String detailCode,
+        List&lt;Integer&gt; path,
+        String expected,
+        String rootSourceHash,
+        Optional&lt;String&gt; actual,
+        Optional&lt;ExactParsedTerm.SourceRange&gt; selectedRange,
+        String rangeCommitmentHash,
+        String projectedSource,
+        Work work
+    ) {
+<span class="fc" id="L491">        Optional&lt;ExactParsedTerm&gt; projected = Optional.empty();</span>
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">        if (!projectedSource.isEmpty()) {</span>
+<span class="nc" id="L493">            throw new IllegalArgumentException(</span>
+                &quot;failed projection cannot retain projected source&quot;);
+        }
+<span class="fc" id="L496">        return new Result(</span>
+            status,
+            detailCode,
+            policy,
+            path,
+            expected,
+            actual,
+<span class="fc bfc" id="L503" title="All 2 branches covered.">            rootSourceHash.isEmpty()</span>
+<span class="fc" id="L504">                ? Optional.empty()</span>
+<span class="fc" id="L505">                : Optional.of(rootSourceHash),</span>
+            selectedRange,
+<span class="fc bfc" id="L507" title="All 2 branches covered.">            rangeCommitmentHash.isEmpty()</span>
+<span class="fc" id="L508">                ? Optional.empty()</span>
+<span class="fc" id="L509">                : Optional.of(rangeCommitmentHash),</span>
+            projected,
+<span class="fc" id="L511">            work.ledger());</span>
+    }
+
+    private static ProjectionLimitReached limit(String detailCode) {
+<span class="fc" id="L515">        return new ProjectionLimitReached(detailCode);</span>
+    }
+
+    private static ProjectionInvariantFailure invariant(
+        String detailCode
+    ) {
+<span class="nc" id="L521">        return new ProjectionInvariantFailure(detailCode);</span>
+    }
+
+    private static String sha256(String value) {
+<span class="fc" id="L525">        EvidenceDigest digest = new EvidenceDigest();</span>
+<span class="fc" id="L526">        digest.append(value);</span>
+<span class="fc" id="L527">        return digest.finish();</span>
+    }
+
+<span class="fc" id="L530">    public enum Status {</span>
+<span class="fc" id="L531">        PROJECTED,</span>
+<span class="fc" id="L532">        POSITION_NOT_PRESENT,</span>
+<span class="fc" id="L533">        POSITION_STALE,</span>
+<span class="fc" id="L534">        UNSUPPORTED,</span>
+<span class="fc" id="L535">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L536">        TECHNICAL_FAILURE</span>
+    }
+
+    /** Explicit structural, representation and total-work bounds. */
+    public record Policy(
+        int maxPathDepth,
+        int maxRootSourceCodeUnits,
+        int maxSubtreeNodes,
+        int maxSubtreeSourceCodeUnits,
+        int maxFormattedCodeUnits,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L548">        public Policy {</span>
+<span class="pc bpc" id="L549" title="12 of 24 branches missed.">            if (maxPathDepth &lt; 0</span>
+                    || maxPathDepth &gt; MAX_PATH_DEPTH
+                    || maxRootSourceCodeUnits &lt; 1
+                    || maxRootSourceCodeUnits
+                        &gt; MAX_ROOT_SOURCE_CODE_UNITS
+                    || maxSubtreeNodes &lt; 1
+                    || maxSubtreeNodes &gt; MAX_SUBTREE_NODES
+                    || maxSubtreeSourceCodeUnits &lt; 1
+                    || maxSubtreeSourceCodeUnits
+                        &gt; MAX_SUBTREE_SOURCE_CODE_UNITS
+                    || maxFormattedCodeUnits &lt; 1
+                    || maxFormattedCodeUnits &gt; MAX_FORMATTED_CODE_UNITS
+                    || maxWorkUnits &lt; 1
+                    || maxWorkUnits &gt; MAX_WORK_UNITS) {
+<span class="nc" id="L563">                throw new IllegalArgumentException(</span>
+                    &quot;exact subterm projection policy is invalid&quot;);
+            }
+<span class="fc" id="L566">        }</span>
+
+        public static Policy boundedDefaults() {
+<span class="fc" id="L569">            return new Policy(</span>
+                256,
+                1_000_000,
+                4_096,
+                100_000,
+                200_000,
+                10_000_000L);
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L579">            return maxPathDepth + &quot;:&quot;</span>
+                + maxRootSourceCodeUnits + &quot;:&quot;
+                + maxSubtreeNodes + &quot;:&quot;
+                + maxSubtreeSourceCodeUnits + &quot;:&quot;
+                + maxFormattedCodeUnits + &quot;:&quot;
+                + maxWorkUnits;
+        }
+    }
+
+    /** Deterministic stage-separated work consumed by one projection. */
+    public record WorkLedger(Map&lt;String, Long&gt; stages) {
+<span class="fc" id="L590">        public WorkLedger {</span>
+<span class="fc" id="L591">            Objects.requireNonNull(stages, &quot;stages&quot;);</span>
+<span class="fc" id="L592">            TreeMap&lt;String, Long&gt; canonical = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L593">            stages.forEach((stage, units) -&gt; {</span>
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">                if (stage == null</span>
+<span class="pc bpc" id="L595" title="2 of 4 branches missed.">                        || stage.isBlank()</span>
+                        || units == null
+<span class="pc bpc" id="L597" title="1 of 2 branches missed.">                        || units &lt; 0) {</span>
+<span class="nc" id="L598">                    throw new IllegalArgumentException(</span>
+                        &quot;subterm projection work ledger is invalid&quot;);
+                }
+<span class="fc" id="L601">                canonical.merge(stage, units, Math::addExact);</span>
+<span class="fc" id="L602">            });</span>
+<span class="fc" id="L603">            checkedTotal(canonical.values());</span>
+<span class="fc" id="L604">            stages = Collections.unmodifiableMap(</span>
+                new LinkedHashMap&lt;&gt;(canonical));
+<span class="fc" id="L606">        }</span>
+
+        public long totalWorkUnits() {
+<span class="fc" id="L609">            return checkedTotal(stages.values());</span>
+        }
+
+        public long units(String stage) {
+<span class="fc" id="L613">            return stages.getOrDefault(stage, 0L);</span>
+        }
+
+        public boolean within(long maximum) {
+<span class="pc bpc" id="L617" title="2 of 4 branches missed.">            return maximum &gt;= 0 &amp;&amp; totalWorkUnits() &lt;= maximum;</span>
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L621">            EvidenceDigest digest = new EvidenceDigest();</span>
+<span class="fc" id="L622">            stages.forEach((stage, units) -&gt; {</span>
+<span class="fc" id="L623">                digest.append(stage);</span>
+<span class="fc" id="L624">                digest.append(Long.toString(units));</span>
+<span class="fc" id="L625">            });</span>
+<span class="fc" id="L626">            digest.append(Long.toString(totalWorkUnits()));</span>
+<span class="fc" id="L627">            return digest.finish();</span>
+        }
+
+        private static long checkedTotal(Iterable&lt;Long&gt; values) {
+            try {
+<span class="fc" id="L632">                long total = 0;</span>
+<span class="fc bfc" id="L633" title="All 2 branches covered.">                for (long value : values) {</span>
+<span class="fc" id="L634">                    total = Math.addExact(total, value);</span>
+<span class="fc" id="L635">                }</span>
+<span class="fc" id="L636">                return total;</span>
+<span class="nc" id="L637">            } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L638">                throw new IllegalArgumentException(</span>
+                    &quot;subterm projection work exceeds long range&quot;,
+                    exception);
+            }
+        }
+    }
+
+    /** Issuer-owned exact projection result. */
+    public static final class Result {
+        private final Status status;
+        private final String detailCode;
+        private final Policy policy;
+        private final List&lt;Integer&gt; path;
+        private final String expectedFormattedText;
+        private final Optional&lt;String&gt; actualFormattedText;
+        private final Optional&lt;String&gt; rootSourceHash;
+        private final Optional&lt;ExactParsedTerm.SourceRange&gt; selectedRange;
+        private final Optional&lt;String&gt; rangeCommitmentHash;
+        private final Optional&lt;ExactParsedTerm&gt; projected;
+        private final WorkLedger work;
+        private final String certificateHash;
+
+        private Result(
+            Status status,
+            String detailCode,
+            Policy policy,
+            List&lt;Integer&gt; path,
+            String expectedFormattedText,
+            Optional&lt;String&gt; actualFormattedText,
+            Optional&lt;String&gt; rootSourceHash,
+            Optional&lt;ExactParsedTerm.SourceRange&gt; selectedRange,
+            Optional&lt;String&gt; rangeCommitmentHash,
+            Optional&lt;ExactParsedTerm&gt; projected,
+            WorkLedger work
+<span class="fc" id="L672">        ) {</span>
+<span class="fc" id="L673">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L674" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L675">                throw new IllegalArgumentException(</span>
+                    &quot;projection detail code must not be blank&quot;);
+            }
+<span class="fc" id="L678">            this.detailCode = detailCode;</span>
+<span class="fc" id="L679">            this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L680">            this.path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="fc" id="L681">            this.expectedFormattedText = Objects.requireNonNull(</span>
+                expectedFormattedText,
+                &quot;expectedFormattedText&quot;);
+<span class="fc" id="L684">            this.actualFormattedText = Objects.requireNonNull(</span>
+                actualFormattedText,
+                &quot;actualFormattedText&quot;);
+<span class="fc" id="L687">            this.rootSourceHash = validateHash(</span>
+<span class="fc" id="L688">                Objects.requireNonNull(rootSourceHash, &quot;rootSourceHash&quot;));</span>
+<span class="fc" id="L689">            this.selectedRange = Objects.requireNonNull(</span>
+                selectedRange,
+                &quot;selectedRange&quot;);
+<span class="fc" id="L692">            this.rangeCommitmentHash = validateHash(</span>
+<span class="fc" id="L693">                Objects.requireNonNull(</span>
+                    rangeCommitmentHash,
+                    &quot;rangeCommitmentHash&quot;));
+<span class="fc" id="L696">            this.projected = Objects.requireNonNull(</span>
+                projected,
+                &quot;projected&quot;);
+<span class="fc" id="L699">            this.work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L700" title="1 of 4 branches missed.">            if ((status == Status.PROJECTED) != projected.isPresent()) {</span>
+<span class="nc" id="L701">                throw new IllegalArgumentException(</span>
+                    &quot;projection status/payload mismatch&quot;);
+            }
+<span class="fc bfc" id="L704" title="All 2 branches covered.">            if (status == Status.PROJECTED</span>
+<span class="pc bpc" id="L705" title="1 of 2 branches missed.">                    &amp;&amp; (actualFormattedText.isEmpty()</span>
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">                        || rootSourceHash.isEmpty()</span>
+<span class="pc bpc" id="L707" title="1 of 2 branches missed.">                        || selectedRange.isEmpty()</span>
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">                        || rangeCommitmentHash.isEmpty())) {</span>
+<span class="nc" id="L709">                throw new IllegalArgumentException(</span>
+                    &quot;successful projection lacks occurrence evidence&quot;);
+            }
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">            if (!work.within(policy.maxWorkUnits())) {</span>
+<span class="nc" id="L713">                throw new IllegalArgumentException(</span>
+                    &quot;projection work exceeds policy&quot;);
+            }
+<span class="fc" id="L716">            this.certificateHash = certificate();</span>
+<span class="fc" id="L717">        }</span>
+
+        private static Optional&lt;String&gt; validateHash(
+            Optional&lt;String&gt; hash
+        ) {
+<span class="fc" id="L722">            hash.ifPresent(value -&gt; {</span>
+<span class="pc bpc" id="L723" title="1 of 2 branches missed.">                if (!value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L724">                    throw new IllegalArgumentException(</span>
+                        &quot;projection evidence hash is invalid&quot;);
+                }
+<span class="fc" id="L727">            });</span>
+<span class="fc" id="L728">            return hash;</span>
+        }
+
+        public Status status() {
+<span class="fc" id="L732">            return status;</span>
+        }
+
+        public String detailCode() {
+<span class="fc" id="L736">            return detailCode;</span>
+        }
+
+        public Policy policy() {
+<span class="nc" id="L740">            return policy;</span>
+        }
+
+        public List&lt;Integer&gt; path() {
+<span class="nc" id="L744">            return path;</span>
+        }
+
+        public String expectedFormattedText() {
+<span class="nc" id="L748">            return expectedFormattedText;</span>
+        }
+
+        public Optional&lt;String&gt; actualFormattedText() {
+<span class="fc" id="L752">            return actualFormattedText;</span>
+        }
+
+        public Optional&lt;String&gt; rootSourceHash() {
+<span class="nc" id="L756">            return rootSourceHash;</span>
+        }
+
+        public Optional&lt;ExactParsedTerm.SourceRange&gt; selectedRange() {
+<span class="fc" id="L760">            return selectedRange;</span>
+        }
+
+        public Optional&lt;String&gt; rangeCommitmentHash() {
+<span class="fc" id="L764">            return rangeCommitmentHash;</span>
+        }
+
+        public Optional&lt;ExactParsedTerm&gt; projected() {
+<span class="fc" id="L768">            return projected;</span>
+        }
+
+        public WorkLedger work() {
+<span class="fc" id="L772">            return work;</span>
+        }
+
+        public String certificateHash() {
+<span class="fc" id="L776">            return certificateHash;</span>
+        }
+
+        public boolean successful() {
+<span class="fc bfc" id="L780" title="All 2 branches covered.">            return status == Status.PROJECTED;</span>
+        }
+
+        private String certificate() {
+<span class="fc" id="L784">            EvidenceDigest digest = new EvidenceDigest();</span>
+<span class="fc" id="L785">            digest.append(PROJECTOR_ID);</span>
+<span class="fc" id="L786">            digest.append(status.name());</span>
+<span class="fc" id="L787">            digest.append(detailCode);</span>
+<span class="fc" id="L788">            digest.append(policy.canonicalMaterial());</span>
+<span class="fc" id="L789">            digest.append(path.stream().map(String::valueOf)</span>
+<span class="fc" id="L790">                .collect(java.util.stream.Collectors.joining(&quot;.&quot;)));</span>
+<span class="fc" id="L791">            digest.append(expectedFormattedText);</span>
+<span class="fc" id="L792">            digest.append(actualFormattedText.orElse(&quot;&quot;));</span>
+<span class="fc" id="L793">            digest.append(rootSourceHash.orElse(&quot;&quot;));</span>
+<span class="fc" id="L794">            digest.append(selectedRange.map(</span>
+<span class="fc" id="L795">                ExactParsedTerm.SourceRange::canonicalMaterial).orElse(&quot;&quot;));</span>
+<span class="fc" id="L796">            digest.append(rangeCommitmentHash.orElse(&quot;&quot;));</span>
+<span class="fc" id="L797">            digest.append(projected.map(ExactParsedTerm::source).orElse(&quot;&quot;));</span>
+<span class="fc" id="L798">            projected.ifPresent(term -&gt; term.literals().forEach(literal -&gt; {</span>
+<span class="fc" id="L799">                digest.append(Integer.toString(literal.startInclusive()));</span>
+<span class="fc" id="L800">                digest.append(Integer.toString(literal.endExclusive()));</span>
+<span class="fc" id="L801">                digest.append(literal.sourceLexeme());</span>
+<span class="fc" id="L802">                digest.append(literal.evidence().certificateHash());</span>
+<span class="fc" id="L803">            }));</span>
+<span class="fc" id="L804">            digest.append(work.canonicalMaterial());</span>
+<span class="fc" id="L805">            return digest.finish();</span>
+        }
+    }
+
+    private record Scan(
+        int nodeCount,
+        Map&lt;Expr, ExactParsedTerm.SourceRange&gt; shiftedRanges,
+        List&lt;ExactParsedTerm.LiteralOccurrence&gt; literals,
+        String rangeCommitmentHash
+    ) {
+<span class="fc" id="L815">        private Scan {</span>
+<span class="fc" id="L816">            shiftedRanges = Collections.unmodifiableMap(</span>
+                new IdentityHashMap&lt;&gt;(shiftedRanges));
+<span class="fc" id="L818">            literals = List.copyOf(literals);</span>
+<span class="pc bpc" id="L819" title="1 of 2 branches missed.">            if (nodeCount &lt; 1</span>
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">                    || !rangeCommitmentHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)) {
+<span class="nc" id="L822">                throw new IllegalArgumentException(</span>
+                    &quot;subterm scan result is invalid&quot;);
+            }
+<span class="fc" id="L825">        }</span>
+    }
+
+    private static final class Work {
+        private final long limit;
+<span class="fc" id="L830">        private final Map&lt;String, Long&gt; stages = new TreeMap&lt;&gt;();</span>
+        private long total;
+
+<span class="fc" id="L833">        private Work(long limit) {</span>
+<span class="fc" id="L834">            this.limit = limit;</span>
+<span class="fc" id="L835">        }</span>
+
+        private void consume(String stage, long units) {
+<span class="pc bpc" id="L838" title="1 of 4 branches missed.">            if (units &lt; 0 || total &gt; limit - units) {</span>
+<span class="fc" id="L839">                throw limit(&quot;SUBTERM_PROJECTION_WORK_BUDGET_EXCEEDED&quot;);</span>
+            }
+<span class="pc bpc" id="L841" title="1 of 2 branches missed.">            if (units == 0) {</span>
+<span class="nc" id="L842">                return;</span>
+            }
+<span class="fc" id="L844">            total += units;</span>
+<span class="fc" id="L845">            stages.merge(stage, units, Math::addExact);</span>
+<span class="fc" id="L846">        }</span>
+
+        private WorkLedger ledger() {
+<span class="fc" id="L849">            return new WorkLedger(stages);</span>
+        }
+    }
+
+    private static final class EvidenceDigest {
+        private final MessageDigest digest;
+
+<span class="fc" id="L856">        private EvidenceDigest() {</span>
+            try {
+<span class="fc" id="L858">                digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="nc" id="L859">            } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L860">                throw new IllegalStateException(</span>
+                    &quot;SHA-256 is unavailable&quot;,
+                    exception);
+<span class="fc" id="L863">            }</span>
+<span class="fc" id="L864">        }</span>
+
+        private void append(String value) {
+<span class="fc" id="L867">            byte[] bytes = Objects.requireNonNull(value, &quot;value&quot;)</span>
+<span class="fc" id="L868">                .getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L869">            byte[] length = Integer.toString(bytes.length)</span>
+<span class="fc" id="L870">                .getBytes(StandardCharsets.US_ASCII);</span>
+<span class="fc" id="L871">            digest.update(length);</span>
+<span class="fc" id="L872">            digest.update((byte) ':');</span>
+<span class="fc" id="L873">            digest.update(bytes);</span>
+<span class="fc" id="L874">            digest.update((byte) '\n');</span>
+<span class="fc" id="L875">        }</span>
+
+        private String finish() {
+<span class="fc" id="L878">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest.digest());</span>
+        }
+    }
+
+    private static final class ProjectionLimitReached
+            extends RuntimeException {
+        private ProjectionLimitReached(String detailCode) {
+<span class="fc" id="L885">            super(detailCode);</span>
+<span class="fc" id="L886">        }</span>
+    }
+
+    private static final class ProjectionInvariantFailure
+            extends RuntimeException {
+        private ProjectionInvariantFailure(String detailCode) {
+<span class="nc" id="L892">            super(detailCode);</span>
+<span class="nc" id="L893">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
