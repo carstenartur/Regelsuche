@@ -1,6 +1,6 @@
 # Domänenbewusste Polynomfaktorisierung
 
-**Implementierungsstand: 27. August 2026**
+**Implementierungsstand: 28. August 2026**
 
 Regelsuche behandelt Polynomfaktorisierung nicht als Sonderfall eines einzelnen
 Quartikoperators. Der mathematische Kern trennt Koeffizientendomänen,
@@ -21,6 +21,7 @@ Verantwortung gestaltet.
 | Backendneutrale Engine-/Verifier-Grenze | implementiert |
 | Begrenzte binäre Quartikengine | implementiert |
 | Verlustfreie univariate Koeffizientenansicht | implementiert |
+| Parsergebundene direkte `ExactParsedTerm`-zu-`Q[x]`-Pipeline | implementiert |
 | Inhalt und primitiver Teil für `Z[x]` und `Q[x]` | implementiert |
 | Euklidischer Polynom-GGT über einem exakten Feld | implementiert |
 | Quadratfreie Zerlegung in Charakteristik null | implementiert |
@@ -31,6 +32,8 @@ Verantwortung gestaltet.
 | Begrenzte deterministische Zassenhaus-Rekombination in `Z[x]` | implementiert |
 | Integrierte native allgemeine Engine für `Z[x]` und `Q[x]` | implementiert |
 | Exakte Produktrückprüfung durch `FactorizationVerifier` | implementiert |
+| Exaktes Faktorenrendering mit Reparse-/Ringrekonstruktion am Wurzelvorkommen | implementiert |
+| Verschachtelte occurrence-preserving Suchintegration | noch offen |
 | Unabhängige Vollständigkeits-/Irreduzibilitätszertifikate | noch offen |
 | LLL-/van-Hoeij-Rekombination für größere Fälle | noch offen |
 | Automatische Integration der allgemeinen Engine in Suche und Workbench | noch offen |
@@ -45,11 +48,12 @@ Irreduzibilitätsaussagen als Backend-Claims sichtbar.
 ## Gesamtfluss
 
 ```text
-Quelltext und parsergebundene exakte Literale
-  -> PolynomialSemanticView
-  -> CoefficientDomain
-  -> PolynomialRing mit expliziter Monomordnung
-  -> kanonisches SparsePolynomial
+Quelltext
+  -> ExpressionParser.parseExactTerm
+  -> ExactParsedTerm mit node-identischer Literalprovenienz
+  -> ExactParsedUnivariatePolynomialView
+  -> PolynomialRing<ExactRational>
+  -> kanonisches SparsePolynomial<ExactRational>
   -> FactorizationRequest
        -> request-weite Strukturgrenzen
        -> Evidence-Anforderung
@@ -67,12 +71,21 @@ NativeUnivariateFactorizationEngine für Z[x] oder Q[x]
   -> untrusted Proposal / BackendClaim / Work Ledger
   -> FactorizationVerifier
   -> exakte Produktrückprüfung und verifier-ausgestellte Evidence
+
+Verifier-issued candidate am Wurzelvorkommen
+  -> vorautorisierte Quell-/Literal-Evidence-Prüfung
+  -> deterministisches exaktes Faktorenrendering
+  -> ExpressionParser.parseExactTerm
+  -> erneute ExactParsedUnivariatePolynomialView
+  -> exakte Ring- und Polynomgleichheit
+  -> content-addressed transformation evidence
 ```
 
-Alle Stufen werden unter derselben Request-Autorität ausgeführt. Ein
-erschöpftes Kandidaten-, Präzisions-, Repräsentations- oder Arbeitsbudget
-bleibt `BUDGET_INCONCLUSIVE` und wird nie zu einer Irreduzibilitätsaussage
-umgedeutet.
+Extraktion, Engine, Produktrückprüfung, Quellbelegprüfung, Rendering und
+Rekonstruktion werden unter derselben ursprünglichen Arbeitsautorität
+ausgeführt. Ein erschöpftes Kandidaten-, Präzisions-, Repräsentations- oder
+Arbeitsbudget bleibt `BUDGET_INCONCLUSIVE` und wird nie zu einer
+Irreduzibilitätsaussage umgedeutet.
 
 ## Getrennte Identitäten
 
@@ -172,11 +185,24 @@ werden am Konstruktor beziehungsweise vor binären Operationen geprüft.
 
 ## Exakte Syntaxgrenze
 
-`PolynomialSemanticView` verwendet `ExpressionParser.parseExactTerm`.
-Numerische Koeffizienten und Exponenten werden über die Identität des vom
-Parser erzeugten `NumberExpr`-Knotens zu ihrer exakten Literal-Evidence
-aufgelöst. Der historische `double`-Wert des Knotens ist für exakte Mathematik
-nicht autoritativ.
+`ExpressionParser.parseExactTerm` erzeugt ein `ExactParsedTerm`, das den
+ursprünglichen Quelltext, den gewöhnlichen Syntax-AST und für jedes numerische
+Literal eine parserausgestellte exakte Evidence enthält. Die Zuordnung erfolgt
+über die Identität des konkret vom Parser erzeugten `NumberExpr`-Knotens.
+Wertgleiche, später erzeugte Knoten erben diese Provenienz nicht.
+
+`ExactParsedUnivariatePolynomialView` löst Koeffizienten und Exponenten nur über
+diese node-identische Evidence auf und erzeugt direkt ein
+`SparsePolynomial<ExactRational>` in einem expliziten Ring. Unterstützt werden
+begrenzt Addition, Subtraktion, kommutative Multiplikation, exakte Division
+durch Konstanten und nichtnegative ganzzahlige Potenzen. Mehrere Variablen,
+Funktionen, variable Divisoren, provenance-freie Zahlknoten und überschrittene
+Darstellungs- oder Arbeitsgrenzen werden fail-closed abgelehnt.
+
+`ExactParsedFactorizationPipeline` übergibt nach der Extraktion ausschließlich
+das verbleibende ursprüngliche Budget an `FactorizationRequest`, Engine und
+`FactorizationVerifier`. Es gibt keinen Render-/Reparse-Zwischenschritt und
+keine Wiedergewinnung exakter Werte aus `double`.
 
 Damit bleibt beispielsweise
 
@@ -186,11 +212,18 @@ Damit bleibt beispielsweise
 
 auch oberhalb der exakten IEEE-754-Ganzzahlgrenze korrekt. Ein fremd erzeugter
 numerischer AST-Knoten erbt keine Source-Evidence. Synthetische Nullknoten aus
-der Unary-Minus-Darstellung werden nur als exakt null akzeptiert.
+der Unary-Minus-Darstellung werden nur als strukturelle Nullmarker akzeptiert,
+nie als allgemeine Koeffizientenautorität.
 
-`ExactExpressionFormatter` formatiert parsergebundene Teilbäume auf derselben
-Grundlage. Strukturelle Atome und spätere Render-Schritte interpretieren exakte
-Werte nicht erneut über `double`.
+Nach einer verifier-ausgestellten Zerlegung rendert
+`ExactFactorizationExpressionRenderer` rationale Werte ausschließlich als
+Ganzzahlen oder explizite Brüche. `ExactFactorizationTransformationPipeline`
+parst dieses Ergebnis erneut exakt, extrahiert das Polynom unabhängig und
+autorisiert eine `transformedExpression` nur bei exakter Gleichheit im
+ursprünglichen Ring. Weitere Details stehen in
+[Exakte Parser-zu-Faktorisierungs-Pipeline](exact-parsed-factorization-pipeline.md)
+und
+[Exakte Faktorisierungs-Transformationspipeline](exact-factorization-transformation-pipeline.md).
 
 ## Faktorisierungsanfrage und request-weite Grenzen
 
@@ -522,6 +555,9 @@ suitable-prime.modular-reduction
 hensel.step-<n>.corrections
 zassenhaus.candidate.attempts
 verify.factor-product-multiplications
+transform.source-evidence-text-validation
+render.inspected-polynomial-terms
+transform.exact-reparse-input-code-units
 ```
 
 Die Stage-Abbildung wird kanonisch sortiert. Verschachtelte Stufen übernehmen
@@ -558,27 +594,34 @@ allgemeine native univariate Engine.
 
 ## Ausdrucksadapter, Suche und Workbench
 
-`PolynomialDecompositionSynthesisOperator` integriert aktuell weiterhin die
-binäre Quartikengine in den Ausdrucks- und Suchpfad:
+`PolynomialDecompositionSynthesisOperator` integriert weiterhin die binäre
+Quartikengine als spezialisierten historischen Kontrollpfad.
+
+Für die allgemeine univariate Engine ist jetzt der exakte Wurzelpfad
+implementiert:
 
 ```text
-String
-  -> PolynomialSemanticView
-  -> FactorizationRequest
-  -> BinaryQuarticFactorizationEngine
-  -> FactorizationVerifier
-  -> VerifiedCandidate
-  -> gerenderter Transformationstext
+ExactParsedTerm
+  -> ExactParsedFactorizationPipeline
+  -> FactorizationVerifier.VerifiedCandidate
+  -> ExactFactorizationExpressionRenderer
+  -> exaktes Reparse und Ringrekonstruktion
+  -> ExactFactorizationTransformationPipeline.Result
 ```
+
+Die Pipeline bewahrt Quell-/Literalprovenienz, unterscheidet Backend-Claims von
+unabhängiger Evidence, verlangt bei mehreren Kandidaten eine explizite Auswahl
+und gibt eine Ersatzdarstellung nur nach vollständiger Rekonstruktion aus.
+Sie ist noch nicht automatisch in einem Suchprofil aktiv.
 
 `PolynomialTheorySubsumptionClassifier` klassifiziert gefundene Identitäten
 gegen verifier-ausgestellte Faktorisierungsevidence. Positiv subsumierte
 Instanzen können nur in den begrenzten `PolynomialDerivedMacroCache`; sie
 werden nicht als neue Kernelgesetze behandelt.
 
-Die allgemeine native Engine ist als Java-Engine implementiert und
-qualifiziert, aber noch nicht automatisch im Workbench-Suchprofil aktiv. Die
-Integration in Vorbereitung, Suche, Replay und Lernen benötigt eine
+Als nächster Produktabschnitt müssen verschachtelte Vorkommen die bestehende
+`TreePosition`-/Stalenessschutz- und Local-Rewrite-Infrastruktur wiederverwenden.
+Danach benötigt die Integration in Vorbereitung, Suche, Replay und Lernen eine
 gesonderte Auswahl- und Explainability-Policy, damit teure algebraische
 Makrooperationen nicht unkontrolliert jede Suchfront erweitern.
 
@@ -609,18 +652,21 @@ Systeme.
 
 ## Nächste Ausbaustufen
 
-Issue #763 verfolgt nach dem ersten integrierten nativen Abschluss insbesondere:
+Issue #763 verfolgt nach dem exakten Wurzel-Transformationspfad insbesondere:
 
-1. algorithmisch unabhängige Vollständigkeits- und
+1. verschachtelte occurrence-preserving Faktorisierung über die vorhandene
+   Pfad- und Stalenessschutz-Infrastruktur;
+2. dieselbe verifier-autorisierte Transformationsidentität für On-Demand-Suche,
+   Replay und abgeleitete Cache-Makros;
+3. den eingefrorenen Vergleich von keiner Faktorisierung, On-Demand-Ausführung
+   und verifier-gebundenem Cache unter gleicher sichtbarer Information und
+   kanonischer Arbeit;
+4. algorithmisch unabhängige Vollständigkeits- und
    Irreduzibilitätszertifikate für `Z[x]` und `Q[x]`;
-2. stärkere Rekombination, zunächst LLL-/van-Hoeij-artig, für Fälle mit vielen
+5. stärkere Rekombination, zunächst LLL-/van-Hoeij-artig, für Fälle mit vielen
    modularen Faktoren;
-3. breitere gehaltene und adversarielle Korpora mit abgestuften Budgets;
-4. Integration der allgemeinen Engine in Suche, Vorbereitung, Replay und
-   Lernen;
-5. dokumentierte Auswahl zwischen nativer Engine, SymPy und späteren
-   Backendportfolios;
-6. spätere multivariate und algebraische Koeffizientendomänen hinter
+6. breitere gehaltene und adversarielle Korpora mit abgestuften Budgets;
+7. spätere multivariate und algebraische Koeffizientendomänen hinter
    demselben Domain-, Ring-, Engine- und Verifiervertrag.
 
 ## Prüfung aus dem Checkout
@@ -642,7 +688,8 @@ Fokussierte Kern- und Algorithmusprüfungen:
   --tests de.regelsuche.math.algorithms.polynomial.SuitablePrimeSelectionTest \
   --tests de.regelsuche.math.algorithms.polynomial.HenselLiftingTest \
   --tests de.regelsuche.math.algorithms.polynomial.ZassenhausRecombinationTest \
-  --tests de.regelsuche.math.algorithms.polynomial.NativeUnivariateFactorizationEngineTest
+  --tests de.regelsuche.math.algorithms.polynomial.NativeUnivariateFactorizationEngineTest \
+  --tests de.regelsuche.math.algorithms.polynomial.ExactFactorizationNativeRenderingIntegrationTest
 ```
 
 Capability-matched Benchmark und validierter Bericht:
@@ -663,9 +710,10 @@ mvn --batch-mode --no-transfer-progress -Pfull verify
 Der implementierte Stand belegt eine erweiterbare exakte
 Faktorisierungsarchitektur, eine begrenzte native allgemeine univariate Engine
 für `Z[x]` und `Q[x]`, vollständige interne Modular-, Lift- und
-Rekombinationsinvarianten sowie exakte Produktrückprüfung.
+Rekombinationsinvarianten, exakte Produktrückprüfung sowie einen exakt
+rekonstruierten Ausdruckstransformationspfad für das Wurzelvorkommen.
 
 Er belegt noch keine algorithmisch unabhängige Vollständigkeit oder
 Irreduzibilität in `Z[x]` beziehungsweise `Q[x]`, keine multivariate
-Faktorisierung und keine universelle Überlegenheit gegenüber etablierten
-Computer-Algebra-Systemen.
+Faktorisierung, keinen qualifizierten Suchvorteil und keine universelle
+Überlegenheit gegenüber etablierten Computer-Algebra-Systemen.
