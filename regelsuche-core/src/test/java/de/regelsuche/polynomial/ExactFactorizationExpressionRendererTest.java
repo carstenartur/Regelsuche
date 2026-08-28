@@ -43,6 +43,9 @@ class ExactFactorizationExpressionRendererTest {
         assertEquals("(1 / 3) * (x - 1) ^ 2", first.expression().orElseThrow());
         assertEquals(first.canonicalMaterial(), second.canonicalMaterial());
         assertTrue(first.work().units("render.output-code-units") > 0);
+        assertTrue(
+            first.work().units("render.inspected-polynomial-terms") > 0);
+        assertTrue(first.work().units("render.inspected-coefficients") > 0);
         assertTrue(first.certificateHash().matches("sha256:[0-9a-f]{64}"));
 
         var reconstructed = view.analyze(
@@ -101,6 +104,43 @@ class ExactFactorizationExpressionRendererTest {
         var reconstructed = view.analyze(
             parser.parseExactTerm(result.expression().orElseThrow()));
         assertEquals(source, reconstructed.polynomial().orElseThrow());
+    }
+
+    @Test
+    void rejectsTheTermLimitBeforeInspectingAnOversizedPolynomial() {
+        SparsePolynomial<ExactRational> factor = polynomial("x - 1");
+        SparsePolynomial<ExactRational> source = factor.pow(2);
+        var candidate = verifiedCandidate(
+            source,
+            ExactRational.ONE,
+            List.of(new PolynomialFactor<>(factor, 2)),
+            SparsePolynomial.one(source.ring()),
+            FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION);
+        var renderer = new ExactFactorizationExpressionRenderer(
+            new ExactFactorizationExpressionRenderer.Policy(
+                10,
+                1,
+                64,
+                8_192,
+                100,
+                1_000));
+
+        var result = renderer.render(candidate);
+
+        assertFalse(result.rendered());
+        assertEquals(
+            ExactFactorizationExpressionRenderer.Status.BUDGET_INCONCLUSIVE,
+            result.status());
+        assertEquals(
+            "MAX_POLYNOMIAL_TERMS_EXCEEDED",
+            result.detailCode());
+        assertEquals(
+            0,
+            result.work().units("render.inspected-polynomial-terms"));
+        assertEquals(
+            1,
+            result.work().units("render.inspected-coefficients"));
+        assertTrue(result.expression().isEmpty());
     }
 
     @Test
