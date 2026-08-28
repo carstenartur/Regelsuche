@@ -17,13 +17,14 @@ der Integration muss zusätzlich belegt werden, dass
   überführt wurden;
 - der gerenderte Ausdruck nach erneutem exaktem Parsen dasselbe Polynom im
   selben Ring ergibt;
-- Faktorisierung, Rendering und Rekonstruktion unter einer einzigen
-  nicht zurückgesetzten Arbeitsautorität ausgeführt wurden.
+- Quellprüfung, Faktorisierung, Rendering und Rekonstruktion unter einer
+  einzigen nicht zurückgesetzten Arbeitsautorität ausgeführt wurden.
 
 Der autoritative Fluss lautet:
 
 ```text
-ExactParsedTerm der ausgewählten Quellvorkommens
+ExactParsedTerm des ausgewählten Quellvorkommens
+  -> vorautorisierte Quell- und Literal-Evidence-Prüfung
   -> ExactParsedFactorizationPipeline.Result
   -> explizit ausgewählter FactorizationVerifier.VerifiedCandidate
   -> ExactFactorizationExpressionRenderer
@@ -44,7 +45,8 @@ Version 1 zielt bewusst zunächst auf das Wurzelvorkommen. Die
 
 - den leeren Wurzelpfad;
 - den unveränderten ursprünglichen Quelltext;
-- einen Inhaltshash über Quelltext und sämtliche exakten Literalbelege.
+- das Inhaltzertifikat der exakten Extraktion, das Quelltext, Literalbelege,
+  Polynomdarstellung und Extraktionsarbeit bindet.
 
 Vor dem Rendering werden der aktuelle `ExactParsedTerm` und die bereits in der
 Faktorisierung gebundene Extraktion verglichen. Übereinstimmen müssen:
@@ -61,6 +63,38 @@ Faktorisierung gebundene Extraktion verglichen. Übereinstimmen müssen:
 Ein nachträglich ersetzter oder nur wertähnlicher Quellausdruck erhält daher
 nicht stillschweigend die Faktorisierungsevidence eines anderen
 Vorkommens. Der Lauf endet als `SOURCE_EVIDENCE_MISMATCH`.
+
+### Vorautorisierte Quellprüfung
+
+Die erneute Quellprüfung ist keine kostenlose Kontrolloperation. Vor dem ersten
+Text- oder Literalvergleich berechnet die Pipeline aus O(1)-Metadaten eine
+konservative obere Arbeitsgrenze:
+
+```text
+4 * (Codeeinheiten des vorgelegten Quelltexts
+     + Codeeinheiten des gebundenen Quelltexts)
++ 512 * max(vorgelegte Literalanzahl, gebundene Literalanzahl)
+```
+
+Diese Einheiten decken Textvergleich, Literal-Feldvergleiche und die
+Kontinuitätsprüfung zur extrahierten Request-Darstellung konservativ ab. Sie
+werden als getrennte Stufen verbucht:
+
+```text
+transform.source-evidence-text-validation
+transform.source-evidence-literal-validation
+```
+
+Reicht die ursprüngliche Gesamtarbeitsautorität für diese Obergrenze nicht aus,
+beginnt die Quellprüfung nicht. Das Ergebnis lautet:
+
+```text
+SOURCE_EVIDENCE_VALIDATION_AUTHORITY_INSUFFICIENT
+```
+
+Insbesondere kann ein durch sehr viel bedeutungslose Leerraumzeichen
+aufgeblähter, mathematisch kleiner Ausdruck keine unverbuchte lineare
+Validierungsarbeit erzwingen.
 
 Für verschachtelte Vorkommen wird später die vorhandene pfadbasierte
 Local-Rewrite-Infrastruktur mit ihrem Stalenessschutz wiederverwendet. Es wird
@@ -179,8 +213,8 @@ Die Transformationspipeline erzeugt keine neue Arbeitsautorität. Sie übernimmt
 das bereits im `ExactParsedFactorizationPipeline.Result` gebundene
 `maxTotalWorkUnits`.
 
-Vor Beginn wird konservativ geprüft, ob das verbleibende Budget den vollständig
-deklarierten Fortsetzungsrahmen tragen kann:
+Nach der vorautorisierten Quellprüfung wird konservativ geprüft, ob das
+verbleibende Budget den vollständig deklarierten Fortsetzungsrahmen tragen kann:
 
 ```text
 max renderer work
@@ -202,6 +236,7 @@ Bei erfolgreicher Ausführung gilt:
 extraction work
 + factorization engine work
 + independent product verification work
++ source evidence validation work
 + rendering validation and output work
 + exact-parser input work
 + reconstruction work
@@ -294,11 +329,12 @@ Die fokussierten Tests decken ab:
 - deterministische Render- und Transformationszertifikate;
 - exaktes Reparse und Gleichheit des rekonstruierten Polynoms;
 - Ablehnung ersetzter Quellbelege;
-- getrennte No-Candidate-, Backend-Claim- und unabhängig zertifizierte
-  Irreduzibilitätsgrenzen;
+- getrennte No-Candidate- und Backend-Irreduzibilitätsclaim-Grenzen;
 - diagnostisch vorhandener Renderertext ohne Ausgabe einer abgelehnten
   `transformedExpression`;
-- frühzeitige Termgrenzen und abgerechnete Validierungsarbeit;
+- vorautorisierte und abgerechnete Quell-/Literalprüfung einschließlich eines
+  whitespace-aufgeblähten Eingangs ohne ausreichende Restautorität;
+- frühzeitige Termgrenzen und abgerechnete Renderer-Validierungsarbeit;
 - Ausgabe- und Fortsetzungsbudgeterschöpfung;
 - Ablehnung multivariater Kandidaten;
 - den vollständigen nativen `Q[x]`-Pfad vom Quelltext bis zur rekonstruierten
