@@ -170,15 +170,15 @@ final class GraalPySymPyRuntime implements AutoCloseable {
 <span class="fc" id="L170">                snapshot.coldStart(),</span>
 <span class="fc" id="L171">                snapshot.initializationNanos(),</span>
                 invocationNanos);
-<span class="fc" id="L173">        } catch (PolyglotException | IllegalStateException exception) {</span>
-<span class="fc" id="L174">            resetGeneration(expectedGeneration, false);</span>
-<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            long invocationNanos = invocationStarted == 0</span>
+<span class="nc" id="L173">        } catch (PolyglotException | IllegalStateException exception) {</span>
+<span class="nc" id="L174">            resetGeneration(expectedGeneration, false);</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            long invocationNanos = invocationStarted == 0</span>
 <span class="nc" id="L176">                ? 0</span>
-<span class="fc" id="L177">                : System.nanoTime() - invocationStarted;</span>
-<span class="fc" id="L178">            return SymPyInvocation.failure(</span>
+<span class="nc" id="L177">                : System.nanoTime() - invocationStarted;</span>
+<span class="nc" id="L178">            return SymPyInvocation.failure(</span>
                 SymPyInvocation.Status.TECHNICAL_FAILURE,
-<span class="fc" id="L180">                &quot;GRAALPY_&quot; + exception.getClass().getSimpleName()</span>
-<span class="fc" id="L181">                    .toUpperCase(java.util.Locale.ROOT),</span>
+<span class="nc" id="L180">                &quot;GRAALPY_&quot; + exception.getClass().getSimpleName()</span>
+<span class="nc" id="L181">                    .toUpperCase(java.util.Locale.ROOT),</span>
                 RUNTIME_ID,
                 invocationNanos,
                 exception);
@@ -226,8 +226,8 @@ final class GraalPySymPyRuntime implements AutoCloseable {
         Worker retiredWorker;
 <span class="fc" id="L227">        ExecutorService retiredExecutor = null;</span>
 <span class="fc" id="L228">        synchronized (stateLock) {</span>
-<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (generation != expectedGeneration) {</span>
-<span class="fc" id="L230">                return;</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">            if (generation != expectedGeneration) {</span>
+<span class="nc" id="L230">                return;</span>
             }
 <span class="fc" id="L232">            generation = Math.incrementExact(generation);</span>
 <span class="fc" id="L233">            retiredWorker = worker;</span>
