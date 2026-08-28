@@ -16,12 +16,15 @@ import java.util.OptionalInt;
  *
  * <p>The original parser evidence, factorization request, verifier report,
  * rendered syntax, exact reparse and reconstructed polynomial remain bound to
- * one content-addressed result. Factorization, rendering, parsing and
- * reconstruction share the original pipeline's non-resettable work ceiling.</p>
+ * one content-addressed result. Source validation, factorization, rendering,
+ * parsing and reconstruction share the original pipeline's non-resettable work
+ * ceiling.</p>
  */
 public final class ExactFactorizationTransformationPipeline {
     public static final String TRANSFORMATION_ID =
         "regelsuche.exact-factorization-transformation/v1";
+    private static final long SOURCE_TEXT_VALIDATION_MULTIPLIER = 4L;
+    private static final long SOURCE_LITERAL_VALIDATION_UNITS = 512L;
 
     private final ExactFactorizationExpressionRenderer renderer;
     private final ExpressionParser parser;
@@ -65,50 +68,49 @@ public final class ExactFactorizationTransformationPipeline {
     ) {
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(factorization, "factorization");
-        OccurrenceEvidence occurrence = OccurrenceEvidence.root(source);
-        String sourceViolation = sourceContinuityViolation(
+        SourceAuthorization authorization = authorizeSource(
             source,
             factorization);
-        if (sourceViolation != null) {
-            return Result.failure(
-                Status.SOURCE_EVIDENCE_MISMATCH,
-                sourceViolation,
-                occurrence,
-                factorization,
-                -1,
-                "",
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                factorization.totalWork());
+        Result authorizationFailure = authorizationFailure(
+            authorization,
+            factorization,
+            -1);
+        if (authorizationFailure != null) {
+            return authorizationFailure;
         }
         if (!factorization.executed()) {
             return unavailableFactorization(
-                occurrence,
-                factorization);
+                authorization.occurrence(),
+                factorization,
+                authorization.totalWork());
         }
         FactorizationVerifier.Report<ExactRational> report =
             factorization.report().orElseThrow();
         if (!report.successful()) {
             return unavailableReport(
-                occurrence,
+                authorization.occurrence(),
                 factorization,
-                report);
+                report,
+                authorization.totalWork());
         }
         if (report.candidates().size() != 1) {
             return Result.failure(
                 Status.UNSUPPORTED,
                 "MULTIPLE_CANDIDATES_REQUIRE_EXPLICIT_SELECTION",
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 -1,
                 "",
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                factorization.totalWork());
+                authorization.totalWork());
         }
-        return transformRoot(source, factorization, 0);
+        return transformSelected(
+            factorization,
+            report,
+            0,
+            authorization);
     }
 
     /** Transforms the root with one explicitly selected verifier candidate. */
@@ -119,82 +121,89 @@ public final class ExactFactorizationTransformationPipeline {
     ) {
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(factorization, "factorization");
-        OccurrenceEvidence occurrence = OccurrenceEvidence.root(source);
-        String sourceViolation = sourceContinuityViolation(
+        SourceAuthorization authorization = authorizeSource(
             source,
             factorization);
-        if (sourceViolation != null) {
-            return Result.failure(
-                Status.SOURCE_EVIDENCE_MISMATCH,
-                sourceViolation,
-                occurrence,
-                factorization,
-                candidateIndex,
-                "",
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                factorization.totalWork());
+        Result authorizationFailure = authorizationFailure(
+            authorization,
+            factorization,
+            candidateIndex);
+        if (authorizationFailure != null) {
+            return authorizationFailure;
         }
         if (!factorization.executed()) {
             return unavailableFactorization(
-                occurrence,
-                factorization);
+                authorization.occurrence(),
+                factorization,
+                authorization.totalWork());
         }
         FactorizationVerifier.Report<ExactRational> report =
             factorization.report().orElseThrow();
         if (!report.successful()) {
             return unavailableReport(
-                occurrence,
+                authorization.occurrence(),
                 factorization,
-                report);
+                report,
+                authorization.totalWork());
         }
         if (candidateIndex < 0
                 || candidateIndex >= report.candidates().size()) {
             return Result.failure(
                 Status.UNSUPPORTED,
                 "CANDIDATE_SELECTION_OUT_OF_RANGE",
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 candidateIndex,
                 "",
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                factorization.totalWork());
+                authorization.totalWork());
         }
+        return transformSelected(
+            factorization,
+            report,
+            candidateIndex,
+            authorization);
+    }
 
+    private Result transformSelected(
+        ExactParsedFactorizationPipeline.Result factorization,
+        FactorizationVerifier.Report<ExactRational> report,
+        int candidateIndex,
+        SourceAuthorization authorization
+    ) {
         FactorizationVerifier.VerifiedCandidate<ExactRational> candidate =
             report.candidates().get(candidateIndex);
         String candidateCertificate =
             candidate.verificationCertificateHash();
         long continuationCeiling = continuationCeiling();
         long remaining = factorization.policy().maxTotalWorkUnits()
-            - factorization.totalWork().totalWorkUnits();
+            - authorization.totalWork().totalWorkUnits();
         if (remaining < continuationCeiling) {
             return Result.failure(
                 Status.BUDGET_INCONCLUSIVE,
                 "INSUFFICIENT_REMAINING_TRANSFORMATION_AUTHORITY",
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 candidateIndex,
                 candidateCertificate,
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                factorization.totalWork());
+                authorization.totalWork());
         }
 
         ExactFactorizationExpressionRenderer.Result rendering =
             renderer.render(candidate);
         PolynomialWorkLedger afterRendering = merge(
-            factorization.totalWork(),
+            authorization.totalWork(),
             rendering.work());
         if (!withinOriginalAuthority(factorization, afterRendering)) {
             return Result.failure(
                 Status.BUDGET_INCONCLUSIVE,
                 "RENDERING_EXCEEDED_ORIGINAL_WORK_AUTHORITY",
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 candidateIndex,
                 candidateCertificate,
@@ -212,7 +221,7 @@ public final class ExactFactorizationTransformationPipeline {
             return Result.failure(
                 status,
                 rendering.detailCode(),
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 candidateIndex,
                 candidateCertificate,
@@ -231,7 +240,7 @@ public final class ExactFactorizationTransformationPipeline {
             return Result.failure(
                 Status.BUDGET_INCONCLUSIVE,
                 "EXACT_REPARSE_EXCEEDED_ORIGINAL_WORK_AUTHORITY",
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 candidateIndex,
                 candidateCertificate,
@@ -250,7 +259,7 @@ public final class ExactFactorizationTransformationPipeline {
                 technicalDetail(
                     "RENDERED_EXPRESSION_NOT_EXACTLY_PARSEABLE",
                     exception),
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 candidateIndex,
                 candidateCertificate,
@@ -269,7 +278,7 @@ public final class ExactFactorizationTransformationPipeline {
             return Result.failure(
                 Status.BUDGET_INCONCLUSIVE,
                 "RECONSTRUCTION_EXCEEDED_ORIGINAL_WORK_AUTHORITY",
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 candidateIndex,
                 candidateCertificate,
@@ -284,7 +293,7 @@ public final class ExactFactorizationTransformationPipeline {
             return Result.failure(
                 Status.BUDGET_INCONCLUSIVE,
                 reconstruction.detailCode(),
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 candidateIndex,
                 candidateCertificate,
@@ -298,7 +307,7 @@ public final class ExactFactorizationTransformationPipeline {
                 Status.TECHNICAL_FAILURE,
                 "RENDERED_EXPRESSION_OUTSIDE_EXACT_POLYNOMIAL_VIEW_"
                     + reconstruction.detailCode(),
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 candidateIndex,
                 candidateCertificate,
@@ -316,7 +325,7 @@ public final class ExactFactorizationTransformationPipeline {
             return Result.failure(
                 Status.TECHNICAL_FAILURE,
                 "RENDERED_EXPRESSION_RING_MISMATCH",
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 candidateIndex,
                 candidateCertificate,
@@ -329,7 +338,7 @@ public final class ExactFactorizationTransformationPipeline {
             return Result.failure(
                 Status.TECHNICAL_FAILURE,
                 "RENDERED_EXPRESSION_POLYNOMIAL_MISMATCH",
-                occurrence,
+                authorization.occurrence(),
                 factorization,
                 candidateIndex,
                 candidateCertificate,
@@ -345,7 +354,7 @@ public final class ExactFactorizationTransformationPipeline {
             : Kind.VERIFIED_DECOMPOSITION;
         return Result.transformed(
             kind,
-            occurrence,
+            authorization.occurrence(),
             factorization,
             candidateIndex,
             candidateCertificate,
@@ -353,6 +362,94 @@ public final class ExactFactorizationTransformationPipeline {
             reparsed,
             reconstruction,
             totalWork);
+    }
+
+    private static SourceAuthorization authorizeSource(
+        ExactParsedTerm source,
+        ExactParsedFactorizationPipeline.Result factorization
+    ) {
+        OccurrenceEvidence occurrence = OccurrenceEvidence.root(
+            factorization);
+        PolynomialWorkLedger validationWork = sourceValidationWork(
+            source,
+            factorization.extraction());
+        long remaining = factorization.policy().maxTotalWorkUnits()
+            - factorization.totalWork().totalWorkUnits();
+        if (!validationWork.within(remaining)) {
+            return new SourceAuthorization(
+                occurrence,
+                factorization.totalWork(),
+                AuthorizationStatus.INSUFFICIENT_AUTHORITY,
+                "SOURCE_EVIDENCE_VALIDATION_AUTHORITY_INSUFFICIENT");
+        }
+        PolynomialWorkLedger totalWork = merge(
+            factorization.totalWork(),
+            validationWork);
+        String violation = sourceContinuityViolation(
+            source,
+            factorization);
+        return new SourceAuthorization(
+            occurrence,
+            totalWork,
+            violation == null
+                ? AuthorizationStatus.AUTHORIZED
+                : AuthorizationStatus.MISMATCH,
+            violation == null ? "SOURCE_EVIDENCE_VALIDATED" : violation);
+    }
+
+    private static PolynomialWorkLedger sourceValidationWork(
+        ExactParsedTerm source,
+        ExactParsedUnivariatePolynomialView.Analysis extraction
+    ) {
+        long sourceCodeUnits = Math.addExact(
+            (long) source.source().length(),
+            extraction.source().length());
+        long textWork = Math.multiplyExact(
+            SOURCE_TEXT_VALIDATION_MULTIPLIER,
+            sourceCodeUnits);
+        long comparedLiterals = Math.max(
+            source.literals().size(),
+            extraction.literals().size());
+        long literalWork = Math.multiplyExact(
+            SOURCE_LITERAL_VALIDATION_UNITS,
+            comparedLiterals);
+        return new PolynomialWorkLedger(Map.of(
+            "transform.source-evidence-literal-validation",
+            literalWork,
+            "transform.source-evidence-text-validation",
+            textWork));
+    }
+
+    private static Result authorizationFailure(
+        SourceAuthorization authorization,
+        ExactParsedFactorizationPipeline.Result factorization,
+        int candidateIndex
+    ) {
+        return switch (authorization.status()) {
+            case AUTHORIZED -> null;
+            case INSUFFICIENT_AUTHORITY -> Result.failure(
+                Status.BUDGET_INCONCLUSIVE,
+                authorization.detailCode(),
+                authorization.occurrence(),
+                factorization,
+                candidateIndex,
+                "",
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                authorization.totalWork());
+            case MISMATCH -> Result.failure(
+                Status.SOURCE_EVIDENCE_MISMATCH,
+                authorization.detailCode(),
+                authorization.occurrence(),
+                factorization,
+                candidateIndex,
+                "",
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                authorization.totalWork());
+        };
     }
 
     private long continuationCeiling() {
@@ -378,7 +475,8 @@ public final class ExactFactorizationTransformationPipeline {
 
     private static Result unavailableFactorization(
         OccurrenceEvidence occurrence,
-        ExactParsedFactorizationPipeline.Result factorization
+        ExactParsedFactorizationPipeline.Result factorization,
+        PolynomialWorkLedger totalWork
     ) {
         Status status = switch (factorization.status()) {
             case BUDGET_INCONCLUSIVE -> Status.BUDGET_INCONCLUSIVE;
@@ -397,13 +495,14 @@ public final class ExactFactorizationTransformationPipeline {
             Optional.empty(),
             Optional.empty(),
             Optional.empty(),
-            factorization.totalWork());
+            totalWork);
     }
 
     private static Result unavailableReport(
         OccurrenceEvidence occurrence,
         ExactParsedFactorizationPipeline.Result factorization,
-        FactorizationVerifier.Report<ExactRational> report
+        FactorizationVerifier.Report<ExactRational> report,
+        PolynomialWorkLedger totalWork
     ) {
         Status status = switch (report.status()) {
             case IRREDUCIBLE -> Status.IRREDUCIBLE;
@@ -431,7 +530,7 @@ public final class ExactFactorizationTransformationPipeline {
             Optional.empty(),
             Optional.empty(),
             Optional.empty(),
-            factorization.totalWork());
+            totalWork);
     }
 
     private static String sourceContinuityViolation(
@@ -516,7 +615,30 @@ public final class ExactFactorizationTransformationPipeline {
         VERIFIED_DECOMPOSITION_WITH_COMPLETE_BACKEND_CLAIM
     }
 
-    /** Root occurrence identity plus source-bound exact evidence hash. */
+    private enum AuthorizationStatus {
+        AUTHORIZED,
+        INSUFFICIENT_AUTHORITY,
+        MISMATCH
+    }
+
+    private record SourceAuthorization(
+        OccurrenceEvidence occurrence,
+        PolynomialWorkLedger totalWork,
+        AuthorizationStatus status,
+        String detailCode
+    ) {
+        private SourceAuthorization {
+            Objects.requireNonNull(occurrence, "occurrence");
+            Objects.requireNonNull(totalWork, "totalWork");
+            Objects.requireNonNull(status, "status");
+            if (detailCode == null || detailCode.isBlank()) {
+                throw new IllegalArgumentException(
+                    "source authorization detail must not be blank");
+            }
+        }
+    }
+
+    /** Root occurrence identity plus source-bound exact extraction evidence. */
     public record OccurrenceEvidence(
         List<Integer> path,
         String sourceText,
@@ -534,11 +656,13 @@ public final class ExactFactorizationTransformationPipeline {
             }
         }
 
-        private static OccurrenceEvidence root(ExactParsedTerm source) {
+        private static OccurrenceEvidence root(
+            ExactParsedFactorizationPipeline.Result factorization
+        ) {
             return new OccurrenceEvidence(
                 List.of(),
-                source.source(),
-                PolynomialEvidence.sha256(sourceMaterial(source)));
+                factorization.extraction().source(),
+                factorization.extraction().certificateHash());
         }
 
         public boolean isRoot() {
@@ -553,36 +677,6 @@ public final class ExactFactorizationTransformationPipeline {
                     .collect(java.util.stream.Collectors.joining(".")));
             PolynomialEvidence.append(result, sourceText);
             PolynomialEvidence.append(result, sourceEvidenceHash);
-            return result.toString();
-        }
-
-        private static String sourceMaterial(ExactParsedTerm source) {
-            StringBuilder result = new StringBuilder();
-            PolynomialEvidence.append(result, source.source());
-            PolynomialEvidence.append(
-                result,
-                Integer.toString(source.literals().size()));
-            for (ExactParsedTerm.LiteralOccurrence literal
-                    : source.literals()) {
-                PolynomialEvidence.append(
-                    result,
-                    Integer.toString(literal.startInclusive()));
-                PolynomialEvidence.append(
-                    result,
-                    Integer.toString(literal.endExclusive()));
-                PolynomialEvidence.append(
-                    result,
-                    literal.sourceLexeme());
-                PolynomialEvidence.append(
-                    result,
-                    literal.evidence().canonicalValue());
-                PolynomialEvidence.append(
-                    result,
-                    literal.evidence().valueId());
-                PolynomialEvidence.append(
-                    result,
-                    literal.evidence().certificateHash());
-            }
             return result.toString();
         }
     }
