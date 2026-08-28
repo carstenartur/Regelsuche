@@ -125,14 +125,10 @@ A backend claim to completeness or irreducibility does not strengthen the
 subsumption classification to independent evidence. A template miss is not an
 irreducibility result.
 
-The optional `PolynomialTheoryTransformationEngine` is the product boundary for
-callers that explicitly select a policy. `ON_DEMAND_VERIFIED_FACTORIZATION`
-verifies each generated candidate before retaining it, while
-`VERIFIED_DERIVED_MACRO_CACHE` replays only an exact cached source and carries
-the original verifier application key and primitive lineage. `NO_FACTORIZATION`
-preserves the wrapped engine unchanged. The default discovery composition does
-not enable this boundary, so callers must opt in and can compare policies under
-the same visible information and work ledger.
+The product learning pipeline is intentionally unchanged. Automatic diversion
+from normal promotion into the derived cache requires a later integration slice
+with explicit authorization evidence and an ablation against on-demand theory
+synthesis.
 
 ## Verification
 
