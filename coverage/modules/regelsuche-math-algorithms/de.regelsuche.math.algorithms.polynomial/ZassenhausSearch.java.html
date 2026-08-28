@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZassenhausSearch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">ZassenhausSearch.java</span></div><h1>ZassenhausSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Deterministic proper-subset search used by Zassenhaus recombination. */
+final class ZassenhausSearch {
+    private ZassenhausSearch() {
+    }
+
+    static SearchResult findFactor(
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; modularFactors,
+        List&lt;List&lt;Integer&gt;&gt; groups,
+        BigInteger coefficientBound,
+        BigInteger modulus,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work,
+        long candidatesBefore,
+        long candidateLimit,
+        CandidateAudit audit
+    ) {
+<span class="fc" id="L25">        List&lt;BigInteger&gt; leadingDivisors =</span>
+<span class="fc" id="L26">            IntegerPolynomialArithmetic.positiveDivisors(</span>
+<span class="fc" id="L27">                source.leadingCoefficient(),</span>
+                policy,
+                work);
+<span class="fc" id="L30">        long candidates = candidatesBefore;</span>
+<span class="fc" id="L31">        int factorCount = modularFactors.size();</span>
+
+<span class="fc" id="L33">        for (int subsetSize = 1;</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                subsetSize &lt;= factorCount / 2;</span>
+<span class="nc" id="L35">                subsetSize++) {</span>
+<span class="fc" id="L36">            int[] subset = initialCombination(subsetSize);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            while (subset != null) {</span>
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">                boolean duplicateComplement =</span>
+                    subsetSize * 2 == factorCount
+                        &amp;&amp; subset[0] != 0;
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                if (!duplicateComplement) {</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">                    for (BigInteger leadingDivisor : leadingDivisors) {</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                        if (candidates &gt;= candidateLimit) {</span>
+<span class="fc" id="L44">                            return SearchResult.inconclusive(</span>
+                                candidates,
+                                &quot;ZASSENHAUS_CANDIDATE_BUDGET_EXHAUSTED&quot;);
+                        }
+<span class="fc" id="L48">                        candidates++;</span>
+<span class="fc" id="L49">                        work.consume(</span>
+                            &quot;zassenhaus.candidate.attempts&quot;,
+                            1);
+<span class="fc" id="L52">                        UnivariatePolynomialView&lt;BigInteger&gt; candidate =</span>
+<span class="fc" id="L53">                            IntegerPolynomialArithmetic.subsetCandidate(</span>
+                                modularFactors,
+                                subset,
+                                leadingDivisor,
+                                modulus,
+                                policy,
+                                work);
+<span class="fc" id="L60">                        String rejection = classifyShape(</span>
+                            candidate,
+                            source,
+                            coefficientBound,
+                            work);
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                        if (rejection != null) {</span>
+<span class="nc" id="L66">                            audit.record(</span>
+                                subset,
+                                leadingDivisor,
+                                candidate,
+                                rejection);
+<span class="nc" id="L71">                            continue;</span>
+                        }
+<span class="fc" id="L73">                        IntegerPolynomialArithmetic.ExactDivision division =</span>
+<span class="fc" id="L74">                            IntegerPolynomialArithmetic.exactDivide(</span>
+                                source,
+                                candidate,
+                                policy,
+                                work,
+                                &quot;zassenhaus.candidate.exact-division&quot;);
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                        if (!division.exact()) {</span>
+<span class="nc" id="L81">                            audit.record(</span>
+                                subset,
+                                leadingDivisor,
+                                candidate,
+                                &quot;NOT_AN_EXACT_INTEGER_DIVISOR&quot;);
+<span class="nc" id="L86">                            continue;</span>
+                        }
+<span class="fc" id="L88">                        audit.record(</span>
+                            subset,
+                            leadingDivisor,
+                            candidate,
+                            &quot;ACCEPTED&quot;);
+<span class="fc" id="L93">                        return SearchResult.found(</span>
+                            candidate,
+<span class="fc" id="L95">                            division.quotient(),</span>
+                            subset,
+<span class="fc" id="L97">                            union(groups, subset),</span>
+                            candidates);
+                    }
+                }
+<span class="nc" id="L101">                subset = nextCombination(subset, factorCount);</span>
+<span class="nc" id="L102">            }</span>
+        }
+<span class="nc" id="L104">        return SearchResult.exhaustive(candidates);</span>
+    }
+
+    private static String classifyShape(
+        UnivariatePolynomialView&lt;BigInteger&gt; candidate,
+        UnivariatePolynomialView&lt;BigInteger&gt; source,
+        BigInteger coefficientBound,
+        PolynomialWorkBudget work
+    ) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (candidate.degree() &lt;= 0</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                || candidate.degree() &gt;= source.degree()) {</span>
+<span class="nc" id="L115">            return &quot;NOT_A_PROPER_NONCONSTANT_FACTOR&quot;;</span>
+        }
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (BigInteger coefficient : candidate.coefficients()) {</span>
+<span class="fc" id="L118">            work.consume(&quot;zassenhaus.candidate.bound-tests&quot;, 1);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            if (coefficient.abs().compareTo(coefficientBound) &gt; 0) {</span>
+<span class="nc" id="L120">                return &quot;COEFFICIENT_BOUND_EXCEEDED&quot;;</span>
+            }
+<span class="fc" id="L122">        }</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        return IntegerPolynomialArithmetic.isPrimitivePositive(</span>
+            candidate,
+            work)
+<span class="fc" id="L126">                ? null</span>
+<span class="nc" id="L127">                : &quot;NOT_PRIMITIVE_POSITIVE&quot;;</span>
+    }
+
+    private static int[] initialCombination(int size) {
+<span class="fc" id="L131">        int[] result = new int[size];</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (int index = 0; index &lt; size; index++) {</span>
+<span class="fc" id="L133">            result[index] = index;</span>
+        }
+<span class="fc" id="L135">        return result;</span>
+    }
+
+    private static int[] nextCombination(
+        int[] current,
+        int universeSize
+    ) {
+<span class="nc" id="L142">        int[] next = current.clone();</span>
+<span class="nc" id="L143">        int index = next.length - 1;</span>
+<span class="nc bnc" id="L144" title="All 4 branches missed.">        while (index &gt;= 0</span>
+                &amp;&amp; next[index]
+                    == universeSize - next.length + index) {
+<span class="nc" id="L147">            index--;</span>
+        }
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (index &lt; 0) {</span>
+<span class="nc" id="L150">            return null;</span>
+        }
+<span class="nc" id="L152">        next[index]++;</span>
+<span class="nc" id="L153">        for (int following = index + 1;</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                following &lt; next.length;</span>
+<span class="nc" id="L155">                following++) {</span>
+<span class="nc" id="L156">            next[following] = next[following - 1] + 1;</span>
+        }
+<span class="nc" id="L158">        return next;</span>
+    }
+
+    private static List&lt;Integer&gt; union(
+        List&lt;List&lt;Integer&gt;&gt; groups,
+        int[] selected
+    ) {
+<span class="fc" id="L165">        return java.util.Arrays.stream(selected)</span>
+<span class="fc" id="L166">            .boxed()</span>
+<span class="fc" id="L167">            .flatMap(index -&gt; groups.get(index).stream())</span>
+<span class="fc" id="L168">            .sorted()</span>
+<span class="fc" id="L169">            .toList();</span>
+    }
+
+    static final class CandidateAudit {
+        private String state;
+        private long count;
+
+<span class="fc" id="L176">        CandidateAudit(String sourceMaterial) {</span>
+<span class="fc" id="L177">            state = AlgorithmEvidence.sha256(</span>
+                ZassenhausRecombination.METHOD_ID
+                    + ':' + sourceMaterial);
+<span class="fc" id="L180">        }</span>
+
+        void record(
+            int[] subset,
+            BigInteger leadingDivisor,
+            UnivariatePolynomialView&lt;BigInteger&gt; candidate,
+            String disposition
+        ) {
+<span class="fc" id="L188">            count = Math.addExact(count, 1L);</span>
+<span class="fc" id="L189">            StringBuilder material = new StringBuilder(state);</span>
+<span class="fc" id="L190">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L192">                java.util.Arrays.toString(subset));</span>
+<span class="fc" id="L193">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L195">                leadingDivisor.toString());</span>
+<span class="fc" id="L196">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L198">                candidate.canonicalMaterial());</span>
+<span class="fc" id="L199">            AlgorithmEvidence.append(material, disposition);</span>
+<span class="fc" id="L200">            state = AlgorithmEvidence.sha256(material.toString());</span>
+<span class="fc" id="L201">        }</span>
+
+        String hash() {
+<span class="fc" id="L204">            return state;</span>
+        }
+
+        long count() {
+<span class="fc" id="L208">            return count;</span>
+        }
+    }
+
+    record SearchResult(
+        boolean found,
+        boolean exhaustive,
+        String detailCode,
+        UnivariatePolynomialView&lt;BigInteger&gt; factor,
+        UnivariatePolynomialView&lt;BigInteger&gt; quotient,
+        int[] selectedPositions,
+        List&lt;Integer&gt; partition,
+        long candidatesConsidered
+    ) {
+<span class="fc" id="L222">        SearchResult {</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            selectedPositions = selectedPositions == null</span>
+<span class="fc" id="L224">                ? null</span>
+<span class="fc" id="L225">                : selectedPositions.clone();</span>
+<span class="fc" id="L226">            partition = List.copyOf(partition);</span>
+<span class="fc" id="L227">        }</span>
+
+        static SearchResult found(
+            UnivariatePolynomialView&lt;BigInteger&gt; factor,
+            UnivariatePolynomialView&lt;BigInteger&gt; quotient,
+            int[] selectedPositions,
+            List&lt;Integer&gt; partition,
+            long candidates
+        ) {
+<span class="fc" id="L236">            return new SearchResult(</span>
+                true,
+                false,
+                &quot;ZASSENHAUS_FACTOR_ACCEPTED&quot;,
+                factor,
+                quotient,
+                selectedPositions,
+                partition,
+                candidates);
+        }
+
+        static SearchResult exhaustive(long candidates) {
+<span class="nc" id="L248">            return new SearchResult(</span>
+                false,
+                true,
+                &quot;ZASSENHAUS_SEARCH_EXHAUSTED&quot;,
+                null,
+                null,
+                null,
+<span class="nc" id="L255">                List.of(),</span>
+                candidates);
+        }
+
+        static SearchResult inconclusive(
+            long candidates,
+            String detailCode
+        ) {
+<span class="fc" id="L263">            return new SearchResult(</span>
+                false,
+                false,
+                detailCode,
+                null,
+                null,
+                null,
+<span class="fc" id="L270">                List.of(),</span>
+                candidates);
+        }
+
+        @Override
+        public int[] selectedPositions() {
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            return selectedPositions == null</span>
+<span class="nc" id="L277">                ? null</span>
+<span class="fc" id="L278">                : selectedPositions.clone();</span>
+        }
+    }
+
+    static &lt;T&gt; List&lt;T&gt; removeSelected(
+        List&lt;T&gt; values,
+        int[] selected
+    ) {
+<span class="fc" id="L286">        boolean[] removed = new boolean[values.size()];</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        for (int index : selected) {</span>
+<span class="fc" id="L288">            removed[index] = true;</span>
+        }
+<span class="fc" id="L290">        ArrayList&lt;T&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">        for (int index = 0; index &lt; values.size(); index++) {</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">            if (!removed[index]) {</span>
+<span class="fc" id="L293">                result.add(values.get(index));</span>
+            }
+        }
+<span class="fc" id="L296">        return List.copyOf(result);</span>
+    }
+
+    static List&lt;List&lt;Integer&gt;&gt; singletonGroups(int count) {
+<span class="fc" id="L300">        ArrayList&lt;List&lt;Integer&gt;&gt; result = new ArrayList&lt;&gt;(count);</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        for (int index = 0; index &lt; count; index++) {</span>
+<span class="fc" id="L302">            result.add(List.of(index));</span>
+        }
+<span class="fc" id="L304">        return List.copyOf(result);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -76,7 +76,7 @@ public record SuitablePrimeSelectionPolicy(
 <span class="fc" id="L76">        ArrayList&lt;Integer&gt; primes = new ArrayList&lt;&gt;();</span>
 <span class="fc" id="L77">        for (int candidate = 2;</span>
                 candidate &lt;= maximumPrime
-<span class="pc bpc" id="L79" title="1 of 4 branches missed.">                    &amp;&amp; primes.size() &lt; maximumPrimes;</span>
+<span class="fc bfc" id="L79" title="All 4 branches covered.">                    &amp;&amp; primes.size() &lt; maximumPrimes;</span>
 <span class="fc" id="L80">                candidate++) {</span>
 <span class="fc bfc" id="L81" title="All 2 branches covered.">            if (PrimeField.isPrimeModulus(candidate)) {</span>
 <span class="fc" id="L82">                primes.add(candidate);</span>

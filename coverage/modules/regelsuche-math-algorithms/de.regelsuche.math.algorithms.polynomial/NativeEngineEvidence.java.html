@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeEngineEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">NativeEngineEvidence.java</span></div><h1>NativeEngineEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.SparsePolynomial;
+import java.util.List;
+
+/** Canonical engine-result and proposal evidence for the native pipeline. */
+final class NativeEngineEvidence {
+    private NativeEngineEvidence() {
+    }
+
+    static &lt;C&gt; FactorizationEngine.EngineResult&lt;C&gt; result(
+        FactorizationRequest&lt;C&gt; request,
+        NativeUnivariateFactorizationPolicy policy,
+        String engineId,
+        FactorizationEngine.Outcome outcome,
+        String detailCode,
+        PolynomialWorkLedger work,
+        List&lt;FactorizationEngine.Proposal&lt;C&gt;&gt; proposals,
+        FactorizationEngine.BackendClaim claim,
+        List&lt;String&gt; certificates
+    ) {
+<span class="fc" id="L26">        StringBuilder material = new StringBuilder(</span>
+            NativeUnivariateFactorizationPipeline.METHOD_ID);
+<span class="fc" id="L28">        AlgorithmEvidence.append(material, engineId);</span>
+<span class="fc" id="L29">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L31">            request.canonicalMaterial());</span>
+<span class="fc" id="L32">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L34">            policy.canonicalMaterial());</span>
+<span class="fc" id="L35">        AlgorithmEvidence.append(material, outcome.name());</span>
+<span class="fc" id="L36">        AlgorithmEvidence.append(material, detailCode);</span>
+<span class="fc" id="L37">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L39">            work.canonicalMaterial());</span>
+<span class="fc" id="L40">        AlgorithmEvidence.append(material, claim.name());</span>
+<span class="fc" id="L41">        certificates.forEach(certificate -&gt;</span>
+<span class="fc" id="L42">            AlgorithmEvidence.append(material, certificate));</span>
+<span class="fc" id="L43">        proposals.forEach(proposal -&gt;</span>
+<span class="fc" id="L44">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L46">                proposal.canonicalMaterial()));</span>
+<span class="fc" id="L47">        return new FactorizationEngine.EngineResult&lt;&gt;(</span>
+            engineId,
+            outcome,
+            detailCode,
+            work,
+            proposals,
+            claim,
+<span class="fc" id="L54">            AlgorithmEvidence.sha256(material.toString()));</span>
+    }
+
+    static &lt;C&gt; String proposalCertificate(
+        FactorizationRequest&lt;C&gt; request,
+        NativeUnivariateFactorizationPolicy policy,
+        String engineId,
+        C unit,
+        List&lt;PolynomialFactor&lt;C&gt;&gt; factors,
+        PolynomialWorkLedger work,
+        List&lt;String&gt; certificates
+    ) {
+<span class="fc" id="L66">        StringBuilder material = new StringBuilder(</span>
+            NativeUnivariateFactorizationPipeline.METHOD_ID);
+<span class="fc" id="L68">        AlgorithmEvidence.append(material, engineId);</span>
+<span class="fc" id="L69">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L71">            request.canonicalMaterial());</span>
+<span class="fc" id="L72">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L74">            policy.canonicalMaterial());</span>
+<span class="fc" id="L75">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L77">            request.source().ring().coefficientDomain()</span>
+<span class="fc" id="L78">                .canonicalText(unit));</span>
+<span class="fc" id="L79">        factors.forEach(factor -&gt; {</span>
+<span class="fc" id="L80">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L82">                Integer.toString(factor.multiplicity()));</span>
+<span class="fc" id="L83">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L85">                factor.polynomial().canonicalMaterial());</span>
+<span class="fc" id="L86">        });</span>
+<span class="fc" id="L87">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L89">            work.canonicalMaterial());</span>
+<span class="fc" id="L90">        certificates.forEach(certificate -&gt;</span>
+<span class="fc" id="L91">            AlgorithmEvidence.append(material, certificate));</span>
+<span class="fc" id="L92">        return AlgorithmEvidence.sha256(material.toString());</span>
+    }
+
+    static &lt;C&gt; boolean trivialAssociate(
+        SparsePolynomial&lt;C&gt; source,
+        C unit,
+        List&lt;PolynomialFactor&lt;C&gt;&gt; factors,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (factors.size() != 1</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">                || factors.getFirst().multiplicity() != 1) {</span>
+<span class="fc" id="L103">            return false;</span>
+        }
+<span class="fc" id="L105">        work.consume(&quot;native-univariate.trivial-associate.product&quot;, 1);</span>
+<span class="fc" id="L106">        SparsePolynomial&lt;C&gt; associate =</span>
+<span class="fc" id="L107">            factors.getFirst().polynomial().scale(unit);</span>
+<span class="fc" id="L108">        work.consume(&quot;native-univariate.trivial-associate.compare&quot;, 1);</span>
+<span class="fc" id="L109">        return source.equals(associate);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

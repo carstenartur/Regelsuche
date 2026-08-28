@@ -162,50 +162,54 @@ final class HenselLiftingEvidence {
 <span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (work.totalWorkUnits() &lt; selectionWork.totalWorkUnits()) {</span>
 <span class="nc" id="L163">            return false;</span>
         }
-<span class="fc" id="L165">        return selectionWork.stages().entrySet().stream().allMatch(entry -&gt;</span>
-<span class="fc bfc" id="L166" title="All 2 branches covered.">            work.units(entry.getKey()) == entry.getValue());</span>
+<span class="fc" id="L165">        return selectionWork.stages().entrySet().stream().allMatch(entry -&gt; {</span>
+<span class="fc" id="L166">            long retainedUnits = work.units(entry.getKey());</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            return entry.getKey().startsWith(&quot;hensel.&quot;)</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                ? retainedUnits &gt;= entry.getValue()</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                : retainedUnits == entry.getValue();</span>
+        });
     }
 
     private static List&lt;SparsePolynomial&lt;BigInteger&gt;&gt;
             anchoredModularFactors(
         SuitablePrimeSelectionResult selection
     ) {
-<span class="fc" id="L173">        FiniteFieldFactorizationResult factorization =</span>
-<span class="fc" id="L174">            selection.modularFactorization();</span>
-<span class="fc" id="L175">        ArrayList&lt;SparsePolynomial&lt;BigInteger&gt;&gt; result =</span>
-<span class="fc" id="L176">            new ArrayList&lt;&gt;(factorization.factors().size());</span>
-<span class="fc" id="L177">        for (int index = 0;</span>
-<span class="fc bfc" id="L178" title="All 2 branches covered.">                index &lt; factorization.factors().size();</span>
-<span class="fc" id="L179">                index++) {</span>
-<span class="fc" id="L180">            PolynomialFactor&lt;BigInteger&gt; factor =</span>
-<span class="fc" id="L181">                factorization.factors().get(index);</span>
-<span class="fc" id="L182">            SparsePolynomial&lt;BigInteger&gt; polynomial = factor.polynomial();</span>
-<span class="fc bfc" id="L183" title="All 2 branches covered.">            result.add(index == 0</span>
-<span class="fc" id="L184">                ? polynomial.scale(factorization.unit())</span>
-<span class="fc" id="L185">                : polynomial);</span>
+<span class="fc" id="L177">        FiniteFieldFactorizationResult factorization =</span>
+<span class="fc" id="L178">            selection.modularFactorization();</span>
+<span class="fc" id="L179">        ArrayList&lt;SparsePolynomial&lt;BigInteger&gt;&gt; result =</span>
+<span class="fc" id="L180">            new ArrayList&lt;&gt;(factorization.factors().size());</span>
+<span class="fc" id="L181">        for (int index = 0;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                index &lt; factorization.factors().size();</span>
+<span class="fc" id="L183">                index++) {</span>
+<span class="fc" id="L184">            PolynomialFactor&lt;BigInteger&gt; factor =</span>
+<span class="fc" id="L185">                factorization.factors().get(index);</span>
+<span class="fc" id="L186">            SparsePolynomial&lt;BigInteger&gt; polynomial = factor.polynomial();</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            result.add(index == 0</span>
+<span class="fc" id="L188">                ? polynomial.scale(factorization.unit())</span>
+<span class="fc" id="L189">                : polynomial);</span>
         }
-<span class="fc" id="L187">        return List.copyOf(result);</span>
+<span class="fc" id="L191">        return List.copyOf(result);</span>
     }
 
     private static SparsePolynomial&lt;BigInteger&gt; reduce(
         SparsePolynomial&lt;BigInteger&gt; source,
         PolynomialRing&lt;BigInteger&gt; modularRing
     ) {
-<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (!(modularRing.coefficientDomain()</span>
-<span class="fc" id="L195">                instanceof PrimeField field)) {</span>
-<span class="nc" id="L196">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (!(modularRing.coefficientDomain()</span>
+<span class="fc" id="L199">                instanceof PrimeField field)) {</span>
+<span class="nc" id="L200">            throw new IllegalArgumentException(</span>
                 &quot;Hensel modular ring is not a prime field&quot;);
         }
-<span class="fc" id="L199">        NavigableMap&lt;Monomial, BigInteger&gt; terms =</span>
-<span class="fc" id="L200">            new TreeMap&lt;&gt;(modularRing.monomialComparator());</span>
+<span class="fc" id="L203">        NavigableMap&lt;Monomial, BigInteger&gt; terms =</span>
+<span class="fc" id="L204">            new TreeMap&lt;&gt;(modularRing.monomialComparator());</span>
         for (Map.Entry&lt;Monomial, BigInteger&gt; term
-<span class="fc bfc" id="L202" title="All 2 branches covered.">                : source.terms().entrySet()) {</span>
-<span class="fc" id="L203">            BigInteger coefficient = field.canonical(term.getValue());</span>
-<span class="fc bfc" id="L204" title="All 2 branches covered.">            if (!field.isZero(coefficient)) {</span>
-<span class="fc" id="L205">                terms.put(term.getKey(), coefficient);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                : source.terms().entrySet()) {</span>
+<span class="fc" id="L207">            BigInteger coefficient = field.canonical(term.getValue());</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            if (!field.isZero(coefficient)) {</span>
+<span class="fc" id="L209">                terms.put(term.getKey(), coefficient);</span>
             }
-<span class="fc" id="L207">        }</span>
-<span class="fc" id="L208">        return new SparsePolynomial&lt;&gt;(modularRing, terms);</span>
+<span class="fc" id="L211">        }</span>
+<span class="fc" id="L212">        return new SparsePolynomial&lt;&gt;(modularRing, terms);</span>
     }
 
     private static boolean congruent(
@@ -213,26 +217,26 @@ final class HenselLiftingEvidence {
         SparsePolynomial&lt;BigInteger&gt; product,
         BigInteger modulus
     ) {
-<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (!source.ring().equals(product.ring())</span>
-<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                || modulus.signum() &lt;= 0) {</span>
-<span class="nc" id="L218">            return false;</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (!source.ring().equals(product.ring())</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                || modulus.signum() &lt;= 0) {</span>
+<span class="nc" id="L222">            return false;</span>
         }
-<span class="fc" id="L220">        UnivariatePolynomialView&lt;BigInteger&gt; left =</span>
-<span class="fc" id="L221">            UnivariatePolynomialView.from(source);</span>
-<span class="fc" id="L222">        UnivariatePolynomialView&lt;BigInteger&gt; right =</span>
-<span class="fc" id="L223">            UnivariatePolynomialView.from(product);</span>
-<span class="fc" id="L224">        int count = Math.max(</span>
-<span class="fc" id="L225">            left.coefficientCount(),</span>
-<span class="fc" id="L226">            right.coefficientCount());</span>
-<span class="fc bfc" id="L227" title="All 2 branches covered.">        for (int exponent = 0; exponent &lt; count; exponent++) {</span>
-<span class="fc" id="L228">            if (left.coefficient(exponent)</span>
-<span class="fc" id="L229">                    .subtract(right.coefficient(exponent))</span>
-<span class="fc" id="L230">                    .remainder(modulus)</span>
-<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                    .signum() != 0) {</span>
-<span class="nc" id="L232">                return false;</span>
+<span class="fc" id="L224">        UnivariatePolynomialView&lt;BigInteger&gt; left =</span>
+<span class="fc" id="L225">            UnivariatePolynomialView.from(source);</span>
+<span class="fc" id="L226">        UnivariatePolynomialView&lt;BigInteger&gt; right =</span>
+<span class="fc" id="L227">            UnivariatePolynomialView.from(product);</span>
+<span class="fc" id="L228">        int count = Math.max(</span>
+<span class="fc" id="L229">            left.coefficientCount(),</span>
+<span class="fc" id="L230">            right.coefficientCount());</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        for (int exponent = 0; exponent &lt; count; exponent++) {</span>
+<span class="fc" id="L232">            if (left.coefficient(exponent)</span>
+<span class="fc" id="L233">                    .subtract(right.coefficient(exponent))</span>
+<span class="fc" id="L234">                    .remainder(modulus)</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">                    .signum() != 0) {</span>
+<span class="nc" id="L236">                return false;</span>
             }
         }
-<span class="fc" id="L235">        return true;</span>
+<span class="fc" id="L239">        return true;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

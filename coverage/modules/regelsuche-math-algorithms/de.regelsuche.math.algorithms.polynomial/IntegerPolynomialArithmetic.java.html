@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IntegerPolynomialArithmetic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">IntegerPolynomialArithmetic.java</span></div><h1>IntegerPolynomialArithmetic.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Exact bounded integer-polynomial operations used by recombination. */
+final class IntegerPolynomialArithmetic {
+    private IntegerPolynomialArithmetic() {
+    }
+
+    static BigInteger coefficientBound(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L20">        requireIntegerUnivariate(source);</span>
+<span class="fc" id="L21">        BigInteger squaredNorm = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        for (BigInteger coefficient : source.terms().values()) {</span>
+<span class="fc" id="L23">            work.consume(&quot;zassenhaus.bound.square&quot;, 1);</span>
+<span class="fc" id="L24">            BigInteger square = multiplyChecked(</span>
+                coefficient,
+                coefficient,
+                policy,
+                &quot;ZASSENHAUS_BOUND_BIT_LENGTH_EXCEEDED&quot;);
+<span class="fc" id="L29">            work.consume(&quot;zassenhaus.bound.sum&quot;, 1);</span>
+<span class="fc" id="L30">            squaredNorm = addChecked(</span>
+                squaredNorm,
+                square,
+                policy,
+                &quot;ZASSENHAUS_BOUND_BIT_LENGTH_EXCEEDED&quot;);
+<span class="fc" id="L35">        }</span>
+<span class="fc" id="L36">        work.consume(&quot;zassenhaus.bound.sqrt&quot;, 1);</span>
+<span class="fc" id="L37">        BigInteger norm = ceilSqrt(squaredNorm);</span>
+<span class="fc" id="L38">        work.consume(&quot;zassenhaus.bound.degree-scale&quot;, 1);</span>
+<span class="fc" id="L39">        return multiplyChecked(</span>
+<span class="fc" id="L40">            BigInteger.ONE.shiftLeft(Math.max(0, source.degree(0))),</span>
+            norm,
+            policy,
+            &quot;ZASSENHAUS_BOUND_BIT_LENGTH_EXCEEDED&quot;);
+    }
+
+    static int minimumHenselExponent(
+        int prime,
+        BigInteger coefficientBound,
+        ZassenhausRecombinationPolicy policy
+    ) {
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">        if (prime &lt; 2 || coefficientBound.signum() &lt; 0) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(</span>
+                &quot;invalid Hensel precision inputs&quot;);
+        }
+<span class="fc" id="L55">        BigInteger threshold = coefficientBound.shiftLeft(1);</span>
+<span class="fc" id="L56">        BigInteger modulus = BigInteger.ONE;</span>
+<span class="fc" id="L57">        BigInteger primeValue = BigInteger.valueOf(prime);</span>
+<span class="fc" id="L58">        for (int exponent = 1;</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                exponent &lt;= policy.maxHenselExponent();</span>
+<span class="fc" id="L60">                exponent++) {</span>
+<span class="fc" id="L61">            if ((long) modulus.bitLength()</span>
+<span class="fc" id="L62">                    + primeValue.bitLength() - 1L</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                    &gt; policy.maxModulusBitLength()) {</span>
+<span class="nc" id="L64">                throw new LimitReached(</span>
+                    &quot;ZASSENHAUS_MODULUS_BIT_LENGTH_POLICY_EXCEEDED&quot;);
+            }
+<span class="fc" id="L67">            modulus = modulus.multiply(primeValue);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            if (modulus.bitLength() &gt; policy.maxModulusBitLength()) {</span>
+<span class="nc" id="L69">                throw new LimitReached(</span>
+                    &quot;ZASSENHAUS_MODULUS_BIT_LENGTH_POLICY_EXCEEDED&quot;);
+            }
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (modulus.compareTo(threshold) &gt; 0) {</span>
+<span class="fc" id="L73">                return exponent;</span>
+            }
+        }
+<span class="nc" id="L76">        throw new LimitReached(</span>
+            &quot;ZASSENHAUS_HENSEL_EXPONENT_POLICY_EXCEEDED&quot;);
+    }
+
+    static List&lt;BigInteger&gt; positiveDivisors(
+        BigInteger value,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L85">        return ZassenhausDivisorEnumeration.positiveDivisors(</span>
+            value,
+            policy,
+            work);
+    }
+
+    static List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; monicLiftedFactors(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L97">        return ZassenhausCandidateArithmetic.monicLiftedFactors(</span>
+            source,
+            lifting,
+            policy,
+            work);
+    }
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; subsetCandidate(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; modularFactors,
+        int[] subset,
+        BigInteger leadingDivisor,
+        BigInteger modulus,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L112">        return ZassenhausCandidateArithmetic.subsetCandidate(</span>
+            modularFactors,
+            subset,
+            leadingDivisor,
+            modulus,
+            policy,
+            work);
+    }
+
+    static ExactDivision exactDivide(
+        UnivariatePolynomialView&lt;BigInteger&gt; dividend,
+        UnivariatePolynomialView&lt;BigInteger&gt; divisor,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L128">        requireSameIntegerRing(dividend, divisor);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (divisor.isZero()) {</span>
+<span class="nc" id="L130">            throw new ArithmeticException(</span>
+                &quot;integer polynomial division by zero&quot;);
+        }
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (dividend.isZero()) {</span>
+<span class="nc" id="L134">            return new ExactDivision(</span>
+                true,
+<span class="nc" id="L136">                UnivariatePolynomialView.zero(dividend.ring()));</span>
+        }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (dividend.degree() &lt; divisor.degree()) {</span>
+<span class="nc" id="L139">            return new ExactDivision(false, null);</span>
+        }
+
+<span class="fc" id="L142">        ArrayList&lt;BigInteger&gt; remainder =</span>
+<span class="fc" id="L143">            new ArrayList&lt;&gt;(dividend.coefficients());</span>
+<span class="fc" id="L144">        ArrayList&lt;BigInteger&gt; quotient = zeros(</span>
+<span class="fc" id="L145">            dividend.degree() - divisor.degree() + 1);</span>
+<span class="fc" id="L146">        int remainderDegree = trimmedDegree(remainder);</span>
+<span class="fc" id="L147">        BigInteger divisorLeading = divisor.leadingCoefficient();</span>
+
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        while (remainderDegree &gt;= divisor.degree()) {</span>
+<span class="fc" id="L150">            work.consume(stage + &quot;.leading-divisions&quot;, 1);</span>
+<span class="fc" id="L151">            BigInteger[] division = remainder.get(remainderDegree)</span>
+<span class="fc" id="L152">                .divideAndRemainder(divisorLeading);</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (division[1].signum() != 0) {</span>
+<span class="nc" id="L154">                return new ExactDivision(false, null);</span>
+            }
+<span class="fc" id="L156">            BigInteger scale = division[0];</span>
+<span class="fc" id="L157">            int shift = remainderDegree - divisor.degree();</span>
+<span class="fc" id="L158">            quotient.set(</span>
+                shift,
+<span class="fc" id="L160">                addChecked(</span>
+<span class="fc" id="L161">                    quotient.get(shift),</span>
+                    scale,
+                    policy,
+                    &quot;ZASSENHAUS_DIVISION_COEFFICIENT_LIMIT_EXCEEDED&quot;));
+<span class="fc" id="L165">            for (int exponent = 0;</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                    exponent &lt;= divisor.degree();</span>
+<span class="fc" id="L167">                    exponent++) {</span>
+<span class="fc" id="L168">                work.consume(stage + &quot;.coefficient-updates&quot;, 2);</span>
+<span class="fc" id="L169">                BigInteger product = multiplyChecked(</span>
+                    scale,
+<span class="fc" id="L171">                    divisor.coefficient(exponent),</span>
+                    policy,
+                    &quot;ZASSENHAUS_DIVISION_COEFFICIENT_LIMIT_EXCEEDED&quot;);
+<span class="fc" id="L174">                int target = shift + exponent;</span>
+<span class="fc" id="L175">                remainder.set(</span>
+                    target,
+<span class="fc" id="L177">                    addChecked(</span>
+<span class="fc" id="L178">                        remainder.get(target),</span>
+<span class="fc" id="L179">                        product.negate(),</span>
+                        policy,
+                        &quot;ZASSENHAUS_DIVISION_COEFFICIENT_LIMIT_EXCEEDED&quot;));
+            }
+<span class="fc" id="L183">            remainderDegree = trimmedDegree(remainder);</span>
+<span class="fc" id="L184">        }</span>
+
+<span class="fc" id="L186">        work.consume(stage + &quot;.remainder-tests&quot;, 1);</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (remainderDegree &gt;= 0) {</span>
+<span class="nc" id="L188">            return new ExactDivision(false, null);</span>
+        }
+<span class="fc" id="L190">        UnivariatePolynomialView&lt;BigInteger&gt; exactQuotient =</span>
+<span class="fc" id="L191">            UnivariatePolynomialView.of(dividend.ring(), quotient);</span>
+<span class="fc" id="L192">        UnivariatePolynomialView&lt;BigInteger&gt; reconstructed =</span>
+<span class="fc" id="L193">            multiplyCheckedView(</span>
+                exactQuotient,
+                divisor,
+                policy,
+                work,
+                stage + &quot;.product-verification&quot;);
+<span class="fc" id="L199">        work.consume(stage + &quot;.product-comparison&quot;, 1);</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (!dividend.equals(reconstructed)) {</span>
+<span class="nc" id="L201">            throw new AlgorithmFailure(</span>
+                &quot;ZASSENHAUS_EXACT_DIVISION_VERIFICATION_FAILED&quot;);
+        }
+<span class="fc" id="L204">        return new ExactDivision(true, exactQuotient);</span>
+    }
+
+    static boolean isPrimitivePositive(
+        UnivariatePolynomialView&lt;BigInteger&gt; polynomial,
+        PolynomialWorkBudget work
+    ) {
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (polynomial.isZero()</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                || polynomial.isConstant()</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                || polynomial.leadingCoefficient().signum() &lt;= 0) {</span>
+<span class="nc" id="L214">            return false;</span>
+        }
+<span class="fc" id="L216">        BigInteger gcd = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (BigInteger coefficient : polynomial.coefficients()) {</span>
+<span class="fc" id="L218">            work.consume(&quot;zassenhaus.candidate.primitive-gcd&quot;, 1);</span>
+<span class="fc" id="L219">            gcd = gcd.gcd(coefficient.abs());</span>
+<span class="fc" id="L220">        }</span>
+<span class="fc" id="L221">        work.consume(&quot;zassenhaus.candidate.primitive-test&quot;, 1);</span>
+<span class="fc" id="L222">        return BigInteger.ONE.equals(gcd);</span>
+    }
+
+    static void verifyProduct(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; factors,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L231">        UnivariatePolynomialView&lt;BigInteger&gt; product =</span>
+<span class="fc" id="L232">            UnivariatePolynomialView.one(source.ring());</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (SparsePolynomial&lt;BigInteger&gt; factor : factors) {</span>
+<span class="fc" id="L234">            product = multiplyCheckedView(</span>
+                product,
+<span class="fc" id="L236">                UnivariatePolynomialView.from(factor),</span>
+                policy,
+                work,
+                &quot;zassenhaus.verify.factor-products&quot;);
+<span class="fc" id="L240">        }</span>
+<span class="fc" id="L241">        work.consume(&quot;zassenhaus.verify.product-comparison&quot;, 1);</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (!UnivariatePolynomialView.from(source).equals(product)) {</span>
+<span class="nc" id="L243">            throw new AlgorithmFailure(</span>
+                &quot;ZASSENHAUS_FACTOR_PRODUCT_MISMATCH&quot;);
+        }
+<span class="fc" id="L246">    }</span>
+
+    private static UnivariatePolynomialView&lt;BigInteger&gt; multiplyCheckedView(
+        UnivariatePolynomialView&lt;BigInteger&gt; left,
+        UnivariatePolynomialView&lt;BigInteger&gt; right,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L255">        requireSameIntegerRing(left, right);</span>
+<span class="pc bpc" id="L256" title="2 of 4 branches missed.">        if (left.isZero() || right.isZero()) {</span>
+<span class="nc" id="L257">            return UnivariatePolynomialView.zero(left.ring());</span>
+        }
+<span class="fc" id="L259">        ArrayList&lt;BigInteger&gt; coefficients = zeros(</span>
+<span class="fc" id="L260">            left.degree() + right.degree() + 1);</span>
+<span class="fc" id="L261">        for (int leftExponent = 0;</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">                leftExponent &lt; left.coefficientCount();</span>
+<span class="fc" id="L263">                leftExponent++) {</span>
+<span class="fc" id="L264">            for (int rightExponent = 0;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">                    rightExponent &lt; right.coefficientCount();</span>
+<span class="fc" id="L266">                    rightExponent++) {</span>
+<span class="fc" id="L267">                work.consume(stage + &quot;.multiply-add&quot;, 2);</span>
+<span class="fc" id="L268">                BigInteger product = multiplyChecked(</span>
+<span class="fc" id="L269">                    left.coefficient(leftExponent),</span>
+<span class="fc" id="L270">                    right.coefficient(rightExponent),</span>
+                    policy,
+                    &quot;ZASSENHAUS_INTERMEDIATE_COEFFICIENT_BIT_LENGTH_EXCEEDED&quot;);
+<span class="fc" id="L273">                int exponent = leftExponent + rightExponent;</span>
+<span class="fc" id="L274">                coefficients.set(</span>
+                    exponent,
+<span class="fc" id="L276">                    addChecked(</span>
+<span class="fc" id="L277">                        coefficients.get(exponent),</span>
+                        product,
+                        policy,
+                        &quot;ZASSENHAUS_INTERMEDIATE_COEFFICIENT_BIT_LENGTH_EXCEEDED&quot;));
+            }
+        }
+<span class="fc" id="L283">        return UnivariatePolynomialView.of(left.ring(), coefficients);</span>
+    }
+
+    private static BigInteger multiplyChecked(
+        BigInteger left,
+        BigInteger right,
+        ZassenhausRecombinationPolicy policy,
+        String detailCode
+    ) {
+<span class="fc bfc" id="L292" title="All 4 branches covered.">        if (left.signum() != 0 &amp;&amp; right.signum() != 0</span>
+<span class="fc" id="L293">                &amp;&amp; (long) left.abs().bitLength()</span>
+<span class="fc" id="L294">                    + right.abs().bitLength() - 1L</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">                    &gt; policy.maxIntermediateCoefficientBitLength()) {</span>
+<span class="nc" id="L296">            throw new LimitReached(detailCode);</span>
+        }
+<span class="fc" id="L298">        BigInteger result = left.multiply(right);</span>
+<span class="fc" id="L299">        if (result.abs().bitLength()</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">                &gt; policy.maxIntermediateCoefficientBitLength()) {</span>
+<span class="nc" id="L301">            throw new LimitReached(detailCode);</span>
+        }
+<span class="fc" id="L303">        return result;</span>
+    }
+
+    private static BigInteger addChecked(
+        BigInteger left,
+        BigInteger right,
+        ZassenhausRecombinationPolicy policy,
+        String detailCode
+    ) {
+<span class="fc" id="L312">        BigInteger result = left.add(right);</span>
+<span class="fc" id="L313">        if (result.abs().bitLength()</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">                &gt; policy.maxIntermediateCoefficientBitLength()) {</span>
+<span class="nc" id="L315">            throw new LimitReached(detailCode);</span>
+        }
+<span class="fc" id="L317">        return result;</span>
+    }
+
+    private static BigInteger ceilSqrt(BigInteger value) {
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">        if (value.signum() &lt; 0) {</span>
+<span class="nc" id="L322">            throw new IllegalArgumentException(</span>
+                &quot;square root input must not be negative&quot;);
+        }
+<span class="fc" id="L325">        BigInteger floor = value.sqrt();</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        return floor.multiply(floor).equals(value)</span>
+<span class="nc" id="L327">            ? floor</span>
+<span class="fc" id="L328">            : floor.add(BigInteger.ONE);</span>
+    }
+
+    private static int trimmedDegree(List&lt;BigInteger&gt; coefficients) {
+<span class="fc" id="L332">        int degree = coefficients.size() - 1;</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        while (degree &gt;= 0</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">                &amp;&amp; coefficients.get(degree).signum() == 0) {</span>
+<span class="fc" id="L335">            degree--;</span>
+        }
+<span class="fc" id="L337">        return degree;</span>
+    }
+
+    private static ArrayList&lt;BigInteger&gt; zeros(int size) {
+<span class="fc" id="L341">        ArrayList&lt;BigInteger&gt; result = new ArrayList&lt;&gt;(size);</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        for (int index = 0; index &lt; size; index++) {</span>
+<span class="fc" id="L343">            result.add(BigInteger.ZERO);</span>
+        }
+<span class="fc" id="L345">        return result;</span>
+    }
+
+    private static void requireIntegerUnivariate(
+        SparsePolynomial&lt;BigInteger&gt; polynomial
+    ) {
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        if (!(polynomial.ring().coefficientDomain()</span>
+                instanceof BigIntegerDomain)
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">                || polynomial.ring().variableCount() != 1) {</span>
+<span class="nc" id="L354">            throw new IllegalArgumentException(</span>
+                &quot;integer univariate polynomial required&quot;);
+        }
+<span class="fc" id="L357">    }</span>
+
+    private static void requireSameIntegerRing(
+        UnivariatePolynomialView&lt;BigInteger&gt; left,
+        UnivariatePolynomialView&lt;BigInteger&gt; right
+    ) {
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        if (!left.ring().equals(right.ring())</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">                || !(left.ring().coefficientDomain()</span>
+                    instanceof BigIntegerDomain)) {
+<span class="nc" id="L366">            throw new IllegalArgumentException(</span>
+                &quot;integer polynomial ring mismatch&quot;);
+        }
+<span class="fc" id="L369">    }</span>
+
+    record ExactDivision(
+        boolean exact,
+        UnivariatePolynomialView&lt;BigInteger&gt; quotient
+    ) {
+<span class="fc" id="L375">        ExactDivision {</span>
+<span class="pc bpc" id="L376" title="2 of 4 branches missed.">            if (exact != (quotient != null)) {</span>
+<span class="nc" id="L377">                throw new IllegalArgumentException(</span>
+                    &quot;exact division result is invalid&quot;);
+            }
+<span class="fc" id="L380">        }</span>
+    }
+
+    static final class LimitReached extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final String detailCode;
+
+<span class="nc" id="L387">        LimitReached(String detailCode) {</span>
+<span class="nc" id="L388">            this.detailCode = detailCode;</span>
+<span class="nc" id="L389">        }</span>
+
+        String detailCode() {
+<span class="nc" id="L392">            return detailCode;</span>
+        }
+    }
+
+    static final class AlgorithmFailure extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final String detailCode;
+
+<span class="nc" id="L400">        AlgorithmFailure(String detailCode) {</span>
+<span class="nc" id="L401">            this.detailCode = detailCode;</span>
+<span class="nc" id="L402">        }</span>
+
+        String detailCode() {
+<span class="nc" id="L405">            return detailCode;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeUnivariateFactorizationPolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">NativeUnivariateFactorizationPolicy.java</span></div><h1>NativeUnivariateFactorizationPolicy.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import java.util.Objects;
+
+/** Complete bounded policy for the native univariate Z[x]/Q[x] engine. */
+public record NativeUnivariateFactorizationPolicy(
+    UnivariateContentPolicy contentPolicy,
+    SuitablePrimeSelectionPolicy suitablePrimePolicy,
+    ZassenhausRecombinationPolicy recombinationPolicy
+) {
+<span class="fc" id="L11">    public NativeUnivariateFactorizationPolicy {</span>
+<span class="fc" id="L12">        Objects.requireNonNull(contentPolicy, &quot;contentPolicy&quot;);</span>
+<span class="fc" id="L13">        Objects.requireNonNull(</span>
+            suitablePrimePolicy,
+            &quot;suitablePrimePolicy&quot;);
+<span class="fc" id="L16">        Objects.requireNonNull(</span>
+            recombinationPolicy,
+            &quot;recombinationPolicy&quot;);
+<span class="fc" id="L19">    }</span>
+
+    public static NativeUnivariateFactorizationPolicy boundedDefaults() {
+<span class="fc" id="L22">        FiniteFieldFactorizationPolicy finiteField =</span>
+<span class="fc" id="L23">            FiniteFieldFactorizationPolicy.deterministicBerlekamp(</span>
+                257,
+                1_000_000);
+<span class="fc" id="L26">        return new NativeUnivariateFactorizationPolicy(</span>
+            new UnivariateContentPolicy(65_536),
+<span class="fc" id="L28">            SuitablePrimeSelectionPolicy.deterministicAscending(</span>
+                257,
+                55,
+                finiteField),
+<span class="fc" id="L32">            ZassenhausRecombinationPolicy.boundedDefaults());</span>
+    }
+
+    public String canonicalMaterial() {
+<span class="fc" id="L36">        StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L37">        AlgorithmEvidence.append(</span>
+            result,
+<span class="fc" id="L39">            contentPolicy.canonicalMaterial());</span>
+<span class="fc" id="L40">        AlgorithmEvidence.append(</span>
+            result,
+<span class="fc" id="L42">            suitablePrimePolicy.canonicalMaterial());</span>
+<span class="fc" id="L43">        AlgorithmEvidence.append(</span>
+            result,
+<span class="fc" id="L45">            recombinationPolicy.canonicalMaterial());</span>
+<span class="fc" id="L46">        return result.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

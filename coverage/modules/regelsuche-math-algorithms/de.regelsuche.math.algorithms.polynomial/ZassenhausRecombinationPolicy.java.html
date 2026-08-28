@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZassenhausRecombinationPolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">ZassenhausRecombinationPolicy.java</span></div><h1>ZassenhausRecombinationPolicy.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import java.util.Objects;
+
+/**
+ * Explicit search, representation and precision limits for deterministic
+ * Zassenhaus recombination.
+ */
+public record ZassenhausRecombinationPolicy(
+    Algorithm algorithm,
+    long maxSubsetCandidates,
+    long maxLeadingDivisorTests,
+    int maxAcceptedFactors,
+    int maxIntermediateCoefficientBitLength,
+    int maxHenselExponent,
+    int maxModulusBitLength
+) {
+    public static final long MAX_SUBSET_CANDIDATES = 10_000_000L;
+    public static final long MAX_LEADING_DIVISOR_TESTS = 10_000_000L;
+    public static final int MAX_ACCEPTED_FACTORS = 100_000;
+    public static final int MAX_INTERMEDIATE_COEFFICIENT_BIT_LENGTH =
+        1_000_000;
+    public static final int MAX_HENSEL_EXPONENT =
+        HenselLiftingPolicy.MAX_TARGET_EXPONENT;
+    public static final int MAX_MODULUS_BIT_LENGTH =
+        HenselLiftingPolicy.MAX_MODULUS_BIT_LENGTH;
+
+<span class="fc" id="L28">    public ZassenhausRecombinationPolicy {</span>
+<span class="fc" id="L29">        Objects.requireNonNull(algorithm, &quot;algorithm&quot;);</span>
+<span class="pc bpc" id="L30" title="11 of 24 branches missed.">        if (maxSubsetCandidates &lt; 1</span>
+                || maxSubsetCandidates &gt; MAX_SUBSET_CANDIDATES
+                || maxLeadingDivisorTests &lt; 1
+                || maxLeadingDivisorTests &gt; MAX_LEADING_DIVISOR_TESTS
+                || maxAcceptedFactors &lt; 1
+                || maxAcceptedFactors &gt; MAX_ACCEPTED_FACTORS
+                || maxIntermediateCoefficientBitLength &lt; 1
+                || maxIntermediateCoefficientBitLength
+                    &gt; MAX_INTERMEDIATE_COEFFICIENT_BIT_LENGTH
+                || maxHenselExponent &lt; 1
+                || maxHenselExponent &gt; MAX_HENSEL_EXPONENT
+                || maxModulusBitLength &lt; 1
+                || maxModulusBitLength &gt; MAX_MODULUS_BIT_LENGTH) {
+<span class="fc" id="L43">            throw new IllegalArgumentException(</span>
+                &quot;Zassenhaus recombination policy is invalid&quot;);
+        }
+<span class="fc" id="L46">    }</span>
+
+    public static ZassenhausRecombinationPolicy boundedDefaults() {
+<span class="fc" id="L49">        return new ZassenhausRecombinationPolicy(</span>
+            Algorithm.DETERMINISTIC_SUBSET_SEARCH_V1,
+            250_000,
+            250_000,
+            4_096,
+            65_536,
+            4_096,
+            65_536);
+    }
+
+    public String canonicalMaterial() {
+<span class="fc" id="L60">        return algorithm.id()</span>
+            + ':' + maxSubsetCandidates
+            + ':' + maxLeadingDivisorTests
+            + ':' + maxAcceptedFactors
+            + ':' + maxIntermediateCoefficientBitLength
+            + ':' + maxHenselExponent
+            + ':' + maxModulusBitLength;
+    }
+
+<span class="fc" id="L69">    public enum Algorithm {</span>
+<span class="fc" id="L70">        DETERMINISTIC_SUBSET_SEARCH_V1(</span>
+            &quot;regelsuche.zassenhaus-recombination.subset-search/v1&quot;);
+
+        private final String id;
+
+<span class="fc" id="L75">        Algorithm(String id) {</span>
+<span class="fc" id="L76">            this.id = id;</span>
+<span class="fc" id="L77">        }</span>
+
+        public String id() {
+<span class="fc" id="L80">            return id;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

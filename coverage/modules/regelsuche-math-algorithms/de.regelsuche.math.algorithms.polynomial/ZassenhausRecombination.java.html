@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZassenhausRecombination.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">ZassenhausRecombination.java</span></div><h1>ZassenhausRecombination.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Deterministic bounded Zassenhaus recombination for one primitive square-free
+ * polynomial in {@code Z[x]}.
+ */
+public final class ZassenhausRecombination {
+    public static final String METHOD_ID =
+        &quot;regelsuche.zassenhaus-recombination/v1&quot;;
+
+    private ZassenhausRecombination() {
+    }
+
+    public static ZassenhausRecombinationResult recombine(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy
+    ) {
+<span class="fc" id="L31">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L32">        Objects.requireNonNull(selection, &quot;selection&quot;);</span>
+<span class="fc" id="L33">        Objects.requireNonNull(lifting, &quot;lifting&quot;);</span>
+<span class="fc" id="L34">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L35">        PolynomialWorkBudget work =</span>
+<span class="fc" id="L36">            resume(request.maxWorkUnits(), lifting.work());</span>
+<span class="fc" id="L37">        ZassenhausSearch.CandidateAudit audit =</span>
+            new ZassenhausSearch.CandidateAudit(
+<span class="fc" id="L39">                request.canonicalMaterial());</span>
+<span class="fc" id="L40">        ZassenhausRecombinationResult rejected = rejectInput(</span>
+            request,
+            selection,
+            lifting,
+            policy,
+            work,
+            audit);
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (rejected != null) {</span>
+<span class="nc" id="L48">            return rejected;</span>
+        }
+        try {
+<span class="fc" id="L51">            BigInteger bound =</span>
+<span class="fc" id="L52">                IntegerPolynomialArithmetic.coefficientBound(</span>
+<span class="fc" id="L53">                    request.source(),</span>
+                    policy,
+                    work);
+<span class="fc" id="L56">            return execute(</span>
+                request,
+                selection,
+                lifting,
+                policy,
+                bound,
+                work,
+                audit);
+<span class="nc" id="L64">        } catch (PolynomialWorkBudget.LimitReached exception) {</span>
+<span class="nc" id="L65">            return inconclusive(</span>
+                &quot;ZASSENHAUS_WORK_BUDGET_EXCEEDED&quot;,
+                null,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+<span class="nc" id="L74">        } catch (IntegerPolynomialArithmetic.LimitReached exception) {</span>
+<span class="nc" id="L75">            return inconclusive(</span>
+<span class="nc" id="L76">                exception.detailCode(),</span>
+                null,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+<span class="nc" id="L84">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L85">            return technicalFailure(</span>
+<span class="nc" id="L86">                technicalDetail(exception),</span>
+                null,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+        }
+    }
+
+    static ZassenhausRecombinationResult recombine(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy,
+        BigInteger coefficientBound,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L105">        Objects.requireNonNull(coefficientBound, &quot;coefficientBound&quot;);</span>
+<span class="fc" id="L106">        ZassenhausSearch.CandidateAudit audit =</span>
+            new ZassenhausSearch.CandidateAudit(
+<span class="fc" id="L108">                request.canonicalMaterial());</span>
+<span class="fc" id="L109">        ZassenhausRecombinationResult rejected = rejectInput(</span>
+            request,
+            selection,
+            lifting,
+            policy,
+            work,
+            audit);
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (rejected != null) {</span>
+<span class="nc" id="L117">            return rejected;</span>
+        }
+        try {
+<span class="fc" id="L120">            return execute(</span>
+                request,
+                selection,
+                lifting,
+                policy,
+                coefficientBound,
+                work,
+                audit);
+<span class="nc" id="L128">        } catch (PolynomialWorkBudget.LimitReached exception) {</span>
+<span class="nc" id="L129">            return inconclusive(</span>
+                &quot;ZASSENHAUS_WORK_BUDGET_EXCEEDED&quot;,
+                coefficientBound,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+<span class="nc" id="L138">        } catch (IntegerPolynomialArithmetic.LimitReached exception) {</span>
+<span class="nc" id="L139">            return inconclusive(</span>
+<span class="nc" id="L140">                exception.detailCode(),</span>
+                coefficientBound,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+<span class="nc" id="L148">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L149">            return technicalFailure(</span>
+<span class="nc" id="L150">                technicalDetail(exception),</span>
+                coefficientBound,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+        }
+    }
+
+    private static ZassenhausRecombinationResult rejectInput(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work,
+        ZassenhausSearch.CandidateAudit audit
+    ) {
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (work.limit() != request.maxWorkUnits()</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                || !work.ledger().equals(lifting.work())) {</span>
+<span class="nc" id="L171">            return technicalFailure(</span>
+                &quot;ZASSENHAUS_WORK_BUDGET_AUTHORITY_MISMATCH&quot;,
+                null,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+        }
+<span class="fc" id="L181">        String structuralViolation =</span>
+<span class="fc" id="L182">            request.structuralViolation().orElse(null);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (structuralViolation != null) {</span>
+<span class="nc" id="L184">            return inconclusive(</span>
+                structuralViolation,
+                null,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+        }
+<span class="fc" id="L194">        SparsePolynomial&lt;BigInteger&gt; source = request.source();</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (!(source.ring().coefficientDomain()</span>
+                instanceof BigIntegerDomain)) {
+<span class="nc" id="L197">            return failure(</span>
+                ZassenhausRecombinationResult.Status.UNSUPPORTED_DOMAIN,
+                &quot;REQUIRES_EXACT_INTEGER_COEFFICIENT_DOMAIN&quot;,
+                null,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+        }
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (source.ring().variableCount() != 1</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                || source.isConstant()</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                || source.leadingCoefficient().signum() &lt;= 0</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                || !primitive(source)) {</span>
+<span class="nc" id="L212">            return failure(</span>
+                ZassenhausRecombinationResult.Status.UNSUPPORTED_SHAPE,
+                &quot;REQUIRES_POSITIVE_LEADING_PRIMITIVE_UNIVARIATE_INTEGER_POLYNOMIAL&quot;,
+                null,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+        }
+<span class="pc bpc" id="L223" title="2 of 4 branches missed.">        if (!selection.completed() || !lifting.completed()) {</span>
+<span class="nc" id="L224">            return failure(</span>
+                ZassenhausRecombinationResult.Status.UNSUPPORTED_SHAPE,
+                &quot;REQUIRES_COMPLETED_SELECTION_AND_HENSEL_LIFT&quot;,
+                null,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+        }
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (!lifting.selectionCertificateHash().equals(</span>
+<span class="fc" id="L236">                selection.certificateHash())) {</span>
+<span class="nc" id="L237">            return technicalFailure(</span>
+                &quot;ZASSENHAUS_SELECTION_LIFT_CERTIFICATE_MISMATCH&quot;,
+                null,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+        }
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (!selection.sourceRequestHash().equals(</span>
+<span class="fc" id="L248">                AlgorithmEvidence.sha256(</span>
+<span class="fc" id="L249">                    request.canonicalMaterial()))) {</span>
+<span class="nc" id="L250">            return technicalFailure(</span>
+                &quot;ZASSENHAUS_SOURCE_REQUEST_MISMATCH&quot;,
+                null,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+        }
+<span class="fc" id="L260">        return null;</span>
+    }
+
+    private static ZassenhausRecombinationResult execute(
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy,
+        BigInteger coefficientBound,
+        PolynomialWorkBudget work,
+        ZassenhausSearch.CandidateAudit audit
+    ) {
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        if (coefficientBound.signum() &lt; 0) {</span>
+<span class="nc" id="L273">            throw new IllegalArgumentException(</span>
+                &quot;coefficient bound must not be negative&quot;);
+        }
+<span class="fc" id="L276">        BigInteger modulus = lifting.targetModulus();</span>
+<span class="fc" id="L277">        work.consume(&quot;zassenhaus.precision.bound-check&quot;, 1);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        if (modulus.compareTo(</span>
+<span class="fc" id="L279">                coefficientBound.shiftLeft(1)) &lt;= 0) {</span>
+<span class="fc" id="L280">            return inconclusive(</span>
+                &quot;ZASSENHAUS_LIFT_MODULUS_INSUFFICIENT&quot;,
+                coefficientBound,
+                work,
+                request,
+                selection,
+                lifting,
+                policy,
+                audit);
+        }
+
+<span class="fc" id="L291">        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; remainingFactors =</span>
+            new ArrayList&lt;&gt;(
+<span class="fc" id="L293">                IntegerPolynomialArithmetic.monicLiftedFactors(</span>
+<span class="fc" id="L294">                    request.source(),</span>
+                    lifting,
+                    policy,
+                    work));
+<span class="fc" id="L298">        List&lt;List&lt;Integer&gt;&gt; remainingGroups =</span>
+<span class="fc" id="L299">            ZassenhausSearch.singletonGroups(</span>
+<span class="fc" id="L300">                remainingFactors.size());</span>
+<span class="fc" id="L301">        UnivariatePolynomialView&lt;BigInteger&gt; remainingSource =</span>
+<span class="fc" id="L302">            UnivariatePolynomialView.from(request.source());</span>
+<span class="fc" id="L303">        ArrayList&lt;SparsePolynomial&lt;BigInteger&gt;&gt; accepted =</span>
+            new ArrayList&lt;&gt;();
+<span class="fc" id="L305">        ArrayList&lt;List&lt;Integer&gt;&gt; acceptedPartitions =</span>
+            new ArrayList&lt;&gt;();
+<span class="fc" id="L307">        long candidates = 0;</span>
+<span class="fc" id="L308">        long candidateLimit = Math.min(</span>
+<span class="fc" id="L309">            policy.maxSubsetCandidates(),</span>
+<span class="fc" id="L310">            Math.max(</span>
+                0,
+<span class="fc" id="L312">                (long) request.maxCandidates()</span>
+<span class="fc" id="L313">                    - selection.attempts().size()));</span>
+
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        while (remainingFactors.size() &gt; 1</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                &amp;&amp; remainingSource.degree() &gt; 1) {</span>
+<span class="fc" id="L317">            ZassenhausSearch.SearchResult search =</span>
+<span class="fc" id="L318">                ZassenhausSearch.findFactor(</span>
+                    remainingSource,
+                    remainingFactors,
+                    remainingGroups,
+                    coefficientBound,
+                    modulus,
+                    policy,
+                    work,
+                    candidates,
+                    candidateLimit,
+                    audit);
+<span class="fc" id="L329">            candidates = search.candidatesConsidered();</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">            if (!search.found()) {</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">                if (!search.exhaustive()) {</span>
+<span class="fc" id="L332">                    return inconclusive(</span>
+<span class="fc" id="L333">                        search.detailCode(),</span>
+                        coefficientBound,
+                        work,
+                        request,
+                        selection,
+                        lifting,
+                        policy,
+                        audit);
+                }
+                break;
+            }
+<span class="fc" id="L344">            accepted.add(search.factor().toSparsePolynomial());</span>
+<span class="fc" id="L345">            acceptedPartitions.add(search.partition());</span>
+<span class="fc" id="L346">            remainingSource = search.quotient();</span>
+<span class="fc" id="L347">            remainingFactors = ZassenhausSearch.removeSelected(</span>
+                remainingFactors,
+<span class="fc" id="L349">                search.selectedPositions());</span>
+<span class="fc" id="L350">            remainingGroups = ZassenhausSearch.removeSelected(</span>
+                remainingGroups,
+<span class="fc" id="L352">                search.selectedPositions());</span>
+<span class="fc" id="L353">        }</span>
+
+<span class="fc" id="L355">        accepted.add(remainingSource.toSparsePolynomial());</span>
+<span class="fc" id="L356">        acceptedPartitions.add(remainingGroups.stream()</span>
+<span class="fc" id="L357">            .flatMap(List::stream)</span>
+<span class="fc" id="L358">            .sorted()</span>
+<span class="fc" id="L359">            .toList());</span>
+
+<span class="fc" id="L361">        List&lt;Integer&gt; order = java.util.stream.IntStream</span>
+<span class="fc" id="L362">            .range(0, accepted.size())</span>
+<span class="fc" id="L363">            .boxed()</span>
+<span class="fc" id="L364">            .sorted(Comparator.comparing(index -&gt;</span>
+<span class="fc" id="L365">                accepted.get(index).canonicalMaterial()))</span>
+<span class="fc" id="L366">            .toList();</span>
+<span class="fc" id="L367">        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; orderedFactors =</span>
+<span class="fc" id="L368">            order.stream().map(accepted::get).toList();</span>
+<span class="fc" id="L369">        List&lt;List&lt;Integer&gt;&gt; orderedPartitions =</span>
+<span class="fc" id="L370">            order.stream().map(acceptedPartitions::get).toList();</span>
+
+<span class="fc" id="L372">        IntegerPolynomialArithmetic.verifyProduct(</span>
+<span class="fc" id="L373">            request.source(),</span>
+            orderedFactors,
+            policy,
+            work);
+<span class="fc" id="L377">        return ZassenhausRecombinationResult.completed(</span>
+            coefficientBound,
+            modulus,
+            orderedFactors,
+            orderedPartitions,
+            candidates,
+<span class="fc" id="L383">            audit.hash(),</span>
+<span class="fc" id="L384">            work.ledger(),</span>
+            request,
+            selection,
+            lifting,
+            policy);
+    }
+
+    private static boolean primitive(
+        SparsePolynomial&lt;BigInteger&gt; polynomial
+    ) {
+<span class="fc" id="L394">        BigInteger gcd = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        for (BigInteger coefficient : polynomial.terms().values()) {</span>
+<span class="fc" id="L396">            gcd = gcd.gcd(coefficient.abs());</span>
+<span class="fc" id="L397">        }</span>
+<span class="fc" id="L398">        return BigInteger.ONE.equals(gcd);</span>
+    }
+
+    private static PolynomialWorkBudget resume(
+        long limit,
+        PolynomialWorkLedger prefix
+    ) {
+<span class="fc" id="L405">        PolynomialWorkBudget work = new PolynomialWorkBudget(limit);</span>
+<span class="fc" id="L406">        prefix.stages().forEach(work::consume);</span>
+<span class="fc" id="L407">        return work;</span>
+    }
+
+    private static ZassenhausRecombinationResult inconclusive(
+        String detailCode,
+        BigInteger coefficientBound,
+        PolynomialWorkBudget work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy,
+        ZassenhausSearch.CandidateAudit audit
+    ) {
+<span class="fc" id="L420">        return failure(</span>
+            ZassenhausRecombinationResult.Status.BUDGET_INCONCLUSIVE,
+            detailCode,
+            coefficientBound,
+            work,
+            request,
+            selection,
+            lifting,
+            policy,
+            audit);
+    }
+
+    private static ZassenhausRecombinationResult technicalFailure(
+        String detailCode,
+        BigInteger coefficientBound,
+        PolynomialWorkBudget work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy,
+        ZassenhausSearch.CandidateAudit audit
+    ) {
+<span class="nc" id="L442">        return failure(</span>
+            ZassenhausRecombinationResult.Status.TECHNICAL_FAILURE,
+            detailCode,
+            coefficientBound,
+            work,
+            request,
+            selection,
+            lifting,
+            policy,
+            audit);
+    }
+
+    private static ZassenhausRecombinationResult failure(
+        ZassenhausRecombinationResult.Status status,
+        String detailCode,
+        BigInteger coefficientBound,
+        PolynomialWorkBudget work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy,
+        ZassenhausSearch.CandidateAudit audit
+    ) {
+<span class="fc" id="L465">        return ZassenhausRecombinationResult.failure(</span>
+            status,
+            detailCode,
+            coefficientBound,
+<span class="fc" id="L469">            audit.count(),</span>
+<span class="fc" id="L470">            audit.hash(),</span>
+<span class="fc" id="L471">            work.ledger(),</span>
+            request,
+            selection,
+            lifting,
+            policy);
+    }
+
+    private static String technicalDetail(RuntimeException exception) {
+<span class="nc bnc" id="L479" title="All 2 branches missed.">        if (exception</span>
+<span class="nc" id="L480">                instanceof IntegerPolynomialArithmetic.AlgorithmFailure</span>
+                    failure) {
+<span class="nc" id="L482">            return failure.detailCode();</span>
+        }
+<span class="nc bnc" id="L484" title="All 2 branches missed.">        if (exception instanceof ArithmeticException) {</span>
+<span class="nc" id="L485">            return &quot;ZASSENHAUS_EXACT_ARITHMETIC_FAILED&quot;;</span>
+        }
+<span class="nc" id="L487">        return &quot;ZASSENHAUS_&quot;</span>
+<span class="nc" id="L488">            + exception.getClass().getSimpleName()</span>
+<span class="nc" id="L489">                .toUpperCase(java.util.Locale.ROOT);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

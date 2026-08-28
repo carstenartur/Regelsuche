@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZassenhausCandidateArithmetic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">ZassenhausCandidateArithmetic.java</span></div><h1>ZassenhausCandidateArithmetic.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Modular lift normalization and deterministic subset reconstruction. */
+final class ZassenhausCandidateArithmetic {
+    private ZassenhausCandidateArithmetic() {
+    }
+
+    static List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; monicLiftedFactors(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        if (!lifting.completed()</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">                || lifting.factors().isEmpty()</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">                || lifting.factors().size() &gt; policy.maxAcceptedFactors()) {</span>
+<span class="nc" id="L23">            throw new IntegerPolynomialArithmetic.AlgorithmFailure(</span>
+                &quot;ZASSENHAUS_INVALID_HENSEL_FACTOR_SET&quot;);
+        }
+<span class="fc" id="L26">        BigInteger modulus = lifting.targetModulus();</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (modulus.signum() &lt;= 0</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">                || modulus.bitLength() &gt; policy.maxModulusBitLength()) {</span>
+<span class="nc" id="L29">            throw new IntegerPolynomialArithmetic.LimitReached(</span>
+                &quot;ZASSENHAUS_MODULUS_BIT_LENGTH_POLICY_EXCEEDED&quot;);
+        }
+
+<span class="fc" id="L33">        ArrayList&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; result =</span>
+<span class="fc" id="L34">            new ArrayList&lt;&gt;(lifting.factors().size());</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        for (int index = 0; index &lt; lifting.factors().size(); index++) {</span>
+<span class="fc" id="L36">            SparsePolynomial&lt;BigInteger&gt; lifted = lifting.factors().get(index);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            if (!source.ring().equals(lifted.ring())</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                    || lifted.isConstant()) {</span>
+<span class="nc" id="L39">                throw new IntegerPolynomialArithmetic.AlgorithmFailure(</span>
+                    &quot;ZASSENHAUS_HENSEL_FACTOR_RING_OR_SHAPE_MISMATCH&quot;);
+            }
+<span class="fc" id="L42">            result.add(monicFactor(</span>
+                source,
+                lifted,
+                index,
+                modulus,
+                policy,
+                work));
+        }
+<span class="fc" id="L50">        return List.copyOf(result);</span>
+    }
+
+    private static UnivariatePolynomialView&lt;BigInteger&gt; monicFactor(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        SparsePolynomial&lt;BigInteger&gt; lifted,
+        int factorIndex,
+        BigInteger modulus,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L61">        UnivariatePolynomialView&lt;BigInteger&gt; view =</span>
+<span class="fc" id="L62">            UnivariatePolynomialView.from(lifted);</span>
+<span class="fc" id="L63">        BigInteger leading = canonicalResidue(</span>
+<span class="fc" id="L64">            view.leadingCoefficient(),</span>
+            modulus);
+<span class="fc" id="L66">        work.consume(&quot;zassenhaus.unanchor.leading-inverses&quot;, 1);</span>
+        BigInteger inverse;
+        try {
+<span class="fc" id="L69">            inverse = leading.modInverse(modulus);</span>
+<span class="nc" id="L70">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L71">            throw new IntegerPolynomialArithmetic.AlgorithmFailure(</span>
+                &quot;ZASSENHAUS_HENSEL_LEADING_COEFFICIENT_NOT_INVERTIBLE&quot;);
+<span class="fc" id="L73">        }</span>
+<span class="fc" id="L74">        ArrayList&lt;BigInteger&gt; coefficients =</span>
+<span class="fc" id="L75">            new ArrayList&lt;&gt;(view.coefficientCount());</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (BigInteger coefficient : view.coefficients()) {</span>
+<span class="fc" id="L77">            BigInteger normalized = modularMultiply(</span>
+                coefficient,
+                inverse,
+                modulus,
+                policy,
+                work,
+                &quot;zassenhaus.unanchor.factor-&quot; + factorIndex);
+<span class="fc" id="L84">            BigInteger centered = centeredResidue(normalized, modulus);</span>
+<span class="fc" id="L85">            requireCoefficientWithinPolicy(centered, policy);</span>
+<span class="fc" id="L86">            coefficients.add(centered);</span>
+<span class="fc" id="L87">        }</span>
+<span class="fc" id="L88">        UnivariatePolynomialView&lt;BigInteger&gt; monic =</span>
+<span class="fc" id="L89">            UnivariatePolynomialView.of(source.ring(), coefficients);</span>
+<span class="fc" id="L90">        work.consume(&quot;zassenhaus.unanchor.monic-tests&quot;, 1);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (monic.isConstant()</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                || !BigInteger.ONE.equals(monic.leadingCoefficient())) {</span>
+<span class="nc" id="L93">            throw new IntegerPolynomialArithmetic.AlgorithmFailure(</span>
+                &quot;ZASSENHAUS_MONIC_LIFT_RECONSTRUCTION_FAILED&quot;);
+        }
+<span class="fc" id="L96">        return monic;</span>
+    }
+
+    static UnivariatePolynomialView&lt;BigInteger&gt; subsetCandidate(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; modularFactors,
+        int[] subset,
+        BigInteger leadingDivisor,
+        BigInteger modulus,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L107">        validateSubsetInput(</span>
+            modularFactors,
+            subset,
+            leadingDivisor,
+            modulus);
+<span class="fc" id="L112">        UnivariatePolynomialView&lt;BigInteger&gt; first =</span>
+<span class="fc" id="L113">            modularFactors.getFirst();</span>
+<span class="fc" id="L114">        UnivariatePolynomialView&lt;BigInteger&gt; product =</span>
+<span class="fc" id="L115">            UnivariatePolynomialView.one(first.ring());</span>
+<span class="fc" id="L116">        int previous = -1;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (int index : subset) {</span>
+<span class="pc bpc" id="L118" title="2 of 4 branches missed.">            if (index &lt;= previous</span>
+                    || index &lt; 0
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                    || index &gt;= modularFactors.size()</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                    || !first.ring().equals(</span>
+<span class="fc" id="L122">                        modularFactors.get(index).ring())) {</span>
+<span class="nc" id="L123">                throw new IllegalArgumentException(</span>
+                    &quot;Zassenhaus subset is not canonical&quot;);
+            }
+<span class="fc" id="L126">            previous = index;</span>
+<span class="fc" id="L127">            product = multiplyModulo(</span>
+                product,
+<span class="fc" id="L129">                modularFactors.get(index),</span>
+                modulus,
+                policy,
+                work,
+                &quot;zassenhaus.subset-product&quot;);
+        }
+<span class="fc" id="L135">        return scaleAndCenter(</span>
+            product,
+            leadingDivisor,
+            modulus,
+            policy,
+            work);
+    }
+
+    private static void validateSubsetInput(
+        List&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt; modularFactors,
+        int[] subset,
+        BigInteger leadingDivisor,
+        BigInteger modulus
+    ) {
+<span class="pc bpc" id="L149" title="2 of 4 branches missed.">        if (modularFactors.isEmpty()</span>
+                || subset.length == 0
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                || leadingDivisor.signum() &lt;= 0</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                || modulus.compareTo(BigInteger.ONE) &lt;= 0) {</span>
+<span class="nc" id="L153">            throw new IllegalArgumentException(</span>
+                &quot;invalid Zassenhaus subset candidate input&quot;);
+        }
+<span class="fc" id="L156">    }</span>
+
+    private static UnivariatePolynomialView&lt;BigInteger&gt; scaleAndCenter(
+        UnivariatePolynomialView&lt;BigInteger&gt; product,
+        BigInteger leadingDivisor,
+        BigInteger modulus,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L165">        ArrayList&lt;BigInteger&gt; coefficients =</span>
+<span class="fc" id="L166">            new ArrayList&lt;&gt;(product.coefficientCount());</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (BigInteger coefficient : product.coefficients()) {</span>
+<span class="fc" id="L168">            BigInteger scaled = modularMultiply(</span>
+                coefficient,
+                leadingDivisor,
+                modulus,
+                policy,
+                work,
+                &quot;zassenhaus.subset-leading-scale&quot;);
+<span class="fc" id="L175">            BigInteger centered = centeredResidue(scaled, modulus);</span>
+<span class="fc" id="L176">            requireCoefficientWithinPolicy(centered, policy);</span>
+<span class="fc" id="L177">            coefficients.add(centered);</span>
+<span class="fc" id="L178">        }</span>
+<span class="fc" id="L179">        UnivariatePolynomialView&lt;BigInteger&gt; candidate =</span>
+<span class="fc" id="L180">            UnivariatePolynomialView.of(product.ring(), coefficients);</span>
+<span class="fc" id="L181">        work.consume(&quot;zassenhaus.subset-leading-tests&quot;, 1);</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (candidate.isZero()</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">                || !candidate.leadingCoefficient().equals(</span>
+                    leadingDivisor)) {
+<span class="nc" id="L185">            throw new IntegerPolynomialArithmetic.AlgorithmFailure(</span>
+                &quot;ZASSENHAUS_SUBSET_LEADING_COEFFICIENT_MISMATCH&quot;);
+        }
+<span class="fc" id="L188">        return candidate;</span>
+    }
+
+    private static UnivariatePolynomialView&lt;BigInteger&gt; multiplyModulo(
+        UnivariatePolynomialView&lt;BigInteger&gt; left,
+        UnivariatePolynomialView&lt;BigInteger&gt; right,
+        BigInteger modulus,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if (!left.ring().equals(right.ring())) {</span>
+<span class="nc" id="L200">            throw new IllegalArgumentException(</span>
+                &quot;Zassenhaus modular polynomial ring mismatch&quot;);
+        }
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">        if (left.isZero() || right.isZero()) {</span>
+<span class="nc" id="L204">            return UnivariatePolynomialView.zero(left.ring());</span>
+        }
+<span class="fc" id="L206">        ArrayList&lt;BigInteger&gt; coefficients = zeros(</span>
+<span class="fc" id="L207">            left.degree() + right.degree() + 1);</span>
+<span class="fc" id="L208">        for (int leftExponent = 0;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                leftExponent &lt; left.coefficientCount();</span>
+<span class="fc" id="L210">                leftExponent++) {</span>
+<span class="fc" id="L211">            multiplyRow(</span>
+<span class="fc" id="L212">                left.coefficient(leftExponent),</span>
+                leftExponent,
+                right,
+                coefficients,
+                modulus,
+                policy,
+                work,
+                stage);
+        }
+<span class="fc" id="L221">        return UnivariatePolynomialView.of(left.ring(), coefficients);</span>
+    }
+
+    private static void multiplyRow(
+        BigInteger leftCoefficient,
+        int leftExponent,
+        UnivariatePolynomialView&lt;BigInteger&gt; right,
+        ArrayList&lt;BigInteger&gt; coefficients,
+        BigInteger modulus,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L234">        for (int rightExponent = 0;</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">                rightExponent &lt; right.coefficientCount();</span>
+<span class="fc" id="L236">                rightExponent++) {</span>
+<span class="fc" id="L237">            int exponent = leftExponent + rightExponent;</span>
+<span class="fc" id="L238">            BigInteger product = modularMultiply(</span>
+                leftCoefficient,
+<span class="fc" id="L240">                right.coefficient(rightExponent),</span>
+                modulus,
+                policy,
+                work,
+                stage + &quot;.multiply&quot;);
+<span class="fc" id="L245">            work.consume(stage + &quot;.add&quot;, 1);</span>
+<span class="fc" id="L246">            BigInteger sum = canonicalResidue(</span>
+<span class="fc" id="L247">                coefficients.get(exponent).add(product),</span>
+                modulus);
+<span class="fc" id="L249">            requireCoefficientWithinPolicy(sum, policy);</span>
+<span class="fc" id="L250">            coefficients.set(exponent, sum);</span>
+        }
+<span class="fc" id="L252">    }</span>
+
+    private static BigInteger modularMultiply(
+        BigInteger left,
+        BigInteger right,
+        BigInteger modulus,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work,
+        String stage
+    ) {
+<span class="fc" id="L262">        BigInteger factor = canonicalResidue(left, modulus);</span>
+<span class="fc" id="L263">        BigInteger multiplier = canonicalResidue(right, modulus);</span>
+<span class="fc" id="L264">        BigInteger result = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        while (multiplier.signum() &gt; 0) {</span>
+<span class="fc" id="L266">            work.consume(stage + &quot;.bits&quot;, 1);</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            if (multiplier.testBit(0)) {</span>
+<span class="fc" id="L268">                result = modularAdd(result, factor, modulus);</span>
+            }
+<span class="fc" id="L270">            multiplier = multiplier.shiftRight(1);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            if (multiplier.signum() &gt; 0) {</span>
+<span class="fc" id="L272">                factor = modularAdd(factor, factor, modulus);</span>
+            }
+        }
+<span class="fc" id="L275">        requireCoefficientWithinPolicy(result, policy);</span>
+<span class="fc" id="L276">        return result;</span>
+    }
+
+    private static BigInteger modularAdd(
+        BigInteger left,
+        BigInteger right,
+        BigInteger modulus
+    ) {
+<span class="fc" id="L284">        BigInteger checkedLeft = canonicalResidue(left, modulus);</span>
+<span class="fc" id="L285">        BigInteger checkedRight = canonicalResidue(right, modulus);</span>
+<span class="fc" id="L286">        BigInteger complement = modulus.subtract(checkedRight);</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        return checkedLeft.compareTo(complement) &gt;= 0</span>
+<span class="nc" id="L288">            ? checkedLeft.subtract(complement)</span>
+<span class="fc" id="L289">            : checkedLeft.add(checkedRight);</span>
+    }
+
+    private static BigInteger centeredResidue(
+        BigInteger value,
+        BigInteger modulus
+    ) {
+<span class="fc" id="L296">        BigInteger residue = canonicalResidue(value, modulus);</span>
+<span class="fc" id="L297">        BigInteger complement = modulus.subtract(residue);</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        return residue.compareTo(complement) &gt; 0</span>
+<span class="fc" id="L299">            ? residue.subtract(modulus)</span>
+<span class="fc" id="L300">            : residue;</span>
+    }
+
+    private static BigInteger canonicalResidue(
+        BigInteger value,
+        BigInteger modulus
+    ) {
+<span class="fc" id="L307">        BigInteger residue = value.remainder(modulus);</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">        return residue.signum() &lt; 0</span>
+<span class="fc" id="L309">            ? residue.add(modulus)</span>
+<span class="fc" id="L310">            : residue;</span>
+    }
+
+    private static void requireCoefficientWithinPolicy(
+        BigInteger value,
+        ZassenhausRecombinationPolicy policy
+    ) {
+<span class="fc" id="L317">        if (value.abs().bitLength()</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                &gt; policy.maxIntermediateCoefficientBitLength()) {</span>
+<span class="nc" id="L319">            throw new IntegerPolynomialArithmetic.LimitReached(</span>
+                &quot;ZASSENHAUS_INTERMEDIATE_COEFFICIENT_BIT_LENGTH_EXCEEDED&quot;);
+        }
+<span class="fc" id="L322">    }</span>
+
+    private static ArrayList&lt;BigInteger&gt; zeros(int size) {
+<span class="fc" id="L325">        ArrayList&lt;BigInteger&gt; result = new ArrayList&lt;&gt;(size);</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        for (int index = 0; index &lt; size; index++) {</span>
+<span class="fc" id="L327">            result.add(BigInteger.ZERO);</span>
+        }
+<span class="fc" id="L329">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

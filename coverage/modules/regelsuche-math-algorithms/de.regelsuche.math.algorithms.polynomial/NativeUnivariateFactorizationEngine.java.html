@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeUnivariateFactorizationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">NativeUnivariateFactorizationEngine.java</span></div><h1>NativeUnivariateFactorizationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.Objects;
+
+/** Complete bounded native univariate factorization over Z[x] or Q[x]. */
+public final class NativeUnivariateFactorizationEngine&lt;C&gt;
+        implements FactorizationEngine&lt;C&gt; {
+    private final NativeUnivariateFactorizationPolicy policy;
+    private final NativeCoefficientAdapter&lt;C&gt; adapter;
+
+    private NativeUnivariateFactorizationEngine(
+        NativeUnivariateFactorizationPolicy policy,
+        NativeCoefficientAdapter&lt;C&gt; adapter
+<span class="fc" id="L18">    ) {</span>
+<span class="fc" id="L19">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L20">        this.adapter = Objects.requireNonNull(adapter, &quot;adapter&quot;);</span>
+<span class="fc" id="L21">    }</span>
+
+    public static NativeUnivariateFactorizationEngine&lt;BigInteger&gt;
+            integers(
+        NativeUnivariateFactorizationPolicy policy
+    ) {
+<span class="fc" id="L27">        return new NativeUnivariateFactorizationEngine&lt;&gt;(</span>
+            policy,
+            NativeCoefficientAdapter.IntegerAdapter.INSTANCE);
+    }
+
+    public static NativeUnivariateFactorizationEngine&lt;ExactRational&gt;
+            rationals(
+        NativeUnivariateFactorizationPolicy policy
+    ) {
+<span class="fc" id="L36">        return new NativeUnivariateFactorizationEngine&lt;&gt;(</span>
+            policy,
+            NativeCoefficientAdapter.RationalAdapter.INSTANCE);
+    }
+
+    public static NativeUnivariateFactorizationEngine&lt;BigInteger&gt;
+            boundedIntegers() {
+<span class="fc" id="L43">        return integers(</span>
+<span class="fc" id="L44">            NativeUnivariateFactorizationPolicy.boundedDefaults());</span>
+    }
+
+    public static NativeUnivariateFactorizationEngine&lt;ExactRational&gt;
+            boundedRationals() {
+<span class="fc" id="L49">        return rationals(</span>
+<span class="fc" id="L50">            NativeUnivariateFactorizationPolicy.boundedDefaults());</span>
+    }
+
+    public NativeUnivariateFactorizationPolicy policy() {
+<span class="nc" id="L54">        return policy;</span>
+    }
+
+    @Override
+    public String engineId() {
+<span class="fc" id="L59">        return adapter.engineId();</span>
+    }
+
+    @Override
+    public String coefficientDomainId() {
+<span class="fc" id="L64">        return adapter.domainId();</span>
+    }
+
+    @Override
+    public EngineResult&lt;C&gt; propose(
+        FactorizationRequest&lt;C&gt; request
+    ) {
+<span class="fc" id="L71">        return NativeUnivariateFactorizationPipeline.factor(</span>
+            request,
+            policy,
+            adapter);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

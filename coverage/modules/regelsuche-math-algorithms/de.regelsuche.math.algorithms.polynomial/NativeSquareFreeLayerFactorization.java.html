@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeSquareFreeLayerFactorization.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">NativeSquareFreeLayerFactorization.java</span></div><h1>NativeSquareFreeLayerFactorization.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.SparsePolynomial;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Factors one primitive square-free integer layer under a shared authority. */
+final class NativeSquareFreeLayerFactorization {
+    private NativeSquareFreeLayerFactorization() {
+    }
+
+    static Result factor(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        FactorizationRequest.StructuralLimits structuralLimits,
+        long maxWorkUnits,
+        NativeUnivariateFactorizationPolicy policy,
+        int candidateBudget,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L24">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L25">        Objects.requireNonNull(structuralLimits, &quot;structuralLimits&quot;);</span>
+<span class="fc" id="L26">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L27">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if (candidateBudget &lt; 1) {</span>
+<span class="nc" id="L29">            return Result.failure(</span>
+                FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE,
+                &quot;NATIVE_UNIVARIATE_CANDIDATE_BUDGET_EXHAUSTED&quot;,
+<span class="nc" id="L32">                List.of());</span>
+        }
+
+<span class="fc" id="L35">        FactorizationRequest&lt;BigInteger&gt; request =</span>
+            new FactorizationRequest&lt;&gt;(
+                source,
+                FactorizationRequest.EvidenceRequirement
+                    .VERIFIED_DECOMPOSITION,
+                structuralLimits,
+                candidateBudget,
+                maxWorkUnits);
+<span class="fc" id="L43">        ArrayList&lt;String&gt; certificates = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L45">        BigInteger bound =</span>
+<span class="fc" id="L46">            IntegerPolynomialArithmetic.coefficientBound(</span>
+                source,
+<span class="fc" id="L48">                policy.recombinationPolicy(),</span>
+                work);
+<span class="fc" id="L50">        SuitablePrimeSelectionResult selection =</span>
+<span class="fc" id="L51">            SuitablePrimeSelection.selectAndFactor(</span>
+                request,
+<span class="fc" id="L53">                policy.suitablePrimePolicy(),</span>
+                work);
+<span class="fc" id="L55">        certificates.add(selection.certificateHash());</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (!selection.completed()) {</span>
+<span class="nc" id="L57">            return Result.failure(</span>
+<span class="nc" id="L58">                map(selection.status()),</span>
+<span class="nc" id="L59">                selection.detailCode(),</span>
+                certificates);
+        }
+
+<span class="fc" id="L63">        int exponent =</span>
+<span class="fc" id="L64">            IntegerPolynomialArithmetic.minimumHenselExponent(</span>
+<span class="fc" id="L65">                selection.selectedPrime(),</span>
+                bound,
+<span class="fc" id="L67">                policy.recombinationPolicy());</span>
+<span class="fc" id="L68">        HenselLiftingPolicy liftingPolicy =</span>
+<span class="fc" id="L69">            HenselLiftingPolicy.linearMultifactor(</span>
+                exponent,
+<span class="fc" id="L71">                policy.recombinationPolicy().maxModulusBitLength(),</span>
+<span class="fc" id="L72">                policy.recombinationPolicy()</span>
+<span class="fc" id="L73">                    .maxIntermediateCoefficientBitLength());</span>
+<span class="fc" id="L74">        HenselLiftingResult lifting = HenselLifting.lift(</span>
+            request,
+            selection,
+            liftingPolicy,
+            work);
+<span class="fc" id="L79">        certificates.add(lifting.certificateHash());</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (!lifting.completed()) {</span>
+<span class="nc" id="L81">            return Result.failure(</span>
+<span class="nc" id="L82">                map(lifting.status()),</span>
+<span class="nc" id="L83">                lifting.detailCode(),</span>
+                certificates);
+        }
+
+<span class="fc" id="L87">        ZassenhausRecombinationResult recombination =</span>
+<span class="fc" id="L88">            ZassenhausRecombination.recombine(</span>
+                request,
+                selection,
+                lifting,
+<span class="fc" id="L92">                policy.recombinationPolicy(),</span>
+                bound,
+                work);
+<span class="fc" id="L95">        certificates.add(recombination.certificateHash());</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (!recombination.completed()) {</span>
+<span class="fc" id="L97">            return Result.failure(</span>
+<span class="fc" id="L98">                map(recombination.status()),</span>
+<span class="fc" id="L99">                recombination.detailCode(),</span>
+                certificates);
+        }
+
+<span class="fc" id="L103">        long used = Math.addExact(</span>
+<span class="fc" id="L104">            selection.attempts().size(),</span>
+<span class="fc" id="L105">            recombination.candidatesConsidered());</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">        if (used &gt; candidateBudget || used &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L107">            return Result.failure(</span>
+                FactorizationEngine.Outcome.TECHNICAL_FAILURE,
+                &quot;NATIVE_UNIVARIATE_CANDIDATE_ACCOUNTING_MISMATCH&quot;,
+                certificates);
+        }
+<span class="fc" id="L112">        return Result.completed(</span>
+<span class="fc" id="L113">            recombination.factors(),</span>
+            (int) used,
+            certificates);
+    }
+
+    private static FactorizationEngine.Outcome map(
+        SuitablePrimeSelectionResult.Status status
+    ) {
+<span class="nc bnc" id="L121" title="All 5 branches missed.">        return switch (status) {</span>
+<span class="nc" id="L122">            case COMPLETED -&gt; throw new IllegalArgumentException(</span>
+                &quot;completed status cannot map to failure&quot;);
+            case UNSUPPORTED_DOMAIN -&gt;
+<span class="nc" id="L125">                FactorizationEngine.Outcome.UNSUPPORTED_DOMAIN;</span>
+            case UNSUPPORTED_SHAPE -&gt;
+<span class="nc" id="L127">                FactorizationEngine.Outcome.UNSUPPORTED_REQUEST;</span>
+            case BUDGET_INCONCLUSIVE -&gt;
+<span class="nc" id="L129">                FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE;</span>
+            case TECHNICAL_FAILURE -&gt;
+<span class="nc" id="L131">                FactorizationEngine.Outcome.TECHNICAL_FAILURE;</span>
+        };
+    }
+
+    private static FactorizationEngine.Outcome map(
+        HenselLiftingResult.Status status
+    ) {
+<span class="nc bnc" id="L138" title="All 5 branches missed.">        return switch (status) {</span>
+<span class="nc" id="L139">            case COMPLETED -&gt; throw new IllegalArgumentException(</span>
+                &quot;completed status cannot map to failure&quot;);
+            case UNSUPPORTED_DOMAIN -&gt;
+<span class="nc" id="L142">                FactorizationEngine.Outcome.UNSUPPORTED_DOMAIN;</span>
+            case UNSUPPORTED_SHAPE -&gt;
+<span class="nc" id="L144">                FactorizationEngine.Outcome.UNSUPPORTED_REQUEST;</span>
+            case BUDGET_INCONCLUSIVE -&gt;
+<span class="nc" id="L146">                FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE;</span>
+            case TECHNICAL_FAILURE -&gt;
+<span class="nc" id="L148">                FactorizationEngine.Outcome.TECHNICAL_FAILURE;</span>
+        };
+    }
+
+    private static FactorizationEngine.Outcome map(
+        ZassenhausRecombinationResult.Status status
+    ) {
+<span class="pc bpc" id="L155" title="4 of 5 branches missed.">        return switch (status) {</span>
+<span class="nc" id="L156">            case COMPLETED -&gt; throw new IllegalArgumentException(</span>
+                &quot;completed status cannot map to failure&quot;);
+            case UNSUPPORTED_DOMAIN -&gt;
+<span class="nc" id="L159">                FactorizationEngine.Outcome.UNSUPPORTED_DOMAIN;</span>
+            case UNSUPPORTED_SHAPE -&gt;
+<span class="nc" id="L161">                FactorizationEngine.Outcome.UNSUPPORTED_REQUEST;</span>
+            case BUDGET_INCONCLUSIVE -&gt;
+<span class="fc" id="L163">                FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE;</span>
+            case TECHNICAL_FAILURE -&gt;
+<span class="nc" id="L165">                FactorizationEngine.Outcome.TECHNICAL_FAILURE;</span>
+        };
+    }
+
+    record Result(
+        boolean completed,
+        FactorizationEngine.Outcome outcome,
+        String detailCode,
+        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; factors,
+        int candidatesUsed,
+        List&lt;String&gt; certificates
+    ) {
+<span class="fc" id="L177">        Result {</span>
+<span class="fc" id="L178">            Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="fc" id="L179">            Objects.requireNonNull(detailCode, &quot;detailCode&quot;);</span>
+<span class="fc" id="L180">            factors = List.copyOf(factors);</span>
+<span class="fc" id="L181">            certificates = List.copyOf(certificates);</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">            if (candidatesUsed &lt; 0</span>
+<span class="pc bpc" id="L183" title="1 of 4 branches missed.">                    || completed != !factors.isEmpty()) {</span>
+<span class="nc" id="L184">                throw new IllegalArgumentException(</span>
+                    &quot;native layer result is invalid&quot;);
+            }
+<span class="fc" id="L187">        }</span>
+
+        static Result completed(
+            List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; factors,
+            int candidatesUsed,
+            List&lt;String&gt; certificates
+        ) {
+<span class="fc" id="L194">            return new Result(</span>
+                true,
+                FactorizationEngine.Outcome.CANDIDATES,
+                &quot;NATIVE_SQUARE_FREE_LAYER_COMPLETE&quot;,
+                factors,
+                candidatesUsed,
+                certificates);
+        }
+
+        static Result failure(
+            FactorizationEngine.Outcome outcome,
+            String detailCode,
+            List&lt;String&gt; certificates
+        ) {
+<span class="fc" id="L208">            return new Result(</span>
+                false,
+                outcome,
+                detailCode,
+<span class="fc" id="L212">                List.of(),</span>
+                0,
+                certificates);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

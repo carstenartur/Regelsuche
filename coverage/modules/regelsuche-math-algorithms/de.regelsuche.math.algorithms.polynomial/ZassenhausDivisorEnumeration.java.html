@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZassenhausDivisorEnumeration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">ZassenhausDivisorEnumeration.java</span></div><h1>ZassenhausDivisorEnumeration.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/** Complete bounded positive-divisor enumeration for leading coefficients. */
+final class ZassenhausDivisorEnumeration {
+    private ZassenhausDivisorEnumeration() {
+    }
+
+    static List&lt;BigInteger&gt; positiveDivisors(
+        BigInteger value,
+        ZassenhausRecombinationPolicy policy,
+        PolynomialWorkBudget work
+    ) {
+<span class="fc" id="L19">        BigInteger magnitude = Objects.requireNonNull(</span>
+            value,
+<span class="fc" id="L21">            &quot;value&quot;).abs();</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (magnitude.signum() == 0) {</span>
+<span class="nc" id="L23">            throw new IllegalArgumentException(</span>
+                &quot;zero has infinitely many divisors&quot;);
+        }
+<span class="fc" id="L26">        ArrayList&lt;BigInteger&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L27">        BigInteger candidate = BigInteger.ONE;</span>
+<span class="fc" id="L28">        long tests = 0;</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        while (candidate.compareTo(</span>
+<span class="fc" id="L30">                magnitude.divide(candidate)) &lt;= 0) {</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if (tests &gt;= policy.maxLeadingDivisorTests()) {</span>
+<span class="nc" id="L32">                throw new IntegerPolynomialArithmetic.LimitReached(</span>
+                    &quot;ZASSENHAUS_LEADING_DIVISOR_POLICY_EXCEEDED&quot;);
+            }
+<span class="fc" id="L35">            tests++;</span>
+<span class="fc" id="L36">            work.consume(&quot;zassenhaus.leading-divisors.tests&quot;, 1);</span>
+<span class="fc" id="L37">            BigInteger[] division =</span>
+<span class="fc" id="L38">                magnitude.divideAndRemainder(candidate);</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            if (division[1].signum() == 0) {</span>
+<span class="fc" id="L40">                result.add(candidate);</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                if (!division[0].equals(candidate)) {</span>
+<span class="nc" id="L42">                    result.add(division[0]);</span>
+                }
+            }
+<span class="fc" id="L45">            candidate = candidate.add(BigInteger.ONE);</span>
+<span class="fc" id="L46">        }</span>
+<span class="fc" id="L47">        result.sort(Comparator.naturalOrder());</span>
+<span class="fc" id="L48">        return List.copyOf(result);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

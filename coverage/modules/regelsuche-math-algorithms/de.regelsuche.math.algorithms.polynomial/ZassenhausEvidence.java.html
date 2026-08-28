@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZassenhausEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">ZassenhausEvidence.java</span></div><h1>ZassenhausEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.Monomial;
+import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.SparsePolynomial;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+
+/** Independent invariants for issuer-owned Zassenhaus results. */
+final class ZassenhausEvidence {
+    private ZassenhausEvidence() {
+    }
+
+    static void validateCompleted(
+        BigInteger coefficientBound,
+        BigInteger targetModulus,
+        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; factors,
+        List&lt;List&lt;Integer&gt;&gt; partitions,
+        long candidatesConsidered,
+        PolynomialWorkLedger work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy
+    ) {
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (!selection.completed()</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                || !lifting.completed()</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                || coefficientBound.signum() &lt; 0</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">                || targetModulus.compareTo(</span>
+<span class="fc" id="L37">                    coefficientBound.shiftLeft(1)) &lt;= 0</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                || !targetModulus.equals(lifting.targetModulus())</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                || !lifting.selectionCertificateHash().equals(</span>
+<span class="fc" id="L40">                    selection.certificateHash())</span>
+                || candidatesConsidered
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">                    &gt; policy.maxSubsetCandidates()</span>
+                || candidatesConsidered
+<span class="fc" id="L44">                    + selection.attempts().size()</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">                    &gt; request.maxCandidates()</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">                || factors.isEmpty()</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                || factors.size() != partitions.size()</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                || !work.within(request.maxWorkUnits())</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">                || !extendsLedger(work, lifting.work())) {</span>
+<span class="nc" id="L50">            fail(&quot;ZASSENHAUS_COMPLETED_CONTRACT_INVALID&quot;);</span>
+        }
+
+<span class="fc" id="L53">        int modularFactorCount =</span>
+<span class="fc" id="L54">            selection.modularFactorization().factors().size();</span>
+<span class="fc" id="L55">        boolean[] assigned = new boolean[modularFactorCount];</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (int index = 0; index &lt; factors.size(); index++) {</span>
+<span class="fc" id="L57">            SparsePolynomial&lt;BigInteger&gt; factor = factors.get(index);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (!request.source().ring().equals(factor.ring())</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                    || factor.isConstant()</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">                    || factor.leadingCoefficient().signum() &lt;= 0</span>
+<span class="fc" id="L61">                    || factor.maxCoefficientBitLength()</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                        &gt; policy.maxIntermediateCoefficientBitLength()</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                    || !primitive(factor)) {</span>
+<span class="nc" id="L64">                fail(&quot;ZASSENHAUS_COMPLETED_FACTOR_INVALID&quot;);</span>
+            }
+<span class="fc" id="L66">            List&lt;Integer&gt; partition = partitions.get(index);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            for (int modularIndex : partition) {</span>
+<span class="pc bpc" id="L68" title="3 of 6 branches missed.">                if (modularIndex &lt; 0</span>
+                        || modularIndex &gt;= assigned.length
+                        || assigned[modularIndex]) {
+<span class="nc" id="L71">                    fail(&quot;ZASSENHAUS_MODULAR_PARTITION_INVALID&quot;);</span>
+                }
+<span class="fc" id="L73">                assigned[modularIndex] = true;</span>
+<span class="fc" id="L74">            }</span>
+<span class="fc" id="L75">            verifyReduction(factor, partition, selection);</span>
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (boolean present : assigned) {</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if (!present) {</span>
+<span class="nc" id="L79">                fail(&quot;ZASSENHAUS_MODULAR_PARTITION_INCOMPLETE&quot;);</span>
+            }
+        }
+
+<span class="fc" id="L83">        SparsePolynomial&lt;BigInteger&gt; product =</span>
+<span class="fc" id="L84">            SparsePolynomial.one(request.source().ring());</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (SparsePolynomial&lt;BigInteger&gt; factor : factors) {</span>
+<span class="fc" id="L86">            product = product.multiply(factor);</span>
+<span class="fc" id="L87">        }</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (!request.source().equals(product)) {</span>
+<span class="nc" id="L89">            fail(&quot;ZASSENHAUS_FACTOR_PRODUCT_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L91">    }</span>
+
+    private static void verifyReduction(
+        SparsePolynomial&lt;BigInteger&gt; factor,
+        List&lt;Integer&gt; partition,
+        SuitablePrimeSelectionResult selection
+    ) {
+<span class="fc" id="L98">        PolynomialRing&lt;BigInteger&gt; modularRing =</span>
+<span class="fc" id="L99">            selection.modularSource().ring();</span>
+<span class="fc" id="L100">        PrimeField field = (PrimeField)</span>
+<span class="fc" id="L101">            modularRing.coefficientDomain();</span>
+<span class="fc" id="L102">        SparsePolynomial&lt;BigInteger&gt; expected =</span>
+<span class="fc" id="L103">            SparsePolynomial.one(modularRing);</span>
+<span class="fc" id="L104">        List&lt;PolynomialFactor&lt;BigInteger&gt;&gt; modularFactors =</span>
+<span class="fc" id="L105">            selection.modularFactorization().factors();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (int index : partition) {</span>
+<span class="fc" id="L107">            expected = expected.multiply(</span>
+<span class="fc" id="L108">                modularFactors.get(index).polynomial());</span>
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">        expected = expected.scale(</span>
+<span class="fc" id="L111">            field.canonical(factor.leadingCoefficient()));</span>
+<span class="fc" id="L112">        SparsePolynomial&lt;BigInteger&gt; actual =</span>
+<span class="fc" id="L113">            reduce(factor, modularRing, field);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (!expected.equals(actual)) {</span>
+<span class="nc" id="L115">            fail(&quot;ZASSENHAUS_FACTOR_MODULAR_PARTITION_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L117">    }</span>
+
+    private static SparsePolynomial&lt;BigInteger&gt; reduce(
+        SparsePolynomial&lt;BigInteger&gt; source,
+        PolynomialRing&lt;BigInteger&gt; ring,
+        PrimeField field
+    ) {
+<span class="fc" id="L124">        NavigableMap&lt;Monomial, BigInteger&gt; terms =</span>
+<span class="fc" id="L125">            new TreeMap&lt;&gt;(ring.monomialComparator());</span>
+        for (Map.Entry&lt;Monomial, BigInteger&gt; term :
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                source.terms().entrySet()) {</span>
+<span class="fc" id="L128">            BigInteger coefficient =</span>
+<span class="fc" id="L129">                field.canonical(term.getValue());</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (!field.isZero(coefficient)) {</span>
+<span class="fc" id="L131">                terms.put(term.getKey(), coefficient);</span>
+            }
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">        return new SparsePolynomial&lt;&gt;(ring, terms);</span>
+    }
+
+    private static boolean primitive(
+        SparsePolynomial&lt;BigInteger&gt; polynomial
+    ) {
+<span class="fc" id="L140">        BigInteger gcd = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (BigInteger coefficient : polynomial.terms().values()) {</span>
+<span class="fc" id="L142">            gcd = gcd.gcd(coefficient.abs());</span>
+<span class="fc" id="L143">        }</span>
+<span class="fc" id="L144">        return BigInteger.ONE.equals(gcd);</span>
+    }
+
+    private static boolean extendsLedger(
+        PolynomialWorkLedger work,
+        PolynomialWorkLedger prefix
+    ) {
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (work.totalWorkUnits() &lt; prefix.totalWorkUnits()) {</span>
+<span class="nc" id="L152">            return false;</span>
+        }
+<span class="fc" id="L154">        return prefix.stages().entrySet().stream().allMatch(entry -&gt;</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            work.units(entry.getKey()) &gt;= entry.getValue());</span>
+    }
+
+    private static void fail(String detailCode) {
+<span class="nc" id="L159">        throw new IntegerPolynomialArithmetic.AlgorithmFailure(detailCode);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

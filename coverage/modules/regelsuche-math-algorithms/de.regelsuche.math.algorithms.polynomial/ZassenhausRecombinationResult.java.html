@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZassenhausRecombinationResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">ZassenhausRecombinationResult.java</span></div><h1>ZassenhausRecombinationResult.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.SparsePolynomial;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Issuer-owned result of deterministic integer-factor recombination. */
+public final class ZassenhausRecombinationResult {
+    private final State state;
+
+<span class="fc" id="L15">    private ZassenhausRecombinationResult(State state) {</span>
+<span class="fc" id="L16">        this.state = state;</span>
+<span class="fc" id="L17">    }</span>
+
+    static ZassenhausRecombinationResult completed(
+        BigInteger coefficientBound,
+        BigInteger targetModulus,
+        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; factors,
+        List&lt;List&lt;Integer&gt;&gt; modularPartitions,
+        long candidatesConsidered,
+        String candidateAuditHash,
+        PolynomialWorkLedger work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy
+    ) {
+<span class="fc" id="L32">        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; retainedFactors =</span>
+<span class="fc" id="L33">            List.copyOf(factors);</span>
+<span class="fc" id="L34">        List&lt;List&lt;Integer&gt;&gt; retainedPartitions =</span>
+<span class="fc" id="L35">            canonicalPartitions(modularPartitions);</span>
+<span class="fc" id="L36">        ZassenhausEvidence.validateCompleted(</span>
+            coefficientBound,
+            targetModulus,
+            retainedFactors,
+            retainedPartitions,
+            candidatesConsidered,
+            work,
+            request,
+            selection,
+            lifting,
+            policy);
+<span class="fc" id="L47">        return create(</span>
+            Status.COMPLETED,
+            &quot;ZASSENHAUS_INTEGER_FACTORIZATION_VERIFIED&quot;,
+            coefficientBound,
+            targetModulus,
+            retainedFactors,
+            retainedPartitions,
+            candidatesConsidered,
+            candidateAuditHash,
+            work,
+            request,
+            selection,
+            lifting,
+            policy);
+    }
+
+    static ZassenhausRecombinationResult failure(
+        Status status,
+        String detailCode,
+        BigInteger coefficientBound,
+        long candidatesConsidered,
+        String candidateAuditHash,
+        PolynomialWorkLedger work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy
+    ) {
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (status == Status.COMPLETED) {</span>
+<span class="nc" id="L76">            throw new IllegalArgumentException(</span>
+                &quot;completed recombination requires factors&quot;);
+        }
+<span class="fc" id="L79">        return create(</span>
+            status,
+            detailCode,
+            coefficientBound,
+            null,
+<span class="fc" id="L84">            List.of(),</span>
+<span class="fc" id="L85">            List.of(),</span>
+            candidatesConsidered,
+            candidateAuditHash,
+            work,
+            request,
+            selection,
+            lifting,
+            policy);
+    }
+
+    private static ZassenhausRecombinationResult create(
+        Status status,
+        String detailCode,
+        BigInteger coefficientBound,
+        BigInteger targetModulus,
+        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; factors,
+        List&lt;List&lt;Integer&gt;&gt; modularPartitions,
+        long candidatesConsidered,
+        String candidateAuditHash,
+        PolynomialWorkLedger work,
+        FactorizationRequest&lt;BigInteger&gt; request,
+        SuitablePrimeSelectionResult selection,
+        HenselLiftingResult lifting,
+        ZassenhausRecombinationPolicy policy
+    ) {
+<span class="fc" id="L110">        Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L111">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L112">        Objects.requireNonNull(selection, &quot;selection&quot;);</span>
+<span class="fc" id="L113">        Objects.requireNonNull(lifting, &quot;lifting&quot;);</span>
+<span class="fc" id="L114">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L115">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (detailCode == null</span>
+<span class="pc bpc" id="L117" title="3 of 6 branches missed.">                || detailCode.isBlank()</span>
+                || candidatesConsidered &lt; 0
+                || candidateAuditHash == null
+<span class="pc bpc" id="L120" title="2 of 6 branches missed.">                || !candidateAuditHash.matches(</span>
+                    &quot;sha256:[0-9a-f]{64}&quot;)
+                || status != Status.COMPLETED
+                    &amp;&amp; (targetModulus != null
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                        || !factors.isEmpty()</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                        || !modularPartitions.isEmpty())) {</span>
+<span class="nc" id="L126">            throw new IllegalArgumentException(</span>
+                &quot;Zassenhaus result metadata is invalid&quot;);
+        }
+
+<span class="fc" id="L130">        StringBuilder material = new StringBuilder(</span>
+            ZassenhausRecombination.METHOD_ID);
+<span class="fc" id="L132">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L134">            request.canonicalMaterial());</span>
+<span class="fc" id="L135">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L137">            selection.certificateHash());</span>
+<span class="fc" id="L138">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L140">            lifting.certificateHash());</span>
+<span class="fc" id="L141">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L143">            policy.canonicalMaterial());</span>
+<span class="fc" id="L144">        AlgorithmEvidence.append(material, status.name());</span>
+<span class="fc" id="L145">        AlgorithmEvidence.append(material, detailCode);</span>
+<span class="fc" id="L146">        AlgorithmEvidence.append(</span>
+            material,
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            coefficientBound == null</span>
+<span class="nc" id="L149">                ? &quot;&quot;</span>
+<span class="fc" id="L150">                : coefficientBound.toString());</span>
+<span class="fc" id="L151">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            targetModulus == null</span>
+<span class="fc" id="L154">                ? &quot;&quot;</span>
+<span class="fc" id="L155">                : targetModulus.toString());</span>
+<span class="fc" id="L156">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L158">            Long.toString(candidatesConsidered));</span>
+<span class="fc" id="L159">        AlgorithmEvidence.append(</span>
+            material,
+            candidateAuditHash);
+<span class="fc" id="L162">        AlgorithmEvidence.append(</span>
+            material,
+<span class="fc" id="L164">            work.canonicalMaterial());</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (int index = 0; index &lt; factors.size(); index++) {</span>
+<span class="fc" id="L166">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L168">                factors.get(index).canonicalMaterial());</span>
+<span class="fc" id="L169">            AlgorithmEvidence.append(</span>
+                material,
+<span class="fc" id="L171">                modularPartitions.get(index).toString());</span>
+        }
+
+<span class="fc" id="L174">        return new ZassenhausRecombinationResult(new State(</span>
+            status,
+            detailCode,
+            coefficientBound,
+            targetModulus,
+<span class="fc" id="L179">            List.copyOf(factors),</span>
+<span class="fc" id="L180">            List.copyOf(modularPartitions),</span>
+            candidatesConsidered,
+            candidateAuditHash,
+            work,
+<span class="fc" id="L184">            selection.certificateHash(),</span>
+<span class="fc" id="L185">            lifting.certificateHash(),</span>
+<span class="fc" id="L186">            AlgorithmEvidence.sha256(material.toString())));</span>
+    }
+
+    private static List&lt;List&lt;Integer&gt;&gt; canonicalPartitions(
+        List&lt;List&lt;Integer&gt;&gt; partitions
+    ) {
+<span class="fc" id="L192">        ArrayList&lt;List&lt;Integer&gt;&gt; result = new ArrayList&lt;&gt;();</span>
+        for (List&lt;Integer&gt; partition :
+<span class="fc bfc" id="L194" title="All 2 branches covered.">                Objects.requireNonNull(partitions, &quot;partitions&quot;)) {</span>
+<span class="fc" id="L195">            List&lt;Integer&gt; ordered = partition.stream()</span>
+<span class="fc" id="L196">                .sorted()</span>
+<span class="fc" id="L197">                .distinct()</span>
+<span class="fc" id="L198">                .toList();</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (ordered.isEmpty()</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                    || ordered.size() != partition.size()) {</span>
+<span class="nc" id="L201">                throw new IllegalArgumentException(</span>
+                    &quot;Zassenhaus partition must be nonempty and unique&quot;);
+            }
+<span class="fc" id="L204">            result.add(ordered);</span>
+<span class="fc" id="L205">        }</span>
+<span class="fc" id="L206">        return List.copyOf(result);</span>
+    }
+
+    public Status status() {
+<span class="fc" id="L210">        return state.status();</span>
+    }
+
+    public String detailCode() {
+<span class="fc" id="L214">        return state.detailCode();</span>
+    }
+
+    public BigInteger coefficientBound() {
+<span class="nc" id="L218">        requireCompleted();</span>
+<span class="nc" id="L219">        return state.coefficientBound();</span>
+    }
+
+    public BigInteger targetModulus() {
+<span class="nc" id="L223">        requireCompleted();</span>
+<span class="nc" id="L224">        return state.targetModulus();</span>
+    }
+
+    public List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; factors() {
+<span class="fc" id="L228">        return state.factors();</span>
+    }
+
+    public List&lt;List&lt;Integer&gt;&gt; modularPartitions() {
+<span class="nc" id="L232">        return state.modularPartitions();</span>
+    }
+
+    public long candidatesConsidered() {
+<span class="fc" id="L236">        return state.candidatesConsidered();</span>
+    }
+
+    public String candidateAuditHash() {
+<span class="fc" id="L240">        return state.candidateAuditHash();</span>
+    }
+
+    public PolynomialWorkLedger work() {
+<span class="fc" id="L244">        return state.work();</span>
+    }
+
+    public String selectionCertificateHash() {
+<span class="nc" id="L248">        return state.selectionCertificateHash();</span>
+    }
+
+    public String liftingCertificateHash() {
+<span class="nc" id="L252">        return state.liftingCertificateHash();</span>
+    }
+
+    public String certificateHash() {
+<span class="fc" id="L256">        return state.certificateHash();</span>
+    }
+
+    public boolean completed() {
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        return status() == Status.COMPLETED;</span>
+    }
+
+    private void requireCompleted() {
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        if (!completed()) {</span>
+<span class="nc" id="L265">            throw new IllegalStateException(</span>
+                &quot;failed recombination has no completed output&quot;);
+        }
+<span class="nc" id="L268">    }</span>
+
+    @Override
+    public boolean equals(Object other) {
+<span class="fc" id="L272">        return this == other</span>
+<span class="pc bpc" id="L273" title="2 of 4 branches missed.">            || other instanceof ZassenhausRecombinationResult result</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">                &amp;&amp; state.equals(result.state);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L279">        return state.hashCode();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L284">        return &quot;ZassenhausRecombinationResult[&quot; + state + ']';</span>
+    }
+
+<span class="fc" id="L287">    public enum Status {</span>
+<span class="fc" id="L288">        COMPLETED,</span>
+<span class="fc" id="L289">        UNSUPPORTED_DOMAIN,</span>
+<span class="fc" id="L290">        UNSUPPORTED_SHAPE,</span>
+<span class="fc" id="L291">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L292">        TECHNICAL_FAILURE</span>
+    }
+
+    private record State(
+        Status status,
+        String detailCode,
+        BigInteger coefficientBound,
+        BigInteger targetModulus,
+        List&lt;SparsePolynomial&lt;BigInteger&gt;&gt; factors,
+        List&lt;List&lt;Integer&gt;&gt; modularPartitions,
+        long candidatesConsidered,
+        String candidateAuditHash,
+        PolynomialWorkLedger work,
+        String selectionCertificateHash,
+        String liftingCertificateHash,
+        String certificateHash
+    ) {
+<span class="fc" id="L309">        private State {</span>
+<span class="fc" id="L310">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L311">            factors = List.copyOf(factors);</span>
+<span class="fc" id="L312">            modularPartitions = List.copyOf(modularPartitions);</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">            if (detailCode == null</span>
+<span class="pc bpc" id="L314" title="3 of 6 branches missed.">                    || detailCode.isBlank()</span>
+                    || candidatesConsidered &lt; 0
+                    || candidateAuditHash == null
+<span class="pc bpc" id="L317" title="3 of 6 branches missed.">                    || !candidateAuditHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)
+                    || work == null
+                    || selectionCertificateHash == null
+<span class="pc bpc" id="L321" title="2 of 4 branches missed.">                    || !selectionCertificateHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)
+                    || liftingCertificateHash == null
+<span class="pc bpc" id="L324" title="2 of 4 branches missed.">                    || !liftingCertificateHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)
+                    || certificateHash == null
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                    || !certificateHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)) {
+<span class="nc" id="L329">                throw new IllegalArgumentException(</span>
+                    &quot;Zassenhaus result is invalid&quot;);
+            }
+<span class="fc" id="L332">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

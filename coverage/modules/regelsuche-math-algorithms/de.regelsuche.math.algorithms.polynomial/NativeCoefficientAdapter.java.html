@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeCoefficientAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">NativeCoefficientAdapter.java</span></div><h1>NativeCoefficientAdapter.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.ExactRationalField;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.Monomial;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+
+/** Domain-specific boundary for the shared native univariate pipeline. */
+interface NativeCoefficientAdapter&lt;C&gt; {
+    String domainId();
+
+    String engineId();
+
+    UnivariateContentResult normalize(
+        FactorizationRequest&lt;C&gt; request,
+        UnivariateContentPolicy policy,
+        PolynomialWorkBudget work);
+
+    C targetUnit(ExactRational unit);
+
+    SparsePolynomial&lt;C&gt; targetFactor(
+        SparsePolynomial&lt;BigInteger&gt; factor,
+        PolynomialRing&lt;C&gt; targetRing);
+
+<span class="fc" id="L31">    enum IntegerAdapter</span>
+            implements NativeCoefficientAdapter&lt;BigInteger&gt; {
+<span class="fc" id="L33">        INSTANCE;</span>
+
+        @Override
+        public String domainId() {
+<span class="fc" id="L37">            return BigIntegerDomain.DOMAIN_ID;</span>
+        }
+
+        @Override
+        public String engineId() {
+<span class="fc" id="L42">            return &quot;regelsuche.factorization.native-univariate-integer/v1&quot;;</span>
+        }
+
+        @Override
+        public UnivariateContentResult normalize(
+            FactorizationRequest&lt;BigInteger&gt; request,
+            UnivariateContentPolicy policy,
+            PolynomialWorkBudget work
+        ) {
+<span class="fc" id="L51">            return UnivariateContentNormalization.normalizeInteger(</span>
+                request,
+                policy,
+                work);
+        }
+
+        @Override
+        public BigInteger targetUnit(ExactRational unit) {
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (!unit.isInteger()) {</span>
+<span class="nc" id="L60">                throw new ArithmeticException(</span>
+                    &quot;integer factorization produced rational unit&quot;);
+            }
+<span class="fc" id="L63">            return unit.numerator();</span>
+        }
+
+        @Override
+        public SparsePolynomial&lt;BigInteger&gt; targetFactor(
+            SparsePolynomial&lt;BigInteger&gt; factor,
+            PolynomialRing&lt;BigInteger&gt; targetRing
+        ) {
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            return factor.ring().equals(targetRing)</span>
+<span class="fc" id="L72">                ? factor</span>
+<span class="nc" id="L73">                : new SparsePolynomial&lt;&gt;(</span>
+                    targetRing,
+<span class="nc" id="L75">                    factor.terms());</span>
+        }
+    }
+
+<span class="fc" id="L79">    enum RationalAdapter</span>
+            implements NativeCoefficientAdapter&lt;ExactRational&gt; {
+<span class="fc" id="L81">        INSTANCE;</span>
+
+        @Override
+        public String domainId() {
+<span class="fc" id="L85">            return ExactRationalField.DOMAIN_ID;</span>
+        }
+
+        @Override
+        public String engineId() {
+<span class="fc" id="L90">            return &quot;regelsuche.factorization.native-univariate-rational/v1&quot;;</span>
+        }
+
+        @Override
+        public UnivariateContentResult normalize(
+            FactorizationRequest&lt;ExactRational&gt; request,
+            UnivariateContentPolicy policy,
+            PolynomialWorkBudget work
+        ) {
+<span class="fc" id="L99">            return UnivariateContentNormalization.normalizeRational(</span>
+                request,
+                policy,
+                work);
+        }
+
+        @Override
+        public ExactRational targetUnit(ExactRational unit) {
+<span class="fc" id="L107">            return unit;</span>
+        }
+
+        @Override
+        public SparsePolynomial&lt;ExactRational&gt; targetFactor(
+            SparsePolynomial&lt;BigInteger&gt; factor,
+            PolynomialRing&lt;ExactRational&gt; targetRing
+        ) {
+<span class="fc" id="L115">            NavigableMap&lt;Monomial, ExactRational&gt; terms =</span>
+<span class="fc" id="L116">                new TreeMap&lt;&gt;(targetRing.monomialComparator());</span>
+<span class="fc" id="L117">            factor.terms().forEach((monomial, coefficient) -&gt;</span>
+<span class="fc" id="L118">                terms.put(</span>
+                    monomial,
+<span class="fc" id="L120">                    ExactRational.integer(coefficient)));</span>
+<span class="fc" id="L121">            return new SparsePolynomial&lt;&gt;(targetRing, terms);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
