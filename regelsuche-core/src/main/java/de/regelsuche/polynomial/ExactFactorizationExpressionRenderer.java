@@ -119,34 +119,40 @@ public final class ExactFactorizationExpressionRenderer {
         FactorizationVerifier.VerifiedCandidate<ExactRational> candidate,
         Work work
     ) {
-        int factorComponents = candidate.factors().size()
-            + (candidate.unresolvedRemainder().isOne() ? 0 : 1);
-        if (factorComponents > policy.maxFactors()) {
+        int factors = candidate.factors().size();
+        boolean hasRemainder =
+            !candidate.unresolvedRemainder().isOne();
+        if (factors > policy.maxFactors()
+                || hasRemainder && factors >= policy.maxFactors()) {
             throw representationLimit("MAX_FACTORS_EXCEEDED");
         }
-        checkCoefficient(candidate.unit());
+        checkCoefficient(candidate.unit(), work);
         int terms = 0;
         for (PolynomialFactor<ExactRational> factor
                 : candidate.factors()) {
             if (factor.multiplicity() > policy.maxExponent()) {
                 throw representationLimit("MAX_EXPONENT_EXCEEDED");
             }
-            terms = Math.addExact(
+            terms = addTermCount(
                 terms,
                 checkedTermCount(factor.polynomial()));
-            checkPolynomial(factor.polynomial());
+            checkPolynomial(factor.polynomial(), work);
             work.consume("render.factor-records", 1);
         }
-        if (!candidate.unresolvedRemainder().isOne()) {
-            terms = Math.addExact(
+        if (hasRemainder) {
+            terms = addTermCount(
                 terms,
                 checkedTermCount(candidate.unresolvedRemainder()));
-            checkPolynomial(candidate.unresolvedRemainder());
+            checkPolynomial(candidate.unresolvedRemainder(), work);
         }
-        if (terms > policy.maxPolynomialTerms()) {
+    }
+
+    private int addTermCount(int current, int additional) {
+        if (additional > policy.maxPolynomialTerms() - current) {
             throw representationLimit(
                 "MAX_POLYNOMIAL_TERMS_EXCEEDED");
         }
+        return current + additional;
     }
 
     private int checkedTermCount(
@@ -159,7 +165,8 @@ public final class ExactFactorizationExpressionRenderer {
     }
 
     private void checkPolynomial(
-        SparsePolynomial<ExactRational> polynomial
+        SparsePolynomial<ExactRational> polynomial,
+        Work work
     ) {
         if (polynomial.ring().variableCount() != 1
                 || !ExactRationalField.DOMAIN_ID.equals(
@@ -168,14 +175,19 @@ public final class ExactFactorizationExpressionRenderer {
         }
         for (Map.Entry<Monomial, ExactRational> term
                 : polynomial.terms().entrySet()) {
+            work.consume("render.inspected-polynomial-terms", 1);
             if (term.getKey().exponent(0) > policy.maxExponent()) {
                 throw representationLimit("MAX_EXPONENT_EXCEEDED");
             }
-            checkCoefficient(term.getValue());
+            checkCoefficient(term.getValue(), work);
         }
     }
 
-    private void checkCoefficient(ExactRational coefficient) {
+    private void checkCoefficient(
+        ExactRational coefficient,
+        Work work
+    ) {
+        work.consume("render.inspected-coefficients", 1);
         if (ExactRationalField.INSTANCE.bitLength(coefficient)
                 > policy.maxCoefficientBits()) {
             throw representationLimit(
