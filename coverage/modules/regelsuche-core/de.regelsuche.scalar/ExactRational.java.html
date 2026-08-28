@@ -75,8 +75,8 @@ public record ExactRational(
 
     public ExactRational add(ExactRational other) {
 <span class="fc" id="L77">        Objects.requireNonNull(other, &quot;other&quot;);</span>
-<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (other.isZero()) {</span>
-<span class="nc" id="L79">            return this;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (other.isZero()) {</span>
+<span class="fc" id="L79">            return this;</span>
         }
 <span class="fc bfc" id="L81" title="All 2 branches covered.">        if (isZero()) {</span>
 <span class="fc" id="L82">            return other;</span>
@@ -103,7 +103,7 @@ public record ExactRational(
 
     public ExactRational multiply(ExactRational other) {
 <span class="fc" id="L105">        Objects.requireNonNull(other, &quot;other&quot;);</span>
-<span class="pc bpc" id="L106" title="1 of 4 branches missed.">        if (isZero() || other.isZero()) {</span>
+<span class="fc bfc" id="L106" title="All 4 branches covered.">        if (isZero() || other.isZero()) {</span>
 <span class="fc" id="L107">            return ZERO;</span>
         }
 <span class="fc bfc" id="L109" title="All 2 branches covered.">        if (isOne()) {</span>
@@ -159,8 +159,8 @@ public record ExactRational(
     }
 
     public ExactRational negate() {
-<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (isZero()) {</span>
-<span class="nc" id="L163">            return ZERO;</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (isZero()) {</span>
+<span class="fc" id="L163">            return ZERO;</span>
         }
 <span class="fc bfc" id="L165" title="All 2 branches covered.">        if (isOne()) {</span>
 <span class="fc" id="L166">            return NEGATIVE_ONE;</span>

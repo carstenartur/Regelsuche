@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactParsedFactorizationPipeline.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">ExactParsedFactorizationPipeline.java</span></div><h1>ExactParsedFactorizationPipeline.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import de.regelsuche.parse.ExactParsedTerm;
+import de.regelsuche.scalar.ExactRational;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Binds parser-issued exact provenance directly to the domain-aware
+ * factorization request and verifier boundary.
+ *
+ * &lt;p&gt;Extraction, backend proposal work and independent product verification
+ * share one total-work ceiling. The extraction layer never renders or reparses
+ * coefficients and no legacy polynomial value becomes an authority.&lt;/p&gt;
+ */
+public final class ExactParsedFactorizationPipeline {
+    public static final String PIPELINE_ID =
+        &quot;regelsuche.exact-parsed-factorization-pipeline/v1&quot;;
+
+    private final ExactParsedUnivariatePolynomialView view;
+    private final Policy policy;
+
+    public ExactParsedFactorizationPipeline() {
+<span class="fc" id="L26">        this(</span>
+            new ExactParsedUnivariatePolynomialView(),
+<span class="fc" id="L28">            Policy.boundedDefaults());</span>
+<span class="fc" id="L29">    }</span>
+
+    public ExactParsedFactorizationPipeline(
+        ExactParsedUnivariatePolynomialView view,
+        Policy policy
+<span class="fc" id="L34">    ) {</span>
+<span class="fc" id="L35">        this.view = Objects.requireNonNull(view, &quot;view&quot;);</span>
+<span class="fc" id="L36">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L37">        long extractionCeiling = Math.addExact(</span>
+<span class="fc" id="L38">            (long) view.budget().maxVisitedNodes(),</span>
+<span class="fc" id="L39">            view.budget().maxArithmeticOperations());</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (extractionCeiling &gt; policy.maxTotalWorkUnits()) {</span>
+<span class="fc" id="L41">            throw new IllegalArgumentException(</span>
+                &quot;PIPELINE_TOTAL_WORK_BELOW_EXTRACTION_CEILING&quot;);
+        }
+<span class="fc" id="L44">    }</span>
+
+    public ExactParsedUnivariatePolynomialView view() {
+<span class="nc" id="L47">        return view;</span>
+    }
+
+    public Policy policy() {
+<span class="nc" id="L51">        return policy;</span>
+    }
+
+    public Result factor(
+        ExactParsedTerm parsed,
+        FactorizationEngine&lt;ExactRational&gt; engine
+    ) {
+<span class="fc" id="L58">        Objects.requireNonNull(parsed, &quot;parsed&quot;);</span>
+<span class="fc" id="L59">        Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="fc" id="L60">        String engineId = requireEngineId(engine.engineId());</span>
+<span class="fc" id="L61">        ExactParsedUnivariatePolynomialView.Analysis extraction =</span>
+<span class="fc" id="L62">            view.analyze(parsed);</span>
+<span class="fc" id="L63">        PolynomialWorkLedger extractionWork =</span>
+<span class="fc" id="L64">            extraction.work().asPolynomialWorkLedger();</span>
+<span class="fc" id="L65">        long extractionUnits = extractionWork.totalWorkUnits();</span>
+
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (extractionUnits &gt; policy.maxTotalWorkUnits()) {</span>
+<span class="nc" id="L68">            throw new IllegalStateException(</span>
+                &quot;exact extraction exceeded its declared work ceiling&quot;);
+        }
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (extraction.status()</span>
+                == ExactParsedUnivariatePolynomialView.Status.UNSUPPORTED) {
+<span class="fc" id="L73">            return Result.failure(</span>
+                Status.UNSUPPORTED_EXPRESSION,
+<span class="fc" id="L75">                extraction.detailCode(),</span>
+                engineId,
+                policy,
+                extraction,
+                extractionWork);
+        }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (extraction.status()</span>
+                == ExactParsedUnivariatePolynomialView.Status
+                    .BUDGET_INCONCLUSIVE) {
+<span class="nc" id="L84">            return Result.failure(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="nc" id="L86">                extraction.detailCode(),</span>
+                engineId,
+                policy,
+                extraction,
+                extractionWork);
+        }
+
+<span class="fc" id="L93">        SparsePolynomial&lt;ExactRational&gt; polynomial =</span>
+<span class="fc" id="L94">            extraction.polynomial().orElseThrow();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (polynomial.isZero()) {</span>
+<span class="fc" id="L96">            return Result.failure(</span>
+                Status.UNSUPPORTED_REQUEST,
+                &quot;ZERO_POLYNOMIAL_HAS_NO_FINITE_FACTORIZATION_CONTRACT&quot;,
+                engineId,
+                policy,
+                extraction,
+                extractionWork);
+        }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (polynomial.ring().variableCount() != 1</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">                || polynomial.isConstant()) {</span>
+<span class="fc" id="L106">            return Result.failure(</span>
+                Status.UNSUPPORTED_REQUEST,
+                &quot;CONSTANT_POLYNOMIAL_HAS_NO_NONTRIVIAL_FACTORIZATION_REQUEST&quot;,
+                engineId,
+                policy,
+                extraction,
+                extractionWork);
+        }
+
+<span class="fc" id="L115">        long remainingWork = policy.maxTotalWorkUnits() - extractionUnits;</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (remainingWork &lt; 1) {</span>
+<span class="fc" id="L117">            return Result.failure(</span>
+                Status.BUDGET_INCONCLUSIVE,
+                &quot;NO_FACTORIZATION_WORK_BUDGET_REMAINING&quot;,
+                engineId,
+                policy,
+                extraction,
+                extractionWork);
+        }
+
+<span class="fc" id="L126">        FactorizationRequest&lt;ExactRational&gt; request =</span>
+            new FactorizationRequest&lt;&gt;(
+                polynomial,
+<span class="fc" id="L129">                policy.evidenceRequirement(),</span>
+<span class="fc" id="L130">                policy.structuralLimits(),</span>
+<span class="fc" id="L131">                policy.maxCandidates(),</span>
+                remainingWork);
+<span class="fc" id="L133">        FactorizationVerifier.Report&lt;ExactRational&gt; report =</span>
+<span class="fc" id="L134">            FactorizationVerifier.execute(engine, request);</span>
+<span class="fc" id="L135">        PolynomialWorkLedger totalWork = merge(</span>
+            extractionWork,
+<span class="fc" id="L137">            report.work());</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (!totalWork.within(policy.maxTotalWorkUnits())) {</span>
+<span class="nc" id="L139">            throw new IllegalStateException(</span>
+                &quot;factorization pipeline exceeded its total-work authority&quot;);
+        }
+<span class="fc" id="L142">        return Result.executed(</span>
+            engineId,
+            policy,
+            extraction,
+            request,
+            report,
+            totalWork);
+    }
+
+    private static String requireEngineId(String engineId) {
+<span class="pc bpc" id="L152" title="2 of 4 branches missed.">        if (engineId == null || engineId.isBlank()) {</span>
+<span class="nc" id="L153">            throw new IllegalArgumentException(</span>
+                &quot;factorization engine ID must not be blank&quot;);
+        }
+<span class="fc" id="L156">        return engineId;</span>
+    }
+
+    private static PolynomialWorkLedger merge(
+        PolynomialWorkLedger first,
+        PolynomialWorkLedger second
+    ) {
+<span class="fc" id="L163">        Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;(first.stages());</span>
+<span class="fc" id="L164">        second.stages().forEach((stage, units) -&gt; stages.merge(</span>
+            stage,
+            units,
+            Math::addExact));
+<span class="fc" id="L168">        return new PolynomialWorkLedger(stages);</span>
+    }
+
+<span class="fc" id="L171">    public enum Status {</span>
+<span class="fc" id="L172">        EXECUTED,</span>
+<span class="fc" id="L173">        UNSUPPORTED_EXPRESSION,</span>
+<span class="fc" id="L174">        UNSUPPORTED_REQUEST,</span>
+<span class="fc" id="L175">        BUDGET_INCONCLUSIVE</span>
+    }
+
+    /** Frozen request and total-work policy for one exact parsed invocation. */
+    public record Policy(
+        FactorizationRequest.StructuralLimits structuralLimits,
+        int maxCandidates,
+        long maxTotalWorkUnits,
+        FactorizationRequest.EvidenceRequirement evidenceRequirement
+    ) {
+<span class="fc" id="L185">        public Policy {</span>
+<span class="fc" id="L186">            Objects.requireNonNull(structuralLimits, &quot;structuralLimits&quot;);</span>
+<span class="fc" id="L187">            Objects.requireNonNull(</span>
+                evidenceRequirement,
+                &quot;evidenceRequirement&quot;);
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">            if (maxCandidates &lt; 0 || maxTotalWorkUnits &lt; 1) {</span>
+<span class="nc" id="L191">                throw new IllegalArgumentException(</span>
+                    &quot;exact parsed factorization policy is invalid&quot;);
+            }
+<span class="fc" id="L194">        }</span>
+
+        public static Policy boundedDefaults() {
+<span class="fc" id="L197">            return new Policy(</span>
+                new FactorizationRequest.StructuralLimits(
+                    1,
+                    ExactParsedUnivariatePolynomialView.MAX_DEGREE,
+                    ExactParsedUnivariatePolynomialView.MAX_DEGREE + 1,
+                    ExactParsedUnivariatePolynomialView
+                        .MAX_COEFFICIENT_BITS),
+                250_000,
+                20_000_000,
+                FactorizationRequest.EvidenceRequirement
+                    .VERIFIED_DECOMPOSITION);
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L211">            StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L212">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L214">                structuralLimits.canonicalMaterial());</span>
+<span class="fc" id="L215">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L217">                Integer.toString(maxCandidates));</span>
+<span class="fc" id="L218">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L220">                Long.toString(maxTotalWorkUnits));</span>
+<span class="fc" id="L221">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L223">                evidenceRequirement.name());</span>
+<span class="fc" id="L224">            return result.toString();</span>
+        }
+    }
+
+    /** Content-addressed result of extraction plus optional verified execution. */
+    public static final class Result {
+        private final Status status;
+        private final String detailCode;
+        private final String engineId;
+        private final Policy policy;
+        private final ExactParsedUnivariatePolynomialView.Analysis extraction;
+        private final Optional&lt;FactorizationRequest&lt;ExactRational&gt;&gt; request;
+        private final Optional&lt;FactorizationVerifier.Report&lt;ExactRational&gt;&gt; report;
+        private final PolynomialWorkLedger totalWork;
+        private final String certificateHash;
+
+        private Result(
+            Status status,
+            String detailCode,
+            String engineId,
+            Policy policy,
+            ExactParsedUnivariatePolynomialView.Analysis extraction,
+            Optional&lt;FactorizationRequest&lt;ExactRational&gt;&gt; request,
+            Optional&lt;FactorizationVerifier.Report&lt;ExactRational&gt;&gt; report,
+            PolynomialWorkLedger totalWork
+<span class="fc" id="L249">        ) {</span>
+<span class="fc" id="L250">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L251" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L252">                throw new IllegalArgumentException(</span>
+                    &quot;factorization pipeline detail code must not be blank&quot;);
+            }
+<span class="fc" id="L255">            this.detailCode = detailCode;</span>
+<span class="fc" id="L256">            this.engineId = requireEngineId(engineId);</span>
+<span class="fc" id="L257">            this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L258">            this.extraction = Objects.requireNonNull(</span>
+                extraction,
+                &quot;extraction&quot;);
+<span class="fc" id="L261">            this.request = Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L262">            this.report = Objects.requireNonNull(report, &quot;report&quot;);</span>
+<span class="fc" id="L263">            this.totalWork = Objects.requireNonNull(totalWork, &quot;totalWork&quot;);</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            boolean executed = status == Status.EXECUTED;</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">            if (executed != request.isPresent()</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                    || executed != report.isPresent()) {</span>
+<span class="nc" id="L267">                throw new IllegalArgumentException(</span>
+                    &quot;factorization pipeline status/payload mismatch&quot;);
+            }
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">            if (!totalWork.within(policy.maxTotalWorkUnits())) {</span>
+<span class="nc" id="L271">                throw new IllegalArgumentException(</span>
+                    &quot;factorization pipeline work exceeds policy&quot;);
+            }
+<span class="fc" id="L274">            this.certificateHash = PolynomialEvidence.sha256(</span>
+<span class="fc" id="L275">                evidenceMaterial());</span>
+<span class="fc" id="L276">        }</span>
+
+        private static Result executed(
+            String engineId,
+            Policy policy,
+            ExactParsedUnivariatePolynomialView.Analysis extraction,
+            FactorizationRequest&lt;ExactRational&gt; request,
+            FactorizationVerifier.Report&lt;ExactRational&gt; report,
+            PolynomialWorkLedger totalWork
+        ) {
+<span class="fc" id="L286">            return new Result(</span>
+                Status.EXECUTED,
+<span class="fc" id="L288">                report.detailCode(),</span>
+                engineId,
+                policy,
+                extraction,
+<span class="fc" id="L292">                Optional.of(request),</span>
+<span class="fc" id="L293">                Optional.of(report),</span>
+                totalWork);
+        }
+
+        private static Result failure(
+            Status status,
+            String detailCode,
+            String engineId,
+            Policy policy,
+            ExactParsedUnivariatePolynomialView.Analysis extraction,
+            PolynomialWorkLedger totalWork
+        ) {
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            if (status == Status.EXECUTED) {</span>
+<span class="nc" id="L306">                throw new IllegalArgumentException(</span>
+                    &quot;executed status requires factorization evidence&quot;);
+            }
+<span class="fc" id="L309">            return new Result(</span>
+                status,
+                detailCode,
+                engineId,
+                policy,
+                extraction,
+<span class="fc" id="L315">                Optional.empty(),</span>
+<span class="fc" id="L316">                Optional.empty(),</span>
+                totalWork);
+        }
+
+        public Status status() {
+<span class="fc" id="L321">            return status;</span>
+        }
+
+        public String detailCode() {
+<span class="fc" id="L325">            return detailCode;</span>
+        }
+
+        public String engineId() {
+<span class="nc" id="L329">            return engineId;</span>
+        }
+
+        public Policy policy() {
+<span class="nc" id="L333">            return policy;</span>
+        }
+
+        public ExactParsedUnivariatePolynomialView.Analysis extraction() {
+<span class="fc" id="L337">            return extraction;</span>
+        }
+
+        public Optional&lt;FactorizationRequest&lt;ExactRational&gt;&gt; request() {
+<span class="fc" id="L341">            return request;</span>
+        }
+
+        public Optional&lt;FactorizationVerifier.Report&lt;ExactRational&gt;&gt; report() {
+<span class="fc" id="L345">            return report;</span>
+        }
+
+        public PolynomialWorkLedger totalWork() {
+<span class="fc" id="L349">            return totalWork;</span>
+        }
+
+        public String certificateHash() {
+<span class="fc" id="L353">            return certificateHash;</span>
+        }
+
+        public boolean executed() {
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            return status == Status.EXECUTED;</span>
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L361">            StringBuilder result = new StringBuilder(evidenceMaterial());</span>
+<span class="fc" id="L362">            PolynomialEvidence.append(result, certificateHash);</span>
+<span class="fc" id="L363">            return result.toString();</span>
+        }
+
+        private String evidenceMaterial() {
+<span class="fc" id="L367">            StringBuilder result = new StringBuilder(PIPELINE_ID);</span>
+<span class="fc" id="L368">            PolynomialEvidence.append(result, status.name());</span>
+<span class="fc" id="L369">            PolynomialEvidence.append(result, detailCode);</span>
+<span class="fc" id="L370">            PolynomialEvidence.append(result, engineId);</span>
+<span class="fc" id="L371">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L373">                policy.canonicalMaterial());</span>
+<span class="fc" id="L374">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L376">                extraction.canonicalMaterial());</span>
+<span class="fc" id="L377">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L379">                request.map(FactorizationRequest::canonicalMaterial)</span>
+<span class="fc" id="L380">                    .orElse(&quot;&quot;));</span>
+<span class="fc" id="L381">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L383">                report.map(FactorizationVerifier.Report::verificationHash)</span>
+<span class="fc" id="L384">                    .orElse(&quot;&quot;));</span>
+<span class="fc" id="L385">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L387">                totalWork.canonicalMaterial());</span>
+<span class="fc" id="L388">            return result.toString();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

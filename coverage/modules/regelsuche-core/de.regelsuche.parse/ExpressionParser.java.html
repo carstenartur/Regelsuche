@@ -216,8 +216,8 @@ public class ExpressionParser {
         }
 
 <span class="fc" id="L218">        double legacyValue = parseFiniteLegacyValue(sourceLexeme, start);</span>
-<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (legacyValue == 0.0d</span>
-<span class="nc bnc" id="L220" title="All 2 branches missed.">                &amp;&amp; !evidence.value().orElseThrow().isZero()) {</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (legacyValue == 0.0d</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">                &amp;&amp; !evidence.value().orElseThrow().isZero()) {</span>
 <span class="nc" id="L221">            throw new IllegalArgumentException(</span>
                 &quot;Exact numeric literal cannot be represented safely by the &quot;
                     + &quot;legacy AST at position &quot; + start);

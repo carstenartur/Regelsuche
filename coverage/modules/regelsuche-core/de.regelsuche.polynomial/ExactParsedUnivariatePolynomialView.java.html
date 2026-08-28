@@ -1,0 +1,723 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactParsedUnivariatePolynomialView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">ExactParsedUnivariatePolynomialView.java</span></div><h1>ExactParsedUnivariatePolynomialView.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExactParsedTerm;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Converts one parser-issued exact term directly into the authoritative
+ * domain-aware polynomial representation.
+ *
+ * &lt;p&gt;Numeric coefficients and exponents are resolved exclusively through
+ * {@link ExactParsedTerm} node identity. The legacy {@link NumberExpr#value()}
+ * is inspected only to identify the parser's provenance-free synthetic zero
+ * for unary minus; it never authorizes an exact coefficient.&lt;/p&gt;
+ */
+public final class ExactParsedUnivariatePolynomialView {
+    public static final String VIEW_ID =
+        &quot;regelsuche.exact-parsed-univariate-polynomial-view/v1&quot;;
+    public static final int MAX_DEGREE = 64;
+    public static final int MAX_COEFFICIENT_BITS = 8_192;
+    public static final int MAX_VISITED_NODES = 4_096;
+    public static final int MAX_ARITHMETIC_OPERATIONS = 100_000;
+<span class="fc" id="L35">    public static final Budget DEFAULT_BUDGET =</span>
+        new Budget(16, 4_096, 512, 10_000);
+
+    private final Budget budget;
+
+    public ExactParsedUnivariatePolynomialView() {
+<span class="fc" id="L41">        this(DEFAULT_BUDGET);</span>
+<span class="fc" id="L42">    }</span>
+
+<span class="fc" id="L44">    public ExactParsedUnivariatePolynomialView(Budget budget) {</span>
+<span class="fc" id="L45">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L46">    }</span>
+
+    public Budget budget() {
+<span class="fc" id="L49">        return budget;</span>
+    }
+
+    public Analysis analyze(ExactParsedTerm parsed) {
+<span class="fc" id="L53">        Objects.requireNonNull(parsed, &quot;parsed&quot;);</span>
+<span class="fc" id="L54">        Work work = new Work(budget);</span>
+<span class="fc" id="L55">        List&lt;LiteralBinding&gt; literals = parsed.literals().stream()</span>
+<span class="fc" id="L56">            .map(LiteralBinding::from)</span>
+<span class="fc" id="L57">            .toList();</span>
+        try {
+<span class="fc" id="L59">            PolynomialValue value = convert(</span>
+<span class="fc" id="L60">                parsed.expression(),</span>
+                parsed,
+                work);
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (value.degree() &gt; budget.maxDegree()) {</span>
+<span class="fc" id="L64">                throw budgetExceeded(&quot;MAX_DEGREE_EXCEEDED&quot;);</span>
+            }
+<span class="fc" id="L66">            return Analysis.supported(</span>
+<span class="fc" id="L67">                parsed.source(),</span>
+                budget,
+<span class="fc" id="L69">                toSparsePolynomial(value),</span>
+                literals,
+<span class="fc" id="L71">                work.snapshot());</span>
+<span class="fc" id="L72">        } catch (BudgetExceeded exception) {</span>
+<span class="fc" id="L73">            return Analysis.failure(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L75">                exception.getMessage(),</span>
+<span class="fc" id="L76">                parsed.source(),</span>
+                budget,
+                literals,
+<span class="fc" id="L79">                work.snapshot());</span>
+<span class="fc" id="L80">        } catch (UnsupportedExpression exception) {</span>
+<span class="fc" id="L81">            return Analysis.failure(</span>
+                Status.UNSUPPORTED,
+<span class="fc" id="L83">                exception.getMessage(),</span>
+<span class="fc" id="L84">                parsed.source(),</span>
+                budget,
+                literals,
+<span class="fc" id="L87">                work.snapshot());</span>
+        }
+    }
+
+    private PolynomialValue convert(
+        Expr expression,
+        ExactParsedTerm parsed,
+        Work work
+    ) {
+<span class="fc" id="L96">        work.visit();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L98">            return exactNumber(number, parsed);</span>
+        }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L101">            return PolynomialValue.variable(variable.name());</span>
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (expression instanceof FunctionExpr) {</span>
+<span class="fc" id="L104">            throw unsupported(&quot;FUNCTION_EXPRESSION_OUTSIDE_UNIVARIATE_VIEW&quot;);</span>
+        }
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="nc" id="L107">            throw unsupported(&quot;EXPRESSION_KIND_OUTSIDE_UNIVARIATE_VIEW&quot;);</span>
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.SUB</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                &amp;&amp; isSyntheticUnaryZero(binary.left(), parsed)) {</span>
+<span class="fc" id="L111">            work.visit();</span>
+<span class="fc" id="L112">            return negate(convert(binary.right(), parsed, work), work);</span>
+        }
+<span class="fc bfc" id="L114" title="All 5 branches covered.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L115">            case ADD -&gt; add(</span>
+<span class="fc" id="L116">                convert(binary.left(), parsed, work),</span>
+<span class="fc" id="L117">                convert(binary.right(), parsed, work),</span>
+                work);
+<span class="fc" id="L119">            case SUB -&gt; subtract(</span>
+<span class="fc" id="L120">                convert(binary.left(), parsed, work),</span>
+<span class="fc" id="L121">                convert(binary.right(), parsed, work),</span>
+                work);
+<span class="fc" id="L123">            case MUL -&gt; multiply(</span>
+<span class="fc" id="L124">                convert(binary.left(), parsed, work),</span>
+<span class="fc" id="L125">                convert(binary.right(), parsed, work),</span>
+                work);
+<span class="fc" id="L127">            case DIV -&gt; divideByConstant(</span>
+<span class="fc" id="L128">                convert(binary.left(), parsed, work),</span>
+<span class="fc" id="L129">                convert(binary.right(), parsed, work),</span>
+                work);
+<span class="fc" id="L131">            case POW -&gt; power(</span>
+<span class="fc" id="L132">                convert(binary.left(), parsed, work),</span>
+<span class="fc" id="L133">                exactExponent(binary.right(), parsed, work),</span>
+                work);
+        };
+    }
+
+    private PolynomialValue exactNumber(
+        NumberExpr number,
+        ExactParsedTerm parsed
+    ) {
+<span class="fc" id="L142">        ExactParsedTerm.LiteralOccurrence occurrence =</span>
+<span class="pc" id="L143">            parsed.literalFor(number).orElseThrow(() -&gt; unsupported(</span>
+                &quot;NUMERIC_NODE_LACKS_EXACT_SOURCE_PROVENANCE&quot;));
+<span class="fc" id="L145">        return PolynomialValue.constant(checked(occurrence.exactValue()));</span>
+    }
+
+    private int exactExponent(
+        Expr expression,
+        ExactParsedTerm parsed,
+        Work work
+    ) {
+<span class="fc" id="L153">        work.visit();</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (!(expression instanceof NumberExpr number)) {</span>
+<span class="nc" id="L155">            throw unsupported(</span>
+                &quot;POWER_EXPONENT_MUST_BE_EXACT_NONNEGATIVE_INTEGER&quot;);
+        }
+<span class="fc" id="L158">        ExactRational value = parsed.literalFor(number)</span>
+<span class="pc" id="L159">            .orElseThrow(() -&gt; unsupported(</span>
+                &quot;POWER_EXPONENT_LACKS_EXACT_SOURCE_PROVENANCE&quot;))
+<span class="fc" id="L161">            .exactValue();</span>
+<span class="pc bpc" id="L162" title="2 of 4 branches missed.">        if (!value.isInteger() || value.signum() &lt; 0) {</span>
+<span class="nc" id="L163">            throw unsupported(</span>
+                &quot;POWER_EXPONENT_MUST_BE_EXACT_NONNEGATIVE_INTEGER&quot;);
+        }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (value.numerator().compareTo(</span>
+<span class="fc" id="L167">                BigInteger.valueOf(budget.maxDegree())) &gt; 0) {</span>
+<span class="fc" id="L168">            throw budgetExceeded(&quot;MAX_DEGREE_EXCEEDED&quot;);</span>
+        }
+<span class="fc" id="L170">        return value.numerator().intValueExact();</span>
+    }
+
+    private boolean isSyntheticUnaryZero(
+        Expr expression,
+        ExactParsedTerm parsed
+    ) {
+<span class="fc" id="L177">        return expression instanceof NumberExpr number</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            &amp;&amp; number.value() == 0.0d</span>
+<span class="pc bpc" id="L179" title="1 of 4 branches missed.">            &amp;&amp; parsed.literalFor(number).isEmpty();</span>
+    }
+
+    private PolynomialValue add(
+        PolynomialValue left,
+        PolynomialValue right,
+        Work work
+    ) {
+<span class="fc" id="L187">        String variable = mergeVariable(left.variable(), right.variable());</span>
+<span class="fc" id="L188">        int size = Math.max(</span>
+<span class="fc" id="L189">            left.coefficients().size(),</span>
+<span class="fc" id="L190">            right.coefficients().size());</span>
+<span class="fc" id="L191">        List&lt;ExactRational&gt; result = new ArrayList&lt;&gt;(size);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (int index = 0; index &lt; size; index++) {</span>
+<span class="fc" id="L193">            work.arithmetic();</span>
+<span class="fc" id="L194">            result.add(checked(</span>
+<span class="fc" id="L195">                left.coefficient(index).add(right.coefficient(index))));</span>
+        }
+<span class="fc" id="L197">        return new PolynomialValue(variable, result);</span>
+    }
+
+    private PolynomialValue subtract(
+        PolynomialValue left,
+        PolynomialValue right,
+        Work work
+    ) {
+<span class="fc" id="L205">        return add(left, negate(right, work), work);</span>
+    }
+
+    private PolynomialValue negate(
+        PolynomialValue value,
+        Work work
+    ) {
+<span class="fc" id="L212">        List&lt;ExactRational&gt; result = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L213">            value.coefficients().size());</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        for (ExactRational coefficient : value.coefficients()) {</span>
+<span class="fc" id="L215">            work.arithmetic();</span>
+<span class="fc" id="L216">            result.add(checked(coefficient.negate()));</span>
+<span class="fc" id="L217">        }</span>
+<span class="fc" id="L218">        return new PolynomialValue(value.variable(), result);</span>
+    }
+
+    private PolynomialValue multiply(
+        PolynomialValue left,
+        PolynomialValue right,
+        Work work
+    ) {
+<span class="fc" id="L226">        String variable = mergeVariable(left.variable(), right.variable());</span>
+<span class="fc" id="L227">        int degree = Math.addExact(left.degree(), right.degree());</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (degree &gt; budget.maxDegree()) {</span>
+<span class="nc" id="L229">            throw budgetExceeded(&quot;MAX_DEGREE_EXCEEDED&quot;);</span>
+        }
+<span class="fc" id="L231">        List&lt;ExactRational&gt; result = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L232">            java.util.Collections.nCopies(</span>
+                degree + 1,
+                ExactRational.ZERO));
+<span class="fc" id="L235">        for (int leftIndex = 0;</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                leftIndex &lt; left.coefficients().size();</span>
+<span class="fc" id="L237">                leftIndex++) {</span>
+<span class="fc" id="L238">            for (int rightIndex = 0;</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">                    rightIndex &lt; right.coefficients().size();</span>
+<span class="fc" id="L240">                    rightIndex++) {</span>
+<span class="fc" id="L241">                int resultIndex = leftIndex + rightIndex;</span>
+<span class="fc" id="L242">                work.arithmetic(2);</span>
+<span class="fc" id="L243">                ExactRational product = checked(</span>
+<span class="fc" id="L244">                    left.coefficient(leftIndex).multiply(</span>
+<span class="fc" id="L245">                        right.coefficient(rightIndex)));</span>
+<span class="fc" id="L246">                result.set(</span>
+                    resultIndex,
+<span class="fc" id="L248">                    checked(result.get(resultIndex).add(product)));</span>
+            }
+        }
+<span class="fc" id="L251">        return new PolynomialValue(variable, result);</span>
+    }
+
+    private PolynomialValue divideByConstant(
+        PolynomialValue dividend,
+        PolynomialValue divisor,
+        Work work
+    ) {
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (!divisor.isConstant()</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">                || divisor.coefficient(0).isZero()) {</span>
+<span class="fc" id="L261">            throw unsupported(&quot;DIVISOR_MUST_BE_EXACT_NONZERO_CONSTANT&quot;);</span>
+        }
+<span class="fc" id="L263">        ExactRational scalar = divisor.coefficient(0);</span>
+<span class="fc" id="L264">        List&lt;ExactRational&gt; result = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L265">            dividend.coefficients().size());</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        for (ExactRational coefficient : dividend.coefficients()) {</span>
+<span class="fc" id="L267">            work.arithmetic();</span>
+<span class="fc" id="L268">            result.add(checked(coefficient.divide(scalar)));</span>
+<span class="fc" id="L269">        }</span>
+<span class="fc" id="L270">        return new PolynomialValue(dividend.variable(), result);</span>
+    }
+
+    private PolynomialValue power(
+        PolynomialValue base,
+        int exponent,
+        Work work
+    ) {
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        if (exponent == 0) {</span>
+<span class="fc" id="L279">            return new PolynomialValue(</span>
+<span class="fc" id="L280">                base.variable(),</span>
+<span class="fc" id="L281">                List.of(ExactRational.ONE));</span>
+        }
+<span class="fc" id="L283">        PolynomialValue result = PolynomialValue.constant(ExactRational.ONE);</span>
+<span class="fc" id="L284">        PolynomialValue factor = base;</span>
+<span class="fc" id="L285">        int remaining = exponent;</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">            if ((remaining &amp; 1) != 0) {</span>
+<span class="fc" id="L288">                result = multiply(result, factor, work);</span>
+            }
+<span class="fc" id="L290">            remaining &gt;&gt;&gt;= 1;</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">            if (remaining &gt; 0) {</span>
+<span class="fc" id="L292">                factor = multiply(factor, factor, work);</span>
+            }
+        }
+<span class="fc" id="L295">        return result;</span>
+    }
+
+    private String mergeVariable(String left, String right) {
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (left.isEmpty()) {</span>
+<span class="fc" id="L300">            return right;</span>
+        }
+<span class="fc bfc" id="L302" title="All 4 branches covered.">        if (right.isEmpty() || left.equals(right)) {</span>
+<span class="fc" id="L303">            return left;</span>
+        }
+<span class="fc" id="L305">        throw unsupported(&quot;MULTIPLE_POLYNOMIAL_VARIABLES&quot;);</span>
+    }
+
+    private ExactRational checked(ExactRational value) {
+<span class="fc" id="L309">        if (ExactRationalField.INSTANCE.bitLength(value)</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">                &gt; budget.maxCoefficientBits()) {</span>
+<span class="fc" id="L311">            throw budgetExceeded(&quot;COEFFICIENT_BIT_LIMIT_EXCEEDED&quot;);</span>
+        }
+<span class="fc" id="L313">        return value;</span>
+    }
+
+    private static SparsePolynomial&lt;ExactRational&gt; toSparsePolynomial(
+        PolynomialValue value
+    ) {
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        List&lt;PolynomialVariable&gt; variables = value.variable().isEmpty()</span>
+<span class="fc" id="L320">            ? List.of()</span>
+<span class="fc" id="L321">            : List.of(new PolynomialVariable(value.variable()));</span>
+<span class="fc" id="L322">        PolynomialRing&lt;ExactRational&gt; ring = new PolynomialRing&lt;&gt;(</span>
+            ExactRationalField.INSTANCE,
+            variables,
+            PolynomialRing.MonomialOrder.LEXICOGRAPHIC);
+<span class="fc" id="L326">        Map&lt;Monomial, ExactRational&gt; terms = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (variables.isEmpty()) {</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            if (value.degree() &gt; 0) {</span>
+<span class="nc" id="L329">                throw new IllegalStateException(</span>
+                    &quot;constant polynomial view retained nonconstant terms&quot;);
+            }
+<span class="fc bfc" id="L332" title="All 2 branches covered.">            if (!value.coefficient(0).isZero()) {</span>
+<span class="fc" id="L333">                terms.put(Monomial.one(0), value.coefficient(0));</span>
+            }
+        } else {
+<span class="fc" id="L336">            for (int exponent = 0;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">                    exponent &lt; value.coefficients().size();</span>
+<span class="fc" id="L338">                    exponent++) {</span>
+<span class="fc" id="L339">                ExactRational coefficient = value.coefficient(exponent);</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">                if (!coefficient.isZero()) {</span>
+<span class="fc" id="L341">                    terms.put(Monomial.of(exponent), coefficient);</span>
+                }
+            }
+        }
+<span class="fc" id="L345">        return new SparsePolynomial&lt;&gt;(ring, terms);</span>
+    }
+
+    private static UnsupportedExpression unsupported(String detailCode) {
+<span class="fc" id="L349">        return new UnsupportedExpression(detailCode);</span>
+    }
+
+    private static BudgetExceeded budgetExceeded(String detailCode) {
+<span class="fc" id="L353">        return new BudgetExceeded(detailCode);</span>
+    }
+
+<span class="fc" id="L356">    public enum Status {</span>
+<span class="fc" id="L357">        SUPPORTED,</span>
+<span class="fc" id="L358">        UNSUPPORTED,</span>
+<span class="fc" id="L359">        BUDGET_INCONCLUSIVE</span>
+    }
+
+    public record Budget(
+        int maxDegree,
+        int maxCoefficientBits,
+        int maxVisitedNodes,
+        int maxArithmeticOperations
+    ) {
+<span class="fc" id="L368">        public Budget {</span>
+<span class="pc bpc" id="L369" title="8 of 16 branches missed.">            if (maxDegree &lt; 0</span>
+                    || maxDegree &gt; MAX_DEGREE
+                    || maxCoefficientBits &lt; 1
+                    || maxCoefficientBits &gt; MAX_COEFFICIENT_BITS
+                    || maxVisitedNodes &lt; 1
+                    || maxVisitedNodes &gt; MAX_VISITED_NODES
+                    || maxArithmeticOperations &lt; 1
+                    || maxArithmeticOperations
+                        &gt; MAX_ARITHMETIC_OPERATIONS) {
+<span class="nc" id="L378">                throw new IllegalArgumentException(</span>
+                    &quot;exact parsed polynomial budget is invalid&quot;);
+            }
+<span class="fc" id="L381">        }</span>
+
+        public String canonicalMaterial() {
+<span class="fc" id="L384">            return maxDegree + &quot;:&quot;</span>
+                + maxCoefficientBits + &quot;:&quot;
+                + maxVisitedNodes + &quot;:&quot;
+                + maxArithmeticOperations;
+        }
+    }
+
+    public record WorkLedger(
+        int visitedNodes,
+        int arithmeticOperations
+    ) {
+<span class="fc" id="L395">        public WorkLedger {</span>
+<span class="pc bpc" id="L396" title="2 of 4 branches missed.">            if (visitedNodes &lt; 0 || arithmeticOperations &lt; 0) {</span>
+<span class="nc" id="L397">                throw new IllegalArgumentException(</span>
+                    &quot;exact parsed polynomial work ledger is invalid&quot;);
+            }
+<span class="fc" id="L400">        }</span>
+
+        public long totalWorkUnits() {
+<span class="fc" id="L403">            return Math.addExact(</span>
+                (long) visitedNodes,
+                arithmeticOperations);
+        }
+
+        public PolynomialWorkLedger asPolynomialWorkLedger() {
+<span class="fc" id="L409">            return new PolynomialWorkLedger(Map.of(</span>
+                &quot;exact-parsed-view.arithmetic-operations&quot;,
+<span class="fc" id="L411">                (long) arithmeticOperations,</span>
+                &quot;exact-parsed-view.ast-visits&quot;,
+<span class="fc" id="L413">                (long) visitedNodes));</span>
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L417">            return visitedNodes + &quot;:&quot; + arithmeticOperations;</span>
+        }
+    }
+
+    public record LiteralBinding(
+        int startInclusive,
+        int endExclusive,
+        String sourceLexeme,
+        String canonicalValue,
+        String valueId,
+        String certificateHash
+    ) {
+<span class="fc" id="L429">        public LiteralBinding {</span>
+<span class="pc bpc" id="L430" title="3 of 6 branches missed.">            if (startInclusive &lt; 0</span>
+                    || endExclusive &lt;= startInclusive
+                    || sourceLexeme == null
+<span class="pc bpc" id="L433" title="2 of 4 branches missed.">                    || sourceLexeme.isEmpty()</span>
+                    || canonicalValue == null
+<span class="pc bpc" id="L435" title="2 of 4 branches missed.">                    || canonicalValue.isEmpty()</span>
+                    || valueId == null
+<span class="pc bpc" id="L437" title="2 of 4 branches missed.">                    || !valueId.matches(&quot;sha256:[0-9a-f]{64}&quot;)</span>
+                    || certificateHash == null
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">                    || !certificateHash.matches(</span>
+                        &quot;sha256:[0-9a-f]{64}&quot;)) {
+<span class="nc" id="L441">                throw new IllegalArgumentException(</span>
+                    &quot;exact literal binding is invalid&quot;);
+            }
+<span class="fc" id="L444">        }</span>
+
+        private static LiteralBinding from(
+            ExactParsedTerm.LiteralOccurrence occurrence
+        ) {
+<span class="fc" id="L449">            return new LiteralBinding(</span>
+<span class="fc" id="L450">                occurrence.startInclusive(),</span>
+<span class="fc" id="L451">                occurrence.endExclusive(),</span>
+<span class="fc" id="L452">                occurrence.sourceLexeme(),</span>
+<span class="fc" id="L453">                occurrence.evidence().canonicalValue(),</span>
+<span class="fc" id="L454">                occurrence.evidence().valueId(),</span>
+<span class="fc" id="L455">                occurrence.evidence().certificateHash());</span>
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L459">            StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L460">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L462">                Integer.toString(startInclusive));</span>
+<span class="fc" id="L463">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L465">                Integer.toString(endExclusive));</span>
+<span class="fc" id="L466">            PolynomialEvidence.append(result, sourceLexeme);</span>
+<span class="fc" id="L467">            PolynomialEvidence.append(result, canonicalValue);</span>
+<span class="fc" id="L468">            PolynomialEvidence.append(result, valueId);</span>
+<span class="fc" id="L469">            PolynomialEvidence.append(result, certificateHash);</span>
+<span class="fc" id="L470">            return result.toString();</span>
+        }
+    }
+
+    public static final class Analysis {
+        private final Status status;
+        private final String detailCode;
+        private final String source;
+        private final Budget budget;
+        private final Optional&lt;SparsePolynomial&lt;ExactRational&gt;&gt; polynomial;
+        private final List&lt;LiteralBinding&gt; literals;
+        private final WorkLedger work;
+        private final String certificateHash;
+
+        private Analysis(
+            Status status,
+            String detailCode,
+            String source,
+            Budget budget,
+            Optional&lt;SparsePolynomial&lt;ExactRational&gt;&gt; polynomial,
+            List&lt;LiteralBinding&gt; literals,
+            WorkLedger work
+<span class="fc" id="L492">        ) {</span>
+<span class="fc" id="L493">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L494" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L495">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L498">            this.detailCode = detailCode;</span>
+<span class="fc" id="L499">            this.source = Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L500">            this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L501">            this.polynomial = Objects.requireNonNull(</span>
+                polynomial,
+                &quot;polynomial&quot;);
+<span class="fc" id="L504">            this.literals = List.copyOf(</span>
+<span class="fc" id="L505">                Objects.requireNonNull(literals, &quot;literals&quot;));</span>
+<span class="fc" id="L506">            this.work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L507" title="1 of 4 branches missed.">            if ((status == Status.SUPPORTED) != polynomial.isPresent()) {</span>
+<span class="nc" id="L508">                throw new IllegalArgumentException(</span>
+                    &quot;exact parsed polynomial status/payload mismatch&quot;);
+            }
+<span class="fc" id="L511">            this.certificateHash = PolynomialEvidence.sha256(</span>
+<span class="fc" id="L512">                evidenceMaterial());</span>
+<span class="fc" id="L513">        }</span>
+
+        private static Analysis supported(
+            String source,
+            Budget budget,
+            SparsePolynomial&lt;ExactRational&gt; polynomial,
+            List&lt;LiteralBinding&gt; literals,
+            WorkLedger work
+        ) {
+<span class="fc" id="L522">            return new Analysis(</span>
+                Status.SUPPORTED,
+                &quot;EXACT_SOURCE_BOUND_POLYNOMIAL&quot;,
+                source,
+                budget,
+<span class="fc" id="L527">                Optional.of(polynomial),</span>
+                literals,
+                work);
+        }
+
+        private static Analysis failure(
+            Status status,
+            String detailCode,
+            String source,
+            Budget budget,
+            List&lt;LiteralBinding&gt; literals,
+            WorkLedger work
+        ) {
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">            if (status == Status.SUPPORTED) {</span>
+<span class="nc" id="L541">                throw new IllegalArgumentException(</span>
+                    &quot;supported status requires a polynomial&quot;);
+            }
+<span class="fc" id="L544">            return new Analysis(</span>
+                status,
+                detailCode,
+                source,
+                budget,
+<span class="fc" id="L549">                Optional.empty(),</span>
+                literals,
+                work);
+        }
+
+        public Status status() {
+<span class="fc" id="L555">            return status;</span>
+        }
+
+        public String detailCode() {
+<span class="fc" id="L559">            return detailCode;</span>
+        }
+
+        public String source() {
+<span class="nc" id="L563">            return source;</span>
+        }
+
+        public Budget budget() {
+<span class="nc" id="L567">            return budget;</span>
+        }
+
+        public Optional&lt;SparsePolynomial&lt;ExactRational&gt;&gt; polynomial() {
+<span class="fc" id="L571">            return polynomial;</span>
+        }
+
+        public List&lt;LiteralBinding&gt; literals() {
+<span class="fc" id="L575">            return literals;</span>
+        }
+
+        public WorkLedger work() {
+<span class="fc" id="L579">            return work;</span>
+        }
+
+        public String certificateHash() {
+<span class="fc" id="L583">            return certificateHash;</span>
+        }
+
+        public boolean supported() {
+<span class="fc bfc" id="L587" title="All 2 branches covered.">            return status == Status.SUPPORTED;</span>
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L591">            StringBuilder result = new StringBuilder(evidenceMaterial());</span>
+<span class="fc" id="L592">            PolynomialEvidence.append(result, certificateHash);</span>
+<span class="fc" id="L593">            return result.toString();</span>
+        }
+
+        private String evidenceMaterial() {
+<span class="fc" id="L597">            StringBuilder result = new StringBuilder(VIEW_ID);</span>
+<span class="fc" id="L598">            PolynomialEvidence.append(result, status.name());</span>
+<span class="fc" id="L599">            PolynomialEvidence.append(result, detailCode);</span>
+<span class="fc" id="L600">            PolynomialEvidence.append(result, source);</span>
+<span class="fc" id="L601">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L603">                budget.canonicalMaterial());</span>
+<span class="fc" id="L604">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L606">                polynomial.map(SparsePolynomial::canonicalMaterial)</span>
+<span class="fc" id="L607">                    .orElse(&quot;&quot;));</span>
+<span class="fc" id="L608">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L610">                Integer.toString(literals.size()));</span>
+<span class="fc" id="L611">            literals.forEach(literal -&gt; PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L613">                literal.canonicalMaterial()));</span>
+<span class="fc" id="L614">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L616">                work.canonicalMaterial());</span>
+<span class="fc" id="L617">            return result.toString();</span>
+        }
+    }
+
+    private record PolynomialValue(
+        String variable,
+        List&lt;ExactRational&gt; coefficients
+    ) {
+<span class="fc" id="L625">        private PolynomialValue {</span>
+<span class="fc" id="L626">            Objects.requireNonNull(variable, &quot;variable&quot;);</span>
+<span class="fc" id="L627">            List&lt;ExactRational&gt; normalized = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L628">                Objects.requireNonNull(coefficients, &quot;coefficients&quot;));</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">            if (normalized.isEmpty()) {</span>
+<span class="nc" id="L630">                throw new IllegalArgumentException(</span>
+                    &quot;polynomial coefficients must not be empty&quot;);
+            }
+<span class="fc" id="L633">            normalized.forEach(value -&gt;</span>
+<span class="fc" id="L634">                Objects.requireNonNull(value, &quot;coefficient&quot;));</span>
+<span class="fc" id="L635">            int last = normalized.size() - 1;</span>
+<span class="pc bpc" id="L636" title="1 of 4 branches missed.">            while (last &gt; 0 &amp;&amp; normalized.get(last).isZero()) {</span>
+<span class="nc" id="L637">                last--;</span>
+            }
+<span class="fc" id="L639">            coefficients = List.copyOf(normalized.subList(0, last + 1));</span>
+<span class="fc" id="L640">        }</span>
+
+        private static PolynomialValue constant(ExactRational value) {
+<span class="fc" id="L643">            return new PolynomialValue(&quot;&quot;, List.of(value));</span>
+        }
+
+        private static PolynomialValue variable(String name) {
+<span class="pc bpc" id="L647" title="2 of 4 branches missed.">            if (name == null || name.isBlank()) {</span>
+<span class="nc" id="L648">                throw new IllegalArgumentException(</span>
+                    &quot;polynomial variable must not be blank&quot;);
+            }
+<span class="fc" id="L651">            return new PolynomialValue(</span>
+                name,
+<span class="fc" id="L653">                List.of(ExactRational.ZERO, ExactRational.ONE));</span>
+        }
+
+        private ExactRational coefficient(int exponent) {
+<span class="fc bfc" id="L657" title="All 2 branches covered.">            return exponent &lt; coefficients.size()</span>
+<span class="fc" id="L658">                ? coefficients.get(exponent)</span>
+<span class="fc" id="L659">                : ExactRational.ZERO;</span>
+        }
+
+        private int degree() {
+<span class="fc" id="L663">            return coefficients.size() - 1;</span>
+        }
+
+        private boolean isConstant() {
+<span class="fc bfc" id="L667" title="All 2 branches covered.">            return degree() == 0;</span>
+        }
+    }
+
+    private static final class Work {
+        private final Budget budget;
+        private int visitedNodes;
+        private int arithmeticOperations;
+
+<span class="fc" id="L676">        private Work(Budget budget) {</span>
+<span class="fc" id="L677">            this.budget = budget;</span>
+<span class="fc" id="L678">        }</span>
+
+        private void visit() {
+<span class="fc bfc" id="L681" title="All 2 branches covered.">            if (visitedNodes &gt;= budget.maxVisitedNodes()) {</span>
+<span class="fc" id="L682">                throw budgetExceeded(&quot;MAX_VISITED_NODES_EXCEEDED&quot;);</span>
+            }
+<span class="fc" id="L684">            visitedNodes++;</span>
+<span class="fc" id="L685">        }</span>
+
+        private void arithmetic() {
+<span class="fc" id="L688">            arithmetic(1);</span>
+<span class="fc" id="L689">        }</span>
+
+        private void arithmetic(int units) {
+<span class="pc bpc" id="L692" title="1 of 2 branches missed.">            if (units &lt; 0</span>
+                    || arithmeticOperations
+<span class="fc bfc" id="L694" title="All 2 branches covered.">                        &gt; budget.maxArithmeticOperations() - units) {</span>
+<span class="fc" id="L695">                throw budgetExceeded(</span>
+                    &quot;MAX_ARITHMETIC_OPERATIONS_EXCEEDED&quot;);
+            }
+<span class="fc" id="L698">            arithmeticOperations += units;</span>
+<span class="fc" id="L699">        }</span>
+
+        private WorkLedger snapshot() {
+<span class="fc" id="L702">            return new WorkLedger(visitedNodes, arithmeticOperations);</span>
+        }
+    }
+
+    private static final class UnsupportedExpression
+            extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        private UnsupportedExpression(String detailCode) {
+<span class="fc" id="L711">            super(detailCode);</span>
+<span class="fc" id="L712">        }</span>
+    }
+
+    private static final class BudgetExceeded extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        private BudgetExceeded(String detailCode) {
+<span class="fc" id="L719">            super(detailCode);</span>
+<span class="fc" id="L720">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
