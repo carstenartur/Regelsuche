@@ -25,6 +25,8 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
       REGELSUCHE_CI_TASK: ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && 'authorizedShowcaseTrainFreeze' || 'ciCheck' }}
+      REGELSUCHE_SEPARATE_MAVEN_AUTHORITY: ${{ github.event_name != 'create' && 'required-by-workflow' || 'disabled' }}
+      ORG_GRADLE_PROJECT_separateMavenAuthority: ${{ github.event_name != 'create' && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: { fetch-depth: 0 }
