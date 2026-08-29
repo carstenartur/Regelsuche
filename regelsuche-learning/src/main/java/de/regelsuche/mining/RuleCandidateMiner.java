@@ -1,55 +1,109 @@
 package de.regelsuche.mining;
 
-import de.regelsuche.validation.CandidateProofStatus;
-
 import de.regelsuche.equivalence.EquivalenceService;
 import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.validation.CandidateProofStatus;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 public class RuleCandidateMiner {
     private final KnownRuleRepository knownRules;
     private final PatternGeneralizer patternGeneralizer;
     private final CandidateValidator validator;
+    private final RuleCandidateFormationObserver formationObserver;
 
     public RuleCandidateMiner(KnownRuleRepository knownRules) {
-        this(knownRules, new SymPyEquivalenceService());
+        this(
+            knownRules,
+            new SymPyEquivalenceService(),
+            RuleCandidateFormationObserver.none());
     }
 
-    public RuleCandidateMiner(KnownRuleRepository knownRules, EquivalenceService equivalenceService) {
-        this.knownRules = knownRules;
+    public RuleCandidateMiner(
+        KnownRuleRepository knownRules,
+        EquivalenceService equivalenceService
+    ) {
+        this(
+            knownRules,
+            equivalenceService,
+            RuleCandidateFormationObserver.none());
+    }
+
+    public RuleCandidateMiner(
+        KnownRuleRepository knownRules,
+        EquivalenceService equivalenceService,
+        RuleCandidateFormationObserver formationObserver
+    ) {
+        this.knownRules = Objects.requireNonNull(
+            knownRules,
+            "knownRules");
         this.patternGeneralizer = new PatternGeneralizer();
-        this.validator = new CandidateValidator(equivalenceService);
+        this.validator = new CandidateValidator(
+            Objects.requireNonNull(
+                equivalenceService,
+                "equivalenceService"));
+        this.formationObserver = Objects.requireNonNull(
+            formationObserver,
+            "formationObserver");
     }
 
-    public List<RuleCandidate> mine(List<SuccessfulTransformationPath> paths) {
+    /** The configured post-formation boundary used by this miner. */
+    public RuleCandidateFormationObserver formationObserver() {
+        return formationObserver;
+    }
+
+    public List<RuleCandidate> mine(
+        List<SuccessfulTransformationPath> paths
+    ) {
         return mine(paths, DiscoverySettings.defaults());
     }
 
-    public List<RuleCandidate> mine(List<SuccessfulTransformationPath> paths, DiscoverySettings settings) {
-        DiscoverySettings effective = settings == null ? DiscoverySettings.defaults() : settings;
-        int minExamples = Math.max(1, effective.minExamplesPerCandidate());
-        CandidateProofStatus minReusableStatus = effective.minReusableStatus();
-        Map<String, List<SuccessfulTransformationPath>> clusters = new LinkedHashMap<>();
-        for (SuccessfulTransformationPath path : paths) {
-            clusters.computeIfAbsent(patternGeneralizer.skeleton(path), key -> new ArrayList<>()).add(path);
-            if (path.rules() != null && !path.rules().isEmpty()) {
-                clusters.computeIfAbsent("rules:" + String.join(">", path.rules()), key -> new ArrayList<>()).add(path);
+    public List<RuleCandidate> mine(
+        List<SuccessfulTransformationPath> paths,
+        DiscoverySettings settings
+    ) {
+        List<SuccessfulTransformationPath> checkedPaths = List.copyOf(
+            Objects.requireNonNull(paths, "paths"));
+        DiscoverySettings effective = settings == null
+            ? DiscoverySettings.defaults()
+            : settings;
+        int minExamples = Math.max(
+            1,
+            effective.minExamplesPerCandidate());
+        CandidateProofStatus minReusableStatus =
+            effective.minReusableStatus();
+        Map<String, List<SuccessfulTransformationPath>> clusters =
+            new LinkedHashMap<>();
+        for (SuccessfulTransformationPath path : checkedPaths) {
+            SuccessfulTransformationPath checked = Objects.requireNonNull(
+                path,
+                "path");
+            clusters.computeIfAbsent(
+                patternGeneralizer.skeleton(checked),
+                key -> new ArrayList<>()).add(checked);
+            if (!checked.rules().isEmpty()) {
+                clusters.computeIfAbsent(
+                    "rules:" + String.join(">", checked.rules()),
+                    key -> new ArrayList<>()).add(checked);
             }
         }
 
         Map<String, CandidateBucket> buckets = new LinkedHashMap<>();
-        for (List<SuccessfulTransformationPath> cluster : clusters.values()) {
+        for (List<SucccessfulTransformationPath> cluster :
+                clusters.values()) {
             if (cluster.size() < minExamples) {
                 continue;
             }
             patternGeneralizer.generalize(cluster)
                 .filter(validator::validate)
                 .ifPresent(pattern -> {
-                    String hash = RulePatternCanonicalizer.hash(pattern.leftPattern(), pattern.rightPattern());
+                    String hash = RulePatternCanonicalizer.hash(
+                        pattern.leftPattern(),
+                        pattern.rightPattern());
                     buckets.computeIfAbsent(
                         hash,
                         key -> new CandidateBucket(
@@ -57,47 +111,92 @@ public class RuleCandidateMiner {
                             pattern.rightPattern(),
                             pattern.parameterRelations(),
                             validator.proofStatus(pattern),
-                            hash
-                        )
-                    ).addAll(cluster);
+                            hash))
+                        .addAll(cluster);
                 });
         }
 
-        return buckets.values().stream()
-            .filter(bucket -> bucket.paths.size() >= minExamples)
-            .filter(bucket -> minReusableStatus == null
-                || bucket.proofStatus.ordinal() >= minReusableStatus.ordinal())
-            .map(bucket -> bucket.toCandidate(knownRules))
-            .toList();
+        List<RuleCandidate> result = new ArrayList<>();
+        for (CandidateBucket bucket : buckets.values()) {
+            if (bucket.paths.size() < minExamples
+                    || minReusableStatus != null
+                        && bucket.proofStatus.ordinal()
+                            < minReusableStatus.ordinal()) {
+                continue;
+            }
+            RuleCandidate candidate = bucket.toCandidate(knownRules);
+            formationObserver.onCandidateFormed(
+                candidate,
+                RuleCandidateFormationObserver.Evidence.fromPaths(
+                    bucket.paths));
+            result.add(candidate);
+        }
+        return List.copyOf(result);
     }
 
-    public Optional<RuleCandidate> mineFromSinglePathForValidatedSchema(SuccessfulTransformationPath path) {
+    public Optional<RuleCandidate> mineFromSinglePathForValidatedSchema(
+        SuccessfulTransformationPath path
+    ) {
+        return formFromSinglePath(path).map(formed -> {
+            formationObserver.onCandidateFormed(
+                formed.candidate(),
+                formed.evidence());
+            return formed.candidate();
+        });
+    }
+
+    public List<RuleCandidate> mineFromSinglePathForValidatedSchema(
+        List<SuccessfulTransformationPath> paths
+    ) {
+        if (paths == null || paths.isEmpty()) {
+            return List.of();
+        }
+        Map<String, FormedCandidate> deduplicated = new LinkedHashMap<>();
+        for (SuccessfulTransformationPath path : paths) {
+            formFromSinglePath(path).ifPresent(formed ->
+                deduplicated.merge(
+                    formed.candidate().canonicalHash(),
+                    formed,
+                    FormedCandidate::merge));
+        }
+        List<RuleCandidate> result = new ArrayList<>(
+            deduplicated.size());
+        for (FormedCandidate formed : deduplicated.values()) {
+            formationObserver.onCandidateFormed(
+                formed.candidate(),
+                formed.evidence());
+            result.add(formed.candidate());
+        }
+        return List.copyOf(result);
+    }
+
+    private Optional<FormedCandidate> formFromSinglePath(
+        SuccessfulTransformationPath path
+    ) {
         if (path == null || !path.equivalenceVerified()) {
             return Optional.empty();
         }
         return patternGeneralizer.generalizeSingleExampleSchema(path)
-            .filter(pattern -> !pattern.expressionPlaceholderValues().isEmpty())
+            .filter(pattern ->
+                !pattern.expressionPlaceholderValues().isEmpty())
             .filter(validator::validateGeneratedExpressionInstantiations)
             .filter(validator::validate)
-            .map(pattern -> toSinglePathCandidate(path, pattern))
-            .filter(candidate -> candidate.status() == RuleStatus.NEW);
+            .map(pattern -> new FormedCandidate(
+                toSinglePathCandidate(path, pattern),
+                RuleCandidateFormationObserver.Evidence.fromPaths(
+                    List.of(path))))
+            .filter(formed ->
+                formed.candidate().status() == RuleStatus.NEW);
     }
 
-    public List<RuleCandidate> mineFromSinglePathForValidatedSchema(List<SuccessfulTransformationPath> paths) {
-        if (paths == null || paths.isEmpty()) {
-            return List.of();
-        }
-        Map<String, RuleCandidate> deduplicated = new LinkedHashMap<>();
-        for (SuccessfulTransformationPath path : paths) {
-            mineFromSinglePathForValidatedSchema(path)
-                .ifPresent(candidate -> deduplicated.putIfAbsent(candidate.canonicalHash(), candidate));
-        }
-        return List.copyOf(deduplicated.values());
-    }
-
-    private RuleCandidate toSinglePathCandidate(SuccessfulTransformationPath path, GeneralizedPattern pattern) {
+    private RuleCandidate toSinglePathCandidate(
+        SuccessfulTransformationPath path,
+        GeneralizedPattern pattern
+    ) {
         CandidateProofStatus proofStatus = validator.proofStatus(pattern);
-        String hash = RulePatternCanonicalizer.hash(pattern.leftPattern(), pattern.rightPattern());
+        String hash = RulePatternCanonicalizer.hash(
+            pattern.leftPattern(),
+            pattern.rightPattern());
         return new RuleCandidate(
             pattern.leftPattern(),
             pattern.rightPattern(),
@@ -108,11 +207,34 @@ public class RuleCandidateMiner {
             true,
             !pattern.expressionPlaceholderValues().isEmpty(),
             pattern.parameterRelations(),
-            knownRules.statusFor(pattern.leftPattern(), pattern.rightPattern()),
+            knownRules.statusFor(
+                pattern.leftPattern(),
+                pattern.rightPattern()),
             proofStatus,
             hash,
-            List.of(path.id())
-        );
+            List.of(path.id()));
+    }
+
+    private record FormedCandidate(
+        RuleCandidate candidate,
+        RuleCandidateFormationObserver.Evidence evidence
+    ) {
+        private FormedCandidate {
+            candidate = Objects.requireNonNull(candidate, "candidate");
+            evidence = Objects.requireNonNull(evidence, "evidence");
+        }
+
+        private FormedCandidate merge(FormedCandidate other) {
+            Objects.requireNonNull(other, "other");
+            if (!candidate.canonicalHash().equals(
+                    other.candidate.canonicalHash())) {
+                throw new IllegalArgumentException(
+                    "cannot merge different formed candidates");
+            }
+            return new FormedCandidate(
+                candidate,
+                evidence.merge(other.evidence));
+        }
     }
 
     private static final class CandidateBucket {
@@ -121,7 +243,8 @@ public class RuleCandidateMiner {
         private final List<String> parameterRelations;
         private final CandidateProofStatus proofStatus;
         private final String hash;
-        private final List<SuccessfulTransformationPath> paths = new ArrayList<>();
+        private final List<SuccessfulTransformationPath> paths =
+            new ArrayList<>();
 
         private CandidateBucket(
             String leftPattern,
@@ -140,20 +263,30 @@ public class RuleCandidateMiner {
         private void addAll(List<SuccessfulTransformationPath> paths) {
             for (SuccessfulTransformationPath path : paths) {
                 boolean alreadyPresent = this.paths.stream()
-                    .anyMatch(existing -> existing.id() != null && existing.id().equals(path.id()));
+                    .anyMatch(existing ->
+                        existing.id().equals(path.id()));
                 if (!alreadyPresent) {
                     this.paths.add(path);
                 }
             }
         }
 
-        private RuleCandidate toCandidate(KnownRuleRepository knownRules) {
-            double average = paths.stream().mapToInt(SuccessfulTransformationPath::scoreImprovement).average().orElse(0);
-            int maximum = paths.stream().mapToInt(SuccessfulTransformationPath::scoreImprovement).max().orElse(0);
-            boolean equivalenceVerified = paths.stream().allMatch(SuccessfulTransformationPath::equivalenceVerified);
+        private RuleCandidate toCandidate(
+            KnownRuleRepository knownRules
+        ) {
+            double average = paths.stream()
+                .mapToInt(SuccessfulTransformationPath::scoreImprovement)
+                .average()
+                .orElse(0);
+            int maximum = paths.stream()
+                .mapToInt(SuccessfulTransformationPath::scoreImprovement)
+                .max()
+                .orElse(0);
+            boolean equivalenceVerified = paths.stream()
+                .allMatch(
+                    SuccessfulTransformationPath::equivalenceVerified);
             List<String> supportingIds = paths.stream()
                 .map(SuccessfulTransformationPath::id)
-                .filter(id -> id != null && !id.isBlank())
                 .distinct()
                 .toList();
             return new RuleCandidate(
@@ -164,13 +297,13 @@ public class RuleCandidateMiner {
                 maximum,
                 equivalenceVerified,
                 true,
-                leftPattern.contains("A") || rightPattern.contains("A"),
+                leftPattern.contains("A")
+                    || rightPattern.contains("A"),
                 parameterRelations,
                 knownRules.statusFor(leftPattern, rightPattern),
                 proofStatus,
                 hash,
-                supportingIds
-            );
+                supportingIds);
         }
     }
 }
