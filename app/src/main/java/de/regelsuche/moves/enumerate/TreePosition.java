@@ -41,12 +41,12 @@ import java.util.stream.Collectors;
  *
  * <h3>Selection and replacement authority</h3>
  * <p>The position owns the shared iterative AST navigation used by ordinary
- * local rewrites and verifier-authorized nested transformations. Both
- * {@link #subtreeAt(Expr)} and {@link #replaceAt(Expr, Expr)} return typed
- * outcomes that distinguish an invalid path from a valid path whose occurrence
- * is absent. They operate on AST objects rather than rendered text. Replacement
- * rebuilds only the selected ancestor chain and preserves every untouched sibling
- * by object identity.</p>
+ * local rewrites and verifier-authorized nested transformations.
+ * {@link #selectAt(Expr)} and {@link #replaceAt(Expr, Expr)} return typed outcomes
+ * that distinguish an invalid path from a valid path whose occurrence is absent.
+ * They operate on AST objects rather than rendered text. Replacement rebuilds
+ * only the selected ancestor chain and preserves every untouched sibling by
+ * object identity.</p>
  */
 public record TreePosition(List<Integer> path, String text) implements Comparable<TreePosition> {
 
@@ -89,11 +89,19 @@ public record TreePosition(List<Integer> path, String text) implements Comparabl
      * @param root complete expression tree
      * @return a typed success or failure result; invalid and absent paths remain distinct
      */
-    public SelectionResult subtreeAt(Expr root) {
+    public SelectionResult selectAt(Expr root) {
         Navigation navigation = navigate(root);
         return navigation.status() == Status.SELECTED
                 ? SelectionResult.selected(path, navigation.selected())
                 : SelectionResult.failure(navigation.status(), path);
+    }
+
+    /**
+     * Convenience view for callers that need only the selected subtree. Use
+     * {@link #selectAt(Expr)} whenever the failure category is authoritative.
+     */
+    public Optional<Expr> subtreeAt(Expr root) {
+        return selectAt(root).selectedSubtree();
     }
 
     /**

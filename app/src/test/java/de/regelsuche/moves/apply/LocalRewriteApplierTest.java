@@ -194,7 +194,7 @@ class LocalRewriteApplierTest {
         Expr replacement = new VariableExpr("y");
         TreePosition position = new TreePosition(List.of(), "x + 1");
 
-        TreePosition.SelectionResult selection = position.subtreeAt(root);
+        TreePosition.SelectionResult selection = position.selectAt(root);
         TreePosition.ReplacementResult result = position.replaceAt(root, replacement);
 
         assertTrue(selection.success());
@@ -235,9 +235,9 @@ class LocalRewriteApplierTest {
         TreePosition invalidBinaryPosition = new TreePosition(List.of(2), "invalid");
         TreePosition missingPosition = new TreePosition(List.of(0, 0), "missing");
 
-        TreePosition.SelectionResult negativeSelection = negativePosition.subtreeAt(root);
-        TreePosition.SelectionResult invalidSelection = invalidBinaryPosition.subtreeAt(root);
-        TreePosition.SelectionResult missingSelection = missingPosition.subtreeAt(root);
+        TreePosition.SelectionResult negativeSelection = negativePosition.selectAt(root);
+        TreePosition.SelectionResult invalidSelection = invalidBinaryPosition.selectAt(root);
+        TreePosition.SelectionResult missingSelection = missingPosition.selectAt(root);
         TreePosition.ReplacementResult invalidReplacement =
                 invalidBinaryPosition.replaceAt(root, replacement);
         TreePosition.ReplacementResult missingReplacement =
@@ -269,7 +269,7 @@ class LocalRewriteApplierTest {
 
         TreePosition.ReplacementResult result = position.replaceAt(root, replacement);
         TreePosition.SelectionResult replayed =
-                position.subtreeAt(result.rewrittenRoot().orElseThrow());
+                position.selectAt(result.rewrittenRoot().orElseThrow());
 
         assertTrue(result.success());
         assertEquals(depth, result.copiedAncestors());

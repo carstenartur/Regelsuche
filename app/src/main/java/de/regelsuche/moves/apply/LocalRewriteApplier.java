@@ -141,7 +141,7 @@ public final class LocalRewriteApplier {
             String rootExpression,
             TreePosition position,
             List<CandidateMove> source) {
-        TreePosition.SelectionResult selection = position.subtreeAt(root);
+        TreePosition.SelectionResult selection = position.selectAt(root);
         if (!selection.success()) {
             return failure(
                     rootExpression,
