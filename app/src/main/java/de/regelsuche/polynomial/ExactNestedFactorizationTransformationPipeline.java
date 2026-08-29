@@ -131,11 +131,6 @@ public final class ExactNestedFactorizationTransformationPipeline {
         OptionalInt candidateIndex
     ) {
         requireAttemptInputs(root, position, engine);
-        Optional<Result> positionFailure = validatePosition(position);
-        if (positionFailure.isPresent()) {
-            return positionFailure.orElseThrow();
-        }
-
         Outcome<PreflightContext> preflight = preflight(root, position);
         if (preflight.failed()) {
             return preflight.failureOrThrow();
@@ -169,29 +164,45 @@ public final class ExactNestedFactorizationTransformationPipeline {
         }
     }
 
-    private Optional<Result> validatePosition(TreePosition position) {
-        if (position.path().stream().anyMatch(
-                index -> index == null || index < 0)) {
-            return Optional.of(emptyFailure(
-                Status.UNSUPPORTED,
-                "INVALID_TREE_POSITION_PATH",
-                position));
-        }
-        if (position.path().size() > policy.maxPathDepth()) {
-            return Optional.of(emptyFailure(
-                Status.BUDGET_INCONCLUSIVE,
-                "MAX_NESTED_PATH_DEPTH_EXCEEDED",
-                position));
-        }
-        return Optional.empty();
-    }
-
     private Outcome<PreflightContext> preflight(
         ExactParsedTerm root,
         TreePosition position
     ) {
         Work work = new Work(policy.maxTotalWorkUnits());
+        if (position.path().size() > policy.maxPathDepth()) {
+            return Outcome.failure(failure(
+                Status.BUDGET_INCONCLUSIVE,
+                "MAX_NESTED_PATH_DEPTH_EXCEEDED",
+                position,
+                work.ledger()));
+        }
         try {
+            TreePosition.SelectionResult selection = position.selectAt(
+                root.expression());
+            work.consume(
+                "nested.position-preflight-path-navigation",
+                position.path().size());
+            switch (selection.status()) {
+                case SELECTED -> {
+                    // The shared TreePosition authority accepted this path.
+                }
+                case INVALID_PATH -> {
+                    return Outcome.failure(failure(
+                        Status.UNSUPPORTED,
+                        "INVALID_TREE_POSITION_PATH",
+                        position,
+                        work.ledger()));
+                }
+                case POSITION_NOT_PRESENT -> {
+                    return Outcome.failure(failure(
+                        Status.POSITION_NOT_PRESENT,
+                        "SELECTED_PATH_IS_NOT_PRESENT",
+                        position,
+                        work.ledger()));
+                }
+                case REPLACED -> throw invariant(
+                    "TREE_POSITION_SELECTION_RETURNED_REPLACED_STATUS");
+            }
             countNodes(
                 root.expression(),
                 policy.maxRootNodes(),

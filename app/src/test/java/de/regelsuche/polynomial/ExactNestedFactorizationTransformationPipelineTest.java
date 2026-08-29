@@ -201,7 +201,7 @@ class ExactNestedFactorizationTransformationPipelineTest {
     }
 
     @Test
-    void invalidChildIndexDoesNotReachTheProjector() {
+    void negativeChildIndexDoesNotReachTheProjector() {
         ExactParsedTerm root = parser.parseExactTerm("x^2 - 1");
         TreePosition invalid = new TreePosition(
             List.of(-1),
@@ -212,10 +212,68 @@ class ExactNestedFactorizationTransformationPipelineTest {
             invalid,
             NativeUnivariateFactorizationEngine.boundedRationals());
 
+        assertInvalidBeforeProjection(result, 1);
+    }
+
+    @Test
+    void outOfRangeBinaryChildIndexDoesNotReachTheProjector() {
+        ExactParsedTerm root = parser.parseExactTerm("x + 1");
+        TreePosition invalid = new TreePosition(
+            List.of(2),
+            "unused");
+
+        var result = pipeline.transform(
+            root,
+            invalid,
+            NativeUnivariateFactorizationEngine.boundedRationals());
+
+        assertInvalidBeforeProjection(result, 1);
+    }
+
+    @Test
+    void descentPastLeafRemainsDistinctFromAnInvalidPath() {
+        ExactParsedTerm root = parser.parseExactTerm("x + 1");
+        TreePosition missing = new TreePosition(
+            List.of(0, 0),
+            "x");
+
+        var result = pipeline.transform(
+            root,
+            missing,
+            NativeUnivariateFactorizationEngine.boundedRationals());
+
+        assertEquals(
+            ExactNestedFactorizationTransformationPipeline.Status
+                .POSITION_NOT_PRESENT,
+            result.status());
+        assertEquals("SELECTED_PATH_IS_NOT_PRESENT", result.detailCode());
+        assertTrue(result.projection().isEmpty());
+        assertEquals(
+            2,
+            result.totalWork().units(
+                "nested.position-preflight-path-navigation"));
+        assertEquals(
+            0,
+            result.totalWork().units(
+                "nested.root-preflight-node-visits"));
+    }
+
+    private static void assertInvalidBeforeProjection(
+        ExactNestedFactorizationTransformationPipeline.Result result,
+        long pathLength
+    ) {
         assertEquals(
             ExactNestedFactorizationTransformationPipeline.Status.UNSUPPORTED,
             result.status());
         assertEquals("INVALID_TREE_POSITION_PATH", result.detailCode());
         assertTrue(result.projection().isEmpty());
+        assertEquals(
+            pathLength,
+            result.totalWork().units(
+                "nested.position-preflight-path-navigation"));
+        assertEquals(
+            0,
+            result.totalWork().units(
+                "nested.root-preflight-node-visits"));
     }
 }
