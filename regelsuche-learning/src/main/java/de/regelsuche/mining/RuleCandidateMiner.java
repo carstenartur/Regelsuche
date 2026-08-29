@@ -64,7 +64,7 @@ public class RuleCandidateMiner {
         List<SuccessfulTransformationPath> paths,
         DiscoverySettings settings
     ) {
-        List<SucccessfulTransformationPath> checkedPaths = List.copyOf(
+        List<SuccessfulTransformationPath> checkedPaths = List.copyOf(
             Objects.requireNonNull(paths, "paths"));
         DiscoverySettings effective = settings == null
             ? DiscoverySettings.defaults()
@@ -86,7 +86,7 @@ public class RuleCandidateMiner {
             if (!checked.rules().isEmpty()) {
                 clusters.computeIfAbsent(
                     "rules:" + String.join(">", checked.rules()),
-                    key -> new ArrayList<>()).add(checed);
+                    key -> new ArrayList<>()).add(checked);
             }
         }
 
