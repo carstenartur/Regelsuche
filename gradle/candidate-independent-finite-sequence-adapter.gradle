@@ -1,7 +1,7 @@
 def finiteAdapterRepositoryRoot = layout.projectDirectory
 def finiteAdapterRepositoryRootPath = finiteAdapterRepositoryRoot.asFile.absolutePath
 def finiteAdapterReleaseProject = project(':regelsuche-release')
-def finiteAdapterRuntimeClasspath = providers.provider {
+def finiteAdapterRuntimeClasspath = finiteAdapterReleaseProject.providers.provider {
     finiteAdapterReleaseProject.extensions
         .getByType(org.gradle.api.tasks.SourceSetContainer)
         .named('main').get().runtimeClasspath
@@ -35,9 +35,9 @@ def finiteAdapterVerificationPython = finiteAdapterVerificationVenv.map { direct
 def configureFiniteAdapterRun = { task, outputFile ->
     task.group = 'verification'
     task.description = 'Executes the available finite-difference form against the frozen candidate-independent corpus.'
-    task.dependsOn ':regelsuche-release:classes',
-        'verifyCandidateIndependentCaseCorpus'
-    task.classpath = files(finiteAdapterRuntimeClasspath)
+    task.dependsOn 'classes', ':verifyCandidateIndependentCaseCorpus'
+    task.classpath = finiteAdapterReleaseProject.files(
+        finiteAdapterRuntimeClasspath)
     task.mainClass = 'de.regelsuche.release.CandidateIndependentFiniteSequenceAdapterMain'
     task.inputs.file finiteAdapterCorpus
     task.inputs.file finiteAdapterProfile
@@ -55,18 +55,36 @@ def configureFiniteAdapterRun = { task, outputFile ->
     }
 }
 
+def runCandidateIndependentFiniteSequenceAdapterFirstAuthority =
+    finiteAdapterReleaseProject.tasks.register(
+        'runCandidateIndependentFiniteSequenceAdapterFirst',
+        JavaExec
+    ) {
+        configureFiniteAdapterRun(delegate, finiteAdapterFirst)
+    }
+
+def runCandidateIndependentFiniteSequenceAdapterSecondAuthority =
+    finiteAdapterReleaseProject.tasks.register(
+        'runCandidateIndependentFiniteSequenceAdapterSecond',
+        JavaExec
+    ) {
+        configureFiniteAdapterRun(delegate, finiteAdapterSecond)
+    }
+
 def runCandidateIndependentFiniteSequenceAdapterFirst = tasks.register(
-    'runCandidateIndependentFiniteSequenceAdapterFirst',
-    JavaExec
+    'runCandidateIndependentFiniteSequenceAdapterFirst'
 ) {
-    configureFiniteAdapterRun(delegate, finiteAdapterFirst)
+    group = 'verification'
+    description = 'Compatibility aggregate for the release-owned first finite-sequence adapter execution.'
+    dependsOn runCandidateIndependentFiniteSequenceAdapterFirstAuthority
 }
 
 def runCandidateIndependentFiniteSequenceAdapterSecond = tasks.register(
-    'runCandidateIndependentFiniteSequenceAdapterSecond',
-    JavaExec
+    'runCandidateIndependentFiniteSequenceAdapterSecond'
 ) {
-    configureFiniteAdapterRun(delegate, finiteAdapterSecond)
+    group = 'verification'
+    description = 'Compatibility aggregate for the release-owned second finite-sequence adapter execution.'
+    dependsOn runCandidateIndependentFiniteSequenceAdapterSecondAuthority
 }
 
 def verifyCandidateIndependentFiniteSequenceAdapter = tasks.register(

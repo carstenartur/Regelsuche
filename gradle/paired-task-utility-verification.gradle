@@ -1,6 +1,6 @@
 def pairedUtilityRoot = rootProject.layout.projectDirectory
 def pairedUtilityAppProject = project(':app')
-def pairedUtilityRuntimeClasspath = providers.provider {
+def pairedUtilityRuntimeClasspath = pairedUtilityAppProject.providers.provider {
     pairedUtilityAppProject.extensions
         .getByType(org.gradle.api.tasks.SourceSetContainer)
         .named('main').get().runtimeClasspath
@@ -68,8 +68,9 @@ def pairedUtilityPython = layout.buildDirectory.dir(
 def configurePairedUtilityExecution = { task, outputFile ->
     task.group = 'verification'
     task.description = 'Executes the frozen stream with baseline plus exactly one TRAIN-selected candidate.'
-    task.dependsOn ':app:classes', 'verifyDownstreamTaskStream'
-    task.classpath = files(pairedUtilityRuntimeClasspath)
+    task.dependsOn 'classes', ':verifyDownstreamTaskStream'
+    task.classpath = pairedUtilityAppProject.files(
+        pairedUtilityRuntimeClasspath)
     task.mainClass =
         'de.regelsuche.benchmark.CandidateIndependentExactOneMacroEvaluationMain'
     task.inputs.file pairedUtilityBenchmarkSource
@@ -117,16 +118,34 @@ def configurePairedUtilityCanonicalization = {
     }
 }
 
+def executePairedTaskUtilityFirstRawAuthority =
+    pairedUtilityAppProject.tasks.register(
+        'executePairedTaskUtilityFirstRaw', JavaExec
+    ) {
+        configurePairedUtilityExecution(delegate, pairedUtilityFirstRaw)
+    }
+
+def executePairedTaskUtilitySecondRawAuthority =
+    pairedUtilityAppProject.tasks.register(
+        'executePairedTaskUtilitySecondRaw', JavaExec
+    ) {
+        configurePairedUtilityExecution(delegate, pairedUtilitySecondRaw)
+    }
+
 def executePairedTaskUtilityFirstRaw = tasks.register(
-    'executePairedTaskUtilityFirstRaw', JavaExec
+    'executePairedTaskUtilityFirstRaw'
 ) {
-    configurePairedUtilityExecution(delegate, pairedUtilityFirstRaw)
+    group = 'verification'
+    description = 'Compatibility aggregate for the app-owned first paired-utility execution.'
+    dependsOn executePairedTaskUtilityFirstRawAuthority
 }
 
 def executePairedTaskUtilitySecondRaw = tasks.register(
-    'executePairedTaskUtilitySecondRaw', JavaExec
+    'executePairedTaskUtilitySecondRaw'
 ) {
-    configurePairedUtilityExecution(delegate, pairedUtilitySecondRaw)
+    group = 'verification'
+    description = 'Compatibility aggregate for the app-owned second paired-utility execution.'
+    dependsOn executePairedTaskUtilitySecondRawAuthority
 }
 
 def runPairedTaskUtilityFirst = tasks.register(

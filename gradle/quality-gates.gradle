@@ -15,6 +15,18 @@ def qualityVerificationPython = providers.provider {
     new File(qualityVerificationVenv.get().asFile, executable)
 }
 
+// The loaded project-parallel authority cannot own the isolated SymPy JaCoCo
+// report. Defer only the final repository-wide decision when both workflow
+// delegation inputs are present; default local ciCheck remains complete.
+def separateSympyRuntimeCoverageAuthority = providers.gradleProperty(
+    'separateSympyRuntimeAuthority'
+).map { value -> value == 'true' }.getOrElse(false)
+def separateSympyRuntimeCoverageAuthorization =
+    System.getenv('REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY')
+def deferCoverageToWorkflowConvergence =
+    separateSympyRuntimeCoverageAuthority &&
+        separateSympyRuntimeCoverageAuthorization == 'required-by-workflow'
+
 def verifyCoverageRegression = tasks.register('verifyCoverageRegression', Exec) {
     group = 'verification'
     description = 'Fails when aggregate/module JaCoCo floors regress or a covered module disappears.'
@@ -26,6 +38,9 @@ def verifyCoverageRegression = tasks.register('verifyCoverageRegression', Exec) 
     outputs.file layout.buildDirectory.file('reports/quality/coverage-report.json')
     outputs.file layout.buildDirectory.file('reports/quality/coverage-report.md')
     outputs.upToDateWhen { false }
+    onlyIf {
+        !deferCoverageToWorkflowConvergence
+    }
     doFirst {
         commandLine qualityVerificationPython.get().absolutePath,
             'scripts/verify-coverage-regression.py',

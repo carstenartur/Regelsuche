@@ -1,0 +1,66 @@
+/*
+ * Isolated JMH authority for CI critical-path reduction.
+ *
+ * The ordinary ciCheck graph keeps every benchmark dependency by default. CI
+ * may set -PseparateJmhAuthority=true only when a separately required job runs
+ * the jmhAuthority task from a fresh checkout. In that mode this script detaches
+ * the exact benchmark execution/validator graphs from ciCheck; their complete
+ * unchanged graph is executed by jmhAuthority on an otherwise idle runner.
+ */
+
+def separateJmhAuthority = providers.gradleProperty(
+    'separateJmhAuthority').map { value -> value == 'true' }.getOrElse(false)
+
+def rootJmhTaskNames = [
+    'verifyJmhRegression',
+    'verifyJmhBenchmark',
+    'runJmhAllocationBenchmark',
+    'verifyJmhAllocationBenchmark'
+] as Set
+
+def appJmhTaskNames = ['jmh'] as Set
+def sympyJmhTaskNames = [
+    'jmh',
+    'verifySymPyFactorizationBenchmark'
+] as Set
+
+if (separateJmhAuthority) {
+    // Run after every project has declared its task dependencies. Merely
+    // disabling a terminal task still schedules its prerequisites in Gradle;
+    // clearing these exact edges avoids compiling and packaging the complete
+    // benchmark graph twice while the required idle-runner authority remains.
+    gradle.projectsEvaluated {
+        tasks.matching { task -> rootJmhTaskNames.contains(task.name) }
+            .configureEach {
+                enabled = false
+                setDependsOn([])
+            }
+        project(':app').tasks.matching { task ->
+            appJmhTaskNames.contains(task.name)
+        }.configureEach {
+            enabled = false
+            setDependsOn([])
+        }
+        project(':regelsuche-math-sympy').tasks.matching { task ->
+            sympyJmhTaskNames.contains(task.name)
+        }.configureEach {
+            enabled = false
+            setDependsOn([])
+        }
+    }
+}
+
+tasks.register('jmhAuthority') {
+    group = 'verification'
+    description = 'Runs every JMH execution and its unchanged fail-closed validators on one isolated runner.'
+    dependsOn 'verifyJmhRegression',
+        'verifyJmhBenchmark',
+        'verifyJmhAllocationBenchmark',
+        ':regelsuche-math-sympy:verifySymPyFactorizationBenchmark'
+    doFirst {
+        if (separateJmhAuthority) {
+            throw new GradleException(
+                'jmhAuthority must run without -PseparateJmhAuthority=true')
+        }
+    }
+}
