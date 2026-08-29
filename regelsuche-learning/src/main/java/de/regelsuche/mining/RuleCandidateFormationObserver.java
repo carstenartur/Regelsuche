@@ -18,11 +18,6 @@ import java.util.Objects;
 public interface RuleCandidateFormationObserver {
     void onCandidateFormed(RuleCandidate candidate, Evidence evidence);
 
-    /** Observer used by the backward-compatible default miner constructors. */
-    static RuleCandidateFormationObserver none() {
-        return (candidate, evidence) -> { };
-    }
-
     /**
      * Formation evidence retained independently from any later theory
      * classification, cache decision, novelty decision or promotion policy.
@@ -71,26 +66,6 @@ public interface RuleCandidateFormationObserver {
                 sourceProvenance,
                 assumptions,
                 validationEvidence);
-        }
-
-        public Evidence merge(Evidence other) {
-            Objects.requireNonNull(other, "other");
-            return new Evidence(
-                concatenated(appliedRuleIds, other.appliedRuleIds),
-                concatenated(sourceProvenance, other.sourceProvenance),
-                concatenated(assumptions, other.assumptions),
-                concatenated(validationEvidence, other.validationEvidence));
-        }
-
-        private static List<String> concatenated(
-            List<String> first,
-            List<String> second
-        ) {
-            List<String> result = new ArrayList<>(
-                first.size() + second.size());
-            result.addAll(first);
-            result.addAll(second);
-            return result;
         }
 
         private static List<String> normalized(

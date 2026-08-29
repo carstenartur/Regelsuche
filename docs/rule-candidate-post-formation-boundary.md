@@ -8,10 +8,11 @@ fully formed and before the public mining call returns it. A configured
 formation evidence that produced it.
 
 This is an integration seam, not a classification or promotion policy. The
-default constructors use `RuleCandidateFormationObserver.none()` and therefore
-preserve the previous product behavior. A later polynomial-theory integration
-must inject its observer explicitly until the general exact classifier has
-replaced the historical quartic classifier.
+default constructors use a private identity-stable no-op observer and therefore
+preserve the previous product behavior without constructing unused strict
+evidence. A later polynomial-theory integration must inject its observer
+explicitly until the general exact classifier has replaced the historical
+quartic classifier.
 
 ## Evidence
 
@@ -22,8 +23,10 @@ The observer receives four independent evidence axes:
 - normalized assumptions;
 - equivalence/validation evidence retained by the source paths.
 
-The evidence is immutable, de-duplicated in encounter order and never written
-back into the candidate. It remains separate from theory subsumption, project
+For a configured observer, the evidence is immutable, rejects blank entries,
+is de-duplicated in encounter order and is never written back into the candidate.
+The default no-op boundary does not impose these additional evidence checks on
+historic mining calls. Evidence remains separate from theory subsumption, project
 inventory novelty, external novelty, cache utility and promotion status.
 
 ## Exactly-once boundary

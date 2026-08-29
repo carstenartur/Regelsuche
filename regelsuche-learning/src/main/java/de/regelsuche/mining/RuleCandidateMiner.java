@@ -11,6 +11,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 public class RuleCandidateMiner {
+    private static final RuleCandidateFormationObserver NO_FORMATION_OBSERVER =
+        (candidate, evidence) -> { };
+
     private final KnownRuleRepository knownRules;
     private final PatternGeneralizer patternGeneralizer;
     private final CandidateValidator validator;
@@ -20,7 +23,7 @@ public class RuleCandidateMiner {
         this(
             knownRules,
             new SymPyEquivalenceService(),
-            RuleCandidateFormationObserver.none());
+            NO_FORMATION_OBSERVER);
     }
 
     public RuleCandidateMiner(
@@ -30,7 +33,7 @@ public class RuleCandidateMiner {
         this(
             knownRules,
             equivalenceService,
-            RuleCandidateFormationObserver.none());
+            NO_FORMATION_OBSERVER);
     }
 
     public RuleCandidateMiner(
@@ -51,11 +54,6 @@ public class RuleCandidateMiner {
             "formationObserver");
     }
 
-    /** The configured post-formation boundary used by this miner. */
-    public RuleCandidateFormationObserver formationObserver() {
-        return formationObserver;
-    }
-
     public List<RuleCandidate> mine(
         List<SuccessfulTransformationPath> paths
     ) {
@@ -66,7 +64,7 @@ public class RuleCandidateMiner {
         List<SuccessfulTransformationPath> paths,
         DiscoverySettings settings
     ) {
-        List<SuccessfulTransformationPath> checkedPaths = List.copyOf(
+        List<SucccessfulTransformationPath> checkedPaths = List.copyOf(
             Objects.requireNonNull(paths, "paths"));
         DiscoverySettings effective = settings == null
             ? DiscoverySettings.defaults()
@@ -88,7 +86,7 @@ public class RuleCandidateMiner {
             if (!checked.rules().isEmpty()) {
                 clusters.computeIfAbsent(
                     "rules:" + String.join(">", checked.rules()),
-                    key -> new ArrayList<>()).add(checked);
+                    key -> new ArrayList<>()).add(checed);
             }
         }
 
@@ -125,10 +123,7 @@ public class RuleCandidateMiner {
                 continue;
             }
             RuleCandidate candidate = bucket.toCandidate(knownRules);
-            formationObserver.onCandidateFormed(
-                candidate,
-                RuleCandidateFormationObserver.Evidence.fromPaths(
-                    bucket.paths));
+            observe(candidate, bucket.paths);
             result.add(candidate);
         }
         return List.copyOf(result);
@@ -138,9 +133,7 @@ public class RuleCandidateMiner {
         SuccessfulTransformationPath path
     ) {
         return formFromSinglePath(path).map(formed -> {
-            formationObserver.onCandidateFormed(
-                formed.candidate(),
-                formed.evidence());
+            observe(formed.candidate(), formed.sourcePaths());
             return formed.candidate();
         });
     }
@@ -162,12 +155,22 @@ public class RuleCandidateMiner {
         List<RuleCandidate> result = new ArrayList<>(
             deduplicated.size());
         for (FormedCandidate formed : deduplicated.values()) {
-            formationObserver.onCandidateFormed(
-                formed.candidate(),
-                formed.evidence());
+            observe(formed.candidate(), formed.sourcePaths());
             result.add(formed.candidate());
         }
         return List.copyOf(result);
+    }
+
+    private void observe(
+        RuleCandidate candidate,
+        List<SuccessfulTransformationPath> sourcePaths
+    ) {
+        if (formationObserver == NO_FORMATION_OBSERVER) {
+            return;
+        }
+        formationObserver.onCandidateFormed(
+            candidate,
+            RuleCandidateFormationObserver.Evidence.fromPaths(sourcePaths));
     }
 
     private Optional<FormedCandidate> formFromSinglePath(
@@ -183,8 +186,7 @@ public class RuleCandidateMiner {
             .filter(validator::validate)
             .map(pattern -> new FormedCandidate(
                 toSinglePathCandidate(path, pattern),
-                RuleCandidateFormationObserver.Evidence.fromPaths(
-                    List.of(path))))
+                List.of(path)))
             .filter(formed ->
                 formed.candidate().status() == RuleStatus.NEW);
     }
@@ -217,11 +219,12 @@ public class RuleCandidateMiner {
 
     private record FormedCandidate(
         RuleCandidate candidate,
-        RuleCandidateFormationObserver.Evidence evidence
+        List<SuccessfulTransformationPath> sourcePaths
     ) {
         private FormedCandidate {
             candidate = Objects.requireNonNull(candidate, "candidate");
-            evidence = Objects.requireNonNull(evidence, "evidence");
+            sourcePaths = List.copyOf(
+                Objects.requireNonNull(sourcePaths, "sourcePaths"));
         }
 
         private FormedCandidate merge(FormedCandidate other) {
@@ -231,9 +234,11 @@ public class RuleCandidateMiner {
                 throw new IllegalArgumentException(
                     "cannot merge different formed candidates");
             }
-            return new FormedCandidate(
-                candidate,
-                evidence.merge(other.evidence));
+            List<SuccessfulTransformationPath> merged = new ArrayList<>(
+                sourcePaths.size() + other.sourcePaths.size());
+            merged.addAll(sourcePaths);
+            merged.addAll(other.sourcePaths);
+            return new FormedCandidate(candidate, merged);
         }
     }
 
@@ -264,7 +269,8 @@ public class RuleCandidateMiner {
             for (SuccessfulTransformationPath path : paths) {
                 boolean alreadyPresent = this.paths.stream()
                     .anyMatch(existing ->
-                        existing.id().equals(path.id()));
+                        existing.id() != null
+                            && existing.id().equals(path.id()));
                 if (!alreadyPresent) {
                     this.paths.add(path);
                 }
@@ -287,6 +293,7 @@ public class RuleCandidateMiner {
                     SuccessfulTransformationPath::equivalenceVerified);
             List<String> supportingIds = paths.stream()
                 .map(SuccessfulTransformationPath::id)
+                .filter(id -> id != null && !id.isBlank())
                 .distinct()
                 .toList();
             return new RuleCandidate(

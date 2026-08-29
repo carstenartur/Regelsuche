@@ -120,6 +120,37 @@ class RuleCandidateMinerFormationRoutingTest {
     }
 
     @Test
+    void defaultNoOpDoesNotImposeUnusedEvidenceValidation() {
+        RuleCandidateMiner miner = new RuleCandidateMiner(
+            new KnownRuleRepository(),
+            (left, right) -> true);
+
+        assertTrue(miner.mineFromSinglePathForValidatedSchema(path(
+            "path:no-op",
+            "x + 0",
+            "x",
+            "")).isPresent());
+    }
+
+    @Test
+    void configuredObserverRejectsBlankAppliedRuleEvidence() {
+        RecordingObserver observer = new RecordingObserver();
+        RuleCandidateMiner miner = new RuleCandidateMiner(
+            new KnownRuleRepository(),
+            (left, right) -> true,
+            observer);
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> miner.mineFromSinglePathForValidatedSchema(path(
+                "path:blank-rule",
+                "x + 0",
+                "x",
+                "")));
+        assertTrue(observer.calls.isEmpty());
+    }
+
+    @Test
     void configuredObserverFailureIsFailClosed() {
         RuleCandidateMiner miner = new RuleCandidateMiner(
             new KnownRuleRepository(),
