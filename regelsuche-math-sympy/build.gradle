@@ -149,6 +149,48 @@ tasks.named('jacocoTestReport') {
     }
 }
 
+// The embedded-runtime tests keep their original 20-second cold-start and
+// recovery assertions. Project-parallel CI runs them after the JMH measurement
+// on the same otherwise idle required runner, from a second fresh checkout.
+// Local `ciCheck` remains unchanged. The property is accepted only together
+// with the workflow-owned marker, so a caller cannot silently omit this graph.
+def separateSympyRuntimeAuthority = providers.gradleProperty(
+    'separateSympyRuntimeAuthority'
+).map { value -> value == 'true' }.getOrElse(false)
+def sympyRuntimeAuthorization =
+    System.getenv('REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY')
+def sympyRuntimeAuthorityAuthorized =
+    sympyRuntimeAuthorization == 'required-by-workflow'
+
+if (separateSympyRuntimeAuthority != sympyRuntimeAuthorityAuthorized) {
+    throw new GradleException(
+        'SymPy runtime separation requires both the project property and the workflow authorization marker')
+}
+
+if (separateSympyRuntimeAuthority) {
+    tasks.named('test').configure {
+        enabled = false
+    }
+    tasks.named('jacocoTestReport').configure {
+        enabled = false
+    }
+}
+
+tasks.register('sympyRuntimeAuthority') {
+    group = 'verification'
+    description = 'Runs the complete Gradle SymPy runtime test and JaCoCo graph on an isolated required runner.'
+    dependsOn tasks.named('jacocoTestReport')
+    doFirst {
+        if (separateSympyRuntimeAuthority
+                || sympyRuntimeAuthorization != null
+                || !tasks.named('test').get().enabled
+                || !tasks.named('jacocoTestReport').get().enabled) {
+            throw new GradleException(
+                'sympyRuntimeAuthority must execute the complete enabled test and JaCoCo graph without separation markers')
+        }
+    }
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport'),
         verifySymPyFactorizationBenchmark
