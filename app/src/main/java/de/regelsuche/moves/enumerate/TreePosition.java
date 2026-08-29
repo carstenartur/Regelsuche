@@ -1,7 +1,13 @@
 package de.regelsuche.moves.enumerate;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -32,6 +38,13 @@ import java.util.stream.Collectors;
  * advantage given that the text is cheap to produce at enumeration time and small
  * relative to the position record as a whole. If the formatter ever becomes
  * expensive, caching at the call site is preferable to removing the guard.</p>
+ *
+ * <h3>Selection and replacement authority</h3>
+ * <p>The position owns the shared iterative AST navigation used by ordinary
+ * local rewrites and verifier-authorized nested transformations. Both
+ * {@link #subtreeAt(Expr)} and {@link #replaceAt(Expr, Expr)} operate on AST
+ * objects rather than rendered text. Replacement rebuilds only the selected
+ * ancestor chain and preserves every untouched sibling by object identity.</p>
  */
 public record TreePosition(List<Integer> path, String text) implements Comparable<TreePosition> {
 
@@ -68,9 +81,95 @@ public record TreePosition(List<Integer> path, String text) implements Comparabl
                 .collect(Collectors.joining("."));
     }
 
+    /** Returns the concrete subtree at this path, or empty for an invalid or absent path. */
+    public Optional<Expr> subtreeAt(Expr root) {
+        Navigation navigation = navigate(root);
+        return navigation.status() == Status.SELECTED
+                ? Optional.of(navigation.selected())
+                : Optional.empty();
+    }
+
+    /**
+     * Replaces this occurrence and rebuilds only its ancestor chain. Untouched
+     * siblings retain their original object identity.
+     *
+     * @param root complete expression tree
+     * @param replacement subtree to install at this position
+     * @return a typed success or failure result; invalid and absent paths remain distinct
+     */
+    public ReplacementResult replaceAt(Expr root, Expr replacement) {
+        Objects.requireNonNull(replacement, "replacement");
+        Navigation navigation = navigate(root);
+        if (navigation.status() != Status.SELECTED) {
+            return ReplacementResult.failure(navigation.status(), path);
+        }
+
+        Expr rewritten = replacement;
+        List<ParentFrame> parents = navigation.parents();
+        for (int index = parents.size() - 1; index >= 0; index--) {
+            ParentFrame frame = parents.get(index);
+            rewritten = rebuildParent(frame.parent(), frame.childIndex(), rewritten);
+        }
+        return ReplacementResult.replaced(
+                path,
+                navigation.selected(),
+                rewritten,
+                parents.size());
+    }
+
     @Override
     public int compareTo(TreePosition other) {
         return CANONICAL_ORDER.compare(this, other);
+    }
+
+    private Navigation navigate(Expr root) {
+        if (root == null || path.stream().anyMatch(index -> index < 0)) {
+            return Navigation.failure(Status.INVALID_PATH, path);
+        }
+
+        Expr current = root;
+        List<ParentFrame> parents = new ArrayList<>(path.size());
+        for (int childIndex : path) {
+            Expr child = childAt(current, childIndex);
+            if (child == null) {
+                return Navigation.failure(Status.POSITION_NOT_PRESENT, path);
+            }
+            parents.add(new ParentFrame(current, childIndex));
+            current = child;
+        }
+        return Navigation.selected(path, current, parents);
+    }
+
+    private static Expr childAt(Expr expression, int childIndex) {
+        if (expression instanceof BinaryExpr binary) {
+            return switch (childIndex) {
+                case 0 -> binary.left();
+                case 1 -> binary.right();
+                default -> null;
+            };
+        }
+        if (expression instanceof FunctionExpr function
+                && childIndex < function.arguments().size()) {
+            return function.arguments().get(childIndex);
+        }
+        return null;
+    }
+
+    private static Expr rebuildParent(Expr parent, int childIndex, Expr rewrittenChild) {
+        if (parent instanceof BinaryExpr binary) {
+            return switch (childIndex) {
+                case 0 -> new BinaryExpr(rewrittenChild, binary.operator(), binary.right());
+                case 1 -> new BinaryExpr(binary.left(), binary.operator(), rewrittenChild);
+                default -> throw new IllegalStateException(
+                        "validated binary path became invalid");
+            };
+        }
+        if (parent instanceof FunctionExpr function) {
+            List<Expr> arguments = new ArrayList<>(function.arguments());
+            arguments.set(childIndex, rewrittenChild);
+            return new FunctionExpr(function.name(), arguments);
+        }
+        throw new IllegalStateException("validated path parent is not traversable");
     }
 
     private static int comparePaths(List<Integer> a, List<Integer> b) {
@@ -82,5 +181,115 @@ public record TreePosition(List<Integer> path, String text) implements Comparabl
             }
         }
         return Integer.compare(a.size(), b.size());
+    }
+
+    /** Outcome categories shared by iterative selection and replacement. */
+    public enum Status {
+        SELECTED,
+        REPLACED,
+        INVALID_PATH,
+        POSITION_NOT_PRESENT
+    }
+
+    /**
+     * Typed replacement outcome. A successful result exposes both the selected
+     * original subtree and the rewritten root; failures expose neither.
+     */
+    public record ReplacementResult(
+            Status status,
+            List<Integer> path,
+            Optional<Expr> selectedSubtree,
+            Optional<Expr> rewrittenRoot,
+            int copiedAncestors) {
+        public ReplacementResult {
+            status = Objects.requireNonNull(status, "status");
+            path = List.copyOf(path);
+            selectedSubtree = Objects.requireNonNull(selectedSubtree, "selectedSubtree");
+            rewrittenRoot = Objects.requireNonNull(rewrittenRoot, "rewrittenRoot");
+            if (copiedAncestors < 0) {
+                throw new IllegalArgumentException("copied ancestor count must not be negative");
+            }
+            boolean replaced = status == Status.REPLACED;
+            if (replaced != selectedSubtree.isPresent()
+                    || replaced != rewrittenRoot.isPresent()
+                    || !replaced && copiedAncestors != 0) {
+                throw new IllegalArgumentException("tree replacement status/payload mismatch");
+            }
+        }
+
+        private static ReplacementResult replaced(
+                List<Integer> path,
+                Expr selectedSubtree,
+                Expr rewrittenRoot,
+                int copiedAncestors) {
+            return new ReplacementResult(
+                    Status.REPLACED,
+                    path,
+                    Optional.of(selectedSubtree),
+                    Optional.of(rewrittenRoot),
+                    copiedAncestors);
+        }
+
+        private static ReplacementResult failure(Status status, List<Integer> path) {
+            if (status == Status.SELECTED || status == Status.REPLACED) {
+                throw new IllegalArgumentException(
+                        "successful status cannot describe replacement failure");
+            }
+            return new ReplacementResult(
+                    status,
+                    path,
+                    Optional.empty(),
+                    Optional.empty(),
+                    0);
+        }
+
+        public boolean success() {
+            return status == Status.REPLACED;
+        }
+    }
+
+    private record ParentFrame(Expr parent, int childIndex) {
+        private ParentFrame {
+            Objects.requireNonNull(parent, "parent");
+            if (childIndex < 0) {
+                throw new IllegalArgumentException("child index must not be negative");
+            }
+        }
+    }
+
+    private record Navigation(
+            Status status,
+            List<Integer> path,
+            Expr selected,
+            List<ParentFrame> parents) {
+        private Navigation {
+            status = Objects.requireNonNull(status, "status");
+            path = List.copyOf(path);
+            parents = List.copyOf(parents);
+            if ((status == Status.SELECTED) != (selected != null)
+                    || status == Status.SELECTED && parents.size() != path.size()
+                    || status != Status.SELECTED && !parents.isEmpty()) {
+                throw new IllegalArgumentException("tree navigation status/payload mismatch");
+            }
+        }
+
+        private static Navigation selected(
+                List<Integer> path,
+                Expr selected,
+                List<ParentFrame> parents) {
+            return new Navigation(
+                    Status.SELECTED,
+                    path,
+                    Objects.requireNonNull(selected, "selected"),
+                    parents);
+        }
+
+        private static Navigation failure(Status status, List<Integer> path) {
+            if (status == Status.SELECTED || status == Status.REPLACED) {
+                throw new IllegalArgumentException(
+                        "successful status cannot describe navigation failure");
+            }
+            return new Navigation(status, path, null, List.of());
+        }
     }
 }
