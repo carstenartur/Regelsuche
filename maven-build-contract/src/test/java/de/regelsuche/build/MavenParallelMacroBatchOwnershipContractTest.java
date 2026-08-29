@@ -25,7 +25,7 @@ class MavenParallelMacroBatchOwnershipContractTest {
     assertEquals(2, occurrences(
         script,
         "macroBatchAppProject.tasks.register("),
-        "both JavaExec producers must be owned by :app");
+        "both JavaExec authorities must be owned by :app");
     assertTrue(script.contains(
         "'executeCandidateIndependentReusableMacroBatchFirstRaw',\n"
             + "        JavaExec"));
@@ -46,10 +46,25 @@ class MavenParallelMacroBatchOwnershipContractTest {
     assertFalse(script.contains(
         "task.dependsOn ':app:classes'"),
         "an app-owned task must depend on its local classes task");
-    assertFalse(script.contains(
-        "tasks.register(\n"
-            + "    'executeCandidateIndependentReusableMacroBatch"),
-        "the root project must not own JavaExec tasks that resolve :app runtimeClasspath");
+
+    String firstAlias = section(
+        script,
+        "def executeCandidateIndependentReusableMacroBatchFirstRaw = "
+            + "tasks.register(",
+        "def executeCandidateIndependentReusableMacroBatchSecondRaw = "
+            + "tasks.register(");
+    String secondAlias = section(
+        script,
+        "def executeCandidateIndependentReusableMacroBatchSecondRaw = "
+            + "tasks.register(",
+        "def runCandidateIndependentReusableMacroBatchFirst = "
+            + "tasks.register(");
+    assertFalse(firstAlias.contains("JavaExec"));
+    assertFalse(secondAlias.contains("JavaExec"));
+    assertTrue(firstAlias.contains(
+        "dependsOn executeCandidateIndependentReusableMacroBatchFirstRawAuthority"));
+    assertTrue(secondAlias.contains(
+        "dependsOn executeCandidateIndependentReusableMacroBatchSecondRawAuthority"));
 
     assertTrue(script.contains(
         "tasks.register(\n"
@@ -63,6 +78,14 @@ class MavenParallelMacroBatchOwnershipContractTest {
     assertTrue(script.contains(
         "macroBatchVerifier.asFile.absolutePath"),
         "ownership repair must retain the independent verifier");
+  }
+
+  private static String section(String text, String start, String end) {
+    int from = text.indexOf(start);
+    assertTrue(from >= 0, () -> "missing section " + start);
+    int to = text.indexOf(end, from + start.length());
+    assertTrue(to > from, () -> "missing section " + end);
+    return text.substring(from, to);
   }
 
   private static int occurrences(String text, String value) {
