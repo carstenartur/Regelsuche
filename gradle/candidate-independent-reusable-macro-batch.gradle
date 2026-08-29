@@ -1,7 +1,7 @@
 def macroBatchRepositoryRoot = layout.projectDirectory
 def macroBatchRepositoryRootPath = macroBatchRepositoryRoot.asFile.absolutePath
 def macroBatchAppProject = project(':app')
-def macroBatchRuntimeClasspath = providers.provider {
+def macroBatchRuntimeClasspath = macroBatchAppProject.providers.provider {
     macroBatchAppProject.extensions
         .getByType(org.gradle.api.tasks.SourceSetContainer)
         .named('main').get().runtimeClasspath
@@ -49,8 +49,8 @@ def macroBatchVerificationPython = macroBatchVerificationVenv.map { directory ->
 def configureMacroBatchExecution = { task, outputFile ->
     task.group = 'verification'
     task.description = 'Executes four frozen reusable-macro formation and paired-utility campaigns into raw JSON.'
-    task.dependsOn ':app:classes', 'verifyCandidateIndependentCaseCorpus'
-    task.classpath = files(macroBatchRuntimeClasspath)
+    task.dependsOn 'classes', ':verifyCandidateIndependentCaseCorpus'
+    task.classpath = macroBatchAppProject.files(macroBatchRuntimeClasspath)
     task.mainClass = 'de.regelsuche.benchmark.CandidateIndependentReusableMacroBatchMain'
     task.inputs.file macroBatchBenchmarkSource
     task.inputs.file macroBatchCorpus
@@ -91,17 +91,21 @@ def configureMacroBatchCanonicalization = { task, rawFile, outputFile, execution
     }
 }
 
-def executeCandidateIndependentReusableMacroBatchFirstRaw = tasks.register(
-    'executeCandidateIndependentReusableMacroBatchFirstRaw', JavaExec
-) {
-    configureMacroBatchExecution(delegate, macroBatchFirstRaw)
-}
+def executeCandidateIndependentReusableMacroBatchFirstRaw =
+    macroBatchAppProject.tasks.register(
+        'executeCandidateIndependentReusableMacroBatchFirstRaw',
+        JavaExec
+    ) {
+        configureMacroBatchExecution(delegate, macroBatchFirstRaw)
+    }
 
-def executeCandidateIndependentReusableMacroBatchSecondRaw = tasks.register(
-    'executeCandidateIndependentReusableMacroBatchSecondRaw', JavaExec
-) {
-    configureMacroBatchExecution(delegate, macroBatchSecondRaw)
-}
+def executeCandidateIndependentReusableMacroBatchSecondRaw =
+    macroBatchAppProject.tasks.register(
+        'executeCandidateIndependentReusableMacroBatchSecondRaw',
+        JavaExec
+    ) {
+        configureMacroBatchExecution(delegate, macroBatchSecondRaw)
+    }
 
 def runCandidateIndependentReusableMacroBatchFirst = tasks.register(
     'runCandidateIndependentReusableMacroBatchFirst', Exec
