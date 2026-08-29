@@ -23,6 +23,10 @@ class MavenParallelVerificationWorkflowContractTest {
     String gradle = section(
         workflow,
         "  gradle-verification:\n",
+        "  jmh-verification:\n");
+    String jmh = section(
+        workflow,
+        "  jmh-verification:\n",
         "  maven-product-verification:\n");
     String maven = section(
         workflow,
@@ -42,16 +46,31 @@ class MavenParallelVerificationWorkflowContractTest {
             + "installPlaywrightHostDependencies --console=plain"));
     assertTrue(gradle.contains(
         "./gradlew --no-daemon --no-configuration-cache "
+            + "-PseparateJmhAuthority=true "
             + "\"$REGELSUCHE_CI_TASK\""));
     assertFalse(gradle.contains(FULL_MAVEN_COMMAND),
         "Maven must not remain serialized behind the Gradle authority");
+    assertFalse(gradle.contains("jmhAuthority"),
+        "the correctness runner must not execute the isolated benchmark graph");
+
+    assertTrue(jmh.contains("actions/checkout@"),
+        "the JMH authority must start from an independent checkout");
+    assertTrue(jmh.contains("gradle/actions/setup-gradle@"));
+    assertTrue(jmh.contains(
+        "bash gradle/run-isolated-jmh-authority.sh"));
+    assertFalse(jmh.contains("-PseparateJmhAuthority=true"),
+        "the benchmark runner must not disable its own task graph");
+    assertFalse(jmh.contains(FULL_MAVEN_COMMAND));
+    assertFalse(jmh.contains("needs:"),
+        "JMH must start concurrently rather than wait for correctness or Maven");
+    assertTrue(jmh.contains("if-no-files-found: error"),
+        "missing benchmark evidence must fail the isolated authority");
 
     assertTrue(maven.contains("actions/checkout@"),
         "the Maven authority must start from a separate fresh checkout");
     assertTrue(maven.contains("cache: maven"),
         "only the Maven dependency repository should be restored");
-    assertTrue(maven.contains(
-        "-f playwright-bootstrap/pom.xml"));
+    assertTrue(maven.contains("-f playwright-bootstrap/pom.xml"));
     assertTrue(maven.contains(
         "org.codehaus.mojo:exec-maven-plugin:3.5.0:java"));
     assertTrue(maven.contains(FULL_MAVEN_COMMAND),
@@ -67,26 +86,80 @@ class MavenParallelVerificationWorkflowContractTest {
 
     String compactConvergence = compact(convergence);
     assertTrue(compactConvergence.contains(
-        "needs: [gradle-verification, maven-product-verification]"));
+        "needs: [gradle-verification, jmh-verification, "
+            + "maven-product-verification]"));
     assertTrue(compactConvergence.contains(
         "needs.gradle-verification.result != 'success' || "
+            + "needs.jmh-verification.result != 'success' || "
             + "(github.event_name != 'create' && "
             + "needs.maven-product-verification.result != 'success')"),
-        "the stable required check must reject either incomplete authority");
+        "the stable required check must reject any incomplete authority");
     assertTrue(convergence.contains("run: exit 1"),
         "an incomplete authority set must fail rather than become skipped-success");
     assertFalse(convergence.contains("actions/checkout@"),
-        "the convergence job is orchestration, not a third verification build");
+        "the convergence job is orchestration, not a fourth verification build");
     assertFalse(convergence.contains("./gradlew"));
     assertFalse(convergence.contains("mvn "));
 
     assertTrue(publication.contains("needs: verification"),
-        "publication must wait for the converged Gradle and Maven authorities");
+        "publication must wait for all converged authorities");
+    assertTrue(publication.contains("name: repository-verification"));
+    assertTrue(publication.contains("name: jmh-verification"),
+        "published benchmark pages must come from the isolated authority");
     assertTrue(workflow.contains(
         "github.event_name == 'create' && "
             + "'Showcase train-freeze authority v1' || "
             + "'Checkout-local ciCheck'"),
         "the existing merge-governance check context must remain stable");
+    assertFalse(workflow.contains(" --exclude-task "));
+    assertFalse(workflow.contains(" -x "),
+        "moving work to required jobs must not use Gradle task exclusion");
+  }
+
+  @Test
+  void jmhSeparationMovesOnlyTheUnchangedBenchmarkAuthority()
+      throws IOException {
+    Path root = repositoryRoot();
+    String settings = Files.readString(root.resolve("settings.gradle"));
+    String separation = Files.readString(root.resolve(
+        "gradle/separated-jmh-authority.gradle"));
+    String entrypoint = Files.readString(root.resolve(
+        "gradle/run-isolated-jmh-authority.sh"));
+
+    int sympyPolicy = settings.indexOf(
+        "gradle/sympy-factorization-verification.gradle");
+    int separatedPolicy = settings.indexOf(
+        "gradle/separated-jmh-authority.gradle");
+    assertTrue(sympyPolicy >= 0 && separatedPolicy > sympyPolicy,
+        "the separation boundary must configure already registered tasks");
+
+    assertTrue(separation.contains(
+        "providers.gradleProperty(\n    'separateJmhAuthority')"));
+    assertTrue(separation.contains("'verifyJmhRegression'"));
+    assertTrue(separation.contains("'verifyJmhBenchmark'"));
+    assertTrue(separation.contains("'runJmhAllocationBenchmark'"));
+    assertTrue(separation.contains("'verifyJmhAllocationBenchmark'"));
+    assertTrue(separation.contains(
+        "'verifySymPyFactorizationBenchmark'"));
+    assertTrue(separation.contains("tasks.register('jmhAuthority')"));
+    assertTrue(separation.contains(
+        "dependsOn 'verifyJmhRegression',\n"
+            + "        'verifyJmhBenchmark',\n"
+            + "        'verifyJmhAllocationBenchmark',\n"
+            + "        ':regelsuche-math-sympy:"
+            + "verifySymPyFactorizationBenchmark'"));
+    assertFalse(separation.contains("warmup"));
+    assertFalse(separation.contains("iteration"));
+    assertFalse(separation.contains("fork"));
+    assertFalse(separation.contains("include"));
+    assertFalse(separation.contains("exclude"),
+        "the separation layer must not alter benchmark selection or policy");
+
+    assertTrue(entrypoint.contains("set -euo pipefail"));
+    assertTrue(entrypoint.contains("exec ./gradlew"));
+    assertTrue(entrypoint.contains("jmhAuthority"));
+    assertTrue(entrypoint.contains("--no-configuration-cache"));
+    assertFalse(entrypoint.contains("-PseparateJmhAuthority=true"));
   }
 
   @Test
