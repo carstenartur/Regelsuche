@@ -44,11 +44,11 @@ jobs:
           # Resolve only the pinned Playwright CLI. The independent bootstrap
           # avoids configuring and compiling the complete production reactor.
           ./gradlew --no-daemon -p playwright-bootstrap installPlaywrightHostDependencies --console=plain
-      - name: Run the checkout-owned Gradle authority
+      - name: Run the checkout-owned Gradle authority without duplicate JMH work
         run: |
           set -o pipefail
           mkdir -p build/logs
-          env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache "$REGELSUCHE_CI_TASK" --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
+          env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache -PseparateJmhAuthority=true "$REGELSUCHE_CI_TASK" --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
       - name: Retain Gradle verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -67,6 +67,44 @@ jobs:
             docs/generated/**
           include-hidden-files: true
           if-no-files-found: warn
+
+  jmh-verification:
+    name: Isolated JMH authority
+    if: github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with: { distribution: temurin, java-version: '25' }
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+        with: { cache-cleanup: on-success }
+      - name: Install isolated benchmark prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            patchelf=0.14.3-1 \
+            python3-venv
+      - name: Run every JMH benchmark and fail-closed validator
+        run: bash gradle/run-isolated-jmh-authority.sh
+      - name: Retain isolated JMH evidence
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: jmh-verification
+          path: |
+            app/build/reports/jmh/**
+            app/build/reports/jmh-allocation/**
+            regelsuche-math-sympy/build/reports/jmh/**
+            build/reports/quality/jmh-regression-report.json
+            build/reports/quality/jmh-regression-report.md
+            public/dev/bench/**
+          include-hidden-files: true
+          if-no-files-found: error
 
   maven-product-verification:
     name: Complete Maven product and Docker authority
@@ -111,7 +149,7 @@ jobs:
 
   verification:
     name: ${{ github.event_name == 'create' && 'Showcase train-freeze authority v1' || 'Checkout-local ciCheck' }}
-    needs: [gradle-verification, maven-product-verification]
+    needs: [gradle-verification, jmh-verification, maven-product-verification]
     if: >-
       ${{ always() && (github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')) }}
     runs-on: ubuntu-22.04
@@ -119,10 +157,10 @@ jobs:
     steps:
       - name: Reject incomplete verification authority
         if: >-
-          ${{ needs.gradle-verification.result != 'success' || (github.event_name != 'create' && needs.maven-product-verification.result != 'success') }}
+          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || (github.event_name != 'create' && needs.maven-product-verification.result != 'success') }}
         run: exit 1
       - name: Record complete verification authority
-        run: echo "Gradle=${{ needs.gradle-verification.result }} Maven=${{ needs.maven-product-verification.result }}"
+        run: echo "Gradle=${{ needs.gradle-verification.result }} JMH=${{ needs.jmh-verification.result }} Maven=${{ needs.maven-product-verification.result }}"
 
   publish-pages:
     name: Publish generated reports
@@ -134,6 +172,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with: { name: repository-verification, path: . }
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with: { name: jmh-verification, path: . }
       - name: Assemble the static site
         run: |
           rm -rf build/pages-site && mkdir -p build/pages-site
