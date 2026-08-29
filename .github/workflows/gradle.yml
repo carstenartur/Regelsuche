@@ -25,6 +25,8 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
       REGELSUCHE_CI_TASK: ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && 'authorizedShowcaseTrainFreeze' || 'ciCheck' }}
+      ORG_GRADLE_PROJECT_separateSympyRuntimeAuthority: 'true'
+      REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY: required-by-workflow
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: { fetch-depth: 0 }
@@ -44,7 +46,7 @@ jobs:
           # Resolve only the pinned Playwright CLI. The independent bootstrap
           # avoids configuring and compiling the complete production reactor.
           ./gradlew --no-daemon -p playwright-bootstrap installPlaywrightHostDependencies --console=plain
-      - name: Run the checkout-owned Gradle authority without duplicate JMH work
+      - name: Run the checkout-owned Gradle authority without duplicate JMH or loaded SymPy runtime work
         run: |
           set -o pipefail
           mkdir -p build/logs
@@ -69,7 +71,7 @@ jobs:
           if-no-files-found: warn
 
   jmh-verification:
-    name: Isolated JMH authority
+    name: Isolated JMH and SymPy runtime authority
     if: github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')
     runs-on: ubuntu-22.04
     timeout-minutes: 120
@@ -91,7 +93,15 @@ jobs:
             python3-venv
       - name: Run every JMH benchmark and fail-closed validator
         run: bash gradle/run-isolated-jmh-authority.sh
-      - name: Retain isolated JMH evidence
+      - name: Checkout isolated SymPy runtime source after measurement
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          path: sympy-runtime-checkout
+      - name: Run the complete Gradle SymPy runtime test authority
+        working-directory: sympy-runtime-checkout
+        run: bash gradle/run-isolated-sympy-runtime-authority.sh
+      - name: Retain isolated JMH and SymPy runtime evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -103,6 +113,9 @@ jobs:
             build/reports/quality/jmh-regression-report.json
             build/reports/quality/jmh-regression-report.md
             public/dev/bench/**
+            sympy-runtime-checkout/regelsuche-math-sympy/build/test-results/**
+            sympy-runtime-checkout/regelsuche-math-sympy/build/reports/tests/**
+            sympy-runtime-checkout/regelsuche-math-sympy/build/reports/jacoco/**
           include-hidden-files: true
           if-no-files-found: error
 
@@ -160,7 +173,7 @@ jobs:
           ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || (github.event_name != 'create' && needs.maven-product-verification.result != 'success') }}
         run: exit 1
       - name: Record complete verification authority
-        run: echo "Gradle=${{ needs.gradle-verification.result }} JMH=${{ needs.jmh-verification.result }} Maven=${{ needs.maven-product-verification.result }}"
+        run: echo "Gradle=${{ needs.gradle-verification.result }} JMHAndSymPy=${{ needs.jmh-verification.result }} Maven=${{ needs.maven-product-verification.result }}"
 
   publish-pages:
     name: Publish generated reports
