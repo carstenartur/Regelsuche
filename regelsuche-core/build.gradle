@@ -46,6 +46,16 @@ def mavenExecutable = System.getProperty('os.name')
     .toLowerCase(Locale.ROOT)
     .contains('windows') ? 'mvn.cmd' : 'mvn'
 
+def separateMavenAuthority = providers.gradleProperty(
+    'separateMavenAuthority').map { value -> value == 'true' }.getOrElse(false)
+def separateMavenAuthorityMarker = providers.environmentVariable(
+    'REGELSUCHE_SEPARATE_MAVEN_AUTHORITY').getOrElse('')
+if (separateMavenAuthority
+        && separateMavenAuthorityMarker != 'required-by-workflow') {
+    throw new GradleException(
+        'separateMavenAuthority requires the versioned workflow authority marker')
+}
+
 def verifyMavenCoreReactor = tasks.register('verifyMavenCoreReactor', Exec) {
     group = 'verification'
     description = 'Runs the focused Maven/JUnit build-contract slice used by Gradle; CI separately runs the complete Maven/Testcontainers reactor.'
@@ -62,6 +72,7 @@ def verifyMavenCoreReactor = tasks.register('verifyMavenCoreReactor', Exec) {
         include 'pom.xml', '*/pom.xml'
     }
     outputs.upToDateWhen { false }
+    enabled = !separateMavenAuthority
 }
 
 rootProject.tasks.named('check') {
