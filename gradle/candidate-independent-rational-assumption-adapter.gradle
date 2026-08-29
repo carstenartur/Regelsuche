@@ -125,7 +125,7 @@ def configureRationalAdapterRun = { task, outputFile ->
     }
 }
 
-def runCandidateIndependentRationalAssumptionAdapterFirst =
+def runCandidateIndependentRationalAssumptionAdapterFirstAuthority =
     rationalAdapterReleaseProject.tasks.register(
         'runCandidateIndependentRationalAssumptionAdapterFirst',
         JavaExec
@@ -133,13 +133,29 @@ def runCandidateIndependentRationalAssumptionAdapterFirst =
         configureRationalAdapterRun(delegate, rationalAdapterFirst)
     }
 
-def runCandidateIndependentRationalAssumptionAdapterSecond =
+def runCandidateIndependentRationalAssumptionAdapterSecondAuthority =
     rationalAdapterReleaseProject.tasks.register(
         'runCandidateIndependentRationalAssumptionAdapterSecond',
         JavaExec
     ) {
         configureRationalAdapterRun(delegate, rationalAdapterSecond)
     }
+
+def runCandidateIndependentRationalAssumptionAdapterFirst = tasks.register(
+    'runCandidateIndependentRationalAssumptionAdapterFirst'
+) {
+    group = 'verification'
+    description = 'Compatibility aggregate for the release-owned first rational adapter execution.'
+    dependsOn runCandidateIndependentRationalAssumptionAdapterFirstAuthority
+}
+
+def runCandidateIndependentRationalAssumptionAdapterSecond = tasks.register(
+    'runCandidateIndependentRationalAssumptionAdapterSecond'
+) {
+    group = 'verification'
+    description = 'Compatibility aggregate for the release-owned second rational adapter execution.'
+    dependsOn runCandidateIndependentRationalAssumptionAdapterSecondAuthority
+}
 
 def verifyCandidateIndependentRationalAssumptionAdapter = tasks.register(
     'verifyCandidateIndependentRationalAssumptionAdapter',
