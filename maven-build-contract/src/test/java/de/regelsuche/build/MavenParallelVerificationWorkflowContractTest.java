@@ -23,6 +23,8 @@ class MavenParallelVerificationWorkflowContractTest {
         ".github/workflows/gradle.yml"));
     String coverageGate = Files.readString(root.resolve(
         "gradle/quality-gates.gradle"));
+    String coverageConvergence = Files.readString(root.resolve(
+        "scripts/verify-cross-authority-coverage.py"));
     String gradle = section(
         workflow,
         "  gradle-verification:\n",
@@ -119,7 +121,7 @@ class MavenParallelVerificationWorkflowContractTest {
         "- name: Reject incomplete verification authority");
     int checkout = convergence.indexOf("- uses: actions/checkout@");
     int coverage = convergence.indexOf(
-        "python3 -B scripts/verify-coverage-regression.py --root \"$PWD\"");
+        "python3 -B scripts/verify-cross-authority-coverage.py");
     assertTrue(rejection >= 0 && checkout > rejection && coverage > checkout,
         "cross-authority coverage may run only after every required producer passed");
     assertTrue(convergence.contains("'repository-verification'"));
@@ -129,10 +131,25 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(convergence.contains(
         "sympy-runtime-checkout/regelsuche-math-sympy/build/reports/"
             + "jacoco/test/jacocoTestReport.xml"));
-    assertTrue(convergence.contains("test ! -e \"$canonical_report\""),
+    assertTrue(convergence.contains("--root \"$PWD\""));
+    assertTrue(convergence.contains("--isolated-report"));
+    assertFalse(convergence.contains("test -f"),
+        "evidence assertions must remain checkout-owned");
+    assertFalse(convergence.contains("test ! -e"),
+        "staleness assertions must remain checkout-owned");
+    assertFalse(convergence.contains("install -D"),
+        "evidence joining must remain checkout-owned");
+    assertTrue(coverageConvergence.contains(
+        "if isolated_report.is_symlink() or not isolated_report.is_file():"));
+    assertTrue(coverageConvergence.contains(
+        "if canonical_report.exists() or canonical_report.is_symlink():"),
         "a stale or duplicate SymPy report must be rejected");
-    assertTrue(convergence.contains(
-        "install -D -m 0644 \"$isolated_report\" \"$canonical_report\""));
+    assertTrue(coverageConvergence.contains(
+        "shutil.copyfile(isolated_report, canonical_report)"));
+    assertTrue(coverageConvergence.contains(
+        "COVERAGE_VERIFIER = Path(\"scripts/verify-coverage-regression.py\")"));
+    assertTrue(coverageConvergence.contains("subprocess.run("));
+    assertTrue(coverageConvergence.contains("check=True"));
     assertTrue(convergence.contains("name: coverage-verification"));
     assertTrue(convergence.contains("if-no-files-found: error"),
         "the converged coverage report must be retained fail closed");

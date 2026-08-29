@@ -184,14 +184,11 @@ jobs:
           name: jmh-verification
           path: build/authority-evidence/jmh
       - name: Verify complete cross-authority coverage
-        run: |
-          set -euo pipefail
-          isolated_report="build/authority-evidence/jmh/sympy-runtime-checkout/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml"
-          canonical_report="regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml"
-          test -f "$isolated_report"
-          test ! -e "$canonical_report"
-          install -D -m 0644 "$isolated_report" "$canonical_report"
-          python3 -B scripts/verify-coverage-regression.py --root "$PWD"
+        run: >-
+          python3 -B scripts/verify-cross-authority-coverage.py
+          --root "$PWD"
+          --isolated-report
+          build/authority-evidence/jmh/sympy-runtime-checkout/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml
       - name: Retain converged coverage evidence
         if: >-
           ${{ always() && !cancelled() && needs.gradle-verification.result == 'success' && needs.jmh-verification.result == 'success' && (github.event_name == 'create' || needs.maven-product-verification.result == 'success') }}
