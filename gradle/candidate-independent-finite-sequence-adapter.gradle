@@ -55,7 +55,7 @@ def configureFiniteAdapterRun = { task, outputFile ->
     }
 }
 
-def runCandidateIndependentFiniteSequenceAdapterFirst =
+def runCandidateIndependentFiniteSequenceAdapterFirstAuthority =
     finiteAdapterReleaseProject.tasks.register(
         'runCandidateIndependentFiniteSequenceAdapterFirst',
         JavaExec
@@ -63,13 +63,29 @@ def runCandidateIndependentFiniteSequenceAdapterFirst =
         configureFiniteAdapterRun(delegate, finiteAdapterFirst)
     }
 
-def runCandidateIndependentFiniteSequenceAdapterSecond =
+def runCandidateIndependentFiniteSequenceAdapterSecondAuthority =
     finiteAdapterReleaseProject.tasks.register(
         'runCandidateIndependentFiniteSequenceAdapterSecond',
         JavaExec
     ) {
         configureFiniteAdapterRun(delegate, finiteAdapterSecond)
     }
+
+def runCandidateIndependentFiniteSequenceAdapterFirst = tasks.register(
+    'runCandidateIndependentFiniteSequenceAdapterFirst'
+) {
+    group = 'verification'
+    description = 'Compatibility aggregate for the release-owned first finite-sequence adapter execution.'
+    dependsOn runCandidateIndependentFiniteSequenceAdapterFirstAuthority
+}
+
+def runCandidateIndependentFiniteSequenceAdapterSecond = tasks.register(
+    'runCandidateIndependentFiniteSequenceAdapterSecond'
+) {
+    group = 'verification'
+    description = 'Compatibility aggregate for the release-owned second finite-sequence adapter execution.'
+    dependsOn runCandidateIndependentFiniteSequenceAdapterSecondAuthority
+}
 
 def verifyCandidateIndependentFiniteSequenceAdapter = tasks.register(
     'verifyCandidateIndependentFiniteSequenceAdapter',
