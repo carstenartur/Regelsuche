@@ -21,17 +21,20 @@ class MavenParallelReleaseAdapterOwnershipContractTest {
             "gradle/candidate-independent-finite-sequence-adapter.gradle",
             "finiteAdapterReleaseProject",
             "finiteAdapterRuntimeClasspath",
-            "runCandidateIndependentFiniteSequenceAdapter"),
+            "runCandidateIndependentFiniteSequenceAdapter",
+            "verifyCandidateIndependentFiniteSequenceAdapter"),
         new AdapterContract(
             "gradle/candidate-independent-linear-recurrence-adapter.gradle",
             "recurrenceAdapterReleaseProject",
             "recurrenceAdapterRuntimeClasspath",
-            "runCandidateIndependentLinearRecurrenceAdapter"),
+            "runCandidateIndependentLinearRecurrenceAdapter",
+            "verifyCandidateIndependentLinearRecurrenceAdapter"),
         new AdapterContract(
             "gradle/candidate-independent-rational-assumption-adapter.gradle",
             "rationalAdapterReleaseProject",
             "rationalAdapterRuntimeClasspath",
-            "runCandidateIndependentRationalAssumptionAdapter")
+            "runCandidateIndependentRationalAssumptionAdapter",
+            "verifyCandidateIndependentRationalAssumptionAdapter")
     );
 
     for (AdapterContract adapter : adapters) {
@@ -43,7 +46,7 @@ class MavenParallelReleaseAdapterOwnershipContractTest {
       assertEquals(2, occurrences(
           script,
           adapter.projectName() + ".tasks.register("),
-          adapter.path() + " must own both JavaExec producers");
+          adapter.path() + " must own both JavaExec authorities");
       assertTrue(script.contains(
           "task.classpath = " + adapter.projectName() + ".files("),
           adapter.path() + " must use the owning project's file collection");
@@ -53,12 +56,34 @@ class MavenParallelReleaseAdapterOwnershipContractTest {
       assertFalse(script.contains(
           "def " + adapter.classpathName() + " = providers.provider"),
           adapter.path() + " must not use a root-owned foreign provider");
-      assertFalse(script.contains(
-          "tasks.register(\n    '" + adapter.taskPrefix()),
-          adapter.path() + " must not register the JavaExec producers on root");
+
+      String firstAlias = section(
+          script,
+          "def " + adapter.taskPrefix() + "First = tasks.register(",
+          "def " + adapter.taskPrefix() + "Second = tasks.register(");
+      String secondAlias = section(
+          script,
+          "def " + adapter.taskPrefix() + "Second = tasks.register(",
+          "def " + adapter.verifyTask() + " = tasks.register(");
+      assertFalse(firstAlias.contains("JavaExec"),
+          adapter.path() + " first root alias must have no Java action");
+      assertFalse(secondAlias.contains("JavaExec"),
+          adapter.path() + " second root alias must have no Java action");
+      assertTrue(firstAlias.contains(
+          "dependsOn " + adapter.taskPrefix() + "FirstAuthority"));
+      assertTrue(secondAlias.contains(
+          "dependsOn " + adapter.taskPrefix() + "SecondAuthority"));
       assertTrue(script.contains("Verifier"),
           adapter.path() + " must retain independent verifier wiring");
     }
+  }
+
+  private static String section(String text, String start, String end) {
+    int from = text.indexOf(start);
+    assertTrue(from >= 0, () -> "missing section " + start);
+    int to = text.indexOf(end, from + start.length());
+    assertTrue(to > from, () -> "missing section " + end);
+    return text.substring(from, to);
   }
 
   private static int occurrences(String text, String value) {
@@ -82,6 +107,7 @@ class MavenParallelReleaseAdapterOwnershipContractTest {
       String path,
       String projectName,
       String classpathName,
-      String taskPrefix
+      String taskPrefix,
+      String verifyTask
   ) { }
 }
