@@ -101,7 +101,7 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
      * {@link #selectAt(Expr)} whenever the failure category is authoritative.
      */
     public Optional&lt;Expr&gt; subtreeAt(Expr root) {
-<span class="nc" id="L104">        return selectAt(root).selectedSubtree();</span>
+<span class="fc" id="L104">        return selectAt(root).selectedSubtree();</span>
     }
 
     /**
