@@ -71,7 +71,7 @@ jobs:
           if-no-files-found: warn
 
   jmh-verification:
-    name: Isolated JMH and SymPy runtime authority
+    name: Isolated JMH authority
     if: github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')
     runs-on: ubuntu-22.04
     timeout-minutes: 120
@@ -93,15 +93,7 @@ jobs:
             python3-venv
       - name: Run every JMH benchmark and fail-closed validator
         run: bash gradle/run-isolated-jmh-authority.sh
-      - name: Checkout isolated SymPy runtime source after measurement
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-          path: sympy-runtime-checkout
-      - name: Run the complete Gradle SymPy runtime test authority
-        working-directory: sympy-runtime-checkout
-        run: bash gradle/run-isolated-sympy-runtime-authority.sh
-      - name: Retain isolated JMH and SymPy runtime evidence
+      - name: Retain isolated JMH evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -113,9 +105,41 @@ jobs:
             build/reports/quality/jmh-regression-report.json
             build/reports/quality/jmh-regression-report.md
             public/dev/bench/**
-            sympy-runtime-checkout/regelsuche-math-sympy/build/test-results/**
-            sympy-runtime-checkout/regelsuche-math-sympy/build/reports/tests/**
-            sympy-runtime-checkout/regelsuche-math-sympy/build/reports/jacoco/**
+          include-hidden-files: true
+          if-no-files-found: error
+
+  sympy-runtime-verification:
+    name: Isolated SymPy runtime authority
+    if: github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with: { distribution: temurin, java-version: '25' }
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+        with: { cache-cleanup: on-success }
+      - name: Install isolated SymPy runtime prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            patchelf=0.14.3-1 \
+            python3-venv
+      - name: Run the complete Gradle SymPy runtime test authority
+        run: bash gradle/run-isolated-sympy-runtime-authority.sh
+      - name: Retain isolated SymPy runtime evidence
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: sympy-runtime-verification
+          path: |
+            regelsuche-math-sympy/build/test-results/**
+            regelsuche-math-sympy/build/reports/tests/**
+            regelsuche-math-sympy/build/reports/jacoco/**
           include-hidden-files: true
           if-no-files-found: error
 
@@ -162,7 +186,7 @@ jobs:
 
   verification:
     name: ${{ github.event_name == 'create' && 'Showcase train-freeze authority v1' || 'Checkout-local ciCheck' }}
-    needs: [gradle-verification, jmh-verification, maven-product-verification]
+    needs: [gradle-verification, jmh-verification, sympy-runtime-verification, maven-product-verification]
     if: >-
       ${{ always() && (github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')) }}
     runs-on: ubuntu-22.04
@@ -170,7 +194,7 @@ jobs:
     steps:
       - name: Reject incomplete verification authority
         if: >-
-          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || (github.event_name != 'create' && needs.maven-product-verification.result != 'success') }}
+          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && needs.maven-product-verification.result != 'success') }}
         run: exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Download project-parallel Gradle coverage evidence
@@ -181,17 +205,17 @@ jobs:
       - name: Download isolated SymPy coverage evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: jmh-verification
-          path: build/authority-evidence/jmh
+          name: sympy-runtime-verification
+          path: build/authority-evidence/sympy
       - name: Verify complete cross-authority coverage
         run: >-
           python3 -B scripts/verify-cross-authority-coverage.py
           --root "$PWD"
           --isolated-report
-          build/authority-evidence/jmh/sympy-runtime-checkout/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml
+          build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml
       - name: Retain converged coverage evidence
         if: >-
-          ${{ always() && !cancelled() && needs.gradle-verification.result == 'success' && needs.jmh-verification.result == 'success' && (github.event_name == 'create' || needs.maven-product-verification.result == 'success') }}
+          ${{ always() && !cancelled() && needs.gradle-verification.result == 'success' && needs.jmh-verification.result == 'success' && needs.sympy-runtime-verification.result == 'success' && (github.event_name == 'create' || needs.maven-product-verification.result == 'success') }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: coverage-verification
@@ -201,7 +225,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
       - name: Record complete verification authority
-        run: echo "Gradle=${{ needs.gradle-verification.result }} JMHAndSymPy=${{ needs.jmh-verification.result }} Maven=${{ needs.maven-product-verification.result }} Coverage=success"
+        run: echo "Gradle=${{ needs.gradle-verification.result }} JMH=${{ needs.jmh-verification.result }} SymPy=${{ needs.sympy-runtime-verification.result }} Maven=${{ needs.maven-product-verification.result }} Coverage=success"
 
   publish-pages:
     name: Publish generated reports

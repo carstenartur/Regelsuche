@@ -98,13 +98,39 @@ fehlender Pflichtinfrastruktur nicht stillschweigend erfolgreich sein.
 ./gradlew --no-configuration-cache ciCheck
 ```
 
-Ist der einzige autoritative Verifikationsaufruf der zentralen CI. Er führt den
-vollständigen Repositoryvertrag aus und erzeugt zusätzlich die veröffentlichbaren
-Coverage-, Test-, Benchmark- und Dokumentationsartefakte.
+Ist der vollständige autoritative Verifikationsaufruf eines normalen Checkouts.
+Er führt den gesamten Repositoryvertrag aus und erzeugt zusätzlich die
+veröffentlichbaren Coverage-, Test-, Benchmark- und Dokumentationsartefakte.
 
 Ein roter GitHub-Lauf muss vom selben Commit mit diesem Befehl reproduzierbar
 sein. GitHub-spezifische Veröffentlichungsjobs dürfen das Ergebnis nicht
 verändern.
+
+### Parallele CI-Autoritäten ohne reduzierte Aussagekraft
+
+GitHub Actions verkürzt ausschließlich die Wandzeit des vollständigen
+Checkout-Vertrags. Vier unabhängige, frische Checkouts beginnen gleichzeitig:
+
+1. die checkout-lokale Gradle-Korrektheitsautorität ohne doppelte JMH- und
+   geladene SymPy-Laufzeitarbeit;
+2. die unveränderte vollständige JMH-Autorität auf einem eigenen Runner;
+3. die unveränderte vollständige SymPy-Laufzeit- und JaCoCo-Autorität auf einem
+   eigenen Runner;
+4. der vollständige Maven-Produkt- und Docker-Vertrag.
+
+Die Delegation der SymPy-Laufzeittests ist doppelt fail-closed: Sowohl die
+Gradle-Property als auch der Workflow-Autorisierungsmarker müssen vorhanden
+sein. Ein normaler lokaler `ciCheck` besitzt keinen solchen Marker und bleibt
+deshalb vollständig.
+
+Der stabile erforderliche Check `Checkout-local ciCheck` wird erst erfolgreich,
+wenn alle für das Ereignis erforderlichen Produzenten erfolgreich waren. Danach
+führt ein eigener Konvergenzschritt den isolierten SymPy-JaCoCo-Bericht mit der
+projektparallelen Coverage zusammen und wendet den unveränderten
+repositoryweiten Coverage-Verifier an. Kein Benchmark, Test, Threshold oder
+negativer Ausgang wird durch die Parallelisierung entfernt. Zwischen den
+Produzenten werden keine Build-Ausgaben wiederverwendet; nur abgeschlossene
+Evidence-Artefakte gelangen in die Konvergenz.
 
 ## Externe Voraussetzungen
 
@@ -266,7 +292,8 @@ gemeinsam aktualisieren.
 
 Unter `.github/workflows/` verbleiben nur Plattformadapter:
 
-- `gradle.yml` provisioniert die Toolchain, ruft `ciCheck` auf und veröffentlicht
+- `gradle.yml` provisioniert unabhängige Runner, ruft ausschließlich
+  checkout-eigene Autoritäten auf, konvergiert deren Evidence und veröffentlicht
   bereits erzeugte Ergebnisse;
 - `release.yml` führt GitHub-spezifische Tag-, Release- und Pull-Request-
   Operationen aus.
