@@ -32,7 +32,7 @@ class RuleCandidateMinerFormationRoutingTest {
         assertEquals(candidate, observer.calls.getFirst().candidate());
         assertEquals(
             List.of("add_zero"),
-            observer.calls.getFirst().evidence().primitiveRuleIds());
+            observer.calls.getFirst().evidence().appliedRuleIds());
         assertEquals(
             List.of("path:single"),
             observer.calls.getFirst().evidence().sourceProvenance());
@@ -70,7 +70,7 @@ class RuleCandidateMinerFormationRoutingTest {
             observer.calls.getFirst().candidate());
         assertEquals(
             List.of("add_zero", "neutral_addition"),
-            observer.calls.getFirst().evidence().primitiveRuleIds());
+            observer.calls.getFirst().evidence().appliedRuleIds());
         assertEquals(
             List.of("path:first", "path:second"),
             observer.calls.getFirst().evidence().sourceProvenance());
@@ -89,19 +89,19 @@ class RuleCandidateMinerFormationRoutingTest {
             observer);
         SuccessfulTransformationPath first = path(
             "path:cluster-first",
-            "x + 0",
-            "x",
-            "add_zero");
+            "(x + 1) ^ 2",
+            "x ^ 2 + 2 * x + 1",
+            "expand_square_one");
         SuccessfulTransformationPath second = path(
             "path:cluster-second",
-            "y + 0",
-            "y",
-            "neutral_addition");
+            "(x + 2) ^ 2",
+            "x ^ 2 + 4 * x + 4",
+            "expand_square_two");
         SuccessfulTransformationPath third = path(
             "path:cluster-third",
-            "z + 0",
-            "z",
-            "zero_identity");
+            "(x + 3) ^ 2",
+            "x ^ 2 + 6 * x + 9",
+            "expand_square_three");
 
         List<RuleCandidate> candidates = miner.mine(
             List.of(first, second, third));
@@ -138,7 +138,7 @@ class RuleCandidateMinerFormationRoutingTest {
     }
 
     @Test
-    void rejectedOrUnformedPathsDoNotReachTheObserver() {
+    void unverifiedSinglePathDoesNotReachTheObserver() {
         RecordingObserver observer = new RecordingObserver();
         RuleCandidateMiner miner = new RuleCandidateMiner(
             new KnownRuleRepository(),

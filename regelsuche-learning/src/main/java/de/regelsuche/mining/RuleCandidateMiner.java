@@ -93,7 +93,7 @@ public class RuleCandidateMiner {
         }
 
         Map<String, CandidateBucket> buckets = new LinkedHashMap<>();
-        for (List<SucccessfulTransformationPath> cluster :
+        for (List<SuccessfulTransformationPath> cluster :
                 clusters.values()) {
             if (cluster.size() < minExamples) {
                 continue;

@@ -28,15 +28,15 @@ public interface RuleCandidateFormationObserver {
      * classification, cache decision, novelty decision or promotion policy.
      */
     record Evidence(
-        List<String> primitiveRuleIds,
+        List<String> appliedRuleIds,
         List<String> sourceProvenance,
         List<String> assumptions,
         List<String> validationEvidence
     ) {
         public Evidence {
-            primitiveRuleIds = normalized(
-                primitiveRuleIds,
-                "primitiveRuleIds");
+            appliedRuleIds = normalized(
+                appliedRuleIds,
+                "appliedRuleIds");
             sourceProvenance = normalized(
                 sourceProvenance,
                 "sourceProvenance");
@@ -50,14 +50,14 @@ public interface RuleCandidateFormationObserver {
             List<SuccessfulTransformationPath> paths
         ) {
             Objects.requireNonNull(paths, "paths");
-            List<String> primitiveRuleIds = new ArrayList<>();
+            List<String> appliedRuleIds = new ArrayList<>();
             List<String> sourceProvenance = new ArrayList<>();
             List<String> assumptions = new ArrayList<>();
             List<String> validationEvidence = new ArrayList<>();
             for (SuccessfulTransformationPath path : paths) {
                 SuccessfulTransformationPath checked =
                     Objects.requireNonNull(path, "path");
-                primitiveRuleIds.addAll(checked.rules());
+                appliedRuleIds.addAll(checked.rules());
                 sourceProvenance.add(checked.id());
                 assumptions.addAll(checked.assumptions());
                 if (checked.equivalenceEvidence() != null
@@ -67,7 +67,7 @@ public interface RuleCandidateFormationObserver {
                 }
             }
             return new Evidence(
-                primitiveRuleIds,
+                appliedRuleIds,
                 sourceProvenance,
                 assumptions,
                 validationEvidence);
@@ -76,7 +76,7 @@ public interface RuleCandidateFormationObserver {
         public Evidence merge(Evidence other) {
             Objects.requireNonNull(other, "other");
             return new Evidence(
-                concatenated(primitiveRuleIds, other.primitiveRuleIds),
+                concatenated(appliedRuleIds, other.appliedRuleIds),
                 concatenated(sourceProvenance, other.sourceProvenance),
                 concatenated(assumptions, other.assumptions),
                 concatenated(validationEvidence, other.validationEvidence));

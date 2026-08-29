@@ -17,7 +17,7 @@ replaced the historical quartic classifier.
 
 The observer receives four independent evidence axes:
 
-- primitive rule IDs used by the successful transformation paths;
+- source-reported applied rule IDs used by the successful transformation paths;
 - source path IDs as provenance;
 - normalized assumptions;
 - equivalence/validation evidence retained by the source paths.
@@ -37,10 +37,11 @@ encounter order, and the observer is called once per returned candidate. This
 prevents duplicate routing when multiple source paths generalize to the same
 schema.
 
-Rejected, unverified or otherwise unformed paths do not reach the observer.
-An observer failure propagates: the lifecycle fails closed rather than returning
-a candidate while pretending that configured post-formation processing
-succeeded.
+Unverified single-path inputs and paths that do not form a returned candidate
+do not reach the observer. Ordinary clustered mining preserves its existing
+eligibility rules. An observer failure propagates for the affected formation;
+the failing candidate is not returned while pretending that configured
+post-formation processing succeeded.
 
 ## Deliberate boundary
 
