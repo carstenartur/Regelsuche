@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 class MavenSeparatedSymPyRuntimeAuthorityContractTest {
 
   @Test
-  void projectParallelCiMovesTheUnchangedRuntimeTestsAfterIdleJmh()
+  void projectParallelCiRunsUnchangedSymPyRuntimeTestsOnAnIndependentRunner()
       throws IOException {
     Path root = repositoryRoot();
     String workflow = Files.readString(root.resolve(
@@ -24,6 +24,10 @@ class MavenSeparatedSymPyRuntimeAuthorityContractTest {
     String jmh = section(
         workflow,
         "  jmh-verification:\n",
+        "  sympy-runtime-verification:\n");
+    String sympy = section(
+        workflow,
+        "  sympy-runtime-verification:\n",
         "  maven-product-verification:\n");
 
     assertTrue(gradle.contains(
@@ -33,26 +37,35 @@ class MavenSeparatedSymPyRuntimeAuthorityContractTest {
     assertFalse(gradle.contains("sympyRuntimeAuthority"),
         "the loaded correctness runner must not execute the isolated runtime graph");
 
-    int benchmark = jmh.indexOf(
-        "bash gradle/run-isolated-jmh-authority.sh");
-    int secondCheckout = jmh.indexOf("path: sympy-runtime-checkout");
-    int runtimeTests = jmh.indexOf(
-        "bash gradle/run-isolated-sympy-runtime-authority.sh");
-    assertTrue(benchmark >= 0, "the complete JMH authority is missing");
-    assertTrue(secondCheckout > benchmark,
-        "the runtime tests must use a second checkout after benchmark measurement");
-    assertTrue(runtimeTests > secondCheckout,
-        "the runtime tests must execute from the second fresh checkout");
-    assertTrue(jmh.contains("working-directory: sympy-runtime-checkout"));
     assertTrue(jmh.contains(
-        "sympy-runtime-checkout/regelsuche-math-sympy/build/test-results/**"));
-    assertTrue(jmh.contains(
-        "sympy-runtime-checkout/regelsuche-math-sympy/build/reports/tests/**"));
-    assertTrue(jmh.contains(
-        "sympy-runtime-checkout/regelsuche-math-sympy/build/reports/jacoco/**"));
+        "bash gradle/run-isolated-jmh-authority.sh"));
     assertFalse(jmh.contains(
+        "bash gradle/run-isolated-sympy-runtime-authority.sh"),
+        "runtime tests must not remain serialized after benchmark measurement");
+    assertFalse(jmh.contains("sympy-runtime-checkout"));
+    assertFalse(jmh.contains("needs:"),
+        "the benchmark authority must start independently");
+
+    assertTrue(sympy.contains("actions/checkout@"),
+        "the runtime authority must start from a separate fresh checkout");
+    assertTrue(sympy.contains("gradle/actions/setup-gradle@"));
+    assertTrue(sympy.contains(
+        "bash gradle/run-isolated-sympy-runtime-authority.sh"));
+    assertFalse(sympy.contains(
+        "bash gradle/run-isolated-jmh-authority.sh"));
+    assertFalse(sympy.contains("working-directory: sympy-runtime-checkout"));
+    assertFalse(sympy.contains("needs:"),
+        "the runtime authority must start concurrently with JMH");
+    assertTrue(sympy.contains(
+        "regelsuche-math-sympy/build/test-results/**"));
+    assertTrue(sympy.contains(
+        "regelsuche-math-sympy/build/reports/tests/**"));
+    assertTrue(sympy.contains(
+        "regelsuche-math-sympy/build/reports/jacoco/**"));
+    assertFalse(sympy.contains(
         "REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY"),
         "the isolated authority must not inherit the delegation marker");
+    assertTrue(sympy.contains("if-no-files-found: error"));
   }
 
   @Test

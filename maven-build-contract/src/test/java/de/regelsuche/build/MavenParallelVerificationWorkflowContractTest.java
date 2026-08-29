@@ -32,6 +32,10 @@ class MavenParallelVerificationWorkflowContractTest {
     String jmh = section(
         workflow,
         "  jmh-verification:\n",
+        "  sympy-runtime-verification:\n");
+    String sympy = section(
+        workflow,
+        "  sympy-runtime-verification:\n",
         "  maven-product-verification:\n");
     String maven = section(
         workflow,
@@ -73,18 +77,43 @@ class MavenParallelVerificationWorkflowContractTest {
         "onlyIf {\n        !deferCoverageToWorkflowConvergence\n    }"),
         "only the workflow-authorized split may defer the aggregate gate");
 
+    assertTrue(jmh.contains("name: Isolated JMH authority"));
     assertTrue(jmh.contains("actions/checkout@"),
         "the JMH authority must start from an independent checkout");
     assertTrue(jmh.contains("gradle/actions/setup-gradle@"));
     assertTrue(jmh.contains(
         "bash gradle/run-isolated-jmh-authority.sh"));
+    assertFalse(jmh.contains("run-isolated-sympy-runtime-authority.sh"),
+        "SymPy runtime tests must not remain serialized behind JMH");
+    assertFalse(jmh.contains("sympy-runtime-checkout"));
     assertFalse(jmh.contains("-PseparateJmhAuthority=true"),
         "the benchmark runner must not disable its own task graph");
     assertFalse(jmh.contains(FULL_MAVEN_COMMAND));
     assertFalse(jmh.contains("needs:"),
-        "JMH must start concurrently rather than wait for correctness or Maven");
+        "JMH must start concurrently rather than wait for another authority");
+    assertTrue(jmh.contains("name: jmh-verification"));
     assertTrue(jmh.contains("if-no-files-found: error"),
         "missing benchmark evidence must fail the isolated authority");
+
+    assertTrue(sympy.contains("name: Isolated SymPy runtime authority"));
+    assertTrue(sympy.contains("actions/checkout@"),
+        "the SymPy authority must start from an independent checkout");
+    assertTrue(sympy.contains("gradle/actions/setup-gradle@"));
+    assertTrue(sympy.contains(
+        "bash gradle/run-isolated-sympy-runtime-authority.sh"));
+    assertFalse(sympy.contains("run-isolated-jmh-authority.sh"));
+    assertFalse(sympy.contains("needs:"),
+        "SymPy must start concurrently rather than wait for JMH");
+    assertFalse(sympy.contains(FULL_MAVEN_COMMAND));
+    assertTrue(sympy.contains("name: sympy-runtime-verification"));
+    assertTrue(sympy.contains(
+        "regelsuche-math-sympy/build/test-results/**"));
+    assertTrue(sympy.contains(
+        "regelsuche-math-sympy/build/reports/tests/**"));
+    assertTrue(sympy.contains(
+        "regelsuche-math-sympy/build/reports/jacoco/**"));
+    assertTrue(sympy.contains("if-no-files-found: error"),
+        "missing runtime evidence must fail the isolated authority");
 
     assertTrue(maven.contains("actions/checkout@"),
         "the Maven authority must start from a separate fresh checkout");
@@ -95,10 +124,10 @@ class MavenParallelVerificationWorkflowContractTest {
         "org.codehaus.mojo:exec-maven-plugin:3.5.0:java"));
     assertTrue(maven.contains(FULL_MAVEN_COMMAND),
         "the complete product and Docker contract must remain unchanged");
-    assertFalse(maven.contains("needs: gradle-verification"),
-        "Maven must begin concurrently rather than wait for Gradle");
+    assertFalse(maven.contains("needs:"),
+        "Maven must begin concurrently rather than wait for another authority");
     assertFalse(maven.contains("actions/download-artifact@"),
-        "Maven must not consume Gradle build output or test evidence");
+        "Maven must not consume another authority's output");
     assertFalse(maven.contains("./gradlew"),
         "the Maven authority must not execute or depend on the Gradle reactor");
     assertEquals(1, occurrences(workflow, FULL_MAVEN_COMMAND),
@@ -107,10 +136,11 @@ class MavenParallelVerificationWorkflowContractTest {
     String compactConvergence = compact(convergence);
     assertTrue(compactConvergence.contains(
         "needs: [gradle-verification, jmh-verification, "
-            + "maven-product-verification]"));
+            + "sympy-runtime-verification, maven-product-verification]"));
     assertTrue(compactConvergence.contains(
         "needs.gradle-verification.result != 'success' || "
             + "needs.jmh-verification.result != 'success' || "
+            + "needs.sympy-runtime-verification.result != 'success' || "
             + "(github.event_name != 'create' && "
             + "needs.maven-product-verification.result != 'success')"),
         "the stable required check must reject any incomplete authority");
@@ -125,12 +155,12 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(rejection >= 0 && checkout > rejection && coverage > checkout,
         "cross-authority coverage may run only after every required producer passed");
     assertTrue(convergence.contains("'repository-verification'"));
-    assertTrue(convergence.contains("name: jmh-verification"));
+    assertTrue(convergence.contains("name: sympy-runtime-verification"));
     assertTrue(convergence.contains(
-        "path: build/authority-evidence/jmh"));
+        "path: build/authority-evidence/sympy"));
     assertTrue(convergence.contains(
-        "sympy-runtime-checkout/regelsuche-math-sympy/build/reports/"
-            + "jacoco/test/jacocoTestReport.xml"));
+        "build/authority-evidence/sympy/regelsuche-math-sympy/"
+            + "build/reports/jacoco/test/jacocoTestReport.xml"));
     assertTrue(convergence.contains("--root \"$PWD\""));
     assertTrue(convergence.contains("--isolated-report"));
     assertFalse(convergence.contains("test -f"),
@@ -151,6 +181,9 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(coverageConvergence.contains("subprocess.run("));
     assertTrue(coverageConvergence.contains("check=True"));
     assertTrue(convergence.contains("name: coverage-verification"));
+    assertTrue(convergence.contains(
+        "needs.sympy-runtime-verification.result == 'success'"),
+        "coverage retention must require the independent runtime authority");
     assertTrue(convergence.contains("if-no-files-found: error"),
         "the converged coverage report must be retained fail closed");
     assertFalse(convergence.contains("./gradlew"));

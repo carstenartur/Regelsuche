@@ -24,6 +24,10 @@ class MavenParallelGradleCorrectnessContractTest {
     String jmh = section(
         workflow,
         "  jmh-verification:\n",
+        "  sympy-runtime-verification:\n");
+    String sympy = section(
+        workflow,
+        "  sympy-runtime-verification:\n",
         "  maven-product-verification:\n");
     String maven = section(
         workflow,
@@ -38,6 +42,8 @@ class MavenParallelGradleCorrectnessContractTest {
         "only the correctness Gradle authority may use project parallelism");
     assertFalse(jmh.contains("--parallel"),
         "JMH tasks must remain serial on their isolated runner");
+    assertFalse(sympy.contains("--parallel"),
+        "the isolated SymPy runtime contract must retain its original execution policy");
     assertFalse(maven.contains("--parallel"));
     assertFalse(workflow.contains("--max-workers"),
         "CI must use the runner CPU limit rather than an unsafe hard-coded fan-out");
