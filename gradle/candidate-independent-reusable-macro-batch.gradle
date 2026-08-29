@@ -91,7 +91,7 @@ def configureMacroBatchCanonicalization = { task, rawFile, outputFile, execution
     }
 }
 
-def executeCandidateIndependentReusableMacroBatchFirstRaw =
+def executeCandidateIndependentReusableMacroBatchFirstRawAuthority =
     macroBatchAppProject.tasks.register(
         'executeCandidateIndependentReusableMacroBatchFirstRaw',
         JavaExec
@@ -99,13 +99,29 @@ def executeCandidateIndependentReusableMacroBatchFirstRaw =
         configureMacroBatchExecution(delegate, macroBatchFirstRaw)
     }
 
-def executeCandidateIndependentReusableMacroBatchSecondRaw =
+def executeCandidateIndependentReusableMacroBatchSecondRawAuthority =
     macroBatchAppProject.tasks.register(
         'executeCandidateIndependentReusableMacroBatchSecondRaw',
         JavaExec
     ) {
         configureMacroBatchExecution(delegate, macroBatchSecondRaw)
     }
+
+def executeCandidateIndependentReusableMacroBatchFirstRaw = tasks.register(
+    'executeCandidateIndependentReusableMacroBatchFirstRaw'
+) {
+    group = 'verification'
+    description = 'Compatibility aggregate for the app-owned first reusable-macro Java execution.'
+    dependsOn executeCandidateIndependentReusableMacroBatchFirstRawAuthority
+}
+
+def executeCandidateIndependentReusableMacroBatchSecondRaw = tasks.register(
+    'executeCandidateIndependentReusableMacroBatchSecondRaw'
+) {
+    group = 'verification'
+    description = 'Compatibility aggregate for the app-owned second reusable-macro Java execution.'
+    dependsOn executeCandidateIndependentReusableMacroBatchSecondRawAuthority
+}
 
 def runCandidateIndependentReusableMacroBatchFirst = tasks.register(
     'runCandidateIndependentReusableMacroBatchFirst', Exec
