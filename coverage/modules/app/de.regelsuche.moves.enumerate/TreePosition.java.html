@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TreePosition.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.moves.enumerate</a> &gt; <span class="el_source">TreePosition.java</span></div><h1>TreePosition.java</h1><pre class="source lang-java linenums">package de.regelsuche.moves.enumerate;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -32,6 +38,15 @@ import java.util.stream.Collectors;
  * advantage given that the text is cheap to produce at enumeration time and small
  * relative to the position record as a whole. If the formatter ever becomes
  * expensive, caching at the call site is preferable to removing the guard.&lt;/p&gt;
+ *
+ * &lt;h3&gt;Selection and replacement authority&lt;/h3&gt;
+ * &lt;p&gt;The position owns the shared iterative AST navigation used by ordinary
+ * local rewrites and verifier-authorized nested transformations.
+ * {@link #selectAt(Expr)} and {@link #replaceAt(Expr, Expr)} return typed outcomes
+ * that distinguish an invalid path from a valid path whose occurrence is absent.
+ * They operate on AST objects rather than rendered text. Replacement rebuilds
+ * only the selected ancestor chain and preserves every untouched sibling by
+ * object identity.&lt;/p&gt;
  */
 public record TreePosition(List&lt;Integer&gt; path, String text) implements Comparable&lt;TreePosition&gt; {
 
@@ -40,17 +55,17 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
      * for deterministic ordering. Compares path lists directly so that the root
      * (empty path) always precedes non-root positions regardless of their display form.
      */
-<span class="fc" id="L43">    public static final Comparator&lt;TreePosition&gt; CANONICAL_ORDER =</span>
-<span class="fc" id="L44">            Comparator.&lt;TreePosition, List&lt;Integer&gt;&gt;comparing(TreePosition::path, TreePosition::comparePaths)</span>
-<span class="fc" id="L45">                    .thenComparing(TreePosition::text);</span>
+<span class="fc" id="L58">    public static final Comparator&lt;TreePosition&gt; CANONICAL_ORDER =</span>
+<span class="fc" id="L59">            Comparator.&lt;TreePosition, List&lt;Integer&gt;&gt;comparing(TreePosition::path, TreePosition::comparePaths)</span>
+<span class="fc" id="L60">                    .thenComparing(TreePosition::text);</span>
 
-<span class="fc" id="L47">    public TreePosition {</span>
-<span class="fc" id="L48">        path = List.copyOf(path);</span>
-<span class="fc" id="L49">    }</span>
+<span class="fc" id="L62">    public TreePosition {</span>
+<span class="fc" id="L63">        path = List.copyOf(path);</span>
+<span class="fc" id="L64">    }</span>
 
     /** {@code true} when this position denotes the whole expression. */
     public boolean isRoot() {
-<span class="fc" id="L53">        return path.isEmpty();</span>
+<span class="fc" id="L68">        return path.isEmpty();</span>
     }
 
     /**
@@ -60,28 +75,276 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
      * indices below 1000.
      */
     public String pathKey() {
-<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
-<span class="fc" id="L64">            return &quot;root&quot;;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
+<span class="fc" id="L79">            return &quot;root&quot;;</span>
         }
-<span class="fc" id="L66">        return path.stream()</span>
-<span class="fc" id="L67">                .map(index -&gt; String.format(&quot;%03d&quot;, index))</span>
-<span class="fc" id="L68">                .collect(Collectors.joining(&quot;.&quot;));</span>
+<span class="fc" id="L81">        return path.stream()</span>
+<span class="fc" id="L82">                .map(index -&gt; String.format(&quot;%03d&quot;, index))</span>
+<span class="fc" id="L83">                .collect(Collectors.joining(&quot;.&quot;));</span>
+    }
+
+    /**
+     * Selects the concrete subtree at this path.
+     *
+     * @param root complete expression tree
+     * @return a typed success or failure result; invalid and absent paths remain distinct
+     */
+    public SelectionResult selectAt(Expr root) {
+<span class="fc" id="L93">        Navigation navigation = navigate(root);</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        return navigation.status() == Status.SELECTED</span>
+<span class="fc" id="L95">                ? SelectionResult.selected(path, navigation.selected())</span>
+<span class="fc" id="L96">                : SelectionResult.failure(navigation.status(), path);</span>
+    }
+
+    /**
+     * Convenience view for callers that need only the selected subtree. Use
+     * {@link #selectAt(Expr)} whenever the failure category is authoritative.
+     */
+    public Optional&lt;Expr&gt; subtreeAt(Expr root) {
+<span class="nc" id="L104">        return selectAt(root).selectedSubtree();</span>
+    }
+
+    /**
+     * Replaces this occurrence and rebuilds only its ancestor chain. Untouched
+     * siblings retain their original object identity.
+     *
+     * @param root complete expression tree
+     * @param replacement subtree to install at this position
+     * @return a typed success or failure result; invalid and absent paths remain distinct
+     */
+    public ReplacementResult replaceAt(Expr root, Expr replacement) {
+<span class="fc" id="L116">        Objects.requireNonNull(replacement, &quot;replacement&quot;);</span>
+<span class="fc" id="L117">        Navigation navigation = navigate(root);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (navigation.status() != Status.SELECTED) {</span>
+<span class="fc" id="L119">            return ReplacementResult.failure(navigation.status(), path);</span>
+        }
+
+<span class="fc" id="L122">        Expr rewritten = replacement;</span>
+<span class="fc" id="L123">        List&lt;ParentFrame&gt; parents = navigation.parents();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (int index = parents.size() - 1; index &gt;= 0; index--) {</span>
+<span class="fc" id="L125">            ParentFrame frame = parents.get(index);</span>
+<span class="fc" id="L126">            rewritten = rebuildParent(frame.parent(), frame.childIndex(), rewritten);</span>
+        }
+<span class="fc" id="L128">        return ReplacementResult.replaced(</span>
+                path,
+<span class="fc" id="L130">                navigation.selected(),</span>
+                rewritten,
+<span class="fc" id="L132">                parents.size());</span>
     }
 
     @Override
     public int compareTo(TreePosition other) {
-<span class="nc" id="L73">        return CANONICAL_ORDER.compare(this, other);</span>
+<span class="nc" id="L137">        return CANONICAL_ORDER.compare(this, other);</span>
+    }
+
+    private Navigation navigate(Expr root) {
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L142">            return Navigation.failure(Status.INVALID_PATH, path);</span>
+        }
+
+<span class="fc" id="L145">        Expr current = root;</span>
+<span class="fc" id="L146">        List&lt;ParentFrame&gt; parents = new ArrayList&lt;&gt;(path.size());</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (int childIndex : path) {</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (childIndex &lt; 0) {</span>
+<span class="fc" id="L149">                return Navigation.failure(Status.INVALID_PATH, path);</span>
+            }
+
+            Expr child;
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            if (current instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L154" title="All 3 branches covered.">                child = switch (childIndex) {</span>
+<span class="fc" id="L155">                    case 0 -&gt; binary.left();</span>
+<span class="fc" id="L156">                    case 1 -&gt; binary.right();</span>
+<span class="fc" id="L157">                    default -&gt; null;</span>
+<span class="fc" id="L158">                };</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">                if (child == null) {</span>
+<span class="fc" id="L160">                    return Navigation.failure(Status.INVALID_PATH, path);</span>
+                }
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            } else if (current instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                if (childIndex &gt;= function.arguments().size()) {</span>
+<span class="fc" id="L164">                    return Navigation.failure(Status.INVALID_PATH, path);</span>
+                }
+<span class="fc" id="L166">                child = function.arguments().get(childIndex);</span>
+            } else {
+<span class="fc" id="L168">                return Navigation.failure(Status.POSITION_NOT_PRESENT, path);</span>
+            }
+
+<span class="fc" id="L171">            parents.add(new ParentFrame(current, childIndex));</span>
+<span class="fc" id="L172">            current = child;</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        return Navigation.selected(path, current, parents);</span>
+    }
+
+    private static Expr rebuildParent(Expr parent, int childIndex, Expr rewrittenChild) {
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (parent instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L179" title="1 of 3 branches missed.">            return switch (childIndex) {</span>
+<span class="fc" id="L180">                case 0 -&gt; new BinaryExpr(rewrittenChild, binary.operator(), binary.right());</span>
+<span class="fc" id="L181">                case 1 -&gt; new BinaryExpr(binary.left(), binary.operator(), rewrittenChild);</span>
+<span class="nc" id="L182">                default -&gt; throw new IllegalStateException(</span>
+                        &quot;validated binary path became invalid&quot;);
+            };
+        }
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (parent instanceof FunctionExpr function) {</span>
+<span class="fc" id="L187">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
+<span class="fc" id="L188">            arguments.set(childIndex, rewrittenChild);</span>
+<span class="fc" id="L189">            return new FunctionExpr(function.name(), arguments);</span>
+        }
+<span class="nc" id="L191">        throw new IllegalStateException(&quot;validated path parent is not traversable&quot;);</span>
     }
 
     private static int comparePaths(List&lt;Integer&gt; a, List&lt;Integer&gt; b) {
-<span class="fc" id="L77">        int min = Math.min(a.size(), b.size());</span>
-<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int i = 0; i &lt; min; i++) {</span>
-<span class="fc" id="L79">            int cmp = Integer.compare(a.get(i), b.get(i));</span>
-<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (cmp != 0) {</span>
-<span class="fc" id="L81">                return cmp;</span>
+<span class="fc" id="L195">        int min = Math.min(a.size(), b.size());</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        for (int i = 0; i &lt; min; i++) {</span>
+<span class="fc" id="L197">            int cmp = Integer.compare(a.get(i), b.get(i));</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (cmp != 0) {</span>
+<span class="fc" id="L199">                return cmp;</span>
             }
         }
-<span class="fc" id="L84">        return Integer.compare(a.size(), b.size());</span>
+<span class="fc" id="L202">        return Integer.compare(a.size(), b.size());</span>
+    }
+
+    /** Outcome categories shared by iterative selection and replacement. */
+<span class="fc" id="L206">    public enum Status {</span>
+<span class="fc" id="L207">        SELECTED,</span>
+<span class="fc" id="L208">        REPLACED,</span>
+<span class="fc" id="L209">        INVALID_PATH,</span>
+<span class="fc" id="L210">        POSITION_NOT_PRESENT</span>
+    }
+
+    /** Typed selection outcome. A successful result exposes the selected subtree. */
+    public record SelectionResult(
+            Status status,
+            List&lt;Integer&gt; path,
+            Optional&lt;Expr&gt; selectedSubtree) {
+<span class="fc" id="L218">        public SelectionResult {</span>
+<span class="fc" id="L219">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L220">            path = List.copyOf(path);</span>
+<span class="fc" id="L221">            selectedSubtree = Objects.requireNonNull(selectedSubtree, &quot;selectedSubtree&quot;);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            boolean selected = status == Status.SELECTED;</span>
+<span class="pc bpc" id="L223" title="2 of 4 branches missed.">            if (status == Status.REPLACED || selected != selectedSubtree.isPresent()) {</span>
+<span class="nc" id="L224">                throw new IllegalArgumentException(&quot;tree selection status/payload mismatch&quot;);</span>
+            }
+<span class="fc" id="L226">        }</span>
+
+        private static SelectionResult selected(List&lt;Integer&gt; path, Expr selectedSubtree) {
+<span class="fc" id="L229">            return new SelectionResult(</span>
+                    Status.SELECTED,
+                    path,
+<span class="fc" id="L232">                    Optional.of(selectedSubtree));</span>
+        }
+
+        private static SelectionResult failure(Status status, List&lt;Integer&gt; path) {
+<span class="pc bpc" id="L236" title="2 of 4 branches missed.">            if (status == Status.SELECTED || status == Status.REPLACED) {</span>
+<span class="nc" id="L237">                throw new IllegalArgumentException(</span>
+                        &quot;successful status cannot describe selection failure&quot;);
+            }
+<span class="fc" id="L240">            return new SelectionResult(status, path, Optional.empty());</span>
+        }
+
+        public boolean success() {
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            return status == Status.SELECTED;</span>
+        }
+    }
+
+    /**
+     * Typed replacement outcome. A successful result exposes both the selected
+     * original subtree and the rewritten root; failures expose neither.
+     */
+    public record ReplacementResult(
+            Status status,
+            List&lt;Integer&gt; path,
+            Optional&lt;Expr&gt; selectedSubtree,
+            Optional&lt;Expr&gt; rewrittenRoot,
+            int copiedAncestors) {
+<span class="fc" id="L258">        public ReplacementResult {</span>
+<span class="fc" id="L259">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L260">            path = List.copyOf(path);</span>
+<span class="fc" id="L261">            selectedSubtree = Objects.requireNonNull(selectedSubtree, &quot;selectedSubtree&quot;);</span>
+<span class="fc" id="L262">            rewrittenRoot = Objects.requireNonNull(rewrittenRoot, &quot;rewrittenRoot&quot;);</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">            if (copiedAncestors &lt; 0) {</span>
+<span class="nc" id="L264">                throw new IllegalArgumentException(&quot;copied ancestor count must not be negative&quot;);</span>
+            }
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            boolean replaced = status == Status.REPLACED;</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            if (replaced != selectedSubtree.isPresent()</span>
+<span class="pc bpc" id="L268" title="2 of 6 branches missed.">                    || replaced != rewrittenRoot.isPresent()</span>
+                    || !replaced &amp;&amp; copiedAncestors != 0) {
+<span class="nc" id="L270">                throw new IllegalArgumentException(&quot;tree replacement status/payload mismatch&quot;);</span>
+            }
+<span class="fc" id="L272">        }</span>
+
+        private static ReplacementResult replaced(
+                List&lt;Integer&gt; path,
+                Expr selectedSubtree,
+                Expr rewrittenRoot,
+                int copiedAncestors) {
+<span class="fc" id="L279">            return new ReplacementResult(</span>
+                    Status.REPLACED,
+                    path,
+<span class="fc" id="L282">                    Optional.of(selectedSubtree),</span>
+<span class="fc" id="L283">                    Optional.of(rewrittenRoot),</span>
+                    copiedAncestors);
+        }
+
+        private static ReplacementResult failure(Status status, List&lt;Integer&gt; path) {
+<span class="pc bpc" id="L288" title="2 of 4 branches missed.">            if (status == Status.SELECTED || status == Status.REPLACED) {</span>
+<span class="nc" id="L289">                throw new IllegalArgumentException(</span>
+                        &quot;successful status cannot describe replacement failure&quot;);
+            }
+<span class="fc" id="L292">            return new ReplacementResult(</span>
+                    status,
+                    path,
+<span class="fc" id="L295">                    Optional.empty(),</span>
+<span class="fc" id="L296">                    Optional.empty(),</span>
+                    0);
+        }
+
+        public boolean success() {
+<span class="fc bfc" id="L301" title="All 2 branches covered.">            return status == Status.REPLACED;</span>
+        }
+    }
+
+    private record ParentFrame(Expr parent, int childIndex) {
+<span class="fc" id="L306">        private ParentFrame {</span>
+<span class="fc" id="L307">            Objects.requireNonNull(parent, &quot;parent&quot;);</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">            if (childIndex &lt; 0) {</span>
+<span class="nc" id="L309">                throw new IllegalArgumentException(&quot;child index must not be negative&quot;);</span>
+            }
+<span class="fc" id="L311">        }</span>
+    }
+
+    private record Navigation(
+            Status status,
+            List&lt;Integer&gt; path,
+            Expr selected,
+            List&lt;ParentFrame&gt; parents) {
+<span class="fc" id="L319">        private Navigation {</span>
+<span class="fc" id="L320">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L321">            path = List.copyOf(path);</span>
+<span class="fc" id="L322">            parents = List.copyOf(parents);</span>
+<span class="pc bpc" id="L323" title="1 of 8 branches missed.">            if ((status == Status.SELECTED) != (selected != null)</span>
+<span class="pc bpc" id="L324" title="1 of 4 branches missed.">                    || status == Status.SELECTED &amp;&amp; parents.size() != path.size()</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">                    || status != Status.SELECTED &amp;&amp; !parents.isEmpty()) {</span>
+<span class="nc" id="L326">                throw new IllegalArgumentException(&quot;tree navigation status/payload mismatch&quot;);</span>
+            }
+<span class="fc" id="L328">        }</span>
+
+        private static Navigation selected(
+                List&lt;Integer&gt; path,
+                Expr selected,
+                List&lt;ParentFrame&gt; parents) {
+<span class="fc" id="L334">            return new Navigation(</span>
+                    Status.SELECTED,
+                    path,
+<span class="fc" id="L337">                    Objects.requireNonNull(selected, &quot;selected&quot;),</span>
+                    parents);
+        }
+
+        private static Navigation failure(Status status, List&lt;Integer&gt; path) {
+<span class="pc bpc" id="L342" title="2 of 4 branches missed.">            if (status == Status.SELECTED || status == Status.REPLACED) {</span>
+<span class="nc" id="L343">                throw new IllegalArgumentException(</span>
+                        &quot;successful status cannot describe navigation failure&quot;);
+            }
+<span class="fc" id="L346">            return new Navigation(status, path, null, List.of());</span>
+        }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
