@@ -1,6 +1,6 @@
 def candidatePanelRoot = rootProject.layout.projectDirectory
 def candidatePanelAppProject = project(':app')
-def candidatePanelRuntimeClasspath = providers.provider {
+def candidatePanelRuntimeClasspath = candidatePanelAppProject.providers.provider {
     candidatePanelAppProject.extensions
         .getByType(org.gradle.api.tasks.SourceSetContainer)
         .named('main').get().runtimeClasspath
@@ -63,8 +63,9 @@ def candidatePanelPython = layout.buildDirectory.dir(
 def configureCandidatePanelExecution = { task, outputFile ->
     task.group = 'verification'
     task.description = 'Evaluates all three TRAIN-formed macros against the verified frozen baseline stream.'
-    task.dependsOn ':app:classes', 'verifyPairedTaskUtility'
-    task.classpath = files(candidatePanelRuntimeClasspath)
+    task.dependsOn 'classes', ':verifyPairedTaskUtility'
+    task.classpath = candidatePanelAppProject.files(
+        candidatePanelRuntimeClasspath)
     task.mainClass =
         'de.regelsuche.benchmark.CandidateIndependentMacroCandidatePanelRunner'
     task.inputs.file candidatePanelCorpus
@@ -109,16 +110,34 @@ def configureCandidatePanelCanonicalization = {
     }
 }
 
+def executeMacroCandidatePanelFirstRawAuthority =
+    candidatePanelAppProject.tasks.register(
+        'executeMacroCandidatePanelFirstRaw', JavaExec
+    ) {
+        configureCandidatePanelExecution(delegate, candidatePanelFirstRaw)
+    }
+
+def executeMacroCandidatePanelSecondRawAuthority =
+    candidatePanelAppProject.tasks.register(
+        'executeMacroCandidatePanelSecondRaw', JavaExec
+    ) {
+        configureCandidatePanelExecution(delegate, candidatePanelSecondRaw)
+    }
+
 def executeMacroCandidatePanelFirstRaw = tasks.register(
-    'executeMacroCandidatePanelFirstRaw', JavaExec
+    'executeMacroCandidatePanelFirstRaw'
 ) {
-    configureCandidatePanelExecution(delegate, candidatePanelFirstRaw)
+    group = 'verification'
+    description = 'Compatibility aggregate for the app-owned first candidate-panel execution.'
+    dependsOn executeMacroCandidatePanelFirstRawAuthority
 }
 
 def executeMacroCandidatePanelSecondRaw = tasks.register(
-    'executeMacroCandidatePanelSecondRaw', JavaExec
+    'executeMacroCandidatePanelSecondRaw'
 ) {
-    configureCandidatePanelExecution(delegate, candidatePanelSecondRaw)
+    group = 'verification'
+    description = 'Compatibility aggregate for the app-owned second candidate-panel execution.'
+    dependsOn executeMacroCandidatePanelSecondRawAuthority
 }
 
 def runMacroCandidatePanelFirst = tasks.register(

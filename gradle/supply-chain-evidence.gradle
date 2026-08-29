@@ -1,4 +1,5 @@
 import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.SortedMap
@@ -11,14 +12,21 @@ import org.gradle.api.artifacts.result.ResolvedDependencyResult
 /*
  * Checkout-owned deterministic dependency inventory foundation for issue #514.
  *
- * This deliberately uses Gradle's own resolved-component graph instead of a
- * second plugin-resolution path. The raw document is valid CycloneDX JSON and
- * contains no generated UUID or timestamp, so identical dependency graphs
- * produce identical bytes before the stricter repository normalizer runs.
+ * Resolution is deliberately performed by one task owned by each project. This
+ * gives Gradle the correct exclusive project lock under --parallel. The root
+ * cyclonedxBom task only combines immutable JSON fragments and never resolves a
+ * foreign project's configuration.
+ *
+ * The raw aggregate document is valid CycloneDX JSON and contains no generated
+ * UUID or timestamp, so identical dependency graphs produce identical bytes
+ * before the stricter repository normalizer runs.
  */
 
 def supplyChainReportDirectory = layout.buildDirectory.dir('reports/quality/supply-chain')
 def supplyChainBom = supplyChainReportDirectory.map { directory -> directory.file('bom.json') }
+def supplyChainFragmentDirectory = supplyChainReportDirectory.map { directory ->
+    directory.dir('fragments')
+}
 
 def encodePurlPart = { String value ->
     URLEncoder.encode(value, StandardCharsets.UTF_8)
@@ -35,30 +43,46 @@ def moduleReference = { identifier ->
     "pkg:maven/${group}/${module}@${version}"
 }
 
-tasks.register('cyclonedxBom') {
-    group = 'reporting'
-    description = 'Generates a deterministic aggregate CycloneDX 1.6 inventory from Gradle resolution results.'
-    notCompatibleWithConfigurationCache(
-        'The task intentionally resolves every declared project graph at execution time.')
-    outputs.file(supplyChainBom)
+def fragmentRegistrations = []
+rootProject.allprojects
+    .toList()
+    .sort { left, right -> left.path <=> right.path }
+    .each { candidateProject ->
+        def fragmentId = candidateProject.path == ':'
+            ? 'root'
+            : candidateProject.path.substring(1).replace(':', '--')
+        def fragmentFile = supplyChainFragmentDirectory
+            .map { directory -> directory.file("${fragmentId}.json") }
+            .get()
+            .asFile
+        def fragmentTask = candidateProject.tasks.register(
+            'writeSupplyChainDependencyFragment'
+        ) {
+            group = 'reporting'
+            description = 'Resolves this project dependency graph under its own Gradle project lock.'
+            notCompatibleWithConfigurationCache(
+                'The task intentionally resolves every declared graph of its owning project at execution time.')
+            outputs.file(fragmentFile)
+            outputs.upToDateWhen { false }
 
-    doLast {
-        SortedMap<String, Map<String, Object>> components = new TreeMap<>()
-        SortedMap<String, SortedSet<String>> dependencyEdges = new TreeMap<>()
-        SortedSet<String> aggregateRootDependencies = new TreeSet<>()
+            doLast {
+                SortedMap<String, Map<String, Object>> components =
+                    new TreeMap<>()
+                SortedMap<String, SortedSet<String>> dependencyEdges =
+                    new TreeMap<>()
+                SortedSet<String> projectRootDependencies =
+                    new TreeSet<>()
 
-        rootProject.allprojects
-            .toList()
-            .sort { left, right -> left.path <=> right.path }
-            .each { candidateProject ->
                 candidateProject.configurations
                     .findAll { configuration ->
                         configuration.canBeResolved
-                            && !configuration.name.startsWith('detachedConfiguration')
+                            && !configuration.name.startsWith(
+                                'detachedConfiguration')
                     }
                     .sort { left, right -> left.name <=> right.name }
                     .each { configuration ->
-                        def resolutionResult = configuration.incoming.resolutionResult
+                        def resolutionResult =
+                            configuration.incoming.resolutionResult
                         resolutionResult.allComponents.each { component ->
                             def identifier = component.id
                             def reference = moduleReference(identifier)
@@ -73,25 +97,109 @@ tasks.register('cyclonedxBom') {
                                 version: identifier.version,
                                 purl: reference
                             ])
-                            dependencyEdges.computeIfAbsent(reference) { new TreeSet<>() }
+                            dependencyEdges.computeIfAbsent(reference) {
+                                new TreeSet<>()
+                            }
                         }
                         resolutionResult.allDependencies
-                            .findAll { dependency -> dependency instanceof ResolvedDependencyResult }
+                            .findAll { dependency ->
+                                dependency instanceof ResolvedDependencyResult
+                            }
                             .each { ResolvedDependencyResult dependency ->
-                                def sourceReference = moduleReference(dependency.from.id)
-                                def targetReference = moduleReference(dependency.selected.id)
+                                def sourceReference =
+                                    moduleReference(dependency.from.id)
+                                def targetReference =
+                                    moduleReference(dependency.selected.id)
                                 if (targetReference == null) {
                                     return
                                 }
                                 if (sourceReference == null) {
-                                    aggregateRootDependencies.add(targetReference)
+                                    projectRootDependencies.add(
+                                        targetReference)
                                 } else if (sourceReference != targetReference) {
                                     dependencyEdges
-                                        .computeIfAbsent(sourceReference) { new TreeSet<>() }
+                                        .computeIfAbsent(sourceReference) {
+                                            new TreeSet<>()
+                                        }
                                         .add(targetReference)
                                 }
                             }
                     }
+
+                def fragment = [
+                    projectPath: candidateProject.path,
+                    components: components.values().toList(),
+                    dependencies: dependencyEdges.collect {
+                        reference, targets ->
+                        [ref: reference, dependsOn: targets.toList()]
+                    },
+                    rootDependencies: projectRootDependencies.toList()
+                ]
+                fragmentFile.parentFile.mkdirs()
+                fragmentFile.setText(
+                    JsonOutput.prettyPrint(JsonOutput.toJson(fragment))
+                        + '\n',
+                    'UTF-8')
+            }
+        }
+        fragmentRegistrations.add([
+            projectPath: candidateProject.path,
+            file: fragmentFile,
+            task: fragmentTask
+        ])
+    }
+
+tasks.register('cyclonedxBom') {
+    group = 'reporting'
+    description = 'Generates a deterministic aggregate CycloneDX 1.6 inventory from project-local resolution fragments.'
+    dependsOn fragmentRegistrations.collect { registration ->
+        registration.task
+    }
+    notCompatibleWithConfigurationCache(
+        'The task intentionally aggregates freshly resolved project dependency fragments.')
+    inputs.files(fragmentRegistrations.collect { registration ->
+        registration.file
+    })
+    outputs.file(supplyChainBom)
+
+    doLast {
+        SortedMap<String, Map<String, Object>> components = new TreeMap<>()
+        SortedMap<String, SortedSet<String>> dependencyEdges = new TreeMap<>()
+        SortedSet<String> aggregateRootDependencies = new TreeSet<>()
+        def parser = new JsonSlurper()
+
+        fragmentRegistrations
+            .sort { left, right ->
+                left.projectPath <=> right.projectPath
+            }
+            .each { registration ->
+                def fragment = parser.parse(registration.file)
+                if (fragment.projectPath != registration.projectPath) {
+                    throw new GradleException(
+                        "dependency fragment project mismatch: "
+                            + registration.projectPath)
+                }
+                fragment.components.each { component ->
+                    def reference = component['bom-ref']
+                    def previous = components.putIfAbsent(
+                        reference,
+                        new LinkedHashMap<String, Object>(component))
+                    if (previous != null && previous != component) {
+                        throw new GradleException(
+                            "conflicting dependency component: ${reference}")
+                    }
+                    dependencyEdges.computeIfAbsent(reference) {
+                        new TreeSet<>()
+                    }
+                }
+                fragment.dependencies.each { dependency ->
+                    def reference = dependency.ref
+                    dependencyEdges
+                        .computeIfAbsent(reference) { new TreeSet<>() }
+                        .addAll(dependency.dependsOn)
+                }
+                aggregateRootDependencies.addAll(
+                    fragment.rootDependencies)
             }
 
         if (components.isEmpty()) {
@@ -102,12 +210,14 @@ tasks.register('cyclonedxBom') {
         if (projectVersion == 'unspecified') {
             projectVersion = 'development'
         }
-        def rootReference = "pkg:maven/de.regelsuche/Regelsuche@${encodePurlPart(projectVersion)}"
+        def rootReference =
+            "pkg:maven/de.regelsuche/Regelsuche@${encodePurlPart(projectVersion)}"
         def dependencyEntries = [[
             ref: rootReference,
             dependsOn: aggregateRootDependencies.toList()
         ]]
-        dependencyEntries.addAll(dependencyEdges.collect { reference, targets ->
+        dependencyEntries.addAll(dependencyEdges.collect {
+            reference, targets ->
             [ref: reference, dependsOn: targets.toList()]
         })
 
@@ -139,6 +249,8 @@ tasks.register('cyclonedxBom') {
 
         def outputFile = supplyChainBom.get().asFile
         outputFile.parentFile.mkdirs()
-        outputFile.setText(JsonOutput.prettyPrint(JsonOutput.toJson(bom)) + '\n', 'UTF-8')
+        outputFile.setText(
+            JsonOutput.prettyPrint(JsonOutput.toJson(bom)) + '\n',
+            'UTF-8')
     }
 }

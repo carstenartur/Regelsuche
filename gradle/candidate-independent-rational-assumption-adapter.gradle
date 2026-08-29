@@ -1,7 +1,7 @@
 def rationalAdapterRepositoryRoot = layout.projectDirectory
 def rationalAdapterRepositoryRootPath = rationalAdapterRepositoryRoot.asFile.absolutePath
 def rationalAdapterReleaseProject = project(':regelsuche-release')
-def rationalAdapterRuntimeClasspath = providers.provider {
+def rationalAdapterRuntimeClasspath = rationalAdapterReleaseProject.providers.provider {
     rationalAdapterReleaseProject.extensions
         .getByType(org.gradle.api.tasks.SourceSetContainer)
         .named('main').get().runtimeClasspath
@@ -96,10 +96,11 @@ def prepareCandidateIndependentRationalBenchmarkSource = tasks.register(
 def configureRationalAdapterRun = { task, outputFile ->
     task.group = 'verification'
     task.description = 'Executes target-free rational candidate formation and the complete frozen held-out task matrix.'
-    task.dependsOn ':regelsuche-release:classes',
-        'verifyCandidateIndependentCaseCorpus',
-        prepareCandidateIndependentRationalBenchmarkSource
-    task.classpath = files(rationalAdapterRuntimeClasspath)
+    task.dependsOn 'classes',
+        ':verifyCandidateIndependentCaseCorpus',
+        ':prepareCandidateIndependentRationalBenchmarkSource'
+    task.classpath = rationalAdapterReleaseProject.files(
+        rationalAdapterRuntimeClasspath)
     task.mainClass = 'de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain'
     task.inputs.file rationalAdapterBenchmarkSource
     task.inputs.file rationalAdapterAdaptedBenchmarkSource
@@ -124,18 +125,36 @@ def configureRationalAdapterRun = { task, outputFile ->
     }
 }
 
+def runCandidateIndependentRationalAssumptionAdapterFirstAuthority =
+    rationalAdapterReleaseProject.tasks.register(
+        'runCandidateIndependentRationalAssumptionAdapterFirst',
+        JavaExec
+    ) {
+        configureRationalAdapterRun(delegate, rationalAdapterFirst)
+    }
+
+def runCandidateIndependentRationalAssumptionAdapterSecondAuthority =
+    rationalAdapterReleaseProject.tasks.register(
+        'runCandidateIndependentRationalAssumptionAdapterSecond',
+        JavaExec
+    ) {
+        configureRationalAdapterRun(delegate, rationalAdapterSecond)
+    }
+
 def runCandidateIndependentRationalAssumptionAdapterFirst = tasks.register(
-    'runCandidateIndependentRationalAssumptionAdapterFirst',
-    JavaExec
+    'runCandidateIndependentRationalAssumptionAdapterFirst'
 ) {
-    configureRationalAdapterRun(delegate, rationalAdapterFirst)
+    group = 'verification'
+    description = 'Compatibility aggregate for the release-owned first rational adapter execution.'
+    dependsOn runCandidateIndependentRationalAssumptionAdapterFirstAuthority
 }
 
 def runCandidateIndependentRationalAssumptionAdapterSecond = tasks.register(
-    'runCandidateIndependentRationalAssumptionAdapterSecond',
-    JavaExec
+    'runCandidateIndependentRationalAssumptionAdapterSecond'
 ) {
-    configureRationalAdapterRun(delegate, rationalAdapterSecond)
+    group = 'verification'
+    description = 'Compatibility aggregate for the release-owned second rational adapter execution.'
+    dependsOn runCandidateIndependentRationalAssumptionAdapterSecondAuthority
 }
 
 def verifyCandidateIndependentRationalAssumptionAdapter = tasks.register(

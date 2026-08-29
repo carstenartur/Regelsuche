@@ -205,48 +205,10 @@ def runTargetFreeHeldOutReproductionImage = tasks.register(
 }
 
 def verifyTargetFreeHeldOutContainerReproduction = tasks.register(
-    'verifyTargetFreeHeldOutContainerReproduction', JavaExec) {
+    'verifyTargetFreeHeldOutContainerReproduction'
+) {
     group = 'verification'
-    description = 'Requires byte-identical host-repeat and pinned-container held-out evidence.'
-    dependsOn ':regelsuche-discovery:classes',
-        ':regelsuche-discovery:generateTargetFreeHeldOutMatrixHostA',
-        ':regelsuche-discovery:generateTargetFreeHeldOutMatrixHostB',
-        runTargetFreeHeldOutReproductionImage
-    timeout = java.time.Duration.ofMinutes(3)
-    mainClass = 'de.regelsuche.discovery.representation.TargetFreeHeldOutContainerReproductionVerifier'
-    argumentProviders.add({
-        [
-            authoritativeRevision.get(),
-            repositoryRoot.asFile.absolutePath,
-            hostRunA.get().absolutePath,
-            hostRunB.get().absolutePath,
-            containerRun.get().absolutePath,
-            dockerfile.asFile.absolutePath,
-            imageIdFile.get().absolutePath,
-            containerPlatform,
-            verifierSchema.asFile.absolutePath,
-            reproductionManifest.get().absolutePath
-        ]
-    } as CommandLineArgumentProvider)
-    inputs.property('repositoryRevision', authoritativeRevision)
-    inputs.file verifierSchema
-    inputs.file dockerfile
-    inputs.file wrapperProperties
-    inputs.file imageIdFile
-    inputs.dir hostRunA
-    inputs.dir hostRunB
-    inputs.dir containerRun
-    outputs.file reproductionManifest
-    outputs.upToDateWhen { false }
-    doFirst {
-        reproductionManifest.get().parentFile.mkdirs()
-    }
-    doLast {
-        if (!reproductionManifest.get().isFile()) {
-            throw new GradleException(
-                'Held-out container reproduction manifest was not written')
-        }
-    }
+    description = 'Compatibility aggregate for the discovery-owned held-out container verifier.'
 }
 
 project(':regelsuche-discovery') { discovery ->
@@ -264,19 +226,66 @@ project(':regelsuche-discovery') { discovery ->
             'generateTargetFreeHeldOutMatrix',
             requestedOutput,
             'Executes and writes the complete target-free held-out matrix.')
-        registerMatrixRun(
+        def hostRunATask = registerMatrixRun(
             discovery,
             'generateTargetFreeHeldOutMatrixHostA',
             hostRunA,
             'Executes the first checkout-JVM held-out reproduction run.')
-        registerMatrixRun(
+        def hostRunBTask = registerMatrixRun(
             discovery,
             'generateTargetFreeHeldOutMatrixHostB',
             hostRunB,
             'Executes the second checkout-JVM held-out reproduction run.')
-        verifyTargetFreeHeldOutContainerReproduction.configure {
+        def verifierAuthority = discovery.tasks.register(
+            'verifyTargetFreeHeldOutContainerReproduction',
+            JavaExec
+        ) {
+            group = 'verification'
+            description = 'Requires byte-identical host-repeat and pinned-container held-out evidence.'
+            dependsOn discovery.tasks.named('testClasses'),
+                hostRunATask,
+                hostRunBTask,
+                runTargetFreeHeldOutReproductionImage
+            timeout = java.time.Duration.ofMinutes(3)
             classpath = discovery.extensions.getByName('sourceSets')
-                .getByName('main').runtimeClasspath
+                .getByName('test').runtimeClasspath
+            mainClass = 'de.regelsuche.discovery.representation.TargetFreeHeldOutContainerReproductionVerifier'
+            argumentProviders.add({
+                [
+                    authoritativeRevision.get(),
+                    repositoryRoot.asFile.absolutePath,
+                    hostRunA.get().absolutePath,
+                    hostRunB.get().absolutePath,
+                    containerRun.get().absolutePath,
+                    dockerfile.asFile.absolutePath,
+                    imageIdFile.get().absolutePath,
+                    containerPlatform,
+                    verifierSchema.asFile.absolutePath,
+                    reproductionManifest.get().absolutePath
+                ]
+            } as CommandLineArgumentProvider)
+            inputs.property('repositoryRevision', authoritativeRevision)
+            inputs.file verifierSchema
+            inputs.file dockerfile
+            inputs.file wrapperProperties
+            inputs.file imageIdFile
+            inputs.dir hostRunA
+            inputs.dir hostRunB
+            inputs.dir containerRun
+            outputs.file reproductionManifest
+            outputs.upToDateWhen { false }
+            doFirst {
+                reproductionManifest.get().parentFile.mkdirs()
+            }
+            doLast {
+                if (!reproductionManifest.get().isFile()) {
+                    throw new GradleException(
+                        'Held-out container reproduction manifest was not written')
+                }
+            }
+        }
+        verifyTargetFreeHeldOutContainerReproduction.configure {
+            dependsOn verifierAuthority
         }
     }
 }
