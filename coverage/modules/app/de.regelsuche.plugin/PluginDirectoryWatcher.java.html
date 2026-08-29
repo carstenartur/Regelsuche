@@ -10,108 +10,242 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.time.Duration;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 /**
- * Watches the plugins/ and rules/ directories for file system changes and triggers
- * a debounced reload on the provided {@link PluginRuntime}.
+ * Watches the plugins/ and rules/ directories and reloads the runtime after a
+ * complete trailing-edge quiet period.
+ *
+ * &lt;p&gt;Filesystem observation, debounce and reload execution deliberately share
+ * one watch-loop authority. A later event resets the quiet period instead of
+ * racing a separately scheduled reload task. Content-neutral duplicate events
+ * complete a debounce cycle but do not emit a user-visible reload callback.&lt;/p&gt;
  */
 public final class PluginDirectoryWatcher implements Closeable {
-<span class="fc" id="L25">    private static final Logger LOGGER = Logger.getLogger(PluginDirectoryWatcher.class.getName());</span>
-<span class="fc" id="L26">    private static final Duration DEFAULT_DEBOUNCE = Duration.ofMillis(300);</span>
+<span class="fc" id="L29">    private static final Logger LOGGER = Logger.getLogger(</span>
+<span class="fc" id="L30">        PluginDirectoryWatcher.class.getName());</span>
+<span class="fc" id="L31">    private static final Duration DEFAULT_DEBOUNCE =</span>
+<span class="fc" id="L32">        Duration.ofMillis(300);</span>
 
     private final PluginRuntime runtime;
-    private final Duration debounce;
+    private final long debounceNanos;
     private final Consumer&lt;PluginReloadResult&gt; listener;
-<span class="fc" id="L31">    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -&gt; {</span>
-<span class="fc" id="L32">        Thread t = new Thread(r, &quot;plugin-dir-watcher&quot;);</span>
-<span class="fc" id="L33">        t.setDaemon(true);</span>
-<span class="fc" id="L34">        return t;</span>
-    });
+    private final Consumer&lt;Boolean&gt; cycleListener;
+    private volatile boolean running;
+    private boolean started;
     private WatchService watchService;
     private Thread watchThread;
-    private volatile ScheduledFuture&lt;?&gt; pending;
-    private volatile boolean running;
+    private ReportedState reportedState;
 
     public PluginDirectoryWatcher(PluginRuntime runtime) {
-<span class="nc" id="L42">        this(runtime, DEFAULT_DEBOUNCE, result -&gt; {});</span>
-<span class="nc" id="L43">    }</span>
+<span class="nc" id="L45">        this(runtime, DEFAULT_DEBOUNCE, result -&gt; { });</span>
+<span class="nc" id="L46">    }</span>
 
-<span class="fc" id="L45">    public PluginDirectoryWatcher(PluginRuntime runtime, Duration debounce, Consumer&lt;PluginReloadResult&gt; listener) {</span>
-<span class="fc" id="L46">        this.runtime = runtime;</span>
-<span class="fc" id="L47">        this.debounce = debounce;</span>
-<span class="fc" id="L48">        this.listener = listener;</span>
-<span class="fc" id="L49">    }</span>
+    public PluginDirectoryWatcher(
+        PluginRuntime runtime,
+        Duration debounce,
+        Consumer&lt;PluginReloadResult&gt; listener
+    ) {
+<span class="fc" id="L53">        this(runtime, debounce, listener, changed -&gt; { });</span>
+<span class="fc" id="L54">    }</span>
 
-    public void start() throws IOException {
-<span class="fc" id="L52">        watchService = FileSystems.getDefault().newWatchService();</span>
-<span class="fc" id="L53">        registerIfExists(runtime.config().pluginsDirectory());</span>
-<span class="fc" id="L54">        registerIfExists(runtime.config().rulesDirectory());</span>
-<span class="fc" id="L55">        running = true;</span>
-<span class="fc" id="L56">        watchThread = new Thread(this::watchLoop, &quot;plugin-dir-watch-loop&quot;);</span>
-<span class="fc" id="L57">        watchThread.setDaemon(true);</span>
-<span class="fc" id="L58">        watchThread.start();</span>
-<span class="fc" id="L59">    }</span>
+    PluginDirectoryWatcher(
+        PluginRuntime runtime,
+        Duration debounce,
+        Consumer&lt;PluginReloadResult&gt; listener,
+        Consumer&lt;Boolean&gt; cycleListener
+<span class="fc" id="L61">    ) {</span>
+<span class="fc" id="L62">        this.runtime = Objects.requireNonNull(runtime, &quot;runtime&quot;);</span>
+<span class="fc" id="L63">        this.debounceNanos = debounceNanos(debounce);</span>
+<span class="fc" id="L64">        this.listener = Objects.requireNonNull(listener, &quot;listener&quot;);</span>
+<span class="fc" id="L65">        this.cycleListener = Objects.requireNonNull(</span>
+            cycleListener,
+            &quot;cycleListener&quot;);
+<span class="fc" id="L68">        this.reportedState = ReportedState.from(runtime);</span>
+<span class="fc" id="L69">    }</span>
 
-    private void registerIfExists(Path dir) throws IOException {
-<span class="pc bpc" id="L62" title="1 of 4 branches missed.">        if (dir != null &amp;&amp; Files.isDirectory(dir)) {</span>
-<span class="fc" id="L63">            dir.register(watchService,</span>
+    public synchronized void start() throws IOException {
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (started) {</span>
+<span class="nc" id="L73">            throw new IllegalStateException(</span>
+                &quot;plugin directory watcher has already been started&quot;);
+        }
+
+<span class="fc" id="L77">        WatchService service = FileSystems.getDefault().newWatchService();</span>
+        try {
+<span class="fc" id="L79">            registerIfExists(</span>
+                service,
+<span class="fc" id="L81">                runtime.config().pluginsDirectory());</span>
+<span class="fc" id="L82">            registerIfExists(service, runtime.config().rulesDirectory());</span>
+<span class="nc" id="L83">        } catch (IOException exception) {</span>
+<span class="nc" id="L84">            service.close();</span>
+<span class="nc" id="L85">            throw exception;</span>
+<span class="fc" id="L86">        }</span>
+
+<span class="fc" id="L88">        reportedState = ReportedState.from(runtime);</span>
+<span class="fc" id="L89">        watchService = service;</span>
+<span class="fc" id="L90">        running = true;</span>
+<span class="fc" id="L91">        started = true;</span>
+<span class="fc" id="L92">        watchThread = new Thread(</span>
+<span class="fc" id="L93">            () -&gt; watchLoop(service),</span>
+            &quot;plugin-dir-watch-loop&quot;);
+<span class="fc" id="L95">        watchThread.setDaemon(true);</span>
+<span class="fc" id="L96">        watchThread.start();</span>
+<span class="fc" id="L97">    }</span>
+
+    private static long debounceNanos(Duration debounce) {
+<span class="fc" id="L100">        Duration required = Objects.requireNonNull(debounce, &quot;debounce&quot;);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (required.isNegative()) {</span>
+<span class="nc" id="L102">            throw new IllegalArgumentException(</span>
+                &quot;plugin directory debounce must not be negative&quot;);
+        }
+        try {
+<span class="fc" id="L106">            return required.toNanos();</span>
+<span class="nc" id="L107">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(</span>
+                &quot;plugin directory debounce is too large&quot;,
+                exception);
+        }
+    }
+
+    private static void registerIfExists(
+        WatchService service,
+        Path directory
+    ) throws IOException {
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">        if (directory != null &amp;&amp; Files.isDirectory(directory)) {</span>
+<span class="fc" id="L119">            directory.register(</span>
+                service,
                 StandardWatchEventKinds.ENTRY_CREATE,
                 StandardWatchEventKinds.ENTRY_MODIFY,
                 StandardWatchEventKinds.ENTRY_DELETE);
         }
-<span class="fc" id="L68">    }</span>
+<span class="fc" id="L125">    }</span>
 
-    private void watchLoop() {
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        while (running) {</span>
-            WatchKey key;
-            try {
-<span class="fc" id="L74">                key = watchService.poll(500, TimeUnit.MILLISECONDS);</span>
-<span class="nc" id="L75">            } catch (InterruptedException e) {</span>
-<span class="nc" id="L76">                Thread.currentThread().interrupt();</span>
-<span class="nc" id="L77">                break;</span>
-<span class="fc" id="L78">            } catch (ClosedWatchServiceException e) {</span>
-<span class="fc" id="L79">                break;</span>
-<span class="fc" id="L80">            }</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (key == null) {</span>
-<span class="fc" id="L82">                continue;</span>
-            }
-<span class="fc" id="L84">            key.pollEvents();</span>
-<span class="fc" id="L85">            key.reset();</span>
-<span class="fc" id="L86">            scheduleReload();</span>
-<span class="fc" id="L87">        }</span>
-<span class="fc" id="L88">    }</span>
-
-    private void scheduleReload() {
-<span class="fc" id="L91">        ScheduledFuture&lt;?&gt; existing = pending;</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (existing != null) {</span>
-<span class="fc" id="L93">            existing.cancel(false);</span>
+    private void watchLoop(WatchService service) {
+        try {
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            while (running) {</span>
+<span class="fc" id="L130">                WatchKey key = service.take();</span>
+<span class="fc" id="L131">                drain(key);</span>
+<span class="pc bpc" id="L132" title="2 of 4 branches missed.">                if (!running || !awaitQuietPeriod(service)) {</span>
+<span class="nc" id="L133">                    break;</span>
+                }
+<span class="fc" id="L135">                reloadAndReportCycle();</span>
+<span class="fc" id="L136">            }</span>
+<span class="nc" id="L137">        } catch (InterruptedException exception) {</span>
+<span class="nc" id="L138">            Thread.currentThread().interrupt();</span>
+<span class="fc" id="L139">        } catch (ClosedWatchServiceException exception) {</span>
+            // Closing the WatchService is the normal shutdown signal.
+        } finally {
+<span class="fc" id="L142">            running = false;</span>
         }
-<span class="fc" id="L95">        pending = scheduler.schedule(() -&gt; {</span>
-            try {
-<span class="fc" id="L97">                PluginReloadResult result = runtime.reloadWithResult();</span>
-<span class="fc" id="L98">                listener.accept(result);</span>
-<span class="nc" id="L99">            } catch (Exception ex) {</span>
-<span class="nc" id="L100">                LOGGER.warning(&quot;Hot reload failed: &quot; + ex.getMessage());</span>
-<span class="fc" id="L101">            }</span>
-<span class="fc" id="L102">        }, debounce.toMillis(), TimeUnit.MILLISECONDS);</span>
-<span class="fc" id="L103">    }</span>
+<span class="fc" id="L144">    }</span>
+
+    private boolean awaitQuietPeriod(
+        WatchService service
+    ) throws InterruptedException {
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        while (running) {</span>
+<span class="fc" id="L150">            WatchKey next = service.poll(</span>
+                debounceNanos,
+                TimeUnit.NANOSECONDS);
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            if (next == null) {</span>
+<span class="fc" id="L154">                return running;</span>
+            }
+<span class="fc" id="L156">            drain(next);</span>
+<span class="fc" id="L157">        }</span>
+<span class="nc" id="L158">        return false;</span>
+    }
+
+    private static void drain(WatchKey key) {
+<span class="fc" id="L162">        key.pollEvents();</span>
+<span class="fc" id="L163">        key.reset();</span>
+<span class="fc" id="L164">    }</span>
+
+    private void reloadAndReportCycle() {
+        try {
+<span class="fc" id="L168">            PluginReloadResult result = runtime.reloadWithResult();</span>
+<span class="fc" id="L169">            ReportedState current = ReportedState.from(result);</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">            boolean changed = !result.pluginChanges().isEmpty()</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                || !result.ruleFileChanges().isEmpty()</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                || !current.equals(reportedState);</span>
+<span class="fc" id="L173">            reportedState = current;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            if (changed) {</span>
+<span class="fc" id="L175">                listener.accept(result);</span>
+            }
+<span class="fc" id="L177">            cycleListener.accept(changed);</span>
+<span class="nc" id="L178">        } catch (Exception exception) {</span>
+<span class="nc" id="L179">            LOGGER.warning(</span>
+<span class="nc" id="L180">                &quot;Hot reload failed: &quot; + exception.getMessage());</span>
+<span class="fc" id="L181">        }</span>
+<span class="fc" id="L182">    }</span>
 
     @Override
     public void close() throws IOException {
-<span class="fc" id="L107">        running = false;</span>
-<span class="fc" id="L108">        scheduler.shutdownNow();</span>
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (watchService != null) {</span>
-<span class="fc" id="L110">            watchService.close();</span>
+        WatchService service;
+        Thread thread;
+<span class="fc" id="L188">        synchronized (this) {</span>
+<span class="fc" id="L189">            running = false;</span>
+<span class="fc" id="L190">            service = watchService;</span>
+<span class="fc" id="L191">            thread = watchThread;</span>
+<span class="fc" id="L192">            watchService = null;</span>
+<span class="fc" id="L193">            watchThread = null;</span>
+<span class="fc" id="L194">        }</span>
+
+<span class="fc" id="L196">        IOException closeFailure = null;</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (service != null) {</span>
+            try {
+<span class="fc" id="L199">                service.close();</span>
+<span class="nc" id="L200">            } catch (IOException exception) {</span>
+<span class="nc" id="L201">                closeFailure = exception;</span>
+<span class="fc" id="L202">            }</span>
         }
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (watchThread != null) {</span>
-<span class="fc" id="L113">            watchThread.interrupt();</span>
+<span class="pc bpc" id="L204" title="2 of 4 branches missed.">        if (thread != null &amp;&amp; thread != Thread.currentThread()) {</span>
+<span class="fc" id="L205">            thread.interrupt();</span>
+            try {
+<span class="fc" id="L207">                thread.join();</span>
+<span class="nc" id="L208">            } catch (InterruptedException exception) {</span>
+<span class="nc" id="L209">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L210">                IOException interrupted = new IOException(</span>
+                    &quot;interrupted while stopping plugin directory watcher&quot;,
+                    exception);
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                if (closeFailure == null) {</span>
+<span class="nc" id="L214">                    closeFailure = interrupted;</span>
+                } else {
+<span class="nc" id="L216">                    closeFailure.addSuppressed(interrupted);</span>
+                }
+<span class="fc" id="L218">            }</span>
         }
-<span class="fc" id="L115">    }</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (closeFailure != null) {</span>
+<span class="nc" id="L221">            throw closeFailure;</span>
+        }
+<span class="fc" id="L223">    }</span>
+
+    private record ReportedState(
+        List&lt;PluginRuntime.RuntimeDiagnostic&gt; diagnostics,
+        List&lt;RuleConflictDetector.RuleConflict&gt; conflicts,
+        List&lt;RuleConflictDetector.CyclicConflict&gt; cyclicConflicts
+    ) {
+<span class="fc" id="L230">        private ReportedState {</span>
+<span class="fc" id="L231">            diagnostics = List.copyOf(diagnostics);</span>
+<span class="fc" id="L232">            conflicts = List.copyOf(conflicts);</span>
+<span class="fc" id="L233">            cyclicConflicts = List.copyOf(cyclicConflicts);</span>
+<span class="fc" id="L234">        }</span>
+
+        private static ReportedState from(PluginRuntime runtime) {
+<span class="fc" id="L237">            return new ReportedState(</span>
+<span class="fc" id="L238">                runtime.diagnostics(),</span>
+<span class="fc" id="L239">                runtime.conflicts(),</span>
+<span class="fc" id="L240">                runtime.cyclicConflicts());</span>
+        }
+
+        private static ReportedState from(PluginReloadResult result) {
+<span class="fc" id="L244">            return new ReportedState(</span>
+<span class="fc" id="L245">                result.diagnostics(),</span>
+<span class="fc" id="L246">                result.conflicts(),</span>
+<span class="fc" id="L247">                result.cyclicConflicts());</span>
+        }
+    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
