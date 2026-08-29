@@ -206,7 +206,7 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: sympy-runtime-verification
-          path: build/authority-evidence/sympy
+          path: build/authority-evidence/sympy/regelsuche-math-sympy/build
       - name: Verify complete cross-authority coverage
         run: >-
           python3 -B scripts/verify-cross-authority-coverage.py

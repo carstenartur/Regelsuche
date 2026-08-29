@@ -108,8 +108,9 @@ verändern.
 
 ### Parallele CI-Autoritäten ohne reduzierte Aussagekraft
 
-GitHub Actions verkürzt ausschließlich die Wandzeit des vollständigen
-Checkout-Vertrags. Vier unabhängige, frische Checkouts beginnen gleichzeitig:
+Bei normalen `push`- und `pull_request`-Läufen verkürzt GitHub Actions
+ ausschließlich die Wandzeit des vollständigen Checkout-Vertrags. Vier
+unabhängige, frische Checkouts beginnen gleichzeitig:
 
 1. die checkout-lokale Gradle-Korrektheitsautorität ohne doppelte JMH- und
    geladene SymPy-Laufzeitarbeit;
@@ -117,6 +118,11 @@ Checkout-Vertrags. Vier unabhängige, frische Checkouts beginnen gleichzeitig:
 3. die unveränderte vollständige SymPy-Laufzeit- und JaCoCo-Autorität auf einem
    eigenen Runner;
 4. der vollständige Maven-Produkt- und Docker-Vertrag.
+
+Der Showcase-Train-Freeze-Lauf über das `create`-Ereignis verwendet dagegen
+nur Gradle, JMH und SymPy. Der Maven-Produkt-/Docker-Job ist für dieses Ereignis
+bewusst nicht erforderlich; der Konvergenzcheck behandelt diese Ausnahme
+explizit und weiterhin fail-closed.
 
 Die Delegation der SymPy-Laufzeittests ist doppelt fail-closed: Sowohl die
 Gradle-Property als auch der Workflow-Autorisierungsmarker müssen vorhanden
