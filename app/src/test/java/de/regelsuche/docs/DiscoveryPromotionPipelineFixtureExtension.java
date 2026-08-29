@@ -143,6 +143,33 @@ final class DiscoveryPromotionPipelineFixture {
         return report;
     }
 
+    Path copyOutputTo(Path target) {
+        try {
+            copyRecursively(outputDirectory, target);
+            assertEquivalentTree(target);
+            return target;
+        } catch (IOException exception) {
+            throw new UncheckedIOException(
+                "Cannot copy shared discovery-promotion fixture",
+                exception
+            );
+        }
+    }
+
+    void assertEquivalentTree(Path candidate) {
+        try {
+            assertTreeState(
+                treeState(candidate),
+                "Discovery-promotion evidence tree differs"
+            );
+        } catch (IOException exception) {
+            throw new AssertionError(
+                "Cannot verify discovery-promotion evidence tree",
+                exception
+            );
+        }
+    }
+
     Set<String> candidateIdsFromCampaigns(Set<String> campaignIds) {
         TreeSet<String> ids = new TreeSet<>();
         report.promotionRecords().stream()
@@ -190,19 +217,9 @@ final class DiscoveryPromotionPipelineFixture {
 
     void assertUnchanged() {
         try {
-            Map<String, String> actual = treeState(outputDirectory);
-            if (expectedTreeState.equals(actual)) {
-                return;
-            }
-            TreeSet<String> changed = new TreeSet<>();
-            changed.addAll(expectedTreeState.keySet());
-            changed.addAll(actual.keySet());
-            changed.removeIf(path -> Objects.equals(
-                expectedTreeState.get(path),
-                actual.get(path)
-            ));
-            throw new AssertionError(
-                "Shared discovery-promotion fixture was mutated: " + changed
+            assertTreeState(
+                treeState(outputDirectory),
+                "Shared discovery-promotion fixture was mutated"
             );
         } catch (IOException exception) {
             throw new AssertionError(
@@ -210,6 +227,23 @@ final class DiscoveryPromotionPipelineFixture {
                 exception
             );
         }
+    }
+
+    private void assertTreeState(
+        Map<String, String> actual,
+        String message
+    ) {
+        if (expectedTreeState.equals(actual)) {
+            return;
+        }
+        TreeSet<String> changed = new TreeSet<>();
+        changed.addAll(expectedTreeState.keySet());
+        changed.addAll(actual.keySet());
+        changed.removeIf(path -> Objects.equals(
+            expectedTreeState.get(path),
+            actual.get(path)
+        ));
+        throw new AssertionError(message + ": " + changed);
     }
 
     private static Map<String, String> treeState(Path root)
@@ -247,6 +281,44 @@ final class DiscoveryPromotionPipelineFixture {
             }
         }
         return Map.copyOf(state);
+    }
+
+    private static void copyRecursively(Path source, Path target)
+            throws IOException {
+        Path normalizedSource = source.toAbsolutePath().normalize();
+        Path normalizedTarget = target.toAbsolutePath().normalize();
+        if (normalizedTarget.equals(normalizedSource)
+                || normalizedTarget.startsWith(normalizedSource)) {
+            throw new IOException(
+                "Fixture copy target must be outside the source tree: "
+                    + normalizedTarget
+            );
+        }
+        deleteRecursively(normalizedTarget);
+        try (Stream<Path> paths = Files.walk(normalizedSource)) {
+            for (Path path : paths.sorted().toList()) {
+                Path relative = normalizedSource.relativize(path);
+                Path destination = normalizedTarget.resolve(relative).normalize();
+                if (!destination.startsWith(normalizedTarget)) {
+                    throw new IOException(
+                        "Fixture copy escaped target root: " + relative
+                    );
+                }
+                if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+                    Files.createDirectories(destination);
+                } else if (Files.isRegularFile(
+                    path,
+                    LinkOption.NOFOLLOW_LINKS
+                )) {
+                    Files.createDirectories(destination.getParent());
+                    Files.copy(path, destination);
+                } else {
+                    throw new IOException(
+                        "Fixture copy rejects non-regular entry: " + relative
+                    );
+                }
+            }
+        }
     }
 
     private static String sha256(byte[] bytes) {
