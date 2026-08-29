@@ -58,7 +58,7 @@ def configureRecurrenceAdapterRun = { task, outputFile ->
     }
 }
 
-def runCandidateIndependentLinearRecurrenceAdapterFirst =
+def runCandidateIndependentLinearRecurrenceAdapterFirstAuthority =
     recurrenceAdapterReleaseProject.tasks.register(
         'runCandidateIndependentLinearRecurrenceAdapterFirst',
         JavaExec
@@ -66,13 +66,29 @@ def runCandidateIndependentLinearRecurrenceAdapterFirst =
         configureRecurrenceAdapterRun(delegate, recurrenceAdapterFirst)
     }
 
-def runCandidateIndependentLinearRecurrenceAdapterSecond =
+def runCandidateIndependentLinearRecurrenceAdapterSecondAuthority =
     recurrenceAdapterReleaseProject.tasks.register(
         'runCandidateIndependentLinearRecurrenceAdapterSecond',
         JavaExec
     ) {
         configureRecurrenceAdapterRun(delegate, recurrenceAdapterSecond)
     }
+
+def runCandidateIndependentLinearRecurrenceAdapterFirst = tasks.register(
+    'runCandidateIndependentLinearRecurrenceAdapterFirst'
+) {
+    group = 'verification'
+    description = 'Compatibility aggregate for the release-owned first recurrence adapter execution.'
+    dependsOn runCandidateIndependentLinearRecurrenceAdapterFirstAuthority
+}
+
+def runCandidateIndependentLinearRecurrenceAdapterSecond = tasks.register(
+    'runCandidateIndependentLinearRecurrenceAdapterSecond'
+) {
+    group = 'verification'
+    description = 'Compatibility aggregate for the release-owned second recurrence adapter execution.'
+    dependsOn runCandidateIndependentLinearRecurrenceAdapterSecondAuthority
+}
 
 def verifyCandidateIndependentLinearRecurrenceAdapter = tasks.register(
     'verifyCandidateIndependentLinearRecurrenceAdapter',
