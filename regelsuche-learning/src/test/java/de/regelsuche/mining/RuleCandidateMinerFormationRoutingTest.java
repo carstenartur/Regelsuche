@@ -97,9 +97,14 @@ class RuleCandidateMinerFormationRoutingTest {
             "y + 0",
             "y",
             "neutral_addition");
+        SuccessfulTransformationPath third = path(
+            "path:cluster-third",
+            "z + 0",
+            "z",
+            "zero_identity");
 
         List<RuleCandidate> candidates = miner.mine(
-            List.of(first, second));
+            List.of(first, second, third));
 
         assertEquals(1, candidates.size());
         assertEquals(1, observer.calls.size());
@@ -107,7 +112,10 @@ class RuleCandidateMinerFormationRoutingTest {
             candidates.getFirst(),
             observer.calls.getFirst().candidate());
         assertEquals(
-            List.of("path:cluster-first", "path:cluster-second"),
+            List.of(
+                "path:cluster-first",
+                "path:cluster-second",
+                "path:cluster-third"),
             observer.calls.getFirst().evidence().sourceProvenance());
     }
 
