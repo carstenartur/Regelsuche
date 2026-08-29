@@ -32,8 +32,10 @@ class MavenParallelVerificationWorkflowContractTest {
         workflow,
         "  verification:\n",
         "  publish-pages:\n");
-    String publication = workflow.substring(workflow.indexOf(
-        "  publish-pages:\n"));
+    int publicationStart = workflow.indexOf("  publish-pages:\n");
+    assertTrue(publicationStart >= 0,
+        "missing workflow section publish-pages");
+    String publication = workflow.substring(publicationStart);
 
     assertTrue(gradle.contains("actions/checkout@"),
         "the Gradle authority must start from its own checkout");
