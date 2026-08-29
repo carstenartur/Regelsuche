@@ -1,6 +1,7 @@
 package de.regelsuche.mining;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.scoring.ExpressionScore;
@@ -76,6 +77,56 @@ class RuleCandidateMinerFormationRoutingTest {
         assertEquals(
             List.of("test-equivalence"),
             observer.calls.getFirst().evidence().validationEvidence());
+    }
+
+
+    @Test
+    void clusteredMiningObservesEachReturnedCandidateOnce() {
+        RecordingObserver observer = new RecordingObserver();
+        RuleCandidateMiner miner = new RuleCandidateMiner(
+            new KnownRuleRepository(),
+            (left, right) -> true,
+            observer);
+        SuccessfulTransformationPath first = path(
+            "path:cluster-first",
+            "x + 0",
+            "x",
+            "add_zero");
+        SuccessfulTransformationPath second = path(
+            "path:cluster-second",
+            "y + 0",
+            "y",
+            "neutral_addition");
+
+        List<RuleCandidate> candidates = miner.mine(
+            List.of(first, second));
+
+        assertEquals(1, candidates.size());
+        assertEquals(1, observer.calls.size());
+        assertEquals(
+            candidates.getFirst(),
+            observer.calls.getFirst().candidate());
+        assertEquals(
+            List.of("path:cluster-first", "path:cluster-second"),
+            observer.calls.getFirst().evidence().sourceProvenance());
+    }
+
+    @Test
+    void configuredObserverFailureIsFailClosed() {
+        RuleCandidateMiner miner = new RuleCandidateMiner(
+            new KnownRuleRepository(),
+            (left, right) -> true,
+            (candidate, evidence) -> {
+                throw new IllegalStateException("observer rejected evidence");
+            });
+
+        assertThrows(
+            IllegalStateException.class,
+            () -> miner.mineFromSinglePathForValidatedSchema(path(
+                "path:observer-failure",
+                "x + 0",
+                "x",
+                "add_zero")));
     }
 
     @Test
