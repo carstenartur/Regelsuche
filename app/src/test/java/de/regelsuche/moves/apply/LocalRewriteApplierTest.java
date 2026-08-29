@@ -3,9 +3,13 @@ package de.regelsuche.moves.apply;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.moves.RewriteMoveKind;
 import de.regelsuche.moves.apply.LocalRewriteApplier.LocalRewriteResult;
 import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
@@ -13,6 +17,7 @@ import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator;
 import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -80,7 +85,9 @@ class LocalRewriteApplierTest {
                 .filter(candidate -> candidate.move().kind() == RewriteMoveKind.COMPLETE_SQUARE)
                 .findFirst()
                 .orElseThrow();
-        TreePosition stale = new TreePosition(List.of(1), nested.position().text());
+        TreePosition stale = new TreePosition(
+                nested.position().path(),
+                "stale subtree snapshot");
 
         LocalRewriteResult result = applier.apply(
                 "sin(x^2 + 6*x + 5)",
@@ -88,8 +95,32 @@ class LocalRewriteApplierTest {
                 nested.move());
 
         assertFalse(result.success());
-        assertNotNull(result.failureReason());
+        assertEquals("position is stale", result.failureReason());
         assertTrue(result.expressionAfter() == null || result.expressionAfter().isBlank());
+    }
+
+    @Test
+    void invalidAndMissingPositionsReportDistinctFailures() {
+        List<CandidateMove> candidates = enumerator.enumerate("x^2 + 6*x + 5").stream()
+                .filter(candidate -> "root".equals(candidate.position().pathKey()))
+                .filter(candidate -> candidate.move().kind() == RewriteMoveKind.COMPLETE_SQUARE)
+                .map(TreeLocalMoveEnumerator.LocalCandidateMove::move)
+                .toList();
+        assertFalse(candidates.isEmpty());
+
+        LocalRewriteResult invalid = applier.apply(
+                "x + 1",
+                new TreePosition(List.of(2), "invalid"),
+                candidates);
+        LocalRewriteResult missing = applier.apply(
+                "x + 1",
+                new TreePosition(List.of(0, 0), "missing"),
+                candidates);
+
+        assertFalse(invalid.success());
+        assertEquals("position path is invalid", invalid.failureReason());
+        assertFalse(missing.success());
+        assertEquals("position is not present in expression", missing.failureReason());
     }
 
     // ── Expr-based API ────────────────────────────────────────────────────────
@@ -153,6 +184,97 @@ class LocalRewriteApplierTest {
 
         assertFalse(result.success());
         assertNotNull(result.failureReason());
+    }
+
+    // ── Shared TreePosition contract ──────────────────────────────────────────
+
+    @Test
+    void treePositionReplacesTheRootWithoutCopyingAnAncestor() {
+        Expr root = parser.parseTerm("x + 1");
+        Expr replacement = new VariableExpr("y");
+        TreePosition position = new TreePosition(List.of(), "x + 1");
+
+        TreePosition.SelectionResult selection = position.selectAt(root);
+        TreePosition.ReplacementResult result = position.replaceAt(root, replacement);
+
+        assertTrue(selection.success());
+        assertSame(root, selection.selectedSubtree().orElseThrow());
+        assertTrue(result.success());
+        assertSame(root, result.selectedSubtree().orElseThrow());
+        assertSame(replacement, result.rewrittenRoot().orElseThrow());
+        assertEquals(0, result.copiedAncestors());
+    }
+
+    @Test
+    void treePositionPreservesUntouchedReferences() {
+        FunctionExpr root = (FunctionExpr) parser.parseTerm("f(x + y, z)");
+        BinaryExpr originalSum = (BinaryExpr) root.arguments().getFirst();
+        Expr untouchedLeft = originalSum.left();
+        Expr untouchedSecondArgument = root.arguments().get(1);
+        Expr replacement = new VariableExpr("t");
+        TreePosition position = new TreePosition(List.of(0, 1), "y");
+
+        TreePosition.ReplacementResult result = position.replaceAt(root, replacement);
+
+        assertTrue(result.success());
+        assertSame(originalSum.right(), result.selectedSubtree().orElseThrow());
+        assertEquals(2, result.copiedAncestors());
+        FunctionExpr rewritten = (FunctionExpr) result.rewrittenRoot().orElseThrow();
+        BinaryExpr rewrittenSum = (BinaryExpr) rewritten.arguments().getFirst();
+        assertSame(untouchedLeft, rewrittenSum.left());
+        assertSame(replacement, rewrittenSum.right());
+        assertSame(untouchedSecondArgument, rewritten.arguments().get(1));
+        assertEquals("f(x + t, z)", ExpressionFormatter.format(rewritten));
+    }
+
+    @Test
+    void treePositionDistinguishesInvalidAndMissingPaths() {
+        Expr root = parser.parseTerm("x + 1");
+        Expr replacement = new VariableExpr("y");
+        TreePosition negativePosition = new TreePosition(List.of(-1), "negative");
+        TreePosition invalidBinaryPosition = new TreePosition(List.of(2), "invalid");
+        TreePosition missingPosition = new TreePosition(List.of(0, 0), "missing");
+
+        TreePosition.SelectionResult negativeSelection = negativePosition.selectAt(root);
+        TreePosition.SelectionResult invalidSelection = invalidBinaryPosition.selectAt(root);
+        TreePosition.SelectionResult missingSelection = missingPosition.selectAt(root);
+        TreePosition.ReplacementResult invalidReplacement =
+                invalidBinaryPosition.replaceAt(root, replacement);
+        TreePosition.ReplacementResult missingReplacement =
+                missingPosition.replaceAt(root, replacement);
+
+        assertFalse(negativeSelection.success());
+        assertEquals(TreePosition.Status.INVALID_PATH, negativeSelection.status());
+        assertFalse(invalidSelection.success());
+        assertEquals(TreePosition.Status.INVALID_PATH, invalidSelection.status());
+        assertFalse(missingSelection.success());
+        assertEquals(TreePosition.Status.POSITION_NOT_PRESENT, missingSelection.status());
+        assertFalse(invalidReplacement.success());
+        assertEquals(TreePosition.Status.INVALID_PATH, invalidReplacement.status());
+        assertFalse(missingReplacement.success());
+        assertEquals(TreePosition.Status.POSITION_NOT_PRESENT, missingReplacement.status());
+    }
+
+    @Test
+    void treePositionHandlesDeepPathsIteratively() {
+        int depth = 8_000;
+        Expr root = new VariableExpr("x");
+        List<Integer> path = new ArrayList<>(depth);
+        for (int index = 0; index < depth; index++) {
+            root = new FunctionExpr("f", List.of(root));
+            path.add(0);
+        }
+        Expr replacement = new VariableExpr("y");
+        TreePosition position = new TreePosition(path, "x");
+
+        TreePosition.ReplacementResult result = position.replaceAt(root, replacement);
+        TreePosition.SelectionResult replayed =
+                position.selectAt(result.rewrittenRoot().orElseThrow());
+
+        assertTrue(result.success());
+        assertEquals(depth, result.copiedAncestors());
+        assertTrue(replayed.success());
+        assertSame(replacement, replayed.selectedSubtree().orElseThrow());
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

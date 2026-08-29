@@ -1,8 +1,6 @@
 package de.regelsuche.moves.apply;
 
-import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
-import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.moves.MoveCandidateTransformationEngine;
 import de.regelsuche.moves.MoveParameter;
 import de.regelsuche.moves.MoveRealizer;
@@ -10,7 +8,6 @@ import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
 import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -18,9 +15,9 @@ import java.util.List;
  *
  * <p>The applier is intentionally framework-free: it depends only on the AST,
  * move enumeration/realization infrastructure and parser/formatter. Internally
- * it navigates and replaces subtrees by {@link TreePosition#path()}, while
- * strings are used only at the parser/formatter boundary and in the returned
- * {@link LocalRewriteResult}.</p>
+ * it delegates subtree navigation and path-local replacement to the shared
+ * {@link TreePosition} AST contract, while strings are used only at the
+ * parser/formatter boundary and in the returned {@link LocalRewriteResult}.</p>
  *
  * <p>Two entry-point families are provided:
  * <ul>
@@ -144,10 +141,16 @@ public final class LocalRewriteApplier {
             String rootExpression,
             TreePosition position,
             List<CandidateMove> source) {
-        Expr subtree = subtreeAt(root, position.path());
-        if (subtree == null) {
-            return failure(rootExpression, position, source, "", "position is not present in expression");
+        TreePosition.SelectionResult selection = position.selectAt(root);
+        if (!selection.success()) {
+            return failure(
+                    rootExpression,
+                    position,
+                    source,
+                    "",
+                    positionFailureReason(selection.status()));
         }
+        Expr subtree = selection.selectedSubtree().orElseThrow();
         String subtreeBefore = ExpressionFormatter.format(subtree);
         if (!subtreeBefore.equals(position.text())) {
             return failure(rootExpression, position, source, subtreeBefore, "position is stale");
@@ -166,7 +169,16 @@ public final class LocalRewriteApplier {
             return failure(rootExpression, position, source, subtreeBefore, "realized subtree is not parseable");
         }
 
-        Expr rewrittenRoot = replaceAt(root, position.path(), replacement);
+        TreePosition.ReplacementResult replacementResult = position.replaceAt(root, replacement);
+        if (!replacementResult.success()) {
+            return failure(
+                    rootExpression,
+                    position,
+                    source,
+                    subtreeBefore,
+                    positionFailureReason(replacementResult.status()));
+        }
+        Expr rewrittenRoot = replacementResult.rewrittenRoot().orElseThrow();
         String expressionAfter = ExpressionFormatter.format(rewrittenRoot);
         CandidateMove first = source.getFirst();
         return new LocalRewriteResult(
@@ -200,48 +212,13 @@ public final class LocalRewriteApplier {
                 .orElse(null);
     }
 
-    private static Expr subtreeAt(Expr expr, List<Integer> path) {
-        Expr current = expr;
-        for (int index : path) {
-            if (current instanceof BinaryExpr binary) {
-                current = switch (index) {
-                    case 0 -> binary.left();
-                    case 1 -> binary.right();
-                    default -> null;
-                };
-            } else if (current instanceof FunctionExpr function) {
-                current = index >= 0 && index < function.arguments().size()
-                        ? function.arguments().get(index)
-                        : null;
-            } else {
-                return null;
-            }
-            if (current == null) {
-                return null;
-            }
-        }
-        return current;
-    }
-
-    private static Expr replaceAt(Expr expr, List<Integer> path, Expr replacement) {
-        if (path.isEmpty()) {
-            return replacement;
-        }
-        int index = path.getFirst();
-        List<Integer> tail = path.subList(1, path.size());
-        if (expr instanceof BinaryExpr binary) {
-            return switch (index) {
-                case 0 -> new BinaryExpr(replaceAt(binary.left(), tail, replacement), binary.operator(), binary.right());
-                case 1 -> new BinaryExpr(binary.left(), binary.operator(), replaceAt(binary.right(), tail, replacement));
-                default -> throw new IllegalArgumentException("invalid binary path index: " + index);
-            };
-        }
-        if (expr instanceof FunctionExpr function) {
-            List<Expr> arguments = new ArrayList<>(function.arguments());
-            arguments.set(index, replaceAt(arguments.get(index), tail, replacement));
-            return new FunctionExpr(function.name(), arguments);
-        }
-        throw new IllegalArgumentException("path descends into a leaf expression");
+    private static String positionFailureReason(TreePosition.Status status) {
+        return switch (status) {
+            case INVALID_PATH -> "position path is invalid";
+            case POSITION_NOT_PRESENT -> "position is not present in expression";
+            case SELECTED, REPLACED -> throw new IllegalArgumentException(
+                    "successful position status cannot describe failure");
+        };
     }
 
     private static List<MoveParameter> bindings(List<CandidateMove> candidates) {
