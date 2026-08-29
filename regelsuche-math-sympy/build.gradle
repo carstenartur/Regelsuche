@@ -46,6 +46,35 @@ def embeddedRuntimeInitialHeap = '512m'
 def embeddedRuntimeMaximumHeap = '2g'
 def symPyPythonProperty = 'regelsuche.sympy.python'
 
+def symPyJmhGeneralShards = [
+    'general-z-small': [
+        'z-linear-pair-degree2',
+        'z-content-mixed-degree4',
+        'z-large-coefficient-degree4'
+    ],
+    'general-z-structural': [
+        'z-eisenstein-irreducible-degree5',
+        'z-repeated-degree6',
+        'z-sparse-cyclotomic-degree6'
+    ],
+    'general-q': [
+        'q-linear-pair-degree2',
+        'q-eisenstein-irreducible-degree4',
+        'q-repeated-degree5'
+    ]
+]
+def symPyJmhShard = providers.gradleProperty('sympyJmhShard').orNull
+def symPyJmhShardIds = new LinkedHashSet<>(symPyJmhGeneralShards.keySet())
+symPyJmhShardIds.add('specialist')
+if (symPyJmhShard != null && !symPyJmhShardIds.contains(symPyJmhShard)) {
+    throw new GradleException(
+        "unsupported SymPy JMH shard '${symPyJmhShard}'; expected one of ${symPyJmhShardIds}")
+}
+def symPyJmhResultFile = layout.buildDirectory.file(
+    symPyJmhShard == null
+        ? 'reports/jmh/sympy-factorization.json'
+        : "reports/jmh/shards/${symPyJmhShard}.json")
+
 def verificationPython = rootProject.layout.buildDirectory.file(
     System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
         ? 'verification-venv/Scripts/python.exe'
@@ -75,8 +104,7 @@ tasks.named('test') { task ->
 
 jmh {
     resultFormat = 'JSON'
-    resultsFile = layout.buildDirectory.file(
-        'reports/jmh/sympy-factorization.json')
+    resultsFile = symPyJmhResultFile
     failOnError = true
     // Fork, warmup and measurement counts live on each benchmark class. This
     // preserves the inexpensive specialist/startup control while requiring a
@@ -91,6 +119,21 @@ jmh {
         "-Xmx${embeddedRuntimeMaximumHeap}",
         "-D${symPyPythonProperty}=${verificationPython.get().asFile.absolutePath}"
     ]
+    if (symPyJmhShard == 'specialist') {
+        includes = [
+            'de[.]regelsuche[.]math[.]sympy[.]SymPyFactorizationBenchmarks[.].*'
+        ]
+    } else if (symPyJmhGeneralShards.containsKey(symPyJmhShard)) {
+        includes = [
+            'de[.]regelsuche[.]math[.]sympy[.]GeneralUnivariateFactorizationBenchmarks[.].*'
+        ]
+        // Each case shard executes native and GraalPy backend/end-to-end tracks
+        // on the same otherwise idle runner. This preserves every within-case
+        // diagnostic ratio while allowing unrelated case groups to overlap.
+        benchmarkParameters = [
+            caseId: symPyJmhGeneralShards.get(symPyJmhShard)
+        ]
+    }
 }
 
 // The JMH plugin builds an uber JAR by unpacking the runtime dependencies.
@@ -122,6 +165,10 @@ def verifySymPyFactorizationBenchmark = tasks.register(
         'public/dev/bench/sympy-factorization.html')
     outputs.upToDateWhen { false }
     doFirst {
+        if (symPyJmhShard != null) {
+            throw new GradleException(
+                'the complete SymPy benchmark validator must not consume a partial shard')
+        }
         commandLine verificationPython.get().asFile.absolutePath,
             'scripts/verify-sympy-factorization-benchmark.py',
             '--result', layout.buildDirectory.file(
@@ -133,6 +180,39 @@ def verifySymPyFactorizationBenchmark = tasks.register(
             '--report-output', rootProject.file(
                 'public/dev/bench/sympy-factorization.html')
                 .absolutePath
+    }
+}
+
+def verifySymPyFactorizationBenchmarkShard = tasks.register(
+    'verifySymPyFactorizationBenchmarkShard', Exec) {
+    group = 'verification'
+    description = 'Runs and validates one exact, versioned SymPy JMH shard without changing benchmark sampling.'
+    workingDir rootProject.projectDir
+    outputs.upToDateWhen { false }
+    if (symPyJmhShard == null) {
+        doFirst {
+            throw new GradleException(
+                'verifySymPyFactorizationBenchmarkShard requires -PsympyJmhShard=<id>')
+        }
+    } else {
+        dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
+            tasks.named('jmh')
+        inputs.file rootProject.file(
+            'scripts/verify-sympy-factorization-benchmark-shard.py')
+        inputs.file rootProject.file(
+            'scripts/sympy_factorization_jmh_shards.py')
+        inputs.file symPyJmhResultFile
+        outputs.file layout.buildDirectory.file(
+            "reports/jmh/shards/${symPyJmhShard}.validated")
+        doFirst {
+            commandLine verificationPython.get().asFile.absolutePath,
+                'scripts/verify-sympy-factorization-benchmark-shard.py',
+                '--shard', symPyJmhShard,
+                '--result', symPyJmhResultFile.get().asFile.absolutePath,
+                '--stamp', layout.buildDirectory.file(
+                    "reports/jmh/shards/${symPyJmhShard}.validated")
+                    .get().asFile.absolutePath
+        }
     }
 }
 
