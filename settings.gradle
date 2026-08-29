@@ -129,6 +129,9 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/visual-regression-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/separated-jmh-authority.gradle')
     }
     if (candidate.path == ':app') {
         candidate.apply from: new File(
