@@ -18,8 +18,11 @@ class MavenParallelVerificationWorkflowContractTest {
   @Test
   void independentAuthoritiesRunInParallelAndConvergeFailClosed()
       throws IOException {
-    String workflow = Files.readString(repositoryRoot().resolve(
+    Path root = repositoryRoot();
+    String workflow = Files.readString(root.resolve(
         ".github/workflows/gradle.yml"));
+    String coverageGate = Files.readString(root.resolve(
+        "gradle/quality-gates.gradle"));
     String gradle = section(
         workflow,
         "  gradle-verification:\n",
@@ -54,6 +57,19 @@ class MavenParallelVerificationWorkflowContractTest {
         "Maven must not remain serialized behind the Gradle authority");
     assertFalse(gradle.contains("jmhAuthority"),
         "the correctness runner must not execute the isolated benchmark graph");
+
+    assertTrue(coverageGate.contains(
+        "providers.gradleProperty(\n    'separateSympyRuntimeAuthority'"));
+    assertTrue(coverageGate.contains(
+        "REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY"));
+    assertTrue(coverageGate.contains(
+        "def deferCoverageToWorkflowConvergence ="));
+    assertTrue(coverageGate.contains(
+        "separateSympyRuntimeCoverageAuthorization "
+            + "== 'required-by-workflow'"));
+    assertTrue(coverageGate.contains(
+        "onlyIf {\n        !deferCoverageToWorkflowConvergence\n    }"),
+        "only the workflow-authorized split may defer the aggregate gate");
 
     assertTrue(jmh.contains("actions/checkout@"),
         "the JMH authority must start from an independent checkout");
@@ -98,8 +114,28 @@ class MavenParallelVerificationWorkflowContractTest {
         "the stable required check must reject any incomplete authority");
     assertTrue(convergence.contains("run: exit 1"),
         "an incomplete authority set must fail rather than become skipped-success");
-    assertFalse(convergence.contains("actions/checkout@"),
-        "the convergence job is orchestration, not a fourth verification build");
+
+    int rejection = convergence.indexOf(
+        "- name: Reject incomplete verification authority");
+    int checkout = convergence.indexOf("- uses: actions/checkout@");
+    int coverage = convergence.indexOf(
+        "python3 -B scripts/verify-coverage-regression.py --root \"$PWD\"");
+    assertTrue(rejection >= 0 && checkout > rejection && coverage > checkout,
+        "cross-authority coverage may run only after every required producer passed");
+    assertTrue(convergence.contains("'repository-verification'"));
+    assertTrue(convergence.contains("name: jmh-verification"));
+    assertTrue(convergence.contains(
+        "path: build/authority-evidence/jmh"));
+    assertTrue(convergence.contains(
+        "sympy-runtime-checkout/regelsuche-math-sympy/build/reports/"
+            + "jacoco/test/jacocoTestReport.xml"));
+    assertTrue(convergence.contains("test ! -e \"$canonical_report\""),
+        "a stale or duplicate SymPy report must be rejected");
+    assertTrue(convergence.contains(
+        "install -D -m 0644 \"$isolated_report\" \"$canonical_report\""));
+    assertTrue(convergence.contains("name: coverage-verification"));
+    assertTrue(convergence.contains("if-no-files-found: error"),
+        "the converged coverage report must be retained fail closed");
     assertFalse(convergence.contains("./gradlew"));
     assertFalse(convergence.contains("mvn "));
 
@@ -108,6 +144,8 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(publication.contains("name: repository-verification"));
     assertTrue(publication.contains("name: jmh-verification"),
         "published benchmark pages must come from the isolated authority");
+    assertTrue(publication.contains("name: coverage-verification"),
+        "published coverage must come from the converged authority set");
     assertTrue(workflow.contains(
         "github.event_name == 'create' && "
             + "'Showcase train-freeze authority v1' || "
