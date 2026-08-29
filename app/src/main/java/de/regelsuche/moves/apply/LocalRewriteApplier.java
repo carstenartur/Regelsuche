@@ -141,10 +141,16 @@ public final class LocalRewriteApplier {
             String rootExpression,
             TreePosition position,
             List<CandidateMove> source) {
-        Expr subtree = position.subtreeAt(root).orElse(null);
-        if (subtree == null) {
-            return failure(rootExpression, position, source, "", "position is not present in expression");
+        TreePosition.SelectionResult selection = position.subtreeAt(root);
+        if (!selection.success()) {
+            return failure(
+                    rootExpression,
+                    position,
+                    source,
+                    "",
+                    positionFailureReason(selection.status()));
         }
+        Expr subtree = selection.selectedSubtree().orElseThrow();
         String subtreeBefore = ExpressionFormatter.format(subtree);
         if (!subtreeBefore.equals(position.text())) {
             return failure(rootExpression, position, source, subtreeBefore, "position is stale");
@@ -165,7 +171,12 @@ public final class LocalRewriteApplier {
 
         TreePosition.ReplacementResult replacementResult = position.replaceAt(root, replacement);
         if (!replacementResult.success()) {
-            return failure(rootExpression, position, source, subtreeBefore, "position is not present in expression");
+            return failure(
+                    rootExpression,
+                    position,
+                    source,
+                    subtreeBefore,
+                    positionFailureReason(replacementResult.status()));
         }
         Expr rewrittenRoot = replacementResult.rewrittenRoot().orElseThrow();
         String expressionAfter = ExpressionFormatter.format(rewrittenRoot);
@@ -199,6 +210,15 @@ public final class LocalRewriteApplier {
                                 .anyMatch(parameter -> value.equals(parameter.value()))))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private static String positionFailureReason(TreePosition.Status status) {
+        return switch (status) {
+            case INVALID_PATH -> "position path is invalid";
+            case POSITION_NOT_PRESENT -> "position is not present in expression";
+            case SELECTED, REPLACED -> throw new IllegalArgumentException(
+                    "successful position status cannot describe failure");
+        };
     }
 
     private static List<MoveParameter> bindings(List<CandidateMove> candidates) {
