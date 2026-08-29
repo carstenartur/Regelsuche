@@ -1,7 +1,7 @@
 def recurrenceAdapterRepositoryRoot = layout.projectDirectory
 def recurrenceAdapterRepositoryRootPath = recurrenceAdapterRepositoryRoot.asFile.absolutePath
 def recurrenceAdapterReleaseProject = project(':regelsuche-release')
-def recurrenceAdapterRuntimeClasspath = providers.provider {
+def recurrenceAdapterRuntimeClasspath = recurrenceAdapterReleaseProject.providers.provider {
     recurrenceAdapterReleaseProject.extensions
         .getByType(org.gradle.api.tasks.SourceSetContainer)
         .named('main').get().runtimeClasspath
@@ -37,9 +37,9 @@ def recurrenceAdapterVerificationPython = recurrenceAdapterVerificationVenv.map 
 def configureRecurrenceAdapterRun = { task, outputFile ->
     task.group = 'verification'
     task.description = 'Executes the exact linear-recurrence form against the frozen candidate-independent sequence corpus.'
-    task.dependsOn ':regelsuche-release:classes',
-        'verifyCandidateIndependentCaseCorpus'
-    task.classpath = files(recurrenceAdapterRuntimeClasspath)
+    task.dependsOn 'classes', ':verifyCandidateIndependentCaseCorpus'
+    task.classpath = recurrenceAdapterReleaseProject.files(
+        recurrenceAdapterRuntimeClasspath)
     task.mainClass = 'de.regelsuche.release.CandidateIndependentLinearRecurrenceAdapterMain'
     task.inputs.file recurrenceAdapterCorpus
     task.inputs.file recurrenceAdapterProfile
@@ -58,19 +58,21 @@ def configureRecurrenceAdapterRun = { task, outputFile ->
     }
 }
 
-def runCandidateIndependentLinearRecurrenceAdapterFirst = tasks.register(
-    'runCandidateIndependentLinearRecurrenceAdapterFirst',
-    JavaExec
-) {
-    configureRecurrenceAdapterRun(delegate, recurrenceAdapterFirst)
-}
+def runCandidateIndependentLinearRecurrenceAdapterFirst =
+    recurrenceAdapterReleaseProject.tasks.register(
+        'runCandidateIndependentLinearRecurrenceAdapterFirst',
+        JavaExec
+    ) {
+        configureRecurrenceAdapterRun(delegate, recurrenceAdapterFirst)
+    }
 
-def runCandidateIndependentLinearRecurrenceAdapterSecond = tasks.register(
-    'runCandidateIndependentLinearRecurrenceAdapterSecond',
-    JavaExec
-) {
-    configureRecurrenceAdapterRun(delegate, recurrenceAdapterSecond)
-}
+def runCandidateIndependentLinearRecurrenceAdapterSecond =
+    recurrenceAdapterReleaseProject.tasks.register(
+        'runCandidateIndependentLinearRecurrenceAdapterSecond',
+        JavaExec
+    ) {
+        configureRecurrenceAdapterRun(delegate, recurrenceAdapterSecond)
+    }
 
 def verifyCandidateIndependentLinearRecurrenceAdapter = tasks.register(
     'verifyCandidateIndependentLinearRecurrenceAdapter',
