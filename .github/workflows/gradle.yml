@@ -15,8 +15,8 @@ concurrency:
     ${{ github.event_name != 'create' || github.event.ref_type != 'branch' || github.event.ref != 'showcase/train-freeze-authority-v1' }}
 permissions: { actions: read, contents: read, packages: read }
 jobs:
-  verification:
-    name: ${{ github.event_name == 'create' && 'Showcase train-freeze authority v1' || 'Checkout-local ciCheck' }}
+  gradle-verification:
+    name: ${{ github.event_name == 'create' && 'Showcase train-freeze Gradle authority' || 'Checkout-local Gradle authority' }}
     if: github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')
     runs-on: ubuntu-22.04
     timeout-minutes: 300
@@ -44,15 +44,12 @@ jobs:
           # Resolve only the pinned Playwright CLI. The independent bootstrap
           # avoids configuring and compiling the complete production reactor.
           ./gradlew --no-daemon -p playwright-bootstrap installPlaywrightHostDependencies --console=plain
-      - name: Run the checkout-owned CI lifecycle
+      - name: Run the checkout-owned Gradle authority
         run: |
           set -o pipefail
           mkdir -p build/logs
           env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache "$REGELSUCHE_CI_TASK" --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
-      - name: Verify the complete Maven product and Docker contract once
-        if: ${{ success() && !cancelled() && github.event_name != 'create' }}
-        run: mvn --batch-mode --no-transfer-progress -Pfull verify
-      - name: Retain verification evidence
+      - name: Retain Gradle verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -67,12 +64,66 @@ jobs:
             **/build/reports/**
             **/build/test-results/**
             **/build/discovery-artifacts/**
-            **/target/surefire-reports/**
-            **/target/failsafe-reports/**
-            **/target/discovery-artifacts/**
             docs/generated/**
           include-hidden-files: true
           if-no-files-found: warn
+
+  maven-product-verification:
+    name: Complete Maven product and Docker authority
+    if: github.event_name != 'create'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    env:
+      AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Install independent Maven checkout prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            patchelf=0.14.3-1 \
+            python3-venv \
+            z3=4.8.12-1
+          mvn --batch-mode --no-transfer-progress \
+            -f playwright-bootstrap/pom.xml \
+            org.codehaus.mojo:exec-maven-plugin:3.5.0:java
+      - name: Verify the complete Maven product and Docker contract
+        run: mvn --batch-mode --no-transfer-progress -Pfull verify
+      - name: Retain Maven product verification evidence
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: maven-product-verification
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+            **/target/discovery-artifacts/**
+          include-hidden-files: true
+          if-no-files-found: warn
+
+  verification:
+    name: ${{ github.event_name == 'create' && 'Showcase train-freeze authority v1' || 'Checkout-local ciCheck' }}
+    needs: [gradle-verification, maven-product-verification]
+    if: >-
+      ${{ always() && (github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')) }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Reject incomplete verification authority
+        if: >-
+          ${{ needs.gradle-verification.result != 'success' || (github.event_name != 'create' && needs.maven-product-verification.result != 'success') }}
+        run: exit 1
+      - name: Record complete verification authority
+        run: echo "Gradle=${{ needs.gradle-verification.result }} Maven=${{ needs.maven-product-verification.result }}"
+
   publish-pages:
     name: Publish generated reports
     needs: verification
