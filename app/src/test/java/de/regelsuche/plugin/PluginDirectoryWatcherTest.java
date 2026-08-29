@@ -22,14 +22,21 @@ class PluginDirectoryWatcherTest {
         try (PluginRuntime runtime = runtime(tempDir, rulesDir)) {
             List<PluginReloadResult> results = new CopyOnWriteArrayList<>();
             CountDownLatch latch = new CountDownLatch(1);
-            try (PluginDirectoryWatcher watcher = watcher(runtime, results, latch)) {
-                Files.writeString(rulesDir.resolve("created.regelsuche"), simpleRule("created_rule", "A + 0", "A"));
+            try (PluginDirectoryWatcher watcher = watcher(
+                    runtime,
+                    results,
+                    latch)) {
+                Files.writeString(
+                    rulesDir.resolve("created.regelsuche"),
+                    simpleRule("created_rule", "A + 0", "A"));
 
                 assertTrue(latch.await(5, TimeUnit.SECONDS));
             }
             assertTrue(results.getLast().ruleFileChanges().stream()
-                .anyMatch(change -> change.id().endsWith("created.regelsuche")
-                    && change.type() == PluginReloadChange.ChangeType.ADDED));
+                .anyMatch(change ->
+                    change.id().endsWith("created.regelsuche")
+                        && change.type()
+                            == PluginReloadChange.ChangeType.ADDED));
         }
     }
 
@@ -37,19 +44,28 @@ class PluginDirectoryWatcherTest {
     void watchesRuleFileModify(@TempDir Path tempDir) throws Exception {
         Path rulesDir = Files.createDirectories(tempDir.resolve("rules"));
         Path file = rulesDir.resolve("changed.regelsuche");
-        Files.writeString(file, simpleRule("changed_rule", "A + 0", "A"));
+        Files.writeString(
+            file,
+            simpleRule("changed_rule", "A + 0", "A"));
 
         try (PluginRuntime runtime = runtime(tempDir, rulesDir)) {
             List<PluginReloadResult> results = new CopyOnWriteArrayList<>();
             CountDownLatch latch = new CountDownLatch(1);
-            try (PluginDirectoryWatcher watcher = watcher(runtime, results, latch)) {
-                Files.writeString(file, simpleRule("changed_rule", "A * 1", "A"));
+            try (PluginDirectoryWatcher watcher = watcher(
+                    runtime,
+                    results,
+                    latch)) {
+                Files.writeString(
+                    file,
+                    simpleRule("changed_rule", "A * 1", "A"));
 
                 assertTrue(latch.await(5, TimeUnit.SECONDS));
             }
             assertTrue(results.getLast().ruleFileChanges().stream()
-                .anyMatch(change -> change.id().endsWith("changed.regelsuche")
-                    && change.type() == PluginReloadChange.ChangeType.CHANGED));
+                .anyMatch(change ->
+                    change.id().endsWith("changed.regelsuche")
+                        && change.type()
+                            == PluginReloadChange.ChangeType.CHANGED));
         }
     }
 
@@ -57,49 +73,113 @@ class PluginDirectoryWatcherTest {
     void watchesRuleFileDelete(@TempDir Path tempDir) throws Exception {
         Path rulesDir = Files.createDirectories(tempDir.resolve("rules"));
         Path file = rulesDir.resolve("removed.regelsuche");
-        Files.writeString(file, simpleRule("removed_rule", "A + 0", "A"));
+        Files.writeString(
+            file,
+            simpleRule("removed_rule", "A + 0", "A"));
 
         try (PluginRuntime runtime = runtime(tempDir, rulesDir)) {
             List<PluginReloadResult> results = new CopyOnWriteArrayList<>();
             CountDownLatch latch = new CountDownLatch(1);
-            try (PluginDirectoryWatcher watcher = watcher(runtime, results, latch)) {
+            try (PluginDirectoryWatcher watcher = watcher(
+                    runtime,
+                    results,
+                    latch)) {
                 Files.delete(file);
 
                 assertTrue(latch.await(5, TimeUnit.SECONDS));
             }
             assertTrue(results.getLast().ruleFileChanges().stream()
-                .anyMatch(change -> change.id().endsWith("removed.regelsuche")
-                    && change.type() == PluginReloadChange.ChangeType.REMOVED));
+                .anyMatch(change ->
+                    change.id().endsWith("removed.regelsuche")
+                        && change.type()
+                            == PluginReloadChange.ChangeType.REMOVED));
         }
     }
 
     @Test
-    void debouncesFastRuleFileChanges(@TempDir Path tempDir) throws Exception {
+    void debouncesFastRuleFileChangesIntoFinalState(
+        @TempDir Path tempDir
+    ) throws Exception {
         Path rulesDir = Files.createDirectories(tempDir.resolve("rules"));
         Path file = rulesDir.resolve("debounced.regelsuche");
 
         try (PluginRuntime runtime = runtime(tempDir, rulesDir)) {
-            CountDownLatch firstReload = new CountDownLatch(1);
-            CountDownLatch secondReload = new CountDownLatch(2);
+            CountDownLatch cycleCompleted = new CountDownLatch(1);
+            List<Boolean> completedCycles = new CopyOnWriteArrayList<>();
             List<PluginReloadResult> results = new CopyOnWriteArrayList<>();
-            try (PluginDirectoryWatcher watcher = new PluginDirectoryWatcher(runtime, Duration.ofMillis(150), result -> {
-                results.add(result);
-                firstReload.countDown();
-                secondReload.countDown();
-            })) {
+            try (PluginDirectoryWatcher watcher = new PluginDirectoryWatcher(
+                    runtime,
+                    Duration.ofMillis(150),
+                    results::add,
+                    changed -> {
+                        completedCycles.add(changed);
+                        cycleCompleted.countDown();
+                    })) {
                 watcher.start();
-                Files.writeString(file, simpleRule("debounced_rule", "A + 0", "A"));
-                Files.writeString(file, simpleRule("debounced_rule", "A * 1", "A"));
-                Files.writeString(file, simpleRule("debounced_rule", "A - 0", "A"));
+                Files.writeString(
+                    file,
+                    simpleRule("debounced_rule_first", "A + 0", "A"));
+                Files.writeString(
+                    file,
+                    simpleRule("debounced_rule_middle", "A * 1", "A"));
+                Files.writeString(
+                    file,
+                    simpleRule("debounced_rule_final", "A - 0", "A"));
 
-                // Wait for the single debounced reload to happen
-                assertTrue(firstReload.await(5, TimeUnit.SECONDS));
-                // Then assert no second reload occurs in a short window
-                assertFalse(secondReload.await(400, TimeUnit.MILLISECONDS));
+                assertTrue(cycleCompleted.await(5, TimeUnit.SECONDS));
             }
+
+            assertEquals(List.of(true), completedCycles);
             assertEquals(1, results.size());
             assertTrue(results.getFirst().ruleFileChanges().stream()
-                .anyMatch(change -> change.id().endsWith("debounced.regelsuche")));
+                .anyMatch(change ->
+                    change.id().endsWith("debounced.regelsuche")));
+            assertTrue(runtime.registeredRules().stream()
+                .anyMatch(rule -> rule.id().equals(
+                    "debounced_rule_final")));
+            assertFalse(runtime.registeredRules().stream()
+                .anyMatch(rule -> rule.id().equals(
+                    "debounced_rule_first")
+                    || rule.id().equals("debounced_rule_middle")));
+        }
+    }
+
+    @Test
+    void suppressesContentNeutralDuplicateEventsAndClosesDeterministically(
+        @TempDir Path tempDir
+    ) throws Exception {
+        Path rulesDir = Files.createDirectories(tempDir.resolve("rules"));
+        Path file = rulesDir.resolve("unchanged.regelsuche");
+        String unchanged = simpleRule(
+            "unchanged_rule",
+            "A + 0",
+            "A");
+        Files.writeString(file, unchanged);
+
+        try (PluginRuntime runtime = runtime(tempDir, rulesDir)) {
+            CountDownLatch cycleCompleted = new CountDownLatch(1);
+            List<Boolean> completedCycles = new CopyOnWriteArrayList<>();
+            List<PluginReloadResult> results = new CopyOnWriteArrayList<>();
+            try (PluginDirectoryWatcher watcher = new PluginDirectoryWatcher(
+                    runtime,
+                    Duration.ofMillis(50),
+                    results::add,
+                    changed -> {
+                        completedCycles.add(changed);
+                        cycleCompleted.countDown();
+                    })) {
+                watcher.start();
+                Files.writeString(file, unchanged);
+                assertTrue(cycleCompleted.await(5, TimeUnit.SECONDS));
+            }
+
+            assertEquals(List.of(false), completedCycles);
+            assertTrue(results.isEmpty());
+
+            Files.writeString(
+                file,
+                simpleRule("after_close", "A * 1", "A"));
+            assertTrue(results.isEmpty());
         }
     }
 
@@ -108,19 +188,31 @@ class PluginDirectoryWatcherTest {
         List<PluginReloadResult> results,
         CountDownLatch latch
     ) throws Exception {
-        PluginDirectoryWatcher watcher = new PluginDirectoryWatcher(runtime, Duration.ofMillis(50), result -> {
-            results.add(result);
-            latch.countDown();
-        });
+        PluginDirectoryWatcher watcher = new PluginDirectoryWatcher(
+            runtime,
+            Duration.ofMillis(50),
+            result -> {
+                results.add(result);
+                latch.countDown();
+            });
         watcher.start();
         return watcher;
     }
 
     private PluginRuntime runtime(Path tempDir, Path rulesDir) {
-        return new PluginRuntime(new PluginRuntimeConfig(tempDir.resolve("plugins"), rulesDir, false, Set.of(), Set.of()));
+        return new PluginRuntime(new PluginRuntimeConfig(
+            tempDir.resolve("plugins"),
+            rulesDir,
+            false,
+            Set.of(),
+            Set.of()));
     }
 
-    private String simpleRule(String id, String pattern, String replace) {
+    private String simpleRule(
+        String id,
+        String pattern,
+        String replace
+    ) {
         return """
             rule %s:
               pattern: %s
