@@ -52,17 +52,58 @@ class PolynomialTheoryUtilityExecutionPlanTest {
     }
 
     @Test
+    void emitsThirtyContiguousRunsInFrozenCaseOrder() {
+        var formation = PolynomialTheoryUtilityCaseCorpus.load();
+        var rows = PolynomialTheoryUtilityExecutionPlan.freeze().rows();
+        List<String> caseIds = formation.cases().stream()
+            .map(PolynomialTheoryUtilityCaseCorpus.FormationCase::caseId)
+            .toList();
+        int runSize = caseIds.size();
+        int offset = 0;
+
+        for (var profile : PolynomialTheoryUtilityExecutionPlan.PROFILES) {
+            for (var checkpoint
+                    : PolynomialTheoryUtilityExecutionPlan.CHECKPOINTS) {
+                var run = rows.subList(offset, offset + runSize);
+                String expectedRunId =
+                    PolynomialTheoryUtilityExecutionIdentity.runId(
+                        profile,
+                        checkpoint
+                    );
+                assertTrue(run.stream().allMatch(row ->
+                    expectedRunId.equals(row.runId())));
+                assertTrue(run.stream().allMatch(row ->
+                    profile.profileId().equals(row.profileId())));
+                assertTrue(run.stream().allMatch(row ->
+                    checkpoint.checkpointId().equals(row.checkpointId())));
+                assertEquals(
+                    caseIds,
+                    run.stream()
+                        .map(PolynomialTheoryUtilityExecutionRow::caseId)
+                        .toList()
+                );
+                offset += runSize;
+            }
+        }
+        assertEquals(600, offset);
+    }
+
+    @Test
     void matchesWorkForAllFiveProfilesAtEveryCheckpoint() {
         var formation = PolynomialTheoryUtilityCaseCorpus.load();
         var artifact = PolynomialTheoryUtilityExecutionPlan.freeze();
         List<String> profiles =
             PolynomialTheoryUtilityPreregistration.PROFILES;
-        int offset = 0;
 
         for (var studyCase : formation.cases()) {
             for (var checkpoint
                     : PolynomialTheoryUtilityExecutionPlan.CHECKPOINTS) {
-                var rows = artifact.rows().subList(offset, offset + 5);
+                var rows = artifact.rows().stream()
+                    .filter(row ->
+                        studyCase.caseId().equals(row.caseId()))
+                    .filter(row ->
+                        checkpoint.checkpointId().equals(row.checkpointId()))
+                    .toList();
                 assertEquals(
                     profiles,
                     rows.stream()
@@ -105,10 +146,8 @@ class PolynomialTheoryUtilityExecutionPlanTest {
                         )
                         .collect(java.util.stream.Collectors.toSet())
                 );
-                offset += 5;
             }
         }
-        assertEquals(600, offset);
     }
 
     @Test
