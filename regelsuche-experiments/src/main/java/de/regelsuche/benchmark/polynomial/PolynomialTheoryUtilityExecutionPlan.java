@@ -28,7 +28,7 @@ public final class PolynomialTheoryUtilityExecutionPlan {
     public static final int EXPECTED_ROW_COUNT = 600;
     public static final long EXPECTED_BYTE_LENGTH = 235_617L;
     public static final String EXPECTED_CONTENT_HASH =
-        "sha256:c4de9337f27acb7f9d9036cf2c656b38d80abed8b59ae30dcdefeb68356f3658";
+        "sha256:0a9be9ab83076ac2e507aa7d0f3c343ec2840556441c7cf8ce750772f215855e";
 
     public static final String VERIFIER_ID =
         "regelsuche.factorization-verifier/v2";
@@ -149,26 +149,26 @@ public final class PolynomialTheoryUtilityExecutionPlan {
         requireBindings(preregistration, formation);
         List<PolynomialTheoryUtilityExecutionRow> rows =
             new ArrayList<>(EXPECTED_ROW_COUNT);
-        for (var studyCase : formation.cases()) {
+        for (var profile : PROFILES) {
             for (var checkpoint : CHECKPOINTS) {
-                int primitive = scale(
-                    studyCase.admittedPrimitiveWork(),
-                    checkpoint
-                );
-                int mechanical = scale(
-                    studyCase.totalMechanicalWork(),
-                    checkpoint
-                );
-                int factorization = scale(
-                    studyCase.factorizationWork(),
-                    checkpoint
-                );
-                for (var profile : PROFILES) {
-                    String runId =
-                        PolynomialTheoryUtilityExecutionIdentity.runId(
-                            profile,
-                            checkpoint
-                        );
+                String runId =
+                    PolynomialTheoryUtilityExecutionIdentity.runId(
+                        profile,
+                        checkpoint
+                    );
+                for (var studyCase : formation.cases()) {
+                    int primitive = scale(
+                        studyCase.admittedPrimitiveWork(),
+                        checkpoint
+                    );
+                    int mechanical = scale(
+                        studyCase.totalMechanicalWork(),
+                        checkpoint
+                    );
+                    int factorization = scale(
+                        studyCase.factorizationWork(),
+                        checkpoint
+                    );
                     rows.add(new PolynomialTheoryUtilityExecutionRow(
                         PolynomialTheoryUtilityExecutionIdentity.rowId(
                             runId,
@@ -298,15 +298,17 @@ public final class PolynomialTheoryUtilityExecutionPlan {
         Set<String> rowIds = new HashSet<>();
         Map<String, Integer> runRows = new HashMap<>();
         int offset = 0;
-        for (var studyCase : cases) {
+        for (var profile : PROFILES) {
             for (var checkpoint : CHECKPOINTS) {
-                for (var profile : PROFILES) {
+                String expectedRunId =
+                    PolynomialTheoryUtilityExecutionIdentity.runId(
+                        profile,
+                        checkpoint
+                    );
+                for (var studyCase : cases) {
                     var row = rows.get(offset++);
                     runRows.merge(row.runId(), 1, Integer::sum);
-                    if (!PolynomialTheoryUtilityExecutionIdentity.runId(
-                                profile,
-                                checkpoint
-                            ).equals(row.runId())
+                    if (!expectedRunId.equals(row.runId())
                             || !studyCase.caseId().equals(row.caseId())
                             || !profile.profileId().equals(row.profileId())
                             || !checkpoint.checkpointId().equals(
