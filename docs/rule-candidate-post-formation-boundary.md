@@ -2,23 +2,22 @@
 
 ## Purpose
 
-`RuleCandidateMiner` now has one explicit boundary after a candidate has been
-fully formed and before the public mining call returns it. A configured
+`RuleCandidateMiner` has one explicit boundary after a candidate has been fully
+formed and before the public mining call returns it. A configured
 `RuleCandidateFormationObserver` receives the immutable `RuleCandidate` and the
 formation evidence that produced it.
 
 In this implementation, “post-formation publication” means the synchronous
 observer call with that candidate/evidence pair. There is deliberately no
-separate `RuleCandidatePostFormationPublisher`, `RuleCandidateDiscoveredEvent`
-or polynomial-classifying listener in this slice. Those names describe possible
-later adapters, not types introduced here.
+separate `RuleCandidatePostFormationPublisher` or
+`RuleCandidateDiscoveredEvent`. Those names describe possible adapters, not
+additional lifecycle authorities.
 
 This is an integration seam, not a classification or promotion policy. The
-default constructors use a private identity-stable no-op observer and therefore
-preserve the previous product behavior without constructing unused strict
-evidence. A later polynomial-theory integration must inject its observer
-explicitly until the general exact classifier has replaced the historical
-quartic classifier.
+default constructors use a private identity-stable no-op observer and preserve
+the previous product behavior without constructing unused strict evidence.
+Polynomial classification remains opt-in: a later integration must explicitly
+inject an observer configured with one visible exact factorization engine.
 
 ## Evidence
 
@@ -32,8 +31,8 @@ The observer receives four independent evidence axes:
 For a configured observer, the evidence is immutable, rejects blank entries,
 is de-duplicated in encounter order and is never written back into the candidate.
 The default no-op boundary does not impose these additional evidence checks on
-historic mining calls. Evidence remains separate from theory subsumption, project
-inventory novelty, external novelty, cache utility and promotion status.
+historic mining calls. Evidence remains separate from theory subsumption,
+project-inventory novelty, external novelty, cache utility and promotion status.
 
 ## Exactly-once and collision boundary
 
@@ -66,18 +65,36 @@ eligibility rules. An observer failure propagates for the affected formation;
 the failing candidate is not returned while pretending that configured
 post-formation processing succeeded.
 
+## Polynomial classifier relation
+
+`PolynomialTheorySubsumptionClassifier` now consumes the exact
+parser → typed request → selected engine → verifier → deterministic rendering →
+exact reparse authority. It is no longer backed by the historical specialized
+quartic synthesis operator.
+
+That classifier is still not installed by the no-op miner constructors. The next
+#748 integration slice must provide an explicit observer adapter that:
+
+- classifies the immutable candidate without changing its formation evidence;
+- retains positive, negative, unsupported, budget-inconclusive and technical
+  outcomes separately;
+- has one clearly owned handoff to the bounded derived-macro cache;
+- never promotes a theory-subsumed observation into the kernel or standard
+  inventory;
+- does not hide engine selection or enable a default search policy.
+
 ## Deliberate boundary
 
-This change does not:
+The formation boundary itself does not:
 
-- classify candidates with the historical quartic-only
-  `PolynomialTheorySubsumptionClassifier`;
+- choose a polynomial factorization engine;
+- classify a candidate automatically;
 - write to `PolynomialDerivedMacroCache`;
 - write to the verifier-authorized executable transition cache;
 - promote a candidate into the kernel, standard inventory or
   `DynamicCandidateRegistry`;
 - enable any default search or Workbench policy.
 
-The next polynomial integration slice must build an observer on the exact
-parser → native engine → verifier → rendering/reparse authority. Only after that
-classifier is qualified may automatic default routing be considered.
+Automatic routing may be considered only after the observer adapter, retained
+outcome ledger, cache ownership and held-out policy experiment have each been
+qualified under their own explicit contracts.
