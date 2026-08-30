@@ -1,0 +1,31 @@
+{
+  "schema": "regelsuche.polynomial-theory-utility-qualification-corpus/v1",
+  "studyId": "polynomial-theory-held-out-utility-v1",
+  "evidenceStatus": "SEALED_NOT_OPENED",
+  "openingCondition": "AFTER_VERSIONED_RESULT_FREEZE",
+  "candidateFormationMayRead": false,
+  "profileSelectionMayRead": false,
+  "caseCount": 20,
+  "cases": [
+    {"caseId":"z02-difference-of-squares","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x-1)*(x+1)","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"z03-cubic-unity","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x-1)*(x^2+x+1)","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"z04-four-linear-factors","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x-2)*(x-1)*(x+1)*(x+2)","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"z04-repeated-factors","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"REPEATED_FACTORS","referenceExpression":"(x-1)^2*(x+1)^2","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"q02-rational-linear-factors","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x-1/2)*(x-1/3)","expectedClassifierOutcome":"SUPPORTED_RATIONAL_UNIVARIATE"},
+    {"caseId":"q03-rational-content","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(3/2)*x*(x-1)*(x+1)","expectedClassifierOutcome":"SUPPORTED_RATIONAL_UNIVARIATE"},
+    {"caseId":"z06-cyclotomic-mixture","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x-1)*(x+1)*(x^2+x+1)*(x^2-x+1)","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"z08-even-sparse","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x-2)*(x-1)*(x+1)*(x+2)*(x^2+1)*(x^2+4)","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"z10-unity-full-budget","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x^5-1)*(x^5+1)","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"z05-eisenstein-irreducible","requiredOutcome":"NEGATIVE","reducibilityStatus":"IRREDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"x^5+5*x+5","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"z04-eisenstein-irreducible","requiredOutcome":"NEGATIVE","reducibilityStatus":"IRREDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"x^4+4*x+2","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"q02-no-rational-root","requiredOutcome":"NEGATIVE","reducibilityStatus":"IRREDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"x^2+1","expectedClassifierOutcome":"SUPPORTED_RATIONAL_UNIVARIATE"},
+    {"caseId":"near-miss-multivariate","requiredOutcome":"NEAR_MISS","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x-y)*(x+y)","expectedClassifierOutcome":"UNSUPPORTED_MULTIVARIATE"},
+    {"caseId":"unsupported-rational-function","requiredOutcome":"UNSUPPORTED","reducibilityStatus":"NOT_APPLICABLE","multiplicityStatus":"NOT_APPLICABLE","referenceExpression":"NOT_APPLICABLE","expectedClassifierOutcome":"UNSUPPORTED_NON_POLYNOMIAL"},
+    {"caseId":"unsupported-symbolic-exponent","requiredOutcome":"UNSUPPORTED","reducibilityStatus":"NOT_APPLICABLE","multiplicityStatus":"NOT_APPLICABLE","referenceExpression":"NOT_APPLICABLE","expectedClassifierOutcome":"UNSUPPORTED_SYMBOLIC_EXPONENT"},
+    {"caseId":"nested-single-occurrence","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x-1)*(x+1)","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"two-identical-occurrences","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x-1)*(x+1)","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"four-identical-occurrences","requiredOutcome":"POSITIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x-1)*(x+1)","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"z08-tiny-budget","requiredOutcome":"BUDGET_INCONCLUSIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x^4-1)*(x^4+1)","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"},
+    {"caseId":"z10-tiny-budget","requiredOutcome":"BUDGET_INCONCLUSIVE","reducibilityStatus":"REDUCIBLE","multiplicityStatus":"SQUARE_FREE","referenceExpression":"(x^5-1)*(x^5+1)","expectedClassifierOutcome":"SUPPORTED_INTEGER_UNIVARIATE"}
+  ]
+}
