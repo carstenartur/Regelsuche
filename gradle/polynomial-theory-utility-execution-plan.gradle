@@ -1,0 +1,84 @@
+def polynomialUtilityRoot = layout.projectDirectory
+def polynomialUtilityExperiments = project(':regelsuche-experiments')
+def polynomialUtilityRuntimeClasspath =
+    polynomialUtilityExperiments.providers.provider {
+        polynomialUtilityExperiments.extensions
+            .getByType(org.gradle.api.tasks.SourceSetContainer)
+            .named('main').get().runtimeClasspath
+    }
+def polynomialUtilityReportDirectory = layout.buildDirectory.dir(
+    'reports/polynomial-theory-utility-execution-plan')
+def polynomialUtilityPreregistration = polynomialUtilityRoot.file(
+    'regelsuche-experiments/src/main/resources/de/regelsuche/benchmark/'
+        + 'polynomial/polynomial-theory-utility-preregistration-v1.json')
+def polynomialUtilityFormation = polynomialUtilityRoot.file(
+    'regelsuche-experiments/src/main/resources/de/regelsuche/benchmark/'
+        + 'polynomial/polynomial-theory-utility-formation-corpus-v1.json')
+def polynomialUtilityPlanSource = polynomialUtilityRoot.file(
+    'regelsuche-experiments/src/main/java/de/regelsuche/benchmark/'
+        + 'polynomial/PolynomialTheoryUtilityExecutionPlan.java')
+
+def freezePolynomialTheoryUtilityExecutionPlanAuthority =
+    polynomialUtilityExperiments.tasks.register(
+        'freezePolynomialTheoryUtilityExecutionPlan',
+        JavaExec
+    ) {
+        group = 'verification'
+        description = 'Exports the frozen 600-row polynomial utility ' \
+            + 'execution plan without opening sealed qualification data.'
+        dependsOn polynomialUtilityExperiments.tasks.named('classes')
+        timeout = java.time.Duration.ofMinutes(1)
+        classpath = polynomialUtilityExperiments.files(
+            polynomialUtilityRuntimeClasspath)
+        mainClass =
+            'de.regelsuche.benchmark.polynomial.'
+                + 'PolynomialTheoryUtilityExecutionPlan'
+        inputs.file polynomialUtilityPreregistration
+        inputs.file polynomialUtilityFormation
+        inputs.file polynomialUtilityPlanSource
+        inputs.property(
+            'expectedPlanHash',
+            'sha256:c4de9337f27acb7f9d9036cf2c656b38d80abed8b59ae30dcdefeb68356f3658')
+        outputs.file(polynomialUtilityReportDirectory.map {
+            it.file('polynomial-theory-utility-execution-plan-v1.json')
+        })
+        argumentProviders.add({
+            [polynomialUtilityReportDirectory.get().asFile.absolutePath]
+        } as CommandLineArgumentProvider)
+        doLast {
+            def plan = polynomialUtilityReportDirectory.get()
+                .file('polynomial-theory-utility-execution-plan-v1.json')
+                .asFile
+            def qualification = polynomialUtilityReportDirectory.get()
+                .file(
+                    'polynomial-theory-utility-qualification-corpus-v1.json')
+                .asFile
+            if (!plan.isFile() || plan.length() != 235617L) {
+                throw new GradleException(
+                    'Missing or changed polynomial utility execution plan')
+            }
+            if (qualification.exists()) {
+                throw new GradleException(
+                    'Execution-plan export exposed sealed qualification')
+            }
+        }
+    }
+
+def freezePolynomialTheoryUtilityExecutionPlan = tasks.register(
+    'freezePolynomialTheoryUtilityExecutionPlan'
+) {
+    group = 'verification'
+    description = 'Compatibility aggregate for the experiments-owned ' \
+        + 'frozen polynomial utility execution plan.'
+    dependsOn freezePolynomialTheoryUtilityExecutionPlanAuthority
+}
+
+polynomialUtilityExperiments.tasks.matching {
+    task -> task.name == 'check'
+}.configureEach {
+    dependsOn freezePolynomialTheoryUtilityExecutionPlanAuthority
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn freezePolynomialTheoryUtilityExecutionPlan
+}

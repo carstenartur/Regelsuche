@@ -3,14 +3,16 @@
 ## Status
 
 Die Nutzenstudie für die Polynomtheorie ist vorbereitet, aber noch nicht
-ausgeführt. Der Profilvertrag und die zielblinde Fallformation sind eingefroren,
-bevor ein Held-out-Ergebnis eines Profils vorliegt. Es wurde weder ein
-Produktstandard noch eine Hybridpolitik oder ein Nutzennachweis ausgewählt.
+ausgeführt. Profilvertrag, zielblinde Fallformation und die vollständige
+Ausführungsmatrix sind eingefroren, bevor ein Held-out-Ergebnis eines Profils
+vorliegt. Es wurde weder ein Produktstandard noch eine Hybridpolitik oder ein
+Nutzennachweis ausgewählt.
 
 | Vertrag | Status |
 | --- | --- |
 | Profil-Präregistrierung | `FROZEN_NOT_EXECUTED` |
 | Fallformation | `FROZEN_NOT_EXECUTED` |
+| Ausführungsplan | `FROZEN_NOT_EXECUTED` |
 | Qualifikation | `SEALED_NOT_OPENED` |
 | Profilausführung | `NOT_STARTED` |
 | Standardentscheidung | `NOT_SELECTED` |
@@ -91,12 +93,56 @@ Fähigkeit. Wiederverwendungsfälle enthalten ein, zwei oder vier äquivalente
 Auftreten, sodass Cache-Lookup, Replay und Amortisation später gemessen werden
 können, ohne die Fallmenge zu ändern.
 
+## Eingefrorener Ausführungsplan
+
+Der Ausführungsplan bildet das kartesische Produkt aus 20 Fällen, fünf
+präregistrierten Profilen und sechs kumulativen Arbeitscheckpoints. Er enthält
+somit genau 600 Zeilen. Jede Zeile besitzt eine inhaltsadressierte Identität und
+beginnt mit `NOT_EXECUTED`.
+
+Die Checkpoints liegen bei `1/12`, `1/6`, `1/3`, `1/2`, `3/4` und dem vollen
+Fallbudget. Teilbudgets werden positiv aufgerundet. Für einen Fall und einen
+Checkpoint erhalten alle fünf Profile exakt dieselben Grenzen für zugelassene
+primitive Arbeit, gesamte mechanische Arbeit und Faktorisierungsarbeit.
+
+Die Ausführung ist vorab in 30 voneinander isolierte Läufe gruppiert:
+
+```text
+5 Profile × 6 Checkpoints = 30 Läufe
+30 Läufe × 20 Fälle = 600 Ergebniszeilen
+```
+
+Jeder Lauf verarbeitet die Fälle in der eingefrorenen Formationsreihenfolge.
+Profil- und Checkpoint-Läufe teilen weder Cache noch sonstigen veränderlichen
+Zustand. Das Cache-Profil startet jeden Lauf leer und darf Einträge nur innerhalb
+des jeweiligen Profil-/Checkpoint-Laufs über die 20 Fälle hinweg behalten.
+Damit sind Wiederverwendung innerhalb eines Falls und über spätere identische
+Auftreten messbar, ohne Ergebnisse zwischen Vergleichsprofilen zu übertragen.
+
+Der Plan bindet außerdem:
+
+- den gemeinsamen exakten Verifizierer und die Transformationsevidence;
+- Cache-Schema, Cache-Revision, Kapazität 128 und FIFO-Eviction;
+- native, spezialisierte und externe Engine-Identitäten;
+- GraalPy 25.1.3, SymPy 1.14.0, mpmath 1.3.0 und die eingecheckte Lockdatei;
+- explizit aufsteigende Kandidatenauswahl statt eines versteckten Best-of;
+- das Verbot einer Backend-Substitution nach einem Fehler;
+- die vollständige Aufbewahrung negativer, nicht unterstützter,
+  budgetbedingt unentschiedener und technischer Ausgänge.
+
+Identität des erzeugten Plans:
+
+- Bytelänge: `235617`;
+- SHA-256:
+  `c4de9337f27acb7f9d9036cf2c656b38d80abed8b59ae30dcdefeb68356f3658`.
+
 ## Verifikation im Checkout
 
-Die zielblinde Formation wird mit folgendem Befehl exportiert:
+Formation und Ausführungsplan werden mit folgenden Befehlen exportiert:
 
 ```bash
 ./gradlew :regelsuche-experiments:freezePolynomialTheoryUtilityCaseCorpus
+./gradlew :regelsuche-experiments:freezePolynomialTheoryUtilityExecutionPlan
 ```
 
 Die fokussierten beziehungsweise modulweiten Tests laufen über:
@@ -106,15 +152,16 @@ Die fokussierten beziehungsweise modulweiten Tests laufen über:
 ./gradlew :regelsuche-experiments:check
 ```
 
-Die `check`-Lebenszyklen des Moduls und des Root-Projekts führen den
-Formation-Export aus. Die Gradle-Aufgabe deklariert ausschließlich die
-Formation als Eingabe und prüft, dass keine Qualifikationsdatei ausgegeben
-wird.
+Die `check`-Lebenszyklen des Moduls und des Root-Projekts führen beide
+Exporte aus. Weder Formation noch Ausführungsplan deklarieren die versiegelte
+Qualifikation als Eingabe. Beide Aufgaben schlagen fehl, falls eine
+Qualifikationsdatei im Ausgabeordner erscheint.
 
 ## Nächster Evidence-Slice
 
-Als Nächstes ist die Ausführungsmatrix aus allen 20 Fällen, den fünf
-präregistrierten Profilen und gemeinsamen kumulativen Arbeitscheckpoints
-einzufrieren. Erst nachdem diese Matrix und die Profiladapter versioniert sind,
-darf die Ausführung beginnen. Qualifikation, Politikauswahl und eine mögliche
-Standardempfehlung bleiben getrennte Schritte nach dem Ergebnis-Freeze.
+Als Nächstes werden die fünf ausführbaren Profiladapter gegen die jetzt
+unveränderliche Matrix implementiert. Danach darf genau ein versionierter
+zielblinder Ergebnis-Freeze erzeugt werden. Erst auf dessen gebundene Bytes darf
+der getrennte Qualifikationsschritt zugreifen. Politikauswahl und eine mögliche
+Standardempfehlung bleiben weitere, mechanisch abgeleitete Schritte nach diesem
+Ergebnis-Freeze.
