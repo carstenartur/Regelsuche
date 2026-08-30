@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityCaseCorpus.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityCaseCorpus.java</span></div><h1>PolynomialTheoryUtilityCaseCorpus.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Fail-closed target-blind case formation for the polynomial utility study.
+ *
+ * &lt;p&gt;The formation resource contains only inputs, strata, assumptions and
+ * matched work budgets. It binds the separately sealed qualification by path,
+ * byte length and SHA-256; this class never opens that resource.&lt;/p&gt;
+ */
+public final class PolynomialTheoryUtilityCaseCorpus {
+    public static final String SCHEMA =
+        &quot;regelsuche.polynomial-theory-utility-formation-corpus/v1&quot;;
+    public static final String STUDY_ID =
+        PolynomialTheoryUtilityPreregistration.STUDY_ID;
+    public static final String EVIDENCE_STATUS = &quot;FROZEN_NOT_EXECUTED&quot;;
+    public static final String CASE_SELECTION_TIMING =
+        &quot;BEFORE_PROFILE_EXECUTION&quot;;
+    public static final String PROFILE_VISIBILITY =
+        &quot;IDENTICAL_ACROSS_PROFILES&quot;;
+    public static final String QUALIFICATION_EXPOSURE =
+        &quot;HASH_ONLY_BEFORE_RESULT_FREEZE&quot;;
+
+    public static final String FORMATION_FILE_NAME =
+        &quot;polynomial-theory-utility-formation-corpus-v1.json&quot;;
+    public static final String FORMATION_RESOURCE =
+        &quot;/de/regelsuche/benchmark/polynomial/&quot; + FORMATION_FILE_NAME;
+    public static final long FORMATION_BYTE_LENGTH = 7346L;
+    public static final String FORMATION_CONTENT_HASH =
+        &quot;sha256:2fd889c51b086afcf36ec450a38a3cbaf15b05cb0b27cf1fa5222b22e906636b&quot;;
+
+    public static final String QUALIFICATION_FILE_NAME =
+        &quot;polynomial-theory-utility-qualification-corpus-v1.json&quot;;
+    public static final String QUALIFICATION_RESOURCE =
+        &quot;/de/regelsuche/benchmark/polynomial/&quot; + QUALIFICATION_FILE_NAME;
+    public static final long QUALIFICATION_BYTE_LENGTH = 5146L;
+    public static final String QUALIFICATION_CONTENT_HASH =
+        &quot;sha256:09455d9540547b48a741679f1d7b07bb1b35d2c44af4a5561b94b225c77963d6&quot;;
+
+<span class="fc" id="L57">    public static final List&lt;String&gt; ORDERED_CASE_IDS = List.of(</span>
+        &quot;z02-difference-of-squares&quot;,
+        &quot;z03-cubic-unity&quot;,
+        &quot;z04-four-linear-factors&quot;,
+        &quot;z04-repeated-factors&quot;,
+        &quot;q02-rational-linear-factors&quot;,
+        &quot;q03-rational-content&quot;,
+        &quot;z06-cyclotomic-mixture&quot;,
+        &quot;z08-even-sparse&quot;,
+        &quot;z10-unity-full-budget&quot;,
+        &quot;z05-eisenstein-irreducible&quot;,
+        &quot;z04-eisenstein-irreducible&quot;,
+        &quot;q02-no-rational-root&quot;,
+        &quot;near-miss-multivariate&quot;,
+        &quot;unsupported-rational-function&quot;,
+        &quot;unsupported-symbolic-exponent&quot;,
+        &quot;nested-single-occurrence&quot;,
+        &quot;two-identical-occurrences&quot;,
+        &quot;four-identical-occurrences&quot;,
+        &quot;z08-tiny-budget&quot;,
+        &quot;z10-tiny-budget&quot;
+    );
+
+<span class="fc" id="L80">    private static final Set&lt;String&gt; DOMAINS = Set.of(</span>
+        &quot;Z[x]&quot;, &quot;Q[x]&quot;, &quot;Z[x,y]&quot;, &quot;Q(x)&quot;, &quot;Z[x,n]&quot;
+    );
+<span class="fc" id="L83">    private static final Set&lt;String&gt; COEFFICIENT_BUCKETS = Set.of(</span>
+        &quot;SMALL&quot;, &quot;MEDIUM&quot;, &quot;RATIONAL_SMALL&quot;, &quot;NOT_APPLICABLE&quot;
+    );
+<span class="fc" id="L86">    private static final Set&lt;String&gt; DENSITY_BUCKETS = Set.of(</span>
+        &quot;DENSE&quot;, &quot;MIXED&quot;, &quot;SPARSE&quot;, &quot;NOT_APPLICABLE&quot;
+    );
+<span class="fc" id="L89">    private static final Set&lt;String&gt; ASSUMPTION_SETS = Set.of(</span>
+        &quot;NONE&quot;, &quot;X_NONZERO&quot;, &quot;N_POSITIVE_INTEGER&quot;
+    );
+<span class="fc" id="L92">    private static final List&lt;String&gt; FORBIDDEN_FIELDS = List.of(</span>
+        &quot;\&quot;requiredOutcome\&quot;&quot;,
+        &quot;\&quot;reducibilityStatus\&quot;&quot;,
+        &quot;\&quot;multiplicityStatus\&quot;&quot;,
+        &quot;\&quot;referenceExpression\&quot;&quot;,
+        &quot;\&quot;expectedClassifierOutcome\&quot;&quot;
+    );
+<span class="fc" id="L99">    private static final Pattern CASE_LINE = Pattern.compile(</span>
+        &quot;^    \\{\&quot;caseId\&quot;:\&quot;([a-z0-9-]+)\&quot;,&quot;
+            + &quot;\&quot;sourceExpression\&quot;:\&quot;([^\&quot;\\\\]+)\&quot;,&quot;
+            + &quot;\&quot;declaredDomain\&quot;:\&quot;([^\&quot;]+)\&quot;,&quot;
+            + &quot;\&quot;observedDegree\&quot;:(-?[0-9]+),&quot;
+            + &quot;\&quot;coefficientBucket\&quot;:\&quot;([A-Z_]+)\&quot;,&quot;
+            + &quot;\&quot;densityBucket\&quot;:\&quot;([A-Z_]+)\&quot;,&quot;
+            + &quot;\&quot;reuseCount\&quot;:([0-9]+),&quot;
+            + &quot;\&quot;occurrenceDepth\&quot;:([0-9]+),&quot;
+            + &quot;\&quot;occurrenceLayout\&quot;:\&quot;([A-Z_]+)\&quot;,&quot;
+            + &quot;\&quot;assumptionSetId\&quot;:\&quot;([A-Z_]+)\&quot;,&quot;
+            + &quot;\&quot;admittedPrimitiveWork\&quot;:([0-9]+),&quot;
+            + &quot;\&quot;totalMechanicalWork\&quot;:([0-9]+),&quot;
+            + &quot;\&quot;factorizationWork\&quot;:([0-9]+)\\}(,?)$&quot;
+    );
+
+    private PolynomialTheoryUtilityCaseCorpus() {
+    }
+
+    /** Loads the formation corpus without opening the qualification resource. */
+    public static FormationArtifact load() {
+<span class="fc" id="L120">        byte[] bytes = readFormationResource();</span>
+<span class="fc" id="L121">        requireIdentity(bytes);</span>
+<span class="fc" id="L122">        String canonical = new String(bytes, StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (!Arrays.equals(bytes, canonical.getBytes(StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L124">            throw new IllegalStateException(</span>
+                &quot;polynomial utility formation corpus is not canonical UTF-8&quot;
+            );
+        }
+<span class="fc" id="L128">        return parseCanonical(canonical);</span>
+    }
+
+    static FormationArtifact parseCanonical(String canonical) {
+<span class="fc" id="L132">        Objects.requireNonNull(canonical, &quot;canonical&quot;);</span>
+<span class="fc" id="L133">        requireFraming(canonical);</span>
+<span class="fc" id="L134">        FORBIDDEN_FIELDS.forEach(field -&gt; {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (canonical.contains(field)) {</span>
+<span class="fc" id="L136">                throw new IllegalStateException(</span>
+                    &quot;formation corpus leaks sealed qualification field: &quot; + field
+                );
+            }
+<span class="fc" id="L140">        });</span>
+
+<span class="fc" id="L142">        String[] lines = canonical.split(&quot;\n&quot;, -1);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (lines.length != 37) {</span>
+<span class="fc" id="L144">            throw new IllegalStateException(</span>
+                &quot;formation corpus line count differs: expected=37, actual=&quot;
+                    + lines.length
+            );
+        }
+<span class="fc" id="L149">        List&lt;String&gt; header = List.of(</span>
+            &quot;{&quot;,
+            &quot;  \&quot;schema\&quot;: \&quot;&quot; + SCHEMA + &quot;\&quot;,&quot;,
+            &quot;  \&quot;studyId\&quot;: \&quot;&quot; + STUDY_ID + &quot;\&quot;,&quot;,
+            &quot;  \&quot;evidenceStatus\&quot;: \&quot;&quot; + EVIDENCE_STATUS + &quot;\&quot;,&quot;,
+            &quot;  \&quot;caseSelectionTiming\&quot;: \&quot;&quot; + CASE_SELECTION_TIMING + &quot;\&quot;,&quot;,
+            &quot;  \&quot;profileVisibility\&quot;: \&quot;&quot; + PROFILE_VISIBILITY + &quot;\&quot;,&quot;,
+            &quot;  \&quot;qualificationExposure\&quot;: \&quot;&quot; + QUALIFICATION_EXPOSURE + &quot;\&quot;,&quot;,
+            &quot;  \&quot;caseCount\&quot;: 20,&quot;,
+            &quot;  \&quot;qualificationBinding\&quot;: {&quot;,
+            &quot;    \&quot;path\&quot;: \&quot;&quot; + QUALIFICATION_FILE_NAME + &quot;\&quot;,&quot;,
+            &quot;    \&quot;byteLength\&quot;: &quot; + QUALIFICATION_BYTE_LENGTH + &quot;,&quot;,
+            &quot;    \&quot;contentHash\&quot;: \&quot;&quot; + QUALIFICATION_CONTENT_HASH + &quot;\&quot;&quot;,
+            &quot;  },&quot;,
+            &quot;  \&quot;cases\&quot;: [&quot;
+        );
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (int index = 0; index &lt; header.size(); index++) {</span>
+<span class="fc" id="L166">            requireLine(lines, index, header.get(index));</span>
+        }
+<span class="fc" id="L168">        requireLine(lines, 34, &quot;  ]&quot;);</span>
+<span class="fc" id="L169">        requireLine(lines, 35, &quot;}&quot;);</span>
+<span class="fc" id="L170">        requireLine(lines, 36, &quot;&quot;);</span>
+
+<span class="fc" id="L172">        List&lt;FormationCase&gt; cases = new ArrayList&lt;&gt;(ORDERED_CASE_IDS.size());</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        for (int index = 0; index &lt; ORDERED_CASE_IDS.size(); index++) {</span>
+<span class="fc" id="L174">            Matcher matcher = CASE_LINE.matcher(lines[14 + index]);</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            if (!matcher.matches()) {</span>
+<span class="nc" id="L176">                throw new IllegalStateException(</span>
+                    &quot;formation case line is not canonical at index &quot; + index
+                );
+            }
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            if ((!matcher.group(14).isEmpty())</span>
+<span class="pc bpc" id="L181" title="1 of 4 branches missed.">                    != (index + 1 &lt; ORDERED_CASE_IDS.size())) {</span>
+<span class="nc" id="L182">                throw new IllegalStateException(</span>
+                    &quot;formation case comma placement differs at index &quot; + index
+                );
+            }
+<span class="fc" id="L186">            FormationCase value = new FormationCase(</span>
+<span class="fc" id="L187">                matcher.group(1), matcher.group(2), matcher.group(3),</span>
+<span class="fc" id="L188">                Integer.parseInt(matcher.group(4)), matcher.group(5),</span>
+<span class="fc" id="L189">                matcher.group(6), Integer.parseInt(matcher.group(7)),</span>
+<span class="fc" id="L190">                Integer.parseInt(matcher.group(8)), matcher.group(9),</span>
+<span class="fc" id="L191">                matcher.group(10), Integer.parseInt(matcher.group(11)),</span>
+<span class="fc" id="L192">                Integer.parseInt(matcher.group(12)),</span>
+<span class="fc" id="L193">                Integer.parseInt(matcher.group(13))</span>
+            );
+<span class="fc" id="L195">            validateCase(value);</span>
+<span class="fc" id="L196">            cases.add(value);</span>
+        }
+
+<span class="fc" id="L199">        List&lt;String&gt; ids = cases.stream().map(FormationCase::caseId).toList();</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (!ORDERED_CASE_IDS.equals(ids)</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                || new HashSet&lt;&gt;(ids).size() != ids.size()) {</span>
+<span class="fc" id="L202">            throw new IllegalStateException(</span>
+                &quot;formation corpus ordered case identities differ&quot;
+            );
+        }
+<span class="fc" id="L206">        Set&lt;String&gt; domains = cases.stream()</span>
+<span class="fc" id="L207">            .map(FormationCase::declaredDomain)</span>
+<span class="fc" id="L208">            .collect(java.util.stream.Collectors.toSet());</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (!DOMAINS.equals(domains)) {</span>
+<span class="nc" id="L210">            throw new IllegalStateException(</span>
+                &quot;formation corpus domain coverage differs: &quot; + domains
+            );
+        }
+<span class="fc" id="L214">        return new FormationArtifact(</span>
+            new QualificationBinding(
+                QUALIFICATION_FILE_NAME,
+                QUALIFICATION_BYTE_LENGTH,
+                QUALIFICATION_CONTENT_HASH
+            ),
+            cases,
+            canonical
+        );
+    }
+
+    /** Writes only the target-blind formation artifact. */
+    public static FormationArtifact write(Path directory) throws IOException {
+<span class="fc" id="L227">        Path root = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L228">            .toAbsolutePath().normalize();</span>
+<span class="fc" id="L229">        Files.createDirectories(root);</span>
+<span class="fc" id="L230">        FormationArtifact artifact = load();</span>
+<span class="fc" id="L231">        Path target = root.resolve(FORMATION_FILE_NAME);</span>
+<span class="fc" id="L232">        AtomicJsonFile.writeUtf8(target, artifact.canonicalJson());</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        if (!Files.isRegularFile(target)</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">                || !artifact.canonicalJson().equals(</span>
+<span class="fc" id="L235">                    Files.readString(target, StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L236">            throw new IllegalStateException(</span>
+                &quot;written polynomial utility formation corpus changed: &quot; + target
+            );
+        }
+<span class="fc" id="L240">        Path qualification = root.resolve(QUALIFICATION_FILE_NAME);</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (Files.exists(qualification)) {</span>
+<span class="nc" id="L242">            throw new IllegalStateException(</span>
+                &quot;formation export must not expose sealed qualification: &quot;
+                    + qualification
+            );
+        }
+<span class="fc" id="L247">        return artifact;</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (args.length != 1) {</span>
+<span class="fc" id="L252">            throw new IllegalArgumentException(&quot;usage: &lt;output-directory&gt;&quot;);</span>
+        }
+<span class="nc" id="L254">        FormationArtifact artifact = write(Path.of(args[0]));</span>
+<span class="nc" id="L255">        System.out.println(</span>
+            &quot;polynomialTheoryUtilityFormationHash=&quot; + FORMATION_CONTENT_HASH
+        );
+<span class="nc" id="L258">        System.out.println(</span>
+<span class="nc" id="L259">            &quot;polynomialTheoryUtilityFormationCases=&quot; + artifact.cases().size()</span>
+        );
+<span class="nc" id="L261">        System.out.println(</span>
+            &quot;polynomialTheoryUtilityQualificationBinding=&quot;
+<span class="nc" id="L263">                + artifact.qualificationBinding().contentHash()</span>
+        );
+<span class="nc" id="L265">    }</span>
+
+    private static byte[] readFormationResource() {
+<span class="fc" id="L268">        try (InputStream input = PolynomialTheoryUtilityCaseCorpus.class</span>
+<span class="fc" id="L269">                .getResourceAsStream(FORMATION_RESOURCE)) {</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">            if (input == null) {</span>
+<span class="nc" id="L271">                throw new IllegalStateException(</span>
+                    &quot;missing polynomial utility formation corpus &quot;
+                        + FORMATION_RESOURCE
+                );
+            }
+<span class="fc" id="L276">            return input.readAllBytes();</span>
+<span class="nc" id="L277">        } catch (IOException exception) {</span>
+<span class="nc" id="L278">            throw new IllegalStateException(</span>
+                &quot;cannot read polynomial utility formation corpus &quot;
+                    + FORMATION_RESOURCE,
+                exception
+            );
+        }
+    }
+
+    private static void requireIdentity(byte[] bytes) {
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (bytes.length != FORMATION_BYTE_LENGTH) {</span>
+<span class="nc" id="L288">            throw new IllegalStateException(</span>
+                &quot;formation corpus byte length differs: expected=&quot;
+                    + FORMATION_BYTE_LENGTH + &quot;, actual=&quot; + bytes.length
+            );
+        }
+<span class="fc" id="L293">        String actual = sha256(bytes);</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (!FORMATION_CONTENT_HASH.equals(actual)) {</span>
+<span class="nc" id="L295">            throw new IllegalStateException(</span>
+                &quot;formation corpus hash differs: expected=&quot;
+                    + FORMATION_CONTENT_HASH + &quot;, actual=&quot; + actual
+            );
+        }
+<span class="fc" id="L300">    }</span>
+
+    private static void requireFraming(String canonical) {
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (!canonical.startsWith(&quot;{\n&quot;)</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">                || !canonical.endsWith(&quot;}\n&quot;)</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">                || canonical.indexOf('\r') &gt;= 0) {</span>
+<span class="fc" id="L306">            throw new IllegalStateException(</span>
+                &quot;polynomial utility formation corpus has non-canonical &quot;
+                    + &quot;framing; use UTF-8 with LF line endings, preserve the &quot;
+                    + &quot;path-specific .gitattributes eol=lf rule and &quot;
+                    + &quot;renormalize before updating length/hash&quot;
+            );
+        }
+<span class="fc" id="L313">    }</span>
+
+    private static void requireLine(String[] lines, int index, String expected) {
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        if (!expected.equals(lines[index])) {</span>
+<span class="nc" id="L317">            throw new IllegalStateException(</span>
+                &quot;formation corpus canonical line differs at index &quot; + index
+            );
+        }
+<span class="fc" id="L321">    }</span>
+
+    private static void validateCase(FormationCase value) {
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (!DOMAINS.contains(value.declaredDomain())</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">                || !COEFFICIENT_BUCKETS.contains(value.coefficientBucket())</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                || !DENSITY_BUCKETS.contains(value.densityBucket())</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                || !ASSUMPTION_SETS.contains(value.assumptionSetId())) {</span>
+<span class="nc" id="L328">            throw new IllegalStateException(</span>
+                &quot;formation case has an unknown frozen category: &quot;
+<span class="nc" id="L330">                    + value.caseId()</span>
+            );
+        }
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        boolean supported = &quot;Z[x]&quot;.equals(value.declaredDomain())</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            || &quot;Q[x]&quot;.equals(value.declaredDomain());</span>
+<span class="pc bpc" id="L335" title="1 of 4 branches missed.">        if (supported != (value.observedDegree() &gt;= 0)) {</span>
+<span class="nc" id="L336">            throw new IllegalStateException(</span>
+                &quot;formation case degree/domain boundary differs: &quot;
+<span class="nc" id="L338">                    + value.caseId()</span>
+            );
+        }
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        if (value.admittedPrimitiveWork() &lt; value.factorizationWork()</span>
+<span class="fc" id="L342">                || value.totalMechanicalWork()</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">                    &lt; value.admittedPrimitiveWork()) {</span>
+<span class="nc" id="L344">            throw new IllegalStateException(</span>
+<span class="nc" id="L345">                &quot;formation case work budgets do not balance: &quot; + value.caseId()</span>
+            );
+        }
+<span class="pc bpc" id="L348" title="1 of 5 branches missed.">        boolean occurrenceValid = switch (value.occurrenceLayout()) {</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">            case &quot;ROOT&quot; -&gt; value.occurrenceDepth() == 0</span>
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">                &amp;&amp; value.reuseCount() == 1;</span>
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">            case &quot;NESTED_RIGHT&quot; -&gt; value.occurrenceDepth() == 1</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">                &amp;&amp; value.reuseCount() == 1;</span>
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">            case &quot;TWO_IDENTICAL_SIBLINGS&quot; -&gt; value.occurrenceDepth() == 1</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">                &amp;&amp; value.reuseCount() == 2;</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            case &quot;FOUR_IDENTICAL_LEAVES&quot; -&gt; value.occurrenceDepth() == 2</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">                &amp;&amp; value.reuseCount() == 4;</span>
+<span class="nc" id="L357">            default -&gt; false;</span>
+        };
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (!occurrenceValid) {</span>
+<span class="nc" id="L360">            throw new IllegalStateException(</span>
+<span class="nc" id="L361">                &quot;formation case occurrence layout differs: &quot; + value.caseId()</span>
+            );
+        }
+<span class="fc" id="L364">    }</span>
+
+    private static String sha256(byte[] value) {
+        try {
+<span class="fc" id="L368">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L369">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value)</span>
+            );
+<span class="nc" id="L371">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L372">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    public record QualificationBinding(
+        String path,
+        long byteLength,
+        String contentHash
+    ) {
+<span class="fc" id="L381">        public QualificationBinding {</span>
+<span class="fc" id="L382">            path = Objects.requireNonNull(path, &quot;path&quot;);</span>
+<span class="fc" id="L383">            contentHash = Objects.requireNonNull(contentHash, &quot;contentHash&quot;);</span>
+<span class="pc bpc" id="L384" title="1 of 4 branches missed.">            if (!QUALIFICATION_FILE_NAME.equals(path)</span>
+                    || byteLength != QUALIFICATION_BYTE_LENGTH
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">                    || !QUALIFICATION_CONTENT_HASH.equals(contentHash)) {</span>
+<span class="fc" id="L387">                throw new IllegalArgumentException(</span>
+                    &quot;qualification binding differs from the sealed contract&quot;
+                );
+            }
+<span class="fc" id="L391">        }</span>
+    }
+
+    public record FormationCase(
+        String caseId,
+        String sourceExpression,
+        String declaredDomain,
+        int observedDegree,
+        String coefficientBucket,
+        String densityBucket,
+        int reuseCount,
+        int occurrenceDepth,
+        String occurrenceLayout,
+        String assumptionSetId,
+        int admittedPrimitiveWork,
+        int totalMechanicalWork,
+        int factorizationWork
+    ) {
+<span class="fc" id="L409">        public FormationCase {</span>
+<span class="fc" id="L410">            caseId = requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L411">            sourceExpression = requireText(sourceExpression, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L412">            declaredDomain = requireText(declaredDomain, &quot;declaredDomain&quot;);</span>
+<span class="fc" id="L413">            coefficientBucket = requireText(</span>
+                coefficientBucket, &quot;coefficientBucket&quot;
+            );
+<span class="fc" id="L416">            densityBucket = requireText(densityBucket, &quot;densityBucket&quot;);</span>
+<span class="fc" id="L417">            occurrenceLayout = requireText(</span>
+                occurrenceLayout, &quot;occurrenceLayout&quot;
+            );
+<span class="fc" id="L420">            assumptionSetId = requireText(assumptionSetId, &quot;assumptionSetId&quot;);</span>
+<span class="pc bpc" id="L421" title="6 of 12 branches missed.">            if (observedDegree &lt; -1</span>
+                    || reuseCount &lt; 1
+                    || occurrenceDepth &lt; 0
+                    || admittedPrimitiveWork &lt; 1
+                    || totalMechanicalWork &lt; 1
+                    || factorizationWork &lt; 1) {
+<span class="nc" id="L427">                throw new IllegalArgumentException(</span>
+                    &quot;formation case numeric values are invalid: &quot; + caseId
+                );
+            }
+<span class="fc" id="L431">        }</span>
+    }
+
+    public record FormationArtifact(
+        QualificationBinding qualificationBinding,
+        List&lt;FormationCase&gt; cases,
+        String canonicalJson
+    ) {
+<span class="fc" id="L439">        public FormationArtifact {</span>
+<span class="fc" id="L440">            qualificationBinding = Objects.requireNonNull(</span>
+                qualificationBinding, &quot;qualificationBinding&quot;
+            );
+<span class="fc" id="L443">            cases = List.copyOf(cases);</span>
+<span class="fc" id="L444">            canonicalJson = requireText(canonicalJson, &quot;canonicalJson&quot;);</span>
+<span class="pc bpc" id="L445" title="1 of 2 branches missed.">            if (!ORDERED_CASE_IDS.equals(</span>
+<span class="fc" id="L446">                    cases.stream().map(FormationCase::caseId).toList())) {</span>
+<span class="nc" id="L447">                throw new IllegalArgumentException(</span>
+                    &quot;formation artifact differs from its frozen contract&quot;
+                );
+            }
+<span class="fc" id="L451">        }</span>
+
+        public String schema() {
+<span class="fc" id="L454">            return SCHEMA;</span>
+        }
+
+        public String studyId() {
+<span class="nc" id="L458">            return STUDY_ID;</span>
+        }
+
+        public String evidenceStatus() {
+<span class="fc" id="L462">            return EVIDENCE_STATUS;</span>
+        }
+
+        public String caseSelectionTiming() {
+<span class="fc" id="L466">            return CASE_SELECTION_TIMING;</span>
+        }
+
+        public String profileVisibility() {
+<span class="fc" id="L470">            return PROFILE_VISIBILITY;</span>
+        }
+
+        public String qualificationExposure() {
+<span class="fc" id="L474">            return QUALIFICATION_EXPOSURE;</span>
+        }
+
+        public String contentHash() {
+<span class="nc" id="L478">            return FORMATION_CONTENT_HASH;</span>
+        }
+
+        public long byteLength() {
+<span class="nc" id="L482">            return FORMATION_BYTE_LENGTH;</span>
+        }
+    }
+
+    private static String requireText(String value, String name) {
+<span class="fc" id="L487">        String text = Objects.requireNonNull(value, name);</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">        if (text.isBlank()) {</span>
+<span class="fc" id="L489">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L491">        return text;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
