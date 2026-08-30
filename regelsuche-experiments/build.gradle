@@ -55,6 +55,8 @@ def representationMatchedWorkReportDirectory = layout.buildDirectory.dir(
     'reports/representation-matched-work')
 def symPyRuleAmplificationReportDirectory = layout.buildDirectory.dir(
     'reports/sympy-rule-amplification')
+def polynomialTheoryUtilityCaseCorpusReportDirectory =
+    layout.buildDirectory.dir('reports/polynomial-theory-utility-case-corpus')
 def historicalRediscoveryOutputArgument =
     historicalRediscoveryReportDirectory.map { it.asFile.absolutePath }
 def historicalRewriteArchitectureDecisionInputs = [
@@ -235,15 +237,51 @@ def symPyRuleAmplification = tasks.register(
     }
 }
 
+def freezePolynomialTheoryUtilityCaseCorpus = tasks.register(
+    'freezePolynomialTheoryUtilityCaseCorpus', JavaExec) {
+    group = 'verification'
+    description = 'Exports the target-blind polynomial utility formation corpus without opening or copying sealed qualification data.'
+    dependsOn tasks.named('classes')
+    timeout = java.time.Duration.ofMinutes(1)
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityCaseCorpus'
+    argumentProviders.add({
+        [polynomialTheoryUtilityCaseCorpusReportDirectory.get()
+            .asFile.absolutePath]
+    } as CommandLineArgumentProvider)
+    inputs.file(layout.projectDirectory.file(
+        'src/main/resources/de/regelsuche/benchmark/polynomial/'
+            + 'polynomial-theory-utility-formation-corpus-v1.json'))
+    outputs.file(polynomialTheoryUtilityCaseCorpusReportDirectory.map {
+        it.file('polynomial-theory-utility-formation-corpus-v1.json')
+    })
+    doLast {
+        def formation = polynomialTheoryUtilityCaseCorpusReportDirectory.get()
+            .file('polynomial-theory-utility-formation-corpus-v1.json').asFile
+        def qualification = polynomialTheoryUtilityCaseCorpusReportDirectory.get()
+            .file('polynomial-theory-utility-qualification-corpus-v1.json').asFile
+        if (!formation.isFile()) {
+            throw new GradleException(
+                'Missing polynomial utility formation corpus artifact')
+        }
+        if (qualification.exists()) {
+            throw new GradleException(
+                'Formation export exposed sealed polynomial qualification')
+        }
+    }
+}
+
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
     dependsOn generateHistoricalRewriteArchitectureDecision
     dependsOn representationMatchedWork
     dependsOn symPyRuleAmplification
+    dependsOn freezePolynomialTheoryUtilityCaseCorpus
 }
 
 rootProject.tasks.named('check') {
     dependsOn generateHistoricalRewriteArchitectureDecision
     dependsOn representationMatchedWork
     dependsOn symPyRuleAmplification
+    dependsOn freezePolynomialTheoryUtilityCaseCorpus
 }

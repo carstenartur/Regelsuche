@@ -1,0 +1,36 @@
+{
+  "schema": "regelsuche.polynomial-theory-utility-formation-corpus/v1",
+  "studyId": "polynomial-theory-held-out-utility-v1",
+  "evidenceStatus": "FROZEN_NOT_EXECUTED",
+  "caseSelectionTiming": "BEFORE_PROFILE_EXECUTION",
+  "profileVisibility": "IDENTICAL_ACROSS_PROFILES",
+  "qualificationExposure": "HASH_ONLY_BEFORE_RESULT_FREEZE",
+  "caseCount": 20,
+  "qualificationBinding": {
+    "path": "polynomial-theory-utility-qualification-corpus-v1.json",
+    "byteLength": 5146,
+    "contentHash": "sha256:09455d9540547b48a741679f1d7b07bb1b35d2c44af4a5561b94b225c77963d6"
+  },
+  "cases": [
+    {"caseId":"z02-difference-of-squares","sourceExpression":"x^2-1","declaredDomain":"Z[x]","observedDegree":2,"coefficientBucket":"SMALL","densityBucket":"DENSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":64,"totalMechanicalWork":256,"factorizationWork":64},
+    {"caseId":"z03-cubic-unity","sourceExpression":"x^3-1","declaredDomain":"Z[x]","observedDegree":3,"coefficientBucket":"SMALL","densityBucket":"SPARSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":96,"totalMechanicalWork":384,"factorizationWork":96},
+    {"caseId":"z04-four-linear-factors","sourceExpression":"x^4-5*x^2+4","declaredDomain":"Z[x]","observedDegree":4,"coefficientBucket":"SMALL","densityBucket":"MIXED","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":128,"totalMechanicalWork":512,"factorizationWork":128},
+    {"caseId":"z04-repeated-factors","sourceExpression":"x^4-2*x^2+1","declaredDomain":"Z[x]","observedDegree":4,"coefficientBucket":"SMALL","densityBucket":"MIXED","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":128,"totalMechanicalWork":512,"factorizationWork":128},
+    {"caseId":"q02-rational-linear-factors","sourceExpression":"x^2-(5/6)*x+1/6","declaredDomain":"Q[x]","observedDegree":2,"coefficientBucket":"RATIONAL_SMALL","densityBucket":"DENSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":96,"totalMechanicalWork":384,"factorizationWork":96},
+    {"caseId":"q03-rational-content","sourceExpression":"(3/2)*x^3-(3/2)*x","declaredDomain":"Q[x]","observedDegree":3,"coefficientBucket":"RATIONAL_SMALL","densityBucket":"SPARSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":128,"totalMechanicalWork":512,"factorizationWork":128},
+    {"caseId":"z06-cyclotomic-mixture","sourceExpression":"x^6-1","declaredDomain":"Z[x]","observedDegree":6,"coefficientBucket":"SMALL","densityBucket":"SPARSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":192,"totalMechanicalWork":768,"factorizationWork":192},
+    {"caseId":"z08-even-sparse","sourceExpression":"x^8-17*x^4+16","declaredDomain":"Z[x]","observedDegree":8,"coefficientBucket":"MEDIUM","densityBucket":"SPARSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":256,"totalMechanicalWork":1024,"factorizationWork":256},
+    {"caseId":"z10-unity-full-budget","sourceExpression":"x^10-1","declaredDomain":"Z[x]","observedDegree":10,"coefficientBucket":"SMALL","densityBucket":"SPARSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":384,"totalMechanicalWork":1536,"factorizationWork":384},
+    {"caseId":"z05-eisenstein-irreducible","sourceExpression":"x^5+5*x+5","declaredDomain":"Z[x]","observedDegree":5,"coefficientBucket":"SMALL","densityBucket":"SPARSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":192,"totalMechanicalWork":768,"factorizationWork":192},
+    {"caseId":"z04-eisenstein-irreducible","sourceExpression":"x^4+4*x+2","declaredDomain":"Z[x]","observedDegree":4,"coefficientBucket":"SMALL","densityBucket":"SPARSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":160,"totalMechanicalWork":640,"factorizationWork":160},
+    {"caseId":"q02-no-rational-root","sourceExpression":"x^2+1","declaredDomain":"Q[x]","observedDegree":2,"coefficientBucket":"SMALL","densityBucket":"SPARSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":96,"totalMechanicalWork":384,"factorizationWork":96},
+    {"caseId":"near-miss-multivariate","sourceExpression":"x^2-y^2","declaredDomain":"Z[x,y]","observedDegree":-1,"coefficientBucket":"SMALL","densityBucket":"NOT_APPLICABLE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":64,"totalMechanicalWork":256,"factorizationWork":64},
+    {"caseId":"unsupported-rational-function","sourceExpression":"x+1/x","declaredDomain":"Q(x)","observedDegree":-1,"coefficientBucket":"SMALL","densityBucket":"NOT_APPLICABLE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"X_NONZERO","admittedPrimitiveWork":64,"totalMechanicalWork":256,"factorizationWork":64},
+    {"caseId":"unsupported-symbolic-exponent","sourceExpression":"x^n-1","declaredDomain":"Z[x,n]","observedDegree":-1,"coefficientBucket":"NOT_APPLICABLE","densityBucket":"NOT_APPLICABLE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"N_POSITIVE_INTEGER","admittedPrimitiveWork":64,"totalMechanicalWork":256,"factorizationWork":64},
+    {"caseId":"nested-single-occurrence","sourceExpression":"1+(x^2-1)","declaredDomain":"Z[x]","observedDegree":2,"coefficientBucket":"SMALL","densityBucket":"DENSE","reuseCount":1,"occurrenceDepth":1,"occurrenceLayout":"NESTED_RIGHT","assumptionSetId":"NONE","admittedPrimitiveWork":96,"totalMechanicalWork":384,"factorizationWork":96},
+    {"caseId":"two-identical-occurrences","sourceExpression":"(x^2-1)+(x^2-1)","declaredDomain":"Z[x]","observedDegree":2,"coefficientBucket":"SMALL","densityBucket":"DENSE","reuseCount":2,"occurrenceDepth":1,"occurrenceLayout":"TWO_IDENTICAL_SIBLINGS","assumptionSetId":"NONE","admittedPrimitiveWork":160,"totalMechanicalWork":640,"factorizationWork":80},
+    {"caseId":"four-identical-occurrences","sourceExpression":"((x^2-1)+(x^2-1))+((x^2-1)+(x^2-1))","declaredDomain":"Z[x]","observedDegree":2,"coefficientBucket":"SMALL","densityBucket":"DENSE","reuseCount":4,"occurrenceDepth":2,"occurrenceLayout":"FOUR_IDENTICAL_LEAVES","assumptionSetId":"NONE","admittedPrimitiveWork":256,"totalMechanicalWork":1024,"factorizationWork":64},
+    {"caseId":"z08-tiny-budget","sourceExpression":"x^8-1","declaredDomain":"Z[x]","observedDegree":8,"coefficientBucket":"SMALL","densityBucket":"SPARSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":4,"totalMechanicalWork":8,"factorizationWork":2},
+    {"caseId":"z10-tiny-budget","sourceExpression":"x^10-1","declaredDomain":"Z[x]","observedDegree":10,"coefficientBucket":"SMALL","densityBucket":"SPARSE","reuseCount":1,"occurrenceDepth":0,"occurrenceLayout":"ROOT","assumptionSetId":"NONE","admittedPrimitiveWork":4,"totalMechanicalWork":8,"factorizationWork":2}
+  ]
+}
