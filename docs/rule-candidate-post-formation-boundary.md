@@ -7,6 +7,12 @@ fully formed and before the public mining call returns it. A configured
 `RuleCandidateFormationObserver` receives the immutable `RuleCandidate` and the
 formation evidence that produced it.
 
+In this implementation, “post-formation publication” means the synchronous
+observer call with that candidate/evidence pair. There is deliberately no
+separate `RuleCandidatePostFormationPublisher`, `RuleCandidateDiscoveredEvent`
+or polynomial-classifying listener in this slice. Those names describe possible
+later adapters, not types introduced here.
+
 This is an integration seam, not a classification or promotion policy. The
 default constructors use a private identity-stable no-op observer and therefore
 preserve the previous product behavior without constructing unused strict
@@ -29,7 +35,7 @@ The default no-op boundary does not impose these additional evidence checks on
 historic mining calls. Evidence remains separate from theory subsumption, project
 inventory novelty, external novelty, cache utility and promotion status.
 
-## Exactly-once boundary
+## Exactly-once and collision boundary
 
 For ordinary clustered mining, each candidate returned by `mine(...)` is
 observed once after bucket de-duplication and threshold filtering.
@@ -39,6 +45,13 @@ then equal canonical candidates are de-duplicated, their evidence is merged in
 encounter order, and the observer is called once per returned candidate. This
 prevents duplicate routing when multiple source paths generalize to the same
 schema.
+
+A canonical key is never trusted as sufficient evidence of candidate equality.
+Both clustered buckets and bulk single-path merging retain the separately
+canonicalized left and right patterns and compare them before evidence is
+combined. Conflicting parameter relations or proof/semantic status are rejected
+as well. A same-key/different-content collision therefore fails before any
+observer receives a candidate; the first value is not silently retained.
 
 Unverified single-path inputs and paths that do not form a returned candidate
 do not reach the observer. Ordinary clustered mining preserves its existing
