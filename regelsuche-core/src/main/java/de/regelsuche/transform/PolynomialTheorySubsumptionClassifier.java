@@ -374,6 +374,10 @@ public final class PolynomialTheorySubsumptionClassifier {
         List<CanonicalNode> operands = new ArrayList<>();
         appendAssociativeOperand(operands, left, operator);
         appendAssociativeOperand(operands, right, operator);
+        operands = combineAssociativeConstants(
+            operator,
+            operands,
+            work);
         work.sort(operands.size());
         operands.sort(Comparator.comparing(CanonicalNode::material));
         String separator = " " + operator.symbol() + " ";
@@ -389,6 +393,45 @@ public final class PolynomialTheorySubsumptionClassifier {
             Optional.empty(),
             operator,
             operands);
+    }
+
+    private List<CanonicalNode> combineAssociativeConstants(
+        BinaryOperator operator,
+        List<CanonicalNode> operands,
+        IdentityWork work
+    ) {
+        List<CanonicalNode> constants = new ArrayList<>();
+        List<CanonicalNode> nonConstants = new ArrayList<>(
+            operands.size());
+        for (CanonicalNode operand : operands) {
+            if (operand.constant().isPresent()) {
+                constants.add(operand);
+            } else {
+                nonConstants.add(operand);
+            }
+        }
+        if (constants.size() < 2) {
+            return operands;
+        }
+
+        work.sort(constants.size());
+        constants.sort(Comparator.comparing(CanonicalNode::material));
+        ExactRational combined = constants.getFirst()
+            .constant()
+            .orElseThrow();
+        for (int index = 1; index < constants.size(); index++) {
+            work.scalarArithmetic();
+            Optional<ExactRational> next = exactConstant(
+                operator,
+                Optional.of(combined),
+                constants.get(index).constant());
+            if (next.isEmpty()) {
+                return operands;
+            }
+            combined = next.orElseThrow();
+        }
+        nonConstants.add(numberNode(combined));
+        return nonConstants;
     }
 
     private static void appendAssociativeOperand(
@@ -777,6 +820,10 @@ public final class PolynomialTheorySubsumptionClassifier {
             units = Math.addExact(
                 units,
                 Math.multiplyExact((long) values, rounds));
+        }
+
+        private void scalarArithmetic() {
+            units = Math.addExact(units, 1);
         }
 
         private long units() {
