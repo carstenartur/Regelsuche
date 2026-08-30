@@ -16,7 +16,13 @@ def polynomialUtilityFormation = polynomialUtilityRoot.file(
         + 'polynomial/polynomial-theory-utility-formation-corpus-v1.json')
 def polynomialUtilityPlanSources = polynomialUtilityExperiments.fileTree(
     'src/main/java/de/regelsuche/benchmark/polynomial') {
-        include 'PolynomialTheoryUtilityExecution*.java'
+        include 'PolynomialTheoryUtilityExecutionArtifact.java'
+        include 'PolynomialTheoryUtilityExecutionCheckpoint.java'
+        include 'PolynomialTheoryUtilityExecutionIdentity.java'
+        include 'PolynomialTheoryUtilityExecutionJson.java'
+        include 'PolynomialTheoryUtilityExecutionPlan.java'
+        include 'PolynomialTheoryUtilityExecutionProfile.java'
+        include 'PolynomialTheoryUtilityExecutionRow.java'
     }
 def polynomialUtilityTaskScript = polynomialUtilityRoot.file(
     'gradle/polynomial-theory-utility-execution-plan.gradle')
@@ -84,4 +90,79 @@ polynomialUtilityExperiments.tasks.matching {
 
 tasks.matching { task -> task.name == 'check' }.configureEach {
     dependsOn freezePolynomialTheoryUtilityExecutionPlan
+}
+
+def polynomialUtilityInputReportDirectory = layout.buildDirectory.dir(
+    'reports/polynomial-theory-utility-execution-inputs')
+def polynomialUtilityInputSources = polynomialUtilityExperiments.fileTree(
+    'src/main/java/de/regelsuche/benchmark/polynomial') {
+        include 'PolynomialTheoryUtilityExecutionInput*.java'
+        include 'PolynomialTheoryUtilityExecutionInputs.java'
+    }
+
+def freezePolynomialTheoryUtilityExecutionInputsAuthority =
+    polynomialUtilityExperiments.tasks.register(
+        'freezePolynomialTheoryUtilityExecutionInputs',
+        JavaExec
+    ) {
+        group = 'verification'
+        description = 'Exports one target-blind input for every frozen ' +
+            'polynomial utility plan row without opening qualification data.'
+        dependsOn polynomialUtilityExperiments.tasks.named('classes')
+        dependsOn freezePolynomialTheoryUtilityExecutionPlanAuthority
+        timeout = java.time.Duration.ofMinutes(1)
+        classpath = polynomialUtilityExperiments.files(
+            polynomialUtilityRuntimeClasspath)
+        mainClass = 'de.regelsuche.benchmark.polynomial.' +
+            'PolynomialTheoryUtilityExecutionInputs'
+        inputs.file polynomialUtilityPreregistration
+        inputs.file polynomialUtilityFormation
+        inputs.files polynomialUtilityPlanSources
+        inputs.files polynomialUtilityInputSources
+        inputs.file polynomialUtilityTaskScript
+        inputs.property(
+            'expectedInputHash',
+            'sha256:d93e2d3c4c3e72d435fa37d6bc988d2a8d873a3d1bc5584232fb1383b64d62c8')
+        outputs.file(polynomialUtilityInputReportDirectory.map {
+            it.file('polynomial-theory-utility-execution-inputs-v1.json')
+        })
+        argumentProviders.add({
+            [polynomialUtilityInputReportDirectory.get().asFile.absolutePath]
+        } as CommandLineArgumentProvider)
+        doLast {
+            def inputs = polynomialUtilityInputReportDirectory.get()
+                .file('polynomial-theory-utility-execution-inputs-v1.json')
+                .asFile
+            def qualification = polynomialUtilityInputReportDirectory.get()
+                .file(
+                    'polynomial-theory-utility-qualification-corpus-v1.json')
+                .asFile
+            if (!inputs.isFile() || inputs.length() != 336406L) {
+                throw new GradleException(
+                    'Missing or changed polynomial utility execution inputs')
+            }
+            if (qualification.exists()) {
+                throw new GradleException(
+                    'Execution-input export exposed sealed qualification')
+            }
+        }
+    }
+
+def freezePolynomialTheoryUtilityExecutionInputs = tasks.register(
+    'freezePolynomialTheoryUtilityExecutionInputs'
+) {
+    group = 'verification'
+    description = 'Compatibility aggregate for the experiments-owned ' +
+        'target-blind polynomial utility execution inputs.'
+    dependsOn freezePolynomialTheoryUtilityExecutionInputsAuthority
+}
+
+polynomialUtilityExperiments.tasks.matching {
+    task -> task.name == 'check'
+}.configureEach {
+    dependsOn freezePolynomialTheoryUtilityExecutionInputsAuthority
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn freezePolynomialTheoryUtilityExecutionInputs
 }
