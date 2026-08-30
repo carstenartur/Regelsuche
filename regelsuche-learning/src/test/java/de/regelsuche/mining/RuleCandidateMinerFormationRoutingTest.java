@@ -79,6 +79,28 @@ class RuleCandidateMinerFormationRoutingTest {
             observer.calls.getFirst().evidence().validationEvidence());
     }
 
+    @Test
+    void bulkSinglePathMiningRejectsHashCollisionBeforeObservation() {
+        RecordingObserver observer = new RecordingObserver();
+        RuleCandidateMiner miner = collisionHashMiner(observer);
+
+        IllegalStateException failure = assertThrows(
+            IllegalStateException.class,
+            () -> miner.mineFromSinglePathForValidatedSchema(List.of(
+                path(
+                    "path:additive",
+                    "x + 0",
+                    "x",
+                    "add_zero"),
+                path(
+                    "path:multiplicative",
+                    "x * 1",
+                    "x",
+                    "multiply_one"))));
+
+        assertTrue(failure.getMessage().contains("collision"));
+        assertTrue(observer.calls.isEmpty());
+    }
 
     @Test
     void clusteredMiningObservesEachReturnedCandidateOnce() {
@@ -117,6 +139,49 @@ class RuleCandidateMinerFormationRoutingTest {
                 "path:cluster-second",
                 "path:cluster-third"),
             observer.calls.getFirst().evidence().sourceProvenance());
+    }
+
+    @Test
+    void clusteredMiningRejectsHashCollisionBeforeObservation() {
+        RecordingObserver observer = new RecordingObserver();
+        RuleCandidateMiner miner = collisionHashMiner(observer);
+
+        IllegalStateException failure = assertThrows(
+            IllegalStateException.class,
+            () -> miner.mine(List.of(
+                path(
+                    "path:add-x",
+                    "x + 0",
+                    "x",
+                    "add_zero_x"),
+                path(
+                    "path:add-y",
+                    "y + 0",
+                    "y",
+                    "add_zero_y"),
+                path(
+                    "path:add-z",
+                    "z + 0",
+                    "z",
+                    "add_zero_z"),
+                path(
+                    "path:square-one",
+                    "(x + 1) ^ 2",
+                    "x ^ 2 + 2 * x + 1",
+                    "expand_square_one"),
+                path(
+                    "path:square-two",
+                    "(x + 2) ^ 2",
+                    "x ^ 2 + 4 * x + 4",
+                    "expand_square_two"),
+                path(
+                    "path:square-three",
+                    "(x + 3) ^ 2",
+                    "x ^ 2 + 6 * x + 9",
+                    "expand_square_three"))));
+
+        assertTrue(failure.getMessage().contains("collision"));
+        assertTrue(observer.calls.isEmpty());
     }
 
     @Test
@@ -192,6 +257,16 @@ class RuleCandidateMinerFormationRoutingTest {
         assertTrue(
             miner.mineFromSinglePathForValidatedSchema(rejected).isEmpty());
         assertTrue(observer.calls.isEmpty());
+    }
+
+    private RuleCandidateMiner collisionHashMiner(
+        RecordingObserver observer
+    ) {
+        return new RuleCandidateMiner(
+            new KnownRuleRepository(),
+            (left, right) -> true,
+            observer,
+            (left, right) -> "forced-collision");
     }
 
     private SuccessfulTransformationPath path(
