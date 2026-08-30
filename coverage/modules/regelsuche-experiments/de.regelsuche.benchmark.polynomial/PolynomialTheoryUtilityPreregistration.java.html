@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityPreregistration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityPreregistration.java</span></div><h1>PolynomialTheoryUtilityPreregistration.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Fail-closed binding for the frozen polynomial-theory utility study contract.
+ *
+ * &lt;p&gt;This class only exposes preregistered study structure. It does not execute
+ * a profile, reveal held-out outcomes, activate factorization in search or
+ * authorize a product default.&lt;/p&gt;
+ */
+public final class PolynomialTheoryUtilityPreregistration {
+    public static final String SCHEMA =
+        &quot;regelsuche.polynomial-theory-utility-preregistration/v1&quot;;
+    public static final String STUDY_ID =
+        &quot;polynomial-theory-held-out-utility-v1&quot;;
+    public static final String EVIDENCE_STATUS = &quot;FROZEN_NOT_EXECUTED&quot;;
+    public static final String PROFILE_SELECTION_TIMING =
+        &quot;BEFORE_HELD_OUT_RESULTS&quot;;
+    public static final String FILE_NAME =
+        &quot;polynomial-theory-utility-preregistration-v1.json&quot;;
+    public static final String RESOURCE =
+        &quot;/de/regelsuche/benchmark/polynomial/&quot; + FILE_NAME;
+    public static final long BYTE_LENGTH = 3174L;
+    public static final String CONTENT_HASH =
+        &quot;sha256:c1c0473eff02ed8df3aae330c3f50a3126f02755363895228c5c2f7e8a60fb5f&quot;;
+
+<span class="fc" id="L38">    public static final List&lt;String&gt; PROFILES = List.of(</span>
+        &quot;NO_FACTORIZATION&quot;,
+        &quot;ON_DEMAND_VERIFIED_FACTORIZATION&quot;,
+        &quot;VERIFIED_DERIVED_MACRO_CACHE&quot;,
+        &quot;SPECIALIZED_BINARY_QUARTIC_CONTROL&quot;,
+        &quot;OPTIONAL_EXTERNAL_VERIFIED_FACTORIZATION&quot;
+    );
+
+<span class="fc" id="L46">    public static final List&lt;String&gt; STRATIFICATION_AXES = List.of(</span>
+        &quot;DOMAIN&quot;,
+        &quot;DEGREE&quot;,
+        &quot;COEFFICIENT_SIZE&quot;,
+        &quot;DENSITY&quot;,
+        &quot;MULTIPLICITY&quot;,
+        &quot;REDUCIBILITY_STATUS&quot;,
+        &quot;REPEATED_REUSE&quot;,
+        &quot;OCCURRENCE_DEPTH&quot;
+    );
+
+<span class="fc" id="L57">    public static final List&lt;String&gt; REQUIRED_CASE_OUTCOMES = List.of(</span>
+        &quot;POSITIVE&quot;,
+        &quot;NEGATIVE&quot;,
+        &quot;UNSUPPORTED&quot;,
+        &quot;BUDGET_INCONCLUSIVE&quot;,
+        &quot;NEAR_MISS&quot;
+    );
+
+<span class="fc" id="L65">    public static final List&lt;String&gt; DECISION_OUTCOMES = List.of(</span>
+        &quot;ON_DEMAND_DEFAULT_JUSTIFIED&quot;,
+        &quot;VERIFIED_CACHE_DEFAULT_JUSTIFIED&quot;,
+        &quot;HYBRID_POLICY_JUSTIFIED&quot;,
+        &quot;KEEP_OPT_IN&quot;,
+        &quot;NULL_RESULT_NO_MATERIAL_UTILITY&quot;
+    );
+
+<span class="fc" id="L73">    private static final List&lt;String&gt; ARTIFACT_REQUIREMENTS = List.of(</span>
+        &quot;VERSIONED_PLAN&quot;,
+        &quot;VERSIONED_CONFIGURATION&quot;,
+        &quot;VERSIONED_CASES&quot;,
+        &quot;VERSIONED_RESULTS&quot;,
+        &quot;VERSIONED_CACHE_LINEAGE&quot;,
+        &quot;VERSIONED_DECISION&quot;,
+        &quot;TWO_CLEAN_CHECKOUT_REPRODUCTIONS&quot;,
+        &quot;ONE_PINNED_CONTAINER_REPRODUCTION&quot;,
+        &quot;RETAIN_NEGATIVE_NULL_AND_GAP_OUTCOMES&quot;
+    );
+
+<span class="fc" id="L85">    private static final List&lt;String&gt; REQUIRED_MEASUREMENTS = List.of(</span>
+        &quot;NEWLY_REACHED_VALIDATED_CONSEQUENCES&quot;,
+        &quot;PATH_DEPTH&quot;,
+        &quot;PRIMITIVE_EXPANSION_LENGTH&quot;,
+        &quot;FACTORIZATION_REQUESTS&quot;,
+        &quot;FACTORIZATION_CANDIDATES&quot;,
+        &quot;VERIFIER_OUTCOMES&quot;,
+        &quot;SOURCE_VALIDATION_WORK&quot;,
+        &quot;FACTORIZATION_WORK&quot;,
+        &quot;RENDER_REPARSE_WORK&quot;,
+        &quot;CACHE_LOOKUP_WORK&quot;,
+        &quot;CACHE_REPLAY_WORK&quot;,
+        &quot;GENERATED_TRANSITIONS&quot;,
+        &quot;EFFECTIVE_BRANCHING&quot;,
+        &quot;CACHE_HITS&quot;,
+        &quot;CACHE_MISSES&quot;,
+        &quot;CACHE_INSERTIONS&quot;,
+        &quot;CACHE_EVICTIONS&quot;,
+        &quot;CACHE_AMORTIZATION_BREAK_EVEN&quot;,
+        &quot;ASSUMPTION_OUTCOMES&quot;,
+        &quot;SOURCE_AST_GROWTH&quot;,
+        &quot;TRANSFORMED_AST_GROWTH&quot;,
+        &quot;HELD_OUT_OCCURRENCE_REUSE&quot;,
+        &quot;STRUCTURAL_FAMILY_REUSE&quot;,
+        &quot;NATIVE_EXTERNAL_SEMANTIC_AGREEMENT&quot;,
+        &quot;SPECIALIZED_CONTROL_COVERAGE&quot;
+    );
+
+<span class="fc" id="L113">    private static final List&lt;String&gt; REQUIRED_FIELD_BINDINGS = List.of(</span>
+        &quot;\&quot;schema\&quot;: \&quot;&quot; + SCHEMA + &quot;\&quot;&quot;,
+        &quot;\&quot;studyId\&quot;: \&quot;&quot; + STUDY_ID + &quot;\&quot;&quot;,
+        &quot;\&quot;evidenceStatus\&quot;: \&quot;&quot; + EVIDENCE_STATUS + &quot;\&quot;&quot;,
+        &quot;\&quot;profileSelectionTiming\&quot;: \&quot;&quot;
+            + PROFILE_SELECTION_TIMING + &quot;\&quot;&quot;,
+        &quot;\&quot;corpusFreeze\&quot;: &quot;
+            + &quot;\&quot;CONTENT_ADDRESSED_BEFORE_PROFILE_EXECUTION\&quot;&quot;,
+        &quot;\&quot;visibleInventory\&quot;: \&quot;IDENTICAL_ACROSS_PROFILES\&quot;&quot;,
+        &quot;\&quot;assumptions\&quot;: \&quot;IDENTICAL_ACROSS_PROFILES\&quot;&quot;,
+        &quot;\&quot;budgets\&quot;: \&quot;IDENTICAL_AT_EVERY_POLICY_CHECKPOINT\&quot;&quot;,
+        &quot;\&quot;hiddenBestOfSelection\&quot;: \&quot;FORBIDDEN\&quot;&quot;,
+        &quot;\&quot;admittedPrimitiveWork\&quot;: &quot;
+            + &quot;\&quot;MATCH_AT_EVERY_POLICY_CHECKPOINT\&quot;&quot;,
+        &quot;\&quot;totalMechanicalWork\&quot;: &quot;
+            + &quot;\&quot;MATCH_AT_EVERY_POLICY_CHECKPOINT\&quot;&quot;,
+        &quot;\&quot;nonResettableAuthority\&quot;: \&quot;REQUIRED\&quot;&quot;,
+        &quot;\&quot;runtimeRole\&quot;: &quot;
+            + &quot;\&quot;ENVIRONMENT_QUALIFIED_DIAGNOSTIC_ONLY\&quot;&quot;,
+        &quot;\&quot;additionalValidatedCoverageOrLowerCanonicalWork\&quot;: &quot;
+            + &quot;\&quot;REQUIRED\&quot;&quot;,
+        &quot;\&quot;wallClockOnly\&quot;: \&quot;INSUFFICIENT\&quot;&quot;
+    );
+
+    private PolynomialTheoryUtilityPreregistration() {
+    }
+
+    public static Artifact load() {
+<span class="fc" id="L141">        byte[] bytes = readResource();</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (bytes.length != BYTE_LENGTH) {</span>
+<span class="nc" id="L143">            throw new IllegalStateException(</span>
+                &quot;polynomial utility preregistration byte length differs: &quot;
+                    + &quot;expected=&quot; + BYTE_LENGTH + &quot;, actual=&quot; + bytes.length
+            );
+        }
+<span class="fc" id="L148">        String actualHash = sha256(bytes);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!CONTENT_HASH.equals(actualHash)) {</span>
+<span class="nc" id="L150">            throw new IllegalStateException(</span>
+                &quot;polynomial utility preregistration hash differs: expected=&quot;
+                    + CONTENT_HASH + &quot;, actual=&quot; + actualHash
+            );
+        }
+<span class="fc" id="L155">        String canonicalJson = new String(bytes, StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (!java.util.Arrays.equals(</span>
+                bytes,
+<span class="fc" id="L158">                canonicalJson.getBytes(StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L159">            throw new IllegalStateException(</span>
+                &quot;polynomial utility preregistration is not canonical UTF-8&quot;
+            );
+        }
+<span class="fc" id="L163">        validateStructure(canonicalJson);</span>
+
+<span class="fc" id="L165">        return new Artifact(</span>
+            SCHEMA,
+            STUDY_ID,
+            EVIDENCE_STATUS,
+            PROFILE_SELECTION_TIMING,
+            PROFILES,
+            STRATIFICATION_AXES,
+            REQUIRED_CASE_OUTCOMES,
+            DECISION_OUTCOMES,
+            CONTENT_HASH,
+            BYTE_LENGTH,
+            canonicalJson
+        );
+    }
+
+    static void validateStructure(String canonicalJson) {
+<span class="fc" id="L181">        Objects.requireNonNull(canonicalJson, &quot;canonicalJson&quot;);</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (!canonicalJson.startsWith(&quot;{\n&quot;)</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">                || !canonicalJson.endsWith(&quot;}\n&quot;)</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                || canonicalJson.indexOf('\r') &gt;= 0) {</span>
+<span class="fc" id="L185">            throw new IllegalStateException(</span>
+                &quot;polynomial utility preregistration has non-canonical &quot;
+                    + &quot;framing; the frozen resource must use UTF-8 with LF &quot;
+                    + &quot;line endings. Preserve the path-specific &quot;
+                    + &quot;.gitattributes eol=lf rule and renormalize the file &quot;
+                    + &quot;before updating its byte length/hash&quot;
+            );
+        }
+<span class="fc" id="L193">        REQUIRED_FIELD_BINDINGS.forEach(binding -&gt;</span>
+<span class="fc" id="L194">            requireExactlyOnce(canonicalJson, binding));</span>
+<span class="fc" id="L195">        requireExactArray(</span>
+            canonicalJson,
+            &quot;artifactRequirements&quot;,
+            ARTIFACT_REQUIREMENTS
+        );
+<span class="fc" id="L200">        requireExactArray(canonicalJson, &quot;decisionOutcomes&quot;, DECISION_OUTCOMES);</span>
+<span class="fc" id="L201">        requireExactArray(canonicalJson, &quot;profiles&quot;, PROFILES);</span>
+<span class="fc" id="L202">        requireExactArray(</span>
+            canonicalJson,
+            &quot;requiredCaseOutcomes&quot;,
+            REQUIRED_CASE_OUTCOMES
+        );
+<span class="fc" id="L207">        requireExactArray(</span>
+            canonicalJson,
+            &quot;requiredMeasurements&quot;,
+            REQUIRED_MEASUREMENTS
+        );
+<span class="fc" id="L212">        requireExactArray(</span>
+            canonicalJson,
+            &quot;stratificationAxes&quot;,
+            STRATIFICATION_AXES
+        );
+<span class="fc" id="L217">    }</span>
+
+    public static Artifact write(Path directory) throws IOException {
+<span class="fc" id="L220">        Path root = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L221">            .toAbsolutePath().normalize();</span>
+<span class="fc" id="L222">        Files.createDirectories(root);</span>
+<span class="fc" id="L223">        Artifact artifact = load();</span>
+<span class="fc" id="L224">        Path target = root.resolve(FILE_NAME);</span>
+<span class="fc" id="L225">        AtomicJsonFile.writeUtf8(target, artifact.canonicalJson());</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (!Files.isRegularFile(target)</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">                || !artifact.canonicalJson().equals(Files.readString(</span>
+                    target,
+                    StandardCharsets.UTF_8))) {
+<span class="nc" id="L230">            throw new IllegalStateException(</span>
+                &quot;written polynomial utility preregistration changed: &quot;
+                    + target
+            );
+        }
+<span class="fc" id="L235">        return artifact;</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        if (args.length != 1) {</span>
+<span class="nc" id="L240">            throw new IllegalArgumentException(&quot;usage: &lt;output-directory&gt;&quot;);</span>
+        }
+<span class="nc" id="L242">        Artifact artifact = write(Path.of(args[0]));</span>
+<span class="nc" id="L243">        System.out.println(</span>
+            &quot;polynomialTheoryUtilityPreregistrationHash=&quot;
+<span class="nc" id="L245">                + artifact.contentHash()</span>
+        );
+<span class="nc" id="L247">        System.out.println(</span>
+<span class="nc" id="L248">            &quot;polynomialTheoryUtilityProfiles=&quot; + artifact.profiles().size()</span>
+        );
+<span class="nc" id="L250">        System.out.println(</span>
+            &quot;polynomialTheoryUtilityEvidenceStatus=&quot;
+<span class="nc" id="L252">                + artifact.evidenceStatus()</span>
+        );
+<span class="nc" id="L254">    }</span>
+
+    private static byte[] readResource() {
+<span class="fc" id="L257">        try (InputStream input =</span>
+                PolynomialTheoryUtilityPreregistration.class
+<span class="fc" id="L259">                    .getResourceAsStream(RESOURCE)) {</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (input == null) {</span>
+<span class="nc" id="L261">                throw new IllegalStateException(</span>
+                    &quot;missing polynomial utility preregistration &quot; + RESOURCE
+                );
+            }
+<span class="fc" id="L265">            return input.readAllBytes();</span>
+<span class="nc" id="L266">        } catch (IOException exception) {</span>
+<span class="nc" id="L267">            throw new IllegalStateException(</span>
+                &quot;cannot read polynomial utility preregistration &quot; + RESOURCE,
+                exception
+            );
+        }
+    }
+
+    private static String sha256(byte[] value) {
+        try {
+<span class="fc" id="L276">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L277">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value)</span>
+            );
+<span class="nc" id="L279">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L280">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static void requireExactArray(
+        String source,
+        String field,
+        List&lt;String&gt; values
+    ) {
+<span class="fc" id="L289">        StringBuilder expected = new StringBuilder();</span>
+<span class="fc" id="L290">        expected.append(&quot;  \&quot;&quot;).append(field).append(&quot;\&quot;: [\n&quot;);</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">        for (int index = 0; index &lt; values.size(); index++) {</span>
+<span class="fc" id="L292">            expected.append(&quot;    \&quot;&quot;).append(values.get(index)).append('&quot;');</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            if (index + 1 &lt; values.size()) {</span>
+<span class="fc" id="L294">                expected.append(',');</span>
+            }
+<span class="fc" id="L296">            expected.append('\n');</span>
+        }
+<span class="fc" id="L298">        expected.append(&quot;  ]&quot;);</span>
+<span class="fc" id="L299">        String exact = expected.toString();</span>
+<span class="fc" id="L300">        int first = source.indexOf(exact);</span>
+<span class="pc bpc" id="L301" title="1 of 4 branches missed.">        if (first &lt; 0 || source.indexOf(exact, first + exact.length()) &gt;= 0) {</span>
+<span class="fc" id="L302">            throw new IllegalStateException(</span>
+                &quot;polynomial utility preregistration must contain exactly &quot;
+                    + &quot;the frozen ordered array: &quot; + field
+            );
+        }
+<span class="fc" id="L307">    }</span>
+
+    private static void requireExactlyOnce(String source, String value) {
+<span class="fc" id="L310">        int first = source.indexOf(value);</span>
+<span class="pc bpc" id="L311" title="2 of 4 branches missed.">        if (first &lt; 0 || source.indexOf(value, first + value.length()) &gt;= 0) {</span>
+<span class="nc" id="L312">            throw new IllegalStateException(</span>
+                &quot;polynomial utility preregistration must contain exactly once: &quot;
+                    + value
+            );
+        }
+<span class="fc" id="L317">    }</span>
+
+    public record Artifact(
+        String schema,
+        String studyId,
+        String evidenceStatus,
+        String profileSelectionTiming,
+        List&lt;String&gt; profiles,
+        List&lt;String&gt; stratificationAxes,
+        List&lt;String&gt; requiredCaseOutcomes,
+        List&lt;String&gt; decisionOutcomes,
+        String contentHash,
+        long byteLength,
+        String canonicalJson
+    ) {
+<span class="fc" id="L332">        public Artifact {</span>
+<span class="fc" id="L333">            schema = Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L334">            studyId = Objects.requireNonNull(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L335">            evidenceStatus = Objects.requireNonNull(</span>
+                evidenceStatus,
+                &quot;evidenceStatus&quot;
+            );
+<span class="fc" id="L339">            profileSelectionTiming = Objects.requireNonNull(</span>
+                profileSelectionTiming,
+                &quot;profileSelectionTiming&quot;
+            );
+<span class="fc" id="L343">            profiles = List.copyOf(profiles);</span>
+<span class="fc" id="L344">            stratificationAxes = List.copyOf(stratificationAxes);</span>
+<span class="fc" id="L345">            requiredCaseOutcomes = List.copyOf(requiredCaseOutcomes);</span>
+<span class="fc" id="L346">            decisionOutcomes = List.copyOf(decisionOutcomes);</span>
+<span class="fc" id="L347">            contentHash = Objects.requireNonNull(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L348">            canonicalJson = Objects.requireNonNull(</span>
+                canonicalJson,
+                &quot;canonicalJson&quot;
+            );
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">            if (byteLength &lt; 1L) {</span>
+<span class="nc" id="L353">                throw new IllegalArgumentException(</span>
+                    &quot;byteLength must be positive&quot;
+                );
+            }
+<span class="fc" id="L357">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
