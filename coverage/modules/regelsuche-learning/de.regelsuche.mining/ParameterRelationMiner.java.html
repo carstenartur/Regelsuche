@@ -21,17 +21,17 @@ import java.util.Map;
 <span class="fc" id="L21">            boolean complete = true;</span>
 <span class="fc bfc" id="L22" title="All 2 branches covered.">            for (Map.Entry&lt;String, List&lt;Integer&gt;&gt; entry : placeholderValues.entrySet()) {</span>
 <span class="fc" id="L23">                Relation relation = findRelation(entry.getValue(), baseValues);</span>
-<span class="pc bpc" id="L24" title="1 of 2 branches missed.">                if (relation == null) {</span>
-<span class="nc" id="L25">                    complete = false;</span>
-<span class="nc" id="L26">                    break;</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">                if (relation == null) {</span>
+<span class="fc" id="L25">                    complete = false;</span>
+<span class="fc" id="L26">                    break;</span>
                 }
 <span class="fc" id="L28">                replacements.put(entry.getKey(), relation.node());</span>
 <span class="fc" id="L29">                descriptions.add(entry.getKey() + &quot; = &quot; + relation.description());</span>
 <span class="fc" id="L30">            }</span>
-<span class="pc bpc" id="L31" title="2 of 4 branches missed.">            if (complete &amp;&amp; replacements.values().stream().anyMatch(node -&gt; node.canonicalString().contains(&quot;A&quot;))) {</span>
+<span class="pc bpc" id="L31" title="1 of 4 branches missed.">            if (complete &amp;&amp; replacements.values().stream().anyMatch(node -&gt; node.canonicalString().contains(&quot;A&quot;))) {</span>
 <span class="fc" id="L32">                return new RelationResult(replacements, descriptions);</span>
             }
-<span class="nc" id="L34">        }</span>
+<span class="fc" id="L34">        }</span>
 <span class="nc" id="L35">        return RelationResult.empty();</span>
     }
 
@@ -83,10 +83,10 @@ import java.util.Map;
                 }
             }
         }
-<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (matches(values, baseValues, a -&gt; a * a)) {</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (matches(values, baseValues, a -&gt; a * a)) {</span>
 <span class="fc" id="L87">            return new Relation(NormalizedNode.pow(NormalizedNode.variable(&quot;A&quot;), NormalizedNode.number(2)), &quot;A^2&quot;);</span>
         }
-<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (matches(values, baseValues, a -&gt; -(a * a))) {</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (matches(values, baseValues, a -&gt; -(a * a))) {</span>
 <span class="nc" id="L90">            return new Relation(</span>
 <span class="nc" id="L91">                NormalizedNode.multiply(List.of(</span>
 <span class="nc" id="L92">                    NormalizedNode.number(-1),</span>
@@ -95,11 +95,11 @@ import java.util.Map;
                 &quot;-A^2&quot;
             );
         }
-<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (values.stream().distinct().count() == 1) {</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (values.stream().distinct().count() == 1) {</span>
 <span class="nc" id="L99">            int constant = values.getFirst();</span>
 <span class="nc" id="L100">            return new Relation(NormalizedNode.number(constant), Integer.toString(constant));</span>
         }
-<span class="nc" id="L102">        return null;</span>
+<span class="fc" id="L102">        return null;</span>
     }
 
     private boolean matches(List&lt;Integer&gt; values, List&lt;Integer&gt; baseValues, RelationFunction function) {

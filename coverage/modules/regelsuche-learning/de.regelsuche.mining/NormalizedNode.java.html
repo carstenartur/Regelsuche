@@ -144,17 +144,17 @@ final class NormalizedNode {
     }
 
     String skeletonString() {
-<span class="nc" id="L147">        return skeletonString(false);</span>
+<span class="fc" id="L147">        return skeletonString(false);</span>
     }
 
     private String skeletonString(boolean exponentPosition) {
-<span class="nc bnc" id="L151" title="All 7 branches missed.">        return switch (kind) {</span>
-<span class="nc bnc" id="L152" title="All 4 branches missed.">            case NUMBER -&gt; exponentPosition ? Integer.toString(number) : (number &lt; 0 ? &quot;-#&quot; : &quot;#&quot;);</span>
-<span class="nc" id="L153">            case VARIABLE -&gt; name;</span>
+<span class="pc bpc" id="L151" title="2 of 7 branches missed.">        return switch (kind) {</span>
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">            case NUMBER -&gt; exponentPosition ? Integer.toString(number) : (number &lt; 0 ? &quot;-#&quot; : &quot;#&quot;);</span>
+<span class="fc" id="L153">            case VARIABLE -&gt; name;</span>
 <span class="nc" id="L154">            case PLACEHOLDER -&gt; &quot;#&quot;;</span>
-<span class="nc" id="L155">            case ADD -&gt; children.stream().map(child -&gt; child.skeletonString(false)).collect(Collectors.joining(&quot;+&quot;, &quot;add(&quot;, &quot;)&quot;));</span>
-<span class="nc" id="L156">            case MUL -&gt; children.stream().map(child -&gt; child.skeletonString(false)).collect(Collectors.joining(&quot;*&quot;, &quot;mul(&quot;, &quot;)&quot;));</span>
-<span class="nc" id="L157">            case POW -&gt; &quot;pow(&quot; + children.get(0).skeletonString(false) + &quot;,&quot; + children.get(1).skeletonString(true) + &quot;)&quot;;</span>
+<span class="fc" id="L155">            case ADD -&gt; children.stream().map(child -&gt; child.skeletonString(false)).collect(Collectors.joining(&quot;+&quot;, &quot;add(&quot;, &quot;)&quot;));</span>
+<span class="fc" id="L156">            case MUL -&gt; children.stream().map(child -&gt; child.skeletonString(false)).collect(Collectors.joining(&quot;*&quot;, &quot;mul(&quot;, &quot;)&quot;));</span>
+<span class="fc" id="L157">            case POW -&gt; &quot;pow(&quot; + children.get(0).skeletonString(false) + &quot;,&quot; + children.get(1).skeletonString(true) + &quot;)&quot;;</span>
 <span class="nc" id="L158">            case FUNCTION -&gt; name + &quot;(&quot; + children.stream()</span>
 <span class="nc" id="L159">                .map(child -&gt; child.skeletonString(false))</span>
 <span class="nc" id="L160">                .collect(Collectors.joining(&quot;,&quot;)) + &quot;)&quot;;</span>

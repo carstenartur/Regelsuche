@@ -35,10 +35,10 @@ public class PatternGeneralizer {
 <span class="fc" id="L35">    }</span>
 
     public String skeleton(SuccessfulTransformationPath path) {
-<span class="nc" id="L38">        NormalizedNode left = normalizer.normalize(path.originalExpression());</span>
-<span class="nc" id="L39">        NormalizedNode right = normalizer.normalize(path.targetExpression());</span>
-<span class="nc" id="L40">        Map&lt;String, String&gt; canonicalVariableBindings = canonicalVariableBindings(path.originalExpression(), path.targetExpression());</span>
-<span class="nc" id="L41">        return left.skeletonString() + &quot;-&gt;&quot; + right.skeletonString();</span>
+<span class="fc" id="L38">        NormalizedNode left = normalizer.normalize(path.originalExpression());</span>
+<span class="fc" id="L39">        NormalizedNode right = normalizer.normalize(path.targetExpression());</span>
+<span class="fc" id="L40">        Map&lt;String, String&gt; canonicalVariableBindings = canonicalVariableBindings(path.originalExpression(), path.targetExpression());</span>
+<span class="fc" id="L41">        return left.skeletonString() + &quot;-&gt;&quot; + right.skeletonString();</span>
     }
 
     public Optional&lt;GeneralizedPattern&gt; generalize(List&lt;SuccessfulTransformationPath&gt; paths) {

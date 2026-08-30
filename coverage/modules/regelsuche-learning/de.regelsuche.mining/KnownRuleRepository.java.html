@@ -15,14 +15,14 @@ import java.util.List;
     );
 
     public RuleStatus statusFor(String leftPattern, String rightPattern) {
-<span class="nc" id="L18">        String candidate = RulePatternCanonicalizer.hash(leftPattern, rightPattern);</span>
-<span class="nc bnc" id="L19" title="All 2 branches missed.">        for (KnownRule rule : rules) {</span>
-<span class="nc bnc" id="L20" title="All 2 branches missed.">            if (candidate.equals(RulePatternCanonicalizer.hash(rule.leftPattern(), rule.rightPattern()))</span>
-<span class="nc bnc" id="L21" title="All 2 branches missed.">                || candidate.equals(RulePatternCanonicalizer.hash(rule.rightPattern(), rule.leftPattern()))) {</span>
-<span class="nc" id="L22">                return RuleStatus.MATCHES_KNOWN_RULE;</span>
+<span class="fc" id="L18">        String candidate = RulePatternCanonicalizer.hash(leftPattern, rightPattern);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        for (KnownRule rule : rules) {</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">            if (candidate.equals(RulePatternCanonicalizer.hash(rule.leftPattern(), rule.rightPattern()))</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">                || candidate.equals(RulePatternCanonicalizer.hash(rule.rightPattern(), rule.leftPattern()))) {</span>
+<span class="fc" id="L22">                return RuleStatus.MATCHES_KNOWN_RULE;</span>
             }
-<span class="nc" id="L24">        }</span>
-<span class="nc" id="L25">        return RuleStatus.NEW;</span>
+<span class="fc" id="L24">        }</span>
+<span class="fc" id="L25">        return RuleStatus.NEW;</span>
     }
 
     public double similarityToKnownRules(String leftPattern, String rightPattern) {

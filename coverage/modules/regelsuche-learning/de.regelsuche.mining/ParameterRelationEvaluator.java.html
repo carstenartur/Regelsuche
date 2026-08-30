@@ -15,11 +15,11 @@ import java.util.Set;
 <span class="fc" id="L15">    private final RulePatternParser parser = new RulePatternParser();</span>
 
     public Set&lt;String&gt; relationTargets(List&lt;String&gt; parameterRelations) {
-<span class="nc" id="L18">        Set&lt;String&gt; targets = new LinkedHashSet&lt;&gt;();</span>
-<span class="nc bnc" id="L19" title="All 2 branches missed.">        for (String relation : parameterRelations) {</span>
-<span class="nc" id="L20">            parseRelation(relation).ifPresent(parsed -&gt; targets.add(parsed.target()));</span>
-<span class="nc" id="L21">        }</span>
-<span class="nc" id="L22">        return targets;</span>
+<span class="fc" id="L18">        Set&lt;String&gt; targets = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        for (String relation : parameterRelations) {</span>
+<span class="fc" id="L20">            parseRelation(relation).ifPresent(parsed -&gt; targets.add(parsed.target()));</span>
+<span class="fc" id="L21">        }</span>
+<span class="fc" id="L22">        return targets;</span>
     }
 
     public Map&lt;String, Expr&gt; completeBindings(
@@ -89,8 +89,8 @@ import java.util.Set;
 
     private java.util.Optional&lt;ParsedRelation&gt; parseRelation(String relation) {
 <span class="fc" id="L91">        int separator = relation.indexOf('=');</span>
-<span class="pc bpc" id="L92" title="2 of 4 branches missed.">        if (separator &lt;= 0 || separator == relation.length() - 1) {</span>
-<span class="nc" id="L93">            return java.util.Optional.empty();</span>
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">        if (separator &lt;= 0 || separator == relation.length() - 1) {</span>
+<span class="fc" id="L93">            return java.util.Optional.empty();</span>
         }
 <span class="fc" id="L95">        String target = relation.substring(0, separator).trim();</span>
 <span class="fc" id="L96">        String expression = relation.substring(separator + 1).trim();</span>
