@@ -81,7 +81,7 @@ DERIVED_MACRO_CACHE
 RETAINED_NOT_SUBSUMED
 RETAINED_UNSUPPORTED
 RETAINED_BUDGET_INCONCLUSIVE
-RETAINED_TECHNICAL_FAILURE
+RETAINED_TENICAL_FAILURE
 ```
 
 A miss, unsupported expression, exhausted budget or technical error is never
@@ -135,10 +135,16 @@ in the formation ledger; they do not replace the verifier-authorized
 factorization method as the cached macro's mathematical expansion.
 
 Different source paths or generations may therefore attach separate lineages
-to one mathematical macro slot. The end-to-end integration test forms the same
-univariate factorization schema from two alpha-equivalent paths in successive
-generations and requires one cache entry, two lineages and two independently
-retained formation outcomes.
+to one mathematical macro slot. The application-layer end-to-end integration
+test forms the same univariate factorization schema from two alpha-equivalent
+paths in successive generations and requires one cache entry, two lineages and
+two independently retained formation outcomes.
+
+The native integration test lives in `app`, the composition layer that is
+already allowed to depend on both `regelsuche-learning` and
+`regelsuche-math-algorithms`. The learning module therefore keeps its declared
+architecture direction and does not acquire a test-only implementation
+back-edge.
 
 ## Relation to executable cache replay
 
@@ -172,7 +178,13 @@ Focused learning contracts:
 
 ```bash
 ./gradlew :regelsuche-learning:test \
-  --tests de.regelsuche.mining.PolynomialTheoryCandidateObserverTest \
+  --tests de.regelsuche.mining.PolynomialTheoryCandidateObserverTest
+```
+
+Application-layer native integration:
+
+```bash
+./gradlew :app:test \
   --tests de.regelsuche.mining.PolynomialTheoryMiningIntegrationTest
 ```
 
