@@ -100,6 +100,8 @@ final class PolynomialTheoryUtilityExecutionJson {
         target.append("  \"executionSchedule\": {")
             .append("\"runGrouping\":\"")
             .append(PolynomialTheoryUtilityExecutionPlan.RUN_GROUPING)
+            .append("\",\"rowOrder\":\"")
+            .append(PolynomialTheoryUtilityExecutionPlan.ROW_ORDER)
             .append("\",\"caseOrder\":\"")
             .append(PolynomialTheoryUtilityExecutionPlan.CASE_ORDER)
             .append("\",\"profileIsolation\":\"")
