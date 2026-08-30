@@ -14,7 +14,8 @@ import java.util.Optional;
  * observer. The adapter never mutates or promotes a candidate. It is the sole
  * owner of the bounded derived-macro handoff and always records the resulting
  * positive, negative, unsupported, budget or technical outcome in the
- * configured ledger.</p>
+ * configured ledger. Ordinary miner constructors do not install this observer;
+ * activation therefore remains an explicit caller-owned policy.</p>
  */
 public final class PolynomialTheoryCandidateObserver
         implements RuleCandidateFormationObserver {
@@ -55,7 +56,8 @@ public final class PolynomialTheoryCandidateObserver
                 || !candidate.proofStatus().atLeast(
                     CandidateProofStatus.VALIDATED_BY_EXAMPLES)) {
             throw new IllegalArgumentException(
-                "polynomial theory observer requires a positively validated candidate");
+                "polynomial theory observer requires a positively "
+                    + "validated candidate");
         }
         if (checkedEvidence.sourceProvenance().isEmpty()) {
             throw new IllegalArgumentException(
