@@ -46,12 +46,19 @@ encounter order, and the observer is called once per returned candidate. This
 prevents duplicate routing when multiple source paths generalize to the same
 schema.
 
-A canonical key is never trusted as sufficient evidence of candidate equality.
-Both clustered buckets and bulk single-path merging retain the separately
-canonicalized left and right patterns and compare them before evidence is
-combined. Conflicting parameter relations or proof/semantic status are rejected
-as well. A same-key/different-content collision therefore fails before any
-observer receives a candidate; the first value is not silently retained.
+A canonical key is never trusted as sufficient evidence of structural candidate
+equality. Both clustered buckets and bulk single-path merging retain the
+separately canonicalized left and right patterns and compare them before source
+paths or observer evidence are combined. A same-key/different-structure
+collision therefore fails before any observer receives a candidate; the first
+value is not silently retained.
+
+Instance-specific formation descriptions are deliberately not part of that
+structural identity. For example, the alpha-equivalent observations
+`x + 0 → x` and `y + 0 → y` may carry `A ∈ {x}` and `A ∈ {y}` respectively,
+while both form the same canonical schema `A + 0 → A`. They remain one candidate
+and retain the combined source-path evidence rather than being rejected as a
+hash collision.
 
 Unverified single-path inputs and paths that do not form a returned candidate
 do not reach the observer. Ordinary clustered mining preserves its existing
