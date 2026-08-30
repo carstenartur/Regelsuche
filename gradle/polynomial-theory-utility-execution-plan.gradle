@@ -33,9 +33,8 @@ def freezePolynomialTheoryUtilityExecutionPlanAuthority =
         timeout = java.time.Duration.ofMinutes(1)
         classpath = polynomialUtilityExperiments.files(
             polynomialUtilityRuntimeClasspath)
-        mainClass =
-            'de.regelsuche.benchmark.polynomial.'
-                + 'PolynomialTheoryUtilityExecutionPlan'
+        mainClass = 'de.regelsuche.benchmark.polynomial.' +
+            'PolynomialTheoryUtilityExecutionPlan'
         inputs.file polynomialUtilityPreregistration
         inputs.file polynomialUtilityFormation
         inputs.files polynomialUtilityPlanSources
