@@ -14,9 +14,12 @@ def polynomialUtilityPreregistration = polynomialUtilityRoot.file(
 def polynomialUtilityFormation = polynomialUtilityRoot.file(
     'regelsuche-experiments/src/main/resources/de/regelsuche/benchmark/'
         + 'polynomial/polynomial-theory-utility-formation-corpus-v1.json')
-def polynomialUtilityPlanSource = polynomialUtilityRoot.file(
-    'regelsuche-experiments/src/main/java/de/regelsuche/benchmark/'
-        + 'polynomial/PolynomialTheoryUtilityExecutionPlan.java')
+def polynomialUtilityPlanSources = polynomialUtilityExperiments.fileTree(
+    'src/main/java/de/regelsuche/benchmark/polynomial') {
+        include 'PolynomialTheoryUtilityExecution*.java'
+    }
+def polynomialUtilityTaskScript = polynomialUtilityRoot.file(
+    'gradle/polynomial-theory-utility-execution-plan.gradle')
 
 def freezePolynomialTheoryUtilityExecutionPlanAuthority =
     polynomialUtilityExperiments.tasks.register(
@@ -35,7 +38,8 @@ def freezePolynomialTheoryUtilityExecutionPlanAuthority =
                 + 'PolynomialTheoryUtilityExecutionPlan'
         inputs.file polynomialUtilityPreregistration
         inputs.file polynomialUtilityFormation
-        inputs.file polynomialUtilityPlanSource
+        inputs.files polynomialUtilityPlanSources
+        inputs.file polynomialUtilityTaskScript
         inputs.property(
             'expectedPlanHash',
             'sha256:c4de9337f27acb7f9d9036cf2c656b38d80abed8b59ae30dcdefeb68356f3658')
