@@ -71,20 +71,29 @@ class PolynomialTheorySubsumptionClassifierNativeIntegrationTest {
     }
 
     @Test
-    void rejectsNearMissWithoutBroadPolynomialEquivalenceFallback() {
-        PolynomialTheorySubsumptionClassifier.Classification result =
+    void rejectsNearMissAndEquivalentButUngeneratedRepresentation() {
+        PolynomialTheorySubsumptionClassifier.Classification nearMiss =
             classifier.classify(
                 "x^2 - 1",
                 "(x + 2) * (x - 1)");
+        PolynomialTheorySubsumptionClassifier.Classification expandedSource =
+            classifier.classify(
+                "x^2 - 1",
+                "x^2 - 1");
 
         assertEquals(
             PolynomialTheorySubsumptionClassifier.Status.NOT_SUBSUMED,
-            result.status());
-        assertFalse(result.subsumed());
+            nearMiss.status());
+        assertEquals(
+            PolynomialTheorySubsumptionClassifier.Status.NOT_SUBSUMED,
+            expandedSource.status(),
+            "mathematical equivalence alone is not generated-representation evidence");
+        assertFalse(nearMiss.subsumed());
+        assertFalse(expandedSource.subsumed());
         assertEquals(
             PolynomialTheorySubsumptionClassifier.RetentionDisposition.NONE,
-            result.retentionDisposition());
-        assertTrue(result.certificateHash().isEmpty());
+            expandedSource.retentionDisposition());
+        assertTrue(expandedSource.certificateHash().isEmpty());
     }
 
     @Test
