@@ -26,9 +26,9 @@ public final class PolynomialTheoryUtilityExecutionPlan {
     public static final String FILE_NAME =
         "polynomial-theory-utility-execution-plan-v1.json";
     public static final int EXPECTED_ROW_COUNT = 600;
-    public static final long EXPECTED_BYTE_LENGTH = 235_617L;
+    public static final long EXPECTED_BYTE_LENGTH = 235_651L;
     public static final String EXPECTED_CONTENT_HASH =
-        "sha256:0a9be9ab83076ac2e507aa7d0f3c343ec2840556441c7cf8ce750772f215855e";
+        "sha256:6cfac16d65611820b713cf1f2aca0fdb724fc542ccef6b9de80981dc290af619";
 
     public static final String VERIFIER_ID =
         "regelsuche.factorization-verifier/v2";
@@ -50,6 +50,7 @@ public final class PolynomialTheoryUtilityExecutionPlan {
         "regelsuche-math-sympy/graalpy.lock";
 
     public static final String RUN_GROUPING = "PROFILE_AND_CHECKPOINT";
+    public static final String ROW_ORDER = "RUN_MAJOR_CONTIGUOUS";
     public static final String CASE_ORDER = "FROZEN_FORMATION_ORDER";
     public static final String PROFILE_ISOLATION = "INDEPENDENT_RUNS";
     public static final String CHECKPOINT_ISOLATION = "INDEPENDENT_RUNS";
