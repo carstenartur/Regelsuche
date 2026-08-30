@@ -12,9 +12,12 @@ public record PolynomialTheoryUtilityExecutionArtifact(
     public PolynomialTheoryUtilityExecutionArtifact {
         rows = List.copyOf(rows);
         canonicalJson = Objects.requireNonNull(canonicalJson, "canonicalJson");
+        String expectedCanonical =
+            PolynomialTheoryUtilityExecutionJson.canonical(rows);
         byte[] bytes = canonicalJson.getBytes(StandardCharsets.UTF_8);
-        if (rows.size()
-                != PolynomialTheoryUtilityExecutionPlan.EXPECTED_ROW_COUNT
+        if (!expectedCanonical.equals(canonicalJson)
+                || rows.size()
+                    != PolynomialTheoryUtilityExecutionPlan.EXPECTED_ROW_COUNT
                 || bytes.length
                     != PolynomialTheoryUtilityExecutionPlan.EXPECTED_BYTE_LENGTH
                 || !PolynomialTheoryUtilityExecutionPlan
