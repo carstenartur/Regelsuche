@@ -27,8 +27,8 @@ def freezePolynomialTheoryUtilityExecutionPlanAuthority =
         JavaExec
     ) {
         group = 'verification'
-        description = 'Exports the frozen 600-row polynomial utility ' \
-            + 'execution plan without opening sealed qualification data.'
+        description = 'Exports the frozen 600-row polynomial utility ' +
+            'execution plan without opening sealed qualification data.'
         dependsOn polynomialUtilityExperiments.tasks.named('classes')
         timeout = java.time.Duration.ofMinutes(1)
         classpath = polynomialUtilityExperiments.files(
@@ -72,8 +72,8 @@ def freezePolynomialTheoryUtilityExecutionPlan = tasks.register(
     'freezePolynomialTheoryUtilityExecutionPlan'
 ) {
     group = 'verification'
-    description = 'Compatibility aggregate for the experiments-owned ' \
-        + 'frozen polynomial utility execution plan.'
+    description = 'Compatibility aggregate for the experiments-owned ' +
+        'frozen polynomial utility execution plan.'
     dependsOn freezePolynomialTheoryUtilityExecutionPlanAuthority
 }
 
