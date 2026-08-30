@@ -292,7 +292,7 @@ public final class PolynomialDecompositionSynthesisOperator
     private static ExpressionFactorizationReport.Status statusFor(
         FactorizationVerifier.Status status
     ) {
-<span class="pc bpc" id="L295" title="3 of 6 branches missed.">        return switch (status) {</span>
+<span class="pc bpc" id="L295" title="4 of 6 branches missed.">        return switch (status) {</span>
             case COMPLETE_FACTORIZATION,
                 PARTIAL_FACTORIZATION -&gt;
 <span class="nc" id="L298">                    ExpressionFactorizationReport.Status.GENERATED;</span>
@@ -305,7 +305,7 @@ public final class PolynomialDecompositionSynthesisOperator
 <span class="fc" id="L305">                    ExpressionFactorizationReport.Status</span>
                         .UNSUPPORTED_FACTORIZATION_REQUEST;
             case BUDGET_INCONCLUSIVE -&gt;
-<span class="fc" id="L308">                ExpressionFactorizationReport.Status.BUDGET_INCONCLUSIVE;</span>
+<span class="nc" id="L308">                ExpressionFactorizationReport.Status.BUDGET_INCONCLUSIVE;</span>
             case TECHNICAL_FAILURE -&gt;
 <span class="nc" id="L310">                ExpressionFactorizationReport.Status.TECHNICAL_FAILURE;</span>
         };

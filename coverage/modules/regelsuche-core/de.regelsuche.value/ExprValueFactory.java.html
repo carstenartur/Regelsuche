@@ -136,9 +136,9 @@ public final class ExprValueFactory implements AutoCloseable {
 <span class="pc bpc" id="L136" title="1 of 2 branches missed.">        } else if (expression instanceof BinaryExpr binary) {</span>
 <span class="fc" id="L137">            ExprValue left = fromExprRecursive(binary.left(), valuesBySyntax);</span>
 <span class="fc" id="L138">            ExprValue right = fromExprRecursive(binary.right(), valuesBySyntax);</span>
-<span class="pc bpc" id="L139" title="1 of 5 branches missed.">            value = switch (binary.operator()) {</span>
+<span class="pc bpc" id="L139" title="2 of 5 branches missed.">            value = switch (binary.operator()) {</span>
 <span class="fc" id="L140">                case ADD -&gt; sum(List.of(left, right));</span>
-<span class="fc" id="L141">                case SUB -&gt; ordered(ValueOperator.SUB, List.of(left, right));</span>
+<span class="nc" id="L141">                case SUB -&gt; ordered(ValueOperator.SUB, List.of(left, right));</span>
 <span class="fc" id="L142">                case MUL -&gt; product(List.of(left, right));</span>
 <span class="nc" id="L143">                case DIV -&gt; ordered(ValueOperator.DIV, List.of(left, right));</span>
 <span class="fc" id="L144">                case POW -&gt; ordered(ValueOperator.POW, List.of(left, right));</span>
@@ -170,7 +170,7 @@ public final class ExprValueFactory implements AutoCloseable {
 <span class="fc bfc" id="L170" title="All 2 branches covered.">        for (ExprValue operand : operands) {</span>
 <span class="fc" id="L171">            ExprValue value = Objects.requireNonNull(operand, &quot;operand&quot;);</span>
 <span class="fc bfc" id="L172" title="All 2 branches covered.">            if (value instanceof AssociativeCommutativeValue nested</span>
-<span class="fc bfc" id="L173" title="All 2 branches covered.">                    &amp;&amp; nested.operator().equals(operator)) {</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                    &amp;&amp; nested.operator().equals(operator)) {</span>
 <span class="fc" id="L174">                nested.multiplicities().forEach(</span>
 <span class="fc" id="L175">                        (nestedValue, count) -&gt; multiplicities.merge(nestedValue, count, Math::addExact));</span>
             } else {
@@ -222,7 +222,7 @@ public final class ExprValueFactory implements AutoCloseable {
         }
 
         public final boolean sameValue(ExprValue other) {
-<span class="pc bpc" id="L225" title="1 of 4 branches missed.">            return other != null &amp;&amp; key.equals(other.key);</span>
+<span class="nc bnc" id="L225" title="All 4 branches missed.">            return other != null &amp;&amp; key.equals(other.key);</span>
         }
 
         @Override
@@ -275,7 +275,7 @@ public final class ExprValueFactory implements AutoCloseable {
         }
 
         private static double normalizeZero(double value) {
-<span class="fc bfc" id="L278" title="All 2 branches covered.">            return value == 0.0d ? 0.0d : value;</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            return value == 0.0d ? 0.0d : value;</span>
         }
 
         @Override

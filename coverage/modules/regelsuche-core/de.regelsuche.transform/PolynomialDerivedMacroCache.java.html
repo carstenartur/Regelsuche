@@ -29,68 +29,68 @@ public final class PolynomialDerivedMacroCache {
         &quot;PERFORMANCE_CACHE_FOR_THEORY_DERIVED_POLYNOMIAL_MACROS&quot;;
 
     private final int capacity;
-<span class="fc" id="L32">    private final Map&lt;String, Entry&gt; entries = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L32">    private final Map&lt;String, Entry&gt; entries = new LinkedHashMap&lt;&gt;();</span>
 
     public PolynomialDerivedMacroCache() {
 <span class="nc" id="L35">        this(DEFAULT_CAPACITY);</span>
 <span class="nc" id="L36">    }</span>
 
-<span class="fc" id="L38">    public PolynomialDerivedMacroCache(int capacity) {</span>
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (capacity &lt; 1) {</span>
+<span class="nc" id="L38">    public PolynomialDerivedMacroCache(int capacity) {</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        if (capacity &lt; 1) {</span>
 <span class="nc" id="L40">            throw new IllegalArgumentException(</span>
                 &quot;derived macro cache capacity must be positive&quot;);
         }
-<span class="fc" id="L43">        this.capacity = capacity;</span>
-<span class="fc" id="L44">    }</span>
+<span class="nc" id="L43">        this.capacity = capacity;</span>
+<span class="nc" id="L44">    }</span>
 
     public synchronized Entry retain(
         PolynomialTheorySubsumptionClassifier.Classification classification,
         List&lt;String&gt; primitiveRuleIds,
         List&lt;String&gt; sourceProvenance
     ) {
-<span class="fc" id="L51">        Objects.requireNonNull(classification, &quot;classification&quot;);</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (!classification.subsumed()</span>
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                || classification.retentionDisposition()</span>
+<span class="nc" id="L51">        Objects.requireNonNull(classification, &quot;classification&quot;);</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (!classification.subsumed()</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">                || classification.retentionDisposition()</span>
                     != PolynomialTheorySubsumptionClassifier
                         .RetentionDisposition.DERIVED_MACRO_CACHE_ONLY) {
-<span class="fc" id="L56">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(</span>
                 &quot;only exactly theory-subsumed identities may enter the cache&quot;);
         }
 
-<span class="fc" id="L60">        Lineage lineage = Lineage.create(</span>
+<span class="nc" id="L60">        Lineage lineage = Lineage.create(</span>
             classification,
             primitiveRuleIds,
             sourceProvenance);
-<span class="fc" id="L64">        String id = entryId(classification);</span>
-<span class="fc" id="L65">        Entry existing = entries.get(id);</span>
-<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (existing != null) {</span>
-<span class="fc" id="L67">            Entry updated = existing.withLineage(lineage);</span>
-<span class="fc" id="L68">            entries.put(id, updated);</span>
-<span class="fc" id="L69">            return updated;</span>
+<span class="nc" id="L64">        String id = entryId(classification);</span>
+<span class="nc" id="L65">        Entry existing = entries.get(id);</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (existing != null) {</span>
+<span class="nc" id="L67">            Entry updated = existing.withLineage(lineage);</span>
+<span class="nc" id="L68">            entries.put(id, updated);</span>
+<span class="nc" id="L69">            return updated;</span>
         }
 
-<span class="fc" id="L72">        Entry retained = new Entry(</span>
+<span class="nc" id="L72">        Entry retained = new Entry(</span>
             id,
-<span class="fc" id="L74">            classification.sourceExpression(),</span>
-<span class="fc" id="L75">            classification.derivedExpression(),</span>
+<span class="nc" id="L74">            classification.sourceExpression(),</span>
+<span class="nc" id="L75">            classification.derivedExpression(),</span>
             classification,
-<span class="fc" id="L77">            List.of(lineage),</span>
+<span class="nc" id="L77">            List.of(lineage),</span>
             PURPOSE);
-<span class="fc" id="L79">        entries.put(id, retained);</span>
-<span class="fc" id="L80">        evictToCapacity();</span>
-<span class="fc" id="L81">        return retained;</span>
+<span class="nc" id="L79">        entries.put(id, retained);</span>
+<span class="nc" id="L80">        evictToCapacity();</span>
+<span class="nc" id="L81">        return retained;</span>
     }
 
     public synchronized Optional&lt;Entry&gt; find(String id) {
-<span class="fc" id="L85">        return Optional.ofNullable(entries.get(id));</span>
+<span class="nc" id="L85">        return Optional.ofNullable(entries.get(id));</span>
     }
 
     public synchronized List&lt;Entry&gt; entries() {
-<span class="fc" id="L89">        return List.copyOf(entries.values());</span>
+<span class="nc" id="L89">        return List.copyOf(entries.values());</span>
     }
 
     public synchronized int size() {
-<span class="fc" id="L93">        return entries.size();</span>
+<span class="nc" id="L93">        return entries.size();</span>
     }
 
     public int capacity() {
@@ -98,58 +98,58 @@ public final class PolynomialDerivedMacroCache {
     }
 
     private void evictToCapacity() {
-<span class="fc bfc" id="L101" title="All 2 branches covered.">        while (entries.size() &gt; capacity) {</span>
-<span class="fc" id="L102">            String oldest = entries.keySet().iterator().next();</span>
-<span class="fc" id="L103">            entries.remove(oldest);</span>
-<span class="fc" id="L104">        }</span>
-<span class="fc" id="L105">    }</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        while (entries.size() &gt; capacity) {</span>
+<span class="nc" id="L102">            String oldest = entries.keySet().iterator().next();</span>
+<span class="nc" id="L103">            entries.remove(oldest);</span>
+<span class="nc" id="L104">        }</span>
+<span class="nc" id="L105">    }</span>
 
     private static String entryId(
         PolynomialTheorySubsumptionClassifier.Classification classification
     ) {
-<span class="fc" id="L110">        StringBuilder material = new StringBuilder();</span>
-<span class="fc" id="L111">        append(material, SCHEMA);</span>
-<span class="fc" id="L112">        append(material, PURPOSE);</span>
-<span class="fc" id="L113">        append(material, classification.sourceExpression());</span>
-<span class="fc" id="L114">        append(material, classification.derivedExpression());</span>
-<span class="fc" id="L115">        append(material, classification.theoryMethodId());</span>
-<span class="fc" id="L116">        append(material, classification.certificateHash());</span>
-<span class="fc" id="L117">        return sha256(material.toString());</span>
+<span class="nc" id="L110">        StringBuilder material = new StringBuilder();</span>
+<span class="nc" id="L111">        append(material, SCHEMA);</span>
+<span class="nc" id="L112">        append(material, PURPOSE);</span>
+<span class="nc" id="L113">        append(material, classification.sourceExpression());</span>
+<span class="nc" id="L114">        append(material, classification.derivedExpression());</span>
+<span class="nc" id="L115">        append(material, classification.theoryMethodId());</span>
+<span class="nc" id="L116">        append(material, classification.certificateHash());</span>
+<span class="nc" id="L117">        return sha256(material.toString());</span>
     }
 
     private static void append(StringBuilder target, String value) {
-<span class="fc" id="L121">        target.append(value.length()).append(':').append(value);</span>
-<span class="fc" id="L122">    }</span>
+<span class="nc" id="L121">        target.append(value.length()).append(':').append(value);</span>
+<span class="nc" id="L122">    }</span>
 
     private static List&lt;String&gt; requireNonBlankList(
         List&lt;String&gt; values,
         String name
     ) {
-<span class="fc" id="L128">        Objects.requireNonNull(values, name);</span>
-<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L128">        Objects.requireNonNull(values, name);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (values.isEmpty()) {</span>
 <span class="nc" id="L130">            throw new IllegalArgumentException(</span>
                 name + &quot; must not be empty&quot;);
         }
-<span class="fc" id="L133">        List&lt;String&gt; copy = new ArrayList&lt;&gt;(values.size());</span>
-<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (String value : values) {</span>
-<span class="fc" id="L135">            requireText(value, name + &quot; entry&quot;);</span>
-<span class="fc" id="L136">            copy.add(value);</span>
-<span class="fc" id="L137">        }</span>
-<span class="fc" id="L138">        return List.copyOf(copy);</span>
+<span class="nc" id="L133">        List&lt;String&gt; copy = new ArrayList&lt;&gt;(values.size());</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        for (String value : values) {</span>
+<span class="nc" id="L135">            requireText(value, name + &quot; entry&quot;);</span>
+<span class="nc" id="L136">            copy.add(value);</span>
+<span class="nc" id="L137">        }</span>
+<span class="nc" id="L138">        return List.copyOf(copy);</span>
     }
 
     private static void requireText(String value, String name) {
-<span class="pc bpc" id="L142" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc bnc" id="L142" title="All 4 branches missed.">        if (value == null || value.isBlank()) {</span>
 <span class="nc" id="L143">            throw new IllegalArgumentException(</span>
                 name + &quot; must not be blank&quot;);
         }
-<span class="fc" id="L146">    }</span>
+<span class="nc" id="L146">    }</span>
 
     private static String sha256(String material) {
         try {
-<span class="fc" id="L150">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L151">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
-<span class="fc" id="L152">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L150">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="nc" id="L151">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L152">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
 <span class="nc" id="L153">        } catch (NoSuchAlgorithmException exception) {</span>
 <span class="nc" id="L154">            throw new IllegalStateException(</span>
                 &quot;SHA-256 unavailable&quot;,
@@ -165,39 +165,39 @@ public final class PolynomialDerivedMacroCache {
         List&lt;Lineage&gt; lineages,
         String purpose
     ) {
-<span class="fc" id="L168">        public Entry {</span>
-<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            if (id == null</span>
-<span class="pc bpc" id="L170" title="2 of 4 branches missed.">                    || !id.matches(&quot;sha256:[0-9a-f]{64}&quot;)</span>
+<span class="nc" id="L168">        public Entry {</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (id == null</span>
+<span class="nc bnc" id="L170" title="All 4 branches missed.">                    || !id.matches(&quot;sha256:[0-9a-f]{64}&quot;)</span>
                     || leftPattern == null
-<span class="pc bpc" id="L172" title="2 of 4 branches missed.">                    || leftPattern.isBlank()</span>
+<span class="nc bnc" id="L172" title="All 4 branches missed.">                    || leftPattern.isBlank()</span>
                     || rightPattern == null
-<span class="pc bpc" id="L174" title="2 of 4 branches missed.">                    || rightPattern.isBlank()</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">                    || rightPattern.isBlank()</span>
                     || classification == null
-<span class="pc bpc" id="L176" title="1 of 2 branches missed.">                    || !classification.subsumed()</span>
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                    || !leftPattern.equals(</span>
-<span class="fc" id="L178">                        classification.sourceExpression())</span>
-<span class="pc bpc" id="L179" title="2 of 4 branches missed.">                    || !rightPattern.equals(</span>
-<span class="fc" id="L180">                        classification.derivedExpression())</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">                    || !classification.subsumed()</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                    || !leftPattern.equals(</span>
+<span class="nc" id="L178">                        classification.sourceExpression())</span>
+<span class="nc bnc" id="L179" title="All 4 branches missed.">                    || !rightPattern.equals(</span>
+<span class="nc" id="L180">                        classification.derivedExpression())</span>
                     || purpose == null
-<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                    || !PURPOSE.equals(purpose)) {</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                    || !PURPOSE.equals(purpose)) {</span>
 <span class="nc" id="L183">                throw new IllegalArgumentException(</span>
                     &quot;derived polynomial macro cache entry is invalid&quot;);
             }
-<span class="fc" id="L186">            lineages = List.copyOf(lineages);</span>
-<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (lineages.isEmpty()) {</span>
+<span class="nc" id="L186">            lineages = List.copyOf(lineages);</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">            if (lineages.isEmpty()) {</span>
 <span class="nc" id="L188">                throw new IllegalArgumentException(</span>
                     &quot;derived polynomial macro requires at least one lineage&quot;);
             }
-<span class="fc" id="L191">        }</span>
+<span class="nc" id="L191">        }</span>
 
         private Entry withLineage(Lineage lineage) {
-<span class="fc bfc" id="L194" title="All 2 branches covered.">            if (lineages.stream().anyMatch(existing -&gt;</span>
-<span class="fc" id="L195">                    existing.id().equals(lineage.id()))) {</span>
-<span class="fc" id="L196">                return this;</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">            if (lineages.stream().anyMatch(existing -&gt;</span>
+<span class="nc" id="L195">                    existing.id().equals(lineage.id()))) {</span>
+<span class="nc" id="L196">                return this;</span>
             }
-<span class="fc" id="L198">            List&lt;Lineage&gt; updated = new ArrayList&lt;&gt;(lineages);</span>
-<span class="fc" id="L199">            updated.add(lineage);</span>
-<span class="fc" id="L200">            return new Entry(</span>
+<span class="nc" id="L198">            List&lt;Lineage&gt; updated = new ArrayList&lt;&gt;(lineages);</span>
+<span class="nc" id="L199">            updated.add(lineage);</span>
+<span class="nc" id="L200">            return new Entry(</span>
                 id,
                 leftPattern,
                 rightPattern,
@@ -214,57 +214,57 @@ public final class PolynomialDerivedMacroCache {
         String applicationKey,
         long workUnits
     ) {
-<span class="fc" id="L217">        public Lineage {</span>
-<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            if (id == null</span>
-<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                    || !id.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L217">        public Lineage {</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">            if (id == null</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                    || !id.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
 <span class="nc" id="L220">                throw new IllegalArgumentException(</span>
                     &quot;derived polynomial macro lineage id is invalid&quot;);
             }
-<span class="fc" id="L223">            primitiveRuleIds = requireNonBlankList(</span>
+<span class="nc" id="L223">            primitiveRuleIds = requireNonBlankList(</span>
                 primitiveRuleIds,
                 &quot;primitiveRuleIds&quot;);
-<span class="fc" id="L226">            sourceProvenance = requireNonBlankList(</span>
+<span class="nc" id="L226">            sourceProvenance = requireNonBlankList(</span>
                 sourceProvenance,
                 &quot;sourceProvenance&quot;);
-<span class="fc" id="L229">            requireText(applicationKey, &quot;applicationKey&quot;);</span>
-<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            if (workUnits &lt; 0) {</span>
+<span class="nc" id="L229">            requireText(applicationKey, &quot;applicationKey&quot;);</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">            if (workUnits &lt; 0) {</span>
 <span class="nc" id="L231">                throw new IllegalArgumentException(</span>
                     &quot;workUnits must not be negative&quot;);
             }
-<span class="fc" id="L234">        }</span>
+<span class="nc" id="L234">        }</span>
 
         private static Lineage create(
             PolynomialTheorySubsumptionClassifier.Classification classification,
             List&lt;String&gt; primitiveRuleIds,
             List&lt;String&gt; sourceProvenance
         ) {
-<span class="fc" id="L241">            List&lt;String&gt; primitives = requireNonBlankList(</span>
+<span class="nc" id="L241">            List&lt;String&gt; primitives = requireNonBlankList(</span>
                 primitiveRuleIds,
                 &quot;primitiveRuleIds&quot;);
-<span class="fc" id="L244">            List&lt;String&gt; provenance = requireNonBlankList(</span>
+<span class="nc" id="L244">            List&lt;String&gt; provenance = requireNonBlankList(</span>
                 sourceProvenance,
                 &quot;sourceProvenance&quot;);
-<span class="fc" id="L247">            Objects.requireNonNull(classification, &quot;classification&quot;);</span>
-<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            if (!classification.subsumed()) {</span>
+<span class="nc" id="L247">            Objects.requireNonNull(classification, &quot;classification&quot;);</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">            if (!classification.subsumed()) {</span>
 <span class="nc" id="L249">                throw new IllegalArgumentException(</span>
                     &quot;lineage requires a theory-subsumed classification&quot;);
             }
-<span class="fc" id="L252">            StringBuilder material = new StringBuilder();</span>
-<span class="fc" id="L253">            append(material, SCHEMA + &quot;.lineage&quot;);</span>
-<span class="fc" id="L254">            append(material, classification.applicationKey());</span>
-<span class="fc" id="L255">            append(</span>
+<span class="nc" id="L252">            StringBuilder material = new StringBuilder();</span>
+<span class="nc" id="L253">            append(material, SCHEMA + &quot;.lineage&quot;);</span>
+<span class="nc" id="L254">            append(material, classification.applicationKey());</span>
+<span class="nc" id="L255">            append(</span>
                 material,
-<span class="fc" id="L257">                Long.toString(classification.workUnits()));</span>
-<span class="fc" id="L258">            append(material, Integer.toString(primitives.size()));</span>
-<span class="fc" id="L259">            primitives.forEach(value -&gt; append(material, value));</span>
-<span class="fc" id="L260">            append(material, Integer.toString(provenance.size()));</span>
-<span class="fc" id="L261">            provenance.forEach(value -&gt; append(material, value));</span>
-<span class="fc" id="L262">            return new Lineage(</span>
-<span class="fc" id="L263">                sha256(material.toString()),</span>
+<span class="nc" id="L257">                Long.toString(classification.workUnits()));</span>
+<span class="nc" id="L258">            append(material, Integer.toString(primitives.size()));</span>
+<span class="nc" id="L259">            primitives.forEach(value -&gt; append(material, value));</span>
+<span class="nc" id="L260">            append(material, Integer.toString(provenance.size()));</span>
+<span class="nc" id="L261">            provenance.forEach(value -&gt; append(material, value));</span>
+<span class="nc" id="L262">            return new Lineage(</span>
+<span class="nc" id="L263">                sha256(material.toString()),</span>
                 primitives,
                 provenance,
-<span class="fc" id="L266">                classification.applicationKey(),</span>
-<span class="fc" id="L267">                classification.workUnits());</span>
+<span class="nc" id="L266">                classification.applicationKey(),</span>
+<span class="nc" id="L267">                classification.workUnits());</span>
         }
     }
 }

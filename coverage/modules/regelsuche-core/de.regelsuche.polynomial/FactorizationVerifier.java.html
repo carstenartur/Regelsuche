@@ -53,12 +53,12 @@ public final class FactorizationVerifier {
 <span class="fc" id="L53">            raw = Objects.requireNonNull(</span>
 <span class="fc" id="L54">                engine.propose(request),</span>
                 &quot;factorization engine result&quot;);
-<span class="nc" id="L56">        } catch (RuntimeException exception) {</span>
-<span class="nc" id="L57">            return failure(</span>
-<span class="nc" id="L58">                engine.engineId(),</span>
+<span class="fc" id="L56">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L57">            return failure(</span>
+<span class="fc" id="L58">                engine.engineId(),</span>
                 Status.TECHNICAL_FAILURE,
-<span class="nc" id="L60">                technicalDetail(exception),</span>
-<span class="nc" id="L61">                PolynomialWorkLedger.empty(),</span>
+<span class="fc" id="L60">                technicalDetail(exception),</span>
+<span class="fc" id="L61">                PolynomialWorkLedger.empty(),</span>
                 ClaimStrength.NONE,
                 &quot;&quot;,
                 request);
@@ -449,10 +449,10 @@ public final class FactorizationVerifier {
     private static String technicalDetail(
         RuntimeException exception
     ) {
-<span class="nc" id="L452">        String simple = exception.getClass().getSimpleName();</span>
-<span class="nc bnc" id="L453" title="All 2 branches missed.">        return &quot;ENGINE_EXCEPTION_&quot; + (simple.isBlank()</span>
+<span class="fc" id="L452">        String simple = exception.getClass().getSimpleName();</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">        return &quot;ENGINE_EXCEPTION_&quot; + (simple.isBlank()</span>
 <span class="nc" id="L454">            ? &quot;RUNTIME&quot;</span>
-<span class="nc" id="L455">            : simple.toUpperCase(java.util.Locale.ROOT));</span>
+<span class="fc" id="L455">            : simple.toUpperCase(java.util.Locale.ROOT));</span>
     }
 
 <span class="fc" id="L458">    public enum Status {</span>
