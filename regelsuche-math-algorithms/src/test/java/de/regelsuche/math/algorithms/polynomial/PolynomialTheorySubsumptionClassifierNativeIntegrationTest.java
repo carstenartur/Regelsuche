@@ -71,6 +71,19 @@ class PolynomialTheorySubsumptionClassifierNativeIntegrationTest {
     }
 
     @Test
+    void combinesConstantsWithinAssociativeGeneratedRepresentation() {
+        PolynomialTheorySubsumptionClassifier.Classification result =
+            classifier.classify(
+                "x^2 + 5*x - 6",
+                "(x - 1) * (x + 3 + 3)");
+
+        assertTrue(result.subsumed(), result.toString());
+        assertEquals(
+            PolynomialTheorySubsumptionClassifier.Status.THEORY_SUBSUMED,
+            result.status());
+    }
+
+    @Test
     void rejectsNearMissAndEquivalentButUngeneratedRepresentation() {
         PolynomialTheorySubsumptionClassifier.Classification nearMiss =
             classifier.classify(
