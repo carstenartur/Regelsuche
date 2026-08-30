@@ -41,7 +41,7 @@ def freezePolynomialTheoryUtilityExecutionPlanAuthority =
         inputs.file polynomialUtilityTaskScript
         inputs.property(
             'expectedPlanHash',
-            'sha256:0a9be9ab83076ac2e507aa7d0f3c343ec2840556441c7cf8ce750772f215855e')
+            'sha256:6cfac16d65611820b713cf1f2aca0fdb724fc542ccef6b9de80981dc290af619')
         outputs.file(polynomialUtilityReportDirectory.map {
             it.file('polynomial-theory-utility-execution-plan-v1.json')
         })
@@ -56,7 +56,7 @@ def freezePolynomialTheoryUtilityExecutionPlanAuthority =
                 .file(
                     'polynomial-theory-utility-qualification-corpus-v1.json')
                 .asFile
-            if (!plan.isFile() || plan.length() != 235617L) {
+            if (!plan.isFile() || plan.length() != 235651L) {
                 throw new GradleException(
                     'Missing or changed polynomial utility execution plan')
             }
