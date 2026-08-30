@@ -16,34 +16,48 @@ final class PolynomialTheoryUtilityExecutionIdentity {
         PolynomialTheoryUtilityExecutionCheckpoint checkpoint
     ) {
         StringBuilder material = new StringBuilder();
-        append(material, PolynomialTheoryUtilityExecutionPlan.SCHEMA + ".run");
-        append(material, PolynomialTheoryUtilityPreregistration.STUDY_ID);
-        append(
-            material,
-            PolynomialTheoryUtilityPreregistration.CONTENT_HASH
-        );
-        append(
-            material,
-            PolynomialTheoryUtilityCaseCorpus.FORMATION_CONTENT_HASH
-        );
-        append(material, profile.profileId());
-        append(material, profile.adapterId());
-        append(material, checkpoint.checkpointId());
-        append(material, PolynomialTheoryUtilityExecutionPlan.RUN_GROUPING);
-        append(material, PolynomialTheoryUtilityExecutionPlan.CASE_ORDER);
-        append(
-            material,
-            PolynomialTheoryUtilityExecutionPlan.PROFILE_ISOLATION
-        );
-        append(
-            material,
-            PolynomialTheoryUtilityExecutionPlan.CHECKPOINT_ISOLATION
-        );
-        append(
-            material,
-            PolynomialTheoryUtilityExecutionPlan.CACHE_INITIAL_STATE
-        );
-        append(material, PolynomialTheoryUtilityExecutionPlan.CACHE_LIFETIME);
+        for (String value : List.of(
+                PolynomialTheoryUtilityExecutionPlan.SCHEMA + ".run",
+                PolynomialTheoryUtilityPreregistration.STUDY_ID,
+                PolynomialTheoryUtilityPreregistration.CONTENT_HASH,
+                PolynomialTheoryUtilityCaseCorpus.FORMATION_CONTENT_HASH,
+                PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_CONTENT_HASH,
+                PolynomialTheoryUtilityExecutionPlan.VERIFIER_ID,
+                PolynomialTheoryUtilityExecutionPlan.TRANSFORMATION_ID,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_SCHEMA,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_REVISION,
+                Integer.toString(
+                    PolynomialTheoryUtilityExecutionPlan.CACHE_CAPACITY),
+                PolynomialTheoryUtilityExecutionPlan.CACHE_LOOKUP,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_REPLAY,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_EVICTION,
+                PolynomialTheoryUtilityExecutionPlan.EXTERNAL_RUNTIME_ID,
+                PolynomialTheoryUtilityExecutionPlan.EXTERNAL_LOCK_PATH,
+                PolynomialTheoryUtilityExecutionPlan.RUN_GROUPING,
+                PolynomialTheoryUtilityExecutionPlan.ROW_ORDER,
+                PolynomialTheoryUtilityExecutionPlan.CASE_ORDER,
+                PolynomialTheoryUtilityExecutionPlan.PROFILE_ISOLATION,
+                PolynomialTheoryUtilityExecutionPlan.CHECKPOINT_ISOLATION,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_INITIAL_STATE,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_LIFETIME,
+                PolynomialTheoryUtilityExecutionPlan.QUALIFICATION_ACCESS,
+                PolynomialTheoryUtilityExecutionPlan.BACKEND_SUBSTITUTION,
+                PolynomialTheoryUtilityExecutionPlan.FAILURE_RETENTION,
+                profile.profileId(),
+                profile.adapterId(),
+                profile.scope(),
+                profile.factorizationMode(),
+                profile.engineId(),
+                profile.transformationId(),
+                profile.cacheMode(),
+                profile.fallbackMode(),
+                profile.candidateSelection(),
+                checkpoint.checkpointId(),
+                Integer.toString(checkpoint.ordinal()),
+                Integer.toString(checkpoint.numerator()),
+                Integer.toString(checkpoint.denominator()))) {
+            append(material, value);
+        }
         return sha256(material.toString().getBytes(StandardCharsets.UTF_8));
     }
 
@@ -75,6 +89,7 @@ final class PolynomialTheoryUtilityExecutionIdentity {
                 PolynomialTheoryUtilityExecutionPlan.EXTERNAL_RUNTIME_ID,
                 PolynomialTheoryUtilityExecutionPlan.EXTERNAL_LOCK_PATH,
                 PolynomialTheoryUtilityExecutionPlan.RUN_GROUPING,
+                PolynomialTheoryUtilityExecutionPlan.ROW_ORDER,
                 PolynomialTheoryUtilityExecutionPlan.CASE_ORDER,
                 PolynomialTheoryUtilityExecutionPlan.PROFILE_ISOLATION,
                 PolynomialTheoryUtilityExecutionPlan.CHECKPOINT_ISOLATION,
@@ -95,6 +110,9 @@ final class PolynomialTheoryUtilityExecutionIdentity {
                 profile.fallbackMode(),
                 profile.candidateSelection(),
                 checkpoint.checkpointId(),
+                Integer.toString(checkpoint.ordinal()),
+                Integer.toString(checkpoint.numerator()),
+                Integer.toString(checkpoint.denominator()),
                 Integer.toString(primitive),
                 Integer.toString(mechanical),
                 Integer.toString(factorization),
