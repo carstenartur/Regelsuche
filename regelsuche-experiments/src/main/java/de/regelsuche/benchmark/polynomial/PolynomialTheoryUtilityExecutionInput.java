@@ -1,6 +1,7 @@
 package de.regelsuche.benchmark.polynomial;
 
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /** One target-blind input envelope for a frozen execution-plan row. */
 public record PolynomialTheoryUtilityExecutionInput(
@@ -16,6 +17,10 @@ public record PolynomialTheoryUtilityExecutionInput(
     int factorizationWork,
     String inputStatus
 ) {
+    private static final Pattern SHA256 = Pattern.compile(
+        "sha256:[0-9a-f]{64}"
+    );
+
     public PolynomialTheoryUtilityExecutionInput {
         requireSha256(inputId, "inputId");
         requireSha256(rowId, "rowId");
@@ -59,7 +64,7 @@ public record PolynomialTheoryUtilityExecutionInput(
     }
 
     private static void requireSha256(String value, String name) {
-        if (value == null || !value.matches("sha256:[0-9a-f]{64}")) {
+        if (value == null || !SHA256.matcher(value).matches()) {
             throw new IllegalArgumentException(name + " is not SHA-256");
         }
     }
