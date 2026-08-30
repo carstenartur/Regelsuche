@@ -112,7 +112,12 @@ Die Ausführung ist vorab in 30 voneinander isolierte Läufe gruppiert:
 30 Läufe × 20 Fälle = 600 Ergebniszeilen
 ```
 
-Jeder Lauf verarbeitet die Fälle in der eingefrorenen Formationsreihenfolge.
+Jeder Lauf bildet im Artefakt einen zusammenhängenden Block von 20 Zeilen und
+verarbeitet die Fälle in der eingefrorenen Formationsreihenfolge. Dadurch kann
+ein Streaming-Runner den Laufwechsel eindeutig am `runId` erkennen und Cache
+oder sonstigen veränderlichen Zustand genau einmal an der Laufgrenze
+zurücksetzen.
+
 Profil- und Checkpoint-Läufe teilen weder Cache noch sonstigen veränderlichen
 Zustand. Das Cache-Profil startet jeden Lauf leer und darf Einträge nur innerhalb
 des jeweiligen Profil-/Checkpoint-Laufs über die 20 Fälle hinweg behalten.
@@ -134,7 +139,7 @@ Identität des erzeugten Plans:
 
 - Bytelänge: `235617`;
 - SHA-256:
-  `c4de9337f27acb7f9d9036cf2c656b38d80abed8b59ae30dcdefeb68356f3658`.
+  `0a9be9ab83076ac2e507aa7d0f3c343ec2840556441c7cf8ce750772f215855e`.
 
 ## Verifikation im Checkout
 
