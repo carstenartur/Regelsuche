@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityExecutionRow.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityExecutionRow.java</span></div><h1>PolynomialTheoryUtilityExecutionRow.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.util.regex.Pattern;
+
+/** One target-blind case/profile/checkpoint row before execution. */
+public record PolynomialTheoryUtilityExecutionRow(
+    String rowId,
+    String runId,
+    String caseId,
+    String profileId,
+    String checkpointId,
+    int admittedPrimitiveWork,
+    int totalMechanicalWork,
+    int factorizationWork,
+    String resultStatus
+) {
+<span class="fc" id="L17">    private static final Pattern SHA_256 =</span>
+<span class="fc" id="L18">        Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+
+<span class="fc" id="L20">    public PolynomialTheoryUtilityExecutionRow {</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (rowId == null</span>
+<span class="pc bpc" id="L22" title="1 of 4 branches missed.">                || !SHA_256.matcher(rowId).matches()</span>
+                || runId == null
+<span class="pc bpc" id="L24" title="2 of 4 branches missed.">                || !SHA_256.matcher(runId).matches()</span>
+                || caseId == null
+<span class="pc bpc" id="L26" title="2 of 4 branches missed.">                || caseId.isBlank()</span>
+                || profileId == null
+<span class="pc bpc" id="L28" title="2 of 4 branches missed.">                || profileId.isBlank()</span>
+                || checkpointId == null
+<span class="pc bpc" id="L30" title="5 of 10 branches missed.">                || checkpointId.isBlank()</span>
+                || admittedPrimitiveWork &lt; 1
+                || totalMechanicalWork &lt; admittedPrimitiveWork
+                || factorizationWork &lt; 1
+                || factorizationWork &gt; admittedPrimitiveWork
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                || !PolynomialTheoryUtilityExecutionPlan.RESULT_STATUS.equals(</span>
+                    resultStatus)) {
+<span class="fc" id="L37">            throw new IllegalArgumentException(&quot;invalid execution row&quot;);</span>
+        }
+<span class="fc" id="L39">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

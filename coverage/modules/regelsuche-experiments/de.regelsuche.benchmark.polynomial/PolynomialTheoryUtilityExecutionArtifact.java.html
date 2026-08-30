@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityExecutionArtifact.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityExecutionArtifact.java</span></div><h1>PolynomialTheoryUtilityExecutionArtifact.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Objects;
+
+/** Exact content-addressed execution plan artifact. */
+public record PolynomialTheoryUtilityExecutionArtifact(
+    List&lt;PolynomialTheoryUtilityExecutionRow&gt; rows,
+    String canonicalJson
+) {
+<span class="fc" id="L12">    public PolynomialTheoryUtilityExecutionArtifact {</span>
+<span class="fc" id="L13">        rows = List.copyOf(rows);</span>
+<span class="fc" id="L14">        canonicalJson = Objects.requireNonNull(canonicalJson, &quot;canonicalJson&quot;);</span>
+<span class="fc" id="L15">        String expectedCanonical =</span>
+<span class="fc" id="L16">            PolynomialTheoryUtilityExecutionJson.canonical(rows);</span>
+<span class="fc" id="L17">        byte[] bytes = canonicalJson.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (!expectedCanonical.equals(canonicalJson)</span>
+<span class="pc bpc" id="L19" title="2 of 4 branches missed.">                || rows.size()</span>
+                    != PolynomialTheoryUtilityExecutionPlan.EXPECTED_ROW_COUNT
+                || bytes.length
+                    != PolynomialTheoryUtilityExecutionPlan.EXPECTED_BYTE_LENGTH
+                || !PolynomialTheoryUtilityExecutionPlan
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">                    .EXPECTED_CONTENT_HASH.equals(</span>
+<span class="fc" id="L25">                        PolynomialTheoryUtilityExecutionIdentity.sha256(bytes))) {</span>
+<span class="fc" id="L26">            throw new IllegalArgumentException(&quot;invalid execution artifact&quot;);</span>
+        }
+<span class="fc" id="L28">    }</span>
+
+    public String schema() {
+<span class="fc" id="L31">        return PolynomialTheoryUtilityExecutionPlan.SCHEMA;</span>
+    }
+
+    public String studyId() {
+<span class="fc" id="L35">        return PolynomialTheoryUtilityPreregistration.STUDY_ID;</span>
+    }
+
+    public String evidenceStatus() {
+<span class="fc" id="L39">        return PolynomialTheoryUtilityExecutionPlan.EVIDENCE_STATUS;</span>
+    }
+
+    public String planSelectionTiming() {
+<span class="nc" id="L43">        return PolynomialTheoryUtilityExecutionPlan.PLAN_SELECTION_TIMING;</span>
+    }
+
+    public String qualificationExposure() {
+<span class="nc" id="L47">        return PolynomialTheoryUtilityExecutionPlan.QUALIFICATION_EXPOSURE;</span>
+    }
+
+    public String contentHash() {
+<span class="fc" id="L51">        return PolynomialTheoryUtilityExecutionPlan.EXPECTED_CONTENT_HASH;</span>
+    }
+
+    public long byteLength() {
+<span class="fc" id="L55">        return PolynomialTheoryUtilityExecutionPlan.EXPECTED_BYTE_LENGTH;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityExecutionIdentity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityExecutionIdentity.java</span></div><h1>PolynomialTheoryUtilityExecutionIdentity.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.List;
+
+/** Content-addresses execution runs, rows and complete artifacts. */
+final class PolynomialTheoryUtilityExecutionIdentity {
+    private PolynomialTheoryUtilityExecutionIdentity() {
+    }
+
+    static String runId(
+        PolynomialTheoryUtilityExecutionProfile profile,
+        PolynomialTheoryUtilityExecutionCheckpoint checkpoint
+    ) {
+<span class="fc" id="L18">        StringBuilder material = new StringBuilder();</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        for (String value : List.of(</span>
+                PolynomialTheoryUtilityExecutionPlan.SCHEMA + &quot;.run&quot;,
+                PolynomialTheoryUtilityPreregistration.STUDY_ID,
+                PolynomialTheoryUtilityPreregistration.CONTENT_HASH,
+                PolynomialTheoryUtilityCaseCorpus.FORMATION_CONTENT_HASH,
+                PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_CONTENT_HASH,
+                PolynomialTheoryUtilityExecutionPlan.VERIFIER_ID,
+                PolynomialTheoryUtilityExecutionPlan.TRANSFORMATION_ID,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_SCHEMA,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_REVISION,
+<span class="fc" id="L29">                Integer.toString(</span>
+                    PolynomialTheoryUtilityExecutionPlan.CACHE_CAPACITY),
+                PolynomialTheoryUtilityExecutionPlan.CACHE_LOOKUP,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_REPLAY,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_EVICTION,
+                PolynomialTheoryUtilityExecutionPlan.EXTERNAL_RUNTIME_ID,
+                PolynomialTheoryUtilityExecutionPlan.EXTERNAL_LOCK_PATH,
+                PolynomialTheoryUtilityExecutionPlan.RUN_GROUPING,
+                PolynomialTheoryUtilityExecutionPlan.ROW_ORDER,
+                PolynomialTheoryUtilityExecutionPlan.CASE_ORDER,
+                PolynomialTheoryUtilityExecutionPlan.PROFILE_ISOLATION,
+                PolynomialTheoryUtilityExecutionPlan.CHECKPOINT_ISOLATION,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_INITIAL_STATE,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_LIFETIME,
+                PolynomialTheoryUtilityExecutionPlan.QUALIFICATION_ACCESS,
+                PolynomialTheoryUtilityExecutionPlan.BACKEND_SUBSTITUTION,
+                PolynomialTheoryUtilityExecutionPlan.FAILURE_RETENTION,
+<span class="fc" id="L46">                profile.profileId(),</span>
+<span class="fc" id="L47">                profile.adapterId(),</span>
+<span class="fc" id="L48">                profile.scope(),</span>
+<span class="fc" id="L49">                profile.factorizationMode(),</span>
+<span class="fc" id="L50">                profile.engineId(),</span>
+<span class="fc" id="L51">                profile.transformationId(),</span>
+<span class="fc" id="L52">                profile.cacheMode(),</span>
+<span class="fc" id="L53">                profile.fallbackMode(),</span>
+<span class="fc" id="L54">                profile.candidateSelection(),</span>
+<span class="fc" id="L55">                checkpoint.checkpointId(),</span>
+<span class="fc" id="L56">                Integer.toString(checkpoint.ordinal()),</span>
+<span class="fc" id="L57">                Integer.toString(checkpoint.numerator()),</span>
+<span class="fc" id="L58">                Integer.toString(checkpoint.denominator()))) {</span>
+<span class="fc" id="L59">            append(material, value);</span>
+<span class="fc" id="L60">        }</span>
+<span class="fc" id="L61">        return sha256(material.toString().getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    static String rowId(
+        String runId,
+        String caseId,
+        PolynomialTheoryUtilityExecutionProfile profile,
+        PolynomialTheoryUtilityExecutionCheckpoint checkpoint,
+        int primitive,
+        int mechanical,
+        int factorization
+    ) {
+<span class="fc" id="L73">        StringBuilder material = new StringBuilder();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (String value : List.of(</span>
+                PolynomialTheoryUtilityExecutionPlan.SCHEMA,
+                PolynomialTheoryUtilityPreregistration.STUDY_ID,
+                PolynomialTheoryUtilityPreregistration.CONTENT_HASH,
+                PolynomialTheoryUtilityCaseCorpus.FORMATION_CONTENT_HASH,
+                PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_CONTENT_HASH,
+                PolynomialTheoryUtilityExecutionPlan.VERIFIER_ID,
+                PolynomialTheoryUtilityExecutionPlan.TRANSFORMATION_ID,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_SCHEMA,
+<span class="fc" id="L83">                Integer.toString(</span>
+                    PolynomialTheoryUtilityExecutionPlan.CACHE_CAPACITY),
+                PolynomialTheoryUtilityExecutionPlan.CACHE_LOOKUP,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_REPLAY,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_EVICTION,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_REVISION,
+                PolynomialTheoryUtilityExecutionPlan.EXTERNAL_RUNTIME_ID,
+                PolynomialTheoryUtilityExecutionPlan.EXTERNAL_LOCK_PATH,
+                PolynomialTheoryUtilityExecutionPlan.RUN_GROUPING,
+                PolynomialTheoryUtilityExecutionPlan.ROW_ORDER,
+                PolynomialTheoryUtilityExecutionPlan.CASE_ORDER,
+                PolynomialTheoryUtilityExecutionPlan.PROFILE_ISOLATION,
+                PolynomialTheoryUtilityExecutionPlan.CHECKPOINT_ISOLATION,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_INITIAL_STATE,
+                PolynomialTheoryUtilityExecutionPlan.CACHE_LIFETIME,
+                PolynomialTheoryUtilityExecutionPlan.QUALIFICATION_ACCESS,
+                PolynomialTheoryUtilityExecutionPlan.BACKEND_SUBSTITUTION,
+                PolynomialTheoryUtilityExecutionPlan.FAILURE_RETENTION,
+                runId,
+                caseId,
+<span class="fc" id="L103">                profile.profileId(),</span>
+<span class="fc" id="L104">                profile.adapterId(),</span>
+<span class="fc" id="L105">                profile.scope(),</span>
+<span class="fc" id="L106">                profile.factorizationMode(),</span>
+<span class="fc" id="L107">                profile.engineId(),</span>
+<span class="fc" id="L108">                profile.transformationId(),</span>
+<span class="fc" id="L109">                profile.cacheMode(),</span>
+<span class="fc" id="L110">                profile.fallbackMode(),</span>
+<span class="fc" id="L111">                profile.candidateSelection(),</span>
+<span class="fc" id="L112">                checkpoint.checkpointId(),</span>
+<span class="fc" id="L113">                Integer.toString(checkpoint.ordinal()),</span>
+<span class="fc" id="L114">                Integer.toString(checkpoint.numerator()),</span>
+<span class="fc" id="L115">                Integer.toString(checkpoint.denominator()),</span>
+<span class="fc" id="L116">                Integer.toString(primitive),</span>
+<span class="fc" id="L117">                Integer.toString(mechanical),</span>
+<span class="fc" id="L118">                Integer.toString(factorization),</span>
+                PolynomialTheoryUtilityExecutionPlan.RESULT_STATUS)) {
+<span class="fc" id="L120">            append(material, value);</span>
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">        return sha256(material.toString().getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    static String sha256(byte[] value) {
+        try {
+<span class="fc" id="L127">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L128">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value)</span>
+            );
+<span class="nc" id="L130">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L131">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L136">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L137">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

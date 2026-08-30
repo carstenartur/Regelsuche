@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityExecutionPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityExecutionPlan.java</span></div><h1>PolynomialTheoryUtilityExecutionPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Freezes the target-blind execution matrix for the polynomial utility study. */
+public final class PolynomialTheoryUtilityExecutionPlan {
+    public static final String SCHEMA =
+        &quot;regelsuche.polynomial-theory-utility-execution-plan/v1&quot;;
+    public static final String EVIDENCE_STATUS = &quot;FROZEN_NOT_EXECUTED&quot;;
+    public static final String RESULT_STATUS = &quot;NOT_EXECUTED&quot;;
+    public static final String PLAN_SELECTION_TIMING =
+        &quot;BEFORE_PROFILE_EXECUTION&quot;;
+    public static final String QUALIFICATION_EXPOSURE =
+        &quot;HASH_ONLY_BEFORE_RESULT_FREEZE&quot;;
+    public static final String FILE_NAME =
+        &quot;polynomial-theory-utility-execution-plan-v1.json&quot;;
+    public static final int EXPECTED_ROW_COUNT = 600;
+    public static final long EXPECTED_BYTE_LENGTH = 235_651L;
+    public static final String EXPECTED_CONTENT_HASH =
+        &quot;sha256:6cfac16d65611820b713cf1f2aca0fdb724fc542ccef6b9de80981dc290af619&quot;;
+
+    public static final String VERIFIER_ID =
+        &quot;regelsuche.factorization-verifier/v2&quot;;
+    public static final String TRANSFORMATION_ID =
+        &quot;regelsuche.exact-factorization-transformation/v1&quot;;
+    public static final String CACHE_SCHEMA =
+        &quot;regelsuche.polynomial-derived-macro-cache-entry/v2&quot;;
+    public static final String CACHE_REVISION =
+        &quot;regelsuche.polynomial-theory-utility-derived-macro-cache/v1&quot;;
+    public static final int CACHE_CAPACITY = 128;
+    public static final String CACHE_LOOKUP =
+        &quot;EXACT_CONTENT_ADDRESSED_ENTRY&quot;;
+    public static final String CACHE_REPLAY =
+        &quot;EXACT_VERIFIER_AUTHORIZED_TRANSFORMATION&quot;;
+    public static final String CACHE_EVICTION = &quot;FIFO_INSERTION_ORDER&quot;;
+    public static final String EXTERNAL_RUNTIME_ID =
+        &quot;graalpy-25.1.3_sympy-1.14.0_mpmath-1.3.0&quot;;
+    public static final String EXTERNAL_LOCK_PATH =
+        &quot;regelsuche-math-sympy/graalpy.lock&quot;;
+
+    public static final String RUN_GROUPING = &quot;PROFILE_AND_CHECKPOINT&quot;;
+    public static final String ROW_ORDER = &quot;RUN_MAJOR_CONTIGUOUS&quot;;
+    public static final String CASE_ORDER = &quot;FROZEN_FORMATION_ORDER&quot;;
+    public static final String PROFILE_ISOLATION = &quot;INDEPENDENT_RUNS&quot;;
+    public static final String CHECKPOINT_ISOLATION = &quot;INDEPENDENT_RUNS&quot;;
+    public static final String CACHE_INITIAL_STATE = &quot;EMPTY_AT_RUN_START&quot;;
+    public static final String CACHE_LIFETIME =
+        &quot;WITHIN_PROFILE_CHECKPOINT_RUN&quot;;
+    public static final String QUALIFICATION_ACCESS = &quot;FORBIDDEN&quot;;
+    public static final String BACKEND_SUBSTITUTION = &quot;FORBIDDEN&quot;;
+    public static final String FAILURE_RETENTION =
+        &quot;RETAIN_ALL_TERMINAL_OUTCOMES&quot;;
+
+    public static final List&lt;PolynomialTheoryUtilityExecutionProfile&gt;
+<span class="fc" id="L66">            PROFILES = List.of(</span>
+        new PolynomialTheoryUtilityExecutionProfile(
+            &quot;NO_FACTORIZATION&quot;,
+            &quot;regelsuche.polynomial-theory-utility.no-factorization/v1&quot;,
+            &quot;NO_FACTORIZATION&quot;,
+            &quot;DISABLED&quot;,
+            &quot;NONE&quot;,
+            &quot;NONE&quot;,
+            &quot;DISABLED&quot;,
+            &quot;NONE&quot;,
+            &quot;NONE&quot;
+        ),
+        new PolynomialTheoryUtilityExecutionProfile(
+            &quot;ON_DEMAND_VERIFIED_FACTORIZATION&quot;,
+            &quot;regelsuche.polynomial-theory-utility.&quot;
+                + &quot;on-demand-verified-factorization/v1&quot;,
+            &quot;DECLARED_UNIVARIATE_ZX_QX&quot;,
+            &quot;ON_DEMAND&quot;,
+            &quot;regelsuche.factorization.native-univariate-rational/v1&quot;,
+            TRANSFORMATION_ID,
+            &quot;DISABLED&quot;,
+            &quot;NONE&quot;,
+            &quot;EXPLICIT_INDEX_ASCENDING&quot;
+        ),
+        new PolynomialTheoryUtilityExecutionProfile(
+            &quot;VERIFIED_DERIVED_MACRO_CACHE&quot;,
+            &quot;regelsuche.polynomial-theory-utility.&quot;
+                + &quot;verified-derived-macro-cache/v1&quot;,
+            &quot;DECLARED_UNIVARIATE_ZX_QX&quot;,
+            &quot;ON_CACHE_MISS&quot;,
+            &quot;regelsuche.factorization.native-univariate-rational/v1&quot;,
+            TRANSFORMATION_ID,
+            &quot;READ_WRITE&quot;,
+            &quot;NATIVE_ON_CACHE_MISS_ONLY&quot;,
+            &quot;EXPLICIT_INDEX_ASCENDING&quot;
+        ),
+        new PolynomialTheoryUtilityExecutionProfile(
+            &quot;SPECIALIZED_BINARY_QUARTIC_CONTROL&quot;,
+            &quot;regelsuche.polynomial-theory-utility.&quot;
+                + &quot;specialized-binary-quartic-control/v1&quot;,
+            &quot;BINARY_HOMOGENEOUS_QUARTIC_2X2_ONLY&quot;,
+            &quot;ON_DEMAND_SPECIALIZED_CONTROL&quot;,
+            &quot;regelsuche.factorization.binary-quartic-2x2/v1&quot;,
+            &quot;hypothesis_polynomial_decomposition_synthesis&quot;,
+            &quot;DISABLED&quot;,
+            &quot;NONE&quot;,
+            &quot;EXPLICIT_INDEX_ASCENDING&quot;
+        ),
+        new PolynomialTheoryUtilityExecutionProfile(
+            &quot;OPTIONAL_EXTERNAL_VERIFIED_FACTORIZATION&quot;,
+            &quot;regelsuche.polynomial-theory-utility.&quot;
+                + &quot;optional-external-verified-factorization/v1&quot;,
+            &quot;DECLARED_UNIVARIATE_ZX_QX&quot;,
+            &quot;ON_DEMAND&quot;,
+            &quot;regelsuche.factorization.sympy-graalpy.rational/v1&quot;,
+            TRANSFORMATION_ID,
+            &quot;DISABLED&quot;,
+            &quot;NONE&quot;,
+            &quot;EXPLICIT_INDEX_ASCENDING&quot;
+        )
+    );
+
+    public static final List&lt;PolynomialTheoryUtilityExecutionCheckpoint&gt;
+<span class="fc" id="L129">            CHECKPOINTS = List.of(</span>
+        new PolynomialTheoryUtilityExecutionCheckpoint(
+            &quot;CP01_1_OF_12&quot;, 1, 1, 12),
+        new PolynomialTheoryUtilityExecutionCheckpoint(
+            &quot;CP02_1_OF_6&quot;, 2, 1, 6),
+        new PolynomialTheoryUtilityExecutionCheckpoint(
+            &quot;CP03_1_OF_3&quot;, 3, 1, 3),
+        new PolynomialTheoryUtilityExecutionCheckpoint(
+            &quot;CP04_1_OF_2&quot;, 4, 1, 2),
+        new PolynomialTheoryUtilityExecutionCheckpoint(
+            &quot;CP05_3_OF_4&quot;, 5, 3, 4),
+        new PolynomialTheoryUtilityExecutionCheckpoint(
+            &quot;CP06_FULL&quot;, 6, 1, 1)
+    );
+
+    private PolynomialTheoryUtilityExecutionPlan() {
+    }
+
+    public static PolynomialTheoryUtilityExecutionArtifact freeze() {
+<span class="fc" id="L148">        var preregistration = PolynomialTheoryUtilityPreregistration.load();</span>
+<span class="fc" id="L149">        var formation = PolynomialTheoryUtilityCaseCorpus.load();</span>
+<span class="fc" id="L150">        requireBindings(preregistration, formation);</span>
+<span class="fc" id="L151">        List&lt;PolynomialTheoryUtilityExecutionRow&gt; rows =</span>
+            new ArrayList&lt;&gt;(EXPECTED_ROW_COUNT);
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        for (var profile : PROFILES) {</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            for (var checkpoint : CHECKPOINTS) {</span>
+<span class="fc" id="L155">                String runId =</span>
+<span class="fc" id="L156">                    PolynomialTheoryUtilityExecutionIdentity.runId(</span>
+                        profile,
+                        checkpoint
+                    );
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                for (var studyCase : formation.cases()) {</span>
+<span class="fc" id="L161">                    int primitive = scale(</span>
+<span class="fc" id="L162">                        studyCase.admittedPrimitiveWork(),</span>
+                        checkpoint
+                    );
+<span class="fc" id="L165">                    int mechanical = scale(</span>
+<span class="fc" id="L166">                        studyCase.totalMechanicalWork(),</span>
+                        checkpoint
+                    );
+<span class="fc" id="L169">                    int factorization = scale(</span>
+<span class="fc" id="L170">                        studyCase.factorizationWork(),</span>
+                        checkpoint
+                    );
+<span class="fc" id="L173">                    rows.add(new PolynomialTheoryUtilityExecutionRow(</span>
+<span class="fc" id="L174">                        PolynomialTheoryUtilityExecutionIdentity.rowId(</span>
+                            runId,
+<span class="fc" id="L176">                            studyCase.caseId(),</span>
+                            profile,
+                            checkpoint,
+                            primitive,
+                            mechanical,
+                            factorization
+                        ),
+                        runId,
+<span class="fc" id="L184">                        studyCase.caseId(),</span>
+<span class="fc" id="L185">                        profile.profileId(),</span>
+<span class="fc" id="L186">                        checkpoint.checkpointId(),</span>
+                        primitive,
+                        mechanical,
+                        factorization,
+                        RESULT_STATUS
+                    ));
+<span class="fc" id="L192">                }</span>
+<span class="fc" id="L193">            }</span>
+<span class="fc" id="L194">        }</span>
+<span class="fc" id="L195">        requireMatrix(formation.cases(), rows);</span>
+<span class="fc" id="L196">        return new PolynomialTheoryUtilityExecutionArtifact(</span>
+            rows,
+<span class="fc" id="L198">            PolynomialTheoryUtilityExecutionJson.canonical(rows)</span>
+        );
+    }
+
+    public static PolynomialTheoryUtilityExecutionArtifact write(
+        Path directory
+    ) throws IOException {
+<span class="fc" id="L205">        Path root = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L206">            .toAbsolutePath().normalize();</span>
+<span class="fc" id="L207">        Files.createDirectories(root);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (Files.exists(root.resolve(</span>
+                PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_FILE_NAME))) {
+<span class="fc" id="L210">            throw new IllegalStateException(</span>
+                &quot;execution plan must not expose sealed qualification&quot;
+            );
+        }
+<span class="fc" id="L214">        var artifact = freeze();</span>
+<span class="fc" id="L215">        Path target = root.resolve(FILE_NAME);</span>
+<span class="fc" id="L216">        AtomicJsonFile.writeUtf8(target, artifact.canonicalJson());</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (!Files.isRegularFile(target)</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                || !java.util.Arrays.equals(</span>
+<span class="fc" id="L219">                    Files.readAllBytes(target),</span>
+<span class="fc" id="L220">                    artifact.canonicalJson().getBytes(StandardCharsets.UTF_8)</span>
+                )) {
+<span class="nc" id="L222">            throw new IllegalStateException(&quot;written execution plan changed&quot;);</span>
+        }
+<span class="fc" id="L224">        return artifact;</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (args.length != 1) {</span>
+<span class="fc" id="L229">            throw new IllegalArgumentException(&quot;usage: &lt;output-directory&gt;&quot;);</span>
+        }
+<span class="nc" id="L231">        var artifact = write(Path.of(args[0]));</span>
+<span class="nc" id="L232">        System.out.println(&quot;polynomialTheoryUtilityExecutionPlanHash=&quot;</span>
+<span class="nc" id="L233">            + artifact.contentHash());</span>
+<span class="nc" id="L234">        System.out.println(&quot;polynomialTheoryUtilityExecutionPlanRows=&quot;</span>
+<span class="nc" id="L235">            + artifact.rows().size());</span>
+<span class="nc" id="L236">        System.out.println(&quot;polynomialTheoryUtilityExecutionPlanStatus=&quot;</span>
+<span class="nc" id="L237">            + artifact.evidenceStatus());</span>
+<span class="nc" id="L238">    }</span>
+
+    static int scale(
+        int fullBudget,
+        PolynomialTheoryUtilityExecutionCheckpoint checkpoint
+    ) {
+<span class="fc" id="L244">        Objects.requireNonNull(checkpoint, &quot;checkpoint&quot;);</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (fullBudget &lt; 1) {</span>
+<span class="fc" id="L246">            throw new IllegalArgumentException(&quot;budget must be positive&quot;);</span>
+        }
+<span class="fc" id="L248">        long numerator = Math.multiplyExact(</span>
+            (long) fullBudget,
+<span class="fc" id="L250">            checkpoint.numerator()</span>
+        );
+<span class="fc" id="L252">        return Math.toIntExact(Math.max(</span>
+            1L,
+<span class="fc" id="L254">            Math.addExact(numerator, checkpoint.denominator() - 1L)</span>
+<span class="fc" id="L255">                / checkpoint.denominator()</span>
+        ));
+    }
+
+    private static void requireBindings(
+        PolynomialTheoryUtilityPreregistration.Artifact preregistration,
+        PolynomialTheoryUtilityCaseCorpus.FormationArtifact formation
+    ) {
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (!PolynomialTheoryUtilityPreregistration.STUDY_ID.equals(</span>
+<span class="fc" id="L264">                preregistration.studyId())</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                || !PolynomialTheoryUtilityPreregistration.STUDY_ID.equals(</span>
+<span class="fc" id="L266">                    formation.studyId())</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                || !PolynomialTheoryUtilityPreregistration.CONTENT_HASH.equals(</span>
+<span class="fc" id="L268">                    preregistration.contentHash())</span>
+                || PolynomialTheoryUtilityPreregistration.BYTE_LENGTH
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">                    != preregistration.byteLength()</span>
+                || !PolynomialTheoryUtilityCaseCorpus.FORMATION_CONTENT_HASH
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                    .equals(formation.contentHash())</span>
+                || PolynomialTheoryUtilityCaseCorpus.FORMATION_BYTE_LENGTH
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">                    != formation.byteLength()</span>
+                || !PolynomialTheoryUtilityCaseCorpus
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                    .QUALIFICATION_CONTENT_HASH.equals(</span>
+<span class="fc" id="L277">                        formation.qualificationBinding().contentHash())</span>
+                || PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_BYTE_LENGTH
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">                    != formation.qualificationBinding().byteLength()</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">                || !preregistration.profiles().equals(</span>
+<span class="fc" id="L281">                    PROFILES.stream()</span>
+<span class="fc" id="L282">                        .map(</span>
+                            PolynomialTheoryUtilityExecutionProfile::profileId
+                        )
+<span class="fc" id="L285">                        .toList())) {</span>
+<span class="nc" id="L286">            throw new IllegalStateException(&quot;execution plan binding differs&quot;);</span>
+        }
+<span class="fc" id="L288">    }</span>
+
+    private static void requireMatrix(
+        List&lt;PolynomialTheoryUtilityCaseCorpus.FormationCase&gt; cases,
+        List&lt;PolynomialTheoryUtilityExecutionRow&gt; rows
+    ) {
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (rows.size() != EXPECTED_ROW_COUNT</span>
+<span class="fc" id="L295">                || rows.size()</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                    != cases.size() * PROFILES.size() * CHECKPOINTS.size()) {</span>
+<span class="nc" id="L297">            throw new IllegalStateException(&quot;execution matrix size differs&quot;);</span>
+        }
+<span class="fc" id="L299">        Set&lt;String&gt; rowIds = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L300">        Map&lt;String, Integer&gt; runRows = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L301">        int offset = 0;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        for (var profile : PROFILES) {</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            for (var checkpoint : CHECKPOINTS) {</span>
+<span class="fc" id="L304">                String expectedRunId =</span>
+<span class="fc" id="L305">                    PolynomialTheoryUtilityExecutionIdentity.runId(</span>
+                        profile,
+                        checkpoint
+                    );
+<span class="fc bfc" id="L309" title="All 2 branches covered.">                for (var studyCase : cases) {</span>
+<span class="fc" id="L310">                    var row = rows.get(offset++);</span>
+<span class="fc" id="L311">                    runRows.merge(row.runId(), 1, Integer::sum);</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">                    if (!expectedRunId.equals(row.runId())</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">                            || !studyCase.caseId().equals(row.caseId())</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">                            || !profile.profileId().equals(row.profileId())</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">                            || !checkpoint.checkpointId().equals(</span>
+<span class="fc" id="L316">                                row.checkpointId())</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                            || !rowIds.add(row.rowId())) {</span>
+<span class="nc" id="L318">                        throw new IllegalStateException(</span>
+                            &quot;execution matrix order differs at &quot; + (offset - 1)
+                        );
+                    }
+<span class="fc" id="L322">                }</span>
+<span class="fc" id="L323">            }</span>
+<span class="fc" id="L324">        }</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if (runRows.size() != PROFILES.size() * CHECKPOINTS.size()</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                || runRows.values().stream().anyMatch(count -&gt;</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                    count != cases.size())) {</span>
+<span class="nc" id="L328">            throw new IllegalStateException(&quot;execution run grouping differs&quot;);</span>
+        }
+<span class="fc" id="L330">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
