@@ -5,45 +5,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.regelsuche.canonical.ExpressionCanonicalizer;
-import de.regelsuche.parse.ExpressionParser;
-import de.regelsuche.polynomial.BinaryQuarticFactorizationEngine;
+import de.regelsuche.polynomial.ExactRationalField;
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.scalar.ExactRational;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class PolynomialTheorySubsumptionClassifierTest {
-    private final PolynomialTheorySubsumptionClassifier classifier =
-        new PolynomialTheorySubsumptionClassifier();
-
-    @Test
-    void classifiesGeneratedSophieGermainIdentityAsTheorySubsumed() {
-        PolynomialTheorySubsumptionClassifier.Classification result =
-            classifier.classify(
-                "x^4 + 4*y^4",
-                "(x^2 - 2*x*y + 2*y^2)"
-                    + " * (x^2 + 2*x*y + 2*y^2)");
-
-        assertTrue(result.subsumed(), result.toString());
-        assertEquals(
-            PolynomialTheorySubsumptionClassifier.Status.THEORY_SUBSUMED,
-            result.status());
-        assertEquals(
-            PolynomialDecompositionSynthesisOperator.METHOD_ID,
-            result.theoryMethodId());
-        assertEquals(
-            PolynomialTheorySubsumptionClassifier.ProjectInventoryNovelty
-                .NOT_EVALUATED,
-            result.projectInventoryNovelty());
-        assertEquals(
-            PolynomialTheorySubsumptionClassifier.RetentionDisposition
-                .DERIVED_MACRO_CACHE_ONLY,
-            result.retentionDisposition());
-        assertFalse(result.sourceExpression().isBlank());
-        assertTrue(result.certificateHash().matches("sha256:[0-9a-f]{64}"));
-        assertFalse(result.derivedExpression().isBlank());
-        assertFalse(result.applicationKey().isBlank());
-        assertTrue(result.workUnits() > 0);
-    }
+    private static final String TEST_HASH =
+        "sha256:" + "0".repeat(64);
 
     @Test
     void positiveClassificationCanOnlyBeIssuedByTheClassifier() {
@@ -56,169 +28,170 @@ class PolynomialTheorySubsumptionClassifierTest {
     }
 
     @Test
-    void acceptsAssociativeCommutativeFactorOrderWithoutBroadEquivalence() {
-        PolynomialTheorySubsumptionClassifier.Classification result =
-            classifier.classify(
-                "x^4 + 5*x^2*y^2 + 4*y^4",
-                "(x^2 + 4*y^2) * (x^2 + y^2)");
-
-        assertTrue(result.subsumed(), result.toString());
+    void requiresOneExplicitFactorizationEngine() {
+        assertThrows(
+            NullPointerException.class,
+            () -> new PolynomialTheorySubsumptionClassifier(null));
     }
 
     @Test
-    void rejectsNearMissAndUnsupportedDomainsFailClosed() {
-        PolynomialTheorySubsumptionClassifier.Classification nearMiss =
-            classifier.classify(
-                "x^4 + 4*y^4",
-                "(x^2 - 2*x*y + 2*y^2)"
-                    + " * (x^2 + 2*x*y + 3*y^2)");
-        PolynomialTheorySubsumptionClassifier.Classification unsupported =
-            classifier.classify(
-                "x^3 + y^3",
-                "(x + y) * (x^2 - x*y + y^2)");
+    void blankInputIsRejectedBeforeTheEngineRuns() {
+        StubEngine engine = StubEngine.noCandidate();
+        PolynomialTheorySubsumptionClassifier classifier =
+            new PolynomialTheorySubsumptionClassifier(engine);
+
+        PolynomialTheorySubsumptionClassifier.Classification result =
+            classifier.classify(" ", "x");
+
+        assertEquals(
+            PolynomialTheorySubsumptionClassifier.Status.UNSUPPORTED,
+            result.status());
+        assertEquals(0, engine.calls);
+        assertNoCacheCandidate(result);
+    }
+
+    @Test
+    void noCandidateIsNotMisreportedAsIrreducibilityOrSubsumption() {
+        StubEngine engine = StubEngine.noCandidate();
+        PolynomialTheorySubsumptionClassifier classifier =
+            new PolynomialTheorySubsumptionClassifier(engine);
+
+        PolynomialTheorySubsumptionClassifier.Classification result =
+            classifier.classify("x^2 - 1", "(x - 1) * (x + 1)");
 
         assertEquals(
             PolynomialTheorySubsumptionClassifier.Status.NOT_SUBSUMED,
-            nearMiss.status());
+            result.status());
+        assertEquals(1, engine.calls);
+        assertFalse(result.subsumed());
+        assertTrue(result.workUnits() > 0);
+        assertNoCacheCandidate(result);
+    }
+
+    @Test
+    void unsupportedAndBudgetOutcomesRemainSeparate() {
+        PolynomialTheorySubsumptionClassifier.Classification unsupported =
+            new PolynomialTheorySubsumptionClassifier(
+                StubEngine.outcome(
+                    FactorizationEngine.Outcome.UNSUPPORTED_REQUEST))
+                .classify("x^2 - 1", "(x - 1) * (x + 1)");
+        PolynomialTheorySubsumptionClassifier.Classification budget =
+            new PolynomialTheorySubsumptionClassifier(
+                StubEngine.outcome(
+                    FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE))
+                .classify("x^2 - 1", "(x - 1) * (x + 1)");
+
         assertEquals(
             PolynomialTheorySubsumptionClassifier.Status.UNSUPPORTED,
             unsupported.status());
-        assertTrue(nearMiss.sourceExpression().isEmpty());
-        assertTrue(nearMiss.certificateHash().isEmpty());
         assertEquals(
-            PolynomialTheorySubsumptionClassifier.RetentionDisposition.NONE,
-            nearMiss.retentionDisposition());
+            PolynomialTheorySubsumptionClassifier.Status.BUDGET_INCONCLUSIVE,
+            budget.status());
+        assertNoCacheCandidate(unsupported);
+        assertNoCacheCandidate(budget);
     }
 
     @Test
-    void exhaustedTheoryBudgetRemainsInconclusive() {
-        PolynomialDecompositionSynthesisOperator bounded =
-            new PolynomialDecompositionSynthesisOperator(
-                new PolynomialSemanticView(
-                    new PolynomialSemanticView.Budget(2, 4, 16, 256)),
-                new BinaryQuarticFactorizationEngine(32, 1),
-                6,
-                1);
-        PolynomialTheorySubsumptionClassifier boundedClassifier =
+    void engineFailureRemainsTechnicalAndFailClosed() {
+        PolynomialTheorySubsumptionClassifier classifier =
             new PolynomialTheorySubsumptionClassifier(
-                bounded,
-                new ExpressionCanonicalizer(),
-                new ExpressionParser());
+                StubEngine.throwing());
 
         PolynomialTheorySubsumptionClassifier.Classification result =
-            boundedClassifier.classify(
-                "x^4 + 4*y^4",
-                "(x^2 - 2*x*y + 2*y^2)"
-                    + " * (x^2 + 2*x*y + 2*y^2)");
+            classifier.classify("x^2 - 1", "(x - 1) * (x + 1)");
 
         assertEquals(
-            PolynomialTheorySubsumptionClassifier.Status.BUDGET_INCONCLUSIVE,
+            PolynomialTheorySubsumptionClassifier.Status.TECHNICAL_FAILURE,
             result.status());
-        assertFalse(result.subsumed());
+        assertNoCacheCandidate(result);
+    }
+
+    @Test
+    void multivariateSourceIsRejectedByTheExactUnivariateView() {
+        StubEngine engine = StubEngine.noCandidate();
+        PolynomialTheorySubsumptionClassifier classifier =
+            new PolynomialTheorySubsumptionClassifier(engine);
+
+        PolynomialTheorySubsumptionClassifier.Classification result =
+            classifier.classify(
+                "x^2 - y^2",
+                "(x - y) * (x + y)");
+
+        assertEquals(
+            PolynomialTheorySubsumptionClassifier.Status.UNSUPPORTED,
+            result.status());
+        assertEquals(0, engine.calls);
+        assertNoCacheCandidate(result);
+    }
+
+    private void assertNoCacheCandidate(
+        PolynomialTheorySubsumptionClassifier.Classification result
+    ) {
+        assertTrue(result.sourceExpression().isEmpty());
+        assertTrue(result.certificateHash().isEmpty());
+        assertTrue(result.derivedExpression().isEmpty());
+        assertTrue(result.applicationKey().isEmpty());
         assertEquals(
             PolynomialTheorySubsumptionClassifier.RetentionDisposition.NONE,
             result.retentionDisposition());
+        assertEquals(
+            PolynomialTheorySubsumptionClassifier.ProjectInventoryNovelty
+                .NOT_EVALUATED,
+            result.projectInventoryNovelty());
+        assertEquals(
+            PolynomialTheorySubsumptionClassifier.THEORY_METHOD_ID,
+            result.theoryMethodId());
     }
 
-    @Test
-    void cacheRetainsDistinctLineagesForOneTheoryDerivedMacro() {
-        PolynomialTheorySubsumptionClassifier.Classification result =
-            classifier.classify(
-                "A^4 + 4*B^4",
-                "(A^2 - 2*A*B + 2*B^2)"
-                    + " * (A^2 + 2*A*B + 2*B^2)");
-        PolynomialDerivedMacroCache cache =
-            new PolynomialDerivedMacroCache(2);
+    private static final class StubEngine
+            implements FactorizationEngine<ExactRational> {
+        private final Outcome outcome;
+        private final boolean throwFailure;
+        private int calls;
 
-        PolynomialDerivedMacroCache.Entry first = cache.retain(
-            result,
-            List.of(PolynomialDecompositionSynthesisOperator.RULE_ID),
-            List.of("path:sophie-replay", "generation:1"));
-        PolynomialDerivedMacroCache.Entry duplicate = cache.retain(
-            result,
-            List.of(PolynomialDecompositionSynthesisOperator.RULE_ID),
-            List.of("path:sophie-replay", "generation:1"));
-        PolynomialDerivedMacroCache.Entry secondLineage = cache.retain(
-            result,
-            List.of("ast_expand", "ast_square_difference_factor"),
-            List.of("path:sophie-replay-2", "generation:2"));
+        private StubEngine(Outcome outcome, boolean throwFailure) {
+            this.outcome = outcome;
+            this.throwFailure = throwFailure;
+        }
 
-        assertEquals(first, duplicate);
-        assertEquals(1, cache.size());
-        assertEquals(2, secondLineage.lineages().size());
-        assertEquals(result.sourceExpression(), secondLineage.leftPattern());
-        assertEquals(result.derivedExpression(), secondLineage.rightPattern());
-        assertEquals(
-            result.certificateHash(),
-            secondLineage.classification().certificateHash());
-        assertEquals(
-            List.of(PolynomialDecompositionSynthesisOperator.RULE_ID),
-            secondLineage.lineages().getFirst().primitiveRuleIds());
-        assertEquals(
-            List.of("path:sophie-replay", "generation:1"),
-            secondLineage.lineages().getFirst().sourceProvenance());
-        assertEquals(
-            result.applicationKey(),
-            secondLineage.lineages().getFirst().applicationKey());
-        assertEquals(
-            result.applicationKey(),
-            secondLineage.lineages().get(1).applicationKey());
-        assertEquals(
-            result.workUnits(),
-            secondLineage.lineages().get(1).workUnits());
-        assertEquals(
-            PolynomialDerivedMacroCache.PURPOSE,
-            secondLineage.purpose());
-    }
+        private static StubEngine noCandidate() {
+            return outcome(Outcome.NO_CANDIDATE);
+        }
 
-    @Test
-    void cacheEvictionIsDeterministicAndRejectsNonSubsumedEntries() {
-        PolynomialDerivedMacroCache cache =
-            new PolynomialDerivedMacroCache(2);
-        PolynomialDerivedMacroCache.Entry first = retain(
-            cache,
-            "x^4 + 4*y^4",
-            "(x^2 - 2*x*y + 2*y^2)"
-                + " * (x^2 + 2*x*y + 2*y^2)",
-            "case:sophie");
-        PolynomialDerivedMacroCache.Entry second = retain(
-            cache,
-            "x^4 + 5*x^2*y^2 + 4*y^4",
-            "(x^2 + y^2) * (x^2 + 4*y^2)",
-            "case:even");
-        PolynomialDerivedMacroCache.Entry third = retain(
-            cache,
-            "x^4 + x^2*y^2 + y^4",
-            "(x^2 - x*y + y^2) * (x^2 + x*y + y^2)",
-            "case:cyclotomic");
+        private static StubEngine outcome(Outcome outcome) {
+            return new StubEngine(outcome, false);
+        }
 
-        assertEquals(List.of(second, third), cache.entries());
-        assertTrue(cache.find(first.id()).isEmpty());
-        assertTrue(cache.find(second.id()).isPresent());
-        assertTrue(cache.find(third.id()).isPresent());
+        private static StubEngine throwing() {
+            return new StubEngine(Outcome.TECHNICAL_FAILURE, true);
+        }
 
-        PolynomialTheorySubsumptionClassifier.Classification nearMiss =
-            classifier.classify(
-                "x^4 + 4*y^4",
-                "(x^2 + y^2) * (x^2 + 4*y^2)");
-        assertThrows(IllegalArgumentException.class, () -> cache.retain(
-            nearMiss,
-            List.of("candidate"),
-            List.of("case:near-miss")));
-    }
+        @Override
+        public String engineId() {
+            return "regelsuche.test-polynomial-theory-engine/v1";
+        }
 
-    private PolynomialDerivedMacroCache.Entry retain(
-        PolynomialDerivedMacroCache cache,
-        String left,
-        String right,
-        String provenance
-    ) {
-        PolynomialTheorySubsumptionClassifier.Classification result =
-            classifier.classify(left, right);
-        assertTrue(result.subsumed(), result.toString());
-        return cache.retain(
-            result,
-            List.of(PolynomialDecompositionSynthesisOperator.RULE_ID),
-            List.of(provenance));
+        @Override
+        public String coefficientDomainId() {
+            return ExactRationalField.DOMAIN_ID;
+        }
+
+        @Override
+        public EngineResult<ExactRational> propose(
+            FactorizationRequest<ExactRational> request
+        ) {
+            calls++;
+            if (throwFailure) {
+                throw new IllegalStateException("test engine failure");
+            }
+            return new EngineResult<>(
+                engineId(),
+                outcome,
+                "TEST_" + outcome.name(),
+                PolynomialWorkLedger.empty(),
+                List.of(),
+                BackendClaim.NONE,
+                TEST_HASH);
+        }
     }
 }
