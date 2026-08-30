@@ -130,10 +130,7 @@ public class RuleCandidateMiner {
                             identity);
                         buckets.put(identity.hash(), bucket);
                     } else {
-                        bucket.requireSameCanonicalContent(
-                            pattern.parameterRelations(),
-                            validator.proofStatus(pattern),
-                            identity);
+                        bucket.requireSameCanonicalContent(identity);
                     }
                     bucket.addAll(cluster);
                 });
@@ -274,31 +271,11 @@ public class RuleCandidateMiner {
             CanonicalPatternIdentity.from(candidate)
                 .requireSameHashContent(
                     CanonicalPatternIdentity.from(other.candidate));
-            requireSameSemanticContent(candidate, other.candidate);
             List<SuccessfulTransformationPath> merged = new ArrayList<>(
                 sourcePaths.size() + other.sourcePaths.size());
             merged.addAll(sourcePaths);
             merged.addAll(other.sourcePaths);
             return new FormedCandidate(candidate, merged);
-        }
-
-        private static void requireSameSemanticContent(
-            RuleCandidate candidate,
-            RuleCandidate other
-        ) {
-            if (!candidate.parameterRelations().equals(
-                        other.parameterRelations())
-                    || candidate.equivalenceVerified()
-                        != other.equivalenceVerified()
-                    || candidate.generalizationPlausible()
-                        != other.generalizationPlausible()
-                    || candidate.containsFreeParameters()
-                        != other.containsFreeParameters()
-                    || candidate.status() != other.status()
-                    || candidate.proofStatus() != other.proofStatus()) {
-                throw new IllegalStateException(
-                    "canonical candidates have conflicting semantic content");
-            }
         }
     }
 
@@ -377,16 +354,9 @@ public class RuleCandidateMiner {
         }
 
         private void requireSameCanonicalContent(
-            List<String> candidateParameterRelations,
-            CandidateProofStatus candidateProofStatus,
             CanonicalPatternIdentity candidateIdentity
         ) {
             identity.requireSameHashContent(candidateIdentity);
-            if (!parameterRelations.equals(candidateParameterRelations)
-                    || proofStatus != candidateProofStatus) {
-                throw new IllegalStateException(
-                    "canonical candidate bucket has conflicting content");
-            }
         }
 
         private void addAll(List<SuccessfulTransformationPath> paths) {
