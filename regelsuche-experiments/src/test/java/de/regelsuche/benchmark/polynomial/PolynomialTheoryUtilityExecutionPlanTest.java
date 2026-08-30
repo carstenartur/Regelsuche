@@ -2,8 +2,12 @@ package de.regelsuche.benchmark.polynomial;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -40,6 +44,9 @@ class PolynomialTheoryUtilityExecutionPlanTest {
         );
         assertTrue(artifact.rows().stream().allMatch(row ->
             "NOT_EXECUTED".equals(row.resultStatus())));
+        assertTrue(artifact.canonicalJson().contains(
+            "\"rowOrder\":\"RUN_MAJOR_CONTIGUOUS\""
+        ));
         assertFalse(artifact.canonicalJson().contains("\r"));
         for (String sealed : List.of(
                 "\"requiredOutcome\"",
@@ -86,6 +93,64 @@ class PolynomialTheoryUtilityExecutionPlanTest {
             }
         }
         assertEquals(600, offset);
+    }
+
+    @Test
+    void contentAddressesEveryRunPolicyAndCheckpointFraction() {
+        var profile = PolynomialTheoryUtilityExecutionPlan.PROFILES.get(1);
+        var checkpoint = PolynomialTheoryUtilityExecutionPlan.CHECKPOINTS.get(0);
+        String original = PolynomialTheoryUtilityExecutionIdentity.runId(
+            profile,
+            checkpoint
+        );
+        var changedEngine = new PolynomialTheoryUtilityExecutionProfile(
+            profile.profileId(),
+            profile.adapterId(),
+            profile.scope(),
+            profile.factorizationMode(),
+            "other-engine/v1",
+            profile.transformationId(),
+            profile.cacheMode(),
+            profile.fallbackMode(),
+            profile.candidateSelection()
+        );
+        var changedFraction =
+            new PolynomialTheoryUtilityExecutionCheckpoint(
+                checkpoint.checkpointId(),
+                checkpoint.ordinal(),
+                2,
+                12
+            );
+
+        assertNotEquals(
+            original,
+            PolynomialTheoryUtilityExecutionIdentity.runId(
+                changedEngine,
+                checkpoint
+            )
+        );
+        assertNotEquals(
+            original,
+            PolynomialTheoryUtilityExecutionIdentity.runId(
+                profile,
+                changedFraction
+            )
+        );
+    }
+
+    @Test
+    void rejectsCanonicalBytesPairedWithDifferentRows() {
+        var artifact = PolynomialTheoryUtilityExecutionPlan.freeze();
+        var changed = new ArrayList<>(artifact.rows());
+        Collections.swap(changed, 0, 1);
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new PolynomialTheoryUtilityExecutionArtifact(
+                changed,
+                artifact.canonicalJson()
+            )
+        );
     }
 
     @Test
