@@ -113,10 +113,16 @@ Die Ausführung ist vorab in 30 voneinander isolierte Läufe gruppiert:
 ```
 
 Jeder Lauf bildet im Artefakt einen zusammenhängenden Block von 20 Zeilen und
-verarbeitet die Fälle in der eingefrorenen Formationsreihenfolge. Dadurch kann
-ein Streaming-Runner den Laufwechsel eindeutig am `runId` erkennen und Cache
-oder sonstigen veränderlichen Zustand genau einmal an der Laufgrenze
-zurücksetzen.
+verarbeitet die Fälle in der eingefrorenen Formationsreihenfolge. Die explizite
+Zeilenordnung lautet `RUN_MAJOR_CONTIGUOUS`. Dadurch kann ein Streaming-Runner
+den Laufwechsel eindeutig am `runId` erkennen und Cache oder sonstigen
+veränderlichen Zustand genau einmal an der Laufgrenze zurücksetzen.
+
+Der `runId` bindet nicht nur Profil- und Checkpointnamen, sondern sämtliche
+Profilparameter, die vollständige Checkpoint-Fraktion, Backend- und
+Verifieridentitäten, Cachepolitik, Laufisolation sowie die Inhaltsadressen der
+vorab eingefrorenen Verträge. Eine Parameteränderung unter einem versehentlich
+unveränderten Anzeigenamen erzeugt daher trotzdem eine andere Laufidentität.
 
 Profil- und Checkpoint-Läufe teilen weder Cache noch sonstigen veränderlichen
 Zustand. Das Cache-Profil startet jeden Lauf leer und darf Einträge nur innerhalb
@@ -137,9 +143,9 @@ Der Plan bindet außerdem:
 
 Identität des erzeugten Plans:
 
-- Bytelänge: `235617`;
+- Bytelänge: `235651`;
 - SHA-256:
-  `0a9be9ab83076ac2e507aa7d0f3c343ec2840556441c7cf8ce750772f215855e`.
+  `6cfac16d65611820b713cf1f2aca0fdb724fc542ccef6b9de80981dc290af619`.
 
 ## Verifikation im Checkout
 
