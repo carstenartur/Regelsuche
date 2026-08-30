@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiFunction;
 
 public class RuleCandidateMiner {
     private static final RuleCandidateFormationObserver NO_FORMATION_OBSERVER =
@@ -18,6 +19,7 @@ public class RuleCandidateMiner {
     private final PatternGeneralizer patternGeneralizer;
     private final CandidateValidator validator;
     private final RuleCandidateFormationObserver formationObserver;
+    private final BiFunction<String, String, String> canonicalHashFunction;
 
     public RuleCandidateMiner(KnownRuleRepository knownRules) {
         this(
@@ -41,6 +43,19 @@ public class RuleCandidateMiner {
         EquivalenceService equivalenceService,
         RuleCandidateFormationObserver formationObserver
     ) {
+        this(
+            knownRules,
+            equivalenceService,
+            formationObserver,
+            RulePatternCanonicalizer::hash);
+    }
+
+    RuleCandidateMiner(
+        KnownRuleRepository knownRules,
+        EquivalenceService equivalenceService,
+        RuleCandidateFormationObserver formationObserver,
+        BiFunction<String, String, String> canonicalHashFunction
+    ) {
         this.knownRules = Objects.requireNonNull(
             knownRules,
             "knownRules");
@@ -52,6 +67,9 @@ public class RuleCandidateMiner {
         this.formationObserver = Objects.requireNonNull(
             formationObserver,
             "formationObserver");
+        this.canonicalHashFunction = Objects.requireNonNull(
+            canonicalHashFunction,
+            "canonicalHashFunction");
     }
 
     public List<RuleCandidate> mine(
@@ -99,18 +117,25 @@ public class RuleCandidateMiner {
             patternGeneralizer.generalize(cluster)
                 .filter(validator::validate)
                 .ifPresent(pattern -> {
-                    String hash = RulePatternCanonicalizer.hash(
+                    CanonicalPatternIdentity identity = canonicalIdentity(
                         pattern.leftPattern(),
                         pattern.rightPattern());
-                    buckets.computeIfAbsent(
-                        hash,
-                        key -> new CandidateBucket(
+                    CandidateBucket bucket = buckets.get(identity.hash());
+                    if (bucket == null) {
+                        bucket = new CandidateBucket(
                             pattern.leftPattern(),
                             pattern.rightPattern(),
                             pattern.parameterRelations(),
                             validator.proofStatus(pattern),
-                            hash))
-                        .addAll(cluster);
+                            identity);
+                        buckets.put(identity.hash(), bucket);
+                    } else {
+                        bucket.requireSameCanonicalContent(
+                            pattern.parameterRelations(),
+                            validator.proofStatus(pattern),
+                            identity);
+                    }
+                    bucket.addAll(cluster);
                 });
         }
 
@@ -196,7 +221,7 @@ public class RuleCandidateMiner {
         GeneralizedPattern pattern
     ) {
         CandidateProofStatus proofStatus = validator.proofStatus(pattern);
-        String hash = RulePatternCanonicalizer.hash(
+        CanonicalPatternIdentity identity = canonicalIdentity(
             pattern.leftPattern(),
             pattern.rightPattern());
         return new RuleCandidate(
@@ -213,8 +238,25 @@ public class RuleCandidateMiner {
                 pattern.leftPattern(),
                 pattern.rightPattern()),
             proofStatus,
-            hash,
+            identity.hash(),
             List.of(path.id()));
+    }
+
+    private CanonicalPatternIdentity canonicalIdentity(
+        String leftPattern,
+        String rightPattern
+    ) {
+        String hash = canonicalHashFunction.apply(
+            leftPattern,
+            rightPattern);
+        if (hash == null || hash.isBlank()) {
+            throw new IllegalStateException(
+                "canonical candidate hash must not be blank");
+        }
+        return CanonicalPatternIdentity.from(
+            leftPattern,
+            rightPattern,
+            hash);
     }
 
     private record FormedCandidate(
@@ -229,16 +271,85 @@ public class RuleCandidateMiner {
 
         private FormedCandidate merge(FormedCandidate other) {
             Objects.requireNonNull(other, "other");
-            if (!candidate.canonicalHash().equals(
-                    other.candidate.canonicalHash())) {
-                throw new IllegalArgumentException(
-                    "cannot merge different formed candidates");
-            }
+            CanonicalPatternIdentity.from(candidate)
+                .requireSameHashContent(
+                    CanonicalPatternIdentity.from(other.candidate));
+            requireSameSemanticContent(candidate, other.candidate);
             List<SuccessfulTransformationPath> merged = new ArrayList<>(
                 sourcePaths.size() + other.sourcePaths.size());
             merged.addAll(sourcePaths);
             merged.addAll(other.sourcePaths);
             return new FormedCandidate(candidate, merged);
+        }
+
+        private static void requireSameSemanticContent(
+            RuleCandidate candidate,
+            RuleCandidate other
+        ) {
+            if (!candidate.parameterRelations().equals(
+                        other.parameterRelations())
+                    || candidate.equivalenceVerified()
+                        != other.equivalenceVerified()
+                    || candidate.generalizationPlausible()
+                        != other.generalizationPlausible()
+                    || candidate.containsFreeParameters()
+                        != other.containsFreeParameters()
+                    || candidate.status() != other.status()
+                    || candidate.proofStatus() != other.proofStatus()) {
+                throw new IllegalStateException(
+                    "canonical candidates have conflicting semantic content");
+            }
+        }
+    }
+
+    private record CanonicalPatternIdentity(
+        String canonicalLeftPattern,
+        String canonicalRightPattern,
+        String hash
+    ) {
+        private CanonicalPatternIdentity {
+            canonicalLeftPattern = Objects.requireNonNull(
+                canonicalLeftPattern,
+                "canonicalLeftPattern");
+            canonicalRightPattern = Objects.requireNonNull(
+                canonicalRightPattern,
+                "canonicalRightPattern");
+            hash = Objects.requireNonNull(hash, "hash");
+        }
+
+        private static CanonicalPatternIdentity from(
+            String leftPattern,
+            String rightPattern,
+            String hash
+        ) {
+            return new CanonicalPatternIdentity(
+                RulePatternCanonicalizer.canonicalize(leftPattern),
+                RulePatternCanonicalizer.canonicalize(rightPattern),
+                hash);
+        }
+
+        private static CanonicalPatternIdentity from(
+            RuleCandidate candidate
+        ) {
+            Objects.requireNonNull(candidate, "candidate");
+            return from(
+                candidate.leftPattern(),
+                candidate.rightPattern(),
+                candidate.canonicalHash());
+        }
+
+        private void requireSameHashContent(
+            CanonicalPatternIdentity other
+        ) {
+            Objects.requireNonNull(other, "other");
+            if (!hash.equals(other.hash)
+                    || !canonicalLeftPattern.equals(
+                        other.canonicalLeftPattern)
+                    || !canonicalRightPattern.equals(
+                        other.canonicalRightPattern)) {
+                throw new IllegalStateException(
+                    "canonical candidate hash collision for key " + hash);
+            }
         }
     }
 
@@ -247,7 +358,7 @@ public class RuleCandidateMiner {
         private final String rightPattern;
         private final List<String> parameterRelations;
         private final CandidateProofStatus proofStatus;
-        private final String hash;
+        private final CanonicalPatternIdentity identity;
         private final List<SuccessfulTransformationPath> paths =
             new ArrayList<>();
 
@@ -256,13 +367,26 @@ public class RuleCandidateMiner {
             String rightPattern,
             List<String> parameterRelations,
             CandidateProofStatus proofStatus,
-            String hash
+            CanonicalPatternIdentity identity
         ) {
             this.leftPattern = leftPattern;
             this.rightPattern = rightPattern;
             this.parameterRelations = List.copyOf(parameterRelations);
             this.proofStatus = proofStatus;
-            this.hash = hash;
+            this.identity = identity;
+        }
+
+        private void requireSameCanonicalContent(
+            List<String> candidateParameterRelations,
+            CandidateProofStatus candidateProofStatus,
+            CanonicalPatternIdentity candidateIdentity
+        ) {
+            identity.requireSameHashContent(candidateIdentity);
+            if (!parameterRelations.equals(candidateParameterRelations)
+                    || proofStatus != candidateProofStatus) {
+                throw new IllegalStateException(
+                    "canonical candidate bucket has conflicting content");
+            }
         }
 
         private void addAll(List<SuccessfulTransformationPath> paths) {
@@ -309,7 +433,7 @@ public class RuleCandidateMiner {
                 parameterRelations,
                 knownRules.statusFor(leftPattern, rightPattern),
                 proofStatus,
-                hash,
+                identity.hash(),
                 supportingIds);
         }
     }
