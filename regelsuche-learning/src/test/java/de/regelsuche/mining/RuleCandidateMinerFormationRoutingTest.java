@@ -150,35 +150,35 @@ class RuleCandidateMinerFormationRoutingTest {
             IllegalStateException.class,
             () -> miner.mine(List.of(
                 path(
-                    "path:add-x",
-                    "x + 0",
-                    "x",
-                    "add_zero_x"),
-                path(
-                    "path:add-y",
-                    "y + 0",
-                    "y",
-                    "add_zero_y"),
-                path(
-                    "path:add-z",
-                    "z + 0",
-                    "z",
-                    "add_zero_z"),
-                path(
-                    "path:square-one",
+                    "path:expand-one",
                     "(x + 1) ^ 2",
                     "x ^ 2 + 2 * x + 1",
                     "expand_square_one"),
                 path(
-                    "path:square-two",
+                    "path:expand-two",
                     "(x + 2) ^ 2",
                     "x ^ 2 + 4 * x + 4",
                     "expand_square_two"),
                 path(
-                    "path:square-three",
+                    "path:expand-three",
                     "(x + 3) ^ 2",
                     "x ^ 2 + 6 * x + 9",
-                    "expand_square_three"))));
+                    "expand_square_three"),
+                path(
+                    "path:factor-one",
+                    "x ^ 2 + 2 * x + 1",
+                    "(x + 1) ^ 2",
+                    "factor_square_one"),
+                path(
+                    "path:factor-two",
+                    "x ^ 2 + 4 * x + 4",
+                    "(x + 2) ^ 2",
+                    "factor_square_two"),
+                path(
+                    "path:factor-three",
+                    "x ^ 2 + 6 * x + 9",
+                    "(x + 3) ^ 2",
+                    "factor_square_three"))));
 
         assertTrue(failure.getMessage().contains("collision"));
         assertTrue(observer.calls.isEmpty());
