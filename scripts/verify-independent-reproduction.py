@@ -26,9 +26,9 @@ BASE_IMAGE = (
 BASE_IMAGE_INDEX_DIGEST = (
     "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
 )
-GRADLE_DISTRIBUTION = "gradle-9.7.0-bin.zip"
+GRADLE_DISTRIBUTION = "gradle-9.7.1-bin.zip"
 GRADLE_DISTRIBUTION_SHA256 = (
-    "84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae"
+    "acd53f1edaf02f1a8ff99879f8a34b302661a057d9b063ae9e35b552f804d20a"
 )
 SHA_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 REVISION_RE = re.compile(r"^[0-9a-f]{40}$")

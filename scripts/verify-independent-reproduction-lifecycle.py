@@ -17,7 +17,7 @@ import tempfile
 from typing import Any
 
 EXPECTED_WRAPPER_SHA256 = (
-    "84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae"
+    "acd53f1edaf02f1a8ff99879f8a34b302661a057d9b063ae9e35b552f804d20a"
 )
 EXPECTED_IMAGE_DIGEST = (
     "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
