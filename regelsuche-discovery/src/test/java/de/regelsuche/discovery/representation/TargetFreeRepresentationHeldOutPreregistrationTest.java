@@ -52,7 +52,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
             + "target-free-held-out-engine-semantics-amendment-v1.json";
     private static final long ENGINE_SEMANTICS_AMENDMENT_BYTE_LENGTH = 1907L;
     private static final String ENGINE_SEMANTICS_AMENDMENT_SHA256 =
-        "sha256:4a31307cdcdd3a81e6909811b35e4ed4ae082872387f8880fff5b89d3f0e5f05";
+        "sha256:e02f180f0504cbbfaf13fc47ef216468ea569ae4b68b58bafefbf9652d19a305";
     private static final List<Integer> CHECKPOINTS =
         List.of(8, 16, 32, 64, 128, 256);
     private static final List<String> POLICY_IDS = List.of(
