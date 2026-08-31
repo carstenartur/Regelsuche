@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
 import de.regelsuche.docs.HistoricalPrecursorTestSupport.FrozenRule;
-import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
 import de.regelsuche.transform.SubtreeHypothesisOperator;
@@ -23,7 +22,8 @@ import org.junit.jupiter.api.Timeout;
  * <p>The frozen completion rule is still root-oriented. The matched baseline
  * receives that exact rule and therefore cannot rewrite an inner sum of squares.
  * The accumulated run wraps the same frozen identity in the generic subtree
- * adapter and must reach the unseen surrounding expression in one step.</p>
+ * adapter and must reach an exactly equivalent completion inside the unseen
+ * surrounding expression in one step.</p>
  */
 class BrahmaguptaSubtreePrecursorIntegrationTest {
     private static final String SOURCE =
@@ -33,7 +33,6 @@ class BrahmaguptaSubtreePrecursorIntegrationTest {
     private static final SearchHeuristic HEURISTIC =
         new SearchHeuristic(1, 64, 1, 4, 16, 32);
 
-    private final ExpressionParser parser = new ExpressionParser();
     private final HistoricalPrecursorTestSupport support =
         new HistoricalPrecursorTestSupport();
 
@@ -52,15 +51,16 @@ class BrahmaguptaSubtreePrecursorIntegrationTest {
 
         SubtreeHypothesisOperator localCompletion =
             new SubtreeHypothesisOperator(completion.operator(), 8);
-        Transformation localMove = localCompletion
-            .generateCandidates(SOURCE)
-            .stream()
-            .filter(candidate -> parser.parseTerm(
-                candidate.transformedExpression()).equals(
-                    parser.parseTerm(EXPECTED)))
+        List<Transformation> localMoves =
+            localCompletion.generateCandidates(SOURCE);
+        Transformation localMove = localMoves.stream()
+            .filter(candidate -> support.exactVerifier().verify(
+                candidate.transformedExpression(),
+                EXPECTED).proved())
             .findFirst()
             .orElseThrow(() -> new AssertionError(
-                "tree-local completion was not generated"));
+                "tree-local completion was not generated; candidates="
+                    + localMoves));
         assertEquals(
             completion.candidate().dynamicRuleId(),
             localMove.rule());
