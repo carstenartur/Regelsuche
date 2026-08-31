@@ -130,6 +130,10 @@ class BrahmaguptaFibonacciTargetFreeSingleRuleIntegrationTest {
 
         SearchState discovered = historicalTwoSquareFormIn(
             accumulated.states());
+        assertTrue(support.exactVerifier().verify(
+            SOURCE,
+            discovered.expression()).proved(),
+            discovered.toString());
         assertEquals(
             parser.parseTerm(SOURCE),
             parser.parseTerm(discovered.path().getFirst()),
