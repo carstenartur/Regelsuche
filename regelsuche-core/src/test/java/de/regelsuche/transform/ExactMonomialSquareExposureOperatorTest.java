@@ -1,6 +1,7 @@
 package de.regelsuche.transform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.Expr;
@@ -30,6 +31,12 @@ class ExactMonomialSquareExposureOperatorTest {
                 && transformation.assumptions().isEmpty()
                 && transformation.primitiveRuleIds().equals(List.of(
                     ExactMonomialSquareExposureOperator.RULE_ID))));
+        assertEquals(
+            transformations.size(),
+            transformations.stream()
+                .map(Transformation::applicationKey)
+                .distinct()
+                .count());
     }
 
     @Test
@@ -56,6 +63,25 @@ class ExactMonomialSquareExposureOperatorTest {
 
         assertEquals(1, transformations.size());
         assertContains(transformations, "(x^2)^2 + 4*y^4");
+    }
+
+    @Test
+    void applicationIdentityBindsTheCompleteSourceSyntax() {
+        ExactMonomialSquareExposureOperator operator =
+            new ExactMonomialSquareExposureOperator();
+
+        String first = operator.generateCandidates("x^4 + y")
+            .getFirst()
+            .applicationKey();
+        String sameFormattedSource = operator.generateCandidates("x^4+y")
+            .getFirst()
+            .applicationKey();
+        String otherSource = operator.generateCandidates("x^4 + z")
+            .getFirst()
+            .applicationKey();
+
+        assertEquals(first, sameFormattedSource);
+        assertNotEquals(first, otherSource);
     }
 
     private void assertContains(
