@@ -17,6 +17,7 @@ import de.regelsuche.mining.DynamicPatternOperator;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.scoring.cost.TransformationGoal;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
@@ -183,6 +184,23 @@ final class HistoricalPrecursorTestSupport {
             scorer,
             canonicalizer,
             heuristic).withTarget(syntaxTarget(target));
+        return new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+    }
+
+    GoalSearchResult searchUntargeted(
+        TransformationEngine engine,
+        SearchHeuristic heuristic,
+        String source,
+        TransformationGoal objective
+    ) {
+        SearchProblem problem = new SearchProblem(
+            source,
+            engine,
+            scorer,
+            canonicalizer,
+            heuristic)
+            .withObjective(objective)
+            .withoutTarget();
         return new BestFirstSearchStrategy().searchWithDiagnostics(problem);
     }
 
