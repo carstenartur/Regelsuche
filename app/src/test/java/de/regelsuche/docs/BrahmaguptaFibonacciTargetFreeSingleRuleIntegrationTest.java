@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
 import de.regelsuche.docs.HistoricalPrecursorTestSupport.FrozenRule;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -61,6 +62,21 @@ class BrahmaguptaFibonacciTargetFreeSingleRuleIntegrationTest {
     private final HistoricalPrecursorTestSupport support =
         new HistoricalPrecursorTestSupport();
     private final ExpressionParser parser = new ExpressionParser();
+
+    @Test
+    void postHocMatcherRequiresExactlyTwoExplicitHistoricalSquares() {
+        assertTrue(matchesHistoricalTwoSquareForm(
+            FIRST_FORM_LEFT + " + " + FIRST_FORM_RIGHT));
+        assertTrue(matchesHistoricalTwoSquareForm(
+            SECOND_FORM_RIGHT + " + " + SECOND_FORM_LEFT));
+        assertFalse(matchesHistoricalTwoSquareForm(SOURCE));
+        assertFalse(matchesHistoricalTwoSquareForm(
+            "(a*c)^2 + (a*d)^2 + (b*c)^2 + (b*d)^2"));
+        assertFalse(matchesHistoricalTwoSquareForm(
+            "(a*c - b*d)^2 + (a*d)^2"));
+        assertFalse(matchesHistoricalTwoSquareForm(
+            "(a*c - b*d)^2 + ((a*d + b*c)^2 + 0)"));
+    }
 
     @Test
     @Timeout(600)
@@ -243,7 +259,7 @@ class BrahmaguptaFibonacciTargetFreeSingleRuleIntegrationTest {
     private boolean isExplicitSquare(Expr expression) {
         return expression instanceof BinaryExpr power
             && power.operator() == BinaryOperator.POW
-            && power.right() instanceof de.regelsuche.ast.NumberExpr exponent
+            && power.right() instanceof NumberExpr exponent
             && Double.compare(exponent.value(), 2.0) == 0;
     }
 }
