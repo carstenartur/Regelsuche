@@ -215,11 +215,11 @@ public class ExpressionParser {
 <span class="fc bfc" id="L215" title="All 2 branches covered.">        if (cursor.peekDigit()) {</span>
 <span class="fc" id="L216">            return parseNumber(cursor);</span>
         }
-<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (cursor.peekLetter()) {</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (cursor.peekLetter()) {</span>
 <span class="fc" id="L219">            return parseVariable(cursor);</span>
         }
-<span class="nc" id="L221">        throw new IllegalArgumentException(</span>
-<span class="nc" id="L222">            &quot;Unexpected token at position &quot; + cursor.position());</span>
+<span class="fc" id="L221">        throw new IllegalArgumentException(</span>
+<span class="fc" id="L222">            &quot;Unexpected token at position &quot; + cursor.position());</span>
     }
 
     private Expr parseNumber(Cursor cursor) {
@@ -393,7 +393,7 @@ public class ExpressionParser {
         }
 
         private boolean peekLetter() {
-<span class="pc bpc" id="L396" title="1 of 2 branches missed.">            return !isAtEnd()</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            return !isAtEnd()</span>
 <span class="pc bpc" id="L397" title="1 of 2 branches missed.">                &amp;&amp; Character.isLetter(value.charAt(position));</span>
         }
 
