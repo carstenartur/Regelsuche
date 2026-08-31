@@ -72,6 +72,11 @@ class BrahmaguptaSquareSignSymmetryIntegrationTest {
                 "the (b*d)^2 occurrence was not sign-reflected; candidates="
                     + signMoves));
 
+        assertTrue(completion.operator()
+            .generateCandidates(negateBd.transformedExpression())
+            .isEmpty(),
+            "the same frozen rule must still require associative pair selection");
+
         List<Transformation> completionMoves =
             pairCompletion.generateCandidates(
                 negateBd.transformedExpression());
@@ -96,7 +101,9 @@ class BrahmaguptaSquareSignSymmetryIntegrationTest {
             EXPECTED_DIFFERENCE_COMPLETION).proved());
 
         GoalSearchResult baseline = support.search(
-            support.engine(List.of(signSymmetry)),
+            support.engine(List.of(
+                signSymmetry,
+                completion.operator())),
             HEURISTIC,
             SOURCE,
             differenceCompletion.transformedExpression());
