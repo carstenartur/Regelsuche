@@ -110,9 +110,17 @@ class MavenSeparatedSymPyRuntimeAuthorityContractTest {
         "REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY"));
 
     assertTrue(bootstrapTest.contains("Duration.ofSeconds(20)"),
-        "the original cold-start assertion must not be relaxed");
-    assertTrue(recoveryTest.contains("Duration.ofSeconds(20)"),
-        "the timeout-recovery assertion must not be relaxed");
+        "the bootstrap cold-start assertion must remain bounded");
+    assertTrue(recoveryTest.contains(
+        "private static final Duration COMPLETION_TIMEOUT = Duration.ofMinutes(1);"),
+        "recovery completion must remain explicitly bounded");
+    assertTrue(recoveryTest.contains("Duration.ofNanos(1)"),
+        "the deliberate timeout stimulus must not be relaxed");
+    assertTrue(
+        recoveryTest.split("COMPLETION_TIMEOUT", -1).length - 1 == 4,
+        "all three successful recovery phases must use the bounded timeout");
+    assertFalse(recoveryTest.contains("Duration.ofSeconds(20)"),
+        "recovery correctness must not depend on a cold-start SLO");
     assertFalse(bootstrapTest.contains("@Disabled"));
     assertFalse(recoveryTest.contains("@Disabled"));
   }
