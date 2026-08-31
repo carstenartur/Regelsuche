@@ -5,12 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class SquareBaseSignSymmetryOperatorTest {
     private final ExpressionParser parser = new ExpressionParser();
+    private final ExpressionCanonicalizer canonicalizer =
+        new ExpressionCanonicalizer();
     private final SquareBaseSignSymmetryOperator operator =
         new SquareBaseSignSymmetryOperator();
 
@@ -24,6 +27,10 @@ class SquareBaseSignSymmetryOperatorTest {
         assertExpression(
             "(-(a*b))^2",
             transformation.transformedExpression());
+        assertEquals(
+            canonicalizer.stableHash("(a*b)^2"),
+            canonicalizer.stableHash(
+                transformation.transformedExpression()));
         assertEquals(
             SquareBaseSignSymmetryOperator.RULE_ID,
             transformation.rule());
