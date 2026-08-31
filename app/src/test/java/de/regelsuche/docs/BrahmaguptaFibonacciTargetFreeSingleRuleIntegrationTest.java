@@ -9,6 +9,10 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.benchmark.TargetFreeHistoricalSearchArtifact;
+import de.regelsuche.benchmark.TargetFreeHistoricalSearchArtifact.Comparison;
+import de.regelsuche.benchmark.TargetFreeHistoricalSearchArtifact.FrozenState;
+import de.regelsuche.benchmark.TargetFreeHistoricalSearchArtifact.RunInput;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
 import de.regelsuche.docs.HistoricalPrecursorTestSupport.FrozenRule;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -17,7 +21,6 @@ import de.regelsuche.scoring.cost.TransformationGoal;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
-import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.transform.AdditivePairHypothesisOperator;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.ExactMonomialSquareExposureOperator;
@@ -27,21 +30,26 @@ import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.SquareBaseSignSymmetryOperator;
 import de.regelsuche.transform.SubtreeHypothesisOperator;
 import de.regelsuche.transform.TransformationEngine;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Target-free Brahmagupta-Fibonacci rediscovery with one independently frozen
  * square-completion rule.
  *
  * <p>The historical two-square forms are used only after both searches have
- * completed. Neither search receives a target expression, family name or
- * historical correspondence signal.</p>
+ * completed and their complete state streams have been retained as one
+ * content-addressed comparison artifact. Neither search receives a target
+ * expression, family name or historical correspondence signal.</p>
  */
 class BrahmaguptaFibonacciTargetFreeSingleRuleIntegrationTest {
+    private static final String STUDY_ID =
+        "brahmagupta-fibonacci-target-free-single-learned-rule-v1";
     private static final String SOURCE =
         "(a^2 + b^2) * (c^2 + d^2)";
     private static final String FIRST_FORM_LEFT =
@@ -56,6 +64,19 @@ class BrahmaguptaFibonacciTargetFreeSingleRuleIntegrationTest {
         "ast_distribute_left_add",
         "ast_distribute_right_add",
         "ast_canonical_normalize");
+    private static final List<String> BASELINE_OPERATOR_INVENTORY = List.of(
+        "ast_distribute_left_add",
+        "ast_distribute_right_add",
+        "ast_canonical_normalize",
+        "expose_exact_monomial_square",
+        "additive_pair(frozen_completion_rule)");
+    private static final List<String> ACCUMULATED_OPERATOR_INVENTORY = List.of(
+        "ast_distribute_left_add",
+        "ast_distribute_right_add",
+        "ast_canonical_normalize",
+        "expose_exact_monomial_square",
+        "subtree(square_base_sign_symmetry)",
+        "additive_pair(frozen_completion_rule)");
     private static final SearchHeuristic SEARCH_BUDGET =
         new SearchHeuristic(11, 60_000, 1, 24, 192, 8_192);
 
@@ -80,7 +101,9 @@ class BrahmaguptaFibonacciTargetFreeSingleRuleIntegrationTest {
 
     @Test
     @Timeout(600)
-    void oneFrozenRuleFormsAHistoricalTwoSquareIdentityWithoutATarget() {
+    void oneFrozenRuleFormsAHistoricalTwoSquareIdentityWithoutATarget(
+        @TempDir Path artifactDirectory
+    ) throws Exception {
         RuntimeTask completionTask = support.completionTask();
         String observableTraining = completionTask.observableInput();
         assertFalse(observableTraining.contains(SOURCE));
@@ -120,16 +143,36 @@ class BrahmaguptaFibonacciTargetFreeSingleRuleIntegrationTest {
 
         assertUntargeted(baseline);
         assertUntargeted(accumulated);
+        Comparison frozen = TargetFreeHistoricalSearchArtifact.freeze(
+            STUDY_ID,
+            SOURCE,
+            TransformationGoal.PROOF_FRIENDLY,
+            SEARCH_BUDGET,
+            completion.candidate().dynamicRuleId(),
+            new RunInput(BASELINE_OPERATOR_INVENTORY, baseline),
+            new RunInput(ACCUMULATED_OPERATOR_INVENTORY, accumulated));
+        Comparison evidence = TargetFreeHistoricalSearchArtifact.write(
+            artifactDirectory,
+            frozen).comparison();
+
+        assertEquals(frozen.contentHash(), evidence.contentHash());
+        assertEquals(
+            BASELINE_OPERATOR_INVENTORY,
+            evidence.baseline().operatorInventory());
+        assertEquals(
+            ACCUMULATED_OPERATOR_INVENTORY,
+            evidence.accumulated().operatorInventory());
         assertTrue(
-            accumulated.states().size()
+            evidence.accumulated().states().size()
                 < SEARCH_BUDGET.maxVisitedExpressions(),
             "rediscovery must not depend on exhausting the state budget: "
-                + accumulated);
-        assertFalse(containsHistoricalTwoSquareForm(baseline.states()),
-            baseline.toString());
+                + evidence.accumulated().metrics());
+        assertFalse(containsHistoricalTwoSquareForm(
+            evidence.baseline().states()),
+            evidence.baseline().toString());
 
-        SearchState discovered = historicalTwoSquareFormIn(
-            accumulated.states());
+        FrozenState discovered = historicalTwoSquareFormIn(
+            evidence.accumulated().states());
         assertTrue(support.exactVerifier().verify(
             SOURCE,
             discovered.expression()).proved(),
@@ -187,15 +230,15 @@ class BrahmaguptaFibonacciTargetFreeSingleRuleIntegrationTest {
     }
 
     private boolean containsHistoricalTwoSquareForm(
-        List<SearchState> states
+        List<FrozenState> states
     ) {
         return states.stream()
-            .map(SearchState::expression)
+            .map(FrozenState::expression)
             .anyMatch(this::matchesHistoricalTwoSquareForm);
     }
 
-    private SearchState historicalTwoSquareFormIn(
-        List<SearchState> states
+    private FrozenState historicalTwoSquareFormIn(
+        List<FrozenState> states
     ) {
         return states.stream()
             .filter(state -> matchesHistoricalTwoSquareForm(
