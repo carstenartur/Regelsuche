@@ -12,7 +12,9 @@ import de.regelsuche.parse.ExpressionParser;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -77,33 +79,35 @@ public final class ExactMonomialSquareExposureOperator
         String source = ExpressionFormatter.format(root);
         String sourceHash = syntaxHash(source);
         Map<String, Transformation> retained = new LinkedHashMap<>();
-        for (PositionedNode positioned : positionedNodes(root)) {
-            if (retained.size() >= maxCandidates) {
-                break;
-            }
+        Deque<PositionedNode> pending = new ArrayDeque<>();
+        pending.push(new PositionedNode(root, List.of()));
+        while (!pending.isEmpty() && retained.size() < maxCandidates) {
+            PositionedNode positioned = pending.pop();
             Candidate candidate = candidate(positioned.expression());
-            if (candidate == null) {
-                continue;
-            }
-            Expr rewritten = replaceAt(
-                root,
-                positioned.path(),
-                0,
-                square(candidate.root().toExpression()));
-            String transformed = ExpressionFormatter.format(rewritten);
-            String position = positionKey(positioned.path());
-            retained.putIfAbsent(
-                transformed,
-                new Transformation(
-                    RULE_ID,
+            if (candidate != null) {
+                Expr rewritten = replaceAt(
+                    root,
+                    positioned.path(),
+                    0,
+                    square(candidate.root().toExpression()));
+                String transformed = ExpressionFormatter.format(rewritten);
+                String position = positionKey(positioned.path());
+                retained.putIfAbsent(
                     transformed,
-                    RewriteKind.NORMALIZE,
-                    true,
-                    1,
-                    true,
-                    RULE_ID + ":" + sourceHash + ":" + position + ":"
-                        + candidate.original().descriptor() + "->"
-                        + candidate.root().descriptor()));
+                    new Transformation(
+                        RULE_ID,
+                        transformed,
+                        RewriteKind.NORMALIZE,
+                        true,
+                        1,
+                        true,
+                        RULE_ID + ":" + sourceHash + ":" + position + ":"
+                            + candidate.original().descriptor() + "->"
+                            + candidate.root().descriptor()));
+            }
+            if (retained.size() < maxCandidates) {
+                pushChildren(pending, positioned);
+            }
         }
         return List.copyOf(retained.values());
     }
@@ -171,27 +175,26 @@ public final class ExactMonomialSquareExposureOperator
             && Double.compare(exponent.value(), 2.0) == 0;
     }
 
-    private static List<PositionedNode> positionedNodes(Expr root) {
-        List<PositionedNode> result = new ArrayList<>();
-        collect(root, List.of(), result);
-        return List.copyOf(result);
-    }
-
-    private static void collect(
-        Expr expression,
-        List<Integer> path,
-        List<PositionedNode> result
+    private static void pushChildren(
+        Deque<PositionedNode> pending,
+        PositionedNode positioned
     ) {
-        result.add(new PositionedNode(expression, path));
+        Expr expression = positioned.expression();
+        List<Integer> path = positioned.path();
         if (expression instanceof BinaryExpr binary) {
-            collect(binary.left(), append(path, 0), result);
-            collect(binary.right(), append(path, 1), result);
+            pending.push(new PositionedNode(
+                binary.right(),
+                append(path, 1)));
+            pending.push(new PositionedNode(
+                binary.left(),
+                append(path, 0)));
         } else if (expression instanceof FunctionExpr function) {
-            for (int index = 0; index < function.arguments().size(); index++) {
-                collect(
+            for (int index = function.arguments().size() - 1;
+                    index >= 0;
+                    index--) {
+                pending.push(new PositionedNode(
                     function.arguments().get(index),
-                    append(path, index),
-                    result);
+                    append(path, index)));
             }
         }
     }
