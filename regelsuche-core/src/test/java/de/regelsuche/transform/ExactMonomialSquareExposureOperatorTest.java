@@ -66,21 +66,21 @@ class ExactMonomialSquareExposureOperatorTest {
     }
 
     @Test
-    void applicationIdentityBindsTheCompleteSourceSyntax() {
+    void applicationIdentityBindsNormalizedSourceSyntax() {
         ExactMonomialSquareExposureOperator operator =
             new ExactMonomialSquareExposureOperator();
 
         String first = operator.generateCandidates("x^4 + y")
             .getFirst()
             .applicationKey();
-        String sameFormattedSource = operator.generateCandidates("x^4+y")
+        String sameNormalizedSource = operator.generateCandidates("x^4+y")
             .getFirst()
             .applicationKey();
         String otherSource = operator.generateCandidates("x^4 + z")
             .getFirst()
             .applicationKey();
 
-        assertEquals(first, sameFormattedSource);
+        assertEquals(first, sameNormalizedSource);
         assertNotEquals(first, otherSource);
     }
 
