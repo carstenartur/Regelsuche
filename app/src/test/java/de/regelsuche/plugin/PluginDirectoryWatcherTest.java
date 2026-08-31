@@ -104,6 +104,8 @@ class PluginDirectoryWatcherTest {
         Path file = rulesDir.resolve("debounced.regelsuche");
 
         try (PluginRuntime runtime = runtime(tempDir, rulesDir)) {
+            CountDownLatch firstEventObserved = new CountDownLatch(1);
+            CountDownLatch releaseWatcher = new CountDownLatch(1);
             CountDownLatch cycleCompleted = new CountDownLatch(1);
             List<Boolean> completedCycles = new CopyOnWriteArrayList<>();
             List<PluginReloadResult> results = new CopyOnWriteArrayList<>();
@@ -114,22 +116,47 @@ class PluginDirectoryWatcherTest {
                     changed -> {
                         completedCycles.add(changed);
                         cycleCompleted.countDown();
+                    },
+                    () -> {
+                        firstEventObserved.countDown();
+                        awaitObserverRelease(releaseWatcher);
                     })) {
                 watcher.start();
-                Files.writeString(
-                    file,
-                    simpleRule("debounced_rule_first", "A + 0", "A"));
-                Files.writeString(
-                    file,
-                    simpleRule("debounced_rule_middle", "A * 1", "A"));
-                Files.writeString(
-                    file,
-                    simpleRule("debounced_rule_final", "A - 0", "A"));
+                try {
+                    Files.writeString(
+                        file,
+                        simpleRule(
+                            "debounced_rule_first",
+                            "A + 0",
+                            "A"));
+                    assertTrue(
+                        firstEventObserved.await(5, TimeUnit.SECONDS),
+                        "watcher did not observe the beginning of the burst");
+                    Files.writeString(
+                        file,
+                        simpleRule(
+                            "debounced_rule_middle",
+                            "A * 1",
+                            "A"));
+                    Files.writeString(
+                        file,
+                        simpleRule(
+                            "debounced_rule_final",
+                            "A - 0",
+                            "A"));
+                } finally {
+                    releaseWatcher.countDown();
+                }
 
                 assertTrue(cycleCompleted.await(5, TimeUnit.SECONDS));
             }
 
-            assertEquals(List.of(true), completedCycles);
+            assertEquals(
+                1L,
+                completedCycles.stream()
+                    .filter(Boolean::booleanValue)
+                    .count(),
+                "the burst must produce exactly one changed cycle");
             assertEquals(1, results.size());
             assertTrue(results.getFirst().ruleFileChanges().stream()
                 .anyMatch(change ->
@@ -197,6 +224,20 @@ class PluginDirectoryWatcherTest {
             });
         watcher.start();
         return watcher;
+    }
+
+    private static void awaitObserverRelease(CountDownLatch release) {
+        try {
+            if (!release.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError(
+                    "test did not release the watcher event observer");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(
+                "watcher event observer was interrupted",
+                exception);
+        }
     }
 
     private PluginRuntime runtime(Path tempDir, Path rulesDir) {
