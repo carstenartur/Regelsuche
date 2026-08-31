@@ -47,13 +47,8 @@ public final class AdditivePairHypothesisOperator
 
     @Override
     public List<Transformation> generateCandidates(String expression) {
-        if (expression == null || expression.isBlank() || maxCandidates == 0) {
-            return List.of();
-        }
-        Expr root;
-        try {
-            root = parser.parseTerm(expression);
-        } catch (IllegalArgumentException exception) {
+        Expr root = parse(expression);
+        if (root == null || maxCandidates == 0) {
             return List.of();
         }
 
@@ -70,80 +65,131 @@ public final class AdditivePairHypothesisOperator
             for (int rightIndex = leftIndex + 1;
                     rightIndex < terms.size();
                     rightIndex++) {
-                for (boolean reversed : List.of(false, true)) {
-                    if (retainedByExpression.size() >= maxCandidates) {
-                        break pairs;
-                    }
-                    Expr first = reversed
-                        ? terms.get(rightIndex)
-                        : terms.get(leftIndex);
-                    Expr second = reversed
-                        ? terms.get(leftIndex)
-                        : terms.get(rightIndex);
-                    Expr selectedPair = new BinaryExpr(
-                        first,
-                        BinaryOperator.ADD,
-                        second);
-                    List<Transformation> delegatedCandidates =
-                        delegate.generateCandidates(
-                            ExpressionFormatter.format(selectedPair));
-                    if (delegatedCandidates == null) {
-                        continue;
-                    }
-                    for (Transformation delegated : delegatedCandidates) {
-                        if (retainedByExpression.size() >= maxCandidates) {
-                            break pairs;
-                        }
-                        if (delegated == null) {
-                            continue;
-                        }
-                        Expr replacement;
-                        try {
-                            replacement = parser.parseTerm(
-                                delegated.transformedExpression());
-                        } catch (IllegalArgumentException exception) {
-                            continue;
-                        }
-                        if (replacement.equals(selectedPair)) {
-                            continue;
-                        }
-
-                        Expr rewritten = replacePair(
-                            terms,
-                            leftIndex,
-                            rightIndex,
-                            replacement);
-                        String transformed =
-                            ExpressionFormatter.format(rewritten);
-                        if (transformed.equals(source)) {
-                            continue;
-                        }
-                        String key = applicationKey(
-                            delegated,
-                            source,
-                            transformed,
-                            leftIndex,
-                            rightIndex,
-                            reversed);
-                        retainedByExpression.putIfAbsent(
-                            transformed,
-                            new Transformation(
-                                delegated.rule(),
-                                transformed,
-                                delegated.kind(),
-                                delegated.mayIncreaseComplexity(),
-                                delegated.estimatedCostDelta(),
-                                delegated.equivalencePreservingByConstruction(),
-                                key,
-                                delegated.assumptions(),
-                                delegated.packId(),
-                                delegated.license(),
-                                delegated.primitiveRuleIds()));
-                    }
+                addPairOrientation(
+                    terms,
+                    source,
+                    retainedByExpression,
+                    leftIndex,
+                    rightIndex,
+                    false);
+                if (retainedByExpression.size() >= maxCandidates) {
+                    break pairs;
+                }
+                addPairOrientation(
+                    terms,
+                    source,
+                    retainedByExpression,
+                    leftIndex,
+                    rightIndex,
+                    true);
+                if (retainedByExpression.size() >= maxCandidates) {
+                    break pairs;
                 }
             }
         }
         return List.copyOf(retainedByExpression.values());
+    }
+
+    private Expr parse(String expression) {
+        if (expression == null || expression.isBlank()) {
+            return null;
+        }
+        try {
+            return parser.parseTerm(expression);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    private void addPairOrientation(
+        List<Expr> terms,
+        String source,
+        Map<String, Transformation> retainedByExpression,
+        int leftIndex,
+        int rightIndex,
+        boolean reversed
+    ) {
+        Expr first = reversed
+            ? terms.get(rightIndex)
+            : terms.get(leftIndex);
+        Expr second = reversed
+            ? terms.get(leftIndex)
+            : terms.get(rightIndex);
+        Expr selectedPair = new BinaryExpr(
+            first,
+            BinaryOperator.ADD,
+            second);
+        List<Transformation> delegatedCandidates =
+            delegate.generateCandidates(
+                ExpressionFormatter.format(selectedPair));
+        if (delegatedCandidates == null) {
+            return;
+        }
+        for (Transformation delegated : delegatedCandidates) {
+            if (retainedByExpression.size() >= maxCandidates) {
+                return;
+            }
+            Transformation rewritten = rewriteCandidate(
+                terms,
+                source,
+                selectedPair,
+                delegated,
+                leftIndex,
+                rightIndex,
+                reversed);
+            if (rewritten != null) {
+                retainedByExpression.putIfAbsent(
+                    rewritten.transformedExpression(),
+                    rewritten);
+            }
+        }
+    }
+
+    private Transformation rewriteCandidate(
+        List<Expr> terms,
+        String source,
+        Expr selectedPair,
+        Transformation delegated,
+        int leftIndex,
+        int rightIndex,
+        boolean reversed
+    ) {
+        if (delegated == null) {
+            return null;
+        }
+        Expr replacement = parse(delegated.transformedExpression());
+        if (replacement == null || replacement.equals(selectedPair)) {
+            return null;
+        }
+
+        Expr rewritten = replacePair(
+            terms,
+            leftIndex,
+            rightIndex,
+            replacement);
+        String transformed = ExpressionFormatter.format(rewritten);
+        if (transformed.equals(source)) {
+            return null;
+        }
+        String key = applicationKey(
+            delegated,
+            source,
+            transformed,
+            leftIndex,
+            rightIndex,
+            reversed);
+        return new Transformation(
+            delegated.rule(),
+            transformed,
+            delegated.kind(),
+            delegated.mayIncreaseComplexity(),
+            delegated.estimatedCostDelta(),
+            delegated.equivalencePreservingByConstruction(),
+            key,
+            delegated.assumptions(),
+            delegated.packId(),
+            delegated.license(),
+            delegated.primitiveRuleIds());
     }
 
     private static List<Expr> flattenAddition(Expr expression) {
