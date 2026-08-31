@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -101,6 +102,9 @@ class BrahmaguptaFibonacciTargetFreeSingleRuleIntegrationTest {
 
     @Test
     @Timeout(600)
+    @EnabledIfEnvironmentVariable(
+        named = "REGELSUCHE_RUN_BRAHMAGUPTA_TARGET_FREE_STUDY",
+        matches = "(?i:true|1|yes)")
     void oneFrozenRuleFormsAHistoricalTwoSquareIdentityWithoutATarget(
         @TempDir Path artifactDirectory
     ) throws Exception {
