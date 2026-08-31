@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.benchmark.polynomial
     .PolynomialTheoryUtilityProfileAdapter.CandidateResult;
+import de.regelsuche.benchmark.polynomial
+    .PolynomialTheoryUtilityProfileAdapter.NoFactorizationAdapter;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -16,7 +18,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
     void executesAllSixFrozenRunsWithZeroWork() {
         var inputs = baselineInputs();
         var formation = PolynomialTheoryUtilityCaseCorpus.load().cases();
-        var adapter = new PolynomialTheoryUtilityNoFactorizationAdapter();
+        var adapter = new NoFactorizationAdapter();
         List<CandidateResult> results = new ArrayList<>(inputs.size());
 
         for (var checkpoint : PolynomialTheoryUtilityExecutionPlan.CHECKPOINTS) {
@@ -46,10 +48,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
                 CandidateResult.TerminalStatus.NO_TRANSITION,
                 result.terminalStatus()
             );
-            assertEquals(
-                PolynomialTheoryUtilityNoFactorizationAdapter.DETAIL_CODE,
-                result.detailCode()
-            );
+            assertEquals(NoFactorizationAdapter.DETAIL_CODE, result.detailCode());
             assertEquals(0L, result.primitiveWorkConsumed());
             assertEquals(0L, result.mechanicalWorkConsumed());
             assertEquals(0L, result.factorizationWorkConsumed());
@@ -65,7 +64,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
             .filter(value -> "CP01_1_OF_12".equals(value.checkpointId()))
             .toList();
         var formation = PolynomialTheoryUtilityCaseCorpus.load().cases();
-        var adapter = new PolynomialTheoryUtilityNoFactorizationAdapter();
+        var adapter = new NoFactorizationAdapter();
 
         var reordered = adapter.openRun(descriptor(runInputs.get(0)));
         assertThrows(
@@ -137,7 +136,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
             .filter(value -> !"NO_FACTORIZATION".equals(value.profileId()))
             .findFirst()
             .orElseThrow();
-        var adapter = new PolynomialTheoryUtilityNoFactorizationAdapter();
+        var adapter = new NoFactorizationAdapter();
         assertThrows(
             IllegalArgumentException.class,
             () -> adapter.openRun(descriptor(foreign))
@@ -164,9 +163,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
             .toList();
         assertEquals(120, values.size());
         assertTrue(values.stream().allMatch(value ->
-            PolynomialTheoryUtilityNoFactorizationAdapter.ADAPTER_ID.equals(
-                value.adapterId()
-            )));
+            NoFactorizationAdapter.ADAPTER_ID.equals(value.adapterId())));
         return values;
     }
 
