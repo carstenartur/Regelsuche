@@ -14,6 +14,13 @@ Sein verschachtelter `CandidateResult` verweist auf die unveränderliche Eingabe
 Deren `inputId` bindet bereits Planzeile, Run, Fall, Profil, Checkpoint, Adapter,
 Budgets und sämtliche eingefrorenen Studienartefakte.
 
+Der Nulladapter verlässt sich jedoch nicht nur auf sichtbare IDs. Beim Öffnen
+eines Runs löst er dessen vollständige 20 Eingaben aus dem content-adressierten
+600-Zeilen-Freeze auf. An jeder Position muss der übergebene Record exakt mit
+der eingefrorenen Eingabe übereinstimmen. Ein syntaktisch gültiger Umschlag, der
+beispielsweise eine echte `inputId` wiederverwendet, aber `rowId` oder Budgets
+verändert, wird vor der Ausführung abgewiesen und verbraucht keine Run-Position.
+
 Ein Ergebnis darf seine primitiven, mechanischen und Faktorisierungsbudgets
 nicht überschreiten. `VALIDATED_TRANSITION` erfordert mindestens einen
 Übergang, `VERIFIED` und eine SHA-256-Evidenz; alle anderen Status behalten null
@@ -48,5 +55,6 @@ Ungenutztes Budget wird weder berechnet noch umverteilt.
 ```
 
 Die Tests decken alle sechs Runs, 120 eindeutige Resultate, Reihenfolge,
-erfundene Run-Hashes, Session-Lebenszyklus, Budget-/Evidenzfehler und Rebinding
-ab. Der nächste getrennte Slice ist die target-blinde 30-Run-Orchestrierung.
+erfundene Run-Hashes, Session-Lebenszyklus, Budget-/Evidenzfehler, Rebinding und
+einen gefälschten Eingabeumschlag mit wiederverwendeter `inputId` ab. Der
+nächste getrennte Slice ist die target-blinde 30-Run-Orchestrierung.
