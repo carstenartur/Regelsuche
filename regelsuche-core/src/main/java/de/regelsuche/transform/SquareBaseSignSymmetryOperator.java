@@ -18,8 +18,10 @@ import java.util.List;
  * <p>The rewrite is representation-only and introduces no assumptions. It is
  * deliberately not emitted for numeric bases or bases already represented as
  * an explicit negation, so repeated application cannot create an immediate
- * two-cycle. Tree-local use is provided by {@link SubtreeHypothesisOperator}
- * rather than being duplicated here.</p>
+ * two-cycle. Because the explicit negation increases structural complexity,
+ * the move is classified as an expansion and participates in the search's
+ * expansion budget. Tree-local use is provided by
+ * {@link SubtreeHypothesisOperator} rather than being duplicated here.</p>
  */
 public final class SquareBaseSignSymmetryOperator
         implements HypothesisOperator {
@@ -52,7 +54,7 @@ public final class SquareBaseSignSymmetryOperator
         return List.of(new Transformation(
             RULE_ID,
             transformed,
-            RewriteKind.NORMALIZE,
+            RewriteKind.EXPAND,
             true,
             2,
             true,
