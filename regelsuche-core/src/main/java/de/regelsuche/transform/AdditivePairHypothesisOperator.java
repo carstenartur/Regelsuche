@@ -74,7 +74,7 @@ public final class AdditivePairHypothesisOperator
         }
 
         String source = ExpressionFormatter.format(root);
-        Map<String, Transformation> retainedByExpression =
+        Map<String, Transformation> retainedByApplication =
             new LinkedHashMap<>();
         pairs:
         for (int leftIndex = 0; leftIndex < terms.size(); leftIndex++) {
@@ -84,26 +84,26 @@ public final class AdditivePairHypothesisOperator
                 addPairOrientation(
                     terms,
                     source,
-                    retainedByExpression,
+                    retainedByApplication,
                     leftIndex,
                     rightIndex,
                     false);
-                if (retainedByExpression.size() >= maxCandidates) {
+                if (retainedByApplication.size() >= maxCandidates) {
                     break pairs;
                 }
                 addPairOrientation(
                     terms,
                     source,
-                    retainedByExpression,
+                    retainedByApplication,
                     leftIndex,
                     rightIndex,
                     true);
-                if (retainedByExpression.size() >= maxCandidates) {
+                if (retainedByApplication.size() >= maxCandidates) {
                     break pairs;
                 }
             }
         }
-        return List.copyOf(retainedByExpression.values());
+        return List.copyOf(retainedByApplication.values());
     }
 
     private Expr parse(String expression) {
@@ -120,7 +120,7 @@ public final class AdditivePairHypothesisOperator
     private void addPairOrientation(
         List<Expr> terms,
         String source,
-        Map<String, Transformation> retainedByExpression,
+        Map<String, Transformation> retainedByApplication,
         int leftIndex,
         int rightIndex,
         boolean reversed
@@ -141,7 +141,7 @@ public final class AdditivePairHypothesisOperator
             return;
         }
         for (Transformation delegated : delegatedCandidates) {
-            if (retainedByExpression.size() >= maxCandidates) {
+            if (retainedByApplication.size() >= maxCandidates) {
                 return;
             }
             Transformation rewritten = rewriteCandidate(
@@ -153,8 +153,8 @@ public final class AdditivePairHypothesisOperator
                 rightIndex,
                 reversed);
             if (rewritten != null) {
-                retainedByExpression.putIfAbsent(
-                    rewritten.transformedExpression(),
+                retainedByApplication.putIfAbsent(
+                    rewritten.applicationKey(),
                     rewritten);
             }
         }
