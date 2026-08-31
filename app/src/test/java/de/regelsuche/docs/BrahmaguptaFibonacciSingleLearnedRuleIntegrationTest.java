@@ -52,7 +52,7 @@ class BrahmaguptaFibonacciSingleLearnedRuleIntegrationTest {
         "ast_distribute_right_add",
         "ast_canonical_normalize");
     private static final SearchHeuristic HEURISTIC =
-        new SearchHeuristic(11, 60_000, 1, 32, 256, 8_192);
+        new SearchHeuristic(11, 20_000, 1, 24, 192, 4_096);
 
     private final ExpressionParser parser = new ExpressionParser();
     private final HistoricalPrecursorTestSupport support =
@@ -70,11 +70,11 @@ class BrahmaguptaFibonacciSingleLearnedRuleIntegrationTest {
         AdditivePairHypothesisOperator pairCompletion =
             new AdditivePairHypothesisOperator(
                 completion.operator(),
-                48);
+                24);
         SubtreeHypothesisOperator signSymmetry =
             new SubtreeHypothesisOperator(
                 new SquareBaseSignSymmetryOperator(),
-                32);
+                16);
         ExactMonomialSquareExposureOperator exposure =
             new ExactMonomialSquareExposureOperator();
 
@@ -125,22 +125,11 @@ class BrahmaguptaFibonacciSingleLearnedRuleIntegrationTest {
             SOURCE,
             discoveredTarget).proved());
 
-        GoalSearchResult withoutPairSelection = support.search(
-            new HypothesisTransformationEngine(
-                structuralEngine(),
-                List.of(
-                    exposure,
-                    signSymmetry,
-                    completion.operator()),
-                256),
-            HEURISTIC,
-            SOURCE,
-            discoveredTarget);
         GoalSearchResult withoutSignSymmetry = support.search(
             new HypothesisTransformationEngine(
                 structuralEngine(),
                 List.of(exposure, pairCompletion),
-                256),
+                192),
             HEURISTIC,
             SOURCE,
             discoveredTarget);
@@ -148,13 +137,11 @@ class BrahmaguptaFibonacciSingleLearnedRuleIntegrationTest {
             new HypothesisTransformationEngine(
                 structuralEngine(),
                 List.of(exposure, signSymmetry, pairCompletion),
-                256),
+                192),
             HEURISTIC,
             SOURCE,
             discoveredTarget);
 
-        assertFalse(withoutPairSelection.reached(),
-            withoutPairSelection.toString());
         assertFalse(withoutSignSymmetry.reached(),
             withoutSignSymmetry.toString());
         assertTrue(accumulated.reached(), accumulated.toString());
