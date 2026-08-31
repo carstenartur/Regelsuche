@@ -1,11 +1,14 @@
 package de.regelsuche.docs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.docs.HiddenRulePilotRunner.CandidateSnapshot;
+import de.regelsuche.docs.HiddenRulePilotRunner.NegativeHoldout;
+import de.regelsuche.docs.HiddenRulePilotRunner.PositiveHoldout;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeResult;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
 import de.regelsuche.evolution.ExactPolynomialPatternVerificationService;
@@ -52,8 +55,22 @@ final class HistoricalPrecursorTestSupport {
             syntaxTarget(target),
             engine(List.of(operator)),
             new SearchHeuristic(1, 48, 1, 4, 8, 16),
-            List.of(),
-            List.of());
+            List.of(
+                new PositiveHoldout(
+                    "completion-expression-bases",
+                    "(m + 1)^2 + n^2",
+                    "((m + 1) + n)^2 - 2*(m + 1)*n"),
+                new PositiveHoldout(
+                    "completion-function-base",
+                    "sin(t)^2 + z^2",
+                    "(sin(t) + z)^2 - 2*sin(t)*z")),
+            List.of(
+                new NegativeHoldout(
+                    "completion-noncubic-left",
+                    "m^3 + n^2"),
+                new NegativeHoldout(
+                    "completion-wrong-operator",
+                    "m^2 - n^2")));
     }
 
     RuntimeTask differenceTask() {
@@ -69,14 +86,41 @@ final class HistoricalPrecursorTestSupport {
             syntaxTarget("(r - s) * (r + s)"),
             new AstRewriteTransformationEngine(List.of(rule)),
             new SearchHeuristic(1, 48, 1, 4, 8, 16),
-            List.of(),
-            List.of());
+            List.of(
+                new PositiveHoldout(
+                    "difference-expression-bases",
+                    "(m + 1)^2 - n^2",
+                    "((m + 1) - n) * ((m + 1) + n)"),
+                new PositiveHoldout(
+                    "difference-function-base",
+                    "sin(t)^2 - z^2",
+                    "(sin(t) - z) * (sin(t) + z)")),
+            List.of(
+                new NegativeHoldout(
+                    "difference-wrong-operator",
+                    "m^2 + n^2"),
+                new NegativeHoldout(
+                    "difference-noncubic-left",
+                    "m^3 - n^2")));
     }
 
     FrozenRule freeze(RuntimeTask task) {
+        assertFalse(task.positiveHoldouts().isEmpty(),
+            "a frozen precursor requires positive holdouts");
+        assertFalse(task.negativeHoldouts().isEmpty(),
+            "a frozen precursor requires negative holdouts");
+
         RuntimeResult result = new HiddenRulePilotRunner().run(task);
         assertTrue(result.frozen(), result.toString());
         assertTrue(result.validationEvidence().passed(), result.toString());
+        assertEquals(
+            task.positiveHoldouts().size(),
+            result.holdouts().positives().size(),
+            result.toString());
+        assertEquals(
+            task.negativeHoldouts().size(),
+            result.holdouts().negatives().size(),
+            result.toString());
         assertTrue(result.holdouts().allPassed(), result.toString());
         CandidateSnapshot candidate = result.candidate();
         assertNotNull(candidate, result.toString());
