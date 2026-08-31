@@ -53,94 +53,144 @@ public final class AdditivePairHypothesisOperator
                 || maxCandidates == 0) {
             return List.of();
         }
+        Expr root = parseTerm(expression);
+        return root == null ? List.of() : generateCandidates(root);
+    }
 
-        Expr root;
-        try {
-            root = parser.parseTerm(expression);
-        } catch (IllegalArgumentException exception) {
-            return List.of();
-        }
-
+    private List<Transformation> generateCandidates(Expr root) {
         List<SignedTerm> terms = signedTerms(root);
-        if (terms.stream().filter(SignedTerm::positive).count() < 2) {
+        List<TermPair> pairs = positivePairs(terms);
+        if (pairs.isEmpty()) {
             return List.of();
         }
 
         String formattedSource = ExpressionFormatter.format(root);
         Map<String, Transformation> retained = new LinkedHashMap<>();
-        pairs:
-        for (int left = 0; left < terms.size(); left++) {
-            if (!terms.get(left).positive()) {
-                continue;
-            }
-            for (int right = left + 1; right < terms.size(); right++) {
-                if (!terms.get(right).positive()) {
-                    continue;
-                }
-
-                Expr selectedPair = new BinaryExpr(
-                    terms.get(left).expression(),
-                    BinaryOperator.ADD,
-                    terms.get(right).expression());
-                String pairText = ExpressionFormatter.format(selectedPair);
-                List<Transformation> delegated =
-                    delegate.generateCandidates(pairText);
-                if (delegated == null) {
-                    continue;
-                }
-                for (Transformation candidate : delegated) {
-                    if (retained.size() >= maxCandidates) {
-                        break pairs;
-                    }
-                    if (candidate == null) {
-                        continue;
-                    }
-
-                    Expr replacement;
-                    try {
-                        replacement = parser.parseTerm(
-                            candidate.transformedExpression());
-                    } catch (IllegalArgumentException exception) {
-                        continue;
-                    }
-                    if (replacement.equals(selectedPair)) {
-                        continue;
-                    }
-
-                    Expr rewritten = rebuild(
-                        terms,
-                        left,
-                        right,
-                        replacement);
-                    String transformed = ExpressionFormatter.format(rewritten);
-                    if (transformed.equals(formattedSource)) {
-                        continue;
-                    }
-
-                    String key = applicationKey(
-                        candidate,
-                        formattedSource,
-                        left,
-                        right,
-                        transformed);
-                    retained.putIfAbsent(
-                        key,
-                        new Transformation(
-                            candidate.rule(),
-                            transformed,
-                            candidate.kind(),
-                            candidate.mayIncreaseComplexity(),
-                            candidate.estimatedCostDelta(),
-                            candidate.equivalencePreservingByConstruction(),
-                            key,
-                            candidate.assumptions(),
-                            candidate.packId(),
-                            candidate.license(),
-                            candidate.primitiveRuleIds()));
-                }
+        for (TermPair pair : pairs) {
+            appendDelegatedCandidates(
+                terms,
+                pair,
+                formattedSource,
+                retained);
+            if (retained.size() >= maxCandidates) {
+                break;
             }
         }
         return List.copyOf(retained.values());
+    }
+
+    private void appendDelegatedCandidates(
+        List<SignedTerm> terms,
+        TermPair pair,
+        String formattedSource,
+        Map<String, Transformation> retained
+    ) {
+        Expr selectedPair = selectedPair(terms, pair);
+        for (Transformation candidate : delegatedCandidates(selectedPair)) {
+            retainCandidate(
+                terms,
+                pair,
+                formattedSource,
+                selectedPair,
+                candidate,
+                retained);
+            if (retained.size() >= maxCandidates) {
+                return;
+            }
+        }
+    }
+
+    private List<Transformation> delegatedCandidates(Expr selectedPair) {
+        List<Transformation> generated = delegate.generateCandidates(
+            ExpressionFormatter.format(selectedPair));
+        return generated == null ? List.of() : generated;
+    }
+
+    private void retainCandidate(
+        List<SignedTerm> terms,
+        TermPair pair,
+        String formattedSource,
+        Expr selectedPair,
+        Transformation candidate,
+        Map<String, Transformation> retained
+    ) {
+        if (candidate == null) {
+            return;
+        }
+        Expr replacement = parseTerm(candidate.transformedExpression());
+        if (replacement == null || replacement.equals(selectedPair)) {
+            return;
+        }
+
+        String transformed = ExpressionFormatter.format(
+            rebuild(terms, pair.left(), pair.right(), replacement));
+        if (transformed.equals(formattedSource)) {
+            return;
+        }
+
+        String key = applicationKey(
+            candidate,
+            formattedSource,
+            pair.left(),
+            pair.right(),
+            transformed);
+        retained.putIfAbsent(key, retained(candidate, transformed, key));
+    }
+
+    private static Transformation retained(
+        Transformation candidate,
+        String transformed,
+        String key
+    ) {
+        return new Transformation(
+            candidate.rule(),
+            transformed,
+            candidate.kind(),
+            candidate.mayIncreaseComplexity(),
+            candidate.estimatedCostDelta(),
+            candidate.equivalencePreservingByConstruction(),
+            key,
+            candidate.assumptions(),
+            candidate.packId(),
+            candidate.license(),
+            candidate.primitiveRuleIds());
+    }
+
+    private Expr parseTerm(String expression) {
+        try {
+            return parser.parseTerm(expression);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    private static Expr selectedPair(
+        List<SignedTerm> terms,
+        TermPair pair
+    ) {
+        return new BinaryExpr(
+            terms.get(pair.left()).expression(),
+            BinaryOperator.ADD,
+            terms.get(pair.right()).expression());
+    }
+
+    private static List<TermPair> positivePairs(List<SignedTerm> terms) {
+        List<Integer> positive = new ArrayList<>();
+        for (int index = 0; index < terms.size(); index++) {
+            if (terms.get(index).positive()) {
+                positive.add(index);
+            }
+        }
+
+        List<TermPair> pairs = new ArrayList<>();
+        for (int left = 0; left < positive.size(); left++) {
+            for (int right = left + 1; right < positive.size(); right++) {
+                pairs.add(new TermPair(
+                    positive.get(left),
+                    positive.get(right)));
+            }
+        }
+        return List.copyOf(pairs);
     }
 
     private static List<SignedTerm> signedTerms(Expr root) {
@@ -162,15 +212,23 @@ public final class AdditivePairHypothesisOperator
         }
         if (expression instanceof BinaryExpr binary
                 && binary.operator() == BinaryOperator.SUB) {
-            if (isZero(binary.left())) {
-                collect(binary.right(), -sign, terms);
-                return;
-            }
-            collect(binary.left(), sign, terms);
-            collect(binary.right(), -sign, terms);
+            collectSubtraction(binary, sign, terms);
             return;
         }
         terms.add(new SignedTerm(sign, expression));
+    }
+
+    private static void collectSubtraction(
+        BinaryExpr subtraction,
+        int sign,
+        List<SignedTerm> terms
+    ) {
+        if (isZero(subtraction.left())) {
+            collect(subtraction.right(), -sign, terms);
+            return;
+        }
+        collect(subtraction.left(), sign, terms);
+        collect(subtraction.right(), -sign, terms);
     }
 
     private static boolean isZero(Expr expression) {
@@ -184,6 +242,24 @@ public final class AdditivePairHypothesisOperator
         int right,
         Expr replacement
     ) {
+        List<SignedTerm> rewritten = replacedTerms(
+            source,
+            left,
+            right,
+            replacement);
+        Expr result = firstTerm(rewritten.getFirst());
+        for (int index = 1; index < rewritten.size(); index++) {
+            result = appendTerm(result, rewritten.get(index));
+        }
+        return result;
+    }
+
+    private static List<SignedTerm> replacedTerms(
+        List<SignedTerm> source,
+        int left,
+        int right,
+        Expr replacement
+    ) {
         List<SignedTerm> rewritten = new ArrayList<>();
         for (int index = 0; index < source.size(); index++) {
             if (index == left) {
@@ -192,22 +268,23 @@ public final class AdditivePairHypothesisOperator
                 rewritten.add(source.get(index));
             }
         }
+        return rewritten;
+    }
 
-        SignedTerm first = rewritten.getFirst();
-        Expr result = first.positive()
+    private static Expr firstTerm(SignedTerm first) {
+        return first.positive()
             ? first.expression()
             : new BinaryExpr(
                 new NumberExpr(0),
                 BinaryOperator.SUB,
                 first.expression());
-        for (int index = 1; index < rewritten.size(); index++) {
-            SignedTerm term = rewritten.get(index);
-            result = new BinaryExpr(
-                result,
-                term.positive() ? BinaryOperator.ADD : BinaryOperator.SUB,
-                term.expression());
-        }
-        return result;
+    }
+
+    private static Expr appendTerm(Expr result, SignedTerm term) {
+        return new BinaryExpr(
+            result,
+            term.positive() ? BinaryOperator.ADD : BinaryOperator.SUB,
+            term.expression());
     }
 
     private static String applicationKey(
@@ -231,6 +308,14 @@ public final class AdditivePairHypothesisOperator
             return HexFormat.of().formatHex(hash, 0, 12);
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
+    private record TermPair(int left, int right) {
+        private TermPair {
+            if (left < 0 || right <= left) {
+                throw new IllegalArgumentException("invalid additive term pair");
+            }
         }
     }
 
