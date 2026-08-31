@@ -87,6 +87,17 @@ class AdditivePairHypothesisOperatorTest {
     }
 
     @Test
+    void leavesSubtractionOpaqueInsteadOfInventingSignedTerms() {
+        List<Transformation> transformations =
+            new AdditivePairHypothesisOperator(pairDelegate())
+                .generateCandidates("a - b + c");
+
+        assertEquals(2, transformations.size());
+        assertExpression("pair(a - b, c)", transformations.get(0));
+        assertExpression("pair(c, a - b)", transformations.get(1));
+    }
+
+    @Test
     void triesTheReverseOrientationOfEveryPair() {
         Expr expectedPair = parser.parseTerm("b + a");
         HypothesisOperator orientationSensitive = expression -> {
