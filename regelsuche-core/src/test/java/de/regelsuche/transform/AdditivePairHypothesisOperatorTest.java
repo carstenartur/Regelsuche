@@ -56,6 +56,30 @@ class AdditivePairHypothesisOperatorTest {
     }
 
     @Test
+    void retainsDistinctApplicationsThatProduceTheSameExpression() {
+        List<Transformation> transformations =
+            new AdditivePairHypothesisOperator(pairDelegate(), 2)
+                .generateCandidates("a + a + b");
+
+        assertEquals(2, transformations.size());
+        assertExpression("pair(a, a) + b", transformations.get(0));
+        assertExpression("pair(a, a) + b", transformations.get(1));
+        assertEquals(
+            transformations.get(0).transformedExpression(),
+            transformations.get(1).transformedExpression());
+        assertTrue(transformations.get(0).applicationKey().contains(
+            ":0.1:forward:"));
+        assertTrue(transformations.get(1).applicationKey().contains(
+            ":0.1:reverse:"));
+        assertEquals(
+            2L,
+            transformations.stream()
+                .map(Transformation::applicationKey)
+                .distinct()
+                .count());
+    }
+
+    @Test
     void exposesTheNonAdjacentSquarePairNeededByBrahmagupta() {
         String source =
             "(a*c)^2 + (a*d)^2 + (b*c)^2 + (b*d)^2";
