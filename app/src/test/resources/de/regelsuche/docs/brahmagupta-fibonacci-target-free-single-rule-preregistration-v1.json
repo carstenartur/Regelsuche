@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "1.0",
+  "studyId": "brahmagupta-fibonacci-target-free-single-learned-rule-v1",
+  "status": "PREREGISTERED_NOT_EXECUTED",
+  "parentCommitBeforePreregistration": "a8d267517fb6c0336a82db71a2b0d707dd23729e",
+  "claim": "One independently frozen square-completion rule, generic exact preparation and target-free best-first search can form a historical Brahmagupta-Fibonacci two-square representation.",
+  "sourceExpression": "(a^2 + b^2) * (c^2 + d^2)",
+  "training": {
+    "frozenLearnedRuleCount": 1,
+    "source": "HistoricalPrecursorTestSupport.completionTask",
+    "freezeOccursBeforeSourceSearch": true,
+    "historicalSourceExcludedFromObservableTraining": true,
+    "historicalTwoSquareFormsExcludedFromObservableTraining": true
+  },
+  "search": {
+    "targetAttached": false,
+    "objective": "PROOF_FRIENDLY",
+    "strategy": "BEST_FIRST",
+    "maxDepth": 11,
+    "maxVisitedExpressions": 60000,
+    "significantImprovementThreshold": 1,
+    "maxExpandingSteps": 24,
+    "maxCandidatesPerState": 192,
+    "beamWidth": 8192,
+    "engineCandidateLimit": 192
+  },
+  "baselineOperatorInventory": [
+    "ast_distribute_left_add",
+    "ast_distribute_right_add",
+    "ast_canonical_normalize",
+    "exact_monomial_square_exposure",
+    "additive_pair(frozen_completion_rule)"
+  ],
+  "accumulatedOperatorInventory": [
+    "ast_distribute_left_add",
+    "ast_distribute_right_add",
+    "ast_canonical_normalize",
+    "exact_monomial_square_exposure",
+    "subtree(square_base_sign_symmetry)",
+    "additive_pair(frozen_completion_rule)"
+  ],
+  "operatorBounds": {
+    "pairCandidateLimit": 24,
+    "subtreeCandidateLimit": 16,
+    "structuralOccurrenceLimit": 32,
+    "structuralCandidateLimit": 128
+  },
+  "postHocSuccessDefinition": {
+    "evaluatedOnlyAfterSearchCompletion": true,
+    "requiresExactlyTwoTopLevelAddends": true,
+    "requiresBothAddendsToBeExplicitSquares": true,
+    "acceptedUnorderedSquarePairs": [
+      ["(a*c - b*d)^2", "(a*d + b*c)^2"],
+      ["(a*c + b*d)^2", "(a*d - b*c)^2"]
+    ],
+    "requiresDynamicFrozenRuleApplications": 2,
+    "requiresSquareBaseSignSymmetryApplications": 1,
+    "requiresMinimumSquareExposureApplications": 4,
+    "requiresMinimumDistributionApplications": 3,
+    "requiresCanonicalization": true,
+    "expectedDepth": 11
+  },
+  "controls": {
+    "baselineMustNotFormAcceptedHistoricalRepresentation": true,
+    "accumulatedRunMustFinishBelowVisitedStateBudget": true,
+    "bothRunsMustReportUntargetedStatus": true,
+    "neitherRunMayExposeAReachedTargetState": true
+  },
+  "changePolicy": "Any change to source, objective, operator inventory, budgets or post-hoc matcher after execution requires a new preregistration version."
+}
