@@ -9,7 +9,11 @@ import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +74,8 @@ public final class ExactMonomialSquareExposureOperator
             return List.of();
         }
 
+        String source = ExpressionFormatter.format(root);
+        String sourceHash = syntaxHash(source);
         Map<String, Transformation> retained = new LinkedHashMap<>();
         for (PositionedNode positioned : positionedNodes(root)) {
             if (retained.size() >= maxCandidates) {
@@ -95,7 +101,7 @@ public final class ExactMonomialSquareExposureOperator
                     true,
                     1,
                     true,
-                    RULE_ID + ":" + position + ":"
+                    RULE_ID + ":" + sourceHash + ":" + position + ":"
                         + candidate.original().descriptor() + "->"
                         + candidate.root().descriptor()));
         }
@@ -242,6 +248,16 @@ public final class ExactMonomialSquareExposureOperator
         return path.stream()
             .map(String::valueOf)
             .collect(java.util.stream.Collectors.joining("."));
+    }
+
+    private static String syntaxHash(String expression) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(expression.getBytes(StandardCharsets.UTF_8));
+            return "syntax-v1:" + HexFormat.of().formatHex(digest, 0, 12);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
     }
 
     private record PositionedNode(Expr expression, List<Integer> path) {
