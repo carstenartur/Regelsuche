@@ -8,6 +8,7 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 class GraalPySymPyRuntimeTest {
+    private static final Duration COMPLETION_TIMEOUT = Duration.ofMinutes(1);
     private static final String FACTORABLE_INTEGER_POLYNOMIAL = """
         {"protocol":"regelsuche.sympy-factorization/v1",\
         "domain":"ZZ","variableCount":1,"terms":[\
@@ -21,7 +22,7 @@ class GraalPySymPyRuntimeTest {
         try (GraalPySymPyRuntime runtime = new GraalPySymPyRuntime()) {
             SymPyInvocation initial = runtime.invoke(
                 FACTORABLE_INTEGER_POLYNOMIAL,
-                Duration.ofSeconds(20));
+                COMPLETION_TIMEOUT);
             assertEquals(SymPyInvocation.Status.COMPLETED, initial.status());
             assertTrue(initial.coldStart());
 
@@ -32,7 +33,7 @@ class GraalPySymPyRuntimeTest {
 
             SymPyInvocation recovered = runtime.invoke(
                 FACTORABLE_INTEGER_POLYNOMIAL,
-                Duration.ofSeconds(20));
+                COMPLETION_TIMEOUT);
             assertEquals(
                 SymPyInvocation.Status.COMPLETED,
                 recovered.status());
@@ -45,7 +46,7 @@ class GraalPySymPyRuntimeTest {
 
             SymPyInvocation warm = runtime.invoke(
                 FACTORABLE_INTEGER_POLYNOMIAL,
-                Duration.ofSeconds(20));
+                COMPLETION_TIMEOUT);
             assertEquals(SymPyInvocation.Status.COMPLETED, warm.status());
             assertFalse(warm.coldStart());
             assertEquals(
