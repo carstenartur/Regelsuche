@@ -1,0 +1,40 @@
+{
+  "affectedCaseCount": 2,
+  "amendmentSequence": 1,
+  "basePreregistrationByteLength": 1512,
+  "basePreregistrationSha256": "sha256:9d79fe60a2a2cf3fda9255cc3b26577b4ac23d61b8359cd22b3a7a0dcdb7bd29",
+  "baseQualificationByteLength": 5462,
+  "baseQualificationSha256": "sha256:00124e14ee828c7b25c48220cff86c4a81239c82119a312a939b93bea3c1071b",
+  "canonicalizerChange": "A normalized term that exposes a fresh ADD or SUB tree is now flattened into the same canonicalization pass. The former depth-three witnesses depended on a second canonicalization call rather than a third admitted primitive rewrite.",
+  "caseAmendments": [
+    {
+      "effectiveMinimumQualifiedDepth": 2,
+      "id": "binomial-expansion-complexity-valley",
+      "maximumQualifiedDepth": 10,
+      "observedWitnessRuleIds": [
+        "ast_distribute_left_add",
+        "ast_distribute_right_add"
+      ],
+      "originalMinimumQualifiedDepth": 3
+    },
+    {
+      "effectiveMinimumQualifiedDepth": 2,
+      "id": "difference-of-squares-reverse-bridge",
+      "maximumQualifiedDepth": 10,
+      "observedWitnessRuleIds": [
+        "ast_distribute_left_add",
+        "ast_distribute_right_subtract"
+      ],
+      "originalMinimumQualifiedDepth": 3
+    }
+  ],
+  "evidenceStatus": "POST_FREEZE_ENGINE_SEMANTICS_AMENDMENT",
+  "formationChanges": "NONE",
+  "reasonCode": "CANONICALIZER_FIXED_POINT_SEMANTICS",
+  "referenceChanges": "NONE",
+  "schema": "regelsuche.target-free-held-out-engine-semantics-amendment/v1",
+  "scopeBoundary": "This amendment changes only the effective lower witness-depth bound for the two polynomial complexity-valley cases under the corrected canonicalizer. Sources, references, assumptions, enabled rule packs, target-blind policies, budgets, checkpoints, qualification maxima and work accounting remain frozen.",
+  "searchPolicyChanges": "NONE",
+  "sourceChanges": "NONE",
+  "workAccountingChanges": "NONE"
+}

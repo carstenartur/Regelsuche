@@ -132,15 +132,31 @@ public class ExpressionCanonicalizer {
         List<SignedTerm> terms = new ArrayList<>();
         collectTerms(expression, 1, terms);
         Map<String, TermBucket> buckets = new LinkedHashMap<>();
+        List<SignedTerm> normalizedTerms = new ArrayList<>();
         for (SignedTerm signedTerm : terms) {
             Expr normalized = canonicalize(signedTerm.term(), context);
-            Coefficient coefficient = coefficientOf(normalized);
-            int value = signedTerm.sign() * coefficient.value();
-            if (value == 0) {
-                continue;
+
+            // Normalizing a non-additive term may expose a signed polynomial
+            // as a fresh ADD/SUB tree, for example
+            // 2*a*(0-b) -> 0-2*a*b. Fold that newly visible sign into this
+            // same addition pass instead of requiring a second canonicalize().
+            normalizedTerms.clear();
+            collectTerms(normalized, signedTerm.sign(), normalizedTerms);
+            for (SignedTerm normalizedTerm : normalizedTerms) {
+                Coefficient coefficient = coefficientOf(
+                    normalizedTerm.term());
+                int value = normalizedTerm.sign()
+                    * coefficient.value();
+                if (value == 0) {
+                    continue;
+                }
+                String key = ExpressionFormatter.format(
+                    coefficient.term());
+                buckets.computeIfAbsent(
+                    key,
+                    ignored -> new TermBucket(coefficient.term()))
+                    .add(value);
             }
-            String key = ExpressionFormatter.format(coefficient.term());
-            buckets.computeIfAbsent(key, ignored -> new TermBucket(coefficient.term())).add(value);
         }
 
         List<TermBucket> ordered = buckets.values().stream()

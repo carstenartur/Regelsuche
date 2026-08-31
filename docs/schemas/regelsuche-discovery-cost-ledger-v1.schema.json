@@ -126,10 +126,11 @@
         "frozenTaskCount": {"const": 12},
         "formationCost": {
           "type": "object", "additionalProperties": false,
+          "$comment": "Exact formation costs are independently recomputed from the bound macro campaign evidence by verify-discovery-cost-ledger.py.",
           "required": ["exploredStates", "candidateEvaluations"],
           "properties": {
-            "exploredStates": {"const": 25},
-            "candidateEvaluations": {"const": 13}
+            "exploredStates": {"type": "integer", "minimum": 0},
+            "candidateEvaluations": {"type": "integer", "minimum": 0}
           }
         },
         "tasks": {
