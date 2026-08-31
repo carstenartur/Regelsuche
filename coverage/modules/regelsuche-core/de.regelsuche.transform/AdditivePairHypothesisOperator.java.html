@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdditivePairHypothesisOperator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">AdditivePairHypothesisOperator.java</span></div><h1>AdditivePairHypothesisOperator.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Applies a root-oriented hypothesis operator to every unordered pair of terms
+ * in one associative top-level sum.
+ *
+ * &lt;p&gt;The adapter is deliberately structural rather than target-aware. It
+ * flattens only addition, enumerates pairs in deterministic index order, tries
+ * both operand orientations, replaces exactly one selected pair, and preserves
+ * all delegated rule and provenance metadata. Subtraction is left opaque so no
+ * sign convention or additional assumption is introduced implicitly. Both the
+ * number of retained candidates and the admitted sum width are bounded before
+ * the quadratic pair enumeration begins.&lt;/p&gt;
+ */
+public final class AdditivePairHypothesisOperator
+        implements HypothesisOperator {
+    private static final int DEFAULT_MAX_CANDIDATES = 64;
+    private static final int DEFAULT_MAX_TERMS = 32;
+
+    private final HypothesisOperator delegate;
+    private final int maxCandidates;
+    private final int maxTerms;
+<span class="fc" id="L38">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    public AdditivePairHypothesisOperator(HypothesisOperator delegate) {
+<span class="fc" id="L41">        this(</span>
+            delegate,
+            DEFAULT_MAX_CANDIDATES,
+            DEFAULT_MAX_TERMS);
+<span class="fc" id="L45">    }</span>
+
+    public AdditivePairHypothesisOperator(
+        HypothesisOperator delegate,
+        int maxCandidates
+    ) {
+<span class="fc" id="L51">        this(delegate, maxCandidates, DEFAULT_MAX_TERMS);</span>
+<span class="fc" id="L52">    }</span>
+
+    public AdditivePairHypothesisOperator(
+        HypothesisOperator delegate,
+        int maxCandidates,
+        int maxTerms
+<span class="fc" id="L58">    ) {</span>
+<span class="fc" id="L59">        this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="fc" id="L60">        this.maxCandidates = Math.max(0, maxCandidates);</span>
+<span class="fc" id="L61">        this.maxTerms = Math.max(0, maxTerms);</span>
+<span class="fc" id="L62">    }</span>
+
+    @Override
+    public List&lt;Transformation&gt; generateCandidates(String expression) {
+<span class="fc" id="L66">        Expr root = parse(expression);</span>
+<span class="pc bpc" id="L67" title="1 of 6 branches missed.">        if (root == null || maxCandidates == 0 || maxTerms &lt; 2) {</span>
+<span class="fc" id="L68">            return List.of();</span>
+        }
+
+<span class="fc" id="L71">        List&lt;Expr&gt; terms = flattenAddition(root);</span>
+<span class="fc bfc" id="L72" title="All 4 branches covered.">        if (terms.size() &lt; 2 || terms.size() &gt; maxTerms) {</span>
+<span class="fc" id="L73">            return List.of();</span>
+        }
+
+<span class="fc" id="L76">        String source = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L77">        Map&lt;String, Transformation&gt; retainedByApplication =</span>
+            new LinkedHashMap&lt;&gt;();
+        pairs:
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (int leftIndex = 0; leftIndex &lt; terms.size(); leftIndex++) {</span>
+<span class="fc" id="L81">            for (int rightIndex = leftIndex + 1;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                    rightIndex &lt; terms.size();</span>
+<span class="fc" id="L83">                    rightIndex++) {</span>
+<span class="fc" id="L84">                addPairOrientation(</span>
+                    terms,
+                    source,
+                    retainedByApplication,
+                    leftIndex,
+                    rightIndex,
+                    false);
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                if (retainedByApplication.size() &gt;= maxCandidates) {</span>
+<span class="fc" id="L92">                    break pairs;</span>
+                }
+<span class="fc" id="L94">                addPairOrientation(</span>
+                    terms,
+                    source,
+                    retainedByApplication,
+                    leftIndex,
+                    rightIndex,
+                    true);
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                if (retainedByApplication.size() &gt;= maxCandidates) {</span>
+<span class="fc" id="L102">                    break pairs;</span>
+                }
+            }
+        }
+<span class="fc" id="L106">        return List.copyOf(retainedByApplication.values());</span>
+    }
+
+    private Expr parse(String expression) {
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L111">            return null;</span>
+        }
+        try {
+<span class="fc" id="L114">            return parser.parseTerm(expression);</span>
+<span class="fc" id="L115">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L116">            return null;</span>
+        }
+    }
+
+    private void addPairOrientation(
+        List&lt;Expr&gt; terms,
+        String source,
+        Map&lt;String, Transformation&gt; retainedByApplication,
+        int leftIndex,
+        int rightIndex,
+        boolean reversed
+    ) {
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        Expr first = reversed</span>
+<span class="fc" id="L129">            ? terms.get(rightIndex)</span>
+<span class="fc" id="L130">            : terms.get(leftIndex);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        Expr second = reversed</span>
+<span class="fc" id="L132">            ? terms.get(leftIndex)</span>
+<span class="fc" id="L133">            : terms.get(rightIndex);</span>
+<span class="fc" id="L134">        Expr selectedPair = new BinaryExpr(</span>
+            first,
+            BinaryOperator.ADD,
+            second);
+<span class="fc" id="L138">        List&lt;Transformation&gt; delegatedCandidates =</span>
+<span class="fc" id="L139">            delegate.generateCandidates(pairExpression(first, second));</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (delegatedCandidates == null) {</span>
+<span class="fc" id="L141">            return;</span>
+        }
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (Transformation delegated : delegatedCandidates) {</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (retainedByApplication.size() &gt;= maxCandidates) {</span>
+<span class="nc" id="L145">                return;</span>
+            }
+<span class="fc" id="L147">            Transformation rewritten = rewriteCandidate(</span>
+                terms,
+                source,
+                selectedPair,
+                delegated,
+                leftIndex,
+                rightIndex,
+                reversed);
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (rewritten != null) {</span>
+<span class="fc" id="L156">                retainedByApplication.putIfAbsent(</span>
+<span class="fc" id="L157">                    rewritten.applicationKey(),</span>
+                    rewritten);
+            }
+<span class="fc" id="L160">        }</span>
+<span class="fc" id="L161">    }</span>
+
+    private static String pairExpression(Expr first, Expr second) {
+<span class="fc" id="L164">        return &quot;(&quot; + ExpressionFormatter.format(first) + &quot;) + (&quot;</span>
+<span class="fc" id="L165">            + ExpressionFormatter.format(second) + &quot;)&quot;;</span>
+    }
+
+    private Transformation rewriteCandidate(
+        List&lt;Expr&gt; terms,
+        String source,
+        Expr selectedPair,
+        Transformation delegated,
+        int leftIndex,
+        int rightIndex,
+        boolean reversed
+    ) {
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (delegated == null) {</span>
+<span class="fc" id="L178">            return null;</span>
+        }
+<span class="fc" id="L180">        Expr replacement = parse(delegated.transformedExpression());</span>
+<span class="pc bpc" id="L181" title="1 of 4 branches missed.">        if (replacement == null || replacement.equals(selectedPair)) {</span>
+<span class="fc" id="L182">            return null;</span>
+        }
+
+<span class="fc" id="L185">        Expr rewritten = replacePair(</span>
+            terms,
+            leftIndex,
+            rightIndex,
+            replacement);
+<span class="fc" id="L190">        String transformed = ExpressionFormatter.format(rewritten);</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (transformed.equals(source)) {</span>
+<span class="nc" id="L192">            return null;</span>
+        }
+<span class="fc" id="L194">        String key = applicationKey(</span>
+            delegated,
+            source,
+            transformed,
+            leftIndex,
+            rightIndex,
+            reversed);
+<span class="fc" id="L201">        return new Transformation(</span>
+<span class="fc" id="L202">            delegated.rule(),</span>
+            transformed,
+<span class="fc" id="L204">            delegated.kind(),</span>
+<span class="fc" id="L205">            delegated.mayIncreaseComplexity(),</span>
+<span class="fc" id="L206">            delegated.estimatedCostDelta(),</span>
+<span class="fc" id="L207">            delegated.equivalencePreservingByConstruction(),</span>
+            key,
+<span class="fc" id="L209">            delegated.assumptions(),</span>
+<span class="fc" id="L210">            delegated.packId(),</span>
+<span class="fc" id="L211">            delegated.license(),</span>
+<span class="fc" id="L212">            delegated.primitiveRuleIds());</span>
+    }
+
+    private static List&lt;Expr&gt; flattenAddition(Expr expression) {
+<span class="fc" id="L216">        List&lt;Expr&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L217">        collectAddition(expression, terms);</span>
+<span class="fc" id="L218">        return List.copyOf(terms);</span>
+    }
+
+    private static void collectAddition(
+        Expr expression,
+        List&lt;Expr&gt; terms
+    ) {
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                &amp;&amp; binary.operator() == BinaryOperator.ADD) {</span>
+<span class="fc" id="L227">            collectAddition(binary.left(), terms);</span>
+<span class="fc" id="L228">            collectAddition(binary.right(), terms);</span>
+        } else {
+<span class="fc" id="L230">            terms.add(expression);</span>
+        }
+<span class="fc" id="L232">    }</span>
+
+    private static Expr replacePair(
+        List&lt;Expr&gt; terms,
+        int leftIndex,
+        int rightIndex,
+        Expr replacement
+    ) {
+<span class="fc" id="L240">        List&lt;Expr&gt; rewritten = new ArrayList&lt;&gt;(terms.size() - 1);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        for (int index = 0; index &lt; terms.size(); index++) {</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (index == leftIndex) {</span>
+<span class="fc" id="L243">                rewritten.add(replacement);</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            } else if (index != rightIndex) {</span>
+<span class="fc" id="L245">                rewritten.add(terms.get(index));</span>
+            }
+        }
+<span class="fc" id="L248">        return buildAddition(rewritten);</span>
+    }
+
+    private static Expr buildAddition(List&lt;Expr&gt; terms) {
+<span class="fc" id="L252">        Expr result = terms.getFirst();</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        for (int index = 1; index &lt; terms.size(); index++) {</span>
+<span class="fc" id="L254">            result = new BinaryExpr(</span>
+                result,
+                BinaryOperator.ADD,
+<span class="fc" id="L257">                terms.get(index));</span>
+        }
+<span class="fc" id="L259">        return result;</span>
+    }
+
+    private static String applicationKey(
+        Transformation delegated,
+        String source,
+        String transformed,
+        int leftIndex,
+        int rightIndex,
+        boolean reversed
+    ) {
+<span class="fc" id="L270">        return &quot;additive-pair-v1:&quot;</span>
+<span class="fc" id="L271">            + delegated.rule()</span>
+            + &quot;:&quot; + leftIndex + &quot;.&quot; + rightIndex
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            + &quot;:&quot; + (reversed ? &quot;reverse&quot; : &quot;forward&quot;)</span>
+<span class="fc" id="L274">            + &quot;:delegate-&quot; + digest(delegated.applicationKey())</span>
+<span class="fc" id="L275">            + &quot;:transition-&quot; + digest(source + &quot;\u0000&quot; + transformed);</span>
+    }
+
+    private static String digest(String value) {
+        try {
+<span class="fc" id="L280">            byte[] hash = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L281">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L282">            return HexFormat.of().formatHex(hash, 0, 12);</span>
+<span class="nc" id="L283">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L284">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
