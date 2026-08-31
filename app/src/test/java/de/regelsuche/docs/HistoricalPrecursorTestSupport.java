@@ -28,6 +28,7 @@ import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.SumOfSquaresCompletionOperator;
+import de.regelsuche.transform.SumOfSquaresDifferenceCompletionOperator;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.util.List;
@@ -71,6 +72,36 @@ final class HistoricalPrecursorTestSupport {
                     "m^3 + n^2"),
                 new NegativeHoldout(
                     "completion-wrong-operator",
+                    "m^2 - n^2")));
+    }
+
+    RuntimeTask differenceCompletionTask() {
+        SumOfSquaresDifferenceCompletionOperator operator =
+            new SumOfSquaresDifferenceCompletionOperator();
+        String target = operator.generateCandidates("r^2 + s^2")
+            .getFirst()
+            .transformedExpression();
+        return new RuntimeTask(
+            "precursor-complete-square-sum-around-difference",
+            "r^2 + s^2",
+            syntaxTarget(target),
+            engine(List.of(operator)),
+            new SearchHeuristic(1, 48, 1, 4, 8, 16),
+            List.of(
+                new PositiveHoldout(
+                    "difference-completion-expression-bases",
+                    "(m + 1)^2 + n^2",
+                    "((m + 1) - n)^2 + 2*(m + 1)*n"),
+                new PositiveHoldout(
+                    "difference-completion-function-base",
+                    "sin(t)^2 + z^2",
+                    "(sin(t) - z)^2 + 2*sin(t)*z")),
+            List.of(
+                new NegativeHoldout(
+                    "difference-completion-nonsquare-left",
+                    "m^3 + n^2"),
+                new NegativeHoldout(
+                    "difference-completion-wrong-operator",
                     "m^2 - n^2")));
     }
 
