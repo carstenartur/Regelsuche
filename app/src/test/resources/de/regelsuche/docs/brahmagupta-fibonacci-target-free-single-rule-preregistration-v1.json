@@ -45,8 +45,19 @@
     "structuralOccurrenceLimit": 32,
     "structuralCandidateLimit": 128
   },
+  "artifact": {
+    "schema": "regelsuche.target-free-historical-search-comparison/v1",
+    "fileName": "target-free-historical-search-comparison.json",
+    "comparisonContainsBothInformationRegimes": true,
+    "freezesBeforePostHocCorrespondence": true,
+    "retainsEveryExploredState": true,
+    "retainsCompletePathRuleAssumptionAndMetricEvidence": true,
+    "contentAddressed": true,
+    "atomicWriteAndReadbackVerified": true
+  },
   "postHocSuccessDefinition": {
     "evaluatedOnlyAfterSearchCompletion": true,
+    "evaluatedOnlyFromVerifiedFrozenArtifact": true,
     "requiresExactlyTwoTopLevelAddends": true,
     "requiresBothAddendsToBeExplicitSquares": true,
     "requiresWholeExpressionExactEquivalence": true,
@@ -67,5 +78,5 @@
     "bothRunsMustReportUntargetedStatus": true,
     "neitherRunMayExposeAReachedTargetState": true
   },
-  "changePolicy": "Any change to source, objective, operator inventory, budgets or post-hoc matcher after execution requires a new preregistration version."
+  "changePolicy": "Any change to source, objective, operator inventory, budgets, artifact contract or post-hoc matcher after execution requires a new preregistration version."
 }
