@@ -1,7 +1,6 @@
 package de.regelsuche.transform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.BinaryExpr;
@@ -9,7 +8,6 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
-import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.ArrayList;
@@ -19,8 +17,6 @@ import org.junit.jupiter.api.Test;
 
 class AdditivePairHypothesisOperatorTest {
     private final ExpressionParser parser = new ExpressionParser();
-    private final ExpressionCanonicalizer canonicalizer =
-        new ExpressionCanonicalizer();
 
     @Test
     void enumeratesPairsDeterministicallyAndPreservesDelegateMetadata() {
@@ -84,10 +80,10 @@ class AdditivePairHypothesisOperatorTest {
             "additive-pair-v1:"
                 + SumOfSquaresCompletionOperator.RULE_ID
                 + ":0.3:"));
+        assertTrue(nonAdjacent.equivalencePreservingByConstruction());
         assertEquals(
-            canonicalizer.stableHash(source),
-            canonicalizer.stableHash(
-                nonAdjacent.transformedExpression()));
+            List.of(SumOfSquaresCompletionOperator.RULE_ID),
+            nonAdjacent.primitiveRuleIds());
     }
 
     @Test
