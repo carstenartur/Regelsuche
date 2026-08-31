@@ -8,6 +8,10 @@ import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 
 /** Generic completion of an explicitly visible sum of two squares. */
@@ -49,7 +53,8 @@ public final class SumOfSquaresCompletionOperator
             true,
             4,
             true,
-            RULE_ID + ":" + source + "->" + transformed));
+            RULE_ID + ":" + syntaxHash(source) + "->"
+                + syntaxHash(transformed)));
     }
 
     private static Expr completed(Expr leftBase, Expr rightBase) {
@@ -72,5 +77,15 @@ public final class SumOfSquaresCompletionOperator
             return power.left();
         }
         return null;
+    }
+
+    private static String syntaxHash(String expression) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                .digest(expression.getBytes(StandardCharsets.UTF_8));
+            return "syntax-v1:" + HexFormat.of().formatHex(hash, 0, 12);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
     }
 }
