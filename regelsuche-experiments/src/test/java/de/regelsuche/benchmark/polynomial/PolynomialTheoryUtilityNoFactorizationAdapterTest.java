@@ -89,6 +89,39 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
     }
 
     @Test
+    void rejectsCounterfeitInputEnvelopeWithMatchingVisibleIds() {
+        var runInputs = baselineInputs().stream()
+            .filter(value -> "CP01_1_OF_12".equals(value.checkpointId()))
+            .toList();
+        var formation = PolynomialTheoryUtilityCaseCorpus.load().cases();
+        var input = runInputs.get(0);
+        var counterfeit = new PolynomialTheoryUtilityExecutionInput(
+            input.inputId(),
+            "sha256:" + "f".repeat(64),
+            input.runId(),
+            input.caseId(),
+            input.profileId(),
+            input.checkpointId(),
+            input.adapterId(),
+            input.admittedPrimitiveWork(),
+            input.totalMechanicalWork(),
+            input.factorizationWork(),
+            input.inputStatus()
+        );
+        assertNotEquals(input, counterfeit);
+
+        var run = new NoFactorizationAdapter().openRun(descriptor(input));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> run.execute(counterfeit, formation.get(0))
+        );
+        for (int index = 0; index < runInputs.size(); index++) {
+            run.execute(runInputs.get(index), formation.get(index));
+        }
+        run.close();
+    }
+
+    @Test
     void resultContractRejectsBudgetEvidenceAndRebinding() {
         var inputs = baselineInputs();
         var input = inputs.get(0);
