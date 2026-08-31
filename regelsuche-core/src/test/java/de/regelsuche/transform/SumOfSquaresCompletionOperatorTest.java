@@ -1,6 +1,8 @@
 package de.regelsuche.transform;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.Expr;
@@ -39,6 +41,26 @@ class SumOfSquaresCompletionOperatorTest {
         assertExpression(
             "((m + 1) + sin(t))^2 - 2*(m + 1)*sin(t)",
             transformations.getFirst().transformedExpression());
+    }
+
+    @Test
+    void usesCompactStableTransitionIdentity() {
+        Transformation compact = operator.generateCandidates("x^2+y^2")
+            .getFirst();
+        Transformation reformatted = operator
+            .generateCandidates("x ^ 2 + y ^ 2")
+            .getFirst();
+        Transformation different = operator.generateCandidates("a^2+b^2")
+            .getFirst();
+
+        assertEquals(compact.applicationKey(), reformatted.applicationKey());
+        assertNotEquals(compact.applicationKey(), different.applicationKey());
+        assertTrue(compact.applicationKey().startsWith(
+            SumOfSquaresCompletionOperator.RULE_ID + ":syntax-v1:"));
+        assertTrue(compact.applicationKey().contains("->syntax-v1:"));
+        assertTrue(compact.applicationKey().length() < 100,
+            compact.applicationKey());
+        assertFalse(compact.applicationKey().contains("x ^ 2"));
     }
 
     @Test
