@@ -40,6 +40,7 @@ class BrahmaguptaFibonacciTargetFreePreregistrationContractTest {
             "\"structuralCandidateLimit\": 128",
             "\"requiresExactlyTwoTopLevelAddends\": true",
             "\"requiresBothAddendsToBeExplicitSquares\": true",
+            "\"requiresWholeExpressionExactEquivalence\": true",
             "\"requiresDynamicFrozenRuleApplications\": 2",
             "\"requiresSquareBaseSignSymmetryApplications\": 1",
             "\"expectedDepth\": 11",
