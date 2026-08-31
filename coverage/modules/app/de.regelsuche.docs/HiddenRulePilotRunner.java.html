@@ -523,7 +523,7 @@ import java.util.Objects;
 <span class="nc" id="L523">                ? 0.0</span>
 <span class="fc" id="L524">                : (baselineStates - candidateStates) / (double) baselineStates;</span>
 <span class="pc bpc" id="L525" title="1 of 2 branches missed.">            boolean material = candidate.reached()</span>
-<span class="pc bpc" id="L526" title="3 of 10 branches missed.">                &amp;&amp; (!baseline.reached()</span>
+<span class="pc bpc" id="L526" title="2 of 10 branches missed.">                &amp;&amp; (!baseline.reached()</span>
                     || reduction &gt;= 0.5
                     || baselineDepth &gt;= 0 &amp;&amp; candidateDepth &gt;= 0 &amp;&amp; candidateDepth &lt; baselineDepth);
 <span class="fc" id="L529">            return new AblationEvidence(</span>
