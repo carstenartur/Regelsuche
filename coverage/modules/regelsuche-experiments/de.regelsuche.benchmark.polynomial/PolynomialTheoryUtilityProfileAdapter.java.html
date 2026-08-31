@@ -1,0 +1,385 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityProfileAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityProfileAdapter.java</span></div><h1>PolynomialTheoryUtilityProfileAdapter.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/** Target-blind run-scoped execution boundary for one frozen study profile. */
+public interface PolynomialTheoryUtilityProfileAdapter {
+    String profileId();
+
+    String adapterId();
+
+    Run openRun(RunDescriptor descriptor);
+
+    interface Run extends AutoCloseable {
+        CandidateResult execute(
+            PolynomialTheoryUtilityExecutionInput input,
+            PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase
+        );
+
+        @Override
+        void close();
+    }
+
+    record RunDescriptor(
+        String runId,
+        String profileId,
+        String checkpointId,
+        String adapterId,
+        int expectedCaseCount
+    ) {
+<span class="fc" id="L33">        public RunDescriptor {</span>
+<span class="fc" id="L34">            runId = requireText(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L35">            profileId = requireText(profileId, &quot;profileId&quot;);</span>
+<span class="fc" id="L36">            checkpointId = requireText(checkpointId, &quot;checkpointId&quot;);</span>
+<span class="fc" id="L37">            adapterId = requireText(adapterId, &quot;adapterId&quot;);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">            if (expectedCaseCount &lt; 1) {</span>
+<span class="nc" id="L39">                throw new IllegalArgumentException(</span>
+                    &quot;expectedCaseCount must be positive&quot;
+                );
+            }
+<span class="fc" id="L43">        }</span>
+    }
+
+    /** One immutable terminal result for an exact frozen execution input. */
+    record CandidateResult(
+        String resultId,
+        PolynomialTheoryUtilityExecutionInput input,
+        TerminalStatus terminalStatus,
+        String detailCode,
+        long primitiveWorkConsumed,
+        long mechanicalWorkConsumed,
+        long factorizationWorkConsumed,
+        int generatedTransitions,
+        String verifierOutcome,
+        String transitionEvidenceHash
+    ) {
+        public static final String SCHEMA =
+            &quot;regelsuche.polynomial-theory-utility-candidate-result/v1&quot;;
+        public static final String NO_TRANSITION_EVIDENCE = &quot;NONE&quot;;
+<span class="fc" id="L62">        private static final Pattern SHA_256 =</span>
+<span class="fc" id="L63">            Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+
+<span class="fc" id="L65">        public CandidateResult {</span>
+<span class="fc" id="L66">            resultId = requireHash(resultId, &quot;resultId&quot;);</span>
+<span class="fc" id="L67">            input = Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L68">            terminalStatus = Objects.requireNonNull(</span>
+                terminalStatus,
+                &quot;terminalStatus&quot;
+            );
+<span class="fc" id="L72">            detailCode = requireText(detailCode, &quot;detailCode&quot;);</span>
+<span class="fc" id="L73">            verifierOutcome = requireText(verifierOutcome, &quot;verifierOutcome&quot;);</span>
+<span class="fc" id="L74">            transitionEvidenceHash = requireText(</span>
+                transitionEvidenceHash,
+                &quot;transitionEvidenceHash&quot;
+            );
+<span class="fc" id="L78">            requireWorkWithinAuthority(</span>
+                input,
+                primitiveWorkConsumed,
+                mechanicalWorkConsumed,
+                factorizationWorkConsumed,
+                generatedTransitions
+            );
+<span class="fc" id="L85">            requireEvidence(</span>
+                terminalStatus,
+                generatedTransitions,
+                verifierOutcome,
+                transitionEvidenceHash
+            );
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if (!resultId.equals(identity(</span>
+                    input,
+                    terminalStatus,
+                    detailCode,
+                    primitiveWorkConsumed,
+                    mechanicalWorkConsumed,
+                    factorizationWorkConsumed,
+                    generatedTransitions,
+                    verifierOutcome,
+                    transitionEvidenceHash))) {
+<span class="nc" id="L101">                throw new IllegalArgumentException(</span>
+                    &quot;candidate result identity differs from its fields&quot;
+                );
+            }
+<span class="fc" id="L105">        }</span>
+
+        static CandidateResult noTransition(
+            PolynomialTheoryUtilityExecutionInput input,
+            String detailCode
+        ) {
+<span class="fc" id="L111">            return create(</span>
+                input,
+                TerminalStatus.NO_TRANSITION,
+                detailCode,
+                0L,
+                0L,
+                0L,
+                0,
+                &quot;NOT_REQUESTED&quot;,
+                NO_TRANSITION_EVIDENCE
+            );
+        }
+
+        static CandidateResult create(
+            PolynomialTheoryUtilityExecutionInput input,
+            TerminalStatus terminalStatus,
+            String detailCode,
+            long primitiveWorkConsumed,
+            long mechanicalWorkConsumed,
+            long factorizationWorkConsumed,
+            int generatedTransitions,
+            String verifierOutcome,
+            String transitionEvidenceHash
+        ) {
+<span class="fc" id="L135">            Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L136">            return new CandidateResult(</span>
+<span class="fc" id="L137">                identity(</span>
+                    input,
+                    terminalStatus,
+                    detailCode,
+                    primitiveWorkConsumed,
+                    mechanicalWorkConsumed,
+                    factorizationWorkConsumed,
+                    generatedTransitions,
+                    verifierOutcome,
+                    transitionEvidenceHash
+                ),
+                input,
+                terminalStatus,
+                detailCode,
+                primitiveWorkConsumed,
+                mechanicalWorkConsumed,
+                factorizationWorkConsumed,
+                generatedTransitions,
+                verifierOutcome,
+                transitionEvidenceHash
+            );
+        }
+
+        void validateAgainst(PolynomialTheoryUtilityExecutionInput expected) {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (!input.equals(Objects.requireNonNull(expected, &quot;expected&quot;))) {</span>
+<span class="fc" id="L162">                throw new IllegalArgumentException(</span>
+                    &quot;candidate result refers to another frozen execution input&quot;
+                );
+            }
+<span class="fc" id="L166">        }</span>
+
+        private static void requireWorkWithinAuthority(
+            PolynomialTheoryUtilityExecutionInput input,
+            long primitive,
+            long mechanical,
+            long factorization,
+            int transitions
+        ) {
+<span class="pc bpc" id="L175" title="4 of 8 branches missed.">            if (primitive &lt; 0</span>
+                    || mechanical &lt; 0
+                    || factorization &lt; 0
+                    || transitions &lt; 0
+<span class="fc bfc" id="L179" title="All 2 branches covered.">                    || primitive &gt; input.admittedPrimitiveWork()</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                    || mechanical &gt; input.totalMechanicalWork()</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">                    || factorization &gt; input.factorizationWork()</span>
+                    || factorization &gt; mechanical) {
+<span class="fc" id="L183">                throw new IllegalArgumentException(</span>
+                    &quot;candidate result work differs from frozen authority&quot;
+                );
+            }
+<span class="fc" id="L187">        }</span>
+
+        private static void requireEvidence(
+            TerminalStatus status,
+            int transitions,
+            String verifier,
+            String evidence
+        ) {
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            boolean validated = status == TerminalStatus.VALIDATED_TRANSITION;</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            if (validated) {</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                if (transitions &lt; 1</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                        || !&quot;VERIFIED&quot;.equals(verifier)</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">                        || !SHA_256.matcher(evidence).matches()) {</span>
+<span class="fc" id="L200">                    throw new IllegalArgumentException(</span>
+                        &quot;validated transition lacks verifier-bound evidence&quot;
+                    );
+                }
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            } else if (transitions != 0</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                    || !NO_TRANSITION_EVIDENCE.equals(evidence)) {</span>
+<span class="nc" id="L206">                throw new IllegalArgumentException(</span>
+                    &quot;non-transition result retains transition evidence&quot;
+                );
+            }
+<span class="fc" id="L210">        }</span>
+
+        private static String identity(
+            PolynomialTheoryUtilityExecutionInput input,
+            TerminalStatus status,
+            String detail,
+            long primitive,
+            long mechanical,
+            long factorization,
+            int transitions,
+            String verifier,
+            String evidence
+        ) {
+<span class="fc" id="L223">            StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L224">            append(material, SCHEMA);</span>
+<span class="fc" id="L225">            append(material, PolynomialTheoryUtilityPreregistration.STUDY_ID);</span>
+<span class="fc" id="L226">            append(material, Objects.requireNonNull(input, &quot;input&quot;).inputId());</span>
+<span class="fc" id="L227">            append(material, Objects.requireNonNull(status, &quot;status&quot;).name());</span>
+<span class="fc" id="L228">            append(material, requireText(detail, &quot;detailCode&quot;));</span>
+<span class="fc" id="L229">            append(material, Long.toString(primitive));</span>
+<span class="fc" id="L230">            append(material, Long.toString(mechanical));</span>
+<span class="fc" id="L231">            append(material, Long.toString(factorization));</span>
+<span class="fc" id="L232">            append(material, Integer.toString(transitions));</span>
+<span class="fc" id="L233">            append(material, requireText(verifier, &quot;verifierOutcome&quot;));</span>
+<span class="fc" id="L234">            append(material, requireText(evidence, &quot;transitionEvidenceHash&quot;));</span>
+<span class="fc" id="L235">            return PolynomialTheoryUtilityExecutionIdentity.sha256(</span>
+<span class="fc" id="L236">                material.toString().getBytes(StandardCharsets.UTF_8)</span>
+            );
+        }
+
+        private static void append(StringBuilder target, String value) {
+<span class="fc" id="L241">            target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L242">        }</span>
+
+        private static String requireHash(String value, String name) {
+<span class="pc bpc" id="L245" title="2 of 4 branches missed.">            if (value == null || !SHA_256.matcher(value).matches()) {</span>
+<span class="nc" id="L246">                throw new IllegalArgumentException(name + &quot; is not SHA-256&quot;);</span>
+            }
+<span class="fc" id="L248">            return value;</span>
+        }
+
+<span class="fc" id="L251">        public enum TerminalStatus {</span>
+<span class="fc" id="L252">            VALIDATED_TRANSITION,</span>
+<span class="fc" id="L253">            NO_TRANSITION,</span>
+<span class="fc" id="L254">            UNSUPPORTED,</span>
+<span class="fc" id="L255">            BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L256">            TECHNICAL_FAILURE</span>
+        }
+    }
+
+    /** Frozen control adapter that deliberately performs no factorization. */
+<span class="fc" id="L261">    final class NoFactorizationAdapter</span>
+            implements PolynomialTheoryUtilityProfileAdapter {
+        public static final String PROFILE_ID = &quot;NO_FACTORIZATION&quot;;
+        public static final String ADAPTER_ID =
+            &quot;regelsuche.polynomial-theory-utility.no-factorization/v1&quot;;
+        public static final String DETAIL_CODE =
+            &quot;FACTORIZATION_DISABLED_BY_FROZEN_PROFILE&quot;;
+
+        @Override
+        public String profileId() {
+<span class="nc" id="L271">            return PROFILE_ID;</span>
+        }
+
+        @Override
+        public String adapterId() {
+<span class="nc" id="L276">            return ADAPTER_ID;</span>
+        }
+
+        @Override
+        public Run openRun(RunDescriptor descriptor) {
+<span class="fc" id="L281">            Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
+<span class="fc" id="L282">            var checkpoint =</span>
+<span class="fc" id="L283">                PolynomialTheoryUtilityExecutionPlan.CHECKPOINTS.stream()</span>
+<span class="fc" id="L284">                    .filter(value -&gt; value.checkpointId().equals(</span>
+<span class="fc" id="L285">                        descriptor.checkpointId()</span>
+                    ))
+<span class="fc" id="L287">                    .findFirst()</span>
+<span class="pc" id="L288">                    .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                        &quot;no-factorization checkpoint is not frozen&quot;
+                    ));
+<span class="fc" id="L291">            var profile =</span>
+<span class="fc" id="L292">                PolynomialTheoryUtilityExecutionInputs.profile(PROFILE_ID);</span>
+<span class="fc" id="L293">            String expectedRunId =</span>
+<span class="fc" id="L294">                PolynomialTheoryUtilityExecutionIdentity.runId(</span>
+                    profile,
+                    checkpoint
+                );
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (!PROFILE_ID.equals(descriptor.profileId())</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">                    || !ADAPTER_ID.equals(descriptor.adapterId())</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">                    || !expectedRunId.equals(descriptor.runId())</span>
+<span class="fc" id="L301">                    || descriptor.expectedCaseCount()</span>
+                        != PolynomialTheoryUtilityCaseCorpus
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                            .ORDERED_CASE_IDS.size()) {</span>
+<span class="fc" id="L304">                throw new IllegalArgumentException(</span>
+                    &quot;no-factorization run differs from the frozen profile&quot;
+                );
+            }
+            List&lt;PolynomialTheoryUtilityExecutionInput&gt; expectedInputs =
+<span class="fc" id="L309">                PolynomialTheoryUtilityExecutionInputs.freeze().inputs().stream()</span>
+<span class="fc" id="L310">                    .filter(value -&gt; expectedRunId.equals(value.runId()))</span>
+<span class="fc" id="L311">                    .toList();</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">            if (expectedInputs.size() != descriptor.expectedCaseCount()) {</span>
+<span class="nc" id="L313">                throw new IllegalStateException(</span>
+                    &quot;no-factorization run input count differs from the freeze&quot;
+                );
+            }
+<span class="fc" id="L317">            return new BaselineRun(descriptor, expectedInputs);</span>
+        }
+
+        private static final class BaselineRun implements Run {
+            private final RunDescriptor descriptor;
+            private final List&lt;PolynomialTheoryUtilityExecutionInput&gt;
+                expectedInputs;
+            private int nextCase;
+            private boolean closed;
+
+            private BaselineRun(
+                RunDescriptor descriptor,
+                List&lt;PolynomialTheoryUtilityExecutionInput&gt; expectedInputs
+<span class="fc" id="L330">            ) {</span>
+<span class="fc" id="L331">                this.descriptor = descriptor;</span>
+<span class="fc" id="L332">                this.expectedInputs = List.copyOf(expectedInputs);</span>
+<span class="fc" id="L333">            }</span>
+
+            @Override
+            public CandidateResult execute(
+                PolynomialTheoryUtilityExecutionInput input,
+                PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase
+            ) {
+<span class="fc" id="L340">                Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L341">                Objects.requireNonNull(formationCase, &quot;formationCase&quot;);</span>
+<span class="pc bpc" id="L342" title="1 of 4 branches missed.">                if (closed || nextCase &gt;= descriptor.expectedCaseCount()) {</span>
+<span class="fc" id="L343">                    throw new IllegalStateException(</span>
+                        &quot;no-factorization run cannot accept another case&quot;
+                    );
+                }
+<span class="fc" id="L347">                var expectedInput = expectedInputs.get(nextCase);</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">                if (!expectedInput.equals(input)</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">                        || !expectedInput.caseId().equals(</span>
+<span class="fc" id="L350">                            formationCase.caseId()</span>
+                        )) {
+<span class="fc" id="L352">                    throw new IllegalArgumentException(</span>
+                        &quot;no-factorization input differs from its frozen position&quot;
+                    );
+                }
+<span class="fc" id="L356">                nextCase++;</span>
+<span class="fc" id="L357">                return CandidateResult.noTransition(input, DETAIL_CODE);</span>
+            }
+
+            @Override
+            public void close() {
+<span class="fc bfc" id="L362" title="All 2 branches covered.">                if (closed) {</span>
+<span class="fc" id="L363">                    throw new IllegalStateException(</span>
+                        &quot;no-factorization run is already closed&quot;
+                    );
+                }
+<span class="fc" id="L367">                closed = true;</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">                if (nextCase != descriptor.expectedCaseCount()) {</span>
+<span class="fc" id="L369">                    throw new IllegalStateException(</span>
+                        &quot;no-factorization run closed before all frozen cases&quot;
+                    );
+                }
+<span class="fc" id="L373">            }</span>
+        }
+    }
+
+    private static String requireText(String value, String name) {
+<span class="fc" id="L378">        String text = Objects.requireNonNull(value, name);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
+<span class="nc" id="L380">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L382">        return text;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
