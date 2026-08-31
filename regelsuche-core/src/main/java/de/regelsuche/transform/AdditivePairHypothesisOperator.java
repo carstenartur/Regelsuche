@@ -120,8 +120,7 @@ public final class AdditivePairHypothesisOperator
             BinaryOperator.ADD,
             second);
         List<Transformation> delegatedCandidates =
-            delegate.generateCandidates(
-                ExpressionFormatter.format(selectedPair));
+            delegate.generateCandidates(pairExpression(first, second));
         if (delegatedCandidates == null) {
             return;
         }
@@ -143,6 +142,11 @@ public final class AdditivePairHypothesisOperator
                     rewritten);
             }
         }
+    }
+
+    private static String pairExpression(Expr first, Expr second) {
+        return "(" + ExpressionFormatter.format(first) + ") + ("
+            + ExpressionFormatter.format(second) + ")";
     }
 
     private Transformation rewriteCandidate(
