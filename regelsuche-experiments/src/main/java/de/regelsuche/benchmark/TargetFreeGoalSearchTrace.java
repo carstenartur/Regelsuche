@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.scoring.cost.TransformationGoal;
 import de.regelsuche.search.SearchHeuristic;
@@ -107,6 +109,29 @@ public final class TargetFreeGoalSearchTrace {
             CLAIM_BOUNDARY
         );
         return Trace.create(content);
+    }
+
+    /**
+     * Projects one trace into the existing complete workspace artifact matrix.
+     *
+     * <p>The search graph and progress ledger intentionally reference the same
+     * immutable trace payload. All other product roles remain explicitly not
+     * produced. No second run or workspace identity is created here.</p>
+     */
+    public static List<RepresentationDiscoveryArtifactReference>
+            workspaceArtifacts(Trace trace) {
+        Trace required = Objects.requireNonNull(trace, "trace");
+        return java.util.Arrays.stream(ArtifactRole.values())
+            .map(role -> switch (role) {
+                case SEARCH_GRAPH, PROGRESS_LEDGER ->
+                    RepresentationDiscoveryArtifactReference.available(
+                        role,
+                        SCHEMA,
+                        required.contentHash());
+                default ->
+                    RepresentationDiscoveryArtifactReference.notProduced(role);
+            })
+            .toList();
     }
 
     /**
@@ -457,7 +482,7 @@ public final class TargetFreeGoalSearchTrace {
         Score score,
         List<String> path,
         List<String> appliedRuleIds,
-        List<String> appliedRuleApplications,
+        List<String> appliedRuleApplicationIdentities,
         int expandedStepCount,
         String canonicalHash,
         String parentExpression,
@@ -485,16 +510,14 @@ public final class TargetFreeGoalSearchTrace {
                 appliedRuleIds,
                 "appliedRuleIds",
                 true);
-            appliedRuleApplications = requireSortedUniqueTextList(
-                appliedRuleApplications,
-                "appliedRuleApplications",
+            appliedRuleApplicationIdentities = requireSortedUniqueTextList(
+                appliedRuleApplicationIdentities,
+                "appliedRuleApplicationIdentities",
                 true);
             canonicalHash = requireText(canonicalHash, "canonicalHash");
             parentExpression = optionalExpression(parentExpression);
             appliedRuleId = optionalText(appliedRuleId);
-            appliedRuleKind = requireText(
-                appliedRuleKind,
-                "appliedRuleKind");
+            appliedRuleKind = optionalText(appliedRuleKind);
             appliedRuleKinds = requireTextList(
                 appliedRuleKinds,
                 "appliedRuleKinds",
@@ -513,7 +536,6 @@ public final class TargetFreeGoalSearchTrace {
                 depth,
                 path,
                 appliedRuleIds,
-                appliedRuleApplications,
                 parentExpression,
                 appliedRuleId,
                 appliedRuleKind,
@@ -527,7 +549,7 @@ public final class TargetFreeGoalSearchTrace {
                 score,
                 path,
                 appliedRuleIds,
-                appliedRuleApplications,
+                appliedRuleApplicationIdentities,
                 expandedStepCount,
                 canonicalHash,
                 parentExpression,
@@ -549,8 +571,10 @@ public final class TargetFreeGoalSearchTrace {
 
         private static State from(int ordinal, SearchState state) {
             SearchState required = Objects.requireNonNull(state, "state");
-            List<String> applications = required.appliedRuleApplications()
-                .stream().sorted().toList();
+            List<String> applicationIdentities =
+                required.appliedRuleApplications().stream()
+                    .sorted()
+                    .toList();
             List<String> kinds = required.appliedRuleKinds().stream()
                 .map(Enum::name).toList();
             String parent = required.parentExpression() == null
@@ -559,18 +583,21 @@ public final class TargetFreeGoalSearchTrace {
             String ruleId = required.appliedRuleId() == null
                 ? ""
                 : required.appliedRuleId();
+            String incomingKind = required.depth() == 0
+                ? ""
+                : required.appliedRuleKind().name();
             StateFingerprint content = new StateFingerprint(
                 normalizeExpression(required.expression()),
                 required.depth(),
                 Score.from(required.score()),
                 required.path(),
                 required.appliedRuleIds(),
-                applications,
+                applicationIdentities,
                 required.expandedStepCount(),
                 required.canonicalHash(),
                 optionalExpression(parent),
                 optionalText(ruleId),
-                required.appliedRuleKind().name(),
+                incomingKind,
                 required.mayIncreaseComplexity(),
                 required.estimatedCostDelta(),
                 required.equivalencePreservingByConstruction(),
@@ -586,7 +613,7 @@ public final class TargetFreeGoalSearchTrace {
                 content.score(),
                 content.path(),
                 content.appliedRuleIds(),
-                content.appliedRuleApplications(),
+                content.appliedRuleApplicationIdentities(),
                 content.expandedStepCount(),
                 content.canonicalHash(),
                 content.parentExpression(),
@@ -610,7 +637,7 @@ public final class TargetFreeGoalSearchTrace {
         Score score,
         List<String> path,
         List<String> appliedRuleIds,
-        List<String> appliedRuleApplications,
+        List<String> appliedRuleApplicationIdentities,
         int expandedStepCount,
         String canonicalHash,
         String parentExpression,
@@ -627,7 +654,8 @@ public final class TargetFreeGoalSearchTrace {
         private StateFingerprint {
             path = List.copyOf(path);
             appliedRuleIds = List.copyOf(appliedRuleIds);
-            appliedRuleApplications = List.copyOf(appliedRuleApplications);
+            appliedRuleApplicationIdentities = List.copyOf(
+                appliedRuleApplicationIdentities);
             appliedRuleKinds = List.copyOf(appliedRuleKinds);
             equivalencePreservingFlags = List.copyOf(
                 equivalencePreservingFlags);
@@ -693,9 +721,10 @@ public final class TargetFreeGoalSearchTrace {
                 || !root.expression().equals(sourceExpression)
                 || root.path().size() != 1
                 || !root.appliedRuleIds().isEmpty()
-                || !root.appliedRuleApplications().isEmpty()
+                || !root.appliedRuleApplicationIdentities().isEmpty()
                 || !root.parentExpression().isEmpty()
-                || !root.appliedRuleId().isEmpty()) {
+                || !root.appliedRuleId().isEmpty()
+                || !root.appliedRuleKind().isEmpty()) {
             throw new IllegalArgumentException(
                 "trace root state is inconsistent with the declared source");
         }
@@ -710,7 +739,6 @@ public final class TargetFreeGoalSearchTrace {
         int depth,
         List<String> path,
         List<String> appliedRuleIds,
-        List<String> appliedRuleApplications,
         String parentExpression,
         String appliedRuleId,
         String appliedRuleKind,
@@ -720,7 +748,6 @@ public final class TargetFreeGoalSearchTrace {
     ) {
         if (path.size() != depth + 1
                 || appliedRuleIds.size() != depth
-                || appliedRuleApplications.size() != depth
                 || appliedRuleKinds.size() != depth
                 || equivalencePreservingFlags.size() != depth
                 || !path.getLast().equals(expression)) {
@@ -730,6 +757,7 @@ public final class TargetFreeGoalSearchTrace {
         if (depth == 0) {
             if (!parentExpression.isEmpty()
                     || !appliedRuleId.isEmpty()
+                    || !appliedRuleKind.isEmpty()
                     || !appliedRuleKinds.isEmpty()
                     || !equivalencePreservingFlags.isEmpty()) {
                 throw new IllegalArgumentException(
