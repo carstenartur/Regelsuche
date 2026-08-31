@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityExecutionInputIdentity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityExecutionInputIdentity.java</span></div><h1>PolynomialTheoryUtilityExecutionInputIdentity.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.List;
+
+/** Content-addresses target-blind polynomial utility execution inputs. */
+final class PolynomialTheoryUtilityExecutionInputIdentity {
+    private PolynomialTheoryUtilityExecutionInputIdentity() {
+    }
+
+    static String inputId(
+        PolynomialTheoryUtilityExecutionRow row,
+        PolynomialTheoryUtilityExecutionProfile profile
+    ) {
+<span class="fc" id="L18">        StringBuilder material = new StringBuilder();</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        for (String value : List.of(</span>
+                PolynomialTheoryUtilityExecutionInputs.SCHEMA,
+                PolynomialTheoryUtilityPreregistration.STUDY_ID,
+                PolynomialTheoryUtilityPreregistration.CONTENT_HASH,
+                PolynomialTheoryUtilityCaseCorpus.FORMATION_CONTENT_HASH,
+                PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_CONTENT_HASH,
+                PolynomialTheoryUtilityExecutionPlan.EXPECTED_CONTENT_HASH,
+<span class="fc" id="L26">                Long.toString(</span>
+                    PolynomialTheoryUtilityExecutionPlan
+                        .EXPECTED_BYTE_LENGTH
+                ),
+<span class="fc" id="L30">                row.rowId(),</span>
+<span class="fc" id="L31">                row.runId(),</span>
+<span class="fc" id="L32">                row.caseId(),</span>
+<span class="fc" id="L33">                row.profileId(),</span>
+<span class="fc" id="L34">                row.checkpointId(),</span>
+<span class="fc" id="L35">                profile.adapterId(),</span>
+<span class="fc" id="L36">                Integer.toString(row.admittedPrimitiveWork()),</span>
+<span class="fc" id="L37">                Integer.toString(row.totalMechanicalWork()),</span>
+<span class="fc" id="L38">                Integer.toString(row.factorizationWork()),</span>
+                PolynomialTheoryUtilityExecutionInputs.INPUT_STATUS,
+                PolynomialTheoryUtilityExecutionInputs
+                    .INPUT_SELECTION_TIMING,
+                PolynomialTheoryUtilityExecutionInputs
+                    .QUALIFICATION_EXPOSURE,
+                PolynomialTheoryUtilityExecutionInputs
+                    .FORMATION_RESOLUTION,
+                PolynomialTheoryUtilityExecutionInputs
+                    .PROFILE_POLICY_SOURCE,
+                PolynomialTheoryUtilityExecutionInputs.RESULT_VISIBILITY,
+                PolynomialTheoryUtilityExecutionInputs.DECISION_AUTHORITY,
+                PolynomialTheoryUtilityExecutionInputs
+                    .ADAPTER_OUTPUT_AUTHORITY)) {
+<span class="fc" id="L52">            append(material, value);</span>
+<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">        return sha256(material.toString().getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    static String sha256(byte[] value) {
+        try {
+<span class="fc" id="L59">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L60">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value)</span>
+            );
+<span class="nc" id="L62">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L63">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L68">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L69">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

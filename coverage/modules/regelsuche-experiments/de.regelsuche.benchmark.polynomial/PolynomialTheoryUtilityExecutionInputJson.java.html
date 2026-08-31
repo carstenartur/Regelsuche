@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityExecutionInputJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityExecutionInputJson.java</span></div><h1>PolynomialTheoryUtilityExecutionInputJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.util.List;
+
+/** Canonical UTF-8/LF representation of target-blind execution inputs. */
+final class PolynomialTheoryUtilityExecutionInputJson {
+    private PolynomialTheoryUtilityExecutionInputJson() {
+    }
+
+    static String canonical(
+        List&lt;PolynomialTheoryUtilityExecutionInput&gt; inputs
+    ) {
+<span class="fc" id="L13">        StringBuilder target = new StringBuilder(340_000);</span>
+<span class="fc" id="L14">        target.append(&quot;{\n&quot;);</span>
+<span class="fc" id="L15">        field(</span>
+            target,
+            &quot;schema&quot;,
+            PolynomialTheoryUtilityExecutionInputs.SCHEMA
+        );
+<span class="fc" id="L20">        field(</span>
+            target,
+            &quot;studyId&quot;,
+            PolynomialTheoryUtilityPreregistration.STUDY_ID
+        );
+<span class="fc" id="L25">        field(</span>
+            target,
+            &quot;evidenceStatus&quot;,
+            PolynomialTheoryUtilityExecutionInputs.EVIDENCE_STATUS
+        );
+<span class="fc" id="L30">        field(</span>
+            target,
+            &quot;inputSelectionTiming&quot;,
+            PolynomialTheoryUtilityExecutionInputs.INPUT_SELECTION_TIMING
+        );
+<span class="fc" id="L35">        field(</span>
+            target,
+            &quot;qualificationExposure&quot;,
+            PolynomialTheoryUtilityExecutionInputs.QUALIFICATION_EXPOSURE
+        );
+<span class="fc" id="L40">        binding(</span>
+            target,
+            &quot;preregistrationBinding&quot;,
+            PolynomialTheoryUtilityPreregistration.BYTE_LENGTH,
+            PolynomialTheoryUtilityPreregistration.CONTENT_HASH
+        );
+<span class="fc" id="L46">        binding(</span>
+            target,
+            &quot;formationBinding&quot;,
+            PolynomialTheoryUtilityCaseCorpus.FORMATION_BYTE_LENGTH,
+            PolynomialTheoryUtilityCaseCorpus.FORMATION_CONTENT_HASH
+        );
+<span class="fc" id="L52">        target.append(&quot;  \&quot;qualificationBinding\&quot;: {\&quot;path\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L53">            .append(PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_FILE_NAME)</span>
+<span class="fc" id="L54">            .append(&quot;\&quot;,\&quot;byteLength\&quot;:&quot;)</span>
+<span class="fc" id="L55">            .append(PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_BYTE_LENGTH)</span>
+<span class="fc" id="L56">            .append(&quot;,\&quot;contentHash\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L57">            .append(</span>
+                PolynomialTheoryUtilityCaseCorpus
+                    .QUALIFICATION_CONTENT_HASH
+            )
+<span class="fc" id="L61">            .append(&quot;\&quot;},\n&quot;);</span>
+<span class="fc" id="L62">        binding(</span>
+            target,
+            &quot;planBinding&quot;,
+            PolynomialTheoryUtilityExecutionPlan.EXPECTED_BYTE_LENGTH,
+            PolynomialTheoryUtilityExecutionPlan.EXPECTED_CONTENT_HASH
+        );
+<span class="fc" id="L68">        number(target, &quot;inputCount&quot;, inputs.size());</span>
+<span class="fc" id="L69">        executionBoundary(target);</span>
+<span class="fc" id="L70">        target.append(&quot;  \&quot;inputs\&quot;: [\n&quot;);</span>
+<span class="fc" id="L71">        appendInputs(target, inputs);</span>
+<span class="fc" id="L72">        return target.append(&quot;  ]\n}\n&quot;).toString();</span>
+    }
+
+    private static void executionBoundary(StringBuilder target) {
+<span class="fc" id="L76">        target.append(&quot;  \&quot;executionBoundary\&quot;: {\&quot;rowOrder\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L77">            .append(PolynomialTheoryUtilityExecutionPlan.ROW_ORDER)</span>
+<span class="fc" id="L78">            .append(&quot;\&quot;,\&quot;runGrouping\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L79">            .append(PolynomialTheoryUtilityExecutionPlan.RUN_GROUPING)</span>
+<span class="fc" id="L80">            .append(&quot;\&quot;,\&quot;formationResolution\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L81">            .append(</span>
+                PolynomialTheoryUtilityExecutionInputs
+                    .FORMATION_RESOLUTION
+            )
+<span class="fc" id="L85">            .append(&quot;\&quot;,\&quot;profilePolicySource\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L86">            .append(</span>
+                PolynomialTheoryUtilityExecutionInputs
+                    .PROFILE_POLICY_SOURCE
+            )
+<span class="fc" id="L90">            .append(&quot;\&quot;,\&quot;resultVisibility\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L91">            .append(PolynomialTheoryUtilityExecutionInputs.RESULT_VISIBILITY)</span>
+<span class="fc" id="L92">            .append(&quot;\&quot;,\&quot;decisionAuthority\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L93">            .append(PolynomialTheoryUtilityExecutionInputs.DECISION_AUTHORITY)</span>
+<span class="fc" id="L94">            .append(&quot;\&quot;,\&quot;adapterOutputAuthority\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L95">            .append(</span>
+                PolynomialTheoryUtilityExecutionInputs
+                    .ADAPTER_OUTPUT_AUTHORITY
+            )
+<span class="fc" id="L99">            .append(&quot;\&quot;},\n&quot;);</span>
+<span class="fc" id="L100">    }</span>
+
+    private static void appendInputs(
+        StringBuilder target,
+        List&lt;PolynomialTheoryUtilityExecutionInput&gt; inputs
+    ) {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (int index = 0; index &lt; inputs.size(); index++) {</span>
+<span class="fc" id="L107">            var value = inputs.get(index);</span>
+<span class="fc" id="L108">            target.append(&quot;    {\&quot;inputId\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L109">                .append(value.inputId())</span>
+<span class="fc" id="L110">                .append(&quot;\&quot;,\&quot;rowId\&quot;:\&quot;&quot;).append(value.rowId())</span>
+<span class="fc" id="L111">                .append(&quot;\&quot;,\&quot;runId\&quot;:\&quot;&quot;).append(value.runId())</span>
+<span class="fc" id="L112">                .append(&quot;\&quot;,\&quot;caseId\&quot;:\&quot;&quot;).append(value.caseId())</span>
+<span class="fc" id="L113">                .append(&quot;\&quot;,\&quot;profileId\&quot;:\&quot;&quot;).append(value.profileId())</span>
+<span class="fc" id="L114">                .append(&quot;\&quot;,\&quot;checkpointId\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L115">                .append(value.checkpointId())</span>
+<span class="fc" id="L116">                .append(&quot;\&quot;,\&quot;adapterId\&quot;:\&quot;&quot;).append(value.adapterId())</span>
+<span class="fc" id="L117">                .append(&quot;\&quot;,\&quot;admittedPrimitiveWork\&quot;:&quot;)</span>
+<span class="fc" id="L118">                .append(value.admittedPrimitiveWork())</span>
+<span class="fc" id="L119">                .append(&quot;,\&quot;totalMechanicalWork\&quot;:&quot;)</span>
+<span class="fc" id="L120">                .append(value.totalMechanicalWork())</span>
+<span class="fc" id="L121">                .append(&quot;,\&quot;factorizationWork\&quot;:&quot;)</span>
+<span class="fc" id="L122">                .append(value.factorizationWork())</span>
+<span class="fc" id="L123">                .append(&quot;,\&quot;inputStatus\&quot;:\&quot;&quot;)</span>
+<span class="fc" id="L124">                .append(value.inputStatus()).append(&quot;\&quot;}&quot;)</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                .append(index + 1 &lt; inputs.size() ? &quot;,\n&quot; : &quot;\n&quot;);</span>
+        }
+<span class="fc" id="L127">    }</span>
+
+    private static void field(
+        StringBuilder target,
+        String name,
+        String value
+    ) {
+<span class="fc" id="L134">        target.append(&quot;  \&quot;&quot;).append(name).append(&quot;\&quot;: \&quot;&quot;)</span>
+<span class="fc" id="L135">            .append(value).append(&quot;\&quot;,\n&quot;);</span>
+<span class="fc" id="L136">    }</span>
+
+    private static void number(
+        StringBuilder target,
+        String name,
+        long value
+    ) {
+<span class="fc" id="L143">        target.append(&quot;  \&quot;&quot;).append(name).append(&quot;\&quot;: &quot;)</span>
+<span class="fc" id="L144">            .append(value).append(&quot;,\n&quot;);</span>
+<span class="fc" id="L145">    }</span>
+
+    private static void binding(
+        StringBuilder target,
+        String name,
+        long byteLength,
+        String hash
+    ) {
+<span class="fc" id="L153">        target.append(&quot;  \&quot;&quot;).append(name)</span>
+<span class="fc" id="L154">            .append(&quot;\&quot;: {\&quot;byteLength\&quot;:&quot;).append(byteLength)</span>
+<span class="fc" id="L155">            .append(&quot;,\&quot;contentHash\&quot;:\&quot;&quot;).append(hash)</span>
+<span class="fc" id="L156">            .append(&quot;\&quot;},\n&quot;);</span>
+<span class="fc" id="L157">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
