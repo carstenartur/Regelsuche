@@ -2,32 +2,26 @@
 
 ## Status
 
-Der erste ausführbare Profiladapter der eingefrorenen Nutzenstudie ist das
-Kontrollprofil `NO_FACTORIZATION`. Es belegt nur die Ausführungs- und
-Arbeitsgrenze des Nullpfads. Die vier mathematischen Vergleichsprofile sind
-weiterhin nicht implementiert und die versiegelte Qualifikation bleibt
-ungeöffnet.
+Dieser Slice implementiert ausschließlich das Kontrollprofil
+`NO_FACTORIZATION`. Die vier mathematischen Profile sind nicht angeschlossen;
+die versiegelte Qualifikation bleibt geschlossen.
 
-## Adaptervertrag
+## Vertrag
 
-`PolynomialTheoryUtilityProfileAdapter` erhält pro Lauf ausschließlich:
+`PolynomialTheoryUtilityProfileAdapter` erhält pro Lauf nur Run-, Profil-,
+Checkpoint- und Adapteridentität sowie jeweils eine target-blinde Eingabe und
+den sichtbaren Formationsfall.
 
-- `runId`, Profil, Checkpoint und die vorab eingefrorene Adapter-ID;
-- genau eine target-blinde Ausführungseingabe;
-- den zugehörigen sichtbaren Formationsfall.
+`PolynomialTheoryUtilityCandidateResult` verweist über `inputId` auf die
+vollständig inhaltsadressierte Eingabe. Diese Identität bindet bereits
+Planzeile, Run, Fall, Profil, Checkpoint, Adapter, alle Arbeitsgrenzen sowie die
+Hashes von Präregistrierung, Formation, Qualifikation und Ausführungsplan.
+Das Resultat ergänzt terminalen Status, tatsächlich verbrauchte Arbeit,
+Übergangszahl, Verifier-Ausgang und Transitionsevidenz. `validateAgainst`
+verlangt das konkrete zugehörige Inputobjekt und prüft Bindung, Budgets,
+Evidenzregeln und Resultathash erneut.
 
-Qualifikationsfelder, Referenzausdrücke, Ergebnisse anderer Profile und eine
-Produktentscheidung sind nicht Teil der API.
-
-## Inhaltsadressiertes terminales Ergebnis
-
-`PolynomialTheoryUtilityCandidateResult` bindet jedes Ergebnis an Eingabe,
-Planzeile, Lauf, Fall, Profil, Checkpoint, Adapter und die drei eingefrorenen
-Arbeitsgrenzen. Seine SHA-256-Identität umfasst außerdem terminalen Status,
-Detailcode, tatsächlich verbrauchte Arbeit, Übergangszahl, Verifier-Ausgang und
-optionale Transitionsevidenz.
-
-Zulässige terminale Status sind:
+Zulässige Status sind:
 
 ```text
 VALIDATED_TRANSITION
@@ -37,13 +31,12 @@ BUDGET_INCONCLUSIVE
 TECHNICAL_FAILURE
 ```
 
-Ein validierter Übergang erfordert mindestens einen Übergang, den
-Verifier-Ausgang `VERIFIED` und eine SHA-256-Evidenz. Alle anderen Status dürfen
-keine Transitionsevidenz behalten. Primitive, mechanische und
-Faktorisierungsarbeit dürfen ihre jeweilige eingefrorene Grenze nicht
-überschreiten.
+Ein validierter Übergang erfordert mindestens einen Übergang, `VERIFIED` und
+eine SHA-256-Evidenz. Andere Status dürfen keine Transitionsevidenz behalten.
+Verbrauchte primitive, mechanische und Faktorisierungsarbeit dürfen ihre
+jeweilige eingefrorene Grenze nicht überschreiten.
 
-## Semantik des Nullprofils
+## Nullprofil
 
 Der Adapter
 
@@ -51,39 +44,31 @@ Der Adapter
 regelsuche.polynomial-theory-utility.no-factorization/v1
 ```
 
-verarbeitet sechs getrennte Checkpoint-Läufe mit jeweils 20 Fällen. Er prüft
-die eingefrorene Fallreihenfolge und liefert für alle 120 Eingaben:
+akzeptiert nur die sechs deterministisch berechneten Baseline-Run-Identitäten
+und verarbeitet je 20 Fälle in eingefrorener Reihenfolge. Für alle 120 Inputs
+erzeugt er:
 
 ```text
-terminalStatus:            NO_TRANSITION
-detailCode:                FACTORIZATION_DISABLED_BY_FROZEN_PROFILE
-primitiveWorkConsumed:     0
-mechanicalWorkConsumed:    0
-factorizationWorkConsumed: 0
-generatedTransitions:      0
-verifierOutcome:           NOT_REQUESTED
-transitionEvidenceHash:    NONE
+NO_TRANSITION
+FACTORIZATION_DISABLED_BY_FROZEN_PROFILE
+primitive/mechanical/factorization work = 0
+transitions = 0
+verifier = NOT_REQUESTED
+evidence = NONE
 ```
 
-Nicht verbrauchtes Budget wird weder künstlich berechnet noch einem anderen
-Suchkanal zugewiesen.
+Nicht verbrauchtes Budget wird weder berechnet noch umverteilt.
 
 ## Verifikation
 
 ```bash
 ./gradlew :regelsuche-experiments:test \
   --tests de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityNoFactorizationAdapterTest
-
-./gradlew :regelsuche-experiments:check
 ```
 
-Die Tests decken alle 120 Baseline-Eingaben, sechs isolierte Läufe, eindeutige
-Ergebnisidentitäten, Nullarbeit, Reihenfolgeverletzungen, unvollständige und
-bereits geschlossene Läufe sowie Budget-, Evidenz- und Rebinding-Fehler ab.
+Die Tests decken alle sechs Runs, 120 eindeutige Resultate, Nullarbeit,
+Reihenfolge, erfundene Run-Hashes, unvollständige oder geschlossene Sessions,
+Budget-/Evidenzfehler und Rebinding ab.
 
-## Aussagegrenze und nächster Slice
-
-Dieser Stand ist kein Nutzennachweis für Faktorisierung oder Cache-Replay. Als
-Nächstes folgt der generische Candidate-Freeze-Runner in einem separaten Slice.
-Erst danach wird der native On-Demand-Adapter an die bestehende exakte
-Parser–Request–Engine–Verifier–Transformation-Kette angeschlossen.
+Der nächste getrennte Slice ist die target-blinde 30-Run-Orchestrierung. Dieser
+Stand ist noch kein Nutzen- oder Produktnachweis.
