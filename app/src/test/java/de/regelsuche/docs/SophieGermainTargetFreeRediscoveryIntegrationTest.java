@@ -66,12 +66,21 @@ class SophieGermainTargetFreeRediscoveryIntegrationTest {
 
         assertUntargeted(baseline);
         assertUntargeted(accumulated);
+        assertTrue(
+            accumulated.states().size()
+                < SEARCH_BUDGET.maxVisitedExpressions(),
+            "rediscovery must not depend on exhausting the state budget: "
+                + accumulated);
         assertFalse(containsHistoricalFactorization(baseline.states()),
             baseline.toString());
 
         SearchState discovered = historicalFactorizationIn(
             accumulated.states());
         assertNotNull(discovered);
+        assertEquals(
+            parser.parseTerm(SOURCE),
+            parser.parseTerm(discovered.path().getFirst()),
+            discovered.toString());
         assertTrue(support.exactVerifier().verify(
             discovered.expression(),
             HISTORICAL_FACTORIZATION).proved());
