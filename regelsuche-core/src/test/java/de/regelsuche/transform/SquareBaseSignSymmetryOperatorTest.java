@@ -32,7 +32,7 @@ class SquareBaseSignSymmetryOperatorTest {
         assertEquals(
             SquareBaseSignSymmetryOperator.RULE_ID,
             transformation.rule());
-        assertEquals(RewriteKind.NORMALIZE, transformation.kind());
+        assertEquals(RewriteKind.EXPAND, transformation.kind());
         assertTrue(transformation.mayIncreaseComplexity());
         assertEquals(2, transformation.estimatedCostDelta());
         assertTrue(transformation.equivalencePreservingByConstruction());
@@ -92,6 +92,8 @@ class SquareBaseSignSymmetryOperatorTest {
         assertTrue(transformations.stream().allMatch(transformation ->
             transformation.rule().equals(
                 SquareBaseSignSymmetryOperator.RULE_ID)
+                && transformation.kind() == RewriteKind.EXPAND
+                && transformation.mayIncreaseComplexity()
                 && transformation.applicationKey().startsWith(
                     "subtree-v1:"
                         + SquareBaseSignSymmetryOperator.RULE_ID
