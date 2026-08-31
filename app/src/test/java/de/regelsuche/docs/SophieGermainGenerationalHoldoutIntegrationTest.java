@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -78,12 +79,14 @@ class SophieGermainGenerationalHoldoutIntegrationTest {
 
         DynamicOperatorCompiler.CompilationResult compilation =
             new DynamicOperatorCompiler().compile(
-                "sophie-germain-generation-zero",
-                "sophie-germain-train-freeze-v1",
+                "pilot-" + trainingTask.opaqueCaseId(),
+                "frozen-v1",
                 candidate.leftPattern(),
                 candidate.rightPattern());
         assertTrue(compilation.isSuccess(), compilation.rejectionReason());
         DynamicPatternOperator learnedRule = compilation.operator().orElseThrow();
+        assertEquals(candidate.dynamicRuleId(), learnedRule.ruleId());
+        assertEquals(candidate.provenanceHash(), learnedRule.provenanceHash());
 
         List<Transformation> heldOutApplications =
             learnedRule.generateCandidates(HOLDOUT_INPUT);
@@ -114,7 +117,8 @@ class SophieGermainGenerationalHoldoutIntegrationTest {
         assertTrue(accumulated.reached(), accumulated.toString());
         assertNotNull(accumulated.reachedState(), accumulated.toString());
         assertTrue(accumulated.reachedState().appliedRuleIds()
-            .contains(learnedRule.ruleId()), accumulated.reachedState().toString());
+            .contains(candidate.dynamicRuleId()),
+            accumulated.reachedState().toString());
     }
 
     private GoalSearchResult search(
