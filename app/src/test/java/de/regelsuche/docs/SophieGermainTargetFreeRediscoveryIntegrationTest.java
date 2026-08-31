@@ -2,7 +2,6 @@ package de.regelsuche.docs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -87,7 +86,6 @@ class SophieGermainTargetFreeRediscoveryIntegrationTest {
 
         SearchState discovered = historicalFactorizationIn(
             accumulated.states());
-        assertNotNull(discovered);
         assertEquals(
             parser.parseTerm(SOURCE),
             parser.parseTerm(discovered.path().getFirst()),
