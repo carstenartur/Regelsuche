@@ -1,6 +1,7 @@
 package de.regelsuche.benchmark.polynomial;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -304,16 +305,31 @@ public interface PolynomialTheoryUtilityProfileAdapter {
                     "no-factorization run differs from the frozen profile"
                 );
             }
-            return new BaselineRun(descriptor);
+            List<PolynomialTheoryUtilityExecutionInput> expectedInputs =
+                PolynomialTheoryUtilityExecutionInputs.freeze().inputs().stream()
+                    .filter(value -> expectedRunId.equals(value.runId()))
+                    .toList();
+            if (expectedInputs.size() != descriptor.expectedCaseCount()) {
+                throw new IllegalStateException(
+                    "no-factorization run input count differs from the freeze"
+                );
+            }
+            return new BaselineRun(descriptor, expectedInputs);
         }
 
         private static final class BaselineRun implements Run {
             private final RunDescriptor descriptor;
+            private final List<PolynomialTheoryUtilityExecutionInput>
+                expectedInputs;
             private int nextCase;
             private boolean closed;
 
-            private BaselineRun(RunDescriptor descriptor) {
+            private BaselineRun(
+                RunDescriptor descriptor,
+                List<PolynomialTheoryUtilityExecutionInput> expectedInputs
+            ) {
                 this.descriptor = descriptor;
+                this.expectedInputs = List.copyOf(expectedInputs);
             }
 
             @Override
@@ -328,18 +344,11 @@ public interface PolynomialTheoryUtilityProfileAdapter {
                         "no-factorization run cannot accept another case"
                     );
                 }
-                String expectedCaseId =
-                    PolynomialTheoryUtilityCaseCorpus.ORDERED_CASE_IDS.get(
-                        nextCase
-                    );
-                if (!descriptor.runId().equals(input.runId())
-                        || !descriptor.profileId().equals(input.profileId())
-                        || !descriptor.checkpointId().equals(
-                            input.checkpointId()
-                        )
-                        || !descriptor.adapterId().equals(input.adapterId())
-                        || !expectedCaseId.equals(input.caseId())
-                        || !input.caseId().equals(formationCase.caseId())) {
+                var expectedInput = expectedInputs.get(nextCase);
+                if (!expectedInput.equals(input)
+                        || !expectedInput.caseId().equals(
+                            formationCase.caseId()
+                        )) {
                     throw new IllegalArgumentException(
                         "no-factorization input differs from its frozen position"
                     );
