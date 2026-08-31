@@ -168,7 +168,7 @@ public final class ExactMonomialSquareExposureOperator
         return expression instanceof BinaryExpr power
             && power.operator() == BinaryOperator.POW
             && power.right() instanceof NumberExpr exponent
-            && exponent.value() == 2;
+            && Double.compare(exponent.value(), 2.0) == 0;
     }
 
     private static List<PositionedNode> positionedNodes(Expr root) {
