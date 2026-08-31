@@ -51,7 +51,7 @@ class BrahmaguptaFibonacciTargetFreePreregistrationContractTest {
         assertTrue(document.contains("ast_distribute_left_add"));
         assertTrue(document.contains("ast_distribute_right_add"));
         assertTrue(document.contains("ast_canonical_normalize"));
-        assertTrue(document.contains("exact_monomial_square_exposure"));
+        assertTrue(document.contains("expose_exact_monomial_square"));
         assertTrue(document.contains(
             "additive_pair(frozen_completion_rule)"));
         assertTrue(document.contains(
