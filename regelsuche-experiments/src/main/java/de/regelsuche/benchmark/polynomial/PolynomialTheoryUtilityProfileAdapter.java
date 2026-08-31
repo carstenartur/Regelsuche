@@ -106,7 +106,7 @@ public interface PolynomialTheoryUtilityProfileAdapter {
             }
         }
 
-        public static CandidateResult noTransition(
+        static CandidateResult noTransition(
             PolynomialTheoryUtilityExecutionInput input,
             String detailCode
         ) {
@@ -123,7 +123,7 @@ public interface PolynomialTheoryUtilityProfileAdapter {
             );
         }
 
-        public static CandidateResult create(
+        static CandidateResult create(
             PolynomialTheoryUtilityExecutionInput input,
             TerminalStatus terminalStatus,
             String detailCode,
@@ -159,7 +159,7 @@ public interface PolynomialTheoryUtilityProfileAdapter {
             );
         }
 
-        public void validateAgainst(
+        void validateAgainst(
             PolynomialTheoryUtilityExecutionInput expected
         ) {
             if (!input.equals(Objects.requireNonNull(expected, "expected"))) {
