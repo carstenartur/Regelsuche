@@ -10,16 +10,15 @@ die versiegelte Qualifikation bleibt geschlossen.
 
 `PolynomialTheoryUtilityProfileAdapter` erhält pro Lauf nur Run-, Profil-,
 Checkpoint- und Adapteridentität sowie jeweils eine target-blinde Eingabe und
-den sichtbaren Formationsfall.
+den sichtbaren Formationsfall. Sein verschachtelter `CandidateResult` bewahrt
+das terminale Ergebnis, ohne ein zusätzliches Repository-Konzept neben dem
+Adaptervertrag einzuführen.
 
-`PolynomialTheoryUtilityCandidateResult` verweist über `inputId` auf die
-vollständig inhaltsadressierte Eingabe. Diese Identität bindet bereits
-Planzeile, Run, Fall, Profil, Checkpoint, Adapter, alle Arbeitsgrenzen sowie die
-Hashes von Präregistrierung, Formation, Qualifikation und Ausführungsplan.
-Das Resultat ergänzt terminalen Status, tatsächlich verbrauchte Arbeit,
-Übergangszahl, Verifier-Ausgang und Transitionsevidenz. `validateAgainst`
-verlangt das konkrete zugehörige Inputobjekt und prüft Bindung, Budgets,
-Evidenzregeln und Resultathash erneut.
+Das Resultat verweist auf die konkrete unveränderliche Eingabehülle. Deren
+`inputId` bindet bereits Planzeile, Run, Fall, Profil, Checkpoint, Adapter, alle
+Arbeitsgrenzen sowie die Hashes von Präregistrierung, Formation, Qualifikation
+und Ausführungsplan. Das Resultat ergänzt nur terminalen Status, tatsächlich
+verbrauchte Arbeit, Übergangszahl, Verifier-Ausgang und Transitionsevidenz.
 
 Zulässige Status sind:
 

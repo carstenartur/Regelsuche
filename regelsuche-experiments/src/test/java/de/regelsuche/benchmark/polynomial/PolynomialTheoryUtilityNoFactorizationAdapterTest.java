@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.benchmark.polynomial
+    .PolynomialTheoryUtilityProfileAdapter.CandidateResult;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -15,8 +17,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
         var inputs = baselineInputs();
         var formation = PolynomialTheoryUtilityCaseCorpus.load().cases();
         var adapter = new PolynomialTheoryUtilityNoFactorizationAdapter();
-        List<PolynomialTheoryUtilityCandidateResult> results =
-            new ArrayList<>(inputs.size());
+        List<CandidateResult> results = new ArrayList<>(inputs.size());
 
         for (var checkpoint : PolynomialTheoryUtilityExecutionPlan.CHECKPOINTS) {
             var runInputs = inputs.stream()
@@ -35,18 +36,14 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
         assertEquals(120, results.size());
         assertEquals(
             120L,
-            results.stream()
-                .map(PolynomialTheoryUtilityCandidateResult::resultId)
-                .distinct()
-                .count()
+            results.stream().map(CandidateResult::resultId).distinct().count()
         );
         for (int index = 0; index < results.size(); index++) {
             var result = results.get(index);
             var input = inputs.get(index);
             result.validateAgainst(input);
             assertEquals(
-                PolynomialTheoryUtilityCandidateResult.TerminalStatus
-                    .NO_TRANSITION,
+                CandidateResult.TerminalStatus.NO_TRANSITION,
                 result.terminalStatus()
             );
             assertEquals(
@@ -96,17 +93,13 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
     void resultContractRejectsBudgetEvidenceAndRebinding() {
         var inputs = baselineInputs();
         var input = inputs.get(0);
-        var valid = PolynomialTheoryUtilityCandidateResult.noTransition(
-            input,
-            "BASELINE"
-        );
+        var valid = CandidateResult.noTransition(input, "BASELINE");
 
         assertThrows(
             IllegalArgumentException.class,
-            () -> PolynomialTheoryUtilityCandidateResult.create(
+            () -> CandidateResult.create(
                 input,
-                PolynomialTheoryUtilityCandidateResult.TerminalStatus
-                    .NO_TRANSITION,
+                CandidateResult.TerminalStatus.NO_TRANSITION,
                 "EXCESSIVE_WORK",
                 input.admittedPrimitiveWork() + 1L,
                 0L,
@@ -118,10 +111,9 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
         );
         assertThrows(
             IllegalArgumentException.class,
-            () -> PolynomialTheoryUtilityCandidateResult.create(
+            () -> CandidateResult.create(
                 input,
-                PolynomialTheoryUtilityCandidateResult.TerminalStatus
-                    .VALIDATED_TRANSITION,
+                CandidateResult.TerminalStatus.VALIDATED_TRANSITION,
                 "UNVERIFIED_TRANSITION",
                 1L,
                 1L,

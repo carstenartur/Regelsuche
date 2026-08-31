@@ -57,7 +57,7 @@ public final class PolynomialTheoryUtilityNoFactorizationAdapter
         }
 
         @Override
-        public PolynomialTheoryUtilityCandidateResult execute(
+        public CandidateResult execute(
             PolynomialTheoryUtilityExecutionInput input,
             PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase
         ) {
@@ -81,10 +81,7 @@ public final class PolynomialTheoryUtilityNoFactorizationAdapter
                 );
             }
             nextCase++;
-            return PolynomialTheoryUtilityCandidateResult.noTransition(
-                input,
-                DETAIL_CODE
-            );
+            return CandidateResult.noTransition(input, DETAIL_CODE);
         }
 
         @Override
