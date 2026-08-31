@@ -67,7 +67,7 @@ final class HistoricalPrecursorTestSupport {
                     "(sin(t) + z)^2 - 2*sin(t)*z")),
             List.of(
                 new NegativeHoldout(
-                    "completion-noncubic-left",
+                    "completion-nonsquare-left",
                     "m^3 + n^2"),
                 new NegativeHoldout(
                     "completion-wrong-operator",
@@ -101,7 +101,7 @@ final class HistoricalPrecursorTestSupport {
                     "difference-wrong-operator",
                     "m^2 + n^2"),
                 new NegativeHoldout(
-                    "difference-noncubic-left",
+                    "difference-nonsquare-left",
                     "m^3 - n^2")));
     }
 
