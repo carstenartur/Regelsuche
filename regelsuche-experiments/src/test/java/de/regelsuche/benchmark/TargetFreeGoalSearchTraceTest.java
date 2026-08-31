@@ -1,5 +1,9 @@
 package de.regelsuche.benchmark;
 
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.PROGRESS_LEDGER;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.SEARCH_GRAPH;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactStatus.AVAILABLE;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactStatus.NOT_PRODUCED;
 import static de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus.REACHED;
 import static de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus.UNTARGETED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -9,6 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.benchmark.TargetFreeGoalSearchTrace.Content;
 import de.regelsuche.benchmark.TargetFreeGoalSearchTrace.Trace;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.scoring.cost.TransformationGoal;
 import de.regelsuche.search.SearchHeuristic;
@@ -52,7 +58,9 @@ class TargetFreeGoalSearchTraceTest {
         assertEquals(
             List.of("application-a", "application-z"),
             first.content().states().get(2)
-                .appliedRuleApplications());
+                .appliedRuleApplicationIdentities());
+        assertEquals("", first.content().states().getFirst()
+            .appliedRuleKind());
         assertEquals(
             first.content().states().get(2).fingerprint(),
             first.content().bestStateFingerprint());
@@ -60,6 +68,49 @@ class TargetFreeGoalSearchTraceTest {
             "\"terminalStatus\":\"UNTARGETED\""));
         assertTrue(first.toCanonicalJson().contains(
             "\"claimBoundary\":"));
+    }
+
+    @Test
+    void applicationIdentitiesRemainASetRatherThanAStepSequence() {
+        Trace trace = trace(result(
+            "application-z",
+            UNTARGETED,
+            false,
+            true));
+        var state = trace.content().states().get(2);
+
+        assertEquals(2, state.depth());
+        assertEquals(2, state.appliedRuleIds().size());
+        assertEquals(
+            List.of("application-z"),
+            state.appliedRuleApplicationIdentities());
+    }
+
+    @Test
+    void projectsOneTraceIntoTheExistingWorkspaceArtifactMatrix() {
+        Trace trace = trace(result("application-a", UNTARGETED, false));
+
+        List<RepresentationDiscoveryArtifactReference> artifacts =
+            TargetFreeGoalSearchTrace.workspaceArtifacts(trace);
+        List<RepresentationDiscoveryArtifactReference> available =
+            artifacts.stream()
+                .filter(reference -> reference.status() == AVAILABLE)
+                .toList();
+
+        assertEquals(ArtifactRole.values().length, artifacts.size());
+        assertEquals(
+            List.of(SEARCH_GRAPH, PROGRESS_LEDGER),
+            available.stream()
+                .map(RepresentationDiscoveryArtifactReference::role)
+                .toList());
+        assertTrue(available.stream().allMatch(reference ->
+            TargetFreeGoalSearchTrace.SCHEMA.equals(
+                reference.artifactSchema())
+                && trace.contentHash().equals(
+                    reference.targetContentHash())));
+        assertTrue(artifacts.stream()
+            .filter(reference -> reference.status() != AVAILABLE)
+            .allMatch(reference -> reference.status() == NOT_PRODUCED));
     }
 
     @Test
@@ -213,6 +264,15 @@ class TargetFreeGoalSearchTraceTest {
         de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus status,
         boolean reached
     ) {
+        return result(secondApplicationKey, status, reached, false);
+    }
+
+    private GoalSearchResult result(
+        String secondApplicationKey,
+        de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus status,
+        boolean reached,
+        boolean retainOneApplicationIdentity
+    ) {
         SearchState root = new SearchState(
             "a + b",
             0,
@@ -251,13 +311,16 @@ class TargetFreeGoalSearchTraceTest {
             List.of(RewriteKind.NORMALIZE),
             List.of(true),
             List.of());
+        Set<String> grandchildApplications = retainOneApplicationIdentity
+            ? Set.of("application-z")
+            : Set.of("application-z", secondApplicationKey);
         SearchState grandchild = new SearchState(
             "(b + a) + 0",
             2,
             new ExpressionScore(11, 5, 2, 2, 0),
             List.of("a + b", "b + a", "(b + a) + 0"),
             List.of("commute", "add-zero"),
-            Set.of("application-z", secondApplicationKey),
+            grandchildApplications,
             1,
             "value-v1:grandchild",
             "b + a",
