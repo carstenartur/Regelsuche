@@ -23,37 +23,53 @@ import java.util.Objects;
  * flattens only addition, enumerates pairs in deterministic index order, tries
  * both operand orientations, replaces exactly one selected pair, and preserves
  * all delegated rule and provenance metadata. Subtraction is left opaque so no
- * sign convention or additional assumption is introduced implicitly.</p>
+ * sign convention or additional assumption is introduced implicitly. Both the
+ * number of retained candidates and the admitted sum width are bounded before
+ * the quadratic pair enumeration begins.</p>
  */
 public final class AdditivePairHypothesisOperator
         implements HypothesisOperator {
     private static final int DEFAULT_MAX_CANDIDATES = 64;
+    private static final int DEFAULT_MAX_TERMS = 32;
 
     private final HypothesisOperator delegate;
     private final int maxCandidates;
+    private final int maxTerms;
     private final ExpressionParser parser = new ExpressionParser();
 
     public AdditivePairHypothesisOperator(HypothesisOperator delegate) {
-        this(delegate, DEFAULT_MAX_CANDIDATES);
+        this(
+            delegate,
+            DEFAULT_MAX_CANDIDATES,
+            DEFAULT_MAX_TERMS);
     }
 
     public AdditivePairHypothesisOperator(
         HypothesisOperator delegate,
         int maxCandidates
     ) {
+        this(delegate, maxCandidates, DEFAULT_MAX_TERMS);
+    }
+
+    public AdditivePairHypothesisOperator(
+        HypothesisOperator delegate,
+        int maxCandidates,
+        int maxTerms
+    ) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.maxCandidates = Math.max(0, maxCandidates);
+        this.maxTerms = Math.max(0, maxTerms);
     }
 
     @Override
     public List<Transformation> generateCandidates(String expression) {
         Expr root = parse(expression);
-        if (root == null || maxCandidates == 0) {
+        if (root == null || maxCandidates == 0 || maxTerms < 2) {
             return List.of();
         }
 
         List<Expr> terms = flattenAddition(root);
-        if (terms.size() < 2) {
+        if (terms.size() < 2 || terms.size() > maxTerms) {
             return List.of();
         }
 

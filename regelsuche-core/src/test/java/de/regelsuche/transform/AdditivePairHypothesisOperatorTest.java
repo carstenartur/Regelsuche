@@ -12,6 +12,7 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 
@@ -141,6 +142,27 @@ class AdditivePairHypothesisOperatorTest {
         assertTrue(new AdditivePairHypothesisOperator(pairDelegate(), -1)
             .generateCandidates("a + b + c")
             .isEmpty());
+    }
+
+    @Test
+    void rejectsOversizedSumsBeforeQuadraticDelegation() {
+        AtomicInteger delegatedCalls = new AtomicInteger();
+        HypothesisOperator countingDelegate = expression -> {
+            delegatedCalls.incrementAndGet();
+            return List.of();
+        };
+
+        assertTrue(new AdditivePairHypothesisOperator(
+            countingDelegate,
+            64,
+            3).generateCandidates("a + b + c + d").isEmpty());
+        assertEquals(0, delegatedCalls.get());
+
+        assertTrue(new AdditivePairHypothesisOperator(
+            countingDelegate,
+            64,
+            -1).generateCandidates("a + b").isEmpty());
+        assertEquals(0, delegatedCalls.get());
     }
 
     @Test
