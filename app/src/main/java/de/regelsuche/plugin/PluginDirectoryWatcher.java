@@ -35,6 +35,9 @@ public final class PluginDirectoryWatcher implements Closeable {
     private final long debounceNanos;
     private final Consumer<PluginReloadResult> listener;
     private final Consumer<Boolean> cycleListener;
+    // Package-private test seam invoked after each WatchKey is drained;
+    // every production constructor installs a no-op.
+    private final Runnable eventObserver;
     private volatile boolean running;
     private boolean started;
     private WatchService watchService;
@@ -59,12 +62,30 @@ public final class PluginDirectoryWatcher implements Closeable {
         Consumer<PluginReloadResult> listener,
         Consumer<Boolean> cycleListener
     ) {
+        this(
+            runtime,
+            debounce,
+            listener,
+            cycleListener,
+            () -> { });
+    }
+
+    PluginDirectoryWatcher(
+        PluginRuntime runtime,
+        Duration debounce,
+        Consumer<PluginReloadResult> listener,
+        Consumer<Boolean> cycleListener,
+        Runnable eventObserver
+    ) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.debounceNanos = debounceNanos(debounce);
         this.listener = Objects.requireNonNull(listener, "listener");
         this.cycleListener = Objects.requireNonNull(
             cycleListener,
             "cycleListener");
+        this.eventObserver = Objects.requireNonNull(
+            eventObserver,
+            "eventObserver");
         this.reportedState = ReportedState.from(runtime);
     }
 
@@ -128,7 +149,7 @@ public final class PluginDirectoryWatcher implements Closeable {
         try {
             while (running) {
                 WatchKey key = service.take();
-                drain(key);
+                observe(key);
                 if (!running || !awaitQuietPeriod(service)) {
                     break;
                 }
@@ -153,9 +174,14 @@ public final class PluginDirectoryWatcher implements Closeable {
             if (next == null) {
                 return running;
             }
-            drain(next);
+            observe(next);
         }
         return false;
+    }
+
+    private void observe(WatchKey key) {
+        drain(key);
+        eventObserver.run();
     }
 
     private static void drain(WatchKey key) {
