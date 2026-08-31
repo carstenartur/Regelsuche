@@ -45,6 +45,13 @@
     "structuralOccurrenceLimit": 32,
     "structuralCandidateLimit": 128
   },
+  "execution": {
+    "environmentGate": "REGELSUCHE_RUN_BRAHMAGUPTA_TARGET_FREE_STUDY",
+    "acceptedGateValues": ["true", "1", "yes"],
+    "normalBuildExecutesHeavyStudy": false,
+    "gradleCommand": "REGELSUCHE_RUN_BRAHMAGUPTA_TARGET_FREE_STUDY=true ./gradlew :app:test --tests de.regelsuche.docs.BrahmaguptaFibonacciTargetFreeSingleRuleIntegrationTest",
+    "mavenCommand": "REGELSUCHE_RUN_BRAHMAGUPTA_TARGET_FREE_STUDY=true mvn --batch-mode --no-transfer-progress -pl app -am -Dtest=de.regelsuche.docs.BrahmaguptaFibonacciTargetFreeSingleRuleIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test"
+  },
   "artifact": {
     "schema": "regelsuche.target-free-historical-search-comparison/v1",
     "fileName": "target-free-historical-search-comparison.json",
@@ -78,5 +85,5 @@
     "bothRunsMustReportUntargetedStatus": true,
     "neitherRunMayExposeAReachedTargetState": true
   },
-  "changePolicy": "Any change to source, objective, operator inventory, budgets, artifact contract or post-hoc matcher after execution requires a new preregistration version."
+  "changePolicy": "Any change to source, objective, operator inventory, budgets, execution gate, artifact contract or post-hoc matcher after execution requires a new preregistration version."
 }
