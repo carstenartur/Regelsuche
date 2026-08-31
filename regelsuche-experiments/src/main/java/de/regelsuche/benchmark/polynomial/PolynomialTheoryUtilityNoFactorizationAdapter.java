@@ -24,21 +24,27 @@ public final class PolynomialTheoryUtilityNoFactorizationAdapter
     @Override
     public Run openRun(RunDescriptor descriptor) {
         Objects.requireNonNull(descriptor, "descriptor");
+        var checkpoint = PolynomialTheoryUtilityExecutionPlan.CHECKPOINTS.stream()
+            .filter(value -> value.checkpointId().equals(
+                descriptor.checkpointId()
+            ))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException(
+                "no-factorization checkpoint is not frozen"
+            ));
+        var profile = PolynomialTheoryUtilityExecutionInputs.profile(PROFILE_ID);
+        String expectedRunId =
+            PolynomialTheoryUtilityExecutionIdentity.runId(profile, checkpoint);
         if (!PROFILE_ID.equals(descriptor.profileId())
                 || !ADAPTER_ID.equals(descriptor.adapterId())
+                || !expectedRunId.equals(descriptor.runId())
                 || descriptor.expectedCaseCount()
-                    != PolynomialTheoryUtilityCaseCorpus.ORDERED_CASE_IDS.size()
-                || !knownCheckpoint(descriptor.checkpointId())) {
+                    != PolynomialTheoryUtilityCaseCorpus.ORDERED_CASE_IDS.size()) {
             throw new IllegalArgumentException(
                 "no-factorization run differs from the frozen profile"
             );
         }
         return new BaselineRun(descriptor);
-    }
-
-    private static boolean knownCheckpoint(String checkpointId) {
-        return PolynomialTheoryUtilityExecutionPlan.CHECKPOINTS.stream()
-            .anyMatch(value -> value.checkpointId().equals(checkpointId));
     }
 
     private static final class BaselineRun implements Run {

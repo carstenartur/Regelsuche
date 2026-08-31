@@ -139,16 +139,29 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
     }
 
     @Test
-    void rejectsAnotherFrozenProfile() {
-        var input = PolynomialTheoryUtilityExecutionInputs.freeze().inputs()
-            .stream()
+    void rejectsAnotherProfileAndInventedRunIdentity() {
+        var allInputs = PolynomialTheoryUtilityExecutionInputs.freeze().inputs();
+        var foreign = allInputs.stream()
             .filter(value -> !"NO_FACTORIZATION".equals(value.profileId()))
             .findFirst()
             .orElseThrow();
+        var adapter = new PolynomialTheoryUtilityNoFactorizationAdapter();
         assertThrows(
             IllegalArgumentException.class,
-            () -> new PolynomialTheoryUtilityNoFactorizationAdapter()
-                .openRun(descriptor(input))
+            () -> adapter.openRun(descriptor(foreign))
+        );
+
+        var baseline = baselineInputs().get(0);
+        var invented = new PolynomialTheoryUtilityProfileAdapter.RunDescriptor(
+            "sha256:" + "0".repeat(64),
+            baseline.profileId(),
+            baseline.checkpointId(),
+            baseline.adapterId(),
+            PolynomialTheoryUtilityCaseCorpus.ORDERED_CASE_IDS.size()
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> adapter.openRun(invented)
         );
     }
 
