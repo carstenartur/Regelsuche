@@ -229,7 +229,7 @@ public record PolynomialTheoryUtilityCandidateResult(
                     &quot;validated result lacks verifier-backed transitions&quot;
                 );
             }
-<span class="pc bpc" id="L232" title="1 of 4 branches missed.">        } else if (!transitions.isEmpty() || &quot;VERIFIED&quot;.equals(verifier)) {</span>
+<span class="fc bfc" id="L232" title="All 4 branches covered.">        } else if (!transitions.isEmpty() || &quot;VERIFIED&quot;.equals(verifier)) {</span>
 <span class="fc" id="L233">            throw new IllegalArgumentException(</span>
                 &quot;non-transition result retains transition authority&quot;
             );
@@ -242,12 +242,12 @@ public record PolynomialTheoryUtilityCandidateResult(
         List&lt;PolynomialTheoryUtilityTransitionOutcome&gt; transitions
     ) {
 <span class="fc bfc" id="L244" title="All 2 branches covered.">        if (&quot;DISABLED&quot;.equals(profile.factorizationMode())</span>
-<span class="pc bpc" id="L245" title="1 of 2 branches missed.">                &amp;&amp; work.factorizationWork() != 0L) {</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">                &amp;&amp; work.factorizationWork() != 0L) {</span>
 <span class="fc" id="L246">            throw new IllegalArgumentException(</span>
                 &quot;factorization-disabled profile retained factorization work&quot;
             );
         }
-<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        if (&quot;DISABLED&quot;.equals(profile.cacheMode())</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (&quot;DISABLED&quot;.equals(profile.cacheMode())</span>
 <span class="fc bfc" id="L251" title="All 2 branches covered.">                &amp;&amp; (work.cacheLookupWork() != 0L</span>
 <span class="pc bpc" id="L252" title="1 of 2 branches missed.">                    || work.cacheInsertionWork() != 0L</span>
 <span class="pc bpc" id="L253" title="1 of 2 branches missed.">                    || work.cacheEvictionWork() != 0L</span>
