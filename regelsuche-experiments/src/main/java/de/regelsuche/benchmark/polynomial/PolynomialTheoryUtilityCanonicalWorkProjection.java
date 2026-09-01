@@ -450,10 +450,9 @@ public final class PolynomialTheoryUtilityCanonicalWorkProjection {
             }
             rawWorkHash = requireHash(rawWorkHash, "rawWorkHash");
             work = Objects.requireNonNull(work, "work");
-            if (!projectionId.equals(projectionId(
-                    executionInputId,
-                    rawWorkHash,
-                    work))) {
+            if (!projectionId.equals(
+                    PolynomialTheoryUtilityCanonicalWorkProjection
+                        .projectionId(executionInputId, rawWorkHash, work))) {
                 throw new IllegalArgumentException(
                     "projection identity differs from its evidence"
                 );
