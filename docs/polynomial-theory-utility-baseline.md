@@ -6,19 +6,26 @@ Produktiv implementiert ist weiterhin nur `NO_FACTORIZATION`. Die vier
 mathematischen Profile bleiben unverbunden; Qualifikation, Candidate-Freeze und
 Produktentscheidung existieren noch nicht.
 
-Die vorliegende Erweiterung ergänzt innerhalb derselben Ausführungsgrenze das
-exakte Adapterinventar, 30 isolierte Run-Sessions und ein validiertes
-In-Memory-Batch. Die Testadapter der vier unverbundenen Profile liefern
-ausschließlich klar als Testdaten markierte `UNSUPPORTED`-Resultate. Daraus
-folgt keine mathematische oder produktbezogene Evidenz.
+Der 30-Run-Runner und das noch nicht eingefrorene Ergebnisbatch verwenden jetzt
+durchgehend den eigenständigen
+`PolynomialTheoryUtilityCandidateResult`-Vertrag in Version 2. Der frühere
+verschachtelte v1-Ergebnisdatensatz wurde entfernt. Die Testadapter der vier
+unverbundenen Profile liefern ausschließlich klar als Testdaten markierte
+`UNSUPPORTED`-Resultate. Daraus folgt keine mathematische oder produktbezogene
+Evidenz.
 
 ## Eingabe- und Ergebnisvertrag
 
 `PolynomialTheoryUtilityProfileAdapter` erhält ausschließlich einen gebundenen
 Run-Deskriptor, eine target-blinde Eingabe und deren sichtbaren Formationsfall.
-Sein `CandidateResult` verweist auf die unveränderliche Eingabe. Deren `inputId`
-bindet Planzeile, Run, Fall, Profil, Checkpoint, Adapter, Budgets und sämtliche
-eingefrorenen Studienartefakte.
+Jeder Run liefert ein `PolynomialTheoryUtilityCandidateResult`. Dieses bindet:
+
+- den vollständigen wertgleichen Eingang aus der eingefrorenen 600-Zeilen-Matrix,
+- die unveränderte Quellwurzel aus dem Formation-Korpus,
+- terminalen Status und Detailcode,
+- einen typisierten Arbeitsvektor,
+- die geordnete Liste occurrence-gebundener Übergänge,
+- das Ergebnis der unabhängigen Verifikation.
 
 Der Nulladapter verlässt sich nicht nur auf sichtbare IDs. Beim Öffnen eines
 Runs löst er dessen vollständige 20 Eingaben aus dem content-adressierten
@@ -27,12 +34,12 @@ der eingefrorenen Eingabe übereinstimmen. Ein syntaktisch gültiger Umschlag, d
 beispielsweise eine echte `inputId` wiederverwendet, aber `rowId` oder Budgets
 verändert, wird vor der Ausführung abgewiesen und verbraucht keine Run-Position.
 
-Ein Ergebnis darf seine primitiven, mechanischen und Faktorisierungsbudgets
-nicht überschreiten. `VALIDATED_TRANSITION` erfordert mindestens einen
-Übergang, `VERIFIED` und eine SHA-256-Evidenz; alle anderen Status behalten null
-Übergänge und `NONE` als Transitionsevidenz. Weitere Status sind
-`NO_TRANSITION`, `UNSUPPORTED`, `BUDGET_INCONCLUSIVE` und
-`TECHNICAL_FAILURE`.
+Der Ergebnisvertrag prüft primitive, mechanische und
+Faktorisierungsarbeitsgrenzen sowie die komponentenweise Deckung sämtlicher
+lokaler Übergangsarbeit. `VALIDATED_TRANSITION` erfordert mindestens einen
+typisierten Übergang und `VERIFIED`. Alle anderen Status dürfen keine
+Übergangsautorität behalten. Weitere Status sind `NO_TRANSITION`,
+`UNSUPPORTED`, `BUDGET_INCONCLUSIVE` und `TECHNICAL_FAILURE`.
 
 ## Nullprofil
 
@@ -47,11 +54,12 @@ Formationsreihenfolge. Alle 120 Ergebnisse lauten:
 
 ```text
 NO_TRANSITION / FACTORIZATION_DISABLED_BY_FROZEN_PROFILE
-primitive/mechanical/factorization work = 0
-transitions = 0; verifier = NOT_REQUESTED; evidence = NONE
+all typed work dimensions = 0
+transitions = []; verifier = NOT_REQUESTED
 ```
 
-Ungenutztes Budget wird weder berechnet noch umverteilt.
+Jedes Resultat enthält zusätzlich die exakte Quellwurzel seines
+Formation-Falls. Ungenutztes Budget wird weder berechnet noch umverteilt.
 
 ## Exaktes Adapterinventar
 
@@ -77,8 +85,11 @@ Der Eingabeartefakt-Vertrag bindet die vollständigen kanonischen Bytes und weis
 jede veränderte Zeile oder Reihenfolge zurück. Der Runner öffnet für jeden der
 30 zusammenhängenden Runs genau eine Adapter-Session. Die 20 Eingaben müssen
 dieselbe Run-, Profil-, Checkpoint- und Adapteridentität besitzen und der
-eingefrorenen Formationsreihenfolge folgen. Jedes Ergebnis wird unmittelbar
-gegen den exakten Input-Record geprüft, bevor es in das Batch gelangt.
+eingefrorenen Formationsreihenfolge folgen.
+
+Jedes Ergebnis wird unmittelbar gegen den exakten Input-Record und den
+positionsgleichen Formation-Fall geprüft. Damit können weder eine fremde
+Eingabe noch eine andere Quellwurzel unbemerkt in das Batch gelangen.
 
 Eine Adapterausnahme erzeugt kein partielles Batch und wird nicht automatisch
 als mathematisches Resultat umgedeutet. `try`-with-resources schließt die aktive
@@ -89,8 +100,14 @@ ausdrücklich als `TECHNICAL_FAILURE` geliefert werden.
 ## Noch nicht eingefrorenes Ergebnisbatch
 
 `PolynomialTheoryUtilityProfileAdapter.CandidateBatch` bewahrt exakt 600
-geordnete, eindeutige und an ihre Eingaben gebundene Resultate. Sein Status
-lautet:
+geordnete, eindeutige und an Eingabe plus Formation gebundene v2-Resultate. Sein
+Schema lautet:
+
+```text
+regelsuche.polynomial-theory-utility-candidate-batch/v2
+```
+
+Der Status bleibt:
 
 ```text
 TARGET_BLIND_RESULTS_COLLECTED_NOT_FROZEN
@@ -98,9 +115,9 @@ TARGET_BLIND_RESULTS_COLLECTED_NOT_FROZEN
 
 Das Batch bindet Inhaltsadresse und Bytelänge der Ausführungseingaben, besitzt
 aber bewusst noch keine eigene kanonische JSON-Darstellung oder öffentliche
-SHA-256-Identität. Der vollständige typisierte Messvertrag und die
-Candidate-Freeze-Serialisierung folgen in einem eigenen Slice, bevor ein
-mathematischer Profiladapter Ergebnisse liefern darf.
+SHA-256-Identität. Eine neue Candidate-Freeze darf nur diesen v2-Vertrag
+serialisieren; der entfernte aggregierte v1-Datensatz ist keine zulässige
+Zwischenautorität mehr.
 
 ## Verifikation
 
@@ -111,9 +128,10 @@ mathematischer Profiladapter Ergebnisse liefern darf.
 
 Die Tests decken ab:
 
-- alle sechs Nullprofil-Runs und 120 eindeutige Zero-Work-Resultate;
-- Reihenfolge, erfundene Run-Hashes, Session-Lebenszyklus, Budget-/Evidenzfehler
-  und Rebinding;
+- alle sechs Nullprofil-Runs und 120 eindeutige Zero-Work-v2-Resultate;
+- Eingabe-, Formation- und Quellwurzelbindung jedes Resultats;
+- Reihenfolge, erfundene Run-Hashes, Session-Lebenszyklus, Budgetfehler und
+  Rebinding;
 - einen gefälschten Eingabeumschlag mit wiederverwendeter `inputId`;
 - 30 exakt gebundene, geöffnete und geschlossene Sessions;
 - 600 Eingaben und Resultate in unveränderter Reihenfolge;
@@ -123,6 +141,6 @@ Die Tests decken ab:
 - Session-Cleanup und unterdrückte Schließfehler;
 - Unveränderlichkeit des Ergebnisbatches.
 
-Als nächster getrennter Slice folgt der versionierte Mess- und
-Candidate-Freeze-Vertrag. Erst danach werden native On-Demand-, Cache-,
-Quartikkontroll- und optionale SymPy-Adapter einzeln angebunden.
+Als nächster getrennter Slice folgt die kanonische Candidate-Freeze für das
+v2-Batch. Danach werden native On-Demand-, Cache-, Quartikkontroll- und
+optionale SymPy-Adapter einzeln angebunden.
