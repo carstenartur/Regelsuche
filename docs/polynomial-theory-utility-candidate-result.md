@@ -37,11 +37,11 @@ abgewiesen.
 
 ## Formation- und Profilbindung
 
-Der Container lädt die eingefrorenen Formation-Fälle als eigene
-Validierungsautorität. Konstruktion und spätere `validateAgainst`-Prüfung
-fordern:
+Der Container lädt die eingefrorenen Ausführungseingänge und
+Formation-Fälle als eigene Validierungsautorität. Konstruktion und spätere
+`validateAgainst`-Prüfung fordern:
 
-- denselben vollständigen Ausführungseingang,
+- den wertgleichen vollständigen Eingang aus der eingefrorenen Matrix,
 - dieselbe Fallidentität,
 - den byte-/wertgleich geladenen Formation-Fall,
 - dieselbe Quellwurzel,
@@ -58,6 +58,11 @@ Der aggregierte Arbeitsvektor muss drei Grenzen einhalten:
 1. primitive Arbeit höchstens das zugelassene primitive Budget,
 2. mechanische Arbeit höchstens das eingefrorene mechanische Budget,
 3. Faktorisierungsarbeit höchstens das Faktorisierungsbudget.
+
+Profilregeln gelten auch für den Aggregatvektor: Ein deaktiviertes Backend
+darf keine Faktorisierungsarbeit und ein deaktivierter Cache keinerlei
+Cache-Arbeit behalten. Ein übergangsfreies Resultat darf keine Einfügungs-,
+Verdrängungs- oder Replay-Arbeit behaupten.
 
 Zusätzlich werden die lokalen Arbeitsvektoren aller Übergänge exakt addiert.
 Der Resultatvektor muss diese Summe komponentenweise abdecken. Matching-Arbeit

@@ -28,12 +28,21 @@ public record PolynomialTheoryUtilityCandidateResult(
         Pattern.compile("sha256:[0-9a-f]{64}");
     private static final Map<
         String,
+        PolynomialTheoryUtilityExecutionInput
+    > FROZEN_INPUTS = loadFrozenInputs();
+    private static final Map<
+        String,
         PolynomialTheoryUtilityCaseCorpus.FormationCase
     > FORMATION_CASES = loadFormationCases();
 
     public PolynomialTheoryUtilityCandidateResult {
         resultId = requireHash(resultId, "resultId");
         input = Objects.requireNonNull(input, "input");
+        if (!input.equals(frozenInput(input.inputId()))) {
+            throw new IllegalArgumentException(
+                "candidate result input differs from the frozen matrix"
+            );
+        }
         sourceRootExpression = requireText(
             sourceRootExpression,
             "sourceRootExpression"
@@ -63,6 +72,7 @@ public record PolynomialTheoryUtilityCandidateResult(
         }
         requireWorkWithinAuthority(input, work);
         requireEvidence(terminalStatus, transitions, verifierOutcome);
+        requireProfileWork(profile, work, transitions);
         requireTransitions(
             input,
             formationCase,
@@ -226,6 +236,36 @@ public record PolynomialTheoryUtilityCandidateResult(
         }
     }
 
+    private static void requireProfileWork(
+        PolynomialTheoryUtilityExecutionProfile profile,
+        PolynomialTheoryUtilityWorkBreakdown work,
+        List<PolynomialTheoryUtilityTransitionOutcome> transitions
+    ) {
+        if ("DISABLED".equals(profile.factorizationMode())
+                && work.factorizationWork() != 0L) {
+            throw new IllegalArgumentException(
+                "factorization-disabled profile retained factorization work"
+            );
+        }
+        if ("DISABLED".equals(profile.cacheMode())
+                && (work.cacheLookupWork() != 0L
+                    || work.cacheInsertionWork() != 0L
+                    || work.cacheEvictionWork() != 0L
+                    || work.cacheReplayWork() != 0L)) {
+            throw new IllegalArgumentException(
+                "cache-disabled profile retained aggregate cache work"
+            );
+        }
+        if (transitions.isEmpty()
+                && (work.cacheInsertionWork() != 0L
+                    || work.cacheEvictionWork() != 0L
+                    || work.cacheReplayWork() != 0L)) {
+            throw new IllegalArgumentException(
+                "transition-free result retained derived-cache mutation work"
+            );
+        }
+    }
+
     private static void requireTransitions(
         PolynomialTheoryUtilityExecutionInput input,
         PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase,
@@ -289,6 +329,35 @@ public record PolynomialTheoryUtilityCandidateResult(
         return PolynomialTheoryUtilityExecutionIdentity.sha256(
             material.toString().getBytes(StandardCharsets.UTF_8)
         );
+    }
+
+    private static Map<
+        String,
+        PolynomialTheoryUtilityExecutionInput
+    > loadFrozenInputs() {
+        Map<String, PolynomialTheoryUtilityExecutionInput> values =
+            new LinkedHashMap<>();
+        for (var value :
+                PolynomialTheoryUtilityExecutionInputs.freeze().inputs()) {
+            if (values.putIfAbsent(value.inputId(), value) != null) {
+                throw new IllegalStateException(
+                    "execution matrix repeats an input identity"
+                );
+            }
+        }
+        return Collections.unmodifiableMap(values);
+    }
+
+    private static PolynomialTheoryUtilityExecutionInput frozenInput(
+        String inputId
+    ) {
+        var value = FROZEN_INPUTS.get(requireHash(inputId, "inputId"));
+        if (value == null) {
+            throw new IllegalArgumentException(
+                "unknown frozen polynomial utility input: " + inputId
+            );
+        }
+        return value;
     }
 
     private static Map<

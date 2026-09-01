@@ -219,6 +219,67 @@ class PolynomialTheoryUtilityCandidateResultTest {
             IllegalArgumentException.class,
             () -> valid.validateAgainst(foreignInput(), studyCase)
         );
+
+        var counterfeitInput = new PolynomialTheoryUtilityExecutionInput(
+            input.inputId(),
+            hash("counterfeit-row"),
+            input.runId(),
+            input.caseId(),
+            input.profileId(),
+            input.checkpointId(),
+            input.adapterId(),
+            input.admittedPrimitiveWork(),
+            input.totalMechanicalWork(),
+            input.factorizationWork(),
+            input.inputStatus()
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> PolynomialTheoryUtilityCandidateResult.noTransition(
+                counterfeitInput,
+                studyCase,
+                "COUNTERFEIT_INPUT"
+            )
+        );
+    }
+
+    @Test
+    void rejectsAggregateWorkThatContradictsTheFrozenProfile() {
+        var studyCase = formationCase();
+        var cacheWork = new PolynomialTheoryUtilityWorkBreakdown(
+            1L, 0L, 0L, 0L, 0L, 0L, 0L,
+            0L, 0L, 1L, 0L, 0L, 0L, 0L
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> PolynomialTheoryUtilityCandidateResult.create(
+                input(),
+                studyCase,
+                TerminalStatus.TECHNICAL_FAILURE,
+                "CACHE_WORK_WITH_CACHE_DISABLED",
+                cacheWork,
+                List.of(),
+                "NOT_VERIFIED"
+            )
+        );
+
+        var baseline = input("NO_FACTORIZATION");
+        var factorizationWork = new PolynomialTheoryUtilityWorkBreakdown(
+            1L, 0L, 0L, 1L, 0L, 0L, 0L,
+            0L, 0L, 0L, 0L, 0L, 0L, 0L
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> PolynomialTheoryUtilityCandidateResult.create(
+                baseline,
+                studyCase,
+                TerminalStatus.TECHNICAL_FAILURE,
+                "FACTORIZATION_WORK_WITH_BACKEND_DISABLED",
+                factorizationWork,
+                List.of(),
+                "NOT_VERIFIED"
+            )
+        );
     }
 
     @Test
@@ -300,9 +361,15 @@ class PolynomialTheoryUtilityCandidateResultTest {
     }
 
     private static PolynomialTheoryUtilityExecutionInput input() {
+        return input(PROFILE_ID);
+    }
+
+    private static PolynomialTheoryUtilityExecutionInput input(
+        String profileId
+    ) {
         return PolynomialTheoryUtilityExecutionInputs.freeze().inputs()
             .stream()
-            .filter(value -> PROFILE_ID.equals(value.profileId()))
+            .filter(value -> profileId.equals(value.profileId()))
             .filter(value -> CASE_ID.equals(value.caseId()))
             .filter(value -> "CP06_FULL".equals(value.checkpointId()))
             .findFirst()
