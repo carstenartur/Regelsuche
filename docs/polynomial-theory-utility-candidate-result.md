@@ -14,9 +14,11 @@ einen anderen Ausführungseingang übertragen.
 
 `PolynomialTheoryUtilityCandidateResult` ist der eigenständige v2-Vertrag für
 alle Adapter-Runs und das noch nicht kanonisch eingefrorene Ergebnisbatch. Der
-frühere verschachtelte v1-Datensatz im Adapter wurde entfernt, damit Runner,
-Batch und spätere Candidate-Freeze nicht zwei konkurrierende
-Resultatautoritäten besitzen.
+frühere verschachtelte v1-Datensatz im Adapter wurde entfernt, damit Runner und
+Batch nicht zwei konkurrierende Resultatautoritäten besitzen. v2 bindet die
+Übergangs- und Arbeitsautorität; die weiteren vorregistrierten Zähler und
+Lineage-Dimensionen folgen bewusst vor der Candidate-Freeze in einem eigenen
+Vertragsschritt.
 
 ## Gebundene Felder
 
@@ -114,12 +116,18 @@ Das Batch ist weiterhin nur eine unveränderliche In-Memory-Grenze mit Status
 
 Noch nicht umgesetzt sind:
 
-- die kanonische Candidate-Freeze-Serialisierung des v2-Batches,
+- Faktorisierungsanfrage- und Kandidatenzähler,
+- Pfadtiefe, primitive Expansionslänge und geordnete Primitive-Lineage,
+- Quell-/Ergebnis-AST-Größen und Cache-Ereigniszähler,
+- normalisierte Annahmen und weitere Lineage-Identitäten,
+- die kanonische Candidate-Freeze-Serialisierung des danach vollständigen
+  Resultatbatches,
 - die vier mathematischen Profiladapter,
 - die Öffnung und Auswertung der versiegelten Qualifikation,
 - die mechanische Studienentscheidung,
 - Änderungen an Ausführungsplan, Formation, Produkt- oder Suchvorgaben.
 
-Die nächste Tranche darf die Candidate-Freeze erst aus dem vollständig
-migrierten v2-Batch erzeugen. Eine Rückkehr zum entfernten aggregierten
-v1-Ergebnisformat ist nicht zulässig.
+Der nächste getrennte Slice ergänzt und revalidiert die fehlenden
+Messdimensionen. Erst der daraus hervorgehende vollständige Resultatvertrag
+darf in einer Candidate-Freeze serialisiert werden. Eine Rückkehr zum
+entfernten aggregierten v1-Ergebnisformat ist nicht zulässig.

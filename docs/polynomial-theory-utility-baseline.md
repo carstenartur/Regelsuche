@@ -115,9 +115,9 @@ TARGET_BLIND_RESULTS_COLLECTED_NOT_FROZEN
 
 Das Batch bindet Inhaltsadresse und Bytelänge der Ausführungseingaben, besitzt
 aber bewusst noch keine eigene kanonische JSON-Darstellung oder öffentliche
-SHA-256-Identität. Eine neue Candidate-Freeze darf nur diesen v2-Vertrag
-serialisieren; der entfernte aggregierte v1-Datensatz ist keine zulässige
-Zwischenautorität mehr.
+SHA-256-Identität. Es ist die einheitliche Pre-Freeze-Ausführungsgrenze, aber
+noch nicht die vollständige vorregistrierte Messoberfläche. Der entfernte
+aggregierte v1-Datensatz ist keine zulässige Zwischenautorität mehr.
 
 ## Verifikation
 
@@ -141,6 +141,18 @@ Die Tests decken ab:
 - Session-Cleanup und unterdrückte Schließfehler;
 - Unveränderlichkeit des Ergebnisbatches.
 
-Als nächster getrennter Slice folgt die kanonische Candidate-Freeze für das
-v2-Batch. Danach werden native On-Demand-, Cache-, Quartikkontroll- und
-optionale SymPy-Adapter einzeln angebunden.
+## Nächster Evidenzschritt
+
+Vor einer Candidate-Freeze folgt ein eigener typisierter Mess-Slice. Er muss die
+noch fehlenden vorregistrierten Dimensionen binden und gegen Resultat,
+Übergänge und Profil revalidieren, insbesondere:
+
+- Faktorisierungsanfragen und erzeugte Kandidaten,
+- Pfadtiefe, primitive Expansionslänge und geordnete Primitive-Lineage,
+- Quell- und Ergebnis-AST-Größen,
+- Cache-Hits, -Misses, -Einfügungen und -Verdrängungen,
+- normalisierte Annahmen und weitere Lineage-Identitäten.
+
+Erst danach darf eine kanonische Candidate-Freeze den vollständigen
+Resultatvertrag serialisieren. Anschließend werden native On-Demand-, Cache-,
+Quartikkontroll- und optionale SymPy-Adapter einzeln angebunden.
