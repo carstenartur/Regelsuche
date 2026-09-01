@@ -8,8 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.benchmark.polynomial
     .PolynomialTheoryUtilityProfileAdapter.AdapterRegistry;
 import de.regelsuche.benchmark.polynomial
-    .PolynomialTheoryUtilityProfileAdapter.CandidateResult;
-import de.regelsuche.benchmark.polynomial
     .PolynomialTheoryUtilityProfileAdapter.NoFactorizationAdapter;
 import de.regelsuche.benchmark.polynomial
     .PolynomialTheoryUtilityProfileAdapter.TargetBlindRunner;
@@ -26,7 +24,8 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
         var inputs = baselineInputs();
         var formation = PolynomialTheoryUtilityCaseCorpus.load().cases();
         var adapter = new NoFactorizationAdapter();
-        List<CandidateResult> results = new ArrayList<>(inputs.size());
+        List<PolynomialTheoryUtilityCandidateResult> results =
+            new ArrayList<>(inputs.size());
 
         for (var checkpoint : PolynomialTheoryUtilityExecutionPlan.CHECKPOINTS) {
             var runInputs = inputs.stream()
@@ -34,7 +33,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
                     value.checkpointId()
                 ))
                 .toList();
-            var first = runInputs.get(0);
+            var first = runInputs.getFirst();
             var run = adapter.openRun(descriptor(first));
             for (int index = 0; index < runInputs.size(); index++) {
                 results.add(run.execute(runInputs.get(index), formation.get(index)));
@@ -45,23 +44,29 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
         assertEquals(120, results.size());
         assertEquals(
             120L,
-            results.stream().map(CandidateResult::resultId).distinct().count()
+            results.stream()
+                .map(PolynomialTheoryUtilityCandidateResult::resultId)
+                .distinct()
+                .count()
         );
         for (int index = 0; index < results.size(); index++) {
             var result = results.get(index);
             var input = inputs.get(index);
-            result.validateAgainst(input);
+            var formationCase = formation.get(index % formation.size());
+            result.validateAgainst(input, formationCase);
             assertEquals(
-                CandidateResult.TerminalStatus.NO_TRANSITION,
+                PolynomialTheoryUtilityCandidateResult.TerminalStatus
+                    .NO_TRANSITION,
                 result.terminalStatus()
             );
             assertEquals(NoFactorizationAdapter.DETAIL_CODE, result.detailCode());
-            assertEquals(0L, result.primitiveWorkConsumed());
-            assertEquals(0L, result.mechanicalWorkConsumed());
-            assertEquals(0L, result.factorizationWorkConsumed());
+            assertEquals(0L, result.work().primitiveWork());
+            assertEquals(0L, result.work().mechanicalWork());
+            assertEquals(0L, result.work().factorizationWork());
             assertEquals(0, result.generatedTransitions());
             assertEquals("NOT_REQUESTED", result.verifierOutcome());
             assertEquals("NONE", result.transitionEvidenceHash());
+            assertEquals(formationCase.sourceExpression(), result.sourceRootExpression());
         }
     }
 
@@ -73,24 +78,24 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
         var formation = PolynomialTheoryUtilityCaseCorpus.load().cases();
         var adapter = new NoFactorizationAdapter();
 
-        var reordered = adapter.openRun(descriptor(runInputs.get(0)));
+        var reordered = adapter.openRun(descriptor(runInputs.getFirst()));
         assertThrows(
             IllegalArgumentException.class,
             () -> reordered.execute(runInputs.get(1), formation.get(1))
         );
 
-        var incomplete = adapter.openRun(descriptor(runInputs.get(0)));
-        incomplete.execute(runInputs.get(0), formation.get(0));
+        var incomplete = adapter.openRun(descriptor(runInputs.getFirst()));
+        incomplete.execute(runInputs.getFirst(), formation.getFirst());
         assertThrows(IllegalStateException.class, incomplete::close);
 
-        var complete = adapter.openRun(descriptor(runInputs.get(0)));
+        var complete = adapter.openRun(descriptor(runInputs.getFirst()));
         for (int index = 0; index < runInputs.size(); index++) {
             complete.execute(runInputs.get(index), formation.get(index));
         }
         complete.close();
         assertThrows(
             IllegalStateException.class,
-            () -> complete.execute(runInputs.get(0), formation.get(0))
+            () -> complete.execute(runInputs.getFirst(), formation.getFirst())
         );
         assertThrows(IllegalStateException.class, complete::close);
     }
@@ -101,7 +106,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
             .filter(value -> "CP01_1_OF_12".equals(value.checkpointId()))
             .toList();
         var formation = PolynomialTheoryUtilityCaseCorpus.load().cases();
-        var input = runInputs.get(0);
+        var input = runInputs.getFirst();
         var counterfeit = new PolynomialTheoryUtilityExecutionInput(
             input.inputId(),
             "sha256:" + "f".repeat(64),
@@ -120,7 +125,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
         var run = new NoFactorizationAdapter().openRun(descriptor(input));
         assertThrows(
             IllegalArgumentException.class,
-            () -> run.execute(counterfeit, formation.get(0))
+            () -> run.execute(counterfeit, formation.getFirst())
         );
         for (int index = 0; index < runInputs.size(); index++) {
             run.execute(runInputs.get(index), formation.get(index));
@@ -131,40 +136,44 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
     @Test
     void resultContractRejectsBudgetEvidenceAndRebinding() {
         var inputs = baselineInputs();
-        var input = inputs.get(0);
-        var valid = CandidateResult.noTransition(input, "BASELINE");
+        var formation = PolynomialTheoryUtilityCaseCorpus.load().cases();
+        var input = inputs.getFirst();
+        var formationCase = formation.getFirst();
+        var valid = PolynomialTheoryUtilityCandidateResult.noTransition(
+            input,
+            formationCase,
+            "BASELINE"
+        );
 
         assertThrows(
             IllegalArgumentException.class,
-            () -> CandidateResult.create(
+            () -> PolynomialTheoryUtilityCandidateResult.create(
                 input,
-                CandidateResult.TerminalStatus.NO_TRANSITION,
+                formationCase,
+                PolynomialTheoryUtilityCandidateResult.TerminalStatus
+                    .NO_TRANSITION,
                 "EXCESSIVE_WORK",
-                input.admittedPrimitiveWork() + 1L,
-                0L,
-                0L,
-                0,
-                "NOT_REQUESTED",
-                "NONE"
+                work(input.admittedPrimitiveWork() + 1L),
+                List.of(),
+                "NOT_REQUESTED"
             )
         );
         assertThrows(
             IllegalArgumentException.class,
-            () -> CandidateResult.create(
+            () -> PolynomialTheoryUtilityCandidateResult.create(
                 input,
-                CandidateResult.TerminalStatus.VALIDATED_TRANSITION,
-                "UNVERIFIED_TRANSITION",
-                1L,
-                1L,
-                1L,
-                1,
-                "NOT_VERIFIED",
-                "NONE"
+                formationCase,
+                PolynomialTheoryUtilityCandidateResult.TerminalStatus
+                    .NO_TRANSITION,
+                "INVALID_VERIFIER",
+                PolynomialTheoryUtilityWorkBreakdown.zero(),
+                List.of(),
+                "VERIFIED"
             )
         );
         assertThrows(
             IllegalArgumentException.class,
-            () -> valid.validateAgainst(inputs.get(1))
+            () -> valid.validateAgainst(inputs.get(1), formation.get(1))
         );
         assertNotEquals(input.inputId(), inputs.get(1).inputId());
     }
@@ -182,7 +191,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
             () -> adapter.openRun(descriptor(foreign))
         );
 
-        var baseline = baselineInputs().get(0);
+        var baseline = baselineInputs().getFirst();
         var invented = new PolynomialTheoryUtilityProfileAdapter.RunDescriptor(
             "sha256:" + "0".repeat(64),
             baseline.profileId(),
@@ -200,13 +209,14 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
     void targetBlindRunnerExecutesThirtyBoundRuns() {
         var tracker = new Tracker();
         var inputs = PolynomialTheoryUtilityExecutionInputs.freeze();
+        var formation = PolynomialTheoryUtilityCaseCorpus.load().cases();
         var batch = new TargetBlindRunner().execute(
             inputs,
             registry(tracker, Mode.NORMAL, null)
         );
 
         assertEquals(
-            "regelsuche.polynomial-theory-utility-candidate-batch/v1",
+            "regelsuche.polynomial-theory-utility-candidate-batch/v2",
             batch.schema()
         );
         assertEquals(
@@ -223,20 +233,34 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
             size == 20));
         assertEquals(
             inputs.inputs(),
-            batch.results().stream().map(CandidateResult::input).toList()
+            batch.results().stream()
+                .map(PolynomialTheoryUtilityCandidateResult::input)
+                .toList()
         );
+        assertTrue(batch.results().stream().allMatch(result ->
+            PolynomialTheoryUtilityCandidateResult.SCHEMA.equals(
+                result.schema()
+            )));
+        for (int index = 0; index < batch.results().size(); index++) {
+            assertEquals(
+                formation.get(index % formation.size()).sourceExpression(),
+                batch.results().get(index).sourceRootExpression()
+            );
+        }
         assertEquals(
             120L,
             batch.results().stream()
                 .filter(result -> result.terminalStatus()
-                    == CandidateResult.TerminalStatus.NO_TRANSITION)
+                    == PolynomialTheoryUtilityCandidateResult.TerminalStatus
+                        .NO_TRANSITION)
                 .count()
         );
         assertEquals(
             480L,
             batch.results().stream()
                 .filter(result -> result.terminalStatus()
-                    == CandidateResult.TerminalStatus.UNSUPPORTED)
+                    == PolynomialTheoryUtilityCandidateResult.TerminalStatus
+                        .UNSUPPORTED)
                 .count()
         );
         for (var profile : PolynomialTheoryUtilityExecutionPlan.PROFILES) {
@@ -263,7 +287,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
         );
 
         var duplicate = adapters(new Tracker(), Mode.NORMAL, null);
-        duplicate.set(1, duplicate.get(0));
+        duplicate.set(1, duplicate.getFirst());
         assertThrows(
             IllegalArgumentException.class,
             () -> new AdapterRegistry(duplicate)
@@ -409,6 +433,25 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
         );
     }
 
+    private static PolynomialTheoryUtilityWorkBreakdown work(long primitive) {
+        return new PolynomialTheoryUtilityWorkBreakdown(
+            primitive,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L
+        );
+    }
+
     private record StubAdapter(
         PolynomialTheoryUtilityExecutionProfile profile,
         Mode mode,
@@ -450,7 +493,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
                 private int nextCase;
 
                 @Override
-                public CandidateResult execute(
+                public PolynomialTheoryUtilityCandidateResult execute(
                     PolynomialTheoryUtilityExecutionInput input,
                     PolynomialTheoryUtilityCaseCorpus.FormationCase studyCase
                 ) {
@@ -474,8 +517,8 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
                             "deliberate execution failure"
                         );
                         case NULL_RESULT -> null;
-                        case REBOUND_RESULT -> unsupported(foreign);
-                        case NORMAL -> unsupported(input);
+                        case REBOUND_RESULT -> unsupported(foreign, studyCase);
+                        case NORMAL -> unsupported(input, studyCase);
                     };
                 }
 
@@ -496,19 +539,19 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
             };
         }
 
-        private static CandidateResult unsupported(
-            PolynomialTheoryUtilityExecutionInput input
+        private static PolynomialTheoryUtilityCandidateResult unsupported(
+            PolynomialTheoryUtilityExecutionInput input,
+            PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase
         ) {
-            return CandidateResult.create(
+            return PolynomialTheoryUtilityCandidateResult.create(
                 input,
-                CandidateResult.TerminalStatus.UNSUPPORTED,
+                formationCase,
+                PolynomialTheoryUtilityCandidateResult.TerminalStatus
+                    .UNSUPPORTED,
                 "TEST_STUB_UNSUPPORTED",
-                0L,
-                0L,
-                0L,
-                0,
-                "NOT_REQUESTED",
-                "NONE"
+                PolynomialTheoryUtilityWorkBreakdown.zero(),
+                List.of(),
+                "NOT_REQUESTED"
             );
         }
     }
@@ -535,7 +578,7 @@ class PolynomialTheoryUtilityNoFactorizationAdapterTest {
                 private boolean closed;
 
                 @Override
-                public CandidateResult execute(
+                public PolynomialTheoryUtilityCandidateResult execute(
                     PolynomialTheoryUtilityExecutionInput input,
                     PolynomialTheoryUtilityCaseCorpus.FormationCase studyCase
                 ) {

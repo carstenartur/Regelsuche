@@ -1,6 +1,6 @@
 # Typisierter Candidate-Result-Vertrag der Polynomstudie
 
-Status: Resultatcontainer vor Runner-Migration und Candidate-Freeze
+Status: aktiver Resultatcontainer in Runner und Pre-Freeze-Batch
 
 Bezug: Issue #748
 
@@ -12,10 +12,13 @@ Gesamtarbeit gemeinsam bindet. Der Container darf weder einzelne lokale
 Aufwände verdecken noch Übergänge nachträglich umordnen, duplizieren oder auf
 einen anderen Ausführungseingang übertragen.
 
-`PolynomialTheoryUtilityCandidateResult` ist deshalb ein eigenständiger
-v2-Vertrag. Der bestehende Runner verwendet ihn in diesem Schritt noch nicht.
-Die Trennung erlaubt, die Resultatsemantik unabhängig von Adapter- und
-Orchestrierungsänderungen zu prüfen.
+`PolynomialTheoryUtilityCandidateResult` ist der eigenständige v2-Vertrag für
+alle Adapter-Runs und das noch nicht kanonisch eingefrorene Ergebnisbatch. Der
+frühere verschachtelte v1-Datensatz im Adapter wurde entfernt, damit Runner und
+Batch nicht zwei konkurrierende Resultatautoritäten besitzen. v2 bindet die
+Übergangs- und Arbeitsautorität; die weiteren vorregistrierten Zähler und
+Lineage-Dimensionen folgen bewusst vor der Candidate-Freeze in einem eigenen
+Vertragsschritt.
 
 ## Gebundene Felder
 
@@ -37,8 +40,8 @@ abgewiesen.
 
 ## Formation- und Profilbindung
 
-Der Container lädt die eingefrorenen Ausführungseingänge und
-Formation-Fälle als eigene Validierungsautorität. Konstruktion und spätere
+Der Container lädt die eingefrorenen Ausführungseingänge und Formation-Fälle
+als eigene Validierungsautorität. Konstruktion und spätere
 `validateAgainst`-Prüfung fordern:
 
 - den wertgleichen vollständigen Eingang aus der eingefrorenen Matrix,
@@ -59,10 +62,10 @@ Der aggregierte Arbeitsvektor muss drei Grenzen einhalten:
 2. mechanische Arbeit höchstens das eingefrorene mechanische Budget,
 3. Faktorisierungsarbeit höchstens das Faktorisierungsbudget.
 
-Profilregeln gelten auch für den Aggregatvektor: Ein deaktiviertes Backend
-darf keine Faktorisierungsarbeit und ein deaktivierter Cache keinerlei
-Cache-Arbeit behalten. Ein übergangsfreies Resultat darf keine Einfügungs-,
-Verdrängungs- oder Replay-Arbeit behaupten.
+Profilregeln gelten auch für den Aggregatvektor: Ein deaktiviertes Backend darf
+keine Faktorisierungsarbeit und ein deaktivierter Cache keinerlei Cache-Arbeit
+behalten. Ein übergangsfreies Resultat darf keine Einfügungs-, Verdrängungs-
+oder Replay-Arbeit behaupten.
 
 Zusätzlich werden die lokalen Arbeitsvektoren aller Übergänge exakt addiert.
 Der Resultatvektor muss diese Summe komponentenweise abdecken. Matching-Arbeit
@@ -91,18 +94,40 @@ die geordnete Liste der Übergangsidentitäten. Bei null Übergängen lautet der
 Wert ausdrücklich `NONE`. Dieser Wert ersetzt nicht die vollständige Liste und
 besitzt keine eigene Entscheidungsautorität.
 
-## Umfang dieses Schritts
+## Runner- und Batch-Integration
 
-Dieser Schritt verändert noch nicht:
+`PolynomialTheoryUtilityProfileAdapter.Run.execute` liefert ausschließlich
+diesen v2-Typ. Der Nulladapter erzeugt mit dem sichtbaren Formation-Fall ein
+Zero-Work-Resultat, sodass dessen Quellwurzel Teil der Resultatidentität bleibt.
 
-- `PolynomialTheoryUtilityProfileAdapter.Run`,
-- den 30-Run-Orchestrator,
-- `CandidateBatch`,
-- die Candidate-Freeze-Serialisierung,
-- mathematische Profiladapter,
-- Ausführungsplan, Formation oder versiegelte Qualifikation,
-- Produkt- oder Suchvorgaben.
+Der 30-Run-Orchestrator prüft jedes zurückgegebene Resultat unmittelbar gegen
+den exakten Matrixeingang und den positionsgleichen Formation-Fall. Das
+`CandidateBatch` wiederholt diese Prüfung für alle 600 Positionen, verlangt
+eindeutige Resultatidentitäten und veröffentlicht deshalb das Schema:
 
-Die nächste Tranche migriert den Runner und den Batch atomar auf diesen
-Container. Erst danach dürfen echte Profilresultate kanonisch eingefroren
-werden.
+```text
+regelsuche.polynomial-theory-utility-candidate-batch/v2
+```
+
+Das Batch ist weiterhin nur eine unveränderliche In-Memory-Grenze mit Status
+`TARGET_BLIND_RESULTS_COLLECTED_NOT_FROZEN`.
+
+## Verbleibender Umfang
+
+Noch nicht umgesetzt sind:
+
+- Faktorisierungsanfrage- und Kandidatenzähler,
+- Pfadtiefe, primitive Expansionslänge und geordnete Primitive-Lineage,
+- Quell-/Ergebnis-AST-Größen und Cache-Ereigniszähler,
+- normalisierte Annahmen und weitere Lineage-Identitäten,
+- die kanonische Candidate-Freeze-Serialisierung des danach vollständigen
+  Resultatbatches,
+- die vier mathematischen Profiladapter,
+- die Öffnung und Auswertung der versiegelten Qualifikation,
+- die mechanische Studienentscheidung,
+- Änderungen an Ausführungsplan, Formation, Produkt- oder Suchvorgaben.
+
+Der nächste getrennte Slice ergänzt und revalidiert die fehlenden
+Messdimensionen. Erst der daraus hervorgehende vollständige Resultatvertrag
+darf in einer Candidate-Freeze serialisiert werden. Eine Rückkehr zum
+entfernten aggregierten v1-Ergebnisformat ist nicht zulässig.
