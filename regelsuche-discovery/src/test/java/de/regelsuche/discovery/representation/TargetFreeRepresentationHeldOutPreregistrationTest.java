@@ -47,6 +47,12 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
     private static final long PREREGISTRATION_BYTE_LENGTH = 1512L;
     private static final String PREREGISTRATION_SHA256 =
         "sha256:9d79fe60a2a2cf3fda9255cc3b26577b4ac23d61b8359cd22b3a7a0dcdb7bd29";
+    private static final String ENGINE_SEMANTICS_AMENDMENT_RESOURCE =
+        "/de/regelsuche/discovery/representation/"
+            + "target-free-held-out-engine-semantics-amendment-v1.json";
+    private static final long ENGINE_SEMANTICS_AMENDMENT_BYTE_LENGTH = 1907L;
+    private static final String ENGINE_SEMANTICS_AMENDMENT_SHA256 =
+        "sha256:e02f180f0504cbbfaf13fc47ef216468ea569ae4b68b58bafefbf9652d19a305";
     private static final List<Integer> CHECKPOINTS =
         List.of(8, 16, 32, 64, 128, 256);
     private static final List<String> POLICY_IDS = List.of(
@@ -141,14 +147,64 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
     }
 
     @Test
+    void recordsPostFreezeCanonicalizerSemanticsWithoutMutatingV1()
+            throws Exception {
+        Resources resources = resources();
+        JsonNode amendment = resources.engineSemanticsAmendment();
+        assertEquals(
+            "regelsuche.target-free-held-out-engine-semantics-amendment/v1",
+            amendment.path("schema").asText());
+        assertEquals("POST_FREEZE_ENGINE_SEMANTICS_AMENDMENT",
+            amendment.path("evidenceStatus").asText());
+        assertEquals("CANONICALIZER_FIXED_POINT_SEMANTICS",
+            amendment.path("reasonCode").asText());
+        assertEquals(PREREGISTRATION_BYTE_LENGTH,
+            amendment.path("basePreregistrationByteLength").asLong());
+        assertEquals(PREREGISTRATION_SHA256,
+            amendment.path("basePreregistrationSha256").asText());
+        assertEquals(
+            resources.preregistration().path("qualificationByteLength").asLong(),
+            amendment.path("baseQualificationByteLength").asLong());
+        assertEquals(
+            resources.preregistration().path("qualificationSha256").asText(),
+            amendment.path("baseQualificationSha256").asText());
+        assertEquals("NONE", amendment.path("formationChanges").asText());
+        assertEquals("NONE", amendment.path("referenceChanges").asText());
+        assertEquals("NONE", amendment.path("searchPolicyChanges").asText());
+        assertEquals("NONE", amendment.path("sourceChanges").asText());
+        assertEquals("NONE", amendment.path("workAccountingChanges").asText());
+
+        Map<String, JsonNode> amendments = byId(
+            amendment.path("caseAmendments"));
+        assertEquals(Set.of(
+            "binomial-expansion-complexity-valley",
+            "difference-of-squares-reverse-bridge"), amendments.keySet());
+        assertEquals(amendments.size(),
+            amendment.path("affectedCaseCount").asInt());
+        for (JsonNode caseAmendment : amendments.values()) {
+            assertEquals(3,
+                caseAmendment.path("originalMinimumQualifiedDepth").asInt());
+            assertEquals(2,
+                caseAmendment.path("effectiveMinimumQualifiedDepth").asInt());
+            assertEquals(10,
+                caseAmendment.path("maximumQualifiedDepth").asInt());
+            assertEquals(2,
+                strings(caseAmendment.path("observedWitnessRuleIds")).size());
+        }
+    }
+
+    @Test
     void positiveCasesHaveNoDirectEdgeAndHaveBoundedWitnesses()
             throws Exception {
         Resources resources = resources();
         Map<String, JsonNode> qualifications = byId(
             resources.qualification().path("caseQualifications"));
+        Map<String, JsonNode> amendments = byId(
+            resources.engineSemanticsAmendment().path("caseAmendments"));
         for (JsonNode benchmarkCase : resources.formation().path("cases")) {
-            JsonNode rule = Objects.requireNonNull(
-                qualifications.get(benchmarkCase.path("id").asText()));
+            String caseId = benchmarkCase.path("id").asText();
+            JsonNode rule = Objects.requireNonNull(qualifications.get(caseId));
+            JsonNode amendment = amendments.get(caseId);
             BoundaryEngine boundaryEngine = boundaryEngine(benchmarkCase);
             Set<String> availableRuleIds = boundaryEngine.boundary()
                 .candidateFormationRules().stream()
@@ -165,7 +221,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
                     CANONICALIZER.canonicalize(
                         transformation.transformedExpression()))),
                 () -> "direct primitive edge reaches a held-out reference for "
-                    + benchmarkCase.path("id").asText());
+                    + caseId);
             if ("NO_POLICY_QUALIFIES".equals(
                     rule.path("expectedOutcome").asText())) {
                 continue;
@@ -173,20 +229,24 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
             Witness witness = shortestWitness(
                 benchmarkCase, rule, boundaryEngine.engine(), references);
             assertNotNull(witness,
-                () -> "no bounded witness found for "
-                    + benchmarkCase.path("id").asText());
-            int minimum = rule.path("minimumQualifiedDepth").asInt();
+                () -> "no bounded witness found for " + caseId);
+            int minimum = effectiveMinimumDepth(rule, amendment);
             int maximum = rule.path("maximumQualifiedDepth").asInt();
             assertTrue(witness.depth() >= minimum
                 && witness.depth() <= maximum,
                 () -> "witness depth " + witness.depth()
                     + " outside " + minimum + ".." + maximum
-                    + " for " + benchmarkCase.path("id").asText()
+                    + " for " + caseId
                     + "; path=" + witness.ruleIds());
+            if (amendment != null) {
+                assertEquals(
+                    strings(amendment.path("observedWitnessRuleIds")),
+                    witness.ruleIds(),
+                    () -> "amended witness path changed for " + caseId);
+            }
             if (rule.path("requireTemporaryComplexityIncrease").asBoolean()) {
                 assertTrue(witness.temporaryComplexityIncrease(),
-                    () -> "required complexity valley missing for "
-                        + benchmarkCase.path("id").asText());
+                    () -> "required complexity valley missing for " + caseId);
             }
         }
     }
@@ -219,6 +279,13 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
         assertEquals(PREREGISTRATION_SHA256,
             TargetFreeRepresentationEvaluationPlan.sha256(
                 preregistrationBytes));
+        byte[] amendmentBytes =
+            TargetFreeRepresentationEvaluationPlan.readResource(
+                ENGINE_SEMANTICS_AMENDMENT_RESOURCE);
+        assertEquals(ENGINE_SEMANTICS_AMENDMENT_BYTE_LENGTH,
+            amendmentBytes.length);
+        assertEquals(ENGINE_SEMANTICS_AMENDMENT_SHA256,
+            TargetFreeRepresentationEvaluationPlan.sha256(amendmentBytes));
         JsonNode preregistration = JSON.readTree(preregistrationBytes);
         byte[] formationBytes =
             TargetFreeRepresentationEvaluationPlan.readResource(
@@ -239,7 +306,27 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
             preregistration,
             JSON.readTree(formationBytes),
             JSON.readTree(qualificationBytes),
+            JSON.readTree(amendmentBytes),
             formationBytes);
+    }
+
+    private static int effectiveMinimumDepth(
+        JsonNode qualification,
+        JsonNode amendment
+    ) {
+        int original = qualification.path("minimumQualifiedDepth").asInt();
+        if (amendment == null) {
+            return original;
+        }
+        assertEquals(original,
+            amendment.path("originalMinimumQualifiedDepth").asInt());
+        assertEquals(
+            qualification.path("maximumQualifiedDepth").asInt(),
+            amendment.path("maximumQualifiedDepth").asInt());
+        int effective = amendment.path(
+            "effectiveMinimumQualifiedDepth").asInt();
+        assertTrue(effective >= 2 && effective < original);
+        return effective;
     }
 
     private static BoundaryEngine boundaryEngine(JsonNode benchmarkCase) {
@@ -393,6 +480,7 @@ class TargetFreeRepresentationHeldOutPreregistrationTest {
         JsonNode preregistration,
         JsonNode formation,
         JsonNode qualification,
+        JsonNode engineSemanticsAmendment,
         byte[] formationBytes
     ) {
         private Resources {
