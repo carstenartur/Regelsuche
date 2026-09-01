@@ -55,7 +55,7 @@ public record PolynomialTheoryUtilityWorkBreakdown(
 <span class="fc" id="L55">    }</span>
 
     public static PolynomialTheoryUtilityWorkBreakdown zero() {
-<span class="nc" id="L58">        return new PolynomialTheoryUtilityWorkBreakdown(</span>
+<span class="fc" id="L58">        return new PolynomialTheoryUtilityWorkBreakdown(</span>
             0L,
             0L,
             0L,
@@ -134,7 +134,7 @@ public record PolynomialTheoryUtilityWorkBreakdown(
 
     public boolean covers(PolynomialTheoryUtilityWorkBreakdown other) {
 <span class="fc" id="L136">        var value = Objects.requireNonNull(other, &quot;other&quot;);</span>
-<span class="pc bpc" id="L137" title="14 of 28 branches missed.">        return primitiveWork &gt;= value.primitiveWork</span>
+<span class="pc bpc" id="L137" title="13 of 28 branches missed.">        return primitiveWork &gt;= value.primitiveWork</span>
             &amp;&amp; matchingWork &gt;= value.matchingWork
             &amp;&amp; sourceValidationWork &gt;= value.sourceValidationWork
             &amp;&amp; factorizationWork &gt;= value.factorizationWork
