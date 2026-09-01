@@ -1,0 +1,385 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityTransitionTrace.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityTransitionTrace.java</span></div><h1>PolynomialTheoryUtilityTransitionTrace.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+/**
+ * Ordered primitive lineage and structural measurements for one transition.
+ *
+ * &lt;p&gt;The trace is an evidence companion to an already validated transition. It
+ * retains path-edge boundaries instead of treating a primitive expansion as an
+ * unordered rule set.&lt;/p&gt;
+ */
+public record PolynomialTheoryUtilityTransitionTrace(
+    String traceId,
+    PolynomialTheoryUtilityTransitionOutcome transition,
+    int pathDepth,
+    List&lt;PrimitiveStep&gt; primitiveSteps,
+    List&lt;String&gt; normalizedAssumptions,
+    int sourceAstNodeCount,
+    int transformedAstNodeCount
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.polynomial-theory-utility-transition-trace/v1&quot;;
+<span class="fc" id="L30">    private static final Pattern SHA_256 =</span>
+<span class="fc" id="L31">        Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="fc" id="L32">    private static final ThreadLocal&lt;ExpressionCanonicalizer&gt; CANONICALIZER =</span>
+<span class="fc" id="L33">        ThreadLocal.withInitial(ExpressionCanonicalizer::new);</span>
+
+<span class="fc" id="L35">    public PolynomialTheoryUtilityTransitionTrace {</span>
+<span class="fc" id="L36">        traceId = requireHash(traceId, &quot;traceId&quot;);</span>
+<span class="fc" id="L37">        transition = Objects.requireNonNull(transition, &quot;transition&quot;);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (pathDepth &lt; 1) {</span>
+<span class="fc" id="L39">            throw new IllegalArgumentException(</span>
+                &quot;pathDepth must be positive&quot;
+            );
+        }
+<span class="fc" id="L43">        primitiveSteps = List.copyOf(</span>
+<span class="fc" id="L44">            Objects.requireNonNull(primitiveSteps, &quot;primitiveSteps&quot;)</span>
+        );
+<span class="fc" id="L46">        normalizedAssumptions = requireNormalizedAssumptions(</span>
+            normalizedAssumptions
+        );
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">        if (sourceAstNodeCount &lt; 1</span>
+                || transformedAstNodeCount &lt; 1
+<span class="fc bfc" id="L51" title="All 2 branches covered.">                || sourceAstNodeCount != nodeCount(</span>
+<span class="fc" id="L52">                    transition.sourceRootExpression()</span>
+                )
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                || transformedAstNodeCount != nodeCount(</span>
+<span class="fc" id="L55">                    transition.transformedRootExpression()</span>
+                )) {
+<span class="fc" id="L57">            throw new IllegalArgumentException(</span>
+                &quot;transition AST measurements differ from expressions&quot;
+            );
+        }
+<span class="fc" id="L61">        requirePrimitiveSteps(</span>
+            transition,
+            pathDepth,
+            primitiveSteps
+        );
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (!traceId.equals(identity(</span>
+                transition,
+                pathDepth,
+                primitiveSteps,
+                normalizedAssumptions,
+                sourceAstNodeCount,
+                transformedAstNodeCount))) {
+<span class="nc" id="L73">            throw new IllegalArgumentException(</span>
+                &quot;transition trace identity differs from its fields&quot;
+            );
+        }
+<span class="fc" id="L77">    }</span>
+
+    public static PolynomialTheoryUtilityTransitionTrace create(
+        PolynomialTheoryUtilityTransitionOutcome transition,
+        int pathDepth,
+        List&lt;PrimitiveStep&gt; primitiveSteps,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L85">        var retainedTransition = Objects.requireNonNull(</span>
+            transition,
+            &quot;transition&quot;
+        );
+<span class="fc" id="L89">        List&lt;PrimitiveStep&gt; steps = List.copyOf(</span>
+<span class="fc" id="L90">            Objects.requireNonNull(primitiveSteps, &quot;primitiveSteps&quot;)</span>
+        );
+<span class="fc" id="L92">        List&lt;String&gt; normalized = canonicalAssumptions(assumptions);</span>
+<span class="fc" id="L93">        int sourceNodes = nodeCount(</span>
+<span class="fc" id="L94">            retainedTransition.sourceRootExpression()</span>
+        );
+<span class="fc" id="L96">        int transformedNodes = nodeCount(</span>
+<span class="fc" id="L97">            retainedTransition.transformedRootExpression()</span>
+        );
+<span class="fc" id="L99">        return new PolynomialTheoryUtilityTransitionTrace(</span>
+<span class="fc" id="L100">            identity(</span>
+                retainedTransition,
+                pathDepth,
+                steps,
+                normalized,
+                sourceNodes,
+                transformedNodes
+            ),
+            retainedTransition,
+            pathDepth,
+            steps,
+            normalized,
+            sourceNodes,
+            transformedNodes
+        );
+    }
+
+    public String schema() {
+<span class="fc" id="L118">        return SCHEMA;</span>
+    }
+
+    public int primitiveExpansionLength() {
+<span class="fc" id="L122">        return primitiveSteps.size();</span>
+    }
+
+    public int astNodeGrowth() {
+<span class="fc" id="L126">        return transformedAstNodeCount - sourceAstNodeCount;</span>
+    }
+
+    public void validateAgainst(
+        int expectedIndex,
+        PolynomialTheoryUtilityTransitionOutcome expectedTransition,
+        int expectedSourceAstNodeCount
+    ) {
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (transition.transitionIndex() != expectedIndex</span>
+<span class="pc bpc" id="L135" title="1 of 4 branches missed.">                || !transition.equals(</span>
+<span class="fc" id="L136">                    Objects.requireNonNull(</span>
+                        expectedTransition,
+                        &quot;expectedTransition&quot;
+                    )
+                )
+                || sourceAstNodeCount != expectedSourceAstNodeCount) {
+<span class="fc" id="L142">            throw new IllegalArgumentException(</span>
+                &quot;transition trace refers to another result transition&quot;
+            );
+        }
+<span class="fc" id="L146">    }</span>
+
+    private static void requirePrimitiveSteps(
+        PolynomialTheoryUtilityTransitionOutcome transition,
+        int pathDepth,
+        List&lt;PrimitiveStep&gt; steps
+    ) {
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (steps.isEmpty()</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                || steps.size() &gt; transition.work().primitiveWork()) {</span>
+<span class="fc" id="L155">            throw new IllegalArgumentException(</span>
+                &quot;primitive lineage differs from retained work&quot;
+            );
+        }
+<span class="fc" id="L159">        int expectedEdge = 0;</span>
+<span class="fc" id="L160">        Set&lt;String&gt; identities = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        for (int index = 0; index &lt; steps.size(); index++) {</span>
+<span class="fc" id="L162">            var step = Objects.requireNonNull(</span>
+<span class="fc" id="L163">                steps.get(index),</span>
+                &quot;primitiveStep&quot;
+            );
+<span class="fc" id="L166">            step.validateAgainst(index, transition);</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            if (step.pathEdgeIndex() &lt; expectedEdge</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                    || step.pathEdgeIndex() &gt; expectedEdge + 1) {</span>
+<span class="fc" id="L169">                throw new IllegalArgumentException(</span>
+                    &quot;primitive path edge order has a gap&quot;
+                );
+            }
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (step.pathEdgeIndex() == expectedEdge + 1) {</span>
+<span class="fc" id="L174">                expectedEdge++;</span>
+            }
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (!identities.add(step.stepId())) {</span>
+<span class="nc" id="L177">                throw new IllegalArgumentException(</span>
+                    &quot;transition trace repeats a primitive step&quot;
+                );
+            }
+        }
+<span class="pc bpc" id="L182" title="1 of 4 branches missed.">        if (steps.getFirst().pathEdgeIndex() != 0</span>
+                || expectedEdge + 1 != pathDepth) {
+<span class="fc" id="L184">            throw new IllegalArgumentException(</span>
+                &quot;pathDepth differs from primitive edge lineage&quot;
+            );
+        }
+<span class="fc" id="L188">    }</span>
+
+    private static String identity(
+        PolynomialTheoryUtilityTransitionOutcome transition,
+        int pathDepth,
+        List&lt;PrimitiveStep&gt; primitiveSteps,
+        List&lt;String&gt; normalizedAssumptions,
+        int sourceAstNodeCount,
+        int transformedAstNodeCount
+    ) {
+<span class="fc" id="L198">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L199">        append(material, SCHEMA);</span>
+<span class="fc" id="L200">        append(</span>
+            material,
+<span class="fc" id="L202">            Objects.requireNonNull(</span>
+                transition,
+                &quot;transition&quot;
+<span class="fc" id="L205">            ).transitionId()</span>
+        );
+<span class="fc" id="L207">        append(material, Integer.toString(pathDepth));</span>
+<span class="fc" id="L208">        append(material, Integer.toString(sourceAstNodeCount));</span>
+<span class="fc" id="L209">        append(material, Integer.toString(transformedAstNodeCount));</span>
+<span class="fc" id="L210">        append(material, Integer.toString(primitiveSteps.size()));</span>
+<span class="fc" id="L211">        primitiveSteps.forEach(value -&gt; append(</span>
+            material,
+<span class="fc" id="L213">            Objects.requireNonNull(value, &quot;primitiveStep&quot;).stepId()</span>
+        ));
+<span class="fc" id="L215">        append(</span>
+            material,
+<span class="fc" id="L217">            Integer.toString(normalizedAssumptions.size())</span>
+        );
+<span class="fc" id="L219">        normalizedAssumptions.forEach(value -&gt; append(</span>
+            material,
+<span class="fc" id="L221">            requireText(value, &quot;normalizedAssumption&quot;)</span>
+        ));
+<span class="fc" id="L223">        return hash(material.toString());</span>
+    }
+
+    private static List&lt;String&gt; canonicalAssumptions(
+        List&lt;String&gt; values
+    ) {
+<span class="fc" id="L229">        return AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L230">            Objects.requireNonNull(values, &quot;assumptions&quot;)</span>
+<span class="fc" id="L231">        ).normalizedAssumptions();</span>
+    }
+
+    private static List&lt;String&gt; requireNormalizedAssumptions(
+        List&lt;String&gt; values
+    ) {
+<span class="fc" id="L237">        List&lt;String&gt; retained = List.copyOf(</span>
+<span class="fc" id="L238">            Objects.requireNonNull(values, &quot;normalizedAssumptions&quot;)</span>
+        );
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (!retained.equals(canonicalAssumptions(retained))) {</span>
+<span class="fc" id="L241">            throw new IllegalArgumentException(</span>
+                &quot;assumptions are not normalized and sorted&quot;
+            );
+        }
+<span class="fc" id="L245">        return retained;</span>
+    }
+
+    private static int nodeCount(String expression) {
+<span class="fc" id="L249">        return CANONICALIZER.get().astNodeCount(expression);</span>
+    }
+
+    private static String hash(String material) {
+<span class="fc" id="L253">        return PolynomialTheoryUtilityExecutionIdentity.sha256(</span>
+<span class="fc" id="L254">            material.getBytes(StandardCharsets.UTF_8)</span>
+        );
+    }
+
+    private static String requireHash(String value, String name) {
+<span class="fc" id="L259">        String text = requireText(value, name);</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        if (!SHA_256.matcher(text).matches()) {</span>
+<span class="nc" id="L261">            throw new IllegalArgumentException(name + &quot; is not SHA-256&quot;);</span>
+        }
+<span class="fc" id="L263">        return text;</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="fc" id="L267">        String text = Objects.requireNonNull(value, name);</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
+<span class="nc" id="L269">            throw new IllegalArgumentException(</span>
+                name + &quot; must not be blank&quot;
+            );
+        }
+<span class="fc" id="L273">        return text;</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L277">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L278">    }</span>
+
+    public record PrimitiveStep(
+        String stepId,
+        int primitiveIndex,
+        int pathEdgeIndex,
+        String transitionId,
+        String ruleId,
+        String evidenceHash
+    ) {
+<span class="fc" id="L288">        public PrimitiveStep {</span>
+<span class="fc" id="L289">            stepId = requireHash(stepId, &quot;stepId&quot;);</span>
+<span class="pc bpc" id="L290" title="2 of 4 branches missed.">            if (primitiveIndex &lt; 0 || pathEdgeIndex &lt; 0) {</span>
+<span class="nc" id="L291">                throw new IllegalArgumentException(</span>
+                    &quot;primitive indices must be non-negative&quot;
+                );
+            }
+<span class="fc" id="L295">            transitionId = requireHash(</span>
+                transitionId,
+                &quot;transitionId&quot;
+            );
+<span class="fc" id="L299">            ruleId = requireText(ruleId, &quot;ruleId&quot;);</span>
+<span class="fc" id="L300">            evidenceHash = requireHash(</span>
+                evidenceHash,
+                &quot;evidenceHash&quot;
+            );
+<span class="fc bfc" id="L304" title="All 2 branches covered.">            if (!stepId.equals(identity(</span>
+                    primitiveIndex,
+                    pathEdgeIndex,
+                    transitionId,
+                    ruleId,
+                    evidenceHash))) {
+<span class="fc" id="L310">                throw new IllegalArgumentException(</span>
+                    &quot;primitive step identity differs from its fields&quot;
+                );
+            }
+<span class="fc" id="L314">        }</span>
+
+        public static PrimitiveStep create(
+            PolynomialTheoryUtilityTransitionOutcome transition,
+            int primitiveIndex,
+            int pathEdgeIndex,
+            String ruleId,
+            String evidenceHash
+        ) {
+<span class="fc" id="L323">            String transitionId = Objects.requireNonNull(</span>
+                transition,
+                &quot;transition&quot;
+<span class="fc" id="L326">            ).transitionId();</span>
+<span class="fc" id="L327">            return new PrimitiveStep(</span>
+<span class="fc" id="L328">                identity(</span>
+                    primitiveIndex,
+                    pathEdgeIndex,
+                    transitionId,
+                    ruleId,
+                    evidenceHash
+                ),
+                primitiveIndex,
+                pathEdgeIndex,
+                transitionId,
+                ruleId,
+                evidenceHash
+            );
+        }
+
+        private void validateAgainst(
+            int expectedIndex,
+            PolynomialTheoryUtilityTransitionOutcome transition
+        ) {
+<span class="fc bfc" id="L347" title="All 2 branches covered.">            if (primitiveIndex != expectedIndex</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">                    || !transitionId.equals(</span>
+<span class="fc" id="L349">                        transition.transitionId()</span>
+                    )) {
+<span class="fc" id="L351">                throw new IllegalArgumentException(</span>
+                    &quot;primitive step refers to another transition&quot;
+                );
+            }
+<span class="fc" id="L355">        }</span>
+
+        private static String identity(
+            int primitiveIndex,
+            int pathEdgeIndex,
+            String transitionId,
+            String ruleId,
+            String evidenceHash
+        ) {
+<span class="fc" id="L364">            StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L365">            append(</span>
+                material,
+                &quot;regelsuche.polynomial-theory-utility-&quot;
+                    + &quot;primitive-step/v1&quot;
+            );
+<span class="fc" id="L370">            append(material, Integer.toString(primitiveIndex));</span>
+<span class="fc" id="L371">            append(material, Integer.toString(pathEdgeIndex));</span>
+<span class="fc" id="L372">            append(</span>
+                material,
+<span class="fc" id="L374">                requireHash(transitionId, &quot;transitionId&quot;)</span>
+            );
+<span class="fc" id="L376">            append(material, requireText(ruleId, &quot;ruleId&quot;));</span>
+<span class="fc" id="L377">            append(</span>
+                material,
+<span class="fc" id="L379">                requireHash(evidenceHash, &quot;evidenceHash&quot;)</span>
+            );
+<span class="fc" id="L381">            return hash(material.toString());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

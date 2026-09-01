@@ -102,8 +102,8 @@ public record PolynomialTheoryUtilityTransitionOutcome(
             );
         }
 <span class="fc bfc" id="L104" title="All 2 branches covered.">        if (occurrencePath.isEmpty()</span>
-<span class="pc bpc" id="L105" title="1 of 2 branches missed.">                &amp;&amp; (!sourceOccurrenceExpression.equals(sourceRootExpression)</span>
-<span class="nc bnc" id="L106" title="All 2 branches missed.">                    || !transformedOccurrenceExpression.equals(</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                &amp;&amp; (!sourceOccurrenceExpression.equals(sourceRootExpression)</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                    || !transformedOccurrenceExpression.equals(</span>
                         transformedRootExpression))) {
 <span class="fc" id="L108">            throw new IllegalArgumentException(</span>
                 &quot;root occurrence must equal its surrounding root&quot;
