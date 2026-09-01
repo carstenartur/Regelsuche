@@ -147,7 +147,7 @@ public final class PluginDirectoryWatcher implements Closeable {
 
     private void watchLoop(WatchService service) {
         try {
-<span class="pc bpc" id="L150" title="1 of 2 branches missed.">            while (running) {</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            while (running) {</span>
 <span class="fc" id="L151">                WatchKey key = service.take();</span>
 <span class="fc" id="L152">                observe(key);</span>
 <span class="pc bpc" id="L153" title="2 of 4 branches missed.">                if (!running || !awaitQuietPeriod(service)) {</span>

@@ -1,0 +1,621 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityCandidateFreeze.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityCandidateFreeze.java</span></div><h1>PolynomialTheoryUtilityCandidateFreeze.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/** Canonical target-blind freeze of a complete measured candidate batch. */
+public record PolynomialTheoryUtilityCandidateFreeze(
+    String contentHash,
+    long byteLength,
+    PolynomialTheoryUtilityCandidateMeasurementBatch measuredBatch,
+    String canonicalJson
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.polynomial-theory-utility-candidate-freeze/v1&quot;;
+    public static final String FILE_NAME =
+        &quot;polynomial-theory-utility-candidate-freeze-v1.json&quot;;
+    public static final String EVIDENCE_STATUS =
+        &quot;CANDIDATES_FROZEN_QUALIFICATION_NOT_OPENED&quot;;
+    public static final String QUALIFICATION_EXPOSURE =
+        &quot;HASH_ONLY_NOT_OPENED&quot;;
+
+<span class="fc" id="L35">    private static final Pattern SHA_256 =</span>
+<span class="fc" id="L36">        Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+
+<span class="fc" id="L38">    public PolynomialTheoryUtilityCandidateFreeze {</span>
+<span class="fc" id="L39">        contentHash = requireHash(contentHash, &quot;contentHash&quot;);</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (byteLength &lt; 1L) {</span>
+<span class="nc" id="L41">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze byteLength must be positive&quot;
+            );
+        }
+<span class="fc" id="L45">        measuredBatch = Objects.requireNonNull(</span>
+            measuredBatch,
+            &quot;measuredBatch&quot;
+        );
+<span class="fc" id="L49">        canonicalJson = requireText(canonicalJson, &quot;canonicalJson&quot;);</span>
+
+<span class="fc" id="L51">        String expected = canonical(measuredBatch);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (!canonicalJson.equals(expected)) {</span>
+<span class="fc" id="L53">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze differs from canonical measured bytes&quot;
+            );
+        }
+<span class="fc" id="L57">        byte[] bytes = utf8(canonicalJson);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (byteLength != bytes.length</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                || !contentHash.equals(</span>
+<span class="fc" id="L60">                    PolynomialTheoryUtilityExecutionIdentity.sha256(bytes)</span>
+                )) {
+<span class="fc" id="L62">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze identity differs from canonical bytes&quot;
+            );
+        }
+<span class="fc" id="L66">    }</span>
+
+    public static PolynomialTheoryUtilityCandidateFreeze create(
+        PolynomialTheoryUtilityCandidateMeasurementBatch measuredBatch
+    ) {
+<span class="fc" id="L71">        var retained = Objects.requireNonNull(</span>
+            measuredBatch,
+            &quot;measuredBatch&quot;
+        );
+<span class="fc" id="L75">        String canonical = canonical(retained);</span>
+<span class="fc" id="L76">        byte[] bytes = utf8(canonical);</span>
+<span class="fc" id="L77">        return new PolynomialTheoryUtilityCandidateFreeze(</span>
+<span class="fc" id="L78">            PolynomialTheoryUtilityExecutionIdentity.sha256(bytes),</span>
+            bytes.length,
+            retained,
+            canonical
+        );
+    }
+
+    public String schema() {
+<span class="fc" id="L86">        return SCHEMA;</span>
+    }
+
+    public String studyId() {
+<span class="fc" id="L90">        return PolynomialTheoryUtilityPreregistration.STUDY_ID;</span>
+    }
+
+    public String evidenceStatus() {
+<span class="fc" id="L94">        return EVIDENCE_STATUS;</span>
+    }
+
+    public String qualificationExposure() {
+<span class="fc" id="L98">        return QUALIFICATION_EXPOSURE;</span>
+    }
+
+    public int rowCount() {
+<span class="fc" id="L102">        return measuredBatch.rowCount();</span>
+    }
+
+    public byte[] bytes() {
+<span class="fc" id="L106">        return utf8(canonicalJson);</span>
+    }
+
+    public boolean verify(byte[] candidate) {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        return candidate != null</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            &amp;&amp; MessageDigest.isEqual(bytes(), candidate);</span>
+    }
+
+    public void requireVerified(byte[] candidate) {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (!verify(candidate)) {</span>
+<span class="fc" id="L116">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze bytes differ from the frozen artifact&quot;
+            );
+        }
+<span class="fc" id="L120">    }</span>
+
+    public void validateAgainst(
+        PolynomialTheoryUtilityCandidateMeasurementBatch expected
+    ) {
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (!measuredBatch.equals(</span>
+<span class="fc" id="L126">                Objects.requireNonNull(expected, &quot;expected&quot;))) {</span>
+<span class="nc" id="L127">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze refers to another measured batch&quot;
+            );
+        }
+<span class="fc" id="L131">    }</span>
+
+    public Path write(Path directory) throws IOException {
+<span class="fc" id="L134">        Path root = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L135">            .toAbsolutePath()</span>
+<span class="fc" id="L136">            .normalize();</span>
+<span class="fc" id="L137">        Files.createDirectories(root);</span>
+<span class="fc" id="L138">        Path qualification = root.resolve(</span>
+            PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_FILE_NAME
+        );
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (Files.exists(qualification, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L142">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze output contains sealed qualification&quot;
+            );
+        }
+<span class="fc" id="L146">        Path target = root.resolve(FILE_NAME);</span>
+<span class="fc" id="L147">        AtomicJsonFile.writeUtf8(target, canonicalJson);</span>
+<span class="fc" id="L148">        requireVerified(Files.readAllBytes(target));</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (Files.exists(qualification, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="nc" id="L150">            throw new IllegalStateException(</span>
+                &quot;sealed qualification appeared during candidate freeze&quot;
+            );
+        }
+<span class="fc" id="L154">        return target;</span>
+    }
+
+    private static String canonical(
+        PolynomialTheoryUtilityCandidateMeasurementBatch measuredBatch
+    ) {
+<span class="fc" id="L160">        var batch = Objects.requireNonNull(</span>
+            measuredBatch,
+            &quot;measuredBatch&quot;
+        );
+<span class="fc" id="L164">        JsonWriter json = new JsonWriter().beginObject();</span>
+<span class="fc" id="L165">        json.property(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L166">        json.property(</span>
+            &quot;studyId&quot;,
+            PolynomialTheoryUtilityPreregistration.STUDY_ID
+        );
+<span class="fc" id="L170">        json.property(&quot;evidenceStatus&quot;, EVIDENCE_STATUS);</span>
+<span class="fc" id="L171">        json.property(</span>
+            &quot;qualificationExposure&quot;,
+            QUALIFICATION_EXPOSURE
+        );
+<span class="fc" id="L175">        binding(</span>
+            json,
+            &quot;preregistrationBinding&quot;,
+            PolynomialTheoryUtilityPreregistration.FILE_NAME,
+            PolynomialTheoryUtilityPreregistration.BYTE_LENGTH,
+            PolynomialTheoryUtilityPreregistration.CONTENT_HASH
+        );
+<span class="fc" id="L182">        binding(</span>
+            json,
+            &quot;formationBinding&quot;,
+            PolynomialTheoryUtilityCaseCorpus.FORMATION_FILE_NAME,
+            PolynomialTheoryUtilityCaseCorpus.FORMATION_BYTE_LENGTH,
+            PolynomialTheoryUtilityCaseCorpus.FORMATION_CONTENT_HASH
+        );
+<span class="fc" id="L189">        binding(</span>
+            json,
+            &quot;qualificationBinding&quot;,
+            PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_FILE_NAME,
+            PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_BYTE_LENGTH,
+            PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_CONTENT_HASH
+        );
+<span class="fc" id="L196">        binding(</span>
+            json,
+            &quot;planBinding&quot;,
+            PolynomialTheoryUtilityExecutionPlan.FILE_NAME,
+            PolynomialTheoryUtilityExecutionPlan.EXPECTED_BYTE_LENGTH,
+            PolynomialTheoryUtilityExecutionPlan.EXPECTED_CONTENT_HASH
+        );
+<span class="fc" id="L203">        binding(</span>
+            json,
+            &quot;executionInputBinding&quot;,
+            PolynomialTheoryUtilityExecutionInputs.FILE_NAME,
+            PolynomialTheoryUtilityExecutionInputs.EXPECTED_BYTE_LENGTH,
+            PolynomialTheoryUtilityExecutionInputs.EXPECTED_CONTENT_HASH
+        );
+<span class="fc" id="L210">        appendMeasuredBatch(json, batch);</span>
+<span class="fc" id="L211">        json.array(&quot;rows&quot;, rows -&gt; {</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            for (int index = 0; index &lt; batch.rowCount(); index++) {</span>
+<span class="fc" id="L213">                int rowIndex = index;</span>
+<span class="fc" id="L214">                rows.objectValue(row -&gt; appendRow(</span>
+                    row,
+                    rowIndex,
+<span class="fc" id="L217">                    batch.results().get(rowIndex),</span>
+<span class="fc" id="L218">                    batch.measurements().get(rowIndex)</span>
+                ));
+            }
+<span class="fc" id="L221">        });</span>
+<span class="fc" id="L222">        return json.endObject().toString() + &quot;\n&quot;;</span>
+    }
+
+    private static void binding(
+        JsonWriter json,
+        String field,
+        String path,
+        long byteLength,
+        String bindingHash
+    ) {
+<span class="fc" id="L232">        json.object(field, value -&gt; {</span>
+<span class="fc" id="L233">            value.property(&quot;path&quot;, path);</span>
+<span class="fc" id="L234">            value.property(&quot;byteLength&quot;, byteLength);</span>
+<span class="fc" id="L235">            value.property(&quot;contentHash&quot;, bindingHash);</span>
+<span class="fc" id="L236">        });</span>
+<span class="fc" id="L237">    }</span>
+
+    private static void appendMeasuredBatch(
+        JsonWriter json,
+        PolynomialTheoryUtilityCandidateMeasurementBatch batch
+    ) {
+<span class="fc" id="L243">        json.object(&quot;measuredBatch&quot;, value -&gt; {</span>
+<span class="fc" id="L244">            value.property(&quot;schema&quot;, batch.schema());</span>
+<span class="fc" id="L245">            value.property(&quot;batchId&quot;, batch.batchId());</span>
+<span class="fc" id="L246">            value.property(&quot;evidenceStatus&quot;, batch.evidenceStatus());</span>
+<span class="fc" id="L247">            value.property(</span>
+                &quot;candidateBatchSchema&quot;,
+<span class="fc" id="L249">                batch.candidateBatch().schema()</span>
+            );
+<span class="fc" id="L251">            value.property(</span>
+                &quot;candidateBatchEvidenceStatus&quot;,
+<span class="fc" id="L253">                batch.candidateBatch().evidenceStatus()</span>
+            );
+<span class="fc" id="L255">            value.property(&quot;inputContentHash&quot;, batch.inputContentHash());</span>
+<span class="fc" id="L256">            value.property(&quot;inputByteLength&quot;, batch.inputByteLength());</span>
+<span class="fc" id="L257">            value.property(&quot;rowCount&quot;, batch.rowCount());</span>
+<span class="fc" id="L258">        });</span>
+<span class="fc" id="L259">    }</span>
+
+    private static void appendRow(
+        JsonWriter row,
+        int index,
+        PolynomialTheoryUtilityCandidateResult result,
+        PolynomialTheoryUtilityCandidateMeasurements measurements
+    ) {
+<span class="fc" id="L267">        row.property(&quot;rowIndex&quot;, index);</span>
+<span class="fc" id="L268">        appendInput(row, result.input());</span>
+<span class="fc" id="L269">        appendResult(row, result);</span>
+<span class="fc" id="L270">        appendMeasurements(row, measurements);</span>
+<span class="fc" id="L271">    }</span>
+
+    private static void appendInput(
+        JsonWriter row,
+        PolynomialTheoryUtilityExecutionInput input
+    ) {
+<span class="fc" id="L277">        row.object(&quot;input&quot;, value -&gt; {</span>
+<span class="fc" id="L278">            value.property(&quot;inputId&quot;, input.inputId());</span>
+<span class="fc" id="L279">            value.property(&quot;rowId&quot;, input.rowId());</span>
+<span class="fc" id="L280">            value.property(&quot;runId&quot;, input.runId());</span>
+<span class="fc" id="L281">            value.property(&quot;caseId&quot;, input.caseId());</span>
+<span class="fc" id="L282">            value.property(&quot;profileId&quot;, input.profileId());</span>
+<span class="fc" id="L283">            value.property(&quot;checkpointId&quot;, input.checkpointId());</span>
+<span class="fc" id="L284">            value.property(&quot;adapterId&quot;, input.adapterId());</span>
+<span class="fc" id="L285">            value.property(</span>
+                &quot;admittedPrimitiveWork&quot;,
+<span class="fc" id="L287">                input.admittedPrimitiveWork()</span>
+            );
+<span class="fc" id="L289">            value.property(</span>
+                &quot;totalMechanicalWork&quot;,
+<span class="fc" id="L291">                input.totalMechanicalWork()</span>
+            );
+<span class="fc" id="L293">            value.property(</span>
+                &quot;factorizationWork&quot;,
+<span class="fc" id="L295">                input.factorizationWork()</span>
+            );
+<span class="fc" id="L297">            value.property(&quot;inputStatus&quot;, input.inputStatus());</span>
+<span class="fc" id="L298">        });</span>
+<span class="fc" id="L299">    }</span>
+
+    private static void appendResult(
+        JsonWriter row,
+        PolynomialTheoryUtilityCandidateResult result
+    ) {
+<span class="fc" id="L305">        row.object(&quot;result&quot;, value -&gt; {</span>
+<span class="fc" id="L306">            value.property(&quot;schema&quot;, result.schema());</span>
+<span class="fc" id="L307">            value.property(&quot;resultId&quot;, result.resultId());</span>
+<span class="fc" id="L308">            value.property(&quot;inputId&quot;, result.input().inputId());</span>
+<span class="fc" id="L309">            value.property(</span>
+                &quot;sourceRootExpression&quot;,
+<span class="fc" id="L311">                result.sourceRootExpression()</span>
+            );
+<span class="fc" id="L313">            value.property(</span>
+                &quot;terminalStatus&quot;,
+<span class="fc" id="L315">                result.terminalStatus().name()</span>
+            );
+<span class="fc" id="L317">            value.property(&quot;detailCode&quot;, result.detailCode());</span>
+<span class="fc" id="L318">            value.property(&quot;verifierOutcome&quot;, result.verifierOutcome());</span>
+<span class="fc" id="L319">            value.property(</span>
+                &quot;transitionEvidenceHash&quot;,
+<span class="fc" id="L321">                result.transitionEvidenceHash()</span>
+            );
+<span class="fc" id="L323">            appendWork(value, &quot;work&quot;, result.work());</span>
+<span class="fc" id="L324">            value.array(&quot;transitions&quot;, transitions -&gt;</span>
+<span class="fc" id="L325">                result.transitions().forEach(transition -&gt;</span>
+<span class="fc" id="L326">                    transitions.objectValue(item -&gt;</span>
+<span class="fc" id="L327">                        appendTransition(item, transition)</span>
+                    )
+                )
+            );
+<span class="fc" id="L331">        });</span>
+<span class="fc" id="L332">    }</span>
+
+    private static void appendTransition(
+        JsonWriter json,
+        PolynomialTheoryUtilityTransitionOutcome transition
+    ) {
+<span class="fc" id="L338">        json.property(&quot;schema&quot;, transition.schema());</span>
+<span class="fc" id="L339">        json.property(&quot;transitionId&quot;, transition.transitionId());</span>
+<span class="fc" id="L340">        json.property(&quot;transitionIndex&quot;, transition.transitionIndex());</span>
+<span class="fc" id="L341">        json.property(&quot;executionInputId&quot;, transition.executionInputId());</span>
+<span class="fc" id="L342">        intArray(json, &quot;occurrencePath&quot;, transition.occurrencePath());</span>
+<span class="fc" id="L343">        json.property(</span>
+            &quot;sourceOccurrenceExpression&quot;,
+<span class="fc" id="L345">            transition.sourceOccurrenceExpression()</span>
+        );
+<span class="fc" id="L347">        json.property(</span>
+            &quot;transformedOccurrenceExpression&quot;,
+<span class="fc" id="L349">            transition.transformedOccurrenceExpression()</span>
+        );
+<span class="fc" id="L351">        json.property(</span>
+            &quot;sourceRootExpression&quot;,
+<span class="fc" id="L353">            transition.sourceRootExpression()</span>
+        );
+<span class="fc" id="L355">        json.property(</span>
+            &quot;transformedRootExpression&quot;,
+<span class="fc" id="L357">            transition.transformedRootExpression()</span>
+        );
+<span class="fc" id="L359">        json.property(&quot;transformationId&quot;, transition.transformationId());</span>
+<span class="fc" id="L360">        json.property(&quot;backendId&quot;, transition.backendId());</span>
+<span class="fc" id="L361">        json.property(&quot;sourceEvidenceHash&quot;, transition.sourceEvidenceHash());</span>
+<span class="fc" id="L362">        json.property(</span>
+            &quot;transitionEvidenceHash&quot;,
+<span class="fc" id="L364">            transition.transitionEvidenceHash()</span>
+        );
+<span class="fc" id="L366">        json.property(</span>
+            &quot;cacheDisposition&quot;,
+<span class="fc" id="L368">            transition.cacheDisposition().name()</span>
+        );
+<span class="fc" id="L370">        json.property(&quot;cacheRevision&quot;, transition.cacheRevision());</span>
+<span class="fc" id="L371">        json.property(&quot;cacheEntryId&quot;, transition.cacheEntryId());</span>
+<span class="fc" id="L372">        json.property(</span>
+            &quot;evictedCacheEntryId&quot;,
+<span class="fc" id="L374">            transition.evictedCacheEntryId()</span>
+        );
+<span class="fc" id="L376">        appendWork(json, &quot;work&quot;, transition.work());</span>
+<span class="fc" id="L377">    }</span>
+
+    private static void appendWork(
+        JsonWriter json,
+        String field,
+        PolynomialTheoryUtilityWorkBreakdown work
+    ) {
+<span class="fc" id="L384">        json.object(field, value -&gt; {</span>
+<span class="fc" id="L385">            value.property(&quot;primitiveWork&quot;, work.primitiveWork());</span>
+<span class="fc" id="L386">            value.property(&quot;matchingWork&quot;, work.matchingWork());</span>
+<span class="fc" id="L387">            value.property(</span>
+                &quot;sourceValidationWork&quot;,
+<span class="fc" id="L389">                work.sourceValidationWork()</span>
+            );
+<span class="fc" id="L391">            value.property(&quot;factorizationWork&quot;, work.factorizationWork());</span>
+<span class="fc" id="L392">            value.property(&quot;verificationWork&quot;, work.verificationWork());</span>
+<span class="fc" id="L393">            value.property(&quot;renderingWork&quot;, work.renderingWork());</span>
+<span class="fc" id="L394">            value.property(&quot;reparseWork&quot;, work.reparseWork());</span>
+<span class="fc" id="L395">            value.property(&quot;reconstructionWork&quot;, work.reconstructionWork());</span>
+<span class="fc" id="L396">            value.property(</span>
+                &quot;occurrenceReplacementWork&quot;,
+<span class="fc" id="L398">                work.occurrenceReplacementWork()</span>
+            );
+<span class="fc" id="L400">            value.property(&quot;cacheLookupWork&quot;, work.cacheLookupWork());</span>
+<span class="fc" id="L401">            value.property(&quot;cacheInsertionWork&quot;, work.cacheInsertionWork());</span>
+<span class="fc" id="L402">            value.property(&quot;cacheEvictionWork&quot;, work.cacheEvictionWork());</span>
+<span class="fc" id="L403">            value.property(&quot;cacheReplayWork&quot;, work.cacheReplayWork());</span>
+<span class="fc" id="L404">            value.property(</span>
+                &quot;evidenceConstructionWork&quot;,
+<span class="fc" id="L406">                work.evidenceConstructionWork()</span>
+            );
+<span class="fc" id="L408">            value.property(&quot;mechanicalWork&quot;, work.mechanicalWork());</span>
+<span class="fc" id="L409">            value.property(&quot;totalWork&quot;, work.totalWork());</span>
+<span class="fc" id="L410">        });</span>
+<span class="fc" id="L411">    }</span>
+
+    private static void appendMeasurements(
+        JsonWriter row,
+        PolynomialTheoryUtilityCandidateMeasurements measurements
+    ) {
+<span class="fc" id="L417">        row.object(&quot;measurements&quot;, value -&gt; {</span>
+<span class="fc" id="L418">            value.property(&quot;schema&quot;, measurements.schema());</span>
+<span class="fc" id="L419">            value.property(&quot;measurementId&quot;, measurements.measurementId());</span>
+<span class="fc" id="L420">            value.property(&quot;resultId&quot;, measurements.result().resultId());</span>
+<span class="fc" id="L421">            value.property(</span>
+                &quot;formationAssumptionSetId&quot;,
+<span class="fc" id="L423">                measurements.formationAssumptionSetId()</span>
+            );
+<span class="fc" id="L425">            value.stringArray(</span>
+                &quot;normalizedAssumptions&quot;,
+<span class="fc" id="L427">                measurements.normalizedAssumptions()</span>
+            );
+<span class="fc" id="L429">            value.property(</span>
+                &quot;sourceAstNodeCount&quot;,
+<span class="fc" id="L431">                measurements.sourceAstNodeCount()</span>
+            );
+<span class="fc" id="L433">            appendDerived(value, measurements);</span>
+<span class="fc" id="L434">            value.array(&quot;transitionTraces&quot;, traces -&gt;</span>
+<span class="fc" id="L435">                measurements.transitionTraces().forEach(trace -&gt;</span>
+<span class="fc" id="L436">                    traces.objectValue(item -&gt; appendTrace(item, trace))</span>
+                )
+            );
+<span class="fc" id="L439">            value.array(&quot;factorizationAttempts&quot;, attempts -&gt;</span>
+<span class="fc" id="L440">                measurements.factorizationAttempts().forEach(attempt -&gt;</span>
+<span class="fc" id="L441">                    attempts.objectValue(item -&gt; appendAttempt(item, attempt))</span>
+                )
+            );
+<span class="fc" id="L444">            value.array(&quot;cacheEvents&quot;, events -&gt;</span>
+<span class="fc" id="L445">                measurements.cacheEvents().forEach(event -&gt;</span>
+<span class="fc" id="L446">                    events.objectValue(item -&gt; appendCacheEvent(item, event))</span>
+                )
+            );
+<span class="fc" id="L449">        });</span>
+<span class="fc" id="L450">    }</span>
+
+    private static void appendDerived(
+        JsonWriter json,
+        PolynomialTheoryUtilityCandidateMeasurements measurements
+    ) {
+<span class="fc" id="L456">        json.object(&quot;derived&quot;, value -&gt; {</span>
+<span class="fc" id="L457">            value.property(</span>
+                &quot;generatedTransitionCount&quot;,
+<span class="fc" id="L459">                measurements.generatedTransitionCount()</span>
+            );
+<span class="fc" id="L461">            intArray(value, &quot;pathDepths&quot;, measurements.pathDepths());</span>
+<span class="fc" id="L462">            value.property(&quot;totalPathDepth&quot;, measurements.totalPathDepth());</span>
+<span class="fc" id="L463">            intArray(</span>
+                value,
+                &quot;primitiveExpansionLengths&quot;,
+<span class="fc" id="L466">                measurements.primitiveExpansionLengths()</span>
+            );
+<span class="fc" id="L468">            value.property(</span>
+                &quot;totalPrimitiveExpansionLength&quot;,
+<span class="fc" id="L470">                measurements.totalPrimitiveExpansionLength()</span>
+            );
+<span class="fc" id="L472">            intArray(</span>
+                value,
+                &quot;transformedAstNodeCounts&quot;,
+<span class="fc" id="L475">                measurements.transformedAstNodeCounts()</span>
+            );
+<span class="fc" id="L477">            intArray(value, &quot;astNodeGrowths&quot;, measurements.astNodeGrowths());</span>
+<span class="fc" id="L478">            value.property(</span>
+                &quot;factorizationRequestCount&quot;,
+<span class="fc" id="L480">                measurements.factorizationRequestCount()</span>
+            );
+<span class="fc" id="L482">            value.property(</span>
+                &quot;factorizationCandidateCount&quot;,
+<span class="fc" id="L484">                measurements.factorizationCandidateCount()</span>
+            );
+<span class="fc" id="L486">            value.property(&quot;cacheHitCount&quot;, measurements.cacheHitCount());</span>
+<span class="fc" id="L487">            value.property(&quot;cacheMissCount&quot;, measurements.cacheMissCount());</span>
+<span class="fc" id="L488">            value.property(</span>
+                &quot;cacheInsertionCount&quot;,
+<span class="fc" id="L490">                measurements.cacheInsertionCount()</span>
+            );
+<span class="fc" id="L492">            value.property(</span>
+                &quot;cacheEvictionCount&quot;,
+<span class="fc" id="L494">                measurements.cacheEvictionCount()</span>
+            );
+<span class="fc" id="L496">            value.property(&quot;cacheReplayCount&quot;, measurements.cacheReplayCount());</span>
+<span class="fc" id="L497">            value.stringArray(</span>
+                &quot;primitiveRuleIds&quot;,
+<span class="fc" id="L499">                measurements.primitiveRuleIds()</span>
+            );
+<span class="fc" id="L501">        });</span>
+<span class="fc" id="L502">    }</span>
+
+    private static void appendTrace(
+        JsonWriter json,
+        PolynomialTheoryUtilityTransitionTrace trace
+    ) {
+<span class="fc" id="L508">        json.property(&quot;schema&quot;, trace.schema());</span>
+<span class="fc" id="L509">        json.property(&quot;traceId&quot;, trace.traceId());</span>
+<span class="fc" id="L510">        json.property(&quot;transitionId&quot;, trace.transition().transitionId());</span>
+<span class="fc" id="L511">        json.property(&quot;pathDepth&quot;, trace.pathDepth());</span>
+<span class="fc" id="L512">        json.property(</span>
+            &quot;primitiveExpansionLength&quot;,
+<span class="fc" id="L514">            trace.primitiveExpansionLength()</span>
+        );
+<span class="fc" id="L516">        json.stringArray(</span>
+            &quot;normalizedAssumptions&quot;,
+<span class="fc" id="L518">            trace.normalizedAssumptions()</span>
+        );
+<span class="fc" id="L520">        json.property(&quot;sourceAstNodeCount&quot;, trace.sourceAstNodeCount());</span>
+<span class="fc" id="L521">        json.property(</span>
+            &quot;transformedAstNodeCount&quot;,
+<span class="fc" id="L523">            trace.transformedAstNodeCount()</span>
+        );
+<span class="fc" id="L525">        json.property(&quot;astNodeGrowth&quot;, trace.astNodeGrowth());</span>
+<span class="fc" id="L526">        json.array(&quot;primitiveSteps&quot;, steps -&gt;</span>
+<span class="fc" id="L527">            trace.primitiveSteps().forEach(step -&gt;</span>
+<span class="fc" id="L528">                steps.objectValue(item -&gt; appendPrimitiveStep(item, step))</span>
+            )
+        );
+<span class="fc" id="L531">    }</span>
+
+    private static void appendPrimitiveStep(
+        JsonWriter json,
+        PolynomialTheoryUtilityTransitionTrace.PrimitiveStep step
+    ) {
+<span class="fc" id="L537">        json.property(&quot;stepId&quot;, step.stepId());</span>
+<span class="fc" id="L538">        json.property(&quot;primitiveIndex&quot;, step.primitiveIndex());</span>
+<span class="fc" id="L539">        json.property(&quot;pathEdgeIndex&quot;, step.pathEdgeIndex());</span>
+<span class="fc" id="L540">        json.property(&quot;transitionId&quot;, step.transitionId());</span>
+<span class="fc" id="L541">        json.property(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="fc" id="L542">        json.property(&quot;evidenceHash&quot;, step.evidenceHash());</span>
+<span class="fc" id="L543">    }</span>
+
+    private static void appendAttempt(
+        JsonWriter json,
+        PolynomialTheoryUtilityFactorizationAttempt attempt
+    ) {
+<span class="fc" id="L549">        json.property(&quot;schema&quot;, attempt.schema());</span>
+<span class="fc" id="L550">        json.property(&quot;attemptId&quot;, attempt.attemptId());</span>
+<span class="fc" id="L551">        json.property(&quot;attemptIndex&quot;, attempt.attemptIndex());</span>
+<span class="fc" id="L552">        json.property(&quot;executionInputId&quot;, attempt.executionInputId());</span>
+<span class="fc" id="L553">        json.property(&quot;backendId&quot;, attempt.backendId());</span>
+<span class="fc" id="L554">        json.property(&quot;requestId&quot;, attempt.requestId());</span>
+<span class="fc" id="L555">        json.property(&quot;requestEvidenceHash&quot;, attempt.requestEvidenceHash());</span>
+<span class="fc" id="L556">        json.stringArray(&quot;candidateIds&quot;, attempt.candidateIds());</span>
+<span class="fc" id="L557">        json.property(&quot;selectedCandidateId&quot;, attempt.selectedCandidateId());</span>
+<span class="fc" id="L558">        json.property(&quot;transitionId&quot;, attempt.transitionId());</span>
+<span class="fc" id="L559">        json.property(&quot;verifierOutcome&quot;, attempt.verifierOutcome());</span>
+<span class="fc" id="L560">        json.property(&quot;reportEvidenceHash&quot;, attempt.reportEvidenceHash());</span>
+<span class="fc" id="L561">    }</span>
+
+    private static void appendCacheEvent(
+        JsonWriter json,
+        PolynomialTheoryUtilityCacheEvent event
+    ) {
+<span class="fc" id="L567">        json.property(&quot;schema&quot;, event.schema());</span>
+<span class="fc" id="L568">        json.property(&quot;eventId&quot;, event.eventId());</span>
+<span class="fc" id="L569">        json.property(&quot;eventIndex&quot;, event.eventIndex());</span>
+<span class="fc" id="L570">        json.property(&quot;executionInputId&quot;, event.executionInputId());</span>
+<span class="fc" id="L571">        json.property(&quot;transitionId&quot;, event.transitionId());</span>
+<span class="fc" id="L572">        json.property(&quot;kind&quot;, event.kind().name());</span>
+<span class="fc" id="L573">        json.property(&quot;cacheRevision&quot;, event.cacheRevision());</span>
+<span class="fc" id="L574">        json.property(&quot;entryId&quot;, event.entryId());</span>
+<span class="fc" id="L575">        json.property(&quot;evidenceHash&quot;, event.evidenceHash());</span>
+<span class="fc" id="L576">    }</span>
+
+    private static void intArray(
+        JsonWriter json,
+        String field,
+        List&lt;Integer&gt; values
+    ) {
+<span class="fc" id="L583">        json.array(field, array -&gt;</span>
+<span class="fc" id="L584">            values.forEach(value -&gt; array.numberValue(value))</span>
+        );
+<span class="fc" id="L586">    }</span>
+
+    private static byte[] utf8(String value) {
+        try {
+<span class="fc" id="L590">            ByteBuffer encoded = StandardCharsets.UTF_8.newEncoder()</span>
+<span class="fc" id="L591">                .onMalformedInput(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L592">                .onUnmappableCharacter(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L593">                .encode(CharBuffer.wrap(value));</span>
+<span class="fc" id="L594">            byte[] bytes = new byte[encoded.remaining()];</span>
+<span class="fc" id="L595">            encoded.get(bytes);</span>
+<span class="fc" id="L596">            return bytes;</span>
+<span class="fc" id="L597">        } catch (CharacterCodingException exception) {</span>
+<span class="fc" id="L598">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze contains invalid Unicode&quot;,
+                exception
+            );
+        }
+    }
+
+    private static String requireHash(String value, String name) {
+<span class="fc" id="L606">        String text = requireText(value, name);</span>
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">        if (!SHA_256.matcher(text).matches()) {</span>
+<span class="nc" id="L608">            throw new IllegalArgumentException(name + &quot; is not SHA-256&quot;);</span>
+        }
+<span class="fc" id="L610">        return text;</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="fc" id="L614">        String text = Objects.requireNonNull(value, name);</span>
+<span class="pc bpc" id="L615" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
+<span class="nc" id="L616">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L618">        return text;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
