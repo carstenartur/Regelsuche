@@ -1,6 +1,6 @@
 # Exakte Faktorisierung an verschachtelten AST-Vorkommen
 
-**Implementierungsstand: 29. August 2026**
+**Implementierungsstand: 1. September 2026**
 
 ## Zweck
 
@@ -31,6 +31,27 @@ Damit kann eine allgemeine verifizierte univariate Faktorisierung an einer
 verschachtelten Stelle ausgeführt werden, ohne einen zweiten Pfadvertrag, einen
 Formatter-Reparse der ursprünglichen Koeffizienten oder eine ungebundene
 Stringersetzung einzuführen.
+
+## Modulgrenze
+
+`TreePosition` und `ExactNestedFactorizationTransformationPipeline` liegen im
+Modul `regelsuche-search`. Ihre Paketnamen und öffentlichen APIs bleiben
+unverändert. Die Verschiebung ist keine zweite Implementierung, sondern entfernt
+eine frühere, für wiederverwendbare Suchinfrastruktur falsche physische
+Abhängigkeit vom Produktmodul `app`.
+
+Dadurch können sowohl `app` als auch `regelsuche-experiments` dieselbe
+Occurrence-, Staleness-, Ersetzungs- und Replayautorität verwenden. Eine
+Abhängigkeit von `regelsuche-experiments` zurück auf `app` wäre zyklisch, weil
+das Produktmodul die Experimentkomponente bereits konsumiert. Die gemeinsame
+Grenze muss deshalb unterhalb beider Verbraucher liegen.
+
+Die umfangreichen Faktorisierungs- und Reserve-Tests verbleiben bewusst im
+`app`-Modul. Sie prüfen damit nicht nur die isolierte Pipeline, sondern zugleich,
+dass das Produkt die aus `regelsuche-search` bezogene Implementierung über die
+reguläre Modulabhängigkeit verwendet. Neue Benchmarkadapter dürfen die Klassen
+direkt aus `regelsuche-search` beziehen und keine lokale Kopie oder abweichende
+AST-Positionslogik einführen.
 
 ## Eine nicht zurücksetzbare Arbeitsautorität
 
@@ -203,6 +224,7 @@ Fokussierter Gradle-Aufruf:
 
 ```bash
 ./gradlew --no-daemon \
+  :regelsuche-search:classes \
   :app:test \
   --tests 'de.regelsuche.polynomial.ExactNestedFactorization*Test'
 ```
