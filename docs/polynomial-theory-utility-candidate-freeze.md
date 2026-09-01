@@ -1,4 +1,4 @@
-# Kanonische Candidate-Freeze der Polynomtheorie-Nutzenstudie
+# Kanonischer Candidate-Freeze der Polynomtheorie-Nutzenstudie
 
 Status: vollständige target-blinde Ergebnis- und Messserialisierung vor
 Qualifikationsöffnung
@@ -35,7 +35,7 @@ versiegelte Qualifikation nicht.
 
 ## Gebundene Artefakte
 
-Die Freeze enthält für jede bereits eingefrorene Quelle Pfad, Bytelänge und
+Der Freeze enthält für jede bereits eingefrorene Quelle Pfad, Bytelänge und
 SHA-256:
 
 - Präregistrierung,
@@ -112,7 +112,7 @@ Der Freeze weist insbesondere zurück:
 - eine im Ausgabeordner vorhandene versiegelte Qualifikation.
 
 Die vollständige Resultat-/Messkonsistenz selbst bleibt Autorität der
-vorherigen Verträge. Die Freeze nimmt deren bereits geprüfte Objekte entgegen
+vorherigen Verträge. Der Freeze nimmt deren bereits geprüfte Objekte entgegen
 und serialisiert sie ohne eine parallele fachliche Modellhierarchie.
 
 ## Charakterisierung
@@ -131,7 +131,9 @@ prüft:
   Entry-/Transition-Lineage,
 - Ablehnung gefälschter Hashes, Längen und kanonischer Daten,
 - Tamper-Erkennung und defensive Byteausgabe,
-- atomisches Schreiben und die Sperre gegen Qualifikation im Ausgabeordner.
+- explizite Ablehnung ungültiger Unicode-Surrogatfolgen,
+- atomisches Schreiben und die Sperre gegen eine Qualifikationsdatei oder
+  einen Qualifikations-Symlink im Ausgabeordner.
 
 Die Testmatrix verwendet 598 terminale Nullresultate sowie zwei synthetische,
 vollständig typisierte Evidenzzeilen. Die beiden positiven Zeilen dienen nur der
