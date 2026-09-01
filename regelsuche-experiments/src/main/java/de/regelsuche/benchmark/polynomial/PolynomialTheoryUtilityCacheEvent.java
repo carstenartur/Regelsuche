@@ -124,15 +124,21 @@ public record PolynomialTheoryUtilityCacheEvent(
                 "cache event differs from its result profile"
             );
         }
-        if (transitionBound()) {
-            var transition = result.transitions().stream()
-                .filter(value -> transitionId.equals(value.transitionId()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException(
-                    "cache event refers to another result transition"
-                ));
-            requireTransitionLineage(transition);
+        if (!transitionBound()) {
+            if (!lookup()) {
+                throw new IllegalArgumentException(
+                    "cache mutation or replay lacks transition lineage"
+                );
+            }
+            return;
         }
+        var transition = result.transitions().stream()
+            .filter(value -> transitionId.equals(value.transitionId()))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException(
+                "cache event refers to another result transition"
+            ));
+        requireTransitionLineage(transition);
     }
 
     private void requireTransitionLineage(
