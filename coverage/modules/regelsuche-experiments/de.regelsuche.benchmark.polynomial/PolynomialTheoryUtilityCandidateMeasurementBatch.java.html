@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityCandidateMeasurementBatch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityCandidateMeasurementBatch.java</span></div><h1>PolynomialTheoryUtilityCandidateMeasurementBatch.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+/** Complete ordered result/measurement batch before canonical freezing. */
+public record PolynomialTheoryUtilityCandidateMeasurementBatch(
+    String batchId,
+    PolynomialTheoryUtilityProfileAdapter.CandidateBatch candidateBatch,
+    List&lt;PolynomialTheoryUtilityCandidateMeasurements&gt; measurements
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.polynomial-theory-utility-candidate-measurement-batch/v1&quot;;
+    public static final String EVIDENCE_STATUS =
+        &quot;TARGET_BLIND_MEASUREMENTS_BOUND_NOT_FROZEN&quot;;
+<span class="fc" id="L20">    private static final Pattern SHA_256 =</span>
+<span class="fc" id="L21">        Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+
+<span class="fc" id="L23">    public PolynomialTheoryUtilityCandidateMeasurementBatch {</span>
+<span class="fc" id="L24">        batchId = requireHash(batchId, &quot;batchId&quot;);</span>
+<span class="fc" id="L25">        candidateBatch = Objects.requireNonNull(</span>
+            candidateBatch,
+            &quot;candidateBatch&quot;
+        );
+<span class="fc" id="L29">        measurements = List.copyOf(</span>
+<span class="fc" id="L30">            Objects.requireNonNull(measurements, &quot;measurements&quot;)</span>
+        );
+<span class="fc" id="L32">        requireBatch(candidateBatch, measurements);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (!batchId.equals(identity(candidateBatch, measurements))) {</span>
+<span class="fc" id="L34">            throw new IllegalArgumentException(</span>
+                &quot;candidate measurement batch identity differs from its fields&quot;
+            );
+        }
+<span class="fc" id="L38">    }</span>
+
+    public static PolynomialTheoryUtilityCandidateMeasurementBatch create(
+        PolynomialTheoryUtilityProfileAdapter.CandidateBatch candidateBatch,
+        List&lt;PolynomialTheoryUtilityCandidateMeasurements&gt; measurements
+    ) {
+<span class="fc" id="L44">        var retainedBatch = Objects.requireNonNull(</span>
+            candidateBatch,
+            &quot;candidateBatch&quot;
+        );
+<span class="fc" id="L48">        List&lt;PolynomialTheoryUtilityCandidateMeasurements&gt; retained =</span>
+<span class="fc" id="L49">            List.copyOf(Objects.requireNonNull(measurements, &quot;measurements&quot;));</span>
+<span class="fc" id="L50">        requireBatch(retainedBatch, retained);</span>
+<span class="fc" id="L51">        return new PolynomialTheoryUtilityCandidateMeasurementBatch(</span>
+<span class="fc" id="L52">            identity(retainedBatch, retained),</span>
+            retainedBatch,
+            retained
+        );
+    }
+
+    public String schema() {
+<span class="fc" id="L59">        return SCHEMA;</span>
+    }
+
+    public String studyId() {
+<span class="fc" id="L63">        return PolynomialTheoryUtilityPreregistration.STUDY_ID;</span>
+    }
+
+    public String evidenceStatus() {
+<span class="fc" id="L67">        return EVIDENCE_STATUS;</span>
+    }
+
+    public String inputContentHash() {
+<span class="fc" id="L71">        return candidateBatch.inputContentHash();</span>
+    }
+
+    public long inputByteLength() {
+<span class="fc" id="L75">        return candidateBatch.inputByteLength();</span>
+    }
+
+    public List&lt;PolynomialTheoryUtilityCandidateResult&gt; results() {
+<span class="fc" id="L79">        return candidateBatch.results();</span>
+    }
+
+    public int rowCount() {
+<span class="fc" id="L83">        return measurements.size();</span>
+    }
+
+    public void validateAgainst(
+        PolynomialTheoryUtilityProfileAdapter.CandidateBatch expected
+    ) {
+<span class="fc" id="L89">        var value = Objects.requireNonNull(expected, &quot;expected&quot;);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (!candidateBatch.inputContentHash().equals(</span>
+<span class="fc" id="L91">                value.inputContentHash())</span>
+<span class="fc" id="L92">                || candidateBatch.inputByteLength()</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                    != value.inputByteLength()</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                || !candidateBatch.results().equals(value.results())) {</span>
+<span class="fc" id="L95">            throw new IllegalArgumentException(</span>
+                &quot;candidate measurements refer to another result batch&quot;
+            );
+        }
+<span class="fc" id="L99">    }</span>
+
+    private static void requireBatch(
+        PolynomialTheoryUtilityProfileAdapter.CandidateBatch candidateBatch,
+        List&lt;PolynomialTheoryUtilityCandidateMeasurements&gt; measurements
+    ) {
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (!PolynomialTheoryUtilityProfileAdapter.CandidateBatch.SCHEMA.equals(</span>
+<span class="fc" id="L106">                candidateBatch.schema())</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                || measurements.size() != candidateBatch.results().size()</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                || measurements.size()</span>
+                    != PolynomialTheoryUtilityExecutionInputs
+                        .EXPECTED_INPUT_COUNT) {
+<span class="fc" id="L111">            throw new IllegalArgumentException(</span>
+                &quot;candidate measurement batch must cover every frozen result&quot;
+            );
+        }
+<span class="fc" id="L115">        Set&lt;String&gt; identities = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (int index = 0; index &lt; measurements.size(); index++) {</span>
+<span class="fc" id="L117">            var measurement = Objects.requireNonNull(</span>
+<span class="fc" id="L118">                measurements.get(index),</span>
+                &quot;measurement&quot;
+            );
+<span class="fc" id="L121">            measurement.validateAgainst(</span>
+<span class="fc" id="L122">                candidateBatch.results().get(index)</span>
+            );
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (!identities.add(measurement.measurementId())) {</span>
+<span class="nc" id="L125">                throw new IllegalArgumentException(</span>
+                    &quot;candidate measurement identities are not unique&quot;
+                );
+            }
+        }
+<span class="fc" id="L130">    }</span>
+
+    private static String identity(
+        PolynomialTheoryUtilityProfileAdapter.CandidateBatch candidateBatch,
+        List&lt;PolynomialTheoryUtilityCandidateMeasurements&gt; measurements
+    ) {
+<span class="fc" id="L136">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L137">        append(material, SCHEMA);</span>
+<span class="fc" id="L138">        append(material, PolynomialTheoryUtilityPreregistration.STUDY_ID);</span>
+<span class="fc" id="L139">        append(material, EVIDENCE_STATUS);</span>
+<span class="fc" id="L140">        append(</span>
+            material,
+<span class="fc" id="L142">            Objects.requireNonNull(candidateBatch, &quot;candidateBatch&quot;).schema()</span>
+        );
+<span class="fc" id="L144">        append(material, candidateBatch.inputContentHash());</span>
+<span class="fc" id="L145">        append(material, Long.toString(candidateBatch.inputByteLength()));</span>
+<span class="fc" id="L146">        append(material, Integer.toString(measurements.size()));</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (int index = 0; index &lt; measurements.size(); index++) {</span>
+<span class="fc" id="L148">            append(</span>
+                material,
+<span class="fc" id="L150">                candidateBatch.results().get(index).resultId()</span>
+            );
+<span class="fc" id="L152">            append(</span>
+                material,
+<span class="fc" id="L154">                Objects.requireNonNull(</span>
+<span class="fc" id="L155">                    measurements.get(index),</span>
+                    &quot;measurement&quot;
+<span class="fc" id="L157">                ).measurementId()</span>
+            );
+        }
+<span class="fc" id="L160">        return PolynomialTheoryUtilityExecutionIdentity.sha256(</span>
+<span class="fc" id="L161">            material.toString().getBytes(StandardCharsets.UTF_8)</span>
+        );
+    }
+
+    private static String requireHash(String value, String name) {
+<span class="fc" id="L166">        String text = requireText(value, name);</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (!SHA_256.matcher(text).matches()) {</span>
+<span class="nc" id="L168">            throw new IllegalArgumentException(name + &quot; is not SHA-256&quot;);</span>
+        }
+<span class="fc" id="L170">        return text;</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="fc" id="L174">        String text = Objects.requireNonNull(value, name);</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
+<span class="nc" id="L176">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L178">        return text;</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L182">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L183">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
