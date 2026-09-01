@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -158,6 +159,8 @@ public record PolynomialTheoryUtilityCandidateFreeze(
     private static byte[] utf8(String value) {
         try {
             ByteBuffer encoded = StandardCharsets.UTF_8.newEncoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
                 .encode(CharBuffer.wrap(value));
             byte[] bytes = new byte[encoded.remaining()];
             encoded.get(bytes);
