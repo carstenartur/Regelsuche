@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityCandidateMeasurements.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityCandidateMeasurements.java</span></div><h1>PolynomialTheoryUtilityCandidateMeasurements.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+
+/** Complete target-blind measurements for one typed candidate result. */
+public record PolynomialTheoryUtilityCandidateMeasurements(
+    String measurementId,
+    PolynomialTheoryUtilityCandidateResult result,
+    String formationAssumptionSetId,
+    List&lt;String&gt; normalizedAssumptions,
+    int sourceAstNodeCount,
+    List&lt;PolynomialTheoryUtilityTransitionTrace&gt; transitionTraces,
+    List&lt;PolynomialTheoryUtilityFactorizationAttempt&gt; factorizationAttempts,
+    List&lt;PolynomialTheoryUtilityCacheEvent&gt; cacheEvents
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.polynomial-theory-utility-candidate-measurements/v1&quot;;
+<span class="fc" id="L28">    private static final Pattern SHA_256 =</span>
+<span class="fc" id="L29">        Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="fc" id="L30">    private static final ThreadLocal&lt;ExpressionCanonicalizer&gt; CANONICALIZER =</span>
+<span class="fc" id="L31">        ThreadLocal.withInitial(ExpressionCanonicalizer::new);</span>
+    private static final Map&lt;
+        String,
+        PolynomialTheoryUtilityCaseCorpus.FormationCase
+<span class="fc" id="L35">    &gt; FORMATION_CASES = loadFormationCases();</span>
+
+<span class="fc" id="L37">    public PolynomialTheoryUtilityCandidateMeasurements {</span>
+<span class="fc" id="L38">        measurementId = requireHash(measurementId, &quot;measurementId&quot;);</span>
+<span class="fc" id="L39">        result = Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L40">        var formationCase = formationCase(result.input().caseId());</span>
+<span class="fc" id="L41">        formationAssumptionSetId = requireText(</span>
+            formationAssumptionSetId,
+            &quot;formationAssumptionSetId&quot;
+        );
+<span class="fc" id="L45">        transitionTraces = immutable(transitionTraces, &quot;transitionTraces&quot;);</span>
+<span class="fc" id="L46">        normalizedAssumptions = requireNormalizedAssumptions(</span>
+            normalizedAssumptions,
+            transitionTraces
+        );
+<span class="fc" id="L50">        factorizationAttempts = immutable(</span>
+            factorizationAttempts,
+            &quot;factorizationAttempts&quot;
+        );
+<span class="fc" id="L54">        cacheEvents = immutable(cacheEvents, &quot;cacheEvents&quot;);</span>
+
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (!result.sourceRootExpression().equals(</span>
+<span class="fc" id="L57">                formationCase.sourceExpression())</span>
+<span class="pc bpc" id="L58" title="1 of 4 branches missed.">                || !formationAssumptionSetId.equals(</span>
+<span class="fc" id="L59">                    formationCase.assumptionSetId())</span>
+                || sourceAstNodeCount &lt; 1
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                || sourceAstNodeCount != nodeCount(</span>
+<span class="fc" id="L62">                    result.sourceRootExpression()</span>
+                )) {
+<span class="fc" id="L64">            throw new IllegalArgumentException(</span>
+                &quot;candidate measurements differ from frozen formation&quot;
+            );
+        }
+
+<span class="fc" id="L69">        requireVisibleAssumptions(</span>
+            formationAssumptionSetId,
+            normalizedAssumptions
+        );
+<span class="fc" id="L73">        var profile = PolynomialTheoryUtilityExecutionInputs.profile(</span>
+<span class="fc" id="L74">            result.input().profileId()</span>
+        );
+<span class="fc" id="L76">        PolynomialTheoryUtilityCandidateMeasurementValidator.validate(</span>
+            result,
+            profile,
+            sourceAstNodeCount,
+            transitionTraces,
+            factorizationAttempts,
+            cacheEvents
+        );
+
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (!measurementId.equals(identity(</span>
+                result,
+                formationAssumptionSetId,
+                normalizedAssumptions,
+                sourceAstNodeCount,
+                transitionTraces,
+                factorizationAttempts,
+                cacheEvents))) {
+<span class="fc" id="L93">            throw new IllegalArgumentException(</span>
+                &quot;candidate measurement identity differs from its fields&quot;
+            );
+        }
+<span class="fc" id="L97">    }</span>
+
+    public static PolynomialTheoryUtilityCandidateMeasurements create(
+        PolynomialTheoryUtilityCandidateResult result,
+        List&lt;PolynomialTheoryUtilityTransitionTrace&gt; transitionTraces,
+        List&lt;PolynomialTheoryUtilityFactorizationAttempt&gt; factorizationAttempts,
+        List&lt;PolynomialTheoryUtilityCacheEvent&gt; cacheEvents
+    ) {
+<span class="fc" id="L105">        var retainedResult = Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L106">        var formationCase = formationCase(retainedResult.input().caseId());</span>
+<span class="fc" id="L107">        List&lt;PolynomialTheoryUtilityTransitionTrace&gt; traces = immutable(</span>
+            transitionTraces,
+            &quot;transitionTraces&quot;
+        );
+<span class="fc" id="L111">        List&lt;String&gt; normalized = traceAssumptions(traces);</span>
+<span class="fc" id="L112">        List&lt;PolynomialTheoryUtilityFactorizationAttempt&gt; attempts = immutable(</span>
+            factorizationAttempts,
+            &quot;factorizationAttempts&quot;
+        );
+<span class="fc" id="L116">        List&lt;PolynomialTheoryUtilityCacheEvent&gt; events = immutable(</span>
+            cacheEvents,
+            &quot;cacheEvents&quot;
+        );
+<span class="fc" id="L120">        int sourceNodes = nodeCount(retainedResult.sourceRootExpression());</span>
+<span class="fc" id="L121">        return new PolynomialTheoryUtilityCandidateMeasurements(</span>
+<span class="fc" id="L122">            identity(</span>
+                retainedResult,
+<span class="fc" id="L124">                formationCase.assumptionSetId(),</span>
+                normalized,
+                sourceNodes,
+                traces,
+                attempts,
+                events
+            ),
+            retainedResult,
+<span class="fc" id="L132">            formationCase.assumptionSetId(),</span>
+            normalized,
+            sourceNodes,
+            traces,
+            attempts,
+            events
+        );
+    }
+
+    public String schema() {
+<span class="fc" id="L142">        return SCHEMA;</span>
+    }
+
+    public int generatedTransitionCount() {
+<span class="fc" id="L146">        return result.transitions().size();</span>
+    }
+
+    public List&lt;Integer&gt; pathDepths() {
+<span class="fc" id="L150">        return transitionTraces.stream()</span>
+<span class="fc" id="L151">            .map(PolynomialTheoryUtilityTransitionTrace::pathDepth)</span>
+<span class="fc" id="L152">            .toList();</span>
+    }
+
+    public int totalPathDepth() {
+<span class="fc" id="L156">        return sum(pathDepths());</span>
+    }
+
+    public List&lt;Integer&gt; primitiveExpansionLengths() {
+<span class="fc" id="L160">        return transitionTraces.stream()</span>
+<span class="fc" id="L161">            .map(PolynomialTheoryUtilityTransitionTrace::primitiveExpansionLength)</span>
+<span class="fc" id="L162">            .toList();</span>
+    }
+
+    public int totalPrimitiveExpansionLength() {
+<span class="fc" id="L166">        return sum(primitiveExpansionLengths());</span>
+    }
+
+    public List&lt;Integer&gt; transformedAstNodeCounts() {
+<span class="fc" id="L170">        return transitionTraces.stream()</span>
+<span class="fc" id="L171">            .map(PolynomialTheoryUtilityTransitionTrace::transformedAstNodeCount)</span>
+<span class="fc" id="L172">            .toList();</span>
+    }
+
+    public List&lt;Integer&gt; astNodeGrowths() {
+<span class="fc" id="L176">        return transitionTraces.stream()</span>
+<span class="fc" id="L177">            .map(PolynomialTheoryUtilityTransitionTrace::astNodeGrowth)</span>
+<span class="fc" id="L178">            .toList();</span>
+    }
+
+    public int factorizationRequestCount() {
+<span class="fc" id="L182">        return factorizationAttempts.size();</span>
+    }
+
+    public int factorizationCandidateCount() {
+<span class="fc" id="L186">        int total = 0;</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (var attempt : factorizationAttempts) {</span>
+<span class="fc" id="L188">            total = Math.addExact(total, attempt.candidateCount());</span>
+<span class="fc" id="L189">        }</span>
+<span class="fc" id="L190">        return total;</span>
+    }
+
+    public int cacheHitCount() {
+<span class="fc" id="L194">        return countEvents(</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            value -&gt; value.kind()</span>
+                == PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_HIT
+        );
+    }
+
+    public int cacheMissCount() {
+<span class="fc" id="L201">        return countEvents(</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            value -&gt; value.kind()</span>
+                == PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_MISS
+        );
+    }
+
+    public int cacheInsertionCount() {
+<span class="fc" id="L208">        return countEvents(</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            value -&gt; value.kind()</span>
+                == PolynomialTheoryUtilityCacheEvent.Kind.INSERTION
+        );
+    }
+
+    public int cacheEvictionCount() {
+<span class="fc" id="L215">        return countEvents(</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            value -&gt; value.kind()</span>
+                == PolynomialTheoryUtilityCacheEvent.Kind.EVICTION
+        );
+    }
+
+    public int cacheReplayCount() {
+<span class="fc" id="L222">        return countEvents(</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            value -&gt; value.kind()</span>
+                == PolynomialTheoryUtilityCacheEvent.Kind.REPLAY
+        );
+    }
+
+    public List&lt;String&gt; primitiveRuleIds() {
+<span class="fc" id="L229">        return transitionTraces.stream()</span>
+<span class="fc" id="L230">            .flatMap(value -&gt; value.primitiveSteps().stream())</span>
+<span class="fc" id="L231">            .map(PolynomialTheoryUtilityTransitionTrace.PrimitiveStep::ruleId)</span>
+<span class="fc" id="L232">            .toList();</span>
+    }
+
+    public void validateAgainst(
+        PolynomialTheoryUtilityCandidateResult expected
+    ) {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (!result.equals(Objects.requireNonNull(expected, &quot;expected&quot;))) {</span>
+<span class="fc" id="L239">            throw new IllegalArgumentException(</span>
+                &quot;candidate measurements refer to another result&quot;
+            );
+        }
+<span class="fc" id="L243">    }</span>
+
+    private int countEvents(
+        Predicate&lt;PolynomialTheoryUtilityCacheEvent&gt; predicate
+    ) {
+<span class="fc" id="L248">        return Math.toIntExact(cacheEvents.stream().filter(predicate).count());</span>
+    }
+
+    private static String identity(
+        PolynomialTheoryUtilityCandidateResult result,
+        String formationAssumptionSetId,
+        List&lt;String&gt; normalizedAssumptions,
+        int sourceAstNodeCount,
+        List&lt;PolynomialTheoryUtilityTransitionTrace&gt; traces,
+        List&lt;PolynomialTheoryUtilityFactorizationAttempt&gt; attempts,
+        List&lt;PolynomialTheoryUtilityCacheEvent&gt; events
+    ) {
+<span class="fc" id="L260">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L261">        append(material, SCHEMA);</span>
+<span class="fc" id="L262">        append(material, PolynomialTheoryUtilityPreregistration.STUDY_ID);</span>
+<span class="fc" id="L263">        append(</span>
+            material,
+<span class="fc" id="L265">            Objects.requireNonNull(result, &quot;result&quot;).resultId()</span>
+        );
+<span class="fc" id="L267">        append(</span>
+            material,
+<span class="fc" id="L269">            requireText(</span>
+                formationAssumptionSetId,
+                &quot;formationAssumptionSetId&quot;
+            )
+        );
+<span class="fc" id="L274">        append(material, Integer.toString(sourceAstNodeCount));</span>
+<span class="fc" id="L275">        append(material, Integer.toString(normalizedAssumptions.size()));</span>
+<span class="fc" id="L276">        normalizedAssumptions.forEach(value -&gt; append(</span>
+            material,
+<span class="fc" id="L278">            requireText(value, &quot;normalizedAssumption&quot;)</span>
+        ));
+<span class="fc" id="L280">        appendIds(material, traces.stream()</span>
+<span class="fc" id="L281">            .map(PolynomialTheoryUtilityTransitionTrace::traceId)</span>
+<span class="fc" id="L282">            .toList());</span>
+<span class="fc" id="L283">        appendIds(material, attempts.stream()</span>
+<span class="fc" id="L284">            .map(PolynomialTheoryUtilityFactorizationAttempt::attemptId)</span>
+<span class="fc" id="L285">            .toList());</span>
+<span class="fc" id="L286">        appendIds(material, events.stream()</span>
+<span class="fc" id="L287">            .map(PolynomialTheoryUtilityCacheEvent::eventId)</span>
+<span class="fc" id="L288">            .toList());</span>
+<span class="fc" id="L289">        return PolynomialTheoryUtilityExecutionIdentity.sha256(</span>
+<span class="fc" id="L290">            material.toString().getBytes(StandardCharsets.UTF_8)</span>
+        );
+    }
+
+    private static void appendIds(StringBuilder target, List&lt;String&gt; values) {
+<span class="fc" id="L295">        append(target, Integer.toString(values.size()));</span>
+<span class="fc" id="L296">        values.forEach(value -&gt; append(target, requireHash(value, &quot;identity&quot;)));</span>
+<span class="fc" id="L297">    }</span>
+
+    private static int sum(List&lt;Integer&gt; values) {
+<span class="fc" id="L300">        int total = 0;</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        for (Integer value : values) {</span>
+<span class="fc" id="L302">            total = Math.addExact(total, Objects.requireNonNull(value, &quot;value&quot;));</span>
+<span class="fc" id="L303">        }</span>
+<span class="fc" id="L304">        return total;</span>
+    }
+
+    private static int nodeCount(String expression) {
+<span class="fc" id="L308">        return CANONICALIZER.get().astNodeCount(expression);</span>
+    }
+
+    private static List&lt;String&gt; traceAssumptions(
+        List&lt;PolynomialTheoryUtilityTransitionTrace&gt; traces
+    ) {
+<span class="fc" id="L314">        List&lt;String&gt; values = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L315">        traces.forEach(value -&gt; values.addAll(</span>
+<span class="fc" id="L316">            Objects.requireNonNull(value, &quot;trace&quot;).normalizedAssumptions()</span>
+        ));
+<span class="fc" id="L318">        return AssumptionSignature.ofExpressions(values)</span>
+<span class="fc" id="L319">            .normalizedAssumptions();</span>
+    }
+
+    private static List&lt;String&gt; requireNormalizedAssumptions(
+        List&lt;String&gt; values,
+        List&lt;PolynomialTheoryUtilityTransitionTrace&gt; traces
+    ) {
+<span class="fc" id="L326">        List&lt;String&gt; retained = List.copyOf(</span>
+<span class="fc" id="L327">            Objects.requireNonNull(values, &quot;normalizedAssumptions&quot;)</span>
+        );
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        if (!retained.equals(traceAssumptions(traces))) {</span>
+<span class="fc" id="L330">            throw new IllegalArgumentException(</span>
+                &quot;candidate assumptions differ from transition traces&quot;
+            );
+        }
+<span class="fc" id="L334">        return retained;</span>
+    }
+
+    private static void requireVisibleAssumptions(
+        String assumptionSetId,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="pc bpc" id="L341" title="1 of 3 branches missed.">        boolean valid = switch (assumptionSetId) {</span>
+<span class="fc" id="L342">            case &quot;NONE&quot;, &quot;N_POSITIVE_INTEGER&quot; -&gt; assumptions.isEmpty();</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">            case &quot;X_NONZERO&quot; -&gt; assumptions.isEmpty()</span>
+<span class="pc bnc" id="L344" title="All 2 branches missed.">                || assumptions.equals(List.of(&quot;x != 0&quot;));</span>
+<span class="nc" id="L345">            default -&gt; false;</span>
+        };
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        if (!valid) {</span>
+<span class="fc" id="L348">            throw new IllegalArgumentException(</span>
+                &quot;trace assumptions exceed the frozen visible assumption set&quot;
+            );
+        }
+<span class="fc" id="L352">    }</span>
+
+    private static &lt;T&gt; List&lt;T&gt; immutable(List&lt;T&gt; values, String name) {
+<span class="fc" id="L355">        return List.copyOf(Objects.requireNonNull(values, name));</span>
+    }
+
+    private static Map&lt;
+        String,
+        PolynomialTheoryUtilityCaseCorpus.FormationCase
+    &gt; loadFormationCases() {
+<span class="fc" id="L362">        Map&lt;String, PolynomialTheoryUtilityCaseCorpus.FormationCase&gt; values =</span>
+            new LinkedHashMap&lt;&gt;();
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        for (var value : PolynomialTheoryUtilityCaseCorpus.load().cases()) {</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">            if (values.putIfAbsent(value.caseId(), value) != null) {</span>
+<span class="nc" id="L366">                throw new IllegalStateException(</span>
+                    &quot;formation corpus repeats a case identity&quot;
+                );
+            }
+<span class="fc" id="L370">        }</span>
+<span class="fc" id="L371">        return Collections.unmodifiableMap(values);</span>
+    }
+
+    private static PolynomialTheoryUtilityCaseCorpus.FormationCase
+            formationCase(String caseId) {
+<span class="fc" id="L376">        var value = FORMATION_CASES.get(requireText(caseId, &quot;caseId&quot;));</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L378">            throw new IllegalArgumentException(</span>
+                &quot;unknown frozen polynomial utility case: &quot; + caseId
+            );
+        }
+<span class="fc" id="L382">        return value;</span>
+    }
+
+    private static String requireHash(String value, String name) {
+<span class="fc" id="L386">        String text = requireText(value, name);</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">        if (!SHA_256.matcher(text).matches()) {</span>
+<span class="nc" id="L388">            throw new IllegalArgumentException(name + &quot; is not SHA-256&quot;);</span>
+        }
+<span class="fc" id="L390">        return text;</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="fc" id="L394">        String text = Objects.requireNonNull(value, name);</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
+<span class="nc" id="L396">            throw new IllegalArgumentException(</span>
+                name + &quot; must not be blank&quot;
+            );
+        }
+<span class="fc" id="L400">        return text;</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L404">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L405">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

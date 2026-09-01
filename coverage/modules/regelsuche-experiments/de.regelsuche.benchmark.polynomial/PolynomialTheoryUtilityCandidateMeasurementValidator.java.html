@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityCandidateMeasurementValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityCandidateMeasurementValidator.java</span></div><h1>PolynomialTheoryUtilityCandidateMeasurementValidator.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Cross-value consistency checks for candidate measurement companions. */
+final class PolynomialTheoryUtilityCandidateMeasurementValidator {
+    private PolynomialTheoryUtilityCandidateMeasurementValidator() {
+    }
+
+    static void validate(
+        PolynomialTheoryUtilityCandidateResult result,
+        PolynomialTheoryUtilityExecutionProfile profile,
+        int sourceAstNodeCount,
+        List&lt;PolynomialTheoryUtilityTransitionTrace&gt; traces,
+        List&lt;PolynomialTheoryUtilityFactorizationAttempt&gt; attempts,
+        List&lt;PolynomialTheoryUtilityCacheEvent&gt; events
+    ) {
+<span class="fc" id="L25">        requireTransitionTraces(</span>
+            result,
+            sourceAstNodeCount,
+            traces
+        );
+<span class="fc" id="L30">        requireFactorizationAttempts(result, profile, attempts);</span>
+<span class="fc" id="L31">        requireCacheEvents(result, profile, events);</span>
+<span class="fc" id="L32">    }</span>
+
+    private static void requireTransitionTraces(
+        PolynomialTheoryUtilityCandidateResult result,
+        int sourceAstNodeCount,
+        List&lt;PolynomialTheoryUtilityTransitionTrace&gt; traces
+    ) {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (traces.size() != result.transitions().size()) {</span>
+<span class="fc" id="L40">            throw new IllegalArgumentException(</span>
+                &quot;candidate result must retain one trace per transition&quot;
+            );
+        }
+<span class="fc" id="L44">        Set&lt;String&gt; identities = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L45">        int primitiveExpansion = 0;</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (int index = 0; index &lt; traces.size(); index++) {</span>
+<span class="fc" id="L47">            var trace = Objects.requireNonNull(traces.get(index), &quot;trace&quot;);</span>
+<span class="fc" id="L48">            trace.validateAgainst(</span>
+                index,
+<span class="fc" id="L50">                result.transitions().get(index),</span>
+                sourceAstNodeCount
+            );
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            if (!identities.add(trace.traceId())) {</span>
+<span class="nc" id="L54">                throw new IllegalArgumentException(</span>
+                    &quot;candidate measurements repeat a transition trace&quot;
+                );
+            }
+<span class="fc" id="L58">            primitiveExpansion = Math.addExact(</span>
+                primitiveExpansion,
+<span class="fc" id="L60">                trace.primitiveExpansionLength()</span>
+            );
+        }
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (primitiveExpansion &gt; result.work().primitiveWork()) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(</span>
+                &quot;candidate trace primitive work exceeds the result&quot;
+            );
+        }
+<span class="fc" id="L68">    }</span>
+
+    private static void requireFactorizationAttempts(
+        PolynomialTheoryUtilityCandidateResult result,
+        PolynomialTheoryUtilityExecutionProfile profile,
+        List&lt;PolynomialTheoryUtilityFactorizationAttempt&gt; attempts
+    ) {
+<span class="fc" id="L75">        Set&lt;String&gt; identities = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L76">        Map&lt;String, Integer&gt; producers = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (int index = 0; index &lt; attempts.size(); index++) {</span>
+<span class="fc" id="L78">            var attempt = Objects.requireNonNull(</span>
+<span class="fc" id="L79">                attempts.get(index),</span>
+                &quot;factorizationAttempt&quot;
+            );
+<span class="fc" id="L82">            attempt.validateAgainst(index, result, profile);</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (!identities.add(attempt.attemptId())) {</span>
+<span class="nc" id="L84">                throw new IllegalArgumentException(</span>
+                    &quot;candidate measurements repeat a factorization attempt&quot;
+                );
+            }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (attempt.producedTransition()) {</span>
+<span class="fc" id="L89">                producers.merge(</span>
+<span class="fc" id="L90">                    attempt.transitionId(),</span>
+<span class="fc" id="L91">                    1,</span>
+                    Math::addExact
+                );
+            }
+        }
+
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        boolean factorizationEnabled = !&quot;DISABLED&quot;.equals(</span>
+<span class="fc" id="L98">            profile.factorizationMode()</span>
+        );
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        boolean workRetained = result.work().factorizationWork() &gt; 0L;</span>
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">        if ((!factorizationEnabled &amp;&amp; !attempts.isEmpty())</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                || (attempts.isEmpty() == workRetained)) {</span>
+<span class="fc" id="L103">            throw new IllegalArgumentException(</span>
+                &quot;factorization observations differ from retained work&quot;
+            );
+        }
+
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (var transition : result.transitions()) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            int expectedProducers = transition.cacheDisposition()</span>
+<span class="fc" id="L110">                    == PolynomialTheoryUtilityTransitionOutcome</span>
+                        .CacheDisposition.CACHE_HIT_REPLAYED
+<span class="fc" id="L112">                ? 0</span>
+<span class="fc" id="L113">                : 1;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (producers.getOrDefault(transition.transitionId(), 0)</span>
+                    != expectedProducers) {
+<span class="fc" id="L116">                throw new IllegalArgumentException(</span>
+                    &quot;result transition has incomplete factorization lineage&quot;
+                );
+            }
+<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">    }</span>
+
+    private static void requireCacheEvents(
+        PolynomialTheoryUtilityCandidateResult result,
+        PolynomialTheoryUtilityExecutionProfile profile,
+        List&lt;PolynomialTheoryUtilityCacheEvent&gt; events
+    ) {
+<span class="fc" id="L128">        Set&lt;String&gt; identities = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L129">        Map&lt;String, List&lt;PolynomialTheoryUtilityCacheEvent&gt;&gt; byTransition =</span>
+            new LinkedHashMap&lt;&gt;();
+<span class="fc" id="L131">        Map&lt;String, Integer&gt; transitionOrder = transitionOrder(result);</span>
+<span class="fc" id="L132">        int lastTransitionIndex = -1;</span>
+
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (int index = 0; index &lt; events.size(); index++) {</span>
+<span class="fc" id="L135">            var event = Objects.requireNonNull(events.get(index), &quot;cacheEvent&quot;);</span>
+<span class="fc" id="L136">            event.validateAgainst(index, result, profile);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (!identities.add(event.eventId())) {</span>
+<span class="nc" id="L138">                throw new IllegalArgumentException(</span>
+                    &quot;candidate measurements repeat a cache event&quot;
+                );
+            }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (!event.transitionBound()) {</span>
+<span class="fc" id="L143">                requireUnboundLookup(event);</span>
+<span class="fc" id="L144">                continue;</span>
+            }
+<span class="fc" id="L146">            int current = transitionOrder.get(event.transitionId());</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            if (current &lt; lastTransitionIndex) {</span>
+<span class="nc" id="L148">                throw new IllegalArgumentException(</span>
+                    &quot;cache transition events are not in result order&quot;
+                );
+            }
+<span class="fc" id="L152">            lastTransitionIndex = current;</span>
+<span class="fc" id="L153">            byTransition.computeIfAbsent(</span>
+<span class="fc" id="L154">                event.transitionId(),</span>
+<span class="fc" id="L155">                ignored -&gt; new ArrayList&lt;&gt;()</span>
+<span class="fc" id="L156">            ).add(event);</span>
+        }
+
+<span class="fc" id="L159">        boolean cacheEnabled = &quot;READ_WRITE&quot;.equals(profile.cacheMode());</span>
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">        if (!cacheEnabled &amp;&amp; !events.isEmpty()) {</span>
+<span class="nc" id="L161">            throw new IllegalArgumentException(</span>
+                &quot;cache-disabled profile retained cache events&quot;
+            );
+        }
+<span class="fc" id="L165">        requireCacheWork(result.work(), events);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        for (var transition : result.transitions()) {</span>
+<span class="fc" id="L167">            requireCacheSequence(</span>
+                transition,
+<span class="fc" id="L169">                byTransition.getOrDefault(</span>
+<span class="fc" id="L170">                    transition.transitionId(),</span>
+<span class="fc" id="L171">                    List.of()</span>
+                )
+            );
+<span class="fc" id="L174">        }</span>
+<span class="fc" id="L175">    }</span>
+
+    private static Map&lt;String, Integer&gt; transitionOrder(
+        PolynomialTheoryUtilityCandidateResult result
+    ) {
+<span class="fc" id="L180">        Map&lt;String, Integer&gt; order = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        for (int index = 0; index &lt; result.transitions().size(); index++) {</span>
+<span class="fc" id="L182">            order.put(result.transitions().get(index).transitionId(), index);</span>
+        }
+<span class="fc" id="L184">        return order;</span>
+    }
+
+    private static void requireUnboundLookup(
+        PolynomialTheoryUtilityCacheEvent event
+    ) {
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (event.kind() != PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_HIT</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                &amp;&amp; event.kind()</span>
+                    != PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_MISS) {
+<span class="nc" id="L193">            throw new IllegalArgumentException(</span>
+                &quot;cache mutation or replay lacks transition lineage&quot;
+            );
+        }
+<span class="fc" id="L197">    }</span>
+
+    private static void requireCacheWork(
+        PolynomialTheoryUtilityWorkBreakdown work,
+        List&lt;PolynomialTheoryUtilityCacheEvent&gt; events
+    ) {
+<span class="fc" id="L203">        long hits = count(</span>
+            events,
+            PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_HIT
+        );
+<span class="fc" id="L207">        long misses = count(</span>
+            events,
+            PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_MISS
+        );
+<span class="fc" id="L211">        long insertions = count(</span>
+            events,
+            PolynomialTheoryUtilityCacheEvent.Kind.INSERTION
+        );
+<span class="fc" id="L215">        long evictions = count(</span>
+            events,
+            PolynomialTheoryUtilityCacheEvent.Kind.EVICTION
+        );
+<span class="fc" id="L219">        long replays = count(</span>
+            events,
+            PolynomialTheoryUtilityCacheEvent.Kind.REPLAY
+        );
+<span class="fc bfc" id="L223" title="All 6 branches covered.">        if ((work.cacheLookupWork() &gt; 0L) != (hits + misses &gt; 0L)</span>
+<span class="fc bfc" id="L224" title="All 6 branches covered.">                || (work.cacheInsertionWork() &gt; 0L) != (insertions &gt; 0L)</span>
+<span class="pc bpc" id="L225" title="1 of 6 branches missed.">                || (work.cacheEvictionWork() &gt; 0L) != (evictions &gt; 0L)</span>
+<span class="pc bpc" id="L226" title="1 of 6 branches missed.">                || (work.cacheReplayWork() &gt; 0L) != (replays &gt; 0L)) {</span>
+<span class="fc" id="L227">            throw new IllegalArgumentException(</span>
+                &quot;cache event counts differ from retained cache work&quot;
+            );
+        }
+<span class="fc" id="L231">    }</span>
+
+    private static long count(
+        List&lt;PolynomialTheoryUtilityCacheEvent&gt; events,
+        PolynomialTheoryUtilityCacheEvent.Kind kind
+    ) {
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        return events.stream().filter(value -&gt; value.kind() == kind).count();</span>
+    }
+
+    private static void requireCacheSequence(
+        PolynomialTheoryUtilityTransitionOutcome transition,
+        List&lt;PolynomialTheoryUtilityCacheEvent&gt; events
+    ) {
+<span class="fc" id="L244">        List&lt;PolynomialTheoryUtilityCacheEvent.Kind&gt; actual = events.stream()</span>
+<span class="fc" id="L245">            .map(PolynomialTheoryUtilityCacheEvent::kind)</span>
+<span class="fc" id="L246">            .toList();</span>
+<span class="fc bfc" id="L247" title="All 3 branches covered.">        List&lt;PolynomialTheoryUtilityCacheEvent.Kind&gt; expected = switch (</span>
+<span class="fc" id="L248">            transition.cacheDisposition()</span>
+        ) {
+<span class="fc" id="L250">            case CACHE_DISABLED -&gt; List.of();</span>
+<span class="fc" id="L251">            case CACHE_HIT_REPLAYED -&gt; List.of(</span>
+                PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_HIT,
+                PolynomialTheoryUtilityCacheEvent.Kind.REPLAY
+            );
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            case CACHE_MISS_INSERTED -&gt; &quot;NONE&quot;.equals(</span>
+<span class="fc" id="L256">                    transition.evictedCacheEntryId()</span>
+                )
+<span class="fc" id="L258">                ? List.of(</span>
+                    PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_MISS,
+                    PolynomialTheoryUtilityCacheEvent.Kind.INSERTION
+                )
+<span class="fc" id="L262">                : List.of(</span>
+                    PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_MISS,
+                    PolynomialTheoryUtilityCacheEvent.Kind.INSERTION,
+                    PolynomialTheoryUtilityCacheEvent.Kind.EVICTION
+                );
+        };
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if (!actual.equals(expected)) {</span>
+<span class="fc" id="L269">            throw new IllegalArgumentException(</span>
+                &quot;cache event sequence differs from transition disposition&quot;
+            );
+        }
+<span class="fc" id="L273">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
