@@ -1,0 +1,474 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityTransitionOutcome.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityTransitionOutcome.java</span></div><h1>PolynomialTheoryUtilityTransitionOutcome.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/**
+ * One occurrence-bound, verifier-backed transition retained by a study row.
+ * The numeric path is an evidence projection of the shared TreePosition model,
+ * not a second navigation or staleness authority.
+ */
+public record PolynomialTheoryUtilityTransitionOutcome(
+    String transitionId,
+    int transitionIndex,
+    String executionInputId,
+    List&lt;Integer&gt; occurrencePath,
+    String sourceOccurrenceExpression,
+    String transformedOccurrenceExpression,
+    String sourceRootExpression,
+    String transformedRootExpression,
+    String transformationId,
+    String backendId,
+    String sourceEvidenceHash,
+    String transitionEvidenceHash,
+    CacheDisposition cacheDisposition,
+    String cacheRevision,
+    String cacheEntryId,
+    String evictedCacheEntryId,
+    PolynomialTheoryUtilityWorkBreakdown work
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.polynomial-theory-utility-transition-outcome/v1&quot;;
+    public static final String NO_CACHE_LINEAGE = &quot;NONE&quot;;
+<span class="fc" id="L36">    private static final Pattern SHA_256 =</span>
+<span class="fc" id="L37">        Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+
+<span class="fc" id="L39">    public PolynomialTheoryUtilityTransitionOutcome {</span>
+<span class="fc" id="L40">        transitionId = requireHash(transitionId, &quot;transitionId&quot;);</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (transitionIndex &lt; 0) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(</span>
+                &quot;transitionIndex must be non-negative&quot;
+            );
+        }
+<span class="fc" id="L46">        executionInputId = requireHash(</span>
+            executionInputId,
+            &quot;executionInputId&quot;
+        );
+<span class="fc" id="L50">        occurrencePath = immutablePath(occurrencePath);</span>
+<span class="fc" id="L51">        sourceOccurrenceExpression = requireText(</span>
+            sourceOccurrenceExpression,
+            &quot;sourceOccurrenceExpression&quot;
+        );
+<span class="fc" id="L55">        transformedOccurrenceExpression = requireText(</span>
+            transformedOccurrenceExpression,
+            &quot;transformedOccurrenceExpression&quot;
+        );
+<span class="fc" id="L59">        sourceRootExpression = requireText(</span>
+            sourceRootExpression,
+            &quot;sourceRootExpression&quot;
+        );
+<span class="fc" id="L63">        transformedRootExpression = requireText(</span>
+            transformedRootExpression,
+            &quot;transformedRootExpression&quot;
+        );
+<span class="fc" id="L67">        transformationId = requireText(</span>
+            transformationId,
+            &quot;transformationId&quot;
+        );
+<span class="fc" id="L71">        backendId = requireText(backendId, &quot;backendId&quot;);</span>
+<span class="fc" id="L72">        sourceEvidenceHash = requireHash(</span>
+            sourceEvidenceHash,
+            &quot;sourceEvidenceHash&quot;
+        );
+<span class="fc" id="L76">        transitionEvidenceHash = requireHash(</span>
+            transitionEvidenceHash,
+            &quot;transitionEvidenceHash&quot;
+        );
+<span class="fc" id="L80">        cacheDisposition = Objects.requireNonNull(</span>
+            cacheDisposition,
+            &quot;cacheDisposition&quot;
+        );
+<span class="fc" id="L84">        cacheRevision = requireText(cacheRevision, &quot;cacheRevision&quot;);</span>
+<span class="fc" id="L85">        cacheEntryId = requireText(cacheEntryId, &quot;cacheEntryId&quot;);</span>
+<span class="fc" id="L86">        evictedCacheEntryId = requireText(</span>
+            evictedCacheEntryId,
+            &quot;evictedCacheEntryId&quot;
+        );
+<span class="fc" id="L90">        work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (work.primitiveWork() &lt; 1L) {</span>
+<span class="nc" id="L93">            throw new IllegalArgumentException(</span>
+                &quot;validated transition must retain primitive work&quot;
+            );
+        }
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (sourceOccurrenceExpression.equals(</span>
+                transformedOccurrenceExpression)
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                || sourceRootExpression.equals(transformedRootExpression)) {</span>
+<span class="nc" id="L100">            throw new IllegalArgumentException(</span>
+                &quot;transition must change its occurrence and root&quot;
+            );
+        }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (occurrencePath.isEmpty()</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">                &amp;&amp; (!sourceOccurrenceExpression.equals(sourceRootExpression)</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                    || !transformedOccurrenceExpression.equals(</span>
+                        transformedRootExpression))) {
+<span class="fc" id="L108">            throw new IllegalArgumentException(</span>
+                &quot;root occurrence must equal its surrounding root&quot;
+            );
+        }
+<span class="fc" id="L112">        requireCacheSemantics(</span>
+            cacheDisposition,
+            cacheRevision,
+            cacheEntryId,
+            evictedCacheEntryId,
+            work
+        );
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (!transitionId.equals(identity(</span>
+                transitionIndex,
+                executionInputId,
+                occurrencePath,
+                sourceOccurrenceExpression,
+                transformedOccurrenceExpression,
+                sourceRootExpression,
+                transformedRootExpression,
+                transformationId,
+                backendId,
+                sourceEvidenceHash,
+                transitionEvidenceHash,
+                cacheDisposition,
+                cacheRevision,
+                cacheEntryId,
+                evictedCacheEntryId,
+                work))) {
+<span class="fc" id="L136">            throw new IllegalArgumentException(</span>
+                &quot;transition identity differs from its fields&quot;
+            );
+        }
+<span class="fc" id="L140">    }</span>
+
+    public static PolynomialTheoryUtilityTransitionOutcome create(
+        int transitionIndex,
+        String executionInputId,
+        List&lt;Integer&gt; occurrencePath,
+        String sourceOccurrenceExpression,
+        String transformedOccurrenceExpression,
+        String sourceRootExpression,
+        String transformedRootExpression,
+        String transformationId,
+        String backendId,
+        String sourceEvidenceHash,
+        String transitionEvidenceHash,
+        CacheDisposition cacheDisposition,
+        String cacheRevision,
+        String cacheEntryId,
+        String evictedCacheEntryId,
+        PolynomialTheoryUtilityWorkBreakdown work
+    ) {
+<span class="fc" id="L160">        List&lt;Integer&gt; path = immutablePath(occurrencePath);</span>
+<span class="fc" id="L161">        var retainedWork = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L162">        return new PolynomialTheoryUtilityTransitionOutcome(</span>
+<span class="fc" id="L163">            identity(</span>
+                transitionIndex,
+                executionInputId,
+                path,
+                sourceOccurrenceExpression,
+                transformedOccurrenceExpression,
+                sourceRootExpression,
+                transformedRootExpression,
+                transformationId,
+                backendId,
+                sourceEvidenceHash,
+                transitionEvidenceHash,
+                cacheDisposition,
+                cacheRevision,
+                cacheEntryId,
+                evictedCacheEntryId,
+                retainedWork
+            ),
+            transitionIndex,
+            executionInputId,
+            path,
+            sourceOccurrenceExpression,
+            transformedOccurrenceExpression,
+            sourceRootExpression,
+            transformedRootExpression,
+            transformationId,
+            backendId,
+            sourceEvidenceHash,
+            transitionEvidenceHash,
+            cacheDisposition,
+            cacheRevision,
+            cacheEntryId,
+            evictedCacheEntryId,
+            retainedWork
+        );
+    }
+
+    public String schema() {
+<span class="fc" id="L201">        return SCHEMA;</span>
+    }
+
+    void validateAgainst(
+        int expectedIndex,
+        PolynomialTheoryUtilityExecutionInput input,
+        PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase,
+        PolynomialTheoryUtilityExecutionProfile profile
+    ) {
+<span class="fc" id="L210">        Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L211">        Objects.requireNonNull(formationCase, &quot;formationCase&quot;);</span>
+<span class="fc" id="L212">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (transitionIndex != expectedIndex</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                || !executionInputId.equals(input.inputId())</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                || !input.caseId().equals(formationCase.caseId())</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                || !sourceRootExpression.equals(</span>
+<span class="fc" id="L217">                    formationCase.sourceExpression())</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                || !transformationId.equals(profile.transformationId())</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                || !backendId.equals(profile.engineId())</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">                || &quot;DISABLED&quot;.equals(profile.factorizationMode())</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                || &quot;NONE&quot;.equals(profile.transformationId())</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                || &quot;NONE&quot;.equals(profile.engineId())) {</span>
+<span class="fc" id="L223">            throw new IllegalArgumentException(</span>
+                &quot;transition differs from its frozen profile or source&quot;
+            );
+        }
+
+<span class="fc" id="L228">        boolean cacheEnabled = &quot;READ_WRITE&quot;.equals(profile.cacheMode());</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (cacheEnabled) {</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            if (cacheDisposition == CacheDisposition.CACHE_DISABLED</span>
+                    || !PolynomialTheoryUtilityExecutionPlan.CACHE_REVISION
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">                        .equals(cacheRevision)) {</span>
+<span class="nc" id="L233">                throw new IllegalArgumentException(</span>
+                    &quot;cache-enabled transition lacks frozen cache lineage&quot;
+                );
+            }
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        } else if (cacheDisposition != CacheDisposition.CACHE_DISABLED) {</span>
+<span class="nc" id="L238">            throw new IllegalArgumentException(</span>
+                &quot;cache-disabled profile retained cache lineage&quot;
+            );
+        }
+<span class="fc" id="L242">    }</span>
+
+    private static String identity(
+        int transitionIndex,
+        String executionInputId,
+        List&lt;Integer&gt; occurrencePath,
+        String sourceOccurrenceExpression,
+        String transformedOccurrenceExpression,
+        String sourceRootExpression,
+        String transformedRootExpression,
+        String transformationId,
+        String backendId,
+        String sourceEvidenceHash,
+        String transitionEvidenceHash,
+        CacheDisposition cacheDisposition,
+        String cacheRevision,
+        String cacheEntryId,
+        String evictedCacheEntryId,
+        PolynomialTheoryUtilityWorkBreakdown work
+    ) {
+<span class="fc" id="L262">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L263">        append(material, SCHEMA);</span>
+<span class="fc" id="L264">        append(material, Integer.toString(transitionIndex));</span>
+<span class="fc" id="L265">        append(</span>
+            material,
+<span class="fc" id="L267">            requireHash(executionInputId, &quot;executionInputId&quot;)</span>
+        );
+<span class="fc" id="L269">        append(material, Integer.toString(occurrencePath.size()));</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        for (Integer element : occurrencePath) {</span>
+<span class="fc" id="L271">            append(material, Integer.toString(element));</span>
+<span class="fc" id="L272">        }</span>
+<span class="fc" id="L273">        append(</span>
+            material,
+<span class="fc" id="L275">            requireText(</span>
+                sourceOccurrenceExpression,
+                &quot;sourceOccurrenceExpression&quot;
+            )
+        );
+<span class="fc" id="L280">        append(</span>
+            material,
+<span class="fc" id="L282">            requireText(</span>
+                transformedOccurrenceExpression,
+                &quot;transformedOccurrenceExpression&quot;
+            )
+        );
+<span class="fc" id="L287">        append(</span>
+            material,
+<span class="fc" id="L289">            requireText(sourceRootExpression, &quot;sourceRootExpression&quot;)</span>
+        );
+<span class="fc" id="L291">        append(</span>
+            material,
+<span class="fc" id="L293">            requireText(transformedRootExpression, &quot;transformedRootExpression&quot;)</span>
+        );
+<span class="fc" id="L295">        append(material, requireText(transformationId, &quot;transformationId&quot;));</span>
+<span class="fc" id="L296">        append(material, requireText(backendId, &quot;backendId&quot;));</span>
+<span class="fc" id="L297">        append(</span>
+            material,
+<span class="fc" id="L299">            requireHash(sourceEvidenceHash, &quot;sourceEvidenceHash&quot;)</span>
+        );
+<span class="fc" id="L301">        append(</span>
+            material,
+<span class="fc" id="L303">            requireHash(transitionEvidenceHash, &quot;transitionEvidenceHash&quot;)</span>
+        );
+<span class="fc" id="L305">        append(</span>
+            material,
+<span class="fc" id="L307">            Objects.requireNonNull(</span>
+                cacheDisposition,
+                &quot;cacheDisposition&quot;
+<span class="fc" id="L310">            ).name()</span>
+        );
+<span class="fc" id="L312">        append(material, requireText(cacheRevision, &quot;cacheRevision&quot;));</span>
+<span class="fc" id="L313">        append(material, requireText(cacheEntryId, &quot;cacheEntryId&quot;));</span>
+<span class="fc" id="L314">        append(</span>
+            material,
+<span class="fc" id="L316">            requireText(evictedCacheEntryId, &quot;evictedCacheEntryId&quot;)</span>
+        );
+<span class="fc" id="L318">        Objects.requireNonNull(work, &quot;work&quot;).appendIdentityMaterial(material);</span>
+<span class="fc" id="L319">        return PolynomialTheoryUtilityExecutionIdentity.sha256(</span>
+<span class="fc" id="L320">            material.toString().getBytes(StandardCharsets.UTF_8)</span>
+        );
+    }
+
+    private static void requireCacheSemantics(
+        CacheDisposition disposition,
+        String revision,
+        String entryId,
+        String evictedEntryId,
+        PolynomialTheoryUtilityWorkBreakdown work
+    ) {
+<span class="pc bpc" id="L331" title="1 of 4 branches missed.">        switch (disposition) {</span>
+<span class="fc" id="L332">            case CACHE_DISABLED -&gt; requireDisabledCache(</span>
+                revision,
+                entryId,
+                evictedEntryId,
+                work
+            );
+<span class="fc" id="L338">            case CACHE_MISS_INSERTED -&gt; requireCacheMiss(</span>
+                revision,
+                entryId,
+                evictedEntryId,
+                work
+            );
+<span class="fc" id="L344">            case CACHE_HIT_REPLAYED -&gt; requireCacheHit(</span>
+                revision,
+                entryId,
+                evictedEntryId,
+                work
+            );
+        }
+<span class="fc" id="L351">    }</span>
+
+    private static void requireDisabledCache(
+        String revision,
+        String entryId,
+        String evictedEntryId,
+        PolynomialTheoryUtilityWorkBreakdown work
+    ) {
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (!NO_CACHE_LINEAGE.equals(revision)</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">                || !NO_CACHE_LINEAGE.equals(entryId)</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">                || !NO_CACHE_LINEAGE.equals(evictedEntryId)</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">                || work.cacheLookupWork() != 0L</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">                || work.cacheInsertionWork() != 0L</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">                || work.cacheEvictionWork() != 0L</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">                || work.cacheReplayWork() != 0L) {</span>
+<span class="nc" id="L366">            throw new IllegalArgumentException(</span>
+                &quot;cache-disabled transition retained cache state or work&quot;
+            );
+        }
+<span class="fc" id="L370">    }</span>
+
+    private static void requireCacheMiss(
+        String revision,
+        String entryId,
+        String evictedEntryId,
+        PolynomialTheoryUtilityWorkBreakdown work
+    ) {
+<span class="fc" id="L378">        requireCacheLineage(revision, entryId);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (work.cacheLookupWork() &lt; 1L</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">                || work.cacheInsertionWork() &lt; 1L</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">                || work.cacheReplayWork() != 0L</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">                || work.factorizationWork() &lt; 1L) {</span>
+<span class="nc" id="L383">            throw new IllegalArgumentException(</span>
+                &quot;cache insertion lacks lookup, insertion or factorization work&quot;
+            );
+        }
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        boolean evictionRetained = !NO_CACHE_LINEAGE.equals(</span>
+            evictedEntryId
+        );
+<span class="fc bfc" id="L390" title="All 4 branches covered.">        if (evictionRetained != (work.cacheEvictionWork() &gt; 0L)) {</span>
+<span class="fc" id="L391">            throw new IllegalArgumentException(</span>
+                &quot;cache eviction identity and work differ&quot;
+            );
+        }
+<span class="pc bpc" id="L395" title="1 of 4 branches missed.">        if (evictionRetained &amp;&amp; !SHA_256.matcher(evictedEntryId).matches()) {</span>
+<span class="nc" id="L396">            throw new IllegalArgumentException(</span>
+                &quot;evicted cache entry is not SHA-256&quot;
+            );
+        }
+<span class="fc" id="L400">    }</span>
+
+    private static void requireCacheHit(
+        String revision,
+        String entryId,
+        String evictedEntryId,
+        PolynomialTheoryUtilityWorkBreakdown work
+    ) {
+<span class="fc" id="L408">        requireCacheLineage(revision, entryId);</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">        if (!NO_CACHE_LINEAGE.equals(evictedEntryId)</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">                || work.cacheLookupWork() &lt; 1L</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">                || work.cacheInsertionWork() != 0L</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">                || work.cacheEvictionWork() != 0L</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">                || work.cacheReplayWork() &lt; 1L</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">                || work.factorizationWork() != 0L) {</span>
+<span class="fc" id="L415">            throw new IllegalArgumentException(</span>
+                &quot;cache replay has inconsistent state or work&quot;
+            );
+        }
+<span class="fc" id="L419">    }</span>
+
+    private static void requireCacheLineage(
+        String revision,
+        String entryId
+    ) {
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        if (!PolynomialTheoryUtilityExecutionPlan.CACHE_REVISION.equals(</span>
+                revision)
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">                || !SHA_256.matcher(entryId).matches()) {</span>
+<span class="fc" id="L428">            throw new IllegalArgumentException(</span>
+                &quot;cache transition differs from the frozen cache contract&quot;
+            );
+        }
+<span class="fc" id="L432">    }</span>
+
+    private static List&lt;Integer&gt; immutablePath(List&lt;Integer&gt; value) {
+<span class="fc" id="L435">        Objects.requireNonNull(value, &quot;occurrencePath&quot;);</span>
+<span class="fc" id="L436">        List&lt;Integer&gt; path = new ArrayList&lt;&gt;(value.size());</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">        for (Integer element : value) {</span>
+<span class="pc bpc" id="L438" title="1 of 4 branches missed.">            if (element == null || element &lt; 0) {</span>
+<span class="fc" id="L439">                throw new IllegalArgumentException(</span>
+                    &quot;occurrencePath contains an invalid element&quot;
+                );
+            }
+<span class="fc" id="L443">            path.add(element);</span>
+<span class="fc" id="L444">        }</span>
+<span class="fc" id="L445">        return List.copyOf(path);</span>
+    }
+
+    private static String requireHash(String value, String name) {
+<span class="fc" id="L449">        String text = requireText(value, name);</span>
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">        if (!SHA_256.matcher(text).matches()) {</span>
+<span class="nc" id="L451">            throw new IllegalArgumentException(name + &quot; is not SHA-256&quot;);</span>
+        }
+<span class="fc" id="L453">        return text;</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="fc" id="L457">        String text = Objects.requireNonNull(value, name);</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
+<span class="nc" id="L459">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L461">        return text;</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L465">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L466">    }</span>
+
+<span class="fc" id="L468">    public enum CacheDisposition {</span>
+<span class="fc" id="L469">        CACHE_DISABLED,</span>
+<span class="fc" id="L470">        CACHE_MISS_INSERTED,</span>
+<span class="fc" id="L471">        CACHE_HIT_REPLAYED</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

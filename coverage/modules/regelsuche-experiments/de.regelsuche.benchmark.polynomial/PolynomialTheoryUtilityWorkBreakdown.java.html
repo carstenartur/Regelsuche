@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityWorkBreakdown.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityWorkBreakdown.java</span></div><h1>PolynomialTheoryUtilityWorkBreakdown.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.util.Objects;
+
+/** Typed canonical-work accounting for one utility-study result or transition. */
+public record PolynomialTheoryUtilityWorkBreakdown(
+    long primitiveWork,
+    long matchingWork,
+    long sourceValidationWork,
+    long factorizationWork,
+    long verificationWork,
+    long renderingWork,
+    long reparseWork,
+    long reconstructionWork,
+    long occurrenceReplacementWork,
+    long cacheLookupWork,
+    long cacheInsertionWork,
+    long cacheEvictionWork,
+    long cacheReplayWork,
+    long evidenceConstructionWork
+) {
+<span class="fc" id="L22">    public PolynomialTheoryUtilityWorkBreakdown {</span>
+<span class="fc" id="L23">        requireNonNegative(</span>
+            primitiveWork,
+            matchingWork,
+            sourceValidationWork,
+            factorizationWork,
+            verificationWork,
+            renderingWork,
+            reparseWork,
+            reconstructionWork,
+            occurrenceReplacementWork,
+            cacheLookupWork,
+            cacheInsertionWork,
+            cacheEvictionWork,
+            cacheReplayWork,
+            evidenceConstructionWork
+        );
+<span class="fc" id="L39">        long mechanical = mechanicalWork(</span>
+            matchingWork,
+            sourceValidationWork,
+            factorizationWork,
+            verificationWork,
+            renderingWork,
+            reparseWork,
+            reconstructionWork,
+            occurrenceReplacementWork,
+            cacheLookupWork,
+            cacheInsertionWork,
+            cacheEvictionWork,
+            cacheReplayWork,
+            evidenceConstructionWork
+        );
+<span class="fc" id="L54">        Math.addExact(primitiveWork, mechanical);</span>
+<span class="fc" id="L55">    }</span>
+
+    public static PolynomialTheoryUtilityWorkBreakdown zero() {
+<span class="nc" id="L58">        return new PolynomialTheoryUtilityWorkBreakdown(</span>
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L
+        );
+    }
+
+    public long mechanicalWork() {
+<span class="fc" id="L77">        return mechanicalWork(</span>
+            matchingWork,
+            sourceValidationWork,
+            factorizationWork,
+            verificationWork,
+            renderingWork,
+            reparseWork,
+            reconstructionWork,
+            occurrenceReplacementWork,
+            cacheLookupWork,
+            cacheInsertionWork,
+            cacheEvictionWork,
+            cacheReplayWork,
+            evidenceConstructionWork
+        );
+    }
+
+    public long totalWork() {
+<span class="fc" id="L95">        return Math.addExact(primitiveWork, mechanicalWork());</span>
+    }
+
+    public PolynomialTheoryUtilityWorkBreakdown plus(
+        PolynomialTheoryUtilityWorkBreakdown other
+    ) {
+<span class="fc" id="L101">        var value = Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc" id="L102">        return new PolynomialTheoryUtilityWorkBreakdown(</span>
+<span class="fc" id="L103">            Math.addExact(primitiveWork, value.primitiveWork),</span>
+<span class="fc" id="L104">            Math.addExact(matchingWork, value.matchingWork),</span>
+<span class="fc" id="L105">            Math.addExact(</span>
+                sourceValidationWork,
+                value.sourceValidationWork
+            ),
+<span class="fc" id="L109">            Math.addExact(factorizationWork, value.factorizationWork),</span>
+<span class="fc" id="L110">            Math.addExact(verificationWork, value.verificationWork),</span>
+<span class="fc" id="L111">            Math.addExact(renderingWork, value.renderingWork),</span>
+<span class="fc" id="L112">            Math.addExact(reparseWork, value.reparseWork),</span>
+<span class="fc" id="L113">            Math.addExact(reconstructionWork, value.reconstructionWork),</span>
+<span class="fc" id="L114">            Math.addExact(</span>
+                occurrenceReplacementWork,
+                value.occurrenceReplacementWork
+            ),
+<span class="fc" id="L118">            Math.addExact(cacheLookupWork, value.cacheLookupWork),</span>
+<span class="fc" id="L119">            Math.addExact(</span>
+                cacheInsertionWork,
+                value.cacheInsertionWork
+            ),
+<span class="fc" id="L123">            Math.addExact(</span>
+                cacheEvictionWork,
+                value.cacheEvictionWork
+            ),
+<span class="fc" id="L127">            Math.addExact(cacheReplayWork, value.cacheReplayWork),</span>
+<span class="fc" id="L128">            Math.addExact(</span>
+                evidenceConstructionWork,
+                value.evidenceConstructionWork
+            )
+        );
+    }
+
+    public boolean covers(PolynomialTheoryUtilityWorkBreakdown other) {
+<span class="fc" id="L136">        var value = Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="pc bpc" id="L137" title="14 of 28 branches missed.">        return primitiveWork &gt;= value.primitiveWork</span>
+            &amp;&amp; matchingWork &gt;= value.matchingWork
+            &amp;&amp; sourceValidationWork &gt;= value.sourceValidationWork
+            &amp;&amp; factorizationWork &gt;= value.factorizationWork
+            &amp;&amp; verificationWork &gt;= value.verificationWork
+            &amp;&amp; renderingWork &gt;= value.renderingWork
+            &amp;&amp; reparseWork &gt;= value.reparseWork
+            &amp;&amp; reconstructionWork &gt;= value.reconstructionWork
+            &amp;&amp; occurrenceReplacementWork &gt;= value.occurrenceReplacementWork
+            &amp;&amp; cacheLookupWork &gt;= value.cacheLookupWork
+            &amp;&amp; cacheInsertionWork &gt;= value.cacheInsertionWork
+            &amp;&amp; cacheEvictionWork &gt;= value.cacheEvictionWork
+            &amp;&amp; cacheReplayWork &gt;= value.cacheReplayWork
+            &amp;&amp; evidenceConstructionWork &gt;= value.evidenceConstructionWork;
+    }
+
+    void appendIdentityMaterial(StringBuilder target) {
+<span class="fc" id="L154">        Objects.requireNonNull(target, &quot;target&quot;);</span>
+<span class="fc" id="L155">        append(target, primitiveWork);</span>
+<span class="fc" id="L156">        append(target, matchingWork);</span>
+<span class="fc" id="L157">        append(target, sourceValidationWork);</span>
+<span class="fc" id="L158">        append(target, factorizationWork);</span>
+<span class="fc" id="L159">        append(target, verificationWork);</span>
+<span class="fc" id="L160">        append(target, renderingWork);</span>
+<span class="fc" id="L161">        append(target, reparseWork);</span>
+<span class="fc" id="L162">        append(target, reconstructionWork);</span>
+<span class="fc" id="L163">        append(target, occurrenceReplacementWork);</span>
+<span class="fc" id="L164">        append(target, cacheLookupWork);</span>
+<span class="fc" id="L165">        append(target, cacheInsertionWork);</span>
+<span class="fc" id="L166">        append(target, cacheEvictionWork);</span>
+<span class="fc" id="L167">        append(target, cacheReplayWork);</span>
+<span class="fc" id="L168">        append(target, evidenceConstructionWork);</span>
+<span class="fc" id="L169">    }</span>
+
+    private static long mechanicalWork(
+        long matching,
+        long sourceValidation,
+        long factorization,
+        long verification,
+        long rendering,
+        long reparse,
+        long reconstruction,
+        long occurrenceReplacement,
+        long cacheLookup,
+        long cacheInsertion,
+        long cacheEviction,
+        long cacheReplay,
+        long evidenceConstruction
+    ) {
+<span class="fc" id="L186">        long total = 0L;</span>
+<span class="fc" id="L187">        total = Math.addExact(total, matching);</span>
+<span class="fc" id="L188">        total = Math.addExact(total, sourceValidation);</span>
+<span class="fc" id="L189">        total = Math.addExact(total, factorization);</span>
+<span class="fc" id="L190">        total = Math.addExact(total, verification);</span>
+<span class="fc" id="L191">        total = Math.addExact(total, rendering);</span>
+<span class="fc" id="L192">        total = Math.addExact(total, reparse);</span>
+<span class="fc" id="L193">        total = Math.addExact(total, reconstruction);</span>
+<span class="fc" id="L194">        total = Math.addExact(total, occurrenceReplacement);</span>
+<span class="fc" id="L195">        total = Math.addExact(total, cacheLookup);</span>
+<span class="fc" id="L196">        total = Math.addExact(total, cacheInsertion);</span>
+<span class="fc" id="L197">        total = Math.addExact(total, cacheEviction);</span>
+<span class="fc" id="L198">        total = Math.addExact(total, cacheReplay);</span>
+<span class="fc" id="L199">        return Math.addExact(total, evidenceConstruction);</span>
+    }
+
+    private static void requireNonNegative(long... values) {
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (long value : values) {</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            if (value &lt; 0L) {</span>
+<span class="fc" id="L205">                throw new IllegalArgumentException(</span>
+                    &quot;work components must be non-negative&quot;
+                );
+            }
+        }
+<span class="fc" id="L210">    }</span>
+
+    private static void append(StringBuilder target, long value) {
+<span class="fc" id="L213">        String text = Long.toString(value);</span>
+<span class="fc" id="L214">        target.append(text.length()).append(':').append(text);</span>
+<span class="fc" id="L215">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
