@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityMeasuredCandidate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityMeasuredCandidate.java</span></div><h1>PolynomialTheoryUtilityMeasuredCandidate.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * One target-blind execution result together with its complete measurements.
+ *
+ * &lt;p&gt;The value prevents a runner from retaining a terminal result while
+ * silently dropping the ordered path, factorization or cache evidence that
+ * justified it.&lt;/p&gt;
+ */
+public record PolynomialTheoryUtilityMeasuredCandidate(
+    PolynomialTheoryUtilityCandidateResult result,
+    PolynomialTheoryUtilityCandidateMeasurements measurements
+) {
+<span class="fc" id="L17">    public PolynomialTheoryUtilityMeasuredCandidate {</span>
+<span class="fc" id="L18">        result = Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L19">        measurements = Objects.requireNonNull(measurements, &quot;measurements&quot;);</span>
+<span class="fc" id="L20">        measurements.validateAgainst(result);</span>
+<span class="fc" id="L21">    }</span>
+
+    public static PolynomialTheoryUtilityMeasuredCandidate create(
+        PolynomialTheoryUtilityCandidateResult result,
+        List&lt;PolynomialTheoryUtilityTransitionTrace&gt; transitionTraces,
+        List&lt;PolynomialTheoryUtilityFactorizationAttempt&gt; factorizationAttempts,
+        List&lt;PolynomialTheoryUtilityCacheEvent&gt; cacheEvents
+    ) {
+<span class="fc" id="L29">        var retained = Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L30">        return new PolynomialTheoryUtilityMeasuredCandidate(</span>
+            retained,
+<span class="fc" id="L32">            PolynomialTheoryUtilityCandidateMeasurements.create(</span>
+                retained,
+                transitionTraces,
+                factorizationAttempts,
+                cacheEvents
+            )
+        );
+    }
+
+    /**
+     * Creates the only valid implicit measurement: an entirely zero-work row.
+     *
+     * &lt;p&gt;Any consumed work or transition requires an adapter-owned measured
+     * result. This prevents a legacy adapter from returning preflight,
+     * validation or technical work while silently dropping the observations
+     * that explain it.&lt;/p&gt;
+     */
+    public static PolynomialTheoryUtilityMeasuredCandidate
+            withoutObservations(
+                PolynomialTheoryUtilityCandidateResult result
+            ) {
+<span class="fc" id="L53">        var retained = Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (!PolynomialTheoryUtilityWorkBreakdown.zero().equals(</span>
+<span class="fc" id="L55">                retained.work())</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                || !retained.transitions().isEmpty()) {</span>
+<span class="fc" id="L57">            throw new IllegalArgumentException(</span>
+                &quot;implicit measurements require a zero-work result&quot;
+            );
+        }
+<span class="fc" id="L61">        return create(retained, List.of(), List.of(), List.of());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

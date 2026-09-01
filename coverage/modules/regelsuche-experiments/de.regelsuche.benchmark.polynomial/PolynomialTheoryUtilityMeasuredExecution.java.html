@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityMeasuredExecution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityMeasuredExecution.java</span></div><h1>PolynomialTheoryUtilityMeasuredExecution.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.benchmark.polynomial
+    .PolynomialTheoryUtilityProfileAdapter.AdapterRegistry;
+import de.regelsuche.benchmark.polynomial
+    .PolynomialTheoryUtilityProfileAdapter.CandidateBatch;
+import de.regelsuche.benchmark.polynomial
+    .PolynomialTheoryUtilityProfileAdapter.Run;
+import de.regelsuche.benchmark.polynomial
+    .PolynomialTheoryUtilityProfileAdapter.RunDescriptor;
+import de.regelsuche.benchmark.polynomial
+    .PolynomialTheoryUtilityProfileAdapter.TargetBlindRunner;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Executes the existing target-blind runner while retaining every measurement.
+ *
+ * &lt;p&gt;This class is not a second matrix runner. It decorates the already frozen
+ * adapter inventory, delegates ordering, input checks and run lifecycle to
+ * {@link TargetBlindRunner}, and binds the resulting batch to the measurements
+ * captured during those exact executions.&lt;/p&gt;
+ */
+<span class="fc" id="L27">public final class PolynomialTheoryUtilityMeasuredExecution {</span>
+    /**
+     * Run extension for adapters that produce non-empty mathematical evidence.
+     */
+    public interface MeasuredRun extends Run {
+        PolynomialTheoryUtilityMeasuredCandidate executeMeasured(
+            PolynomialTheoryUtilityExecutionInput input,
+            PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase
+        );
+
+        @Override
+        default PolynomialTheoryUtilityCandidateResult execute(
+            PolynomialTheoryUtilityExecutionInput input,
+            PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase
+        ) {
+<span class="pc" id="L42">            return Objects.requireNonNull(</span>
+<span class="fc" id="L43">                executeMeasured(input, formationCase),</span>
+                &quot;measured adapter result&quot;
+<span class="nc" id="L45">            ).result();</span>
+        }
+    }
+
+    public PolynomialTheoryUtilityCandidateMeasurementBatch execute(
+        PolynomialTheoryUtilityExecutionInputArtifact inputs,
+        List&lt;PolynomialTheoryUtilityProfileAdapter&gt; adapters
+    ) {
+<span class="fc" id="L53">        Objects.requireNonNull(inputs, &quot;inputs&quot;);</span>
+<span class="fc" id="L54">        List&lt;PolynomialTheoryUtilityProfileAdapter&gt; supplied = List.copyOf(</span>
+<span class="fc" id="L55">            Objects.requireNonNull(adapters, &quot;adapters&quot;)</span>
+        );
+<span class="fc" id="L57">        Map&lt;String, PolynomialTheoryUtilityCandidateMeasurements&gt; captured =</span>
+            new LinkedHashMap&lt;&gt;();
+<span class="fc" id="L59">        List&lt;PolynomialTheoryUtilityProfileAdapter&gt; decorated =</span>
+<span class="fc" id="L60">            new ArrayList&lt;&gt;(supplied.size());</span>
+<span class="fc" id="L61">        supplied.forEach(adapter -&gt; decorated.add(</span>
+            new CapturingAdapter(adapter, captured)
+        ));
+
+<span class="fc" id="L65">        CandidateBatch results = new TargetBlindRunner().execute(</span>
+            inputs,
+            new AdapterRegistry(decorated)
+        );
+<span class="fc" id="L69">        List&lt;PolynomialTheoryUtilityCandidateMeasurements&gt; measurements =</span>
+<span class="fc" id="L70">            results.results().stream()</span>
+<span class="fc" id="L71">                .map(result -&gt; requireMeasurement(captured, result))</span>
+<span class="fc" id="L72">                .toList();</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (captured.size() != measurements.size()) {</span>
+<span class="nc" id="L74">            throw new IllegalStateException(</span>
+                &quot;measured execution retained evidence outside its result batch&quot;
+            );
+        }
+<span class="fc" id="L78">        return PolynomialTheoryUtilityCandidateMeasurementBatch.create(</span>
+            results,
+            measurements
+        );
+    }
+
+    private static PolynomialTheoryUtilityCandidateMeasurements
+            requireMeasurement(
+                Map&lt;String, PolynomialTheoryUtilityCandidateMeasurements&gt;
+                    captured,
+                PolynomialTheoryUtilityCandidateResult result
+            ) {
+<span class="fc" id="L90">        var value = captured.get(</span>
+<span class="fc" id="L91">            Objects.requireNonNull(result, &quot;result&quot;).resultId()</span>
+        );
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L94">            throw new IllegalStateException(</span>
+                &quot;target-blind result lacks its execution-time measurement&quot;
+            );
+        }
+<span class="fc" id="L98">        value.validateAgainst(result);</span>
+<span class="fc" id="L99">        return value;</span>
+    }
+
+    private static final class CapturingAdapter
+            implements PolynomialTheoryUtilityProfileAdapter {
+        private final PolynomialTheoryUtilityProfileAdapter delegate;
+        private final Map&lt;
+            String,
+            PolynomialTheoryUtilityCandidateMeasurements
+        &gt; captured;
+
+        private CapturingAdapter(
+            PolynomialTheoryUtilityProfileAdapter delegate,
+            Map&lt;String, PolynomialTheoryUtilityCandidateMeasurements&gt; captured
+<span class="fc" id="L113">        ) {</span>
+<span class="fc" id="L114">            this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="fc" id="L115">            this.captured = Objects.requireNonNull(captured, &quot;captured&quot;);</span>
+<span class="fc" id="L116">        }</span>
+
+        @Override
+        public String profileId() {
+<span class="fc" id="L120">            return delegate.profileId();</span>
+        }
+
+        @Override
+        public String adapterId() {
+<span class="fc" id="L125">            return delegate.adapterId();</span>
+        }
+
+        @Override
+        public Run openRun(RunDescriptor descriptor) {
+<span class="fc" id="L130">            return new CapturingRun(</span>
+<span class="fc" id="L131">                Objects.requireNonNull(</span>
+<span class="fc" id="L132">                    delegate.openRun(descriptor),</span>
+                    &quot;delegate run&quot;
+                ),
+                captured
+            );
+        }
+    }
+
+    private static final class CapturingRun implements Run {
+        private final Run delegate;
+        private final Map&lt;
+            String,
+            PolynomialTheoryUtilityCandidateMeasurements
+        &gt; captured;
+
+        private CapturingRun(
+            Run delegate,
+            Map&lt;String, PolynomialTheoryUtilityCandidateMeasurements&gt; captured
+<span class="fc" id="L150">        ) {</span>
+<span class="fc" id="L151">            this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="fc" id="L152">            this.captured = Objects.requireNonNull(captured, &quot;captured&quot;);</span>
+<span class="fc" id="L153">        }</span>
+
+        @Override
+        public PolynomialTheoryUtilityCandidateResult execute(
+            PolynomialTheoryUtilityExecutionInput input,
+            PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase
+        ) {
+            PolynomialTheoryUtilityMeasuredCandidate measured =
+<span class="fc bfc" id="L161" title="All 2 branches covered.">                delegate instanceof MeasuredRun measuredRun</span>
+<span class="fc" id="L162">                    ? Objects.requireNonNull(</span>
+<span class="fc" id="L163">                        measuredRun.executeMeasured(input, formationCase),</span>
+                        &quot;measured adapter result&quot;
+                    )
+                    : PolynomialTheoryUtilityMeasuredCandidate
+<span class="fc" id="L167">                        .withoutObservations(</span>
+<span class="fc" id="L168">                            Objects.requireNonNull(</span>
+<span class="fc" id="L169">                                delegate.execute(input, formationCase),</span>
+                                &quot;adapter result&quot;
+                            )
+                        );
+<span class="fc" id="L173">            var result = measured.result();</span>
+<span class="fc" id="L174">            var previous = captured.putIfAbsent(</span>
+<span class="fc" id="L175">                result.resultId(),</span>
+<span class="fc" id="L176">                measured.measurements()</span>
+            );
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            if (previous != null) {</span>
+<span class="nc" id="L179">                throw new IllegalArgumentException(</span>
+                    &quot;measured execution repeats a result identity&quot;
+                );
+            }
+<span class="fc" id="L183">            return result;</span>
+        }
+
+        @Override
+        public void close() {
+<span class="fc" id="L188">            delegate.close();</span>
+<span class="fc" id="L189">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
