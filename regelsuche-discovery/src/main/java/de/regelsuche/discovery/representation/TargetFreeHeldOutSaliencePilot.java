@@ -322,7 +322,7 @@ public final class TargetFreeHeldOutSaliencePilot {
         PilotSummary summary = pilot.content().summary();
         System.out.println("saliencePilotHash=" + pilot.contentHash());
         System.out.println("saliencePilotRetainedReferenceRows="
-            + summary.referenceReachedPositiveRows());
+            + summary.retainedReferencePositiveRows());
         System.out.println("saliencePilotRecognizedRows="
             + summary.recognizedPositiveRows());
         System.out.println("saliencePilotRankedAtCutoffRows="
@@ -1062,19 +1062,19 @@ public final class TargetFreeHeldOutSaliencePilot {
     public record PilotCaseSummary(
         String caseId,
         int configuredRows,
-        int referenceReachedRows,
+        int retainedReferenceRows,
         int recognizedRows,
         int rankedRows,
         int bestRank
     ) {
         public PilotCaseSummary {
             caseId = requireText(caseId, "caseId");
-            if (configuredRows < 1 || referenceReachedRows < 0
+            if (configuredRows < 1 || retainedReferenceRows < 0
                     || recognizedRows < 0 || rankedRows < 0
                     || bestRank < 0
                     || rankedRows > recognizedRows
-                    || recognizedRows > referenceReachedRows
-                    || referenceReachedRows > configuredRows) {
+                    || recognizedRows > retainedReferenceRows
+                    || retainedReferenceRows > configuredRows) {
                 throw new IllegalArgumentException(
                     "pilot case summary does not balance");
             }
@@ -1085,7 +1085,7 @@ public final class TargetFreeHeldOutSaliencePilot {
         int configuredRows,
         int positiveRows,
         int negativeControlRows,
-        int referenceReachedPositiveRows,
+        int retainedReferencePositiveRows,
         int recognizedPositiveRows,
         int rankedPositiveRows,
         int retainedNotRecognizedRows,
@@ -1102,7 +1102,7 @@ public final class TargetFreeHeldOutSaliencePilot {
             if (configuredRows < 1 || positiveRows < 0
                     || negativeControlRows < 0
                     || positiveRows + negativeControlRows != configuredRows
-                    || referenceReachedPositiveRows < 0
+                    || retainedReferencePositiveRows < 0
                     || recognizedPositiveRows < 0
                     || rankedPositiveRows < 0
                     || retainedNotRecognizedRows < 0
@@ -1110,17 +1110,17 @@ public final class TargetFreeHeldOutSaliencePilot {
                     || preRetentionUnresolvedRows < 0
                     || falsePositiveRows < 0
                     || recognizedPositiveRows
-                        > referenceReachedPositiveRows
+                        > retainedReferencePositiveRows
                     || rankedPositiveRows > recognizedPositiveRows
                     || retainedNotRecognizedRows
-                        > referenceReachedPositiveRows
+                        > retainedReferencePositiveRows
                     || recognizedNotRankedRows > recognizedPositiveRows
-                    || referenceReachedPositiveRows
+                    || retainedReferencePositiveRows
                         + preRetentionUnresolvedRows != positiveRows
                     || falsePositiveRows > negativeControlRows
                     || topOneRows < 0 || topThreeRows < topOneRows
                     || topFiveRows < topThreeRows
-                    || topFiveRows > referenceReachedPositiveRows) {
+                    || topFiveRows > retainedReferencePositiveRows) {
                 throw new IllegalArgumentException(
                     "pilot summary counts do not balance");
             }
@@ -1314,7 +1314,7 @@ public final class TargetFreeHeldOutSaliencePilot {
                 .append("- **Top-k cutoff:** `")
                 .append(content.rankingCutoff()).append("`\n")
                 .append("- **Reference present in retained candidates:** `")
-                .append(content.summary().referenceReachedPositiveRows())
+                .append(content.summary().retainedReferencePositiveRows())
                 .append(" / ").append(content.summary().positiveRows())
                 .append("`\n")
                 .append("- **Pre-retention outcome unresolved:** `")
@@ -1323,7 +1323,7 @@ public final class TargetFreeHeldOutSaliencePilot {
                 .append("- **Recognized rows:** `")
                 .append(content.summary().recognizedPositiveRows())
                 .append(" / ")
-                .append(content.summary().referenceReachedPositiveRows())
+                .append(content.summary().retainedReferencePositiveRows())
                 .append("`\n")
                 .append("- **Surfaced in top-k:** `")
                 .append(content.summary().rankedPositiveRows())
@@ -1339,7 +1339,7 @@ public final class TargetFreeHeldOutSaliencePilot {
             for (PilotCaseSummary value : content.summary().cases()) {
                 markdown.append("| ").append(value.caseId())
                     .append(" | ").append(value.configuredRows())
-                    .append(" | ").append(value.referenceReachedRows())
+                    .append(" | ").append(value.retainedReferenceRows())
                     .append(" | ").append(value.recognizedRows())
                     .append(" | ").append(value.rankedRows())
                     .append(" | ").append(value.bestRank())
