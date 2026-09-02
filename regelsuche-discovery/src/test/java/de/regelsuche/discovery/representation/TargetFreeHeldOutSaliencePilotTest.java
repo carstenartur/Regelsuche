@@ -5,6 +5,8 @@ import static de.regelsuche.ast.BinaryOperator.SUB;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_KNOWN_WHOLE_FORM_BRIDGE;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.TYPE_NO_MATERIAL_REPRESENTATION_GAIN;
 import static de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary.Track.R1_TARGET_FREE_COMPRESSION;
+import static de.regelsuche.discovery.representation
+    .RepresentationSalienceCaseAudit.ReferenceReachability.UNSUPPORTED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -95,6 +97,24 @@ class TargetFreeHeldOutSaliencePilotTest {
                 "x / y", List.of("x != 0", "y != 0")),
             TargetFreeHeldOutSaliencePilot.representationId(
                 "x / y", List.of("y != 0", "x != 0"))
+        );
+    }
+
+    @Test
+    void doesNotOverclaimIndependentReachabilityEvidence() {
+        assertEquals(
+            UNSUPPORTED,
+            TargetFreeHeldOutSaliencePilot.RETAINED_MATRIX_REACHABILITY
+        );
+        assertTrue(
+            TargetFreeHeldOutSaliencePilot.PILOT_CLAIM_BOUNDARY.contains(
+                "without oracle confirmation"
+            )
+        );
+        assertTrue(
+            TargetFreeHeldOutSaliencePilot.PILOT_CLAIM_BOUNDARY.contains(
+                "retained-candidate projections"
+            )
         );
     }
 
