@@ -147,14 +147,22 @@ public final class TargetFreeIntrinsicCandidateValidator {
                     "oracleStatus must not be blank");
             }
             Objects.requireNonNull(scope, "scope");
-            assumptions = List.copyOf(
-                Objects.requireNonNull(assumptions, "assumptions"));
+            assumptions = normalizeAssumptions(assumptions);
+            boolean verified = status.atLeast(
+                CandidateProofStatus.SYMBOLICALLY_VERIFIED);
             if (scope
                     == ValidationScope.CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED
-                    && (assumptions.isEmpty() || intrinsicallyVerified())) {
+                    && (assumptions.isEmpty() || verified)) {
                 throw new IllegalArgumentException(
                     "conditional unresolved evidence requires assumptions "
                         + "and must not be verified"
+                );
+            }
+            if (scope == ValidationScope.UNCONDITIONAL
+                    && !assumptions.isEmpty() && !verified) {
+                throw new IllegalArgumentException(
+                    "non-verified evidence with assumptions must preserve "
+                        + "conditional uncertainty"
                 );
             }
             if (scope == ValidationScope.NOT_APPLICABLE
@@ -163,8 +171,7 @@ public final class TargetFreeIntrinsicCandidateValidator {
                     "not-applicable validation must not claim an oracle run"
                 );
             }
-            if (intrinsicallyVerified()
-                    && scope != ValidationScope.UNCONDITIONAL) {
+            if (verified && scope != ValidationScope.UNCONDITIONAL) {
                 throw new IllegalArgumentException(
                     "verified intrinsic evidence must be unconditional"
                 );
