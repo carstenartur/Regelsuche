@@ -23,4 +23,25 @@ new = '''            throw new IllegalArgumentException(
 '''
 if old not in source:
     raise RuntimeError("authority exception block not found")
-path.write_text(source.replace(old, new, 1), encoding="utf-8")
+source = source.replace(old, new, 1)
+
+old_call = '''        requireWithinAuthority(frozenInput, work);
+'''
+new_call = '''        try {
+            requireWithinAuthority(frozenInput, work);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                exception.getMessage()
+                    + ", matchingRaw=" + raw.matchingWork().stages()
+                    + ", sourceValidationRaw="
+                    + raw.sourceValidationWork().stages()
+                    + ", factorizationRaw="
+                    + raw.factorizationWork().stages(),
+                exception
+            );
+        }
+'''
+if old_call not in source:
+    raise RuntimeError("authority invocation not found")
+source = source.replace(old_call, new_call, 1)
+path.write_text(source, encoding="utf-8")
