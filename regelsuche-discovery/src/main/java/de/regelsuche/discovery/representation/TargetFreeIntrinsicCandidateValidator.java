@@ -26,8 +26,9 @@ import java.util.TreeSet;
  * depends on assumptions, because {@link OracleValidator} has no
  * assumption-aware entry point. Such evidence is retained explicitly as
  * {@link ValidationScope#CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED} rather than
- * silently treating conditional validity as disproved. Historical matching
- * and later literature/novelty search remain separate steps.</p>
+ * silently treating conditional validity as disproved. Both the stable
+ * oracle status and its complete evidence string are retained. Historical
+ * matching and later literature/novelty search remain separate steps.</p>
  */
 public final class TargetFreeIntrinsicCandidateValidator {
     private TargetFreeIntrinsicCandidateValidator() {
@@ -75,6 +76,7 @@ public final class TargetFreeIntrinsicCandidateValidator {
             return new IntrinsicValidation(
                 CandidateProofStatus.OBSERVED,
                 "NOT_RUN_NOT_EQUIVALENCE_PRESERVING_BY_CONSTRUCTION",
+                "The formation process did not claim source equivalence.",
                 ValidationScope.NOT_APPLICABLE,
                 normalizedAssumptions
             );
@@ -88,6 +90,7 @@ public final class TargetFreeIntrinsicCandidateValidator {
                 return new IntrinsicValidation(
                     CandidateProofStatus.SYMBOLICALLY_VERIFIED,
                     validation.status().name(),
+                    validation.evidence(),
                     ValidationScope.UNCONDITIONAL,
                     normalizedAssumptions
                 );
@@ -95,6 +98,7 @@ public final class TargetFreeIntrinsicCandidateValidator {
             return new IntrinsicValidation(
                 CandidateProofStatus.OBSERVED,
                 validation.status().name(),
+                validation.evidence(),
                 unresolvedScope(normalizedAssumptions),
                 normalizedAssumptions
             );
@@ -102,10 +106,18 @@ public final class TargetFreeIntrinsicCandidateValidator {
             return new IntrinsicValidation(
                 CandidateProofStatus.OBSERVED,
                 "VALIDATOR_ERROR_" + exception.getClass().getSimpleName(),
+                errorEvidence(exception),
                 unresolvedScope(normalizedAssumptions),
                 normalizedAssumptions
             );
         }
+    }
+
+    private static String errorEvidence(RuntimeException exception) {
+        String message = exception.getMessage();
+        return message == null || message.isBlank()
+            ? exception.getClass().getName()
+            : exception.getClass().getName() + ": " + message.trim();
     }
 
     private static ValidationScope unresolvedScope(List<String> assumptions) {
@@ -137,6 +149,7 @@ public final class TargetFreeIntrinsicCandidateValidator {
     public record IntrinsicValidation(
         CandidateProofStatus status,
         String oracleStatus,
+        String oracleEvidence,
         ValidationScope scope,
         List<String> assumptions
     ) {
@@ -146,6 +159,8 @@ public final class TargetFreeIntrinsicCandidateValidator {
                 throw new IllegalArgumentException(
                     "oracleStatus must not be blank");
             }
+            oracleEvidence = Objects.requireNonNull(
+                oracleEvidence, "oracleEvidence");
             Objects.requireNonNull(scope, "scope");
             assumptions = normalizeAssumptions(assumptions);
             boolean verified = status.atLeast(
