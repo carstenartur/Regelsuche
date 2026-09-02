@@ -142,6 +142,11 @@ class TargetFreeHeldOutSaliencePilotTest {
             Map.of("UNSUPPORTED", 1)
         );
 
+        assertEquals(0, unresolved.retainedReferencePositiveRows());
+        assertEquals(
+            0,
+            unresolved.cases().getFirst().retainedReferenceRows()
+        );
         assertEquals(1, unresolved.preRetentionUnresolvedRows());
         assertThrows(
             IllegalArgumentException.class,
