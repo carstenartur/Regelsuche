@@ -192,3 +192,27 @@ runtime_test_path.write_text(
     + runtime_test[closing:],
     encoding="utf-8",
 )
+
+authority_test_path = (
+    ROOT
+    / "regelsuche-math-algorithms/src/test/java/de/regelsuche/math/"
+      "algorithms/polynomial/NativeUnivariateEngineWorkAuthorityTest.java"
+)
+authority_test = authority_test_path.read_text(encoding="utf-8")
+old_assertion = '''        assertEquals(
+            FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE,
+            result.outcome()
+        );
+'''
+new_assertion = '''        assertEquals(
+            FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE,
+            result.outcome(),
+            result.detailCode()
+        );
+'''
+if old_assertion not in authority_test:
+    raise RuntimeError("native authority outcome assertion not found")
+authority_test_path.write_text(
+    authority_test.replace(old_assertion, new_assertion, 1),
+    encoding="utf-8",
+)
