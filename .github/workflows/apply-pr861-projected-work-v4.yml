@@ -7,6 +7,7 @@ on:
     paths:
       - tools/apply_pr861_projected_work_v4.py
       - tools/patch_pr861_authority_diagnostics.py
+      - tools/patch_pr861_root_identity_projection.py
       - .github/workflows/apply-pr861-projected-work-v4.yml
 
 permissions:
@@ -37,13 +38,14 @@ jobs:
       - name: Apply the projected-work implementation
         run: |
           python3 tools/apply_pr861_projected_work_v4.py
+          python3 tools/patch_pr861_root_identity_projection.py
           python3 tools/patch_pr861_authority_diagnostics.py
 
       - name: Compile and run affected regression tests
         run: >-
           mvn --batch-mode --no-transfer-progress
           -pl app -am
-          -Dtest=PolynomialWorkProjectionTest,PolynomialWorkBudgetProjectionTest,NativeUnivariateEngineWorkAuthorityTest,PolynomialTheoryUtilityRuntimeProjectionParityTest,PolynomialTheoryUtilityTerminalStatusTest,PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapterTest,PolynomialTheoryUtilityOnDemandProfileMatrixTest
+          -Dtest=ExactParsedSubtermProjectorTest,ExactNestedFactorizationTransformationPipelineTest,PolynomialWorkProjectionTest,PolynomialWorkBudgetProjectionTest,NativeUnivariateEngineWorkAuthorityTest,PolynomialTheoryUtilityRuntimeProjectionParityTest,PolynomialTheoryUtilityTerminalStatusTest,PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapterTest,PolynomialTheoryUtilityOnDemandProfileMatrixTest
           -Dsurefire.failIfNoSpecifiedTests=false
           test
 
@@ -54,6 +56,7 @@ jobs:
           rm -f tools/apply_pr861_projected_work_v3.py
           rm -f tools/apply_pr861_projected_work_v4.py
           rm -f tools/patch_pr861_authority_diagnostics.py
+          rm -f tools/patch_pr861_root_identity_projection.py
           rm -f tools/.apply_pr861_projected_work_runtime.py
           rm -f .github/workflows/apply-pr861-projected-work.yml
           rm -f .github/workflows/apply-pr861-projected-work-v3.yml
