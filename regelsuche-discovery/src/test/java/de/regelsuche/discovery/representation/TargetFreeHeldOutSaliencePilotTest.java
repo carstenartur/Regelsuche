@@ -9,11 +9,13 @@ import static de.regelsuche.discovery.representation
     .RepresentationSalienceCaseAudit.ReferenceReachability.UNSUPPORTED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.knowledge.RuleProfile;
 import de.regelsuche.transform.PatternExpr;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class TargetFreeHeldOutSaliencePilotTest {
@@ -114,6 +116,51 @@ class TargetFreeHeldOutSaliencePilotTest {
         assertTrue(
             TargetFreeHeldOutSaliencePilot.PILOT_CLAIM_BOUNDARY.contains(
                 "retained-candidate projections"
+            )
+        );
+    }
+
+    @Test
+    void representsMissingRetainedReferencesAsUnresolvedPreRetentionRows() {
+        var unresolved = new TargetFreeHeldOutSaliencePilot.PilotSummary(
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            List.of(new TargetFreeHeldOutSaliencePilot.PilotCaseSummary(
+                "case", 1, 0, 0, 0, 0
+            )),
+            Map.of("UNSUPPORTED", 1)
+        );
+
+        assertEquals(1, unresolved.preRetentionUnresolvedRows());
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new TargetFreeHeldOutSaliencePilot.PilotSummary(
+                1,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                unresolved.cases(),
+                unresolved.localizationCounts()
             )
         );
     }
