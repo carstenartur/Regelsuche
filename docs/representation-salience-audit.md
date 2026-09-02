@@ -97,6 +97,16 @@ policy is repaired. The resulting matrix will therefore reveal candidates that
 Regelsuche already reached but that the current representation assessor or ranker
 failed to surface.
 
+The first executable 6 × 4 × 6 calibration pilot begins with already retained
+candidate sets. Its source artifact contains neither an independent bounded-
+reachability receipt nor complete pre-retention stage sets. Observed positive
+hits are therefore recorded as reached without oracle confirmation, while the
+`reached`, `formed` and `retained` sets are explicitly retained-candidate
+projections. This pilot can localize losses from retention to recognition and
+from recognition to ranking. It cannot distinguish an earlier search miss from
+a formation or retention loss until a trace-complete successor artifact supplies
+those boundaries.
+
 The subsequent held-out study in issue #750 must use disjoint TEST families and
 report the same stage-conditioned recall and false-positive controls.
 
