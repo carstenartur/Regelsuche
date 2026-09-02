@@ -24,7 +24,10 @@ class PolynomialTheoryUtilityRawWorkPartitionerTest {
         stages.put("cache.insertion.entry", 1L);
         stages.put("cache.eviction.entry", 1L);
         stages.put("cache.replay.entry", 1L);
-        stages.put("study.evidence.payload-utf8-bytes", 64L);
+        stages.put(
+            "study.evidence.projection-payload-utf8-bytes",
+            64L
+        );
         var ledger = new PolynomialWorkLedger(stages);
 
         var raw = PolynomialTheoryUtilityRawWorkPartitioner.partition(
