@@ -524,22 +524,51 @@ public final class
         List<PolynomialTheoryUtilityTransitionOutcome> transitions,
         List<ExactNestedFactorizationTransformationPipeline.Status> statuses
     ) {
-        if (!transitions.isEmpty()) {
+        return terminalStatus(transitions.size(), statuses);
+    }
+
+    static TerminalStatus terminalStatus(
+        int transitionCount,
+        List<ExactNestedFactorizationTransformationPipeline.Status> statuses
+    ) {
+        var retainedStatuses = List.copyOf(
+            Objects.requireNonNull(statuses, "statuses")
+        );
+        if (transitionCount < 0 || transitionCount > retainedStatuses.size()) {
+            throw new IllegalArgumentException(
+                "transition count differs from occurrence status count"
+            );
+        }
+        if (transitionCount > 0) {
+            boolean everyOccurrenceTransformed =
+                transitionCount == retainedStatuses.size()
+                    && retainedStatuses.stream().allMatch(value ->
+                        value
+                            == ExactNestedFactorizationTransformationPipeline
+                                .Status.TRANSFORMED
+                    );
+            if (!everyOccurrenceTransformed) {
+                throw new IllegalStateException(
+                    "partial occurrence success cannot become a terminal "
+                        + "validated result"
+                );
+            }
             return TerminalStatus.VALIDATED_TRANSITION;
         }
-        if (statuses.contains(
+        if (retainedStatuses.contains(
                 ExactNestedFactorizationTransformationPipeline.Status
                     .TECHNICAL_FAILURE)) {
             return TerminalStatus.TECHNICAL_FAILURE;
         }
-        if (statuses.contains(
+        if (retainedStatuses.contains(
                 ExactNestedFactorizationTransformationPipeline.Status
                     .BUDGET_INCONCLUSIVE)) {
             return TerminalStatus.BUDGET_INCONCLUSIVE;
         }
-        if (statuses.stream().anyMatch(
+        if (retainedStatuses.stream().anyMatch(
                 PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
-                    ::unsupported)) {
+                    ::unsupported
+        )) {
             return TerminalStatus.UNSUPPORTED;
         }
         return TerminalStatus.NO_TRANSITION;
