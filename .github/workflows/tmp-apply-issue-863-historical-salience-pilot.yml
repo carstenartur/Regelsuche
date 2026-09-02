@@ -1,0 +1,31 @@
+name: Apply issue 863 historical salience pilot
+
+on:
+  push:
+    branches:
+      - feature/863-historical-salience-pilot-v1
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == 'Apply issue 863 historical salience pilot payload'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Apply and commit reviewed payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          gzip -dc .github/automation/issue-863-historical-salience-pilot.patch.gz | git apply --index --whitespace=error-all
+          git rm .github/automation/issue-863-historical-salience-pilot.patch.gz
+          git rm .github/workflows/tmp-apply-issue-863-historical-salience-pilot.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Add hard held-out representation salience pilot'
+          git push origin HEAD:feature/863-historical-salience-pilot-v1
