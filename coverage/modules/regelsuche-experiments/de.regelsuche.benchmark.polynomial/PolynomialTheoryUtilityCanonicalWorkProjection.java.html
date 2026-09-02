@@ -1,0 +1,471 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityCanonicalWorkProjection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityCanonicalWorkProjection.java</span></div><h1>PolynomialTheoryUtilityCanonicalWorkProjection.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Projects the exact polynomial pipeline ledger into the preregistered study
+ * work vector without consulting qualification data or mathematical outcomes.
+ *
+ * &lt;p&gt;Every raw stage must occur in exactly one named segment. Unknown stages
+ * are charged conservatively one-for-one and are accepted only as native
+ * factorization work. The few discounted stages undo explicit implementation
+ * multipliers for literal comparison, source-text comparison and structural
+ * hashing; their divisors are fixed by this revision before profile
+ * execution.&lt;/p&gt;
+ */
+public final class PolynomialTheoryUtilityCanonicalWorkProjection {
+    public static final String REVISION =
+        &quot;regelsuche.polynomial-theory-utility-work-projection/v1&quot;;
+
+    private static final long LITERAL_VALIDATION_QUANTUM = 512L;
+    private static final long SOURCE_TEXT_VALIDATION_QUANTUM = 4L;
+    private static final long STRUCTURAL_HASH_QUANTUM = 128L;
+    private static final long UTF8_EVIDENCE_QUANTUM = 64L;
+
+    private PolynomialTheoryUtilityCanonicalWorkProjection() {
+    }
+
+    public static Projection project(
+        PolynomialTheoryUtilityExecutionInput input,
+        RawWork rawWork
+    ) {
+<span class="fc" id="L38">        var frozenInput = Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L39">        var raw = Objects.requireNonNull(rawWork, &quot;rawWork&quot;);</span>
+<span class="fc" id="L40">        PolynomialTheoryUtilityWorkBreakdown work =</span>
+            new PolynomialTheoryUtilityWorkBreakdown(
+<span class="fc" id="L42">                raw.primitiveWork(),</span>
+<span class="fc" id="L43">                canonicalUnits(raw.matchingWork(), Dimension.MATCHING),</span>
+<span class="fc" id="L44">                canonicalUnits(</span>
+<span class="fc" id="L45">                    raw.sourceValidationWork(),</span>
+                    Dimension.SOURCE_VALIDATION
+                ),
+<span class="fc" id="L48">                canonicalUnits(</span>
+<span class="fc" id="L49">                    raw.factorizationWork(),</span>
+                    Dimension.FACTORIZATION
+                ),
+<span class="fc" id="L52">                canonicalUnits(</span>
+<span class="fc" id="L53">                    raw.verificationWork(),</span>
+                    Dimension.VERIFICATION
+                ),
+<span class="fc" id="L56">                canonicalUnits(raw.renderingWork(), Dimension.RENDERING),</span>
+<span class="fc" id="L57">                canonicalUnits(raw.reparseWork(), Dimension.REPARSE),</span>
+<span class="fc" id="L58">                canonicalUnits(</span>
+<span class="fc" id="L59">                    raw.reconstructionWork(),</span>
+                    Dimension.RECONSTRUCTION
+                ),
+<span class="fc" id="L62">                canonicalUnits(</span>
+<span class="fc" id="L63">                    raw.occurrenceReplacementWork(),</span>
+                    Dimension.OCCURRENCE_REPLACEMENT
+                ),
+<span class="fc" id="L66">                canonicalUnits(</span>
+<span class="fc" id="L67">                    raw.cacheLookupWork(),</span>
+                    Dimension.CACHE_LOOKUP
+                ),
+<span class="fc" id="L70">                canonicalUnits(</span>
+<span class="fc" id="L71">                    raw.cacheInsertionWork(),</span>
+                    Dimension.CACHE_INSERTION
+                ),
+<span class="fc" id="L74">                canonicalUnits(</span>
+<span class="fc" id="L75">                    raw.cacheEvictionWork(),</span>
+                    Dimension.CACHE_EVICTION
+                ),
+<span class="fc" id="L78">                canonicalUnits(</span>
+<span class="fc" id="L79">                    raw.cacheReplayWork(),</span>
+                    Dimension.CACHE_REPLAY
+                ),
+<span class="fc" id="L82">                canonicalUnits(</span>
+<span class="fc" id="L83">                    raw.evidenceConstructionWork(),</span>
+                    Dimension.EVIDENCE_CONSTRUCTION
+                )
+            );
+<span class="fc" id="L87">        requireWithinAuthority(frozenInput, work);</span>
+<span class="fc" id="L88">        String rawWorkHash = hash(raw.identityMaterial());</span>
+<span class="fc" id="L89">        String projectionId = projectionId(</span>
+<span class="fc" id="L90">            frozenInput.inputId(),</span>
+            rawWorkHash,
+            work
+        );
+<span class="fc" id="L94">        return new Projection(</span>
+            projectionId,
+<span class="fc" id="L96">            frozenInput.inputId(),</span>
+            REVISION,
+            rawWorkHash,
+            work
+        );
+    }
+
+    private static void requireWithinAuthority(
+        PolynomialTheoryUtilityExecutionInput input,
+        PolynomialTheoryUtilityWorkBreakdown work
+    ) {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (work.primitiveWork() &gt; input.admittedPrimitiveWork()</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                || work.mechanicalWork() &gt; input.totalMechanicalWork()</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                || work.factorizationWork() &gt; input.factorizationWork()) {</span>
+<span class="fc" id="L110">            throw new IllegalArgumentException(</span>
+                &quot;projected work exceeds the frozen execution authority&quot;
+            );
+        }
+<span class="fc" id="L114">    }</span>
+
+    private static long canonicalUnits(
+        PolynomialWorkLedger ledger,
+        Dimension dimension
+    ) {
+<span class="fc" id="L120">        long result = 0L;</span>
+        for (Map.Entry&lt;String, Long&gt; entry
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                : Objects.requireNonNull(ledger, &quot;ledger&quot;).stages().entrySet()) {</span>
+<span class="fc" id="L123">            String stage = entry.getKey();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (!dimension.accepts(stage)) {</span>
+<span class="fc" id="L125">                throw new IllegalArgumentException(</span>
+                    &quot;raw stage is assigned to the wrong study dimension: &quot;
+                        + dimension + &quot;:&quot; + stage
+                );
+            }
+<span class="fc" id="L130">            result = Math.addExact(</span>
+                result,
+<span class="fc" id="L132">                divideRoundUp(entry.getValue(), quantum(stage))</span>
+            );
+<span class="fc" id="L134">        }</span>
+<span class="fc" id="L135">        return result;</span>
+    }
+
+    private static long quantum(String stage) {
+<span class="fc bfc" id="L139" title="All 3 branches covered.">        return switch (stage) {</span>
+            case &quot;transform.source-evidence-literal-validation&quot; -&gt;
+<span class="fc" id="L141">                LITERAL_VALIDATION_QUANTUM;</span>
+            case &quot;transform.source-evidence-text-validation&quot; -&gt;
+<span class="fc" id="L143">                SOURCE_TEXT_VALIDATION_QUANTUM;</span>
+            default -&gt; {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                if (stage.endsWith(&quot;-payload-utf8-bytes&quot;)) {</span>
+<span class="fc" id="L146">                    yield UTF8_EVIDENCE_QUANTUM;</span>
+                }
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                if (stage.contains(&quot;structural-hash&quot;)) {</span>
+<span class="fc" id="L149">                    yield STRUCTURAL_HASH_QUANTUM;</span>
+                }
+<span class="fc" id="L151">                yield 1L;</span>
+            }
+        };
+    }
+
+    private static long divideRoundUp(long value, long divisor) {
+<span class="pc bpc" id="L157" title="2 of 4 branches missed.">        if (value &lt; 0L || divisor &lt; 1L) {</span>
+<span class="nc" id="L158">            throw new IllegalArgumentException(</span>
+                &quot;canonical work conversion received an invalid value&quot;
+            );
+        }
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (value == 0L) {</span>
+<span class="nc" id="L163">            return 0L;</span>
+        }
+<span class="fc" id="L165">        return 1L + (value - 1L) / divisor;</span>
+    }
+
+    private static String projectionId(
+        String inputId,
+        String rawWorkHash,
+        PolynomialTheoryUtilityWorkBreakdown work
+    ) {
+<span class="fc" id="L173">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L174">        append(material, REVISION);</span>
+<span class="fc" id="L175">        append(material, inputId);</span>
+<span class="fc" id="L176">        append(material, rawWorkHash);</span>
+<span class="fc" id="L177">        work.appendIdentityMaterial(material);</span>
+<span class="fc" id="L178">        return hash(material.toString());</span>
+    }
+
+    private static String hash(String value) {
+<span class="fc" id="L182">        return PolynomialTheoryUtilityExecutionIdentity.sha256(</span>
+<span class="fc" id="L183">            value.getBytes(StandardCharsets.UTF_8)</span>
+        );
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L188">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L189">    }</span>
+
+<span class="fc" id="L191">    private enum Dimension {</span>
+<span class="fc" id="L192">        MATCHING,</span>
+<span class="fc" id="L193">        SOURCE_VALIDATION,</span>
+<span class="fc" id="L194">        FACTORIZATION,</span>
+<span class="fc" id="L195">        VERIFICATION,</span>
+<span class="fc" id="L196">        RENDERING,</span>
+<span class="fc" id="L197">        REPARSE,</span>
+<span class="fc" id="L198">        RECONSTRUCTION,</span>
+<span class="fc" id="L199">        OCCURRENCE_REPLACEMENT,</span>
+<span class="fc" id="L200">        CACHE_LOOKUP,</span>
+<span class="fc" id="L201">        CACHE_INSERTION,</span>
+<span class="fc" id="L202">        CACHE_EVICTION,</span>
+<span class="fc" id="L203">        CACHE_REPLAY,</span>
+<span class="fc" id="L204">        EVIDENCE_CONSTRUCTION;</span>
+
+        private boolean accepts(String stage) {
+<span class="fc" id="L207">            Objects.requireNonNull(stage, &quot;stage&quot;);</span>
+<span class="fc bfc" id="L208" title="All 13 branches covered.">            return switch (this) {</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                case MATCHING -&gt; stage.startsWith(&quot;projection.&quot;)</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                    || stage.startsWith(&quot;nested.position-&quot;)</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                    || stage.startsWith(&quot;nested.root-preflight-&quot;)</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                    || stage.startsWith(&quot;nested.application-staleness-&quot;)</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                    || stage.startsWith(&quot;nested.unchanged-&quot;);</span>
+                case SOURCE_VALIDATION -&gt;
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                    stage.startsWith(&quot;exact-parsed-view.&quot;)</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                    || stage.startsWith(&quot;transform.source-evidence-&quot;);</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">                case FACTORIZATION -&gt; !reserved(stage);</span>
+<span class="fc" id="L218">                case VERIFICATION -&gt; stage.startsWith(&quot;verify.&quot;);</span>
+<span class="fc" id="L219">                case RENDERING -&gt; stage.startsWith(&quot;render.&quot;);</span>
+                case REPARSE -&gt;
+<span class="fc" id="L221">                    stage.startsWith(&quot;transform.exact-reparse-&quot;);</span>
+<span class="fc" id="L222">                case RECONSTRUCTION -&gt; stage.equals(</span>
+                    &quot;transform.structural-change-comparison&quot;
+                );
+                case OCCURRENCE_REPLACEMENT -&gt;
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">                    stage.startsWith(&quot;nested.replacement-&quot;)</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">                    || stage.startsWith(&quot;nested.rewritten-&quot;)</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                    || stage.startsWith(&quot;nested.replay-&quot;)</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">                    || stage.startsWith(</span>
+                        &quot;nested.application-path-navigation&quot;
+                    );
+<span class="fc" id="L232">                case CACHE_LOOKUP -&gt; stage.startsWith(&quot;cache.lookup.&quot;);</span>
+                case CACHE_INSERTION -&gt;
+<span class="fc" id="L234">                    stage.startsWith(&quot;cache.insertion.&quot;);</span>
+                case CACHE_EVICTION -&gt;
+<span class="fc" id="L236">                    stage.startsWith(&quot;cache.eviction.&quot;);</span>
+<span class="fc" id="L237">                case CACHE_REPLAY -&gt; stage.startsWith(&quot;cache.replay.&quot;);</span>
+                case EVIDENCE_CONSTRUCTION -&gt;
+<span class="fc" id="L239">                    stage.startsWith(&quot;study.evidence.&quot;);</span>
+            };
+        }
+
+        private static boolean reserved(String stage) {
+<span class="fc" id="L244">            return valuesExceptFactorization().stream()</span>
+<span class="fc" id="L245">                .anyMatch(value -&gt; value.accepts(stage));</span>
+        }
+
+        private static java.util.List&lt;Dimension&gt; valuesExceptFactorization() {
+<span class="fc" id="L249">            return java.util.List.of(</span>
+                MATCHING,
+                SOURCE_VALIDATION,
+                VERIFICATION,
+                RENDERING,
+                REPARSE,
+                RECONSTRUCTION,
+                OCCURRENCE_REPLACEMENT,
+                CACHE_LOOKUP,
+                CACHE_INSERTION,
+                CACHE_EVICTION,
+                CACHE_REPLAY,
+                EVIDENCE_CONSTRUCTION
+            );
+        }
+    }
+
+    /**
+     * One exact partition of the raw mechanical ledger plus primitive lineage.
+     */
+    public record RawWork(
+        long primitiveWork,
+        PolynomialWorkLedger totalMechanicalWork,
+        PolynomialWorkLedger matchingWork,
+        PolynomialWorkLedger sourceValidationWork,
+        PolynomialWorkLedger factorizationWork,
+        PolynomialWorkLedger verificationWork,
+        PolynomialWorkLedger renderingWork,
+        PolynomialWorkLedger reparseWork,
+        PolynomialWorkLedger reconstructionWork,
+        PolynomialWorkLedger occurrenceReplacementWork,
+        PolynomialWorkLedger cacheLookupWork,
+        PolynomialWorkLedger cacheInsertionWork,
+        PolynomialWorkLedger cacheEvictionWork,
+        PolynomialWorkLedger cacheReplayWork,
+        PolynomialWorkLedger evidenceConstructionWork
+    ) {
+<span class="fc" id="L286">        public RawWork {</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">            if (primitiveWork &lt; 0L) {</span>
+<span class="nc" id="L288">                throw new IllegalArgumentException(</span>
+                    &quot;primitive work must be non-negative&quot;
+                );
+            }
+<span class="fc" id="L292">            totalMechanicalWork = require(totalMechanicalWork);</span>
+<span class="fc" id="L293">            matchingWork = require(matchingWork);</span>
+<span class="fc" id="L294">            sourceValidationWork = require(sourceValidationWork);</span>
+<span class="fc" id="L295">            factorizationWork = require(factorizationWork);</span>
+<span class="fc" id="L296">            verificationWork = require(verificationWork);</span>
+<span class="fc" id="L297">            renderingWork = require(renderingWork);</span>
+<span class="fc" id="L298">            reparseWork = require(reparseWork);</span>
+<span class="fc" id="L299">            reconstructionWork = require(reconstructionWork);</span>
+<span class="fc" id="L300">            occurrenceReplacementWork = require(</span>
+                occurrenceReplacementWork
+            );
+<span class="fc" id="L303">            cacheLookupWork = require(cacheLookupWork);</span>
+<span class="fc" id="L304">            cacheInsertionWork = require(cacheInsertionWork);</span>
+<span class="fc" id="L305">            cacheEvictionWork = require(cacheEvictionWork);</span>
+<span class="fc" id="L306">            cacheReplayWork = require(cacheReplayWork);</span>
+<span class="fc" id="L307">            evidenceConstructionWork = require(</span>
+                evidenceConstructionWork
+            );
+<span class="fc" id="L310">            requireUniqueStageOwnership(</span>
+                matchingWork,
+                sourceValidationWork,
+                factorizationWork,
+                verificationWork,
+                renderingWork,
+                reparseWork,
+                reconstructionWork,
+                occurrenceReplacementWork,
+                cacheLookupWork,
+                cacheInsertionWork,
+                cacheEvictionWork,
+                cacheReplayWork,
+                evidenceConstructionWork
+            );
+<span class="fc" id="L325">            PolynomialWorkLedger partition = merge(</span>
+                matchingWork,
+                sourceValidationWork,
+                factorizationWork,
+                verificationWork,
+                renderingWork,
+                reparseWork,
+                reconstructionWork,
+                occurrenceReplacementWork,
+                cacheLookupWork,
+                cacheInsertionWork,
+                cacheEvictionWork,
+                cacheReplayWork,
+                evidenceConstructionWork
+            );
+<span class="fc bfc" id="L340" title="All 2 branches covered.">            if (!totalMechanicalWork.equals(partition)) {</span>
+<span class="fc" id="L341">                throw new IllegalArgumentException(</span>
+                    &quot;raw study work does not exactly partition the pipeline ledger&quot;
+                );
+            }
+<span class="fc" id="L345">        }</span>
+
+        private static PolynomialWorkLedger require(
+            PolynomialWorkLedger value
+        ) {
+<span class="fc" id="L350">            return Objects.requireNonNull(value, &quot;raw work segment&quot;);</span>
+        }
+
+        private static void requireUniqueStageOwnership(
+            PolynomialWorkLedger... values
+        ) {
+<span class="fc" id="L356">            Set&lt;String&gt; ownedStages = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            for (PolynomialWorkLedger value : values) {</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">                for (String stage : value.stages().keySet()) {</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">                    if (!ownedStages.add(stage)) {</span>
+<span class="fc" id="L360">                        throw new IllegalArgumentException(</span>
+                            &quot;raw stage is split across study dimensions: &quot;
+                                + stage
+                        );
+                    }
+<span class="fc" id="L365">                }</span>
+            }
+<span class="fc" id="L367">        }</span>
+
+        private String identityMaterial() {
+<span class="fc" id="L370">            StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L371">            append(material, REVISION);</span>
+<span class="fc" id="L372">            append(material, Long.toString(primitiveWork));</span>
+<span class="fc" id="L373">            appendLedger(material, &quot;total&quot;, totalMechanicalWork);</span>
+<span class="fc" id="L374">            appendLedger(material, &quot;matching&quot;, matchingWork);</span>
+<span class="fc" id="L375">            appendLedger(</span>
+                material,
+                &quot;source-validation&quot;,
+                sourceValidationWork
+            );
+<span class="fc" id="L380">            appendLedger(material, &quot;factorization&quot;, factorizationWork);</span>
+<span class="fc" id="L381">            appendLedger(material, &quot;verification&quot;, verificationWork);</span>
+<span class="fc" id="L382">            appendLedger(material, &quot;rendering&quot;, renderingWork);</span>
+<span class="fc" id="L383">            appendLedger(material, &quot;reparse&quot;, reparseWork);</span>
+<span class="fc" id="L384">            appendLedger(</span>
+                material,
+                &quot;reconstruction&quot;,
+                reconstructionWork
+            );
+<span class="fc" id="L389">            appendLedger(</span>
+                material,
+                &quot;occurrence-replacement&quot;,
+                occurrenceReplacementWork
+            );
+<span class="fc" id="L394">            appendLedger(material, &quot;cache-lookup&quot;, cacheLookupWork);</span>
+<span class="fc" id="L395">            appendLedger(</span>
+                material,
+                &quot;cache-insertion&quot;,
+                cacheInsertionWork
+            );
+<span class="fc" id="L400">            appendLedger(material, &quot;cache-eviction&quot;, cacheEvictionWork);</span>
+<span class="fc" id="L401">            appendLedger(material, &quot;cache-replay&quot;, cacheReplayWork);</span>
+<span class="fc" id="L402">            appendLedger(</span>
+                material,
+                &quot;evidence-construction&quot;,
+                evidenceConstructionWork
+            );
+<span class="fc" id="L407">            return material.toString();</span>
+        }
+
+        private static void appendLedger(
+            StringBuilder target,
+            String role,
+            PolynomialWorkLedger ledger
+        ) {
+<span class="fc" id="L415">            append(target, role);</span>
+<span class="fc" id="L416">            append(target, ledger.canonicalMaterial());</span>
+<span class="fc" id="L417">        }</span>
+
+        private static PolynomialWorkLedger merge(
+            PolynomialWorkLedger... values
+        ) {
+<span class="fc" id="L422">            Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            for (PolynomialWorkLedger value : values) {</span>
+<span class="fc" id="L424">                value.stages().forEach((stage, units) -&gt;</span>
+<span class="fc" id="L425">                    stages.merge(stage, units, Math::addExact)</span>
+                );
+            }
+<span class="fc" id="L428">            return new PolynomialWorkLedger(stages);</span>
+        }
+    }
+
+    /** Content-addressed result of the fixed raw-to-canonical projection. */
+    public record Projection(
+        String projectionId,
+        String executionInputId,
+        String projectionRevision,
+        String rawWorkHash,
+        PolynomialTheoryUtilityWorkBreakdown work
+    ) {
+<span class="fc" id="L440">        public Projection {</span>
+<span class="fc" id="L441">            projectionId = requireHash(projectionId, &quot;projectionId&quot;);</span>
+<span class="fc" id="L442">            executionInputId = requireHash(</span>
+                executionInputId,
+                &quot;executionInputId&quot;
+            );
+<span class="pc bpc" id="L446" title="1 of 2 branches missed.">            if (!REVISION.equals(projectionRevision)) {</span>
+<span class="nc" id="L447">                throw new IllegalArgumentException(</span>
+                    &quot;projection revision differs from the frozen contract&quot;
+                );
+            }
+<span class="fc" id="L451">            rawWorkHash = requireHash(rawWorkHash, &quot;rawWorkHash&quot;);</span>
+<span class="fc" id="L452">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">            if (!projectionId.equals(</span>
+                    PolynomialTheoryUtilityCanonicalWorkProjection
+<span class="fc" id="L455">                        .projectionId(executionInputId, rawWorkHash, work))) {</span>
+<span class="nc" id="L456">                throw new IllegalArgumentException(</span>
+                    &quot;projection identity differs from its evidence&quot;
+                );
+            }
+<span class="fc" id="L460">        }</span>
+
+        private static String requireHash(String value, String name) {
+<span class="fc" id="L463">            String text = Objects.requireNonNull(value, name);</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">            if (!text.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L465">                throw new IllegalArgumentException(name + &quot; is not SHA-256&quot;);</span>
+            }
+<span class="fc" id="L467">            return text;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
