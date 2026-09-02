@@ -83,7 +83,7 @@ class TargetFreeRepresentationSalienceBaselineTest {
         long retainedReferenceRows = QUALIFICATION.content().entries().stream()
             .filter(row -> row.candidates().stream().anyMatch(candidate ->
                 candidate.referenceMatched()
-                    && FROZEN_BY_CONFIGURATION.get(row.configurationId())
+                    && requireFrozenConfiguration(row.configurationId())
                         .candidates().stream().anyMatch(frozen ->
                             frozen.candidateHash().equals(
                                 candidate.candidateHash()))
@@ -130,5 +130,16 @@ class TargetFreeRepresentationSalienceBaselineTest {
             candidate.disqualificationReasons().contains(
                 "SYMBOLIC_VALIDATION_NOT_CONFIRMED")
         ));
+    }
+
+    private static TargetFreeRepresentationCandidateFreeze.ExecutionEntry
+            requireFrozenConfiguration(String configurationId) {
+        var entry = FROZEN_BY_CONFIGURATION.get(configurationId);
+        if (entry == null) {
+            throw new IllegalStateException(
+                "Missing frozen configuration " + configurationId
+            );
+        }
+        return entry;
     }
 }
