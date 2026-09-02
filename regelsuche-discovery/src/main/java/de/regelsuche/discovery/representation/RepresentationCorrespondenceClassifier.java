@@ -140,26 +140,31 @@ public final class RepresentationCorrespondenceClassifier {
     }
 
     /**
-     * Evaluates a frozen search trace including the source expression at
-     * depth 0 against the target's representation class. The shallowest
+     * Evaluates a frozen search trace including exactly one source expression
+     * at depth 0 against the target's representation class. The shallowest
      * matching occurrence is selected deterministically.
      */
     public RediscoveryEvidence evaluateTrace(
         List<TraceStep> trace,
         String targetExpression
     ) {
-        Objects.requireNonNull(trace, "trace");
+        List<TraceStep> frozenTrace = List.copyOf(
+            Objects.requireNonNull(trace, "trace"));
         Objects.requireNonNull(targetExpression, "targetExpression");
-        if (trace.isEmpty()) {
+        if (frozenTrace.isEmpty()) {
             throw new IllegalArgumentException("trace must not be empty");
         }
-        if (trace.stream().noneMatch(step -> step.depth() == 0)) {
+        long sourceOccurrenceCount = frozenTrace.stream()
+            .filter(step -> step.depth() == 0)
+            .count();
+        if (sourceOccurrenceCount != 1) {
             throw new IllegalArgumentException(
-                "trace must include the source expression at depth zero");
+                "trace must include exactly one source expression at depth zero"
+            );
         }
 
         String targetSignature = signature(targetExpression);
-        TraceStep match = trace.stream()
+        TraceStep match = frozenTrace.stream()
             .filter(step -> signature(step.expression())
                 .equals(targetSignature))
             .min(Comparator.comparingInt(TraceStep::depth)
