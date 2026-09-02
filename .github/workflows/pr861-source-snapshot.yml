@@ -1,4 +1,4 @@
-name: Temporary PR 861 source snapshot
+name: Temporary projected-work prototype export
 
 on:
   push:
@@ -13,23 +13,15 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
-      - name: Check out exact branch head
+      - name: Check out discarded prototype commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          fetch-depth: 0
-      - name: Create source archive outside the checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          tar \
-            --exclude=.git \
-            --exclude='**/build' \
-            --exclude='**/.gradle' \
-            -czf "$RUNNER_TEMP/pr861-source-snapshot.tar.gz" .
-      - name: Retain source archive
+          ref: ef477375723e066beff8af8280dd1e1c12a93a30
+          fetch-depth: 1
+      - name: Retain prototype generator
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pr861-source-snapshot
-          path: ${{ runner.temp }}/pr861-source-snapshot.tar.gz
+          name: pr861-projected-work-prototype
+          path: tools/apply_pr861_projected_work_v4.py
           if-no-files-found: error
           retention-days: 1
