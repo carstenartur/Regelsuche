@@ -379,10 +379,12 @@ public record RepresentationSalienceCaseAudit(
         Objects.requireNonNull(reachability, "reachability");
         Objects.requireNonNull(verdict, "verdict");
         if (role == CaseRole.POSITIVE_REFERENCE
-                && reachability != ReferenceReachability.REACHABLE
+                && reachability
+                    == ReferenceReachability.NOT_REACHABLE_COMPLETE_CLOSURE
                 && !reached.isEmpty()) {
             throw new IllegalArgumentException(
-                "non-reachable positive case cannot retain a matched state"
+                "complete-closure-unreachable positive case cannot retain "
+                    + "a matched state"
             );
         }
         if (ranked.isEmpty() && verdict != ExpertVerdict.NOT_EVALUATED) {
