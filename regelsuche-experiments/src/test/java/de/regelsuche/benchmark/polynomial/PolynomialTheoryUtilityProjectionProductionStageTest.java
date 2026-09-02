@@ -6,6 +6,7 @@ import de.regelsuche.parse.ExactParsedSubtermProjector;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.polynomial.PolynomialWorkLedger;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ class PolynomialTheoryUtilityProjectionProductionStageTest {
             projected.work().stages()
         );
         var measured = PolynomialTheoryUtilityCanonicalWorkProjection.project(
-            input(),
+            pricingAuthority(),
             matchingOnly(matching)
         );
 
@@ -97,7 +98,33 @@ class PolynomialTheoryUtilityProjectionProductionStageTest {
         );
     }
 
-    private static PolynomialTheoryUtilityExecutionInput input() {
+    /**
+     * Supplies room to characterize production-stage pricing independently of
+     * any one frozen study row. Frozen-row rejection remains covered by the
+     * projection contract tests; this test measures the conversion itself.
+     */
+    private static PolynomialTheoryUtilityExecutionInput pricingAuthority() {
+        var frozen = frozenInput();
+        int budget = 1_000_000;
+        return new PolynomialTheoryUtilityExecutionInput(
+            PolynomialTheoryUtilityExecutionIdentity.sha256(
+                "projection-production-stage-pricing-authority/v1"
+                    .getBytes(StandardCharsets.UTF_8)
+            ),
+            frozen.rowId(),
+            frozen.runId(),
+            frozen.caseId(),
+            frozen.profileId(),
+            frozen.checkpointId(),
+            frozen.adapterId(),
+            budget,
+            budget,
+            budget,
+            frozen.inputStatus()
+        );
+    }
+
+    private static PolynomialTheoryUtilityExecutionInput frozenInput() {
         return PolynomialTheoryUtilityExecutionInputs.freeze().inputs()
             .stream()
             .filter(value ->
