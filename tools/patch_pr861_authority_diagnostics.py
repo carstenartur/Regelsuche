@@ -18,6 +18,7 @@ new = '''            throw new IllegalArgumentException(
                     + "/" + input.totalMechanicalWork()
                     + ", factorization=" + work.factorizationWork()
                     + "/" + input.factorizationWork()
+                    + ", breakdown=" + work
             );
 '''
 if old not in source:
