@@ -6,8 +6,29 @@ import java.util.Objects;
 public record NativeUnivariateFactorizationPolicy(
     UnivariateContentPolicy contentPolicy,
     SuitablePrimeSelectionPolicy suitablePrimePolicy,
-    ZassenhausRecombinationPolicy recombinationPolicy
+    ZassenhausRecombinationPolicy recombinationPolicy,
+    long maxEngineWorkUnits
 ) {
+    /**
+     * Preserves the historical request-owned work authority.
+     *
+     * <p>Callers that need a stricter backend-only boundary use
+     * {@link #withMaxEngineWorkUnits(long)}. The outer request remains the
+     * authority for backend plus independent verification work.</p>
+     */
+    public NativeUnivariateFactorizationPolicy(
+        UnivariateContentPolicy contentPolicy,
+        SuitablePrimeSelectionPolicy suitablePrimePolicy,
+        ZassenhausRecombinationPolicy recombinationPolicy
+    ) {
+        this(
+            contentPolicy,
+            suitablePrimePolicy,
+            recombinationPolicy,
+            Long.MAX_VALUE
+        );
+    }
+
     public NativeUnivariateFactorizationPolicy {
         Objects.requireNonNull(contentPolicy, "contentPolicy");
         Objects.requireNonNull(
@@ -16,6 +37,11 @@ public record NativeUnivariateFactorizationPolicy(
         Objects.requireNonNull(
             recombinationPolicy,
             "recombinationPolicy");
+        if (maxEngineWorkUnits < 1L) {
+            throw new IllegalArgumentException(
+                "native engine work authority must be positive"
+            );
+        }
     }
 
     public static NativeUnivariateFactorizationPolicy boundedDefaults() {
@@ -32,6 +58,17 @@ public record NativeUnivariateFactorizationPolicy(
             ZassenhausRecombinationPolicy.boundedDefaults());
     }
 
+    public NativeUnivariateFactorizationPolicy withMaxEngineWorkUnits(
+        long maximum
+    ) {
+        return new NativeUnivariateFactorizationPolicy(
+            contentPolicy,
+            suitablePrimePolicy,
+            recombinationPolicy,
+            maximum
+        );
+    }
+
     public String canonicalMaterial() {
         StringBuilder result = new StringBuilder();
         AlgorithmEvidence.append(
@@ -43,6 +80,16 @@ public record NativeUnivariateFactorizationPolicy(
         AlgorithmEvidence.append(
             result,
             recombinationPolicy.canonicalMaterial());
+        if (maxEngineWorkUnits != Long.MAX_VALUE) {
+            AlgorithmEvidence.append(
+                result,
+                "regelsuche.native-engine-work-authority/v1"
+            );
+            AlgorithmEvidence.append(
+                result,
+                Long.toString(maxEngineWorkUnits)
+            );
+        }
         return result.toString();
     }
 }

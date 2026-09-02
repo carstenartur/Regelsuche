@@ -33,8 +33,16 @@ final class NativeUnivariateFactorizationPipeline {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(policy, "policy");
         Objects.requireNonNull(adapter, "adapter");
+        long engineWorkLimit = Math.min(
+            request.maxWorkUnits(),
+            policy.maxEngineWorkUnits()
+        );
+        FactorizationRequest<C> engineRequest = engineRequest(
+            request,
+            engineWorkLimit
+        );
         PolynomialWorkBudget work =
-            new PolynomialWorkBudget(request.maxWorkUnits());
+            new PolynomialWorkBudget(engineWorkLimit);
         ArrayList<String> certificates = new ArrayList<>();
 
         FactorizationEngine.EngineResult<C> rejected =
@@ -46,6 +54,7 @@ final class NativeUnivariateFactorizationPipeline {
         try {
             return execute(
                 request,
+                engineRequest,
                 policy,
                 adapter,
                 work,
@@ -93,13 +102,14 @@ final class NativeUnivariateFactorizationPipeline {
 
     private static <C> FactorizationEngine.EngineResult<C> execute(
         FactorizationRequest<C> request,
+        FactorizationRequest<C> engineRequest,
         NativeUnivariateFactorizationPolicy policy,
         NativeCoefficientAdapter<C> adapter,
         PolynomialWorkBudget work,
         ArrayList<String> certificates
     ) {
         UnivariateContentResult content = adapter.normalize(
-            request,
+            engineRequest,
             policy.contentPolicy(),
             work);
         certificates.add(content.certificateHash());
@@ -131,7 +141,7 @@ final class NativeUnivariateFactorizationPipeline {
 
         FactorizationRequest.StructuralLimits internalLimits =
             internalLimits(
-                request.structuralLimits(),
+                engineRequest.structuralLimits(),
                 primitive);
         PolynomialRing<ExactRational> rationalRing =
             new PolynomialRing<>(
@@ -145,7 +155,7 @@ final class NativeUnivariateFactorizationPipeline {
             SquareFreeDecomposition.decompose(
                 rationalPrimitive,
                 internalLimits,
-                remainingWork(request, work));
+                remainingWork(engineRequest, work));
         mergeWork(work, squareFree.work());
         certificates.add(squareFree.certificateHash());
         if (!squareFree.completed()) {
@@ -163,7 +173,7 @@ final class NativeUnivariateFactorizationPipeline {
             .multiply(squareFree.unit());
         ArrayList<PolynomialFactor<BigInteger>> integerFactors =
             new ArrayList<>();
-        int remainingCandidates = request.maxCandidates();
+        int remainingCandidates = engineRequest.maxCandidates();
 
         for (PolynomialFactor<ExactRational> layer :
                 squareFree.factors()) {
@@ -174,7 +184,7 @@ final class NativeUnivariateFactorizationPipeline {
                         .VERIFIED_DECOMPOSITION,
                     internalLimits,
                     remainingCandidates,
-                    request.maxWorkUnits());
+                    engineRequest.maxWorkUnits());
             UnivariateContentResult layerContent =
                 UnivariateContentNormalization.normalizeRational(
                     layerRequest,
@@ -211,7 +221,7 @@ final class NativeUnivariateFactorizationPipeline {
                 NativeSquareFreeLayerFactorization.factor(
                     layerPrimitive,
                     layerLimits,
-                    request.maxWorkUnits(),
+                    engineRequest.maxWorkUnits(),
                     policy,
                     remainingCandidates,
                     work);
@@ -289,6 +299,22 @@ final class NativeUnivariateFactorizationPipeline {
             List.of(proposal),
             FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION,
             certificates);
+    }
+
+    private static <C> FactorizationRequest<C> engineRequest(
+        FactorizationRequest<C> request,
+        long maxWorkUnits
+    ) {
+        if (maxWorkUnits == request.maxWorkUnits()) {
+            return request;
+        }
+        return new FactorizationRequest<>(
+            request.source(),
+            request.evidenceRequirement(),
+            request.structuralLimits(),
+            request.maxCandidates(),
+            maxWorkUnits
+        );
     }
 
     private static <C> FactorizationEngine.EngineResult<C> rejectInput(

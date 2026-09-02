@@ -1,158 +1,220 @@
 # Target-blinde Ausführungsgrenze der Polynomtheorie-Nutzenstudie
 
-## Status und Grenze
+## Status und Claim-Grenze
 
-Produktiv implementiert ist weiterhin nur `NO_FACTORIZATION`. Die vier
-mathematischen Profile bleiben unverbunden; Qualifikation, Candidate-Freeze und
-Produktentscheidung existieren noch nicht.
+Auf `main` stehen das Nullprofil, der 30-Run-/600-Zeilen-Runner, die typisierte
+Resultat- und Messoberfläche, die Candidate-Freeze-Verträge sowie die
+vor Ausführung eingefrorene Roh-zu-kanonisch-Arbeitsprojektion zur Verfügung.
 
-Der 30-Run-Runner und das noch nicht eingefrorene Ergebnisbatch verwenden jetzt
-durchgehend den eigenständigen
-`PolynomialTheoryUtilityCandidateResult`-Vertrag in Version 2. Der frühere
-verschachtelte v1-Ergebnisdatensatz wurde entfernt. Die Testadapter der vier
-unverbundenen Profile liefern ausschließlich klar als Testdaten markierte
-`UNSUPPORTED`-Resultate. Daraus folgt keine mathematische oder produktbezogene
-Evidenz.
+Der zugehörige native Adapter-Slice ergänzt das erste mathematisch aktive Profil:
 
-## Eingabe- und Ergebnisvertrag
+```text
+ON_DEMAND_VERIFIED_FACTORIZATION
+regelsuche.polynomial-theory-utility.on-demand-verified-factorization/v1
+```
+
+Er führt alle 20 sichtbaren Formation-Fälle an allen sechs Checkpoints durch die
+vorhandene target-blinde Run-Grenze. Das ist noch kein vollständiger
+Studienlauf: Cache-, Quartikkontroll- und optionaler externer Adapter fehlen,
+der 600-Zeilen-Candidate-Freeze wurde noch nicht erzeugt und die Qualifikation
+bleibt versiegelt. Daraus folgt weder eine Produktentscheidung noch eine
+Behauptung zusätzlicher mathematischer Reichweite oder historischer
+Wiederentdeckung.
+
+## Eingabe-, Run- und Ergebnisvertrag
 
 `PolynomialTheoryUtilityProfileAdapter` erhält ausschließlich einen gebundenen
-Run-Deskriptor, eine target-blinde Eingabe und deren sichtbaren Formationsfall.
-Jeder Run liefert ein `PolynomialTheoryUtilityCandidateResult`. Dieses bindet:
+Run-Deskriptor, eine target-blinde Eingabe und den positionsgleichen sichtbaren
+Formationsfall. Der native Adapter löst beim Öffnen eines Runs dessen vollständige
+20 Eingaben aus dem content-adressierten Freeze auf. Jede Eingabe muss exakt an
+der nächsten eingefrorenen Position stehen. Der Run kann nur nach allen 20 Fällen
+geschlossen werden.
 
-- den vollständigen wertgleichen Eingang aus der eingefrorenen 600-Zeilen-Matrix,
+`PolynomialTheoryUtilityMeasuredExecution` bleibt der einzige Matrixexecutor.
+Ein mathematisch aktiver Adapter liefert atomar:
+
+- ein `PolynomialTheoryUtilityCandidateResult`,
+- die dazugehörigen Übergangsspuren,
+- alle ausgeführten Faktorisierungsversuche,
+- alle Cacheereignisse des Profils.
+
+Fehlende, doppelte, fremde oder nicht zum Resultat passende Messungen werden
+abgewiesen. Ein Resultat mit Arbeit oder Übergängen darf nicht über die
+Zero-Observation-Abkürzung eingeschleust werden.
+
+Der Resultatvertrag bindet:
+
+- den vollständigen wertgleichen Eingang aus der 600-Zeilen-Matrix,
 - die unveränderte Quellwurzel aus dem Formation-Korpus,
 - terminalen Status und Detailcode,
-- einen typisierten Arbeitsvektor,
-- die geordnete Liste occurrence-gebundener Übergänge,
-- das Ergebnis der unabhängigen Verifikation.
+- den typisierten kanonischen Arbeitsvektor,
+- occurrence-gebundene Übergänge in stabiler Pfadreihenfolge,
+- das unabhängige Verifikationsergebnis.
 
-Der Nulladapter verlässt sich nicht nur auf sichtbare IDs. Beim Öffnen eines
-Runs löst er dessen vollständige 20 Eingaben aus dem content-adressierten
-600-Zeilen-Freeze auf. An jeder Position muss der übergebene Record exakt mit
-der eingefrorenen Eingabe übereinstimmen. Ein syntaktisch gültiger Umschlag, der
-beispielsweise eine echte `inputId` wiederverwendet, aber `rowId` oder Budgets
-verändert, wird vor der Ausführung abgewiesen und verbraucht keine Run-Position.
+`VALIDATED_TRANSITION` erfordert mindestens einen verifizierten Übergang. Alle
+anderen terminalen Status dürfen keine Übergangsautorität behalten:
+`NO_TRANSITION`, `UNSUPPORTED`, `BUDGET_INCONCLUSIVE` und
+`TECHNICAL_FAILURE`.
 
-Der Ergebnisvertrag prüft primitive, mechanische und
-Faktorisierungsarbeitsgrenzen sowie die komponentenweise Deckung sämtlicher
-lokaler Übergangsarbeit. `VALIDATED_TRANSITION` erfordert mindestens einen
-typisierten Übergang und `VERIFIED`. Alle anderen Status dürfen keine
-Übergangsautorität behalten. Weitere Status sind `NO_TRANSITION`,
-`UNSUPPORTED`, `BUDGET_INCONCLUSIVE` und `TECHNICAL_FAILURE`.
+## Exakter nativer Ausführungspfad
 
-## Nullprofil
-
-Der Adapter
+Der On-Demand-Adapter verwendet keine zweite Faktorisierungsimplementierung und
+keinen versteckten Zielausdruck. Für jedes zugelassene Vorkommen lautet der
+Pfad:
 
 ```text
-regelsuche.polynomial-theory-utility.no-factorization/v1
+parser-issued ExactParsedTerm
+  -> frozen occurrence plan in numeric TreePosition order
+  -> exact source-bound subterm projection
+  -> ExactParsedUnivariatePolynomialView over Q[x]
+  -> native rational univariate factorization engine
+  -> common FactorizationVerifier with exact product reconstruction
+  -> deterministic exact factor rendering
+  -> exact reparse and polynomial reconstruction
+  -> verifier-authorized TreePosition replacement
+  -> structural replay and certificate
+  -> typed transition, trace, attempt and work projection
 ```
 
-akzeptiert nur die sechs berechneten Baseline-Run-Identitäten und je 20 Fälle in
-Formationsreihenfolge. Alle 120 Ergebnisse lauten:
+Die native Engine erhält eine eigene, nicht rücksetzbare
+`maxEngineWorkUnits`-Grenze aus dem Faktorisierungsanteil des konkreten
+Vorkommens. Die äußere Pipeline behält weiterhin ihre Verifikations-, Rendering-,
+Reparse-, Rekonstruktions- und Replayautorität. Ein externer Backendwechsel ist
+in diesem Profil verboten.
+
+Positive und negative Verifierberichte werden retained. Nicht unterstützte
+multivariate Ausdrücke, rationale Funktionen und symbolische Exponenten werden
+nicht durch SymPy oder einen anderen Solver ersetzt.
+
+## Versionierte Zulassung vor Ausführung
+
+Die Ausführung verwendet keine nach Betrachtung mathematischer Resultate gewählte
+Magic Number. `PolynomialTheoryUtilityOnDemandAdmissionPolicy/v1` rekonstruiert
+die Zulassungsgrenze ausschließlich aus bereits versiegelten sichtbaren Daten:
+
+1. Es werden die 20 On-Demand-Zeilen am Checkpoint `CP06_FULL` gebunden.
+2. Die zwei schon im sichtbaren `caseId` als `-tiny-budget` markierten
+   Negativkontrollen werden ausgeschlossen.
+3. Die übrigen Zeilen werden mit dem eingefrorenen Occurrence-Plan in ihre
+   konkreten Vorkommensautoritäten zerlegt.
+4. Das Minimum über 22 sichtbare Vorkommen wird eingefroren:
 
 ```text
-NO_TRANSITION / FACTORIZATION_DISABLED_BY_FROZEN_PROFILE
-all typed work dimensions = 0
-transitions = []; verifier = NOT_REQUESTED
+minimumMechanicalAuthority    = 256
+minimumFactorizationAuthority = 16
 ```
 
-Jedes Resultat enthält zusätzlich die exakte Quellwurzel seines
-Formation-Falls. Ungenutztes Budget wird weder berechnet noch umverteilt.
+Die Policy bindet Formation-Hash, Execution-Plan-Hash, Ausschlussregel,
+Vorkommensanzahl und beide Minima in einer eigenen SHA-256-Identität. Ändert sich
+einer dieser Werte ohne Revisionswechsel, schlägt die Initialisierung fehl.
 
-## Exaktes Adapterinventar
+Zulassung erfolgt pro Zeile **all-or-none**. Sobald ein vorgesehenes Vorkommen
+die Policy nicht erfüllt, endet die gesamte Zeile vor Parser- und
+Faktorisierungsausführung als `BUDGET_INCONCLUSIVE`. Damit kann ein erfolgreicher
+Teil einer wiederholten Struktur kein anderes ausgelassenes Vorkommen
+überdecken. Die Policy-Identität ist Bestandteil jedes Resultatdetailcodes; bei
+erfolgreichen Übergängen wird sie zusätzlich in der retaineden Ausführungsspur
+gebunden.
 
-`PolynomialTheoryUtilityProfileAdapter.AdapterRegistry` akzeptiert genau einen
-Adapter für jedes der fünf vorab registrierten Profil-/Adapter-Paare. Fehlende,
-zusätzliche, doppelte oder unter einem anderen Profil eingesetzte Adapter werden
-vor der ersten Ausführung abgelehnt.
+Die Vorentscheidung verbraucht keine mathematische Transformationsarbeit: Sie
+wertet nur bereits eingefrorene Eingabefelder und den content-adressierten
+Occurrence-Plan aus. Deshalb bleibt ein vor Ausführung abgewiesenes Resultat im
+kanonischen Arbeitsvektor bei null, ist aber über Policy-Hash und Detailcode
+vollständig erklärbar.
 
-Unabhängig von der Reihenfolge des Aufrufers speichert die Registry die Adapter
-in der eingefrorenen Profilreihenfolge. Damit bleiben spätere Iteration,
-Berichterstattung und Artefaktbildung deterministisch.
+## Vollständige Roharbeitsprojektion
 
-## Run-major Ausführung
+Die produktive Pipeline führt einen nicht rücksetzbaren
+`PolynomialWorkLedger`. `PolynomialTheoryUtilityRawWorkPartitioner` ordnet jede
+Stage genau einer vorab eingefrorenen Studienkomponente zu. Die Segmente müssen
+den vollständigen Ledger exakt rekonstruieren.
 
-`PolynomialTheoryUtilityProfileAdapter.TargetBlindRunner` konsumiert nur das
-content-adressierte Ausführungseingabeartefakt:
+Explizit getrennt bleiben:
+
+- Matching und Positionsprüfung,
+- Quell- und Literalvalidierung,
+- native Faktorisierung,
+- unabhängige Verifikation,
+- Rendering, Reparse und Rekonstruktion,
+- occurrence-gebundene Ersetzung und Replay,
+- Lookup, Insert, Eviction und Replay eines Caches,
+- Konstruktion der Studien-Evidenz.
+
+Unbekannte native Stages verschwinden nicht. Sie werden konservativ eins zu eins
+als Faktorisierungsarbeit gezählt. Die versionierte kanonische Projektion hebt nur
+die vorab dokumentierten Implementierungsmultiplikatoren mit Aufrundung auf. Der
+projizierte Vektor muss innerhalb der primitiven, mechanischen und
+Faktorisierungsautorität der konkreten Eingabe bleiben.
+
+Für das On-Demand-Profil sind sämtliche Cache-Dimensionen null und jeder
+Übergang trägt `CACHE_DISABLED`.
+
+## Wiederholte Vorkommen
+
+Der Formation-Korpus enthält Wurzel-, verschachtelte, zwei identische und vier
+identische Vorkommen. Der Occurrence-Plan teilt primitive, mechanische und
+Faktorisierungsautorität deterministisch auf und verteilt Restwerte in
+kanonischer Pfadreihenfolge.
+
+Jedes zugelassene Vorkommen wird unabhängig gegen die unveränderte Quellwurzel
+ausgeführt. Das Resultat bewahrt Übergänge und Faktorisierungsversuche in
+numerischer `TreePosition`-Reihenfolge. Für einen validierten wiederholten Fall
+muss die Zahl der Übergänge exakt der Zahl der vorgesehenen Vorkommen
+entsprechen.
+
+## Matrixcharakterisierung
+
+Die Profilprüfung führt aus:
 
 ```text
-5 Profile × 6 Checkpoints × 20 Fälle = 600 Eingaben
+1 Profil × 6 Checkpoints × 20 Formation-Fälle = 120 Resultate
 ```
 
-Der Eingabeartefakt-Vertrag bindet die vollständigen kanonischen Bytes und weist
-jede veränderte Zeile oder Reihenfolge zurück. Der Runner öffnet für jeden der
-30 zusammenhängenden Runs genau eine Adapter-Session. Die 20 Eingaben müssen
-dieselbe Run-, Profil-, Checkpoint- und Adapteridentität besitzen und der
-eingefrorenen Formationsreihenfolge folgen.
+Geprüft werden unter anderem:
 
-Jedes Ergebnis wird unmittelbar gegen den exakten Input-Record und den
-positionsgleichen Formation-Fall geprüft. Damit können weder eine fremde
-Eingabe noch eine andere Quellwurzel unbemerkt in das Batch gelangen.
+- genau sechs vollständige Run-Lebenszyklen mit je 20 Fällen,
+- eindeutige Resultatidentitäten,
+- Resultat-/Messungs-Rebinding,
+- integer- und rationalkoeffiziente Faktorisierungen,
+- negative beziehungsweise irreduzible Verifierberichte,
+- unsupported und budget-inconclusive Ausgänge,
+- verschachtelte und wiederholte Vorkommen in Pfadreihenfolge,
+- vollständige Übergangs- und Versuchszahl bei Wiederholung,
+- komponentenweise Budgeteinhaltung,
+- null Cachearbeit und keine Cacheereignisse,
+- keine technischen Terminalfehler in der eingefrorenen 120-Zeilen-Matrix.
 
-Eine Adapterausnahme erzeugt kein partielles Batch und wird nicht automatisch
-als mathematisches Resultat umgedeutet. `try`-with-resources schließt die aktive
-Session; ein zusätzlicher Schließfehler bleibt als unterdrückte Ausnahme am
-ursprünglichen Fehler erhalten. Ein technischer Studienausgang muss vom Adapter
-ausdrücklich als `TECHNICAL_FAILURE` geliefert werden.
-
-## Noch nicht eingefrorenes Ergebnisbatch
-
-`PolynomialTheoryUtilityProfileAdapter.CandidateBatch` bewahrt exakt 600
-geordnete, eindeutige und an Eingabe plus Formation gebundene v2-Resultate. Sein
-Schema lautet:
-
-```text
-regelsuche.polynomial-theory-utility-candidate-batch/v2
-```
-
-Der Status bleibt:
-
-```text
-TARGET_BLIND_RESULTS_COLLECTED_NOT_FROZEN
-```
-
-Das Batch bindet Inhaltsadresse und Bytelänge der Ausführungseingaben, besitzt
-aber bewusst noch keine eigene kanonische JSON-Darstellung oder öffentliche
-SHA-256-Identität. Es ist die einheitliche Pre-Freeze-Ausführungsgrenze, aber
-noch nicht die vollständige vorregistrierte Messoberfläche. Der entfernte
-aggregierte v1-Datensatz ist keine zulässige Zwischenautorität mehr.
+Die Prüfung fordert bewusst mehrere terminale Kategorien; ein Adapter, der alle
+Zeilen pauschal in denselben Status überführt, besteht sie nicht.
 
 ## Verifikation
 
 ```bash
 ./gradlew :regelsuche-experiments:test \
-  --tests de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityNoFactorizationAdapterTest
+  --tests de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityOnDemandAdmissionPolicyTest \
+  --tests de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityOnDemandOccurrencePlanTest \
+  --tests de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityRawWorkPartitionerTest
+
+./gradlew :app:test \
+  --tests de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapterTest \
+  --tests de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityOnDemandProfileMatrixTest
 ```
 
-Die Tests decken ab:
+Die geschützten Repository-Autoritäten bleiben zusätzlich maßgeblich:
+Checkout-lokales Gradle, vollständiger Maven-/Docker-Vertrag, isolierte
+SymPy-Laufzeit und isoliertes JMH.
 
-- alle sechs Nullprofil-Runs und 120 eindeutige Zero-Work-v2-Resultate;
-- Eingabe-, Formation- und Quellwurzelbindung jedes Resultats;
-- Reihenfolge, erfundene Run-Hashes, Session-Lebenszyklus, Budgetfehler und
-  Rebinding;
-- einen gefälschten Eingabeumschlag mit wiederverwendeter `inputId`;
-- 30 exakt gebundene, geöffnete und geschlossene Sessions;
-- 600 Eingaben und Resultate in unveränderter Reihenfolge;
-- fehlende, doppelte und falsch profilierte Adapter sowie deterministische
-  Registry-Reihenfolge;
-- Null- und an fremde Eingaben gebundene Resultate;
-- Session-Cleanup und unterdrückte Schließfehler;
-- Unveränderlichkeit des Ergebnisbatches.
+## Nächste Evidenzschritte
 
-## Nächster Evidenzschritt
+Vor Öffnung der Qualifikation müssen noch folgen:
 
-Vor einer Candidate-Freeze folgt ein eigener typisierter Mess-Slice. Er muss die
-noch fehlenden vorregistrierten Dimensionen binden und gegen Resultat,
-Übergänge und Profil revalidieren, insbesondere:
+1. `VERIFIED_DERIVED_MACRO_CACHE` mit exakter Cachelineage,
+2. `SPECIALIZED_BINARY_QUARTIC_CONTROL`,
+3. `OPTIONAL_EXTERNAL_VERIFIED_FACTORIZATION`,
+4. eine vollständige Registry für alle fünf Profile,
+5. target-blinde Ausführung und content-adressierter Freeze aller 600 Resultate
+   samt Messbegleitern,
+6. erst danach Qualifikationsöffnung, Vergleich, Kontrollen und Reproduktionen.
 
-- Faktorisierungsanfragen und erzeugte Kandidaten,
-- Pfadtiefe, primitive Expansionslänge und geordnete Primitive-Lineage,
-- Quell- und Ergebnis-AST-Größen,
-- Cache-Hits, -Misses, -Einfügungen und -Verdrängungen,
-- normalisierte Annahmen und weitere Lineage-Identitäten.
-
-Erst danach darf eine kanonische Candidate-Freeze den vollständigen
-Resultatvertrag serialisieren. Anschließend werden native On-Demand-, Cache-,
-Quartikkontroll- und optionale SymPy-Adapter einzeln angebunden.
+Eine Produktvoreinstellung darf erst aus der versionierten Abschlussentscheidung
+der vollständigen Studie abgeleitet werden.
