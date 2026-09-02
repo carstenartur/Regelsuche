@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
-      - name: Create source archive
+      - name: Create source archive outside the checkout
         shell: bash
         run: |
           set -euo pipefail
@@ -25,12 +25,11 @@ jobs:
             --exclude=.git \
             --exclude='**/build' \
             --exclude='**/.gradle' \
-            --exclude='pr861-source-snapshot.tar.gz' \
-            -czf pr861-source-snapshot.tar.gz .
+            -czf "$RUNNER_TEMP/pr861-source-snapshot.tar.gz" .
       - name: Retain source archive
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: pr861-source-snapshot
-          path: pr861-source-snapshot.tar.gz
+          path: ${{ runner.temp }}/pr861-source-snapshot.tar.gz
           if-no-files-found: error
           retention-days: 1
