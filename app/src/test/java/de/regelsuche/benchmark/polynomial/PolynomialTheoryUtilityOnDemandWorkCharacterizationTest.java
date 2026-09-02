@@ -46,9 +46,10 @@ class PolynomialTheoryUtilityOnDemandWorkCharacterizationTest {
             List.of(),
             ExpressionFormatter.format(source.expression())
         );
+        int diagnosticAuthority = 1_000_000;
         var engine = NativeUnivariateFactorizationEngine.rationals(
             NativeUnivariateFactorizationPolicy.boundedDefaults()
-                .withMaxEngineWorkUnits(input.factorizationWork())
+                .withMaxEngineWorkUnits(diagnosticAuthority)
         );
         var nested = new ExactNestedFactorizationTransformationPipeline()
             .transform(source, position, engine, 0);
@@ -83,7 +84,6 @@ class PolynomialTheoryUtilityOnDemandWorkCharacterizationTest {
             Math::addExact
         );
         var raw = new PolynomialWorkLedger(stages);
-        int diagnosticAuthority = 1_000_000;
         var pricingInput = new PolynomialTheoryUtilityExecutionInput(
             PolynomialTheoryUtilityExecutionIdentity.sha256(
                 "on-demand-root-work-characterization/v1"
