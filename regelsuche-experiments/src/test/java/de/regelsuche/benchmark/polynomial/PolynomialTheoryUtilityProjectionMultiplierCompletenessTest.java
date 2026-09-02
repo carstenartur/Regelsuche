@@ -49,6 +49,22 @@ class PolynomialTheoryUtilityProjectionMultiplierCompletenessTest {
     }
 
     @Test
+    void rejectsProjectorLiteralCountWithoutItsCompanionWork() {
+        var matching = ledger(
+            "projection.revalidation-literal-bindings",
+            1L
+        );
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> PolynomialTheoryUtilityCanonicalWorkProjection.project(
+                input(),
+                matchingOnly(matching)
+            )
+        );
+    }
+
+    @Test
     void rejectsProjectorLiteralWorkThatCannotBeDecodedExactly() {
         var matching = ledger(
             "projection.revalidation-literal-bindings", 2L,
