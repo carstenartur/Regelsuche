@@ -1,4 +1,4 @@
-name: Apply PR 861 projected work authority v4
+name: Characterize PR 861 projected work authority
 
 on:
   push:
@@ -8,17 +8,18 @@ on:
       - tools/apply_pr861_projected_work_v4.py
       - tools/patch_pr861_authority_diagnostics.py
       - tools/patch_pr861_root_identity_projection.py
+      - tools/patch_pr861_formation_characterization.py
       - .github/workflows/apply-pr861-projected-work-v4.yml
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: pr861-projected-work-bootstrap-v4
-  cancel-in-progress: false
+  group: pr861-projected-work-characterization
+  cancel-in-progress: true
 
 jobs:
-  apply-test-and-clean:
+  characterize:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
@@ -35,41 +36,56 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Apply the projected-work implementation
+      - name: Apply the candidate implementation and diagnostic test
         run: |
           python3 tools/apply_pr861_projected_work_v4.py
           python3 tools/patch_pr861_root_identity_projection.py
           python3 tools/patch_pr861_authority_diagnostics.py
+          python3 tools/patch_pr861_formation_characterization.py
 
-      - name: Compile and run affected regression tests
+      - name: Execute all 120 visible formation rows
         run: >-
           mvn --batch-mode --no-transfer-progress
           -pl app -am
-          -Dtest=ExactParsedSubtermProjectorTest,ExactNestedFactorizationTransformationPipelineTest,PolynomialWorkProjectionTest,PolynomialWorkBudgetProjectionTest,NativeUnivariateEngineWorkAuthorityTest,PolynomialTheoryUtilityRuntimeProjectionParityTest,PolynomialTheoryUtilityTerminalStatusTest,PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapterTest,PolynomialTheoryUtilityOnDemandProfileMatrixTest
+          -Dtest=PolynomialTheoryUtilityOnDemandFormationCharacterizationTest
           -Dsurefire.failIfNoSpecifiedTests=false
           test
 
-      - name: Commit verified source and remove bootstrap artifacts
+      - name: Show compact characterization summary
         run: |
-          rm -f tools/apply_pr861_projected_work.py
-          rm -f tools/apply_pr861_projected_work_v2.py
-          rm -f tools/apply_pr861_projected_work_v3.py
-          rm -f tools/apply_pr861_projected_work_v4.py
-          rm -f tools/patch_pr861_authority_diagnostics.py
-          rm -f tools/patch_pr861_root_identity_projection.py
-          rm -f tools/.apply_pr861_projected_work_runtime.py
-          rm -f .github/workflows/apply-pr861-projected-work.yml
-          rm -f .github/workflows/apply-pr861-projected-work-v3.yml
-          rm -f .github/workflows/apply-pr861-projected-work-v4.yml
-          rm -f tools/_connector_local_path_probe.txt
-          rm -f tools/pr861-bootstrap-failure.log
-          git add -A
-          git diff --cached --check
-          if git diff --cached --quiet; then
-            echo 'No source changes remained after verification.'
-            exit 1
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'Enforce projected native polynomial work authority'
-          git push origin HEAD:feature/748-on-demand-verified-factorization-adapter-v2
+          python3 - <<'PY'
+          import csv
+          from collections import Counter, defaultdict
+          from pathlib import Path
+
+          path = Path('build/reports/pr861-formation-characterization.tsv')
+          rows = list(csv.DictReader(path.open(encoding='utf-8'), delimiter='\t'))
+          print(f'rows={len(rows)}')
+          print('kind=' + repr(Counter(row['kind'] for row in rows)))
+          print('terminal=' + repr(Counter(row['terminalStatus'] for row in rows if row['terminalStatus'])))
+          by_checkpoint = defaultdict(Counter)
+          for row in rows:
+              outcome = row['terminalStatus'] or row['kind']
+              by_checkpoint[row['checkpoint']][outcome] += 1
+          for checkpoint, counts in by_checkpoint.items():
+              print(f'{checkpoint}={dict(counts)}')
+          print('CP06_ROWS')
+          for row in rows:
+              if row['checkpoint'] == 'CP06_FULL':
+                  print(
+                      row['case'],
+                      row['terminalStatus'] or row['kind'],
+                      row['mechanicalAuthority'],
+                      row['factorizationAuthority'],
+                      row['detail'] or row['error'],
+                      sep='\t',
+                  )
+          PY
+
+      - name: Upload the complete formation map
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pr861-formation-characterization
+          path: build/reports/pr861-formation-characterization.tsv
+          if-no-files-found: error
+          retention-days: 7
