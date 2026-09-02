@@ -1,0 +1,68 @@
+name: Apply PR 861 projected work authority v4
+
+on:
+  push:
+    branches:
+      - feature/748-on-demand-verified-factorization-adapter-v2
+    paths:
+      - tools/apply_pr861_projected_work_v4.py
+      - .github/workflows/apply-pr861-projected-work-v4.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr861-projected-work-bootstrap-v4
+  cancel-in-progress: false
+
+jobs:
+  apply-test-and-clean:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out the PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feature/748-on-demand-verified-factorization-adapter-v2
+          fetch-depth: 0
+
+      - name: Set up Java 25
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Apply the projected-work implementation
+        run: python3 tools/apply_pr861_projected_work_v4.py
+
+      - name: Compile and run affected regression tests
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -pl app -am
+          -Dtest=PolynomialWorkProjectionTest,PolynomialWorkBudgetProjectionTest,NativeUnivariateEngineWorkAuthorityTest,PolynomialTheoryUtilityRuntimeProjectionParityTest,PolynomialTheoryUtilityTerminalStatusTest,PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapterTest,PolynomialTheoryUtilityOnDemandProfileMatrixTest
+          -Dsurefire.failIfNoSpecifiedTests=false
+          test
+
+      - name: Commit verified source and remove bootstrap artifacts
+        run: |
+          rm -f tools/apply_pr861_projected_work.py
+          rm -f tools/apply_pr861_projected_work_v2.py
+          rm -f tools/apply_pr861_projected_work_v3.py
+          rm -f tools/apply_pr861_projected_work_v4.py
+          rm -f tools/.apply_pr861_projected_work_runtime.py
+          rm -f .github/workflows/apply-pr861-projected-work.yml
+          rm -f .github/workflows/apply-pr861-projected-work-v3.yml
+          rm -f .github/workflows/apply-pr861-projected-work-v4.yml
+          rm -f tools/_connector_local_path_probe.txt
+          rm -f tools/pr861-bootstrap-failure.log
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No source changes remained after verification.'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Enforce projected native polynomial work authority'
+          git push origin HEAD:feature/748-on-demand-verified-factorization-adapter-v2
