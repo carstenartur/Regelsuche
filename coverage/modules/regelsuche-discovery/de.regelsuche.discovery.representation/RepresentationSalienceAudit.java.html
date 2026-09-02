@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationSalienceAudit.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationSalienceAudit.java</span></div><h1>RepresentationSalienceAudit.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation
+    .RepresentationDiscoveryRunContractSupport.append;
+import static de.regelsuche.discovery.representation
+    .RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation
+    .RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation
+    .RepresentationDiscoveryRunContractSupport.sha256;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Content-addressed localization of representation-detection failure stages.
+ *
+ * &lt;p&gt;The audit is bound to an existing immutable representation-discovery run
+ * workspace. It does not create a competing run identity.&lt;/p&gt;
+ */
+public record RepresentationSalienceAudit(
+    String schema,
+    String studyId,
+    String repositoryRevision,
+    String runWorkspaceHash,
+    String informationBoundaryHash,
+    List&lt;RepresentationSalienceCaseAudit&gt; cases,
+    RepresentationSalienceSummary summary,
+    String claimBoundary,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.representation-salience-audit/v1&quot;;
+    public static final String CLAIM_BOUNDARY =
+        &quot;Bounded target-free representation detection recall and failure-stage &quot;
+            + &quot;localization; not global reachability, universal &quot;
+            + &quot;interestingness, external novelty or representation optimality.&quot;;
+
+<span class="fc" id="L42">    public RepresentationSalienceAudit {</span>
+<span class="fc" id="L43">        schema = requireText(schema, &quot;schema&quot;);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(</span>
+                &quot;unsupported salience-audit schema&quot;
+            );
+        }
+<span class="fc" id="L49">        studyId = requireText(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L50">        repositoryRevision = requireText(</span>
+            repositoryRevision,
+            &quot;repositoryRevision&quot;
+        );
+<span class="fc" id="L54">        runWorkspaceHash = requireSha256(</span>
+            runWorkspaceHash,
+            &quot;runWorkspaceHash&quot;
+        );
+<span class="fc" id="L58">        informationBoundaryHash = requireSha256(</span>
+            informationBoundaryHash,
+            &quot;informationBoundaryHash&quot;
+        );
+<span class="fc" id="L62">        cases = orderedCases(cases);</span>
+<span class="fc" id="L63">        RepresentationSalienceSummary expectedSummary =</span>
+<span class="fc" id="L64">            RepresentationSalienceSummary.derive(cases);</span>
+<span class="fc" id="L65">        summary = Objects.requireNonNull(summary, &quot;summary&quot;);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (!summary.equals(expectedSummary)) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(</span>
+                &quot;salience-audit summary differs from cases&quot;
+            );
+        }
+<span class="fc" id="L71">        claimBoundary = requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (!CLAIM_BOUNDARY.equals(claimBoundary)) {</span>
+<span class="nc" id="L73">            throw new IllegalArgumentException(</span>
+                &quot;unsupported salience-audit claim boundary&quot;
+            );
+        }
+<span class="fc" id="L77">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L78">        String expected = artifactHash(</span>
+            studyId,
+            repositoryRevision,
+            runWorkspaceHash,
+            informationBoundaryHash,
+            cases,
+            summary
+        );
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L87">            throw new IllegalArgumentException(</span>
+                &quot;salience-audit content hash mismatch&quot;
+            );
+        }
+<span class="fc" id="L91">    }</span>
+
+    /** Creates an audit bound to an existing run and information boundary. */
+    public static RepresentationSalienceAudit create(
+        String studyId,
+        String repositoryRevision,
+        String runWorkspaceHash,
+        String informationBoundaryHash,
+        List&lt;RepresentationSalienceCaseAudit&gt; cases
+    ) {
+<span class="fc" id="L101">        String retainedStudyId = requireText(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L102">        String retainedRevision = requireText(</span>
+            repositoryRevision,
+            &quot;repositoryRevision&quot;
+        );
+<span class="fc" id="L106">        String retainedWorkspace = requireSha256(</span>
+            runWorkspaceHash,
+            &quot;runWorkspaceHash&quot;
+        );
+<span class="fc" id="L110">        String retainedBoundary = requireSha256(</span>
+            informationBoundaryHash,
+            &quot;informationBoundaryHash&quot;
+        );
+<span class="fc" id="L114">        List&lt;RepresentationSalienceCaseAudit&gt; retainedCases = orderedCases(</span>
+            cases
+        );
+<span class="fc" id="L117">        RepresentationSalienceSummary summary =</span>
+<span class="fc" id="L118">            RepresentationSalienceSummary.derive(retainedCases);</span>
+<span class="fc" id="L119">        String contentHash = artifactHash(</span>
+            retainedStudyId,
+            retainedRevision,
+            retainedWorkspace,
+            retainedBoundary,
+            retainedCases,
+            summary
+        );
+<span class="fc" id="L127">        return new RepresentationSalienceAudit(</span>
+            SCHEMA,
+            retainedStudyId,
+            retainedRevision,
+            retainedWorkspace,
+            retainedBoundary,
+            retainedCases,
+            summary,
+            CLAIM_BOUNDARY,
+            contentHash
+        );
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L141">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L142">            .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L143">            .property(&quot;studyId&quot;, studyId)</span>
+<span class="fc" id="L144">            .property(&quot;repositoryRevision&quot;, repositoryRevision)</span>
+<span class="fc" id="L145">            .property(&quot;runWorkspaceHash&quot;, runWorkspaceHash)</span>
+<span class="fc" id="L146">            .property(&quot;informationBoundaryHash&quot;, informationBoundaryHash)</span>
+<span class="fc" id="L147">            .array(&quot;cases&quot;, array -&gt; cases.forEach(value -&gt;</span>
+<span class="fc" id="L148">                array.objectValue(value::writeJson)))</span>
+<span class="fc" id="L149">            .object(&quot;summary&quot;, summary::writeJson)</span>
+<span class="fc" id="L150">            .property(&quot;claimBoundary&quot;, claimBoundary)</span>
+<span class="fc" id="L151">            .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L152">            .endObject()</span>
+<span class="fc" id="L153">            .toString();</span>
+    }
+
+    private static List&lt;RepresentationSalienceCaseAudit&gt; orderedCases(
+        List&lt;RepresentationSalienceCaseAudit&gt; cases
+    ) {
+<span class="fc" id="L159">        List&lt;RepresentationSalienceCaseAudit&gt; result = List.copyOf(</span>
+<span class="fc" id="L160">            Objects.requireNonNull(cases, &quot;cases&quot;)</span>
+<span class="fc" id="L161">        ).stream()</span>
+<span class="fc" id="L162">            .map(value -&gt; Objects.requireNonNull(value, &quot;case&quot;))</span>
+<span class="fc" id="L163">            .sorted(Comparator.comparing(</span>
+                RepresentationSalienceCaseAudit::caseId))
+<span class="fc" id="L165">            .toList();</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (result.isEmpty()) {</span>
+<span class="nc" id="L167">            throw new IllegalArgumentException(&quot;audit cases must not be empty&quot;);</span>
+        }
+<span class="fc" id="L169">        if (new HashSet&lt;&gt;(result.stream()</span>
+<span class="fc" id="L170">                .map(RepresentationSalienceCaseAudit::caseId)</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                .toList()).size() != result.size()) {</span>
+<span class="nc" id="L172">            throw new IllegalArgumentException(&quot;audit case IDs must be unique&quot;);</span>
+        }
+<span class="fc" id="L174">        return result;</span>
+    }
+
+    private static String artifactHash(
+        String studyId,
+        String repositoryRevision,
+        String runWorkspaceHash,
+        String informationBoundaryHash,
+        List&lt;RepresentationSalienceCaseAudit&gt; cases,
+        RepresentationSalienceSummary summary
+    ) {
+<span class="fc" id="L185">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L186">        append(descriptor, SCHEMA);</span>
+<span class="fc" id="L187">        append(descriptor, studyId);</span>
+<span class="fc" id="L188">        append(descriptor, repositoryRevision);</span>
+<span class="fc" id="L189">        append(descriptor, runWorkspaceHash);</span>
+<span class="fc" id="L190">        append(descriptor, informationBoundaryHash);</span>
+<span class="fc" id="L191">        append(descriptor, Integer.toString(cases.size()));</span>
+<span class="fc" id="L192">        cases.forEach(value -&gt; value.appendIdentity(descriptor));</span>
+<span class="fc" id="L193">        summary.appendIdentity(descriptor);</span>
+<span class="fc" id="L194">        append(descriptor, CLAIM_BOUNDARY);</span>
+<span class="fc" id="L195">        return sha256(descriptor.toString());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

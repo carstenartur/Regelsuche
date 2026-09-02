@@ -1,0 +1,513 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationSalienceCaseAudit.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationSalienceCaseAudit.java</span></div><h1>RepresentationSalienceCaseAudit.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation
+    .RepresentationDiscoveryRunContractSupport.append;
+import static de.regelsuche.discovery.representation
+    .RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation
+    .RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation
+    .RepresentationDiscoveryRunContractSupport.sha256;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Objects;
+
+/** One case localized to the first stage that lost a relevant representation. */
+public record RepresentationSalienceCaseAudit(
+    String caseId,
+    CaseRole role,
+    ReferenceReachability referenceReachability,
+    String oracleEvidenceHash,
+    String searchTraceHash,
+    String candidateFormationHash,
+    String candidateRetentionHash,
+    String recognitionEvidenceHash,
+    String rankingEvidenceHash,
+    String expertReviewEvidenceHash,
+    RepresentationSalienceStageSet reached,
+    RepresentationSalienceStageSet formed,
+    RepresentationSalienceStageSet retained,
+    RepresentationSalienceStageSet recognized,
+    RepresentationSalienceStageSet ranked,
+    int rankingCutoff,
+    ExpertVerdict expertVerdict,
+    Localization localization,
+    String contentHash
+) {
+<span class="fc" id="L37">    public RepresentationSalienceCaseAudit {</span>
+<span class="fc" id="L38">        caseId = requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L39">        role = Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L40">        referenceReachability = Objects.requireNonNull(</span>
+            referenceReachability,
+            &quot;referenceReachability&quot;
+        );
+<span class="fc" id="L44">        oracleEvidenceHash = requireSha256(</span>
+            oracleEvidenceHash,
+            &quot;oracleEvidenceHash&quot;
+        );
+<span class="fc" id="L48">        searchTraceHash = requireSha256(searchTraceHash, &quot;searchTraceHash&quot;);</span>
+<span class="fc" id="L49">        candidateFormationHash = requireSha256(</span>
+            candidateFormationHash,
+            &quot;candidateFormationHash&quot;
+        );
+<span class="fc" id="L53">        candidateRetentionHash = requireSha256(</span>
+            candidateRetentionHash,
+            &quot;candidateRetentionHash&quot;
+        );
+<span class="fc" id="L57">        recognitionEvidenceHash = requireSha256(</span>
+            recognitionEvidenceHash,
+            &quot;recognitionEvidenceHash&quot;
+        );
+<span class="fc" id="L61">        rankingEvidenceHash = requireSha256(</span>
+            rankingEvidenceHash,
+            &quot;rankingEvidenceHash&quot;
+        );
+<span class="fc" id="L65">        expertReviewEvidenceHash = requireSha256(</span>
+            expertReviewEvidenceHash,
+            &quot;expertReviewEvidenceHash&quot;
+        );
+<span class="fc" id="L69">        reached = Objects.requireNonNull(reached, &quot;reached&quot;);</span>
+<span class="fc" id="L70">        formed = Objects.requireNonNull(formed, &quot;formed&quot;);</span>
+<span class="fc" id="L71">        retained = Objects.requireNonNull(retained, &quot;retained&quot;);</span>
+<span class="fc" id="L72">        recognized = Objects.requireNonNull(recognized, &quot;recognized&quot;);</span>
+<span class="fc" id="L73">        ranked = Objects.requireNonNull(ranked, &quot;ranked&quot;);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (rankingCutoff &lt; 1) {</span>
+<span class="nc" id="L75">            throw new IllegalArgumentException(&quot;rankingCutoff must be positive&quot;);</span>
+        }
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (ranked.representationIds().size() &gt; rankingCutoff) {</span>
+<span class="nc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;ranked stage exceeds rankingCutoff&quot;
+            );
+        }
+<span class="fc" id="L82">        expertVerdict = Objects.requireNonNull(</span>
+            expertVerdict,
+            &quot;expertVerdict&quot;
+        );
+<span class="fc" id="L86">        requireStageNesting(reached, formed, retained, recognized, ranked);</span>
+<span class="fc" id="L87">        requireRoleAndReviewConsistency(</span>
+            role,
+            referenceReachability,
+            reached,
+            ranked,
+            expertVerdict
+        );
+<span class="fc" id="L94">        Localization expected = localize(</span>
+            role,
+            referenceReachability,
+            reached,
+            formed,
+            retained,
+            recognized,
+            ranked,
+            expertVerdict
+        );
+<span class="fc" id="L104">        localization = Objects.requireNonNull(localization, &quot;localization&quot;);</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (localization != expected) {</span>
+<span class="nc" id="L106">            throw new IllegalArgumentException(</span>
+                &quot;localization differs from stage evidence&quot;
+            );
+        }
+<span class="fc" id="L110">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L111">        String expectedHash = caseHash(</span>
+            caseId,
+            role,
+            referenceReachability,
+            oracleEvidenceHash,
+            searchTraceHash,
+            candidateFormationHash,
+            candidateRetentionHash,
+            recognitionEvidenceHash,
+            rankingEvidenceHash,
+            expertReviewEvidenceHash,
+            reached,
+            formed,
+            retained,
+            recognized,
+            ranked,
+            rankingCutoff,
+            expertVerdict,
+            localization
+        );
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (!expectedHash.equals(contentHash)) {</span>
+<span class="nc" id="L132">            throw new IllegalArgumentException(&quot;case-audit content hash mismatch&quot;);</span>
+        }
+<span class="fc" id="L134">    }</span>
+
+    public static RepresentationSalienceCaseAudit create(
+        String caseId,
+        CaseRole role,
+        ReferenceReachability referenceReachability,
+        String oracleEvidenceHash,
+        String searchTraceHash,
+        String candidateFormationHash,
+        String candidateRetentionHash,
+        String recognitionEvidenceHash,
+        String rankingEvidenceHash,
+        String expertReviewEvidenceHash,
+        RepresentationSalienceStageSet reached,
+        RepresentationSalienceStageSet formed,
+        RepresentationSalienceStageSet retained,
+        RepresentationSalienceStageSet recognized,
+        RepresentationSalienceStageSet ranked,
+        int rankingCutoff,
+        ExpertVerdict expertVerdict
+    ) {
+<span class="fc" id="L155">        String retainedCaseId = requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L156">        CaseRole retainedRole = Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L157">        ReferenceReachability reachability = Objects.requireNonNull(</span>
+            referenceReachability,
+            &quot;referenceReachability&quot;
+        );
+<span class="fc" id="L161">        RepresentationSalienceStageSet reachedSet = Objects.requireNonNull(</span>
+            reached,
+            &quot;reached&quot;
+        );
+<span class="fc" id="L165">        RepresentationSalienceStageSet formedSet = Objects.requireNonNull(</span>
+            formed,
+            &quot;formed&quot;
+        );
+<span class="fc" id="L169">        RepresentationSalienceStageSet retainedSet = Objects.requireNonNull(</span>
+            retained,
+            &quot;retained&quot;
+        );
+<span class="fc" id="L173">        RepresentationSalienceStageSet recognizedSet = Objects.requireNonNull(</span>
+            recognized,
+            &quot;recognized&quot;
+        );
+<span class="fc" id="L177">        RepresentationSalienceStageSet rankedSet = Objects.requireNonNull(</span>
+            ranked,
+            &quot;ranked&quot;
+        );
+<span class="fc" id="L181">        ExpertVerdict verdict = Objects.requireNonNull(</span>
+            expertVerdict,
+            &quot;expertVerdict&quot;
+        );
+<span class="fc" id="L185">        Localization localization = localize(</span>
+            retainedRole,
+            reachability,
+            reachedSet,
+            formedSet,
+            retainedSet,
+            recognizedSet,
+            rankedSet,
+            verdict
+        );
+<span class="fc" id="L195">        String hash = caseHash(</span>
+            retainedCaseId,
+            retainedRole,
+            reachability,
+            oracleEvidenceHash,
+            searchTraceHash,
+            candidateFormationHash,
+            candidateRetentionHash,
+            recognitionEvidenceHash,
+            rankingEvidenceHash,
+            expertReviewEvidenceHash,
+            reachedSet,
+            formedSet,
+            retainedSet,
+            recognizedSet,
+            rankedSet,
+            rankingCutoff,
+            verdict,
+            localization
+        );
+<span class="fc" id="L215">        return new RepresentationSalienceCaseAudit(</span>
+            retainedCaseId,
+            retainedRole,
+            reachability,
+            oracleEvidenceHash,
+            searchTraceHash,
+            candidateFormationHash,
+            candidateRetentionHash,
+            recognitionEvidenceHash,
+            rankingEvidenceHash,
+            expertReviewEvidenceHash,
+            reachedSet,
+            formedSet,
+            retainedSet,
+            recognizedSet,
+            rankedSet,
+            rankingCutoff,
+            verdict,
+            localization,
+            hash
+        );
+    }
+
+    public boolean reachedRelevantRepresentation() {
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        return !reached.isEmpty();</span>
+    }
+
+    public boolean formedRelevantCandidate() {
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        return !formed.isEmpty();</span>
+    }
+
+    public boolean retainedRelevantCandidate() {
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        return !retained.isEmpty();</span>
+    }
+
+    public boolean recognizedRelevantCandidate() {
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        return !recognized.isEmpty();</span>
+    }
+
+    public boolean rankedRelevantCandidate() {
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        return !ranked.isEmpty();</span>
+    }
+
+    void appendIdentity(StringBuilder descriptor) {
+<span class="fc" id="L259">        append(descriptor, contentHash);</span>
+<span class="fc" id="L260">    }</span>
+
+    void writeJson(JsonWriter json) {
+<span class="fc" id="L263">        json.property(&quot;caseId&quot;, caseId)</span>
+<span class="fc" id="L264">            .property(&quot;role&quot;, role.name())</span>
+<span class="fc" id="L265">            .property(&quot;referenceReachability&quot;, referenceReachability.name())</span>
+<span class="fc" id="L266">            .property(&quot;oracleEvidenceHash&quot;, oracleEvidenceHash)</span>
+<span class="fc" id="L267">            .property(&quot;searchTraceHash&quot;, searchTraceHash)</span>
+<span class="fc" id="L268">            .property(&quot;candidateFormationHash&quot;, candidateFormationHash)</span>
+<span class="fc" id="L269">            .property(&quot;candidateRetentionHash&quot;, candidateRetentionHash)</span>
+<span class="fc" id="L270">            .property(&quot;recognitionEvidenceHash&quot;, recognitionEvidenceHash)</span>
+<span class="fc" id="L271">            .property(&quot;rankingEvidenceHash&quot;, rankingEvidenceHash)</span>
+<span class="fc" id="L272">            .property(&quot;expertReviewEvidenceHash&quot;, expertReviewEvidenceHash);</span>
+<span class="fc" id="L273">        writeStageSet(json, &quot;reached&quot;, reached);</span>
+<span class="fc" id="L274">        writeStageSet(json, &quot;formed&quot;, formed);</span>
+<span class="fc" id="L275">        writeStageSet(json, &quot;retained&quot;, retained);</span>
+<span class="fc" id="L276">        writeStageSet(json, &quot;recognized&quot;, recognized);</span>
+<span class="fc" id="L277">        writeStageSet(json, &quot;ranked&quot;, ranked);</span>
+<span class="fc" id="L278">        json.property(&quot;rankingCutoff&quot;, rankingCutoff)</span>
+<span class="fc" id="L279">            .property(&quot;expertVerdict&quot;, expertVerdict.name())</span>
+<span class="fc" id="L280">            .property(&quot;localization&quot;, localization.name())</span>
+<span class="fc" id="L281">            .property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L282">    }</span>
+
+    private static void writeStageSet(
+        JsonWriter json,
+        String name,
+        RepresentationSalienceStageSet value
+    ) {
+<span class="fc" id="L289">        json.object(name, value::writeJson);</span>
+<span class="fc" id="L290">    }</span>
+
+    private static Localization localize(
+        CaseRole role,
+        ReferenceReachability referenceReachability,
+        RepresentationSalienceStageSet reached,
+        RepresentationSalienceStageSet formed,
+        RepresentationSalienceStageSet retained,
+        RepresentationSalienceStageSet recognized,
+        RepresentationSalienceStageSet ranked,
+        ExpertVerdict expertVerdict
+    ) {
+<span class="fc" id="L302">        requireStageNesting(reached, formed, retained, recognized, ranked);</span>
+<span class="fc" id="L303">        requireRoleAndReviewConsistency(</span>
+            role,
+            referenceReachability,
+            reached,
+            ranked,
+            expertVerdict
+        );
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (role == CaseRole.NEGATIVE_OR_ALIAS_CONTROL) {</span>
+<span class="pc bpc" id="L311" title="3 of 4 branches missed.">            return recognized.isEmpty() &amp;&amp; ranked.isEmpty()</span>
+<span class="nc" id="L312">                ? Localization.NEGATIVE_CONTROL_CORRECTLY_REJECTED</span>
+<span class="fc" id="L313">                : Localization.INVALID_OR_FALSE_POSITIVE;</span>
+        }
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (referenceReachability</span>
+                == ReferenceReachability.NOT_REACHABLE_COMPLETE_CLOSURE) {
+<span class="nc" id="L317">            return Localization.NOT_REACHABLE_IN_DECLARED_CLOSURE;</span>
+        }
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        if (referenceReachability == ReferenceReachability.INCONCLUSIVE) {</span>
+<span class="fc" id="L320">            return Localization.REACHABILITY_INCONCLUSIVE;</span>
+        }
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (referenceReachability == ReferenceReachability.UNSUPPORTED) {</span>
+<span class="nc" id="L323">            return Localization.UNSUPPORTED;</span>
+        }
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        if (reached.isEmpty()) {</span>
+<span class="fc" id="L326">            return Localization.REACHABLE_NOT_REACHED_BY_POLICY;</span>
+        }
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (formed.isEmpty()) {</span>
+<span class="nc" id="L329">            return Localization.REACHED_NOT_FORMED;</span>
+        }
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        if (retained.isEmpty()) {</span>
+<span class="nc" id="L332">            return Localization.FORMED_NOT_RETAINED;</span>
+        }
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (recognized.isEmpty()) {</span>
+<span class="fc" id="L335">            return Localization.RETAINED_NOT_RECOGNIZED;</span>
+        }
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (ranked.isEmpty()) {</span>
+<span class="fc" id="L338">            return Localization.RECOGNIZED_NOT_RANKED;</span>
+        }
+<span class="pc bpc" id="L340" title="3 of 4 branches missed.">        return switch (expertVerdict) {</span>
+            case NOT_EVALUATED, PENDING -&gt;
+<span class="nc" id="L342">                Localization.RANKED_PENDING_EXPERT_REVIEW;</span>
+<span class="nc" id="L343">            case UNCERTAIN -&gt; Localization.RANKED_EXPERT_REVIEW_UNCERTAIN;</span>
+            case CONSENSUS_NOT_INTERESTING -&gt;
+<span class="nc" id="L345">                Localization.RANKED_NO_EXPERT_CONSENSUS;</span>
+<span class="fc" id="L346">            case CONSENSUS_INTERESTING -&gt; Localization.FULLY_DETECTED;</span>
+        };
+    }
+
+    private static void requireStageNesting(
+        RepresentationSalienceStageSet reached,
+        RepresentationSalienceStageSet formed,
+        RepresentationSalienceStageSet retained,
+        RepresentationSalienceStageSet recognized,
+        RepresentationSalienceStageSet ranked
+    ) {
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">        if (!Objects.requireNonNull(reached, &quot;reached&quot;).containsAll(</span>
+<span class="fc" id="L358">                Objects.requireNonNull(formed, &quot;formed&quot;))</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">                || !formed.containsAll(</span>
+<span class="fc" id="L360">                    Objects.requireNonNull(retained, &quot;retained&quot;))</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">                || !retained.containsAll(</span>
+<span class="fc" id="L362">                    Objects.requireNonNull(recognized, &quot;recognized&quot;))</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">                || !recognized.containsAll(</span>
+<span class="fc" id="L364">                    Objects.requireNonNull(ranked, &quot;ranked&quot;))) {</span>
+<span class="fc" id="L365">            throw new IllegalArgumentException(</span>
+                &quot;salience-audit stage sets are not nested&quot;
+            );
+        }
+<span class="fc" id="L369">    }</span>
+
+    private static void requireRoleAndReviewConsistency(
+        CaseRole role,
+        ReferenceReachability reachability,
+        RepresentationSalienceStageSet reached,
+        RepresentationSalienceStageSet ranked,
+        ExpertVerdict verdict
+    ) {
+<span class="fc" id="L378">        Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L379">        Objects.requireNonNull(reachability, &quot;reachability&quot;);</span>
+<span class="fc" id="L380">        Objects.requireNonNull(verdict, &quot;verdict&quot;);</span>
+<span class="fc bfc" id="L381" title="All 4 branches covered.">        if (role == CaseRole.POSITIVE_REFERENCE</span>
+                &amp;&amp; reachability
+                    == ReferenceReachability.NOT_REACHABLE_COMPLETE_CLOSURE
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">                &amp;&amp; !reached.isEmpty()) {</span>
+<span class="fc" id="L385">            throw new IllegalArgumentException(</span>
+                &quot;complete-closure-unreachable positive case cannot retain &quot;
+                    + &quot;a matched state&quot;
+            );
+        }
+<span class="pc bpc" id="L390" title="1 of 4 branches missed.">        if (ranked.isEmpty() &amp;&amp; verdict != ExpertVerdict.NOT_EVALUATED) {</span>
+<span class="nc" id="L391">            throw new IllegalArgumentException(</span>
+                &quot;unranked case cannot retain an expert verdict&quot;
+            );
+        }
+<span class="pc bpc" id="L395" title="1 of 4 branches missed.">        if (role == CaseRole.NEGATIVE_OR_ALIAS_CONTROL</span>
+                &amp;&amp; verdict != ExpertVerdict.NOT_EVALUATED) {
+<span class="nc" id="L397">            throw new IllegalArgumentException(</span>
+                &quot;negative controls do not receive relevance consensus&quot;
+            );
+        }
+<span class="fc" id="L401">    }</span>
+
+    private static String caseHash(
+        String caseId,
+        CaseRole role,
+        ReferenceReachability reachability,
+        String oracleEvidenceHash,
+        String searchTraceHash,
+        String candidateFormationHash,
+        String candidateRetentionHash,
+        String recognitionEvidenceHash,
+        String rankingEvidenceHash,
+        String expertReviewEvidenceHash,
+        RepresentationSalienceStageSet reached,
+        RepresentationSalienceStageSet formed,
+        RepresentationSalienceStageSet retained,
+        RepresentationSalienceStageSet recognized,
+        RepresentationSalienceStageSet ranked,
+        int rankingCutoff,
+        ExpertVerdict expertVerdict,
+        Localization localization
+    ) {
+<span class="fc" id="L423">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L424">        append(descriptor, RepresentationSalienceAudit.SCHEMA + &quot;/case&quot;);</span>
+<span class="fc" id="L425">        append(descriptor, requireText(caseId, &quot;caseId&quot;));</span>
+<span class="fc" id="L426">        append(descriptor, Objects.requireNonNull(role, &quot;role&quot;).name());</span>
+<span class="fc" id="L427">        append(</span>
+            descriptor,
+<span class="fc" id="L429">            Objects.requireNonNull(reachability, &quot;reachability&quot;).name()</span>
+        );
+<span class="fc" id="L431">        append(descriptor, requireSha256(</span>
+            oracleEvidenceHash,
+            &quot;oracleEvidenceHash&quot;
+        ));
+<span class="fc" id="L435">        append(descriptor, requireSha256(</span>
+            searchTraceHash,
+            &quot;searchTraceHash&quot;
+        ));
+<span class="fc" id="L439">        append(descriptor, requireSha256(</span>
+            candidateFormationHash,
+            &quot;candidateFormationHash&quot;
+        ));
+<span class="fc" id="L443">        append(descriptor, requireSha256(</span>
+            candidateRetentionHash,
+            &quot;candidateRetentionHash&quot;
+        ));
+<span class="fc" id="L447">        append(descriptor, requireSha256(</span>
+            recognitionEvidenceHash,
+            &quot;recognitionEvidenceHash&quot;
+        ));
+<span class="fc" id="L451">        append(descriptor, requireSha256(</span>
+            rankingEvidenceHash,
+            &quot;rankingEvidenceHash&quot;
+        ));
+<span class="fc" id="L455">        append(descriptor, requireSha256(</span>
+            expertReviewEvidenceHash,
+            &quot;expertReviewEvidenceHash&quot;
+        ));
+<span class="fc" id="L459">        append(descriptor, reached.contentHash());</span>
+<span class="fc" id="L460">        append(descriptor, formed.contentHash());</span>
+<span class="fc" id="L461">        append(descriptor, retained.contentHash());</span>
+<span class="fc" id="L462">        append(descriptor, recognized.contentHash());</span>
+<span class="fc" id="L463">        append(descriptor, ranked.contentHash());</span>
+<span class="fc" id="L464">        append(descriptor, Integer.toString(rankingCutoff));</span>
+<span class="fc" id="L465">        append(descriptor, Objects.requireNonNull(</span>
+            expertVerdict,
+            &quot;expertVerdict&quot;
+<span class="fc" id="L468">        ).name());</span>
+<span class="fc" id="L469">        append(descriptor, Objects.requireNonNull(</span>
+            localization,
+            &quot;localization&quot;
+<span class="fc" id="L472">        ).name());</span>
+<span class="fc" id="L473">        return sha256(descriptor.toString());</span>
+    }
+
+<span class="fc" id="L476">    public enum CaseRole {</span>
+<span class="fc" id="L477">        POSITIVE_REFERENCE,</span>
+<span class="fc" id="L478">        NEGATIVE_OR_ALIAS_CONTROL</span>
+    }
+
+<span class="fc" id="L481">    public enum ReferenceReachability {</span>
+<span class="fc" id="L482">        REACHABLE,</span>
+<span class="fc" id="L483">        NOT_REACHABLE_COMPLETE_CLOSURE,</span>
+<span class="fc" id="L484">        INCONCLUSIVE,</span>
+<span class="fc" id="L485">        UNSUPPORTED</span>
+    }
+
+<span class="fc" id="L488">    public enum ExpertVerdict {</span>
+<span class="fc" id="L489">        NOT_EVALUATED,</span>
+<span class="fc" id="L490">        PENDING,</span>
+<span class="fc" id="L491">        CONSENSUS_INTERESTING,</span>
+<span class="fc" id="L492">        CONSENSUS_NOT_INTERESTING,</span>
+<span class="fc" id="L493">        UNCERTAIN</span>
+    }
+
+<span class="fc" id="L496">    public enum Localization {</span>
+<span class="fc" id="L497">        NOT_REACHABLE_IN_DECLARED_CLOSURE,</span>
+<span class="fc" id="L498">        REACHABILITY_INCONCLUSIVE,</span>
+<span class="fc" id="L499">        REACHABLE_NOT_REACHED_BY_POLICY,</span>
+<span class="fc" id="L500">        REACHED_NOT_FORMED,</span>
+<span class="fc" id="L501">        FORMED_NOT_RETAINED,</span>
+<span class="fc" id="L502">        RETAINED_NOT_RECOGNIZED,</span>
+<span class="fc" id="L503">        RECOGNIZED_NOT_RANKED,</span>
+<span class="fc" id="L504">        RANKED_PENDING_EXPERT_REVIEW,</span>
+<span class="fc" id="L505">        RANKED_EXPERT_REVIEW_UNCERTAIN,</span>
+<span class="fc" id="L506">        RANKED_NO_EXPERT_CONSENSUS,</span>
+<span class="fc" id="L507">        FULLY_DETECTED,</span>
+<span class="fc" id="L508">        NEGATIVE_CONTROL_CORRECTLY_REJECTED,</span>
+<span class="fc" id="L509">        INVALID_OR_FALSE_POSITIVE,</span>
+<span class="fc" id="L510">        UNSUPPORTED</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

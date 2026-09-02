@@ -1,0 +1,393 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationSalienceSummary.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationSalienceSummary.java</span></div><h1>RepresentationSalienceSummary.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation
+    .RepresentationDiscoveryRunContractSupport.append;
+
+import de.regelsuche.discovery.representation
+    .RepresentationSalienceCaseAudit.CaseRole;
+import de.regelsuche.discovery.representation
+    .RepresentationSalienceCaseAudit.ExpertVerdict;
+import de.regelsuche.discovery.representation
+    .RepresentationSalienceCaseAudit.Localization;
+import de.regelsuche.discovery.representation
+    .RepresentationSalienceCaseAudit.ReferenceReachability;
+import de.regelsuche.json.JsonWriter;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Predicate;
+
+/** Aggregate stage recall without hiding inconclusive or unsupported cases. */
+public record RepresentationSalienceSummary(
+    int caseCount,
+    int positiveCaseCount,
+    int negativeControlCount,
+    int oracleReachablePositiveCount,
+    int reachabilityInconclusiveCount,
+    int unsupportedCount,
+    int reachedPositiveCount,
+    int formedPositiveCount,
+    int retainedPositiveCount,
+    int recognizedPositiveCount,
+    int rankedPositiveCount,
+    int pendingExpertReviewCount,
+    int expertReviewedCount,
+    int expertConfirmedCount,
+    int falsePositiveCount,
+    RepresentationSalienceConditionalRate policyReachabilityRecall,
+    RepresentationSalienceConditionalRate formationRecallGivenReached,
+    RepresentationSalienceConditionalRate retentionRecallGivenFormed,
+    RepresentationSalienceConditionalRate recognitionRecallGivenRetained,
+    RepresentationSalienceConditionalRate rankingRecallGivenRecognized,
+    RepresentationSalienceConditionalRate automatedDetectionRecallGivenReachable,
+    RepresentationSalienceConditionalRate expertConsensusGivenReviewed,
+    RepresentationSalienceConditionalRate falsePositiveRate
+) {
+<span class="fc" id="L45">    public RepresentationSalienceSummary {</span>
+<span class="pc bpc" id="L46" title="16 of 32 branches missed.">        if (caseCount &lt; 1</span>
+                || positiveCaseCount &lt; 0
+                || negativeControlCount &lt; 0
+                || positiveCaseCount + negativeControlCount != caseCount
+                || oracleReachablePositiveCount &lt; 0
+                || reachabilityInconclusiveCount &lt; 0
+                || unsupportedCount &lt; 0
+                || reachedPositiveCount &lt; 0
+                || formedPositiveCount &lt; 0
+                || retainedPositiveCount &lt; 0
+                || recognizedPositiveCount &lt; 0
+                || rankedPositiveCount &lt; 0
+                || pendingExpertReviewCount &lt; 0
+                || expertReviewedCount &lt; 0
+                || expertConfirmedCount &lt; 0
+                || falsePositiveCount &lt; 0) {
+<span class="nc" id="L62">            throw new IllegalArgumentException(</span>
+                &quot;salience-audit summary counts do not balance&quot;
+            );
+        }
+<span class="fc" id="L66">        policyReachabilityRecall = Objects.requireNonNull(</span>
+            policyReachabilityRecall,
+            &quot;policyReachabilityRecall&quot;
+        );
+<span class="fc" id="L70">        formationRecallGivenReached = Objects.requireNonNull(</span>
+            formationRecallGivenReached,
+            &quot;formationRecallGivenReached&quot;
+        );
+<span class="fc" id="L74">        retentionRecallGivenFormed = Objects.requireNonNull(</span>
+            retentionRecallGivenFormed,
+            &quot;retentionRecallGivenFormed&quot;
+        );
+<span class="fc" id="L78">        recognitionRecallGivenRetained = Objects.requireNonNull(</span>
+            recognitionRecallGivenRetained,
+            &quot;recognitionRecallGivenRetained&quot;
+        );
+<span class="fc" id="L82">        rankingRecallGivenRecognized = Objects.requireNonNull(</span>
+            rankingRecallGivenRecognized,
+            &quot;rankingRecallGivenRecognized&quot;
+        );
+<span class="fc" id="L86">        automatedDetectionRecallGivenReachable = Objects.requireNonNull(</span>
+            automatedDetectionRecallGivenReachable,
+            &quot;automatedDetectionRecallGivenReachable&quot;
+        );
+<span class="fc" id="L90">        expertConsensusGivenReviewed = Objects.requireNonNull(</span>
+            expertConsensusGivenReviewed,
+            &quot;expertConsensusGivenReviewed&quot;
+        );
+<span class="fc" id="L94">        falsePositiveRate = Objects.requireNonNull(</span>
+            falsePositiveRate,
+            &quot;falsePositiveRate&quot;
+        );
+<span class="fc" id="L98">        requireMonotoneCounts(</span>
+            oracleReachablePositiveCount,
+            reachedPositiveCount,
+            formedPositiveCount,
+            retainedPositiveCount,
+            recognizedPositiveCount,
+            rankedPositiveCount,
+            pendingExpertReviewCount,
+            expertReviewedCount,
+            expertConfirmedCount,
+            negativeControlCount,
+            falsePositiveCount
+        );
+<span class="fc" id="L111">        requireRates(</span>
+            oracleReachablePositiveCount,
+            reachedPositiveCount,
+            formedPositiveCount,
+            retainedPositiveCount,
+            recognizedPositiveCount,
+            rankedPositiveCount,
+            expertReviewedCount,
+            expertConfirmedCount,
+            negativeControlCount,
+            falsePositiveCount,
+            policyReachabilityRecall,
+            formationRecallGivenReached,
+            retentionRecallGivenFormed,
+            recognitionRecallGivenRetained,
+            rankingRecallGivenRecognized,
+            automatedDetectionRecallGivenReachable,
+            expertConsensusGivenReviewed,
+            falsePositiveRate
+        );
+<span class="fc" id="L131">    }</span>
+
+    public static RepresentationSalienceSummary derive(
+        List&lt;RepresentationSalienceCaseAudit&gt; cases
+    ) {
+<span class="fc" id="L136">        List&lt;RepresentationSalienceCaseAudit&gt; retainedCases = List.copyOf(</span>
+<span class="fc" id="L137">            Objects.requireNonNull(cases, &quot;cases&quot;)</span>
+        );
+<span class="fc" id="L139">        int positives = count(retainedCases, RepresentationSalienceSummary</span>
+            ::positive);
+<span class="fc" id="L141">        int negatives = retainedCases.size() - positives;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        int reachable = count(retainedCases, value -&gt; positive(value)</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            &amp;&amp; value.referenceReachability()</span>
+                == ReferenceReachability.REACHABLE);
+<span class="fc" id="L145">        int inconclusive = count(retainedCases, value -&gt;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            value.referenceReachability()</span>
+                == ReferenceReachability.INCONCLUSIVE);
+<span class="fc" id="L148">        int unsupported = count(retainedCases, value -&gt;</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            value.referenceReachability()</span>
+                == ReferenceReachability.UNSUPPORTED);
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        int reached = count(retainedCases, value -&gt; positive(value)</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            &amp;&amp; value.reachedRelevantRepresentation());</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        int formed = count(retainedCases, value -&gt; positive(value)</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            &amp;&amp; value.formedRelevantCandidate());</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        int retained = count(retainedCases, value -&gt; positive(value)</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            &amp;&amp; value.retainedRelevantCandidate());</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        int recognized = count(retainedCases, value -&gt; positive(value)</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            &amp;&amp; value.recognizedRelevantCandidate());</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        int ranked = count(retainedCases, value -&gt; positive(value)</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            &amp;&amp; value.rankedRelevantCandidate());</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        int pending = count(retainedCases, value -&gt; positive(value)</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            &amp;&amp; value.localization()</span>
+                == Localization.RANKED_PENDING_EXPERT_REVIEW);
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        int reviewed = count(retainedCases, value -&gt; positive(value)</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            &amp;&amp; reviewed(value.expertVerdict()));</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        int confirmed = count(retainedCases, value -&gt; positive(value)</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            &amp;&amp; value.expertVerdict()</span>
+                == ExpertVerdict.CONSENSUS_INTERESTING);
+<span class="fc" id="L169">        int falsePositives = count(retainedCases, value -&gt;</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            value.localization() == Localization.INVALID_OR_FALSE_POSITIVE);</span>
+<span class="fc" id="L171">        return new RepresentationSalienceSummary(</span>
+<span class="fc" id="L172">            retainedCases.size(),</span>
+            positives,
+            negatives,
+            reachable,
+            inconclusive,
+            unsupported,
+            reached,
+            formed,
+            retained,
+            recognized,
+            ranked,
+            pending,
+            reviewed,
+            confirmed,
+            falsePositives,
+<span class="fc" id="L187">            RepresentationSalienceConditionalRate.of(reached, reachable),</span>
+<span class="fc" id="L188">            RepresentationSalienceConditionalRate.of(formed, reached),</span>
+<span class="fc" id="L189">            RepresentationSalienceConditionalRate.of(retained, formed),</span>
+<span class="fc" id="L190">            RepresentationSalienceConditionalRate.of(recognized, retained),</span>
+<span class="fc" id="L191">            RepresentationSalienceConditionalRate.of(ranked, recognized),</span>
+<span class="fc" id="L192">            RepresentationSalienceConditionalRate.of(ranked, reachable),</span>
+<span class="fc" id="L193">            RepresentationSalienceConditionalRate.of(confirmed, reviewed),</span>
+<span class="fc" id="L194">            RepresentationSalienceConditionalRate.of(falsePositives, negatives)</span>
+        );
+    }
+
+    void appendIdentity(StringBuilder descriptor) {
+<span class="fc" id="L199">        append(descriptor, Integer.toString(caseCount));</span>
+<span class="fc" id="L200">        append(descriptor, Integer.toString(positiveCaseCount));</span>
+<span class="fc" id="L201">        append(descriptor, Integer.toString(negativeControlCount));</span>
+<span class="fc" id="L202">        append(descriptor, Integer.toString(oracleReachablePositiveCount));</span>
+<span class="fc" id="L203">        append(descriptor, Integer.toString(reachabilityInconclusiveCount));</span>
+<span class="fc" id="L204">        append(descriptor, Integer.toString(unsupportedCount));</span>
+<span class="fc" id="L205">        append(descriptor, Integer.toString(reachedPositiveCount));</span>
+<span class="fc" id="L206">        append(descriptor, Integer.toString(formedPositiveCount));</span>
+<span class="fc" id="L207">        append(descriptor, Integer.toString(retainedPositiveCount));</span>
+<span class="fc" id="L208">        append(descriptor, Integer.toString(recognizedPositiveCount));</span>
+<span class="fc" id="L209">        append(descriptor, Integer.toString(rankedPositiveCount));</span>
+<span class="fc" id="L210">        append(descriptor, Integer.toString(pendingExpertReviewCount));</span>
+<span class="fc" id="L211">        append(descriptor, Integer.toString(expertReviewedCount));</span>
+<span class="fc" id="L212">        append(descriptor, Integer.toString(expertConfirmedCount));</span>
+<span class="fc" id="L213">        append(descriptor, Integer.toString(falsePositiveCount));</span>
+<span class="fc" id="L214">        policyReachabilityRecall.appendIdentity(descriptor);</span>
+<span class="fc" id="L215">        formationRecallGivenReached.appendIdentity(descriptor);</span>
+<span class="fc" id="L216">        retentionRecallGivenFormed.appendIdentity(descriptor);</span>
+<span class="fc" id="L217">        recognitionRecallGivenRetained.appendIdentity(descriptor);</span>
+<span class="fc" id="L218">        rankingRecallGivenRecognized.appendIdentity(descriptor);</span>
+<span class="fc" id="L219">        automatedDetectionRecallGivenReachable.appendIdentity(descriptor);</span>
+<span class="fc" id="L220">        expertConsensusGivenReviewed.appendIdentity(descriptor);</span>
+<span class="fc" id="L221">        falsePositiveRate.appendIdentity(descriptor);</span>
+<span class="fc" id="L222">    }</span>
+
+    void writeJson(JsonWriter json) {
+<span class="fc" id="L225">        json.property(&quot;caseCount&quot;, caseCount)</span>
+<span class="fc" id="L226">            .property(&quot;positiveCaseCount&quot;, positiveCaseCount)</span>
+<span class="fc" id="L227">            .property(&quot;negativeControlCount&quot;, negativeControlCount)</span>
+<span class="fc" id="L228">            .property(</span>
+                &quot;oracleReachablePositiveCount&quot;,
+                oracleReachablePositiveCount
+            )
+<span class="fc" id="L232">            .property(</span>
+                &quot;reachabilityInconclusiveCount&quot;,
+                reachabilityInconclusiveCount
+            )
+<span class="fc" id="L236">            .property(&quot;unsupportedCount&quot;, unsupportedCount)</span>
+<span class="fc" id="L237">            .property(&quot;reachedPositiveCount&quot;, reachedPositiveCount)</span>
+<span class="fc" id="L238">            .property(&quot;formedPositiveCount&quot;, formedPositiveCount)</span>
+<span class="fc" id="L239">            .property(&quot;retainedPositiveCount&quot;, retainedPositiveCount)</span>
+<span class="fc" id="L240">            .property(&quot;recognizedPositiveCount&quot;, recognizedPositiveCount)</span>
+<span class="fc" id="L241">            .property(&quot;rankedPositiveCount&quot;, rankedPositiveCount)</span>
+<span class="fc" id="L242">            .property(&quot;pendingExpertReviewCount&quot;, pendingExpertReviewCount)</span>
+<span class="fc" id="L243">            .property(&quot;expertReviewedCount&quot;, expertReviewedCount)</span>
+<span class="fc" id="L244">            .property(&quot;expertConfirmedCount&quot;, expertConfirmedCount)</span>
+<span class="fc" id="L245">            .property(&quot;falsePositiveCount&quot;, falsePositiveCount);</span>
+<span class="fc" id="L246">        writeRate(json, &quot;policyReachabilityRecall&quot;, policyReachabilityRecall);</span>
+<span class="fc" id="L247">        writeRate(</span>
+            json,
+            &quot;formationRecallGivenReached&quot;,
+            formationRecallGivenReached
+        );
+<span class="fc" id="L252">        writeRate(</span>
+            json,
+            &quot;retentionRecallGivenFormed&quot;,
+            retentionRecallGivenFormed
+        );
+<span class="fc" id="L257">        writeRate(</span>
+            json,
+            &quot;recognitionRecallGivenRetained&quot;,
+            recognitionRecallGivenRetained
+        );
+<span class="fc" id="L262">        writeRate(</span>
+            json,
+            &quot;rankingRecallGivenRecognized&quot;,
+            rankingRecallGivenRecognized
+        );
+<span class="fc" id="L267">        writeRate(</span>
+            json,
+            &quot;automatedDetectionRecallGivenReachable&quot;,
+            automatedDetectionRecallGivenReachable
+        );
+<span class="fc" id="L272">        writeRate(</span>
+            json,
+            &quot;expertConsensusGivenReviewed&quot;,
+            expertConsensusGivenReviewed
+        );
+<span class="fc" id="L277">        writeRate(json, &quot;falsePositiveRate&quot;, falsePositiveRate);</span>
+<span class="fc" id="L278">    }</span>
+
+    private static void requireRates(
+        int reachable,
+        int reached,
+        int formed,
+        int retained,
+        int recognized,
+        int ranked,
+        int reviewed,
+        int confirmed,
+        int negativeControls,
+        int falsePositives,
+        RepresentationSalienceConditionalRate policyReachability,
+        RepresentationSalienceConditionalRate formationRecall,
+        RepresentationSalienceConditionalRate retentionRecall,
+        RepresentationSalienceConditionalRate recognitionRecall,
+        RepresentationSalienceConditionalRate rankingRecall,
+        RepresentationSalienceConditionalRate automatedDetectionRecall,
+        RepresentationSalienceConditionalRate expertConsensus,
+        RepresentationSalienceConditionalRate falsePositiveRate
+    ) {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (!policyReachability.equals(</span>
+<span class="fc" id="L301">                RepresentationSalienceConditionalRate.of(</span>
+                    reached,
+                    reachable))
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">                || !formationRecall.equals(</span>
+<span class="fc" id="L305">                    RepresentationSalienceConditionalRate.of(</span>
+                        formed,
+                        reached))
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">                || !retentionRecall.equals(</span>
+<span class="fc" id="L309">                    RepresentationSalienceConditionalRate.of(</span>
+                        retained,
+                        formed))
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">                || !recognitionRecall.equals(</span>
+<span class="fc" id="L313">                    RepresentationSalienceConditionalRate.of(</span>
+                        recognized,
+                        retained))
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                || !rankingRecall.equals(</span>
+<span class="fc" id="L317">                    RepresentationSalienceConditionalRate.of(</span>
+                        ranked,
+                        recognized))
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">                || !automatedDetectionRecall.equals(</span>
+<span class="fc" id="L321">                    RepresentationSalienceConditionalRate.of(</span>
+                        ranked,
+                        reachable))
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">                || !expertConsensus.equals(</span>
+<span class="fc" id="L325">                    RepresentationSalienceConditionalRate.of(</span>
+                        confirmed,
+                        reviewed))
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">                || !falsePositiveRate.equals(</span>
+<span class="fc" id="L329">                    RepresentationSalienceConditionalRate.of(</span>
+                        falsePositives,
+                        negativeControls))) {
+<span class="nc" id="L332">            throw new IllegalArgumentException(</span>
+                &quot;salience-audit rates differ from stage counts&quot;
+            );
+        }
+<span class="fc" id="L336">    }</span>
+
+    private static void requireMonotoneCounts(
+        int reachable,
+        int reached,
+        int formed,
+        int retained,
+        int recognized,
+        int ranked,
+        int pending,
+        int reviewed,
+        int confirmed,
+        int negativeControls,
+        int falsePositives
+    ) {
+<span class="pc bpc" id="L351" title="9 of 18 branches missed.">        if (ranked &gt; recognized</span>
+                || recognized &gt; retained
+                || retained &gt; formed
+                || formed &gt; reached
+                || reached &gt; reachable
+                || confirmed &gt; reviewed
+                || reviewed &gt; ranked
+                || pending &gt; ranked
+                || falsePositives &gt; negativeControls) {
+<span class="nc" id="L360">            throw new IllegalArgumentException(</span>
+                &quot;salience-audit stage counts are not monotone&quot;
+            );
+        }
+<span class="fc" id="L364">    }</span>
+
+    private static boolean positive(
+        RepresentationSalienceCaseAudit value
+    ) {
+<span class="fc bfc" id="L369" title="All 2 branches covered.">        return value.role() == CaseRole.POSITIVE_REFERENCE;</span>
+    }
+
+    private static boolean reviewed(ExpertVerdict verdict) {
+<span class="pc bpc" id="L373" title="2 of 6 branches missed.">        return verdict == ExpertVerdict.CONSENSUS_INTERESTING</span>
+            || verdict == ExpertVerdict.CONSENSUS_NOT_INTERESTING
+            || verdict == ExpertVerdict.UNCERTAIN;
+    }
+
+    private static int count(
+        List&lt;RepresentationSalienceCaseAudit&gt; cases,
+        Predicate&lt;RepresentationSalienceCaseAudit&gt; predicate
+    ) {
+<span class="fc" id="L382">        return Math.toIntExact(cases.stream().filter(predicate).count());</span>
+    }
+
+    private static void writeRate(
+        JsonWriter json,
+        String name,
+        RepresentationSalienceConditionalRate value
+    ) {
+<span class="fc" id="L390">        json.object(name, value::writeJson);</span>
+<span class="fc" id="L391">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

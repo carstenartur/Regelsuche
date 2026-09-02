@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationSalienceConditionalRate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationSalienceConditionalRate.java</span></div><h1>RepresentationSalienceConditionalRate.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation
+    .RepresentationDiscoveryRunContractSupport.append;
+
+import de.regelsuche.json.JsonWriter;
+
+/** Explicit conditional rate that retains zero denominators. */
+public record RepresentationSalienceConditionalRate(
+    int numerator,
+    int denominator,
+    boolean defined,
+    int permille
+) {
+<span class="fc" id="L15">    public RepresentationSalienceConditionalRate {</span>
+<span class="pc bpc" id="L16" title="3 of 6 branches missed.">        if (numerator &lt; 0 || denominator &lt; 0 || numerator &gt; denominator) {</span>
+<span class="nc" id="L17">            throw new IllegalArgumentException(</span>
+                &quot;conditional-rate counts do not balance&quot;
+            );
+        }
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        boolean expectedDefined = denominator &gt; 0;</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        int expectedPermille = expectedDefined</span>
+<span class="fc" id="L23">            ? Math.toIntExact((long) numerator * 1_000L / denominator)</span>
+<span class="fc" id="L24">            : 0;</span>
+<span class="pc bpc" id="L25" title="2 of 4 branches missed.">        if (defined != expectedDefined || permille != expectedPermille) {</span>
+<span class="nc" id="L26">            throw new IllegalArgumentException(</span>
+                &quot;conditional-rate value differs from counts&quot;
+            );
+        }
+<span class="fc" id="L30">    }</span>
+
+    public static RepresentationSalienceConditionalRate of(
+        int numerator,
+        int denominator
+    ) {
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        return new RepresentationSalienceConditionalRate(</span>
+            numerator,
+            denominator,
+            denominator &gt; 0,
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            denominator &gt; 0</span>
+<span class="fc" id="L41">                ? Math.toIntExact((long) numerator * 1_000L / denominator)</span>
+<span class="fc" id="L42">                : 0</span>
+        );
+    }
+
+    void appendIdentity(StringBuilder descriptor) {
+<span class="fc" id="L47">        append(descriptor, Integer.toString(numerator));</span>
+<span class="fc" id="L48">        append(descriptor, Integer.toString(denominator));</span>
+<span class="fc" id="L49">        append(descriptor, Boolean.toString(defined));</span>
+<span class="fc" id="L50">        append(descriptor, Integer.toString(permille));</span>
+<span class="fc" id="L51">    }</span>
+
+    void writeJson(JsonWriter json) {
+<span class="fc" id="L54">        json.property(&quot;numerator&quot;, numerator)</span>
+<span class="fc" id="L55">            .property(&quot;denominator&quot;, denominator)</span>
+<span class="fc" id="L56">            .property(&quot;defined&quot;, defined)</span>
+<span class="fc" id="L57">            .property(&quot;permille&quot;, permille);</span>
+<span class="fc" id="L58">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
