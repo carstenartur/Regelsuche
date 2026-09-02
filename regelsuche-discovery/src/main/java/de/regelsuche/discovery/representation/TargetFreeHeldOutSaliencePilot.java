@@ -321,7 +321,7 @@ public final class TargetFreeHeldOutSaliencePilot {
         PilotArtifact pilot = write(Path.of(args[0]), Path.of(args[1]));
         PilotSummary summary = pilot.content().summary();
         System.out.println("saliencePilotHash=" + pilot.contentHash());
-        System.out.println("saliencePilotReferenceReachedRows="
+        System.out.println("saliencePilotRetainedReferenceRows="
             + summary.referenceReachedPositiveRows());
         System.out.println("saliencePilotRecognizedRows="
             + summary.recognizedPositiveRows());
@@ -1090,7 +1090,7 @@ public final class TargetFreeHeldOutSaliencePilot {
         int rankedPositiveRows,
         int retainedNotRecognizedRows,
         int recognizedNotRankedRows,
-        int policyMissRows,
+        int preRetentionUnresolvedRows,
         int falsePositiveRows,
         int topOneRows,
         int topThreeRows,
@@ -1107,14 +1107,16 @@ public final class TargetFreeHeldOutSaliencePilot {
                     || rankedPositiveRows < 0
                     || retainedNotRecognizedRows < 0
                     || recognizedNotRankedRows < 0
-                    || policyMissRows < 0 || falsePositiveRows < 0
+                    || preRetentionUnresolvedRows < 0
+                    || falsePositiveRows < 0
                     || recognizedPositiveRows
                         > referenceReachedPositiveRows
                     || rankedPositiveRows > recognizedPositiveRows
                     || retainedNotRecognizedRows
                         > referenceReachedPositiveRows
                     || recognizedNotRankedRows > recognizedPositiveRows
-                    || policyMissRows > positiveRows
+                    || referenceReachedPositiveRows
+                        + preRetentionUnresolvedRows != positiveRows
                     || falsePositiveRows > negativeControlRows
                     || topOneRows < 0 || topThreeRows < topOneRows
                     || topFiveRows < topThreeRows
@@ -1168,8 +1170,7 @@ public final class TargetFreeHeldOutSaliencePilot {
                 localizations.getOrDefault(
                     "RETAINED_NOT_RECOGNIZED", 0),
                 localizations.getOrDefault("RECOGNIZED_NOT_RANKED", 0),
-                localizations.getOrDefault(
-                    "REACHABLE_NOT_REACHED_BY_POLICY", 0),
+                localizations.getOrDefault("UNSUPPORTED", 0),
                 localizations.getOrDefault("INVALID_OR_FALSE_POSITIVE", 0),
                 count(rows, row -> positive(row)
                     && row.bestRelevantRank() == 1),
@@ -1312,9 +1313,12 @@ public final class TargetFreeHeldOutSaliencePilot {
                 .append(content.rankingProfile()).append("`\n")
                 .append("- **Top-k cutoff:** `")
                 .append(content.rankingCutoff()).append("`\n")
-                .append("- **Reference reached rows:** `")
+                .append("- **Reference present in retained candidates:** `")
                 .append(content.summary().referenceReachedPositiveRows())
                 .append(" / ").append(content.summary().positiveRows())
+                .append("`\n")
+                .append("- **Pre-retention outcome unresolved:** `")
+                .append(content.summary().preRetentionUnresolvedRows())
                 .append("`\n")
                 .append("- **Recognized rows:** `")
                 .append(content.summary().recognizedPositiveRows())
@@ -1330,7 +1334,7 @@ public final class TargetFreeHeldOutSaliencePilot {
                 .append(content.summary().falsePositiveRows())
                 .append("`\n\n> ")
                 .append(content.claimBoundary()).append("\n\n")
-                .append("| Case | Rows | Reached | Recognized | Top-k | Best rank |\n")
+                .append("| Case | Rows | Retained reference | Recognized | Top-k | Best rank |\n")
                 .append("|---|---:|---:|---:|---:|---:|\n");
             for (PilotCaseSummary value : content.summary().cases()) {
                 markdown.append("| ").append(value.caseId())
