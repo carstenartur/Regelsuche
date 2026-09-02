@@ -1,4 +1,4 @@
-name: Temporary projected-work prototype export
+name: Temporary projected-work inputs export
 
 on:
   push:
@@ -13,15 +13,39 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
-      - name: Check out discarded prototype commit
+      - name: Check out current main with history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ef477375723e066beff8af8280dd1e1c12a93a30
-          fetch-depth: 1
-      - name: Retain prototype generator
+          ref: main
+          fetch-depth: 0
+      - name: Export main source and discarded prototype inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar \
+            --exclude=.git \
+            --exclude='**/build' \
+            --exclude='**/.gradle' \
+            -czf "$RUNNER_TEMP/regelsuche-main-source.tar.gz" .
+          git show \
+            838fbbee2135128351bd68811a25c3b2e8d8581b:tools/apply_pr861_projected_work_v2.py \
+            > "$RUNNER_TEMP/apply_pr861_projected_work_v2.py"
+          git show \
+            ef477375723e066beff8af8280dd1e1c12a93a30:tools/apply_pr861_projected_work_v4.py \
+            > "$RUNNER_TEMP/apply_pr861_projected_work_v4.py"
+      - name: Retain main source
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pr861-projected-work-prototype
-          path: tools/apply_pr861_projected_work_v4.py
+          name: regelsuche-main-source
+          path: ${{ runner.temp }}/regelsuche-main-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+      - name: Retain prototype inputs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pr861-projected-work-prototype-inputs
+          path: |
+            ${{ runner.temp }}/apply_pr861_projected_work_v2.py
+            ${{ runner.temp }}/apply_pr861_projected_work_v4.py
           if-no-files-found: error
           retention-days: 1
