@@ -1,6 +1,6 @@
 # Kanonische Arbeitsprojektion der Polynomtheorie-Nutzenstudie
 
-Status: vor der ersten mathematischen Profilausführung eingefroren
+Status: Revision v2 vor der ersten mathematischen Profilausführung eingefroren
 
 Bezug: Issue #748
 
@@ -18,6 +18,26 @@ nachträglich passend rechnen noch nur die erfolgreichen Teile behalten.
 
 `PolynomialTheoryUtilityCanonicalWorkProjection` legt deshalb vor der ersten
 mathematischen Ausführung eine einzige Projektion fest.
+
+## Vor-Ausführungspräzisierung v2
+
+Beim Anschluss des ersten mathematischen Adapters wurde vor jeder
+Profilausführung geprüft, ob alle tatsächlich erzeugten Pipeline-Stages durch
+die eingefrorenen Quanten abgedeckt sind. Dabei zeigte sich, dass Revision v1
+die Multiplikatoren der späteren Transformationsstufe zurückrechnete, die
+gleichen bereits vorhandenen Multiplikatoren des
+`ExactParsedSubtermProjector` aber unter `projection.*` eins zu eins zählte.
+
+Das hätte schon den kleinsten regulären Fall `x^2-1` vor einem mathematischen
+Versuch beendet: Allein die kombinierte Literal-Revalidierungsstufe enthält
+für zwei Literale mindestens `2 * 512` Roharbeit, während das vollständige
+mechanische Fallbudget 256 beträgt.
+
+Revision v1 wurde von keinem mathematischen Profil ausgeführt und hat keine
+Resultate oder Qualification-Daten gesehen. Revision v2 vervollständigt daher
+vor der ersten Ausführung ausschließlich die bereits dokumentierte
+Rückrechnung. Fallauswahl, Fallreihenfolge, Checkpoints, Eingabebudgets,
+Profile, Backends und Erfolgsdefinitionen bleiben unverändert.
 
 ## Vollständige Partition
 
@@ -63,21 +83,49 @@ Arbeit verschwinden lassen.
 ## Vorab festgelegte Quanten
 
 Fast alle Rohwerte werden eins zu eins in kanonische Einheiten überführt. Nur
-vier ausdrücklich bekannte Implementierungsmultiplikatoren werden
+die ausdrücklich bekannten Implementierungsmultiplikatoren werden
 zurückgerechnet:
 
-| Rohstufe | Rohwerte je kanonischer Einheit |
+| Rohstufe oder Stufenfamilie | Rohwerte je kanonischer Einheit |
 |---|---:|
-| Literal-Evidence-Vergleich | 512 |
-| Quelltext-Evidence-Vergleich | 4 |
+| `transform.source-evidence-literal-validation` | 512 |
+| `transform.source-evidence-text-validation` | 4 |
+| `projection.root-source-hash-code-units` | 4 |
+| `projection.range-commitment-code-units` | 4 |
 | strukturelle Hasharbeit je Knoten | 128 |
 | UTF-8-Evidence-Payload | 64 Byte |
 
-Jede Division rundet nach oben. Ein nichtleerer Rohposten bleibt daher immer
-mindestens eine kanonische Arbeitseinheit. Die Werte stammen aus den bereits
-vorhandenen expliziten Sicherheitsmultiplikatoren und sind Bestandteil der
-versionierten Projektionsrevision; sie werden nicht aus Qualification- oder
-Ergebnisdaten geschätzt.
+Die Projektor-Stufe `projection.revalidation-literal-code-units` enthält zwei
+bereits getrennt bekannte Anteile in einem Rohwert. Sei
+
+```text
+n = projection.revalidation-literal-bindings
+E = projection.revalidation-literal-code-units
+```
+
+Dann muss gelten:
+
+```text
+E >= 512 * n
+(E - 512 * n) mod 4 = 0
+```
+
+Der kanonische Beitrag der kombinierten Stufe lautet exakt:
+
+```text
+n + (E - 512 * n) / 4
+```
+
+Die separat gezählte Binding-Arbeit `n` bleibt zusätzlich eins zu eins
+erhalten. Fehlt eine der beiden Companion-Stages oder lässt sich der Rohwert
+nicht exakt zerlegen, verwirft die Projektion das Artefakt. Damit wird kein
+Wert geschätzt und keine Information aus Ergebnissen benötigt.
+
+Alle gewöhnlichen Divisionen runden nach oben. Ein nichtleerer Rohposten
+bleibt daher immer mindestens eine kanonische Arbeitseinheit. Die Werte
+stammen aus den bereits vorhandenen expliziten Sicherheitsmultiplikatoren und
+sind Bestandteil der versionierten Projektionsrevision; sie werden nicht aus
+Qualification- oder Ergebnisdaten geschätzt.
 
 ## Eingabebudget
 
