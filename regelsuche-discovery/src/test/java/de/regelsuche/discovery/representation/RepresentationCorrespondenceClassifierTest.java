@@ -44,6 +44,18 @@ class RepresentationCorrespondenceClassifierTest {
     void treatsAssociativeCommutativeAdditionAsSameRepresentationClass() {
         assertSameRepresentation("a + (b + c)", "c + a + b");
         assertSameRepresentation("a - b + c", "c + a - b");
+        assertSameRepresentation("a + (b - c)", "b + a - c");
+    }
+
+    @Test
+    void preservesGroupedSumInSubtrahend() {
+        assertDifferentRepresentation("a - (b + c)", "a - b - c");
+        assertSameRepresentation("a - (b + c)", "a - (c + b)");
+    }
+
+    @Test
+    void preservesGroupedDifferenceInSubtrahend() {
+        assertDifferentRepresentation("a - (b - c)", "a - b + c");
     }
 
     @Test
