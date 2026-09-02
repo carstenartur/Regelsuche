@@ -148,7 +148,21 @@ class RepresentationCorrespondenceClassifierTest {
                 List.of(new RepresentationCorrespondenceClassifier.TraceStep(
                     1, SOPHIE_GERMAIN_TARGET)),
                 SOPHIE_GERMAIN_TARGET))
-            .getMessage().contains("depth zero"));
+            .getMessage().contains("exactly one"));
+    }
+
+    @Test
+    void rejectsAmbiguousMultipleSourceOccurrencesAtDepthZero() {
+        assertTrue(assertThrows(
+            IllegalArgumentException.class,
+            () -> classifier.evaluateTrace(
+                List.of(
+                    new RepresentationCorrespondenceClassifier.TraceStep(
+                        0, SOPHIE_GERMAIN_SOURCE),
+                    new RepresentationCorrespondenceClassifier.TraceStep(
+                        0, SOPHIE_GERMAIN_TARGET)),
+                SOPHIE_GERMAIN_TARGET))
+            .getMessage().contains("exactly one"));
     }
 
     @Test
