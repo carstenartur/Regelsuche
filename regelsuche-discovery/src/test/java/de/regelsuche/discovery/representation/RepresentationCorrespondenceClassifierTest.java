@@ -1,9 +1,9 @@
 package de.regelsuche.discovery.representation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -30,20 +30,41 @@ class RepresentationCorrespondenceClassifierTest {
 
     @Test
     void doesNotCreditValueEquivalentSourceAsSameRepresentationClass() {
-        assertEquals(
-            RepresentationCorrespondenceClassifier.Correspondence
-                .DIFFERENT_REPRESENTATION_CLASS,
-            classifier.classify(
-                SOPHIE_GERMAIN_SOURCE, SOPHIE_GERMAIN_TARGET));
+        assertDifferentRepresentation(
+            SOPHIE_GERMAIN_SOURCE, SOPHIE_GERMAIN_TARGET);
     }
 
     @Test
     void treatsAcReorderedFactorizationAsSameRepresentationClass() {
-        assertEquals(
-            RepresentationCorrespondenceClassifier.Correspondence
-                .SAME_REPRESENTATION_CLASS,
-            classifier.classify(
-                SOPHIE_GERMAIN_TARGET_REORDERED, SOPHIE_GERMAIN_TARGET));
+        assertSameRepresentation(
+            SOPHIE_GERMAIN_TARGET_REORDERED, SOPHIE_GERMAIN_TARGET);
+    }
+
+    @Test
+    void treatsAssociativeCommutativeAdditionAsSameRepresentationClass() {
+        assertSameRepresentation("a + (b + c)", "c + a + b");
+        assertSameRepresentation("a - b + c", "c + a - b");
+    }
+
+    @Test
+    void treatsAssociativeCommutativeMultiplicationAsSameRepresentationClass() {
+        assertSameRepresentation("a * (b * c)", "c * a * b");
+    }
+
+    @Test
+    void preservesRepeatedTermCompressionAsRepresentationChange() {
+        assertDifferentRepresentation("x + x", "2 * x");
+    }
+
+    @Test
+    void preservesRepeatedFactorCompressionAsRepresentationChange() {
+        assertDifferentRepresentation("x * x", "x^2");
+    }
+
+    @Test
+    void preservesNeutralTermsAsRepresentationChanges() {
+        assertDifferentRepresentation("x + 0", "x");
+        assertDifferentRepresentation("x * 1", "x");
     }
 
     @Test
@@ -101,24 +122,54 @@ class RepresentationCorrespondenceClassifierTest {
 
     @Test
     void requiresNonEmptyTrace() {
-        assertTrue(org.junit.jupiter.api.Assertions.assertThrows(
+        assertTrue(assertThrows(
             IllegalArgumentException.class,
             () -> classifier.evaluateTrace(List.of(), SOPHIE_GERMAIN_TARGET))
             .getMessage().contains("trace must not be empty"));
     }
 
     @Test
-    void selectsShallowestMatchWhenMultipleStepsMatch() {
+    void requiresSourceOccurrenceAtDepthZero() {
+        assertTrue(assertThrows(
+            IllegalArgumentException.class,
+            () -> classifier.evaluateTrace(
+                List.of(new RepresentationCorrespondenceClassifier.TraceStep(
+                    1, SOPHIE_GERMAIN_TARGET)),
+                SOPHIE_GERMAIN_TARGET))
+            .getMessage().contains("depth zero"));
+    }
+
+    @Test
+    void selectsShallowestMatchDeterministically() {
         var evidence = classifier.evaluateTrace(
             List.of(
+                new RepresentationCorrespondenceClassifier.TraceStep(
+                    0, SOPHIE_GERMAIN_SOURCE),
                 new RepresentationCorrespondenceClassifier.TraceStep(
                     3, SOPHIE_GERMAIN_TARGET),
                 new RepresentationCorrespondenceClassifier.TraceStep(
                     2, SOPHIE_GERMAIN_TARGET_REORDERED)),
             SOPHIE_GERMAIN_TARGET);
 
+        assertEquals(
+            RepresentationCorrespondenceClassifier.RediscoveryStatus
+                .REPRESENTATION_REDISCOVERED,
+            evidence.status());
         assertEquals(2, evidence.matchedDepth());
         assertNotNull(evidence.matchedExpression());
-        assertFalse(evidence.matchedDepth() == 0);
+    }
+
+    private void assertSameRepresentation(String left, String right) {
+        assertEquals(
+            RepresentationCorrespondenceClassifier.Correspondence
+                .SAME_REPRESENTATION_CLASS,
+            classifier.classify(left, right));
+    }
+
+    private void assertDifferentRepresentation(String left, String right) {
+        assertEquals(
+            RepresentationCorrespondenceClassifier.Correspondence
+                .DIFFERENT_REPRESENTATION_CLASS,
+            classifier.classify(left, right));
     }
 }
