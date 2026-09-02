@@ -1,6 +1,12 @@
 package de.regelsuche.discovery.representation;
 
-import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -19,34 +25,34 @@ import java.util.Objects;
  * conflates semantic truth with representation occurrence: the search never
  * had to change the representation to satisfy value equivalence.</p>
  *
- * <p>This classifier instead compares the assumption-free algebraic-normal
- * form ({@link ExpressionCanonicalizer#canonicalize(String)}) of each trace
- * step to that of the target. Two expressions correspond to the same
- * representation class when they canonicalize identically, which happens
- * for permitted commutative/associative regrouping and reordering, but not
- * for arbitrary algebraically equivalent expanded/factorized forms, since
- * those have different top-level structure. A match found only at depth 0
- * is reported as a false-positive diagnostic rather than as a genuine
- * representation rediscovery.</p>
+ * <p>This classifier therefore uses an AC-structural signature rather than
+ * the repository's strong algebraic canonicalizer. It ignores only
+ * associative regrouping and commutative ordering of additions and
+ * multiplications, while preserving multiplicity, coefficients, neutral
+ * terms, powers, division and factorization boundaries. In particular,
+ * {@code x + x}, {@code 2 * x} and {@code x^2} remain three different
+ * representation classes.</p>
+ *
+ * <p>Addition and subtraction are represented as a sorted multiset of signed
+ * terms. This permits reordering such as {@code a - b + c} versus
+ * {@code c + a - b} without combining terms or applying distributivity. A
+ * match found at depth 0 is reported as a false-positive diagnostic rather
+ * than as a genuine representation rediscovery.</p>
  */
 public final class RepresentationCorrespondenceClassifier {
-    private final ExpressionCanonicalizer canonicalizer;
+    private final ExpressionParser parser;
 
     public RepresentationCorrespondenceClassifier() {
-        this(new ExpressionCanonicalizer());
+        this(new ExpressionParser());
     }
 
-    public RepresentationCorrespondenceClassifier(
-        ExpressionCanonicalizer canonicalizer
-    ) {
-        this.canonicalizer = Objects.requireNonNull(
-            canonicalizer, "canonicalizer");
+    RepresentationCorrespondenceClassifier(ExpressionParser parser) {
+        this.parser = Objects.requireNonNull(parser, "parser");
     }
 
     /**
-     * Whether two expressions belong to the same representation class, that
-     * is, whether they canonicalize to the identical assumption-free
-     * algebraic-normal form.
+     * Whether two expressions belong to the same AC-structural
+     * representation class.
      */
     public enum Correspondence {
         SAME_REPRESENTATION_CLASS,
@@ -73,7 +79,10 @@ public final class RepresentationCorrespondenceClassifier {
     /** A single frozen search-trace occurrence at a given depth. */
     public record TraceStep(int depth, String expression) {
         public TraceStep {
-            Objects.requireNonNull(expression, "expression");
+            if (expression == null || expression.isBlank()) {
+                throw new IllegalArgumentException(
+                    "expression must not be blank");
+            }
             if (depth < 0) {
                 throw new IllegalArgumentException(
                     "depth must not be negative");
@@ -96,7 +105,21 @@ public final class RepresentationCorrespondenceClassifier {
                 }
             } else {
                 Objects.requireNonNull(matchedDepth, "matchedDepth");
-                Objects.requireNonNull(matchedExpression, "matchedExpression");
+                if (matchedExpression == null || matchedExpression.isBlank()) {
+                    throw new IllegalArgumentException(
+                        "matchedExpression must not be blank");
+                }
+                if (status
+                    == RediscoveryStatus.SOURCE_ALREADY_MATCHES_FALSE_POSITIVE
+                    && matchedDepth != 0) {
+                    throw new IllegalArgumentException(
+                        "source-match evidence must have depth zero");
+                }
+                if (status == RediscoveryStatus.REPRESENTATION_REDISCOVERED
+                    && matchedDepth <= 0) {
+                    throw new IllegalArgumentException(
+                        "rediscovery evidence must have positive depth");
+                }
             }
         }
     }
@@ -107,20 +130,15 @@ public final class RepresentationCorrespondenceClassifier {
     ) {
         Objects.requireNonNull(candidateExpression, "candidateExpression");
         Objects.requireNonNull(targetExpression, "targetExpression");
-        String candidateCanonical =
-            canonicalizer.canonicalize(candidateExpression);
-        String targetCanonical = canonicalizer.canonicalize(targetExpression);
-        return candidateCanonical.equals(targetCanonical)
+        return signature(candidateExpression).equals(signature(targetExpression))
             ? Correspondence.SAME_REPRESENTATION_CLASS
             : Correspondence.DIFFERENT_REPRESENTATION_CLASS;
     }
 
     /**
-     * Evaluates a frozen, depth-ordered search trace (including the source
-     * expression at depth 0) against the target's representation class,
-     * reporting the shallowest occurrence and distinguishing a genuine
-     * rediscovery (first match at depth &gt; 0) from a depth-0
-     * value-equivalence false positive.
+     * Evaluates a frozen search trace including the source expression at
+     * depth 0 against the target's representation class. The shallowest
+     * matching occurrence is selected deterministically.
      */
     public RediscoveryEvidence evaluateTrace(
         List<TraceStep> trace,
@@ -131,10 +149,17 @@ public final class RepresentationCorrespondenceClassifier {
         if (trace.isEmpty()) {
             throw new IllegalArgumentException("trace must not be empty");
         }
+        if (trace.stream().noneMatch(step -> step.depth() == 0)) {
+            throw new IllegalArgumentException(
+                "trace must include the source expression at depth zero");
+        }
+
+        String targetSignature = signature(targetExpression);
         TraceStep match = trace.stream()
-            .filter(step -> classify(step.expression(), targetExpression)
-                == Correspondence.SAME_REPRESENTATION_CLASS)
-            .min(Comparator.comparingInt(TraceStep::depth))
+            .filter(step -> signature(step.expression())
+                .equals(targetSignature))
+            .min(Comparator.comparingInt(TraceStep::depth)
+                .thenComparing(TraceStep::expression))
             .orElse(null);
         if (match == null) {
             return new RediscoveryEvidence(
@@ -145,5 +170,108 @@ public final class RepresentationCorrespondenceClassifier {
             : RediscoveryStatus.REPRESENTATION_REDISCOVERED;
         return new RediscoveryEvidence(
             status, match.depth(), match.expression());
+    }
+
+    private String signature(String expression) {
+        return signature(parser.parseTerm(expression));
+    }
+
+    private String signature(Expr expression) {
+        if (expression instanceof NumberExpr number) {
+            return atom("number", Double.toHexString(number.value()));
+        }
+        if (expression instanceof VariableExpr variable) {
+            return atom("variable", variable.name());
+        }
+        if (expression instanceof FunctionExpr function) {
+            List<String> arguments = function.arguments().stream()
+                .map(this::signature)
+                .toList();
+            List<String> components = new ArrayList<>(arguments.size() + 1);
+            components.add(atom("name", function.name()));
+            components.addAll(arguments);
+            return sequence("function", components);
+        }
+        BinaryExpr binary = (BinaryExpr) expression;
+        return switch (binary.operator()) {
+            case ADD, SUB -> additiveSignature(binary);
+            case MUL -> multiplicativeSignature(binary);
+            case DIV -> sequence(
+                "division",
+                List.of(signature(binary.left()), signature(binary.right()))
+            );
+            case POW -> sequence(
+                "power",
+                List.of(signature(binary.left()), signature(binary.right()))
+            );
+        };
+    }
+
+    private String additiveSignature(Expr expression) {
+        List<SignedTerm> terms = new ArrayList<>();
+        collectSignedTerms(expression, 1, terms);
+        List<String> components = terms.stream()
+            .map(term -> atom(
+                term.sign() > 0 ? "positive" : "negative",
+                signature(term.expression())
+            ))
+            .sorted()
+            .toList();
+        return sequence("addition", components);
+    }
+
+    private void collectSignedTerms(
+        Expr expression,
+        int sign,
+        List<SignedTerm> terms
+    ) {
+        if (expression instanceof BinaryExpr binary) {
+            if (binary.operator() == de.regelsuche.ast.BinaryOperator.ADD) {
+                collectSignedTerms(binary.left(), sign, terms);
+                collectSignedTerms(binary.right(), sign, terms);
+                return;
+            }
+            if (binary.operator() == de.regelsuche.ast.BinaryOperator.SUB) {
+                collectSignedTerms(binary.left(), sign, terms);
+                collectSignedTerms(binary.right(), -sign, terms);
+                return;
+            }
+        }
+        terms.add(new SignedTerm(sign, expression));
+    }
+
+    private String multiplicativeSignature(Expr expression) {
+        List<Expr> factors = new ArrayList<>();
+        collectFactors(expression, factors);
+        List<String> components = factors.stream()
+            .map(this::signature)
+            .sorted()
+            .toList();
+        return sequence("multiplication", components);
+    }
+
+    private void collectFactors(Expr expression, List<Expr> factors) {
+        if (expression instanceof BinaryExpr binary
+            && binary.operator() == de.regelsuche.ast.BinaryOperator.MUL) {
+            collectFactors(binary.left(), factors);
+            collectFactors(binary.right(), factors);
+            return;
+        }
+        factors.add(expression);
+    }
+
+    private static String atom(String tag, String value) {
+        return tag + '[' + value.length() + ':' + value + ']';
+    }
+
+    private static String sequence(String tag, List<String> components) {
+        StringBuilder result = new StringBuilder(tag).append('[');
+        for (String component : components) {
+            result.append(component.length()).append(':').append(component);
+        }
+        return result.append(']').toString();
+    }
+
+    private record SignedTerm(int sign, Expr expression) {
     }
 }
