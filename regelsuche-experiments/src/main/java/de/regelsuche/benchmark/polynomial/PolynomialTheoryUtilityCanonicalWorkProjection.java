@@ -21,7 +21,16 @@ import java.util.Set;
  */
 public final class PolynomialTheoryUtilityCanonicalWorkProjection {
     public static final String REVISION =
-        "regelsuche.polynomial-theory-utility-work-projection/v1";
+        "regelsuche.polynomial-theory-utility-work-projection/v2";
+
+    private static final String PROJECTOR_ROOT_SOURCE_HASH =
+        "projection.root-source-hash-code-units";
+    private static final String PROJECTOR_RANGE_COMMITMENT =
+        "projection.range-commitment-code-units";
+    private static final String PROJECTOR_LITERAL_BINDINGS =
+        "projection.revalidation-literal-bindings";
+    private static final String PROJECTOR_LITERAL_CODE_UNITS =
+        "projection.revalidation-literal-code-units";
 
     private static final long LITERAL_VALIDATION_QUANTUM = 512L;
     private static final long SOURCE_TEXT_VALIDATION_QUANTUM = 4L;
@@ -117,30 +126,89 @@ public final class PolynomialTheoryUtilityCanonicalWorkProjection {
         PolynomialWorkLedger ledger,
         Dimension dimension
     ) {
-        long result = 0L;
-        for (Map.Entry<String, Long> entry
-                : Objects.requireNonNull(ledger, "ledger").stages().entrySet()) {
-            String stage = entry.getKey();
+        Map<String, Long> stages = Objects.requireNonNull(
+            ledger,
+            "ledger"
+        ).stages();
+        for (String stage : stages.keySet()) {
             if (!dimension.accepts(stage)) {
                 throw new IllegalArgumentException(
                     "raw stage is assigned to the wrong study dimension: "
                         + dimension + ":" + stage
                 );
             }
-            result = Math.addExact(
-                result,
-                divideRoundUp(entry.getValue(), quantum(stage))
-            );
+        }
+        requireCompleteProjectorLiteralEvidence(stages, dimension);
+
+        long result = 0L;
+        for (Map.Entry<String, Long> entry : stages.entrySet()) {
+            long units = PROJECTOR_LITERAL_CODE_UNITS.equals(entry.getKey())
+                ? canonicalProjectorLiteralEvidence(stages, entry.getValue())
+                : divideRoundUp(entry.getValue(), quantum(entry.getKey()));
+            result = Math.addExact(result, units);
         }
         return result;
+    }
+
+    private static void requireCompleteProjectorLiteralEvidence(
+        Map<String, Long> stages,
+        Dimension dimension
+    ) {
+        boolean hasBindings = stages.containsKey(PROJECTOR_LITERAL_BINDINGS);
+        boolean hasCodeUnits = stages.containsKey(
+            PROJECTOR_LITERAL_CODE_UNITS
+        );
+        if (dimension == Dimension.MATCHING && hasBindings != hasCodeUnits) {
+            throw new IllegalArgumentException(
+                "projector literal evidence lacks its companion work stage"
+            );
+        }
+    }
+
+    private static long canonicalProjectorLiteralEvidence(
+        Map<String, Long> stages,
+        long encodedWork
+    ) {
+        long literalCount = stages.getOrDefault(
+            PROJECTOR_LITERAL_BINDINGS,
+            -1L
+        );
+        if (literalCount < 0L) {
+            throw new IllegalArgumentException(
+                "projector literal evidence lacks its binding count"
+            );
+        }
+        long literalValidationWork = Math.multiplyExact(
+            LITERAL_VALIDATION_QUANTUM,
+            literalCount
+        );
+        if (encodedWork < literalValidationWork) {
+            throw new IllegalArgumentException(
+                "projector literal evidence is smaller than its binding count"
+            );
+        }
+        long encodedLexemeWork = encodedWork - literalValidationWork;
+        if (encodedLexemeWork % SOURCE_TEXT_VALIDATION_QUANTUM != 0L) {
+            throw new IllegalArgumentException(
+                "projector literal lexeme work is not exactly divisible"
+            );
+        }
+        long lexemeCodeUnits =
+            encodedLexemeWork / SOURCE_TEXT_VALIDATION_QUANTUM;
+        return Math.addExact(literalCount, lexemeCodeUnits);
     }
 
     private static long quantum(String stage) {
         return switch (stage) {
             case "transform.source-evidence-literal-validation" ->
                 LITERAL_VALIDATION_QUANTUM;
-            case "transform.source-evidence-text-validation" ->
+            case "transform.source-evidence-text-validation",
+                    PROJECTOR_ROOT_SOURCE_HASH,
+                    PROJECTOR_RANGE_COMMITMENT ->
                 SOURCE_TEXT_VALIDATION_QUANTUM;
+            case PROJECTOR_LITERAL_CODE_UNITS -> throw new IllegalStateException(
+                "projector literal work requires its companion binding count"
+            );
             default -> {
                 if (stage.endsWith("-payload-utf8-bytes")) {
                     yield UTF8_EVIDENCE_QUANTUM;
