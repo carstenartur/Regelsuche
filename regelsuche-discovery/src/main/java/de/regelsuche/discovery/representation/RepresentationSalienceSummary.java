@@ -22,6 +22,9 @@ public record RepresentationSalienceSummary(
     int positiveCaseCount,
     int negativeControlCount,
     int oracleReachablePositiveCount,
+    int oracleConfirmedReachedPositiveCount,
+    int oracleConfirmedRankedPositiveCount,
+    int reachedWithoutOracleConfirmationCount,
     int reachabilityInconclusiveCount,
     int unsupportedCount,
     int reachedPositiveCount,
@@ -48,6 +51,9 @@ public record RepresentationSalienceSummary(
                 || negativeControlCount < 0
                 || positiveCaseCount + negativeControlCount != caseCount
                 || oracleReachablePositiveCount < 0
+                || oracleConfirmedReachedPositiveCount < 0
+                || oracleConfirmedRankedPositiveCount < 0
+                || reachedWithoutOracleConfirmationCount < 0
                 || reachabilityInconclusiveCount < 0
                 || unsupportedCount < 0
                 || reachedPositiveCount < 0
@@ -96,7 +102,11 @@ public record RepresentationSalienceSummary(
             "falsePositiveRate"
         );
         requireMonotoneCounts(
+            positiveCaseCount,
             oracleReachablePositiveCount,
+            oracleConfirmedReachedPositiveCount,
+            oracleConfirmedRankedPositiveCount,
+            reachedWithoutOracleConfirmationCount,
             reachedPositiveCount,
             formedPositiveCount,
             retainedPositiveCount,
@@ -110,11 +120,13 @@ public record RepresentationSalienceSummary(
         );
         requireRates(
             oracleReachablePositiveCount,
+            oracleConfirmedReachedPositiveCount,
             reachedPositiveCount,
             formedPositiveCount,
             retainedPositiveCount,
             recognizedPositiveCount,
             rankedPositiveCount,
+            oracleConfirmedRankedPositiveCount,
             expertReviewedCount,
             expertConfirmedCount,
             negativeControlCount,
@@ -150,6 +162,18 @@ public record RepresentationSalienceSummary(
                 == ReferenceReachability.UNSUPPORTED);
         int reached = count(retainedCases, value -> positive(value)
             && value.reachedRelevantRepresentation());
+        int oracleConfirmedReached = count(retainedCases, value ->
+            positive(value)
+                && value.referenceReachability()
+                    == ReferenceReachability.REACHABLE
+                && value.reachedRelevantRepresentation());
+        int reachedWithoutOracleConfirmation = count(
+            retainedCases,
+            value -> positive(value)
+                && value.referenceReachability()
+                    != ReferenceReachability.REACHABLE
+                && value.reachedRelevantRepresentation()
+        );
         int formed = count(retainedCases, value -> positive(value)
             && value.formedRelevantCandidate());
         int retained = count(retainedCases, value -> positive(value)
@@ -158,6 +182,11 @@ public record RepresentationSalienceSummary(
             && value.recognizedRelevantCandidate());
         int ranked = count(retainedCases, value -> positive(value)
             && value.rankedRelevantCandidate());
+        int oracleConfirmedRanked = count(retainedCases, value ->
+            positive(value)
+                && value.referenceReachability()
+                    == ReferenceReachability.REACHABLE
+                && value.rankedRelevantCandidate());
         int pending = count(retainedCases, value -> positive(value)
             && value.localization()
                 == Localization.RANKED_PENDING_EXPERT_REVIEW);
@@ -173,6 +202,9 @@ public record RepresentationSalienceSummary(
             positives,
             negatives,
             reachable,
+            oracleConfirmedReached,
+            oracleConfirmedRanked,
+            reachedWithoutOracleConfirmation,
             inconclusive,
             unsupported,
             reached,
@@ -184,12 +216,18 @@ public record RepresentationSalienceSummary(
             reviewed,
             confirmed,
             falsePositives,
-            RepresentationSalienceConditionalRate.of(reached, reachable),
+            RepresentationSalienceConditionalRate.of(
+                oracleConfirmedReached,
+                reachable
+            ),
             RepresentationSalienceConditionalRate.of(formed, reached),
             RepresentationSalienceConditionalRate.of(retained, formed),
             RepresentationSalienceConditionalRate.of(recognized, retained),
             RepresentationSalienceConditionalRate.of(ranked, recognized),
-            RepresentationSalienceConditionalRate.of(ranked, reachable),
+            RepresentationSalienceConditionalRate.of(
+                oracleConfirmedRanked,
+                reachable
+            ),
             RepresentationSalienceConditionalRate.of(confirmed, reviewed),
             RepresentationSalienceConditionalRate.of(falsePositives, negatives)
         );
@@ -200,6 +238,18 @@ public record RepresentationSalienceSummary(
         append(descriptor, Integer.toString(positiveCaseCount));
         append(descriptor, Integer.toString(negativeControlCount));
         append(descriptor, Integer.toString(oracleReachablePositiveCount));
+        append(
+            descriptor,
+            Integer.toString(oracleConfirmedReachedPositiveCount)
+        );
+        append(
+            descriptor,
+            Integer.toString(oracleConfirmedRankedPositiveCount)
+        );
+        append(
+            descriptor,
+            Integer.toString(reachedWithoutOracleConfirmationCount)
+        );
         append(descriptor, Integer.toString(reachabilityInconclusiveCount));
         append(descriptor, Integer.toString(unsupportedCount));
         append(descriptor, Integer.toString(reachedPositiveCount));
@@ -228,6 +278,18 @@ public record RepresentationSalienceSummary(
             .property(
                 "oracleReachablePositiveCount",
                 oracleReachablePositiveCount
+            )
+            .property(
+                "oracleConfirmedReachedPositiveCount",
+                oracleConfirmedReachedPositiveCount
+            )
+            .property(
+                "oracleConfirmedRankedPositiveCount",
+                oracleConfirmedRankedPositiveCount
+            )
+            .property(
+                "reachedWithoutOracleConfirmationCount",
+                reachedWithoutOracleConfirmationCount
             )
             .property(
                 "reachabilityInconclusiveCount",
@@ -279,11 +341,13 @@ public record RepresentationSalienceSummary(
 
     private static void requireRates(
         int reachable,
+        int oracleConfirmedReached,
         int reached,
         int formed,
         int retained,
         int recognized,
         int ranked,
+        int oracleConfirmedRanked,
         int reviewed,
         int confirmed,
         int negativeControls,
@@ -299,7 +363,7 @@ public record RepresentationSalienceSummary(
     ) {
         if (!policyReachability.equals(
                 RepresentationSalienceConditionalRate.of(
-                    reached,
+                    oracleConfirmedReached,
                     reachable))
                 || !formationRecall.equals(
                     RepresentationSalienceConditionalRate.of(
@@ -319,7 +383,7 @@ public record RepresentationSalienceSummary(
                         recognized))
                 || !automatedDetectionRecall.equals(
                     RepresentationSalienceConditionalRate.of(
-                        ranked,
+                        oracleConfirmedRanked,
                         reachable))
                 || !expertConsensus.equals(
                     RepresentationSalienceConditionalRate.of(
@@ -336,7 +400,11 @@ public record RepresentationSalienceSummary(
     }
 
     private static void requireMonotoneCounts(
+        int positiveCases,
         int reachable,
+        int oracleConfirmedReached,
+        int oracleConfirmedRanked,
+        int reachedWithoutOracleConfirmation,
         int reached,
         int formed,
         int retained,
@@ -348,11 +416,17 @@ public record RepresentationSalienceSummary(
         int negativeControls,
         int falsePositives
     ) {
-        if (ranked > recognized
+        if (reachable > positiveCases
+                || oracleConfirmedReached > reachable
+                || oracleConfirmedRanked > oracleConfirmedReached
+                || oracleConfirmedRanked > ranked
+                || reachedWithoutOracleConfirmation
+                    != reached - oracleConfirmedReached
+                || ranked > recognized
                 || recognized > retained
                 || retained > formed
                 || formed > reached
-                || reached > reachable
+                || reached > positiveCases
                 || confirmed > reviewed
                 || reviewed > ranked
                 || pending > ranked

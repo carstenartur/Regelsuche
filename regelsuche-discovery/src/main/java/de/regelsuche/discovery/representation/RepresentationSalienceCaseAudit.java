@@ -316,13 +316,13 @@ public record RepresentationSalienceCaseAudit(
                 == ReferenceReachability.NOT_REACHABLE_COMPLETE_CLOSURE) {
             return Localization.NOT_REACHABLE_IN_DECLARED_CLOSURE;
         }
-        if (referenceReachability == ReferenceReachability.INCONCLUSIVE) {
-            return Localization.REACHABILITY_INCONCLUSIVE;
-        }
-        if (referenceReachability == ReferenceReachability.UNSUPPORTED) {
-            return Localization.UNSUPPORTED;
-        }
         if (reached.isEmpty()) {
+            if (referenceReachability == ReferenceReachability.INCONCLUSIVE) {
+                return Localization.REACHABILITY_INCONCLUSIVE;
+            }
+            if (referenceReachability == ReferenceReachability.UNSUPPORTED) {
+                return Localization.UNSUPPORTED;
+            }
             return Localization.REACHABLE_NOT_REACHED_BY_POLICY;
         }
         if (formed.isEmpty()) {

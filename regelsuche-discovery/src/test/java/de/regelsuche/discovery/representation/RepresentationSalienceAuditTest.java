@@ -17,7 +17,11 @@ import static de.regelsuche.discovery.representation
 import static de.regelsuche.discovery.representation
     .RepresentationSalienceCaseAudit.Localization.RETAINED_NOT_RECOGNIZED;
 import static de.regelsuche.discovery.representation
+    .RepresentationSalienceCaseAudit.Localization.RANKED_PENDING_EXPERT_REVIEW;
+import static de.regelsuche.discovery.representation
     .RepresentationSalienceCaseAudit.ReferenceReachability.INCONCLUSIVE;
+import static de.regelsuche.discovery.representation
+    .RepresentationSalienceCaseAudit.ReferenceReachability.NOT_REACHABLE_COMPLETE_CLOSURE;
 import static de.regelsuche.discovery.representation
     .RepresentationSalienceCaseAudit.ReferenceReachability.REACHABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -145,6 +149,9 @@ class RepresentationSalienceAuditTest {
         assertEquals(4, summary.caseCount());
         assertEquals(3, summary.positiveCaseCount());
         assertEquals(2, summary.oracleReachablePositiveCount());
+        assertEquals(2, summary.oracleConfirmedReachedPositiveCount());
+        assertEquals(1, summary.oracleConfirmedRankedPositiveCount());
+        assertEquals(0, summary.reachedWithoutOracleConfirmationCount());
         assertEquals(1, summary.reachabilityInconclusiveCount());
         assertEquals(2, summary.reachedPositiveCount());
         assertEquals(1, summary.recognizedPositiveCount());
@@ -161,6 +168,86 @@ class RepresentationSalienceAuditTest {
             "\"localization\":\"RETAINED_NOT_RECOGNIZED\""
         ));
         assertEquals(artifact.toCanonicalJson(), artifact.toCanonicalJson());
+    }
+
+    @Test
+    void retainsReachedEvidenceWhenOracleWasInconclusive() {
+        RepresentationSalienceStageSet candidate =
+            RepresentationSalienceStageSet.of(List.of(
+                hash("independently-reached")
+            ));
+        RepresentationSalienceCaseAudit result =
+            RepresentationSalienceCaseAudit.create(
+                "oracle-inconclusive-search-hit",
+                POSITIVE_REFERENCE,
+                INCONCLUSIVE,
+                evidence("oracle-inconclusive-search-hit", "oracle"),
+                evidence("oracle-inconclusive-search-hit", "search"),
+                evidence("oracle-inconclusive-search-hit", "formation"),
+                evidence("oracle-inconclusive-search-hit", "retention"),
+                evidence("oracle-inconclusive-search-hit", "recognition"),
+                evidence("oracle-inconclusive-search-hit", "ranking"),
+                evidence("oracle-inconclusive-search-hit", "expert"),
+                candidate,
+                candidate,
+                candidate,
+                candidate,
+                candidate,
+                5,
+                NOT_EVALUATED
+            );
+
+        var summary = RepresentationSalienceAudit.create(
+            "oracle-inconclusive-search-hit-v1",
+            "WORKTREE",
+            hash("workspace-inconclusive-hit"),
+            hash("boundary-inconclusive-hit"),
+            List.of(result)
+        ).summary();
+
+        assertEquals(RANKED_PENDING_EXPERT_REVIEW, result.localization());
+        assertEquals(0, summary.oracleReachablePositiveCount());
+        assertEquals(0, summary.oracleConfirmedReachedPositiveCount());
+        assertEquals(0, summary.oracleConfirmedRankedPositiveCount());
+        assertEquals(1, summary.reachedWithoutOracleConfirmationCount());
+        assertEquals(1, summary.reachedPositiveCount());
+        assertFalse(summary.policyReachabilityRecall().defined());
+        assertEquals(1_000,
+            summary.formationRecallGivenReached().permille());
+        assertEquals(1_000,
+            summary.rankingRecallGivenRecognized().permille());
+        assertFalse(
+            summary.automatedDetectionRecallGivenReachable().defined());
+    }
+
+    @Test
+    void stillRejectsSearchHitsContradictingCompleteClosure() {
+        RepresentationSalienceStageSet candidate =
+            RepresentationSalienceStageSet.of(List.of(
+                hash("impossible-complete-closure-hit")
+            ));
+
+        assertThrows(IllegalArgumentException.class, () ->
+            RepresentationSalienceCaseAudit.create(
+                "contradictory-complete-closure-hit",
+                POSITIVE_REFERENCE,
+                NOT_REACHABLE_COMPLETE_CLOSURE,
+                evidence("contradictory-complete-closure-hit", "oracle"),
+                evidence("contradictory-complete-closure-hit", "search"),
+                evidence("contradictory-complete-closure-hit", "formation"),
+                evidence("contradictory-complete-closure-hit", "retention"),
+                evidence("contradictory-complete-closure-hit", "recognition"),
+                evidence("contradictory-complete-closure-hit", "ranking"),
+                evidence("contradictory-complete-closure-hit", "expert"),
+                candidate,
+                candidate,
+                candidate,
+                candidate,
+                candidate,
+                5,
+                NOT_EVALUATED
+            )
+        );
     }
 
     @Test

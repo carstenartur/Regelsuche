@@ -20,6 +20,9 @@ def hostRunB = reportRoot.map { directory ->
 def containerRun = reportRoot.map { directory ->
     directory.dir('container').asFile
 }
+def saliencePilot = reportRoot.map { directory ->
+    directory.dir('salience-pilot').asFile
+}
 def imageIdFile = reportRoot.map { directory ->
     directory.file('container-image-id.txt').asFile
 }
@@ -236,6 +239,57 @@ project(':regelsuche-discovery') { discovery ->
             'generateTargetFreeHeldOutMatrixHostB',
             hostRunB,
             'Executes the second checkout-JVM held-out reproduction run.')
+        def saliencePilotTask = discovery.tasks.register(
+            'generateTargetFreeHeldOutSaliencePilot',
+            JavaExec
+        ) {
+            group = 'verification'
+            description = 'Freezes target-blind salience ranks before post-freeze correspondence.'
+            dependsOn discovery.tasks.named('classes'), hostRunATask
+            timeout = java.time.Duration.ofMinutes(3)
+            classpath = discovery.extensions.getByName('sourceSets')
+                .getByName('main').runtimeClasspath
+            mainClass =
+                'de.regelsuche.discovery.representation.TargetFreeHeldOutSaliencePilot'
+            argumentProviders.add({
+                [
+                    hostRunA.get().absolutePath,
+                    saliencePilot.get().absolutePath
+                ]
+            } as CommandLineArgumentProvider)
+            inputs.dir hostRunA
+            outputs.dir saliencePilot
+            outputs.upToDateWhen { false }
+            doFirst {
+                def output = saliencePilot.get()
+                delete output
+                if (!output.mkdirs() && !output.isDirectory()) {
+                    throw new GradleException(
+                        "Cannot create salience-pilot output: ${output}")
+                }
+            }
+            doLast {
+                def output = saliencePilot.get()
+                def expectedFiles = [
+                    'target-free-held-out-salience-pilot.json',
+                    'target-free-held-out-salience-pilot.md',
+                    'target-free-held-out-salience-ranking-freeze.json'
+                ]
+                def actualFiles = output.listFiles()
+                    .findAll { candidate -> candidate.isFile() }
+                    .collect { candidate -> candidate.name }
+                    .sort()
+                def retainedRuns = new File(output, 'runs').listFiles()
+                    ?.findAll { candidate -> candidate.isFile() }
+                    ?.size() ?: 0
+                if (actualFiles != expectedFiles || retainedRuns != 144) {
+                    throw new GradleException(
+                        "Salience pilot produced files ${actualFiles} and "
+                            + "${retainedRuns} retained runs; expected "
+                            + "${expectedFiles} and 144 runs")
+                }
+            }
+        }
         def verifierAuthority = discovery.tasks.register(
             'verifyTargetFreeHeldOutContainerReproduction',
             JavaExec
@@ -285,7 +339,7 @@ project(':regelsuche-discovery') { discovery ->
             }
         }
         verifyTargetFreeHeldOutContainerReproduction.configure {
-            dependsOn verifierAuthority
+            dependsOn verifierAuthority, saliencePilotTask
         }
     }
 }

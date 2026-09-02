@@ -33,7 +33,7 @@ public record RepresentationSalienceAudit(
     String contentHash
 ) {
     public static final String SCHEMA =
-        "regelsuche.representation-salience-audit/v1";
+        "regelsuche.representation-salience-audit/v2";
     public static final String CLAIM_BOUNDARY =
         "Bounded target-free representation detection recall and failure-stage "
             + "localization; not global reachability, universal "

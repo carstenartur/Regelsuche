@@ -7,7 +7,7 @@ interesting representation, or it may reach one and subsequently fail to form,
 retain, recognize or rank it. Those outcomes require different architectural
 changes and must not share one generic `NOT_FOUND` status.
 
-`RepresentationSalienceAudit/v1` introduces a content-addressed diagnostic
+`RepresentationSalienceAudit/v2` introduces a content-addressed diagnostic
 contract for this separation. It is bound to an existing
 `RepresentationDiscoveryRunWorkspace`; it does not create a second run identity
 or replace the search graph, candidate freeze, recognition dossier or ranking
@@ -51,18 +51,22 @@ The summary retains numerator, denominator, whether the rate is defined and the
 integer permille value for every transition:
 
 ```text
-policy reachability recall       = reached / oracle-reachable
+policy reachability recall       = oracle-confirmed reached / oracle-reachable
 formation recall | reached       = formed / reached
 retention recall | formed        = retained / formed
 recognition recall | retained    = recognized / retained
 ranking recall | recognized      = ranked / recognized
-automated end-to-end recall      = ranked / oracle-reachable
+automated end-to-end recall      = oracle-confirmed ranked / oracle-reachable
 false-positive rate              = false-positive controls / controls
 ```
 
 A zero denominator is represented as `defined=false`; it is not converted to a
 perfect score or silently omitted. Counts of inconclusive and unsupported cases
-are retained independently of these denominators.
+are retained independently of these denominators. A representation that the
+search reaches despite an inconclusive or unsupported oracle is retained in
+`reachedWithoutOracleConfirmationCount`; it participates in downstream
+formation/recognition diagnostics but cannot silently increase an
+oracle-conditioned recall numerator.
 
 ## Information boundary
 

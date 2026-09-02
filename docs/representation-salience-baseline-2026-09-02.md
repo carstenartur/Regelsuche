@@ -250,7 +250,7 @@ werden.
 
 ## Verbindlicher nächster Test
 
-Issue #863 und `RepresentationSalienceAudit/v1` trennen künftig für jeden
+Issue #863 und `RepresentationSalienceAudit/v2` trennen künftig für jeden
 Kandidaten:
 
 ```text
