@@ -6,6 +6,7 @@ on:
       - feature/748-on-demand-verified-factorization-adapter-v2
     paths:
       - tools/apply_pr861_projected_work_v4.py
+      - tools/patch_pr861_authority_diagnostics.py
       - .github/workflows/apply-pr861-projected-work-v4.yml
 
 permissions:
@@ -34,7 +35,9 @@ jobs:
           cache: maven
 
       - name: Apply the projected-work implementation
-        run: python3 tools/apply_pr861_projected_work_v4.py
+        run: |
+          python3 tools/apply_pr861_projected_work_v4.py
+          python3 tools/patch_pr861_authority_diagnostics.py
 
       - name: Compile and run affected regression tests
         run: >-
@@ -50,6 +53,7 @@ jobs:
           rm -f tools/apply_pr861_projected_work_v2.py
           rm -f tools/apply_pr861_projected_work_v3.py
           rm -f tools/apply_pr861_projected_work_v4.py
+          rm -f tools/patch_pr861_authority_diagnostics.py
           rm -f tools/.apply_pr861_projected_work_runtime.py
           rm -f .github/workflows/apply-pr861-projected-work.yml
           rm -f .github/workflows/apply-pr861-projected-work-v3.yml
