@@ -1,0 +1,31 @@
+name: Temporary issue 863 source snapshot
+
+on:
+  push:
+    branches:
+      - feature/863-historical-salience-pilot-v1
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Create source archive outside the checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude=.git --exclude='**/build' --exclude='**/.gradle' -czf /tmp/regelsuche-issue-863-source.tar.gz .
+      - name: Retain source archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: issue-863-source-snapshot
+          path: /tmp/regelsuche-issue-863-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
