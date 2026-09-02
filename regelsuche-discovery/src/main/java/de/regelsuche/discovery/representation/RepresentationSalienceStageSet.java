@@ -7,6 +7,7 @@ import static de.regelsuche.discovery.representation
 import static de.regelsuche.discovery.representation
     .RepresentationDiscoveryRunContractSupport.sha256;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.regelsuche.json.JsonWriter;
 import java.util.HashSet;
 import java.util.List;
@@ -46,6 +47,8 @@ public record RepresentationSalienceStageSet(
         return of(List.of());
     }
 
+    /** Derived convenience state; not part of the canonical JSON contract. */
+    @JsonIgnore
     public boolean isEmpty() {
         return representationIds.isEmpty();
     }
