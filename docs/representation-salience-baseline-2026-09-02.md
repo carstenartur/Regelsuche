@@ -97,6 +97,63 @@ reduziert wiederholte semantische Struktur beziehungsweise macht eine
 Multiplizität explizit, wird von der gegenwärtigen Token-/AST-Metrik aber nicht
 als hinreichend mehrdimensionaler Gewinn bewertet.
 
+## Ergebnis 1b: Gleichwertige Varianten fallen an Referenz- und Ausführbarkeitsgrenzen durch
+
+Die eingefrorenen Kandidaten enthalten zusätzlich mathematisch gleichwertige
+Varianten wie:
+
+```text
+cos(x)^2 + sin(x)^2
+(cos(x)^2 + sin(x)^2) * y
+y * (cos(x)^2 + sin(x)^2)
+```
+
+Der Assessor erkennt darin bereits `KNOWN_WHOLE_FORM_BRIDGE` beziehungsweise
+`KNOWN_SUBFORM_BRIDGE` und teilweise materiellen Kompressionsgewinn. Die
+Post-freeze-Qualifikation markiert sie dennoch als `referenceMatched=false`,
+weil ihre Referenz nur in der Reihenfolge `sin(x)^2 + cos(x)^2` vorliegt. Die
+hinterlegte Folgeregel ist für die vertauschte beziehungsweise umgebettete Form
+ebenfalls nicht direkt ausführbar.
+
+Über die vier Politiken treten 13 solche nicht referenzgematchten
+trigonometrischen Kandidaten auf, obwohl sie strukturell als bekannte Form
+erkannt werden. Das ist weder ein reiner Suchfehler noch derselbe Fehler wie bei
+`2 * x`. Es ist eine Lücke zwischen:
+
+```text
+Struktur erkannt
+  -> semantische/AC-Korrespondenz bestätigt
+  -> Konsequenz unter Vorbereitung ausführbar
+```
+
+Die künftige Auswertung muss deshalb exakte Syntaxkorrespondenz,
+AC-/Alpha-/Semantikkorrespondenz und tatsächlich ausführbare Folgefähigkeit
+getrennt ausweisen.
+
+## Blocker für bislang unbekannte Kandidaten im heutigen Studien-Qualifier
+
+Der gegenwärtige Post-freeze-Qualifier ruft die symbolische
+Äquivalenzprüfung nur auf, nachdem ein Kandidat bereits eine bekannte
+Referenzdarstellung getroffen hat. Für `referenceMatched=false` wird unmittelbar
+nur der Evidenzstatus `OBSERVED` mit `NOT_RUN_REFERENCE_MISS` vergeben.
+
+Das ist für einen historischen Target-Test zulässig, beantwortet aber die Frage
+nach bisher unbekannten Darstellungen nicht: Ein unbekannter Kandidat besitzt
+definitionsgemäß keine Referenz und kann an dieser Grenze daher nie
+`SYMBOLICALLY_VERIFIED` und anschließend claim-eligible werden.
+
+Der Open-target-Test aus Issue #863 muss die Reihenfolge umdrehen:
+
+```text
+Kandidat target-free einfrieren
+  -> unabhängig von jeder Referenz mathematisch validieren
+  -> intrinsische Struktur, Kompression, Sharing, Capability und Transfer prüfen
+  -> erst danach historische/literarische Korrespondenz und Neuheit untersuchen
+```
+
+Diese Änderung betrifft zunächst die Studien- und Evidence-Grenze. Sie ist keine
+Erlaubnis, unbekannte Kandidaten ohne Beweis als neu oder relevant zu bezeichnen.
+
 ## Ergebnis 2: Die einfache Kalibrierung findet alle sechs Zielrepräsentationen
 
 | Fall | eingefrorene Zielrepräsentation | von Politiken gefunden | vom heutigen Assessor als relevant anerkannt | Tiefe |
