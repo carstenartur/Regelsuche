@@ -15,7 +15,7 @@ import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunO
 import static de.regelsuche.discovery.representation.RepresentationSalienceCaseAudit.CaseRole.NEGATIVE_OR_ALIAS_CONTROL;
 import static de.regelsuche.discovery.representation.RepresentationSalienceCaseAudit.CaseRole.POSITIVE_REFERENCE;
 import static de.regelsuche.discovery.representation.RepresentationSalienceCaseAudit.ExpertVerdict.NOT_EVALUATED;
-import static de.regelsuche.discovery.representation.RepresentationSalienceCaseAudit.ReferenceReachability.REACHABLE;
+import static de.regelsuche.discovery.representation.RepresentationSalienceCaseAudit.ReferenceReachability.UNSUPPORTED;
 import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.FREEZE_FILE_NAME;
 import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.FREEZE_SCHEMA;
 import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.NOT_COMPARABLE;
@@ -77,16 +77,24 @@ public final class TargetFreeHeldOutSaliencePilot {
             + "intrinsic representation evidence. Qualification references, "
             + "historical names and expected outcomes remain undisclosed.";
     public static final String PILOT_CLAIM_BOUNDARY =
-        "Calibration-only localization of search, recognition and top-k ranking "
-            + "losses on an already exposed held-out matrix; not fresh TEST "
-            + "evidence, expert interestingness, external novelty or global "
-            + "transformation-space completeness.";
+        "Calibration-only localization of recognition and top-k ranking losses "
+            + "on an already exposed retained-candidate matrix. The source "
+            + "artifact contains neither independent bounded-reachability "
+            + "receipts nor pre-retention stage sets, so observed hits remain "
+            + "without oracle confirmation and reached/formed/retained are "
+            + "retained-candidate projections; not fresh TEST evidence, expert "
+            + "interestingness, external novelty or global transformation-space "
+            + "completeness.";
 
     private static final String RANKING_STATUS =
         "CANDIDATES_ASSESSED_AND_RANKED_QUALIFICATION_NOT_DISCLOSED";
     private static final String PILOT_STATUS =
         "POST_FREEZE_CORRESPONDENCE_EVALUATED_CALIBRATION_ONLY";
     private static final ExpressionScorer SCORER = new ExpressionScorer();
+    static final RepresentationSalienceCaseAudit.ReferenceReachability
+        RETAINED_MATRIX_REACHABILITY = UNSUPPORTED;
+    static final String RETAINED_MATRIX_REACHABILITY_EVIDENCE =
+        "INDEPENDENT_BOUNDED_REACHABILITY_NOT_AVAILABLE_IN_SOURCE_ARTIFACT";
 
     private TargetFreeHeldOutSaliencePilot() {
     }
@@ -364,12 +372,19 @@ public final class TargetFreeHeldOutSaliencePilot {
         RepresentationSalienceStageSet selectedSet =
             RepresentationSalienceStageSet.of(selected);
         String rowHash = KnownStructureCatalog.sha256(canonical(ranking));
+        // This source begins at retained candidates and contains no independent
+        // bounded-reachability receipt. An observed policy hit must therefore
+        // not become an oracle-confirmed reachability numerator.
         RepresentationSalienceCaseAudit caseAudit =
             RepresentationSalienceCaseAudit.create(
                 qualified.caseId(),
                 positive ? POSITIVE_REFERENCE : NEGATIVE_OR_ALIAS_CONTROL,
-                REACHABLE,
-                plan.content().qualificationHash(),
+                RETAINED_MATRIX_REACHABILITY,
+                KnownStructureCatalog.sha256(
+                    PILOT_SCHEMA + "/"
+                        + RETAINED_MATRIX_REACHABILITY_EVIDENCE + "/"
+                        + qualified.configurationId()
+                ),
                 qualified.candidateBatchHash(),
                 qualified.candidateSetHash(),
                 qualified.candidateFreezeReceiptHash(),
