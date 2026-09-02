@@ -2,7 +2,9 @@ package de.regelsuche.discovery.representation;
 
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.OracleValidator;
+import java.util.List;
 import java.util.Objects;
+import java.util.TreeSet;
 
 /**
  * Validates a frozen target-free candidate against its own source
@@ -17,59 +19,116 @@ import java.util.Objects;
  * makes the qualifier unable to validate a genuinely unknown candidate,
  * since an unknown candidate has no reference by definition.</p>
  *
- * <p>This validator performs the intrinsic soundness check &mdash; "is the
- * candidate still equivalent to the frozen source expression?" &mdash;
- * that any candidate, known or unknown, must satisfy before its intrinsic
- * or downstream salience can be assessed. Reference matching against a
- * historical corpus, and any later literature/novelty search, remain
- * separate, later steps and are intentionally not performed here.</p>
+ * <p>This validator first asks the available oracle the unconditional
+ * question "is the candidate equivalent to the frozen source expression?".
+ * An unconditional {@code AGREE} also establishes validity under any listed
+ * assumptions. A non-agreement does not refute a candidate whose derivation
+ * depends on assumptions, because {@link OracleValidator} has no
+ * assumption-aware entry point. Such evidence is retained explicitly as
+ * {@link ValidationScope#CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED} rather than
+ * silently treating conditional validity as disproved. Historical matching
+ * and later literature/novelty search remain separate steps.</p>
  */
 public final class TargetFreeIntrinsicCandidateValidator {
     private TargetFreeIntrinsicCandidateValidator() {
+    }
+
+    /** Describes the logical scope actually established by the evidence. */
+    public enum ValidationScope {
+        /** The oracle result concerns unconditional source equivalence. */
+        UNCONDITIONAL,
+        /**
+         * Listed assumptions may matter, but the available oracle did not
+         * establish unconditional equivalence and cannot evaluate them.
+         */
+        CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED,
+        /** No equivalence claim was made by the formation process. */
+        NOT_APPLICABLE
     }
 
     /**
      * @param sourceExpression the frozen source expression the candidate was
      *     derived from
      * @param candidateExpression the frozen candidate expression to validate
+     * @param assumptions the candidate's frozen assumptions; the current
+     *     oracle can prove unconditional equivalence but cannot consume them
      * @param equivalencePreserving whether the candidate was formed only
      *     through equivalence-preserving formation rules; when {@code false}
      *     the oracle is intentionally not consulted because the candidate is
      *     not claimed to be equivalence-preserving by construction
-     * @param oracle the symbolic oracle used to independently confirm
-     *     equivalence between source and candidate
-     * @return the intrinsic validation outcome, computed without regard to
-     *     any historical reference expression
+     * @param oracle the symbolic oracle used to independently test
+     *     unconditional equivalence between source and candidate
+     * @return reference-independent validation evidence with its exact scope
      */
     public static IntrinsicValidation validate(
         String sourceExpression,
         String candidateExpression,
+        List<String> assumptions,
         boolean equivalencePreserving,
         OracleValidator oracle
     ) {
         Objects.requireNonNull(sourceExpression, "sourceExpression");
         Objects.requireNonNull(candidateExpression, "candidateExpression");
+        List<String> normalizedAssumptions = normalizeAssumptions(assumptions);
         Objects.requireNonNull(oracle, "oracle");
         if (!equivalencePreserving) {
             return new IntrinsicValidation(
                 CandidateProofStatus.OBSERVED,
-                "NOT_EQUIVALENCE_PRESERVING_BY_CONSTRUCTION");
+                "NOT_RUN_NOT_EQUIVALENCE_PRESERVING_BY_CONSTRUCTION",
+                ValidationScope.NOT_APPLICABLE,
+                normalizedAssumptions
+            );
         }
         try {
             OracleValidator.OracleValidation validation =
                 oracle.validateEquivalence(
                     sourceExpression, candidateExpression);
+            if (validation.status()
+                    == OracleValidator.OracleValidationStatus.AGREE) {
+                return new IntrinsicValidation(
+                    CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+                    validation.status().name(),
+                    ValidationScope.UNCONDITIONAL,
+                    normalizedAssumptions
+                );
+            }
             return new IntrinsicValidation(
-                validation.status()
-                    == OracleValidator.OracleValidationStatus.AGREE
-                    ? CandidateProofStatus.SYMBOLICALLY_VERIFIED
-                    : CandidateProofStatus.OBSERVED,
-                validation.status().name());
+                CandidateProofStatus.OBSERVED,
+                validation.status().name(),
+                unresolvedScope(normalizedAssumptions),
+                normalizedAssumptions
+            );
         } catch (RuntimeException exception) {
             return new IntrinsicValidation(
                 CandidateProofStatus.OBSERVED,
-                "VALIDATOR_ERROR_" + exception.getClass().getSimpleName());
+                "VALIDATOR_ERROR_" + exception.getClass().getSimpleName(),
+                unresolvedScope(normalizedAssumptions),
+                normalizedAssumptions
+            );
         }
+    }
+
+    private static ValidationScope unresolvedScope(List<String> assumptions) {
+        return assumptions.isEmpty()
+            ? ValidationScope.UNCONDITIONAL
+            : ValidationScope.CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED;
+    }
+
+    private static List<String> normalizeAssumptions(
+        List<String> assumptions
+    ) {
+        Objects.requireNonNull(assumptions, "assumptions");
+        TreeSet<String> normalized = new TreeSet<>();
+        for (String assumption : assumptions) {
+            String value = Objects.requireNonNull(
+                assumption, "assumption").trim();
+            if (value.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "assumption must not be blank");
+            }
+            normalized.add(value);
+        }
+        return List.copyOf(normalized);
     }
 
     /**
@@ -77,7 +136,9 @@ public final class TargetFreeIntrinsicCandidateValidator {
      */
     public record IntrinsicValidation(
         CandidateProofStatus status,
-        String oracleStatus
+        String oracleStatus,
+        ValidationScope scope,
+        List<String> assumptions
     ) {
         public IntrinsicValidation {
             Objects.requireNonNull(status, "status");
@@ -85,15 +146,46 @@ public final class TargetFreeIntrinsicCandidateValidator {
                 throw new IllegalArgumentException(
                     "oracleStatus must not be blank");
             }
+            Objects.requireNonNull(scope, "scope");
+            assumptions = List.copyOf(
+                Objects.requireNonNull(assumptions, "assumptions"));
+            if (scope
+                    == ValidationScope.CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED
+                    && (assumptions.isEmpty() || intrinsicallyVerified())) {
+                throw new IllegalArgumentException(
+                    "conditional unresolved evidence requires assumptions "
+                        + "and must not be verified"
+                );
+            }
+            if (scope == ValidationScope.NOT_APPLICABLE
+                    && !oracleStatus.startsWith("NOT_RUN_")) {
+                throw new IllegalArgumentException(
+                    "not-applicable validation must not claim an oracle run"
+                );
+            }
+            if (intrinsicallyVerified()
+                    && scope != ValidationScope.UNCONDITIONAL) {
+                throw new IllegalArgumentException(
+                    "verified intrinsic evidence must be unconditional"
+                );
+            }
         }
 
         /**
-         * @return whether the candidate was confirmed equivalent to its
-         *     source expression, independent of historical reference
-         *     matching
+         * @return whether unconditional source equivalence was confirmed,
+         *     independent of historical reference matching
          */
         public boolean intrinsicallyVerified() {
             return status.atLeast(CandidateProofStatus.SYMBOLICALLY_VERIFIED);
+        }
+
+        /**
+         * @return whether listed assumptions still require an assumption-aware
+         *     evaluator before validity can be accepted or rejected
+         */
+        public boolean conditionalValidityUnresolved() {
+            return scope
+                == ValidationScope.CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED;
         }
     }
 }
