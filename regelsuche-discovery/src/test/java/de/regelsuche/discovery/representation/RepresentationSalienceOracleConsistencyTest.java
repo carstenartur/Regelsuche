@@ -5,7 +5,8 @@ import static de.regelsuche.discovery.representation
 import static de.regelsuche.discovery.representation
     .RepresentationSalienceCaseAudit.ExpertVerdict.NOT_EVALUATED;
 import static de.regelsuche.discovery.representation
-    .RepresentationSalienceCaseAudit.Localization.REACHABILITY_INCONCLUSIVE;
+    .RepresentationSalienceCaseAudit.Localization
+        .RANKED_PENDING_EXPERT_REVIEW;
 import static de.regelsuche.discovery.representation
     .RepresentationSalienceCaseAudit.ReferenceReachability.INCONCLUSIVE;
 import static de.regelsuche.discovery.representation
@@ -19,7 +20,7 @@ import org.junit.jupiter.api.Test;
 
 class RepresentationSalienceOracleConsistencyTest {
     @Test
-    void acceptsReachedEvidenceWhenOracleWasInconclusive() {
+    void continuesReachedEvidenceWhenOracleWasInconclusive() {
         RepresentationSalienceStageSet candidate =
             RepresentationSalienceStageSet.of(List.of(hash("candidate")));
 
@@ -44,7 +45,7 @@ class RepresentationSalienceOracleConsistencyTest {
                 NOT_EVALUATED
             );
 
-        assertEquals(REACHABILITY_INCONCLUSIVE, audit.localization());
+        assertEquals(RANKED_PENDING_EXPERT_REVIEW, audit.localization());
     }
 
     @Test
