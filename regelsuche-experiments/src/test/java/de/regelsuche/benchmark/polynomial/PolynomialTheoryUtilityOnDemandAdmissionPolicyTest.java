@@ -77,7 +77,7 @@ class PolynomialTheoryUtilityOnDemandAdmissionPolicyTest {
         );
     }
 
-    private static PolynomialTheoryUtilityOnDemandOccurrencePlan plan(
+    private static PolynomialTheoryUtilityOnDemandOccurrencePlan.Plan plan(
         String caseId,
         String checkpointId
     ) {
