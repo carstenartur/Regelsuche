@@ -33,11 +33,15 @@ import java.util.Objects;
  * {@code x + x}, {@code 2 * x} and {@code x^2} remain three different
  * representation classes.</p>
  *
- * <p>Addition and subtraction are represented as a sorted multiset of signed
- * terms. This permits reordering such as {@code a - b + c} versus
- * {@code c + a - b} without combining terms or applying distributivity. A
- * match found at depth 0 is reported as a false-positive diagnostic rather
- * than as a genuine representation rediscovery.</p>
+ * <p>Additive structure is flattened only in positive position. A direct
+ * subtraction contributes one negative term, so reordering such as
+ * {@code a - b + c} versus {@code c + a - b} is accepted. The classifier
+ * never distributes a negative sign through a grouped expression:
+ * {@code a - (b + c)} remains distinct from {@code a - b - c}, and
+ * {@code a - (b - c)} remains distinct from {@code a - b + c}. This keeps
+ * subtraction grouping visible while still permitting harmless AC
+ * regrouping. A match found at depth 0 is reported as a false-positive
+ * diagnostic rather than as a genuine representation rediscovery.</p>
  */
 public final class RepresentationCorrespondenceClassifier {
     private final ExpressionParser parser;
@@ -209,7 +213,7 @@ public final class RepresentationCorrespondenceClassifier {
 
     private String additiveSignature(Expr expression) {
         List<SignedTerm> terms = new ArrayList<>();
-        collectSignedTerms(expression, 1, terms);
+        collectPositiveAdditiveTerms(expression, terms);
         List<String> components = terms.stream()
             .map(term -> atom(
                 term.sign() > 0 ? "positive" : "negative",
@@ -220,24 +224,29 @@ public final class RepresentationCorrespondenceClassifier {
         return sequence("addition", components);
     }
 
-    private void collectSignedTerms(
+    /**
+     * Flattens addition and the left spine of subtraction, but keeps every
+     * right-hand subtraction operand intact as one negative term. Recursing
+     * into that operand would distribute a negative sign through explicit
+     * grouping and incorrectly identify non-associative subtraction forms.
+     */
+    private void collectPositiveAdditiveTerms(
         Expr expression,
-        int sign,
         List<SignedTerm> terms
     ) {
         if (expression instanceof BinaryExpr binary) {
             if (binary.operator() == de.regelsuche.ast.BinaryOperator.ADD) {
-                collectSignedTerms(binary.left(), sign, terms);
-                collectSignedTerms(binary.right(), sign, terms);
+                collectPositiveAdditiveTerms(binary.left(), terms);
+                collectPositiveAdditiveTerms(binary.right(), terms);
                 return;
             }
             if (binary.operator() == de.regelsuche.ast.BinaryOperator.SUB) {
-                collectSignedTerms(binary.left(), sign, terms);
-                collectSignedTerms(binary.right(), -sign, terms);
+                collectPositiveAdditiveTerms(binary.left(), terms);
+                terms.add(new SignedTerm(-1, binary.right()));
                 return;
             }
         }
-        terms.add(new SignedTerm(sign, expression));
+        terms.add(new SignedTerm(1, expression));
     }
 
     private String multiplicativeSignature(Expr expression) {
