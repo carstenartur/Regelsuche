@@ -185,10 +185,46 @@ class SchematicProofPlanTest {
                 "OCCURRENCES_DISJOINT")));
         assertEquals(ResolutionState.COMPLETE_REFERENCES, complete.state());
 
+        SchematicProofPlanResolution numericOrder =
+            SchematicProofPlanResolution.create(
+                occurrencePlan,
+                List.of(new HoleBinding(
+                    "term-pair",
+                    HoleSort.OCCURRENCE_PAIR,
+                    "0.2|0.10",
+                    hash("numeric-order"))),
+                List.of());
+        assertEquals(ResolutionState.PARTIAL, numericOrder.state());
+
+        SchematicProofPlanResolution arbitraryPrecisionOrder =
+            SchematicProofPlanResolution.create(
+                occurrencePlan,
+                List.of(new HoleBinding(
+                    "term-pair",
+                    HoleSort.OCCURRENCE_PAIR,
+                    "0.9223372036854775808|0.18446744073709551616",
+                    hash("arbitrary-precision-order"))),
+                List.of());
+        assertEquals(
+            ResolutionState.PARTIAL,
+            arbitraryPrecisionOrder.state());
+
         assertThrows(IllegalArgumentException.class, () ->
             SchematicProofPlanResolution.create(occurrencePlan,
                 List.of(new HoleBinding("term-pair", HoleSort.OCCURRENCE_PAIR,
                     "1.0|0.1", hash("reversed-pair"))), List.of()));
+        assertThrows(IllegalArgumentException.class, () ->
+            SchematicProofPlanResolution.create(occurrencePlan,
+                List.of(new HoleBinding("term-pair", HoleSort.OCCURRENCE_PAIR,
+                    "0.10|0.2", hash("lexically-misordered-pair"))), List.of()));
+        assertThrows(IllegalArgumentException.class, () ->
+            SchematicProofPlanResolution.create(occurrencePlan,
+                List.of(new HoleBinding(
+                    "term-pair",
+                    HoleSort.OCCURRENCE_PAIR,
+                    "0.18446744073709551616|0.9223372036854775808",
+                    hash("arbitrary-precision-reversed"))),
+                List.of()));
         assertThrows(IllegalArgumentException.class, () ->
             SchematicProofPlanResolution.create(occurrencePlan,
                 List.of(new HoleBinding("term-pair", HoleSort.OCCURRENCE_PAIR,
@@ -229,6 +265,16 @@ class SchematicProofPlanTest {
                 List.of(new HoleBinding("alpha", HoleSort.EXACT_RATIONAL,
                     "1234567890123456789012345678901234567890",
                     hash("too-many-bytes"))), List.of()));
+        assertThrows(IllegalArgumentException.class, () ->
+            new SchematicProofPlanResolution(
+                SchematicProofPlanResolution.SCHEMA,
+                hash("empty-hole-plan"),
+                List.of(),
+                List.of("required-obligation"),
+                List.of(),
+                List.of(),
+                ResolutionState.PARTIAL,
+                hash("empty-hole-resolution")));
 
         assertThrows(IllegalArgumentException.class, () -> new SchematicProofPlan(
             plan.schema(), plan.planId(), plan.informationBoundary(),
