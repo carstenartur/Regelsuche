@@ -173,7 +173,21 @@ public final class ExactFinitePolynomialPlanReplayVerifier {
                 throw new IllegalArgumentException(
                     "replay receipt contentHash does not match contents");
             }
-            requireSize(toCanonicalJson());
+            requireSize(render(
+                verifierId,
+                verifierRevisionHash,
+                planHash,
+                planRunHash,
+                solverResultHash,
+                solverRevisionHash,
+                runStatus,
+                totalAssignments,
+                evaluatedAssignments,
+                matchingAssignments,
+                retainedSolutions,
+                resolvedCandidateHashes,
+                replayStatus,
+                contentHash));
         }
 
         static ReplayReceipt create(
