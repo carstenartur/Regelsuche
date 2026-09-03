@@ -378,3 +378,27 @@
   jmhPatterns:
     - regelsuche-math-sympy/src/jmh/**/*Factorization*
   tags: [polynomial, factorization, hensel, zassenhaus, sympy]
+
+- id: schematic-exact-plan-replay
+  label: "Schematic exact-plan resolution and replay"
+  description: "Creates content-addressed schematic proof plans, resolves finite polynomial coefficient and sign holes exhaustively, and replays complete plan runs under bound solver and resolver revisions."
+  modules: [regelsuche-learning, regelsuche-math-algorithms]
+  ownerModules: [regelsuche-learning]
+  typePatterns:
+    - 'SchematicProofPlan*'
+    - 'ExactFinitePolynomialPlan*'
+    - 'ExactFinitePolynomialHoleSolver'
+    - 'ExactFinitePolynomialResolvedCandidate'
+  testPatterns:
+    - 'SchematicProofPlan*Test'
+    - 'ExactFinitePolynomialPlan*Test'
+    - 'ExactFinitePolynomialHoleSolverTest'
+  docPatterns:
+    - docs/schematic-proof-plan-ir.md
+    - docs/schematic-proof-plan-residual-composition.md
+    - docs/exact-finite-polynomial-hole-solver.md
+    - docs/exact-finite-polynomial-plan-resolution.md
+    - docs/exact-finite-polynomial-plan-replay-receipt.md
+  evidenceTypes:
+    - validation-evidence
+  tags: [schematic-plan, exact-solver, replay, reproducibility]
