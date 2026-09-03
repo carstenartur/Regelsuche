@@ -199,8 +199,7 @@ Proof-Autorität getrennt.
 ./gradlew \
   :regelsuche-learning:test \
   --tests '*ExactFinitePolynomialPlanRunSubstitutionTest' \
-  --tests '*ExactFinitePolynomialPlanReplayVerifierTest' \
-  --tests '*ExactFinitePolynomialRevisionBindingTest'
+  --tests '*ExactFinitePolynomialPlanReplayVerifierTest'
 
 ./gradlew --no-configuration-cache ciCheck
 ```
