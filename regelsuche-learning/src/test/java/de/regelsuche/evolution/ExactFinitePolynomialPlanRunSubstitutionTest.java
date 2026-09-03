@@ -1,6 +1,6 @@
 package de.regelsuche.evolution;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import de.regelsuche.evolution.SchematicProofPlan.HoleSort;
@@ -50,10 +50,10 @@ class ExactFinitePolynomialPlanRunSubstitutionTest {
                 ExactRational.ONE)),
             signSolution.instantiatedExpression(),
             signSolution.exactNormalForm());
-        assertEquals(
+        assertNotEquals(
             signSolution.contentHash(),
             forgedCoefficientSolution.contentHash(),
-            "the legacy solution hash does not encode the hole kind");
+            "the solution identity must encode the hole kind");
 
         HoleDomain coefficientDomain = new HoleDomain(
             "unit",

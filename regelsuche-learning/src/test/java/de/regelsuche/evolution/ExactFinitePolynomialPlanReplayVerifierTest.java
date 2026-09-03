@@ -2,13 +2,16 @@ package de.regelsuche.evolution;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayVerifier.ReplayReceipt;
 import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayVerifier.ReplayStatus;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver;
 import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
 import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -208,6 +211,122 @@ class ExactFinitePolynomialPlanReplayVerifierTest {
     }
 
     @Test
+    void bindsTypedSolutionRevisionThroughPlanRunAndReplayReceipt() {
+        String source = "x + 1";
+        String ansatz = "x + ${unit}";
+        List<HoleDomain> domains = List.of(
+            HoleDomain.integerRange("unit", 1, 1));
+        int retainedSolutionLimit = 4;
+
+        String legacySolverRevision = legacySolverRevision();
+        String currentSolverRevision =
+            ExactFinitePolynomialHoleSolver.REVISION_HASH;
+        assertNotEquals(legacySolverRevision, currentSolverRevision);
+
+        String currentResolverRevision = resolverRevision(
+            currentSolverRevision);
+        String legacyResolverRevision = resolverRevision(
+            legacySolverRevision);
+        assertEquals(
+            currentResolverRevision,
+            ExactFinitePolynomialPlanResolver.REVISION_HASH);
+        assertNotEquals(
+            legacyResolverRevision,
+            currentResolverRevision);
+
+        String currentVerifierRevision = replayVerifierRevision(
+            currentSolverRevision,
+            currentResolverRevision);
+        String legacyVerifierRevision = replayVerifierRevision(
+            legacySolverRevision,
+            legacyResolverRevision);
+        assertEquals(
+            currentVerifierRevision,
+            ExactFinitePolynomialPlanReplayVerifier.REVISION_HASH);
+        assertNotEquals(
+            legacyVerifierRevision,
+            currentVerifierRevision);
+
+        SchematicProofPlan currentPlan = resolver.createPlan(
+            "typed-solution-revision-plan",
+            source,
+            ansatz,
+            domains,
+            retainedSolutionLimit,
+            LIMITS);
+        HoleDomain domain = domains.getFirst();
+        String legacyScopeHash = SchematicProofPlan.hash(lengthPrefixed(
+            ExactFinitePolynomialPlanResolver.RESOLVER_ID,
+            legacyResolverRevision,
+            ExactFinitePolynomialHoleSolver.SOLVER_ID,
+            legacySolverRevision,
+            currentPlan.planId(),
+            Integer.toString(LIMITS.maxSteps()),
+            Integer.toString(LIMITS.maxHoles()),
+            Integer.toString(LIMITS.maxObligations()),
+            Integer.toString(LIMITS.maxCanonicalBytes()),
+            source,
+            ansatz,
+            Integer.toString(retainedSolutionLimit),
+            domain.holeId(),
+            domain.kind().name(),
+            domain.values().getFirst().canonicalText()));
+        assertNotEquals(
+            legacyScopeHash,
+            currentPlan.formationScopeHash());
+
+        SchematicProofPlan.Obligation currentObligation =
+            currentPlan.obligations().getFirst();
+        SchematicProofPlan.Obligation legacyObligation =
+            new SchematicProofPlan.Obligation(
+                currentObligation.id(),
+                currentObligation.kind(),
+                currentObligation.issuerStepId(),
+                currentObligation.dependentHoleIds(),
+                currentObligation.assumptions(),
+                currentObligation.checkerCapability(),
+                legacySolverRevision,
+                currentObligation.initialStatus());
+        SchematicProofPlan legacyPlan = SchematicProofPlan.create(
+            currentPlan.planId(),
+            currentPlan.informationBoundary(),
+            legacyScopeHash,
+            currentPlan.steps(),
+            currentPlan.holes(),
+            List.of(legacyObligation),
+            currentPlan.limits());
+        assertNotEquals(
+            legacyPlan.contentHash(),
+            currentPlan.contentHash());
+
+        ExactFinitePolynomialPlanRun currentRun = resolver.resolve(
+            currentPlan,
+            source,
+            ansatz,
+            domains,
+            retainedSolutionLimit);
+        ReplayReceipt currentReceipt = verifier.verify(
+            currentPlan,
+            source,
+            ansatz,
+            domains,
+            retainedSolutionLimit,
+            currentRun);
+        assertEquals(
+            currentSolverRevision,
+            currentRun.solverResult().solverRevisionHash());
+        assertEquals(
+            currentResolverRevision,
+            currentRun.resolverRevisionHash());
+        assertEquals(
+            currentSolverRevision,
+            currentReceipt.solverRevisionHash());
+        assertEquals(
+            currentVerifierRevision,
+            currentReceipt.verifierRevisionHash());
+    }
+
+    @Test
     void receiptImplementationIsSealedPrivateAndVerifierOwned() {
         assertTrue(ReplayReceipt.class.isSealed());
         Class<?>[] permitted = ReplayReceipt.class.getPermittedSubclasses();
@@ -216,5 +335,49 @@ class ExactFinitePolynomialPlanReplayVerifierTest {
         assertTrue(Arrays.stream(permitted[0].getDeclaredConstructors())
             .allMatch(constructor ->
                 Modifier.isPrivate(constructor.getModifiers())));
+    }
+
+    private static String legacySolverRevision() {
+        return SchematicProofPlan.hash(lengthPrefixed(
+            ExactFinitePolynomialHoleSolver.SOLVER_ID,
+            "source-exact-polynomial-arithmetic",
+            "complete-finite-cartesian-enumeration",
+            "coefficient-and-sign-holes",
+            "unsupported-instantiation-fails-closed"));
+    }
+
+    private static String resolverRevision(String solverRevision) {
+        return SchematicProofPlan.hash(
+            ExactFinitePolynomialPlanResolver.RESOLVER_ID
+                + "|solver=" + solverRevision
+                + "|plan=" + SchematicProofPlan.SCHEMA
+                + "|resolution=" + SchematicProofPlanResolution.SCHEMA
+                + "|topology=finite-domains-solve-discharge-emit"
+                + "|evidence=solution-binding-and-equivalence-outcome");
+    }
+
+    private static String replayVerifierRevision(
+        String solverRevision,
+        String resolverRevision
+    ) {
+        return SchematicProofPlan.hash(lengthPrefixed(
+            ExactFinitePolynomialPlanReplayVerifier.VERIFIER_ID,
+            ExactFinitePolynomialPlanResolver.RESOLVER_ID,
+            resolverRevision,
+            ExactFinitePolynomialHoleSolver.SOLVER_ID,
+            solverRevision,
+            "complete-run-reexecution",
+            "exact-plan-run-equality",
+            "sealed-verifier-owned-non-executable-receipt"));
+    }
+
+    private static String lengthPrefixed(String... values) {
+        StringBuilder result = new StringBuilder();
+        for (String value : values) {
+            result.append(value.getBytes(StandardCharsets.UTF_8).length)
+                .append(':')
+                .append(value);
+        }
+        return result.toString();
     }
 }
