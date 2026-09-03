@@ -25,7 +25,7 @@ Transformation stehen absichtlich nicht im Receipt.
 ## Unabhängig geladene Artifact-Bytes
 
 `ExactFinitePolynomialPlanReplayArtifactVerifier` ergänzt eine getrennte
-Speichergrenze. Ein Receipt wird zunächst durch eine versionierte
+Speichergrenze. Ein Receipt oder Planlauf wird zunächst durch eine versionierte
 `ArtifactReference` beschrieben:
 
 ```text
@@ -46,7 +46,8 @@ und metadata-gebundene Artifact-ID selbst erneut.
 `VerifiedArtifactBytes` ist eine versiegelte Schnittstelle mit einer einzigen
 privaten Implementierung. Alle Byte-Zugriffe liefern Kopien. Identische Bytes
 unter einer anderen Rolle oder einem anderen Inhaltsschema besitzen eine andere
-Artifact-ID.
+Artifact-ID. Die Rollen `replay-receipt` und `plan-run` sind getrennt und
+können nicht gegeneinander eingesetzt werden.
 
 ## Kanonische semantische Receipt-Prüfung
 
@@ -79,27 +80,70 @@ die semantischen Receipt-Felder und eine eigene versionierte
 Verifikationsidentität. Die einzige Implementierung ist privat und wird nur nach
 vollständiger Prüfung erzeugt.
 
-## Präzise Vertrauensgrenze
+## Kanonischer Planlauf
 
-Die semantische Stufe bestätigt, dass unabhängig geladene Bytes genau ein
-kanonisches, intern konsistentes Receipt der aktuellen Revision darstellen. Sie
-bestätigt noch nicht, dass ein separat gespeicherter Planlauf geladen wurde oder
-dass dieser Planlauf unter den gebundenen Formationseingaben erneut ausführbar
-ist.
+`ExactFinitePolynomialPlanRunArtifactCodec` erzeugt ausschließlich aus einem
+bereits validierten `ExactFinitePolynomialPlanRun` eine kanonische kompakte
+Projektion. Sie enthält:
 
-Der nächste stärkere Schritt lautet daher:
+- Codec-, Resolver- und Solverrevision;
+- Plan-, Planlauf- und Solverresultat-Hash;
+- normalisierte Quelle und Ansatzschablone;
+- alle typisierten endlichen Hole-Domänen und exakten Werte;
+- Belegungszähler, Retained-Limit und beide Laufstatus;
+- jede gespeicherte Lösung mit typisierten Bindungen, Ausdruck und Normalform;
+- jeden Kandidaten mit Lösung-, Resolution-, Plan- und Solverresultat-Bindung;
+- einen eigenen Hash über dieselbe Darstellung ohne Selbst-Hash.
+
+Diese Bytes erhalten an der Speichergrenze noch keine semantische Autorität.
+Auch ein kompakter, aber falscher JSON-Gegenstand kann unter seiner eigenen
+Adresse als unveränderte Bytefolge bestätigt werden.
+
+## Unabhängige Replay-Bestätigung
+
+`ExactFinitePolynomialPlanReplayConfirmationVerifier` verbindet erst danach die
+beiden unabhängigen Artefakte mit den eingefrorenen Formationseingaben:
 
 ```text
 VerifiedReplayReceiptArtifact
-+ unabhängig geladener kanonischer Planlauf
-+ eingefrorener Plan, Quelle, Ansatz, Domänen und Limits
-  -> Bindung an receipt.planRunHash
-  -> vollständige Resolver-/Solverausführung
-  -> neues identisches Replay-Receipt
++ VerifiedArtifactBytes(role = plan-run)
++ Plan, Quelle, Ansatz, Domänen und Retained-Limit
+  -> erste vollständige Resolver-/Solverausführung
+  -> Receipt-/Planlauf-/Solver-/Status-/Zähler-/Kandidaten-Bindung
+  -> kanonischen Planlauf vollständig neu rendern
+  -> exakte Byte- und ArtifactReference-Gleichheit
+  -> zweite vollständige Ausführung durch den Replay-Verifier
+  -> identisches kanonisches Replay-Receipt
+  -> VerifiedReplayConfirmation
 ```
 
-Auch dieses Ergebnis bleibt von primitiver Rewrite-Evidence, einem ausführbaren
-`RewriteProgram`, formaler Proof-Evidence und Promotion-Autorität getrennt.
+Die erste Ausführung rekonstruiert die unabhängig gespeicherten Planlauf-Bytes.
+Die zweite Ausführung verlangt über den bestehenden Replay-Verifier
+Objektgleichheit des gesamten Planlaufs und reproduziert das bereits semantisch
+geprüfte Receipt. Eingabe-, Receipt-, Rollen-, Byte- oder Laufsubstitution wird
+fail-closed abgelehnt.
+
+`VerifiedReplayConfirmation` ist wieder eine versiegelte öffentliche
+Nur-Lese-Schnittstelle mit genau einer privaten Implementierung. Ihre
+versionierte Identität bindet beide Artifact-Referenzen, beide
+Verifikationsidentitäten, den rekonstruierten Planlauf und das erneut erzeugte
+Receipt.
+
+## Präzise Vertrauensgrenze
+
+Die Bestätigung weist nach, dass die unabhängig geladenen Planlauf-Bytes unter
+den eingefrorenen Eingaben durch zwei vollständige aktuelle Ausführungen
+reproduziert werden und mit dem semantisch geprüften Receipt übereinstimmen.
+
+Sie weist noch nicht nach, dass die resultierende Transformation als Folge
+einzelner primitiver Rewrite-Anwendungen unabhängig ausgeführt wurde. Der
+nächste stärkere Schritt muss deshalb Regel-ID, AST-Position, Vorher-/Nachher-
+Ausdruck, Annahmen und Work-Evidence jeder primitiven Anwendung laden und
+replayen, bevor ein vollständig geprüfter Plan in ein ausführbares
+`RewriteProgram` kompiliert werden darf.
+
+Auch die Replay-Bestätigung bleibt von formaler Proof-Evidence, autonomer
+Ansatzgrammatik, externer Neuheit und Promotion-Autorität getrennt.
 
 ## Reproduktion
 
@@ -107,7 +151,8 @@ Auch dieses Ergebnis bleibt von primitiver Rewrite-Evidence, einem ausführbaren
 ./gradlew :regelsuche-learning:test \
   --tests '*ExactFinitePolynomialPlanReplayVerifierTest' \
   --tests '*ExactFinitePolynomialPlanReplayArtifactVerifierTest' \
-  --tests '*ExactFinitePolynomialPlanReplayReceiptArtifactVerifierTest'
+  --tests '*ExactFinitePolynomialPlanReplayReceiptArtifactVerifierTest' \
+  --tests '*ExactFinitePolynomialPlanReplayConfirmationVerifierTest'
 
 ./gradlew --no-configuration-cache ciCheck
 ```
