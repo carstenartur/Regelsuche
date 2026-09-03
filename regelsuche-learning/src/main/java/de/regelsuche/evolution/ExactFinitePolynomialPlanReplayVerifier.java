@@ -11,7 +11,7 @@ import java.util.Objects;
 
 /**
  * Repeats a complete finite polynomial plan run and issues a content-addressed
- * receipt only when the replay is byte-for-byte identical.
+ * receipt only when the replay is value-for-value identical.
  *
  * <p>The receipt confirms deterministic replay under the bound resolver and
  * solver revisions. It is not formal proof evidence, an executable rewrite
