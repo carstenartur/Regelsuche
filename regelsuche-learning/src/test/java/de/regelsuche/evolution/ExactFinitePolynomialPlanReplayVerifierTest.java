@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayVerifier.ReplayReceipt;
 import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayVerifier.ReplayStatus;
 import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -73,6 +75,7 @@ class ExactFinitePolynomialPlanReplayVerifierTest {
             run));
 
         String json = receipt.toCanonicalJson();
+        assertTrue(json.contains(receipt.contentHash()));
         assertFalse(json.contains("sourceExpression"));
         assertFalse(json.contains("ansatzTemplate"));
         assertFalse(json.contains("targetExpression"));
@@ -138,10 +141,11 @@ class ExactFinitePolynomialPlanReplayVerifierTest {
         assertEquals(2, truncated.matchingAssignments());
         assertEquals(1, truncated.retainedSolutions());
         assertEquals(1, truncated.resolvedCandidateHashes().size());
+        assertFalse(none.equals(truncated));
     }
 
     @Test
-    void rejectsChangedInputsPlanRunsAndReceiptHashes() {
+    void rejectsChangedInputsPlanAndRunSubstitution() {
         List<HoleDomain> domains = List.of(
             HoleDomain.integerRange("constant", 0, 2));
         SchematicProofPlan plan = resolver.createPlan(
@@ -187,6 +191,12 @@ class ExactFinitePolynomialPlanReplayVerifierTest {
             domains,
             4,
             LIMITS);
+        ExactFinitePolynomialPlanRun differentRun = resolver.resolve(
+            differentPlan,
+            "x^2 + 1",
+            "x^2 + ${constant}",
+            domains,
+            4);
         assertThrows(IllegalArgumentException.class, () -> verifier.verify(
             differentPlan,
             "x^2 + 1",
@@ -194,85 +204,17 @@ class ExactFinitePolynomialPlanReplayVerifierTest {
             domains,
             4,
             run));
-        assertFalse(receipt.matches(differentPlan, run));
-
-        assertThrows(IllegalArgumentException.class, () ->
-            new ReplayReceipt(
-                receipt.schema(),
-                receipt.verifierId(),
-                receipt.verifierRevisionHash(),
-                receipt.planHash(),
-                receipt.planRunHash(),
-                receipt.solverResultHash(),
-                receipt.solverRevisionHash(),
-                receipt.runStatus(),
-                receipt.totalAssignments(),
-                receipt.evaluatedAssignments(),
-                receipt.matchingAssignments(),
-                receipt.retainedSolutions(),
-                receipt.resolvedCandidateHashes(),
-                receipt.replayStatus(),
-                SchematicProofPlan.hash("forged-receipt")));
+        assertFalse(receipt.matches(differentPlan, differentRun));
     }
 
     @Test
-    void rejectsInconsistentStatusCountsAndDuplicateCandidateHashes() {
-        List<HoleDomain> domains = List.of(HoleDomain.signs("sign"));
-        SchematicProofPlan plan = resolver.createPlan(
-            "status-replay-plan",
-            "x^2",
-            "(${sign}*x)^2",
-            domains,
-            2,
-            LIMITS);
-        ExactFinitePolynomialPlanRun run = resolver.resolve(
-            plan,
-            "x^2",
-            "(${sign}*x)^2",
-            domains,
-            2);
-        ReplayReceipt receipt = verifier.verify(
-            plan,
-            "x^2",
-            "(${sign}*x)^2",
-            domains,
-            2,
-            run);
-
-        assertThrows(IllegalArgumentException.class, () ->
-            new ReplayReceipt(
-                receipt.schema(),
-                receipt.verifierId(),
-                receipt.verifierRevisionHash(),
-                receipt.planHash(),
-                receipt.planRunHash(),
-                receipt.solverResultHash(),
-                receipt.solverRevisionHash(),
-                ExactFinitePolynomialPlanRun.Status.COMPLETE_WITHOUT_SOLUTION,
-                receipt.totalAssignments(),
-                receipt.evaluatedAssignments(),
-                receipt.matchingAssignments(),
-                receipt.retainedSolutions(),
-                receipt.resolvedCandidateHashes(),
-                receipt.replayStatus(),
-                receipt.contentHash()));
-        String hash = receipt.resolvedCandidateHashes().getFirst();
-        assertThrows(IllegalArgumentException.class, () ->
-            new ReplayReceipt(
-                receipt.schema(),
-                receipt.verifierId(),
-                receipt.verifierRevisionHash(),
-                receipt.planHash(),
-                receipt.planRunHash(),
-                receipt.solverResultHash(),
-                receipt.solverRevisionHash(),
-                receipt.runStatus(),
-                receipt.totalAssignments(),
-                receipt.evaluatedAssignments(),
-                receipt.matchingAssignments(),
-                2,
-                List.of(hash, hash),
-                receipt.replayStatus(),
-                receipt.contentHash()));
+    void receiptImplementationIsSealedPrivateAndVerifierOwned() {
+        assertTrue(ReplayReceipt.class.isSealed());
+        Class<?>[] permitted = ReplayReceipt.class.getPermittedSubclasses();
+        assertEquals(1, permitted.length);
+        assertTrue(Modifier.isPrivate(permitted[0].getModifiers()));
+        assertTrue(Arrays.stream(permitted[0].getDeclaredConstructors())
+            .allMatch(constructor ->
+                Modifier.isPrivate(constructor.getModifiers())));
     }
 }
