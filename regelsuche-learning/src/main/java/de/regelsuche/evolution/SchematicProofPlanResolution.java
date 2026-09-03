@@ -56,7 +56,7 @@ public record SchematicProofPlanResolution(
         requiredHoleIds = SchematicProofPlan.normalizeIds(
             requiredHoleIds,
             "requiredHoleIds",
-            true);
+            false);
         requiredObligationIds = SchematicProofPlan.normalizeIds(
             requiredObligationIds,
             "requiredObligationIds",
@@ -218,357 +218,4 @@ public record SchematicProofPlanResolution(
     }
 
     private static String render(
-        String planHash,
-        List<String> requiredHoleIds,
-        List<String> requiredObligationIds,
-        List<HoleBinding> bindings,
-        List<ObligationOutcome> outcomes,
-        ResolutionState state,
-        String contentHash
-    ) {
-        JsonWriter json = new JsonWriter().beginObject()
-            .property("schema", SCHEMA)
-            .property("planHash", planHash)
-            .stringArray("requiredHoleIds", requiredHoleIds)
-            .stringArray(
-                "requiredObligationIds",
-                requiredObligationIds)
-            .array("bindings", array -> bindings.forEach(binding ->
-                array.objectValue(object ->
-                    writeBinding(object, binding))))
-            .array("outcomes", array -> outcomes.forEach(outcome ->
-                array.objectValue(object ->
-                    writeOutcome(object, outcome))))
-            .property("state", state.name());
-        if (contentHash != null) {
-            json.property("contentHash", contentHash);
-        }
-        return json.endObject().toString();
-    }
-
-    private static void writeBinding(
-        JsonWriter json,
-        HoleBinding binding
-    ) {
-        json.property("holeId", binding.holeId())
-            .property("sort", binding.sort().name())
-            .property("canonicalValue", binding.canonicalValue())
-            .property("evidenceHash", binding.evidenceHash());
-    }
-
-    private static void writeOutcome(
-        JsonWriter json,
-        ObligationOutcome outcome
-    ) {
-        json.property("obligationId", outcome.obligationId())
-            .property("status", outcome.status().name())
-            .property(
-                "checkerCapability",
-                outcome.checkerCapability())
-            .property(
-                "checkerRevisionHash",
-                outcome.checkerRevisionHash())
-            .property(
-                "checkerExecutionHash",
-                outcome.checkerExecutionHash())
-            .property("detailCode", outcome.detailCode());
-    }
-
-    private static List<HoleBinding> normalizeBindings(
-        List<HoleBinding> values
-    ) {
-        Objects.requireNonNull(values, "bindings");
-        if (values.size() > MAX_BINDINGS) {
-            throw new IllegalArgumentException(
-                "binding count exceeds absolute limit");
-        }
-        List<HoleBinding> result = values.stream()
-            .map(value -> Objects.requireNonNull(value, "binding"))
-            .sorted(Comparator.comparing(HoleBinding::holeId))
-            .toList();
-        SchematicProofPlan.requireUnique(
-            result.stream().map(HoleBinding::holeId).toList(),
-            "binding hole IDs");
-        return List.copyOf(result);
-    }
-
-    private static List<ObligationOutcome> normalizeOutcomes(
-        List<ObligationOutcome> values
-    ) {
-        Objects.requireNonNull(values, "outcomes");
-        if (values.size() > MAX_OUTCOMES) {
-            throw new IllegalArgumentException(
-                "outcome count exceeds absolute limit");
-        }
-        List<ObligationOutcome> result = values.stream()
-            .map(value ->
-                Objects.requireNonNull(value, "outcome"))
-            .sorted(Comparator.comparing(
-                ObligationOutcome::obligationId))
-            .toList();
-        SchematicProofPlan.requireUnique(
-            result.stream()
-                .map(ObligationOutcome::obligationId)
-                .toList(),
-            "outcome obligation IDs");
-        return List.copyOf(result);
-    }
-
-    private static void validateBinding(
-        HoleBinding binding,
-        Hole hole
-    ) {
-        if (binding.sort() != hole.sort()) {
-            throw new IllegalArgumentException(
-                "binding sort differs from hole sort");
-        }
-        if (utf8Length(binding.canonicalValue())
-                > hole.budget().maxCanonicalBytes()) {
-            throw new IllegalArgumentException(
-                "binding exceeds hole byte budget");
-        }
-        switch (binding.sort()) {
-            case EXACT_RATIONAL ->
-                validateExactRational(binding, hole);
-            case SIGN -> validateSign(binding);
-            case OCCURRENCE_PATH -> validateOccurrencePath(
-                binding.canonicalValue(),
-                hole.budget().maxOccurrenceDepth());
-            case OCCURRENCE_PAIR -> validateOccurrencePair(
-                binding.canonicalValue(),
-                hole.budget().maxOccurrenceDepth());
-            case TERM, FORMULA -> {
-                // Semantic validation belongs to referenced checker evidence.
-            }
-        }
-    }
-
-    private static void validateExactRational(
-        HoleBinding binding,
-        Hole hole
-    ) {
-        if (!ExactRationalDomain.DOMAIN_ID.equals(hole.domainId())) {
-            throw new IllegalArgumentException(
-                "unsupported exact-rational domain");
-        }
-        ExactRationalParseEvidence parsed =
-            new ExactRationalDomain().parse(binding.canonicalValue());
-        if (!parsed.exact()
-                || !binding.canonicalValue().equals(
-                    parsed.canonicalValue())) {
-            throw new IllegalArgumentException(
-                "rational binding must be canonical and exact");
-        }
-        ExactRational value = parsed.value().orElseThrow();
-        int bits = Math.max(
-            value.numerator().abs().bitLength(),
-            value.denominator().bitLength());
-        if (bits > hole.budget().maxScalarBits()) {
-            throw new IllegalArgumentException(
-                "rational binding exceeds scalar bit budget");
-        }
-    }
-
-    private static void validateSign(
-        HoleBinding binding
-    ) {
-        if (!binding.canonicalValue().equals("-1")
-                && !binding.canonicalValue().equals("1")) {
-            throw new IllegalArgumentException(
-                "sign binding must be -1 or 1");
-        }
-    }
-
-    private static void validateOccurrencePath(
-        String value,
-        int maxDepth
-    ) {
-        if (!OCCURRENCE_PATH.matcher(value).matches()) {
-            throw new IllegalArgumentException(
-                "occurrence path is not canonical");
-        }
-        int depth = value.equals("root")
-            ? 0
-            : value.split("\\.").length;
-        if (depth > maxDepth) {
-            throw new IllegalArgumentException(
-                "occurrence path exceeds depth budget");
-        }
-    }
-
-    private static void validateOccurrencePair(
-        String value,
-        int maxDepth
-    ) {
-        String[] paths = value.split("\\|", -1);
-        if (paths.length != 2) {
-            throw new IllegalArgumentException(
-                "occurrence pair requires two paths");
-        }
-        validateOccurrencePath(paths[0], maxDepth);
-        validateOccurrencePath(paths[1], maxDepth);
-        if (paths[0].compareTo(paths[1]) >= 0) {
-            throw new IllegalArgumentException(
-                "occurrence pair must be distinct and ordered");
-        }
-        if (occurrencesOverlap(paths[0], paths[1])) {
-            throw new IllegalArgumentException(
-                "occurrence pair paths must be disjoint");
-        }
-    }
-
-    private static boolean occurrencesOverlap(
-        String left,
-        String right
-    ) {
-        return left.equals("root")
-            || right.equals("root")
-            || left.startsWith(right + ".")
-            || right.startsWith(left + ".");
-    }
-
-    private static void validateOutcome(
-        ObligationOutcome outcome,
-        Obligation obligation
-    ) {
-        if (!outcome.checkerCapability().equals(
-                obligation.checkerCapability())) {
-            throw new IllegalArgumentException(
-                "checker capability differs from obligation");
-        }
-        if (!outcome.checkerRevisionHash().equals(
-                obligation.checkerRevisionHash())) {
-            throw new IllegalArgumentException(
-                "checker revision differs from obligation");
-        }
-    }
-
-    private static ResolutionState deriveState(
-        List<String> requiredHoleIds,
-        List<String> requiredObligationIds,
-        List<HoleBinding> bindings,
-        List<ObligationOutcome> outcomes
-    ) {
-        if (outcomes.stream().anyMatch(outcome ->
-                outcome.status() != OutcomeStatus.CONFIRMED)) {
-            return ResolutionState.BLOCKED;
-        }
-        Set<String> bound = Set.copyOf(
-            bindings.stream().map(HoleBinding::holeId).toList());
-        Set<String> decided = Set.copyOf(
-            outcomes.stream()
-                .map(ObligationOutcome::obligationId)
-                .toList());
-        return bound.equals(Set.copyOf(requiredHoleIds))
-                && decided.equals(Set.copyOf(requiredObligationIds))
-            ? ResolutionState.COMPLETE_REFERENCES
-            : ResolutionState.PARTIAL;
-    }
-
-    private static void requireSubset(
-        List<String> actual,
-        List<String> required,
-        String name
-    ) {
-        if (!new HashSet<>(required).containsAll(actual)) {
-            throw new IllegalArgumentException(
-                name + " contain unknown IDs");
-        }
-    }
-
-    private static int utf8Length(
-        String value
-    ) {
-        return value.getBytes(StandardCharsets.UTF_8).length;
-    }
-
-    private static void requireSize(
-        String value,
-        int maximumBytes
-    ) {
-        if (utf8Length(value) > maximumBytes) {
-            throw new IllegalArgumentException(
-                "canonical resolution exceeds byte limit");
-        }
-    }
-
-    public enum ResolutionState {
-        PARTIAL,
-        BLOCKED,
-        COMPLETE_REFERENCES
-    }
-
-    public enum OutcomeStatus {
-        CONFIRMED,
-        REFUTED,
-        UNKNOWN,
-        UNSUPPORTED,
-        BUDGET_INCONCLUSIVE,
-        ERROR
-    }
-
-    public record HoleBinding(
-        String holeId,
-        HoleSort sort,
-        String canonicalValue,
-        String evidenceHash
-    ) {
-        public HoleBinding {
-            holeId = SchematicProofPlan.requireId(
-                holeId,
-                "holeId");
-            sort = Objects.requireNonNull(sort, "sort");
-            if (canonicalValue == null
-                    || canonicalValue.isBlank()
-                    || !canonicalValue.equals(
-                        canonicalValue.strip())) {
-                throw new IllegalArgumentException(
-                    "canonicalValue must be nonblank and trimmed");
-            }
-            if (canonicalValue.chars().anyMatch(
-                    Character::isISOControl)) {
-                throw new IllegalArgumentException(
-                    "canonicalValue contains a control character");
-            }
-            if (utf8Length(canonicalValue) > MAX_VALUE_BYTES) {
-                throw new IllegalArgumentException(
-                    "canonicalValue exceeds absolute byte limit");
-            }
-            evidenceHash = SchematicProofPlan.requireSha256(
-                evidenceHash,
-                "evidenceHash");
-        }
-    }
-
-    public record ObligationOutcome(
-        String obligationId,
-        OutcomeStatus status,
-        String checkerCapability,
-        String checkerRevisionHash,
-        String checkerExecutionHash,
-        String detailCode
-    ) {
-        public ObligationOutcome {
-            obligationId = SchematicProofPlan.requireId(
-                obligationId,
-                "obligationId");
-            status = Objects.requireNonNull(status, "status");
-            checkerCapability = SchematicProofPlan.requireToken(
-                checkerCapability,
-                "checkerCapability");
-            checkerRevisionHash =
-                SchematicProofPlan.requireSha256(
-                    checkerRevisionHash,
-                    "checkerRevisionHash");
-            checkerExecutionHash =
-                SchematicProofPlan.requireSha256(
-                    checkerExecutionHash,
-                    "checkerExecutionHash");
-            if (detailCode == null
-                    || !DETAIL_CODE.matcher(detailCode).matches()) {
-                throw new IllegalArgumentException(
-                    "detailCode must be an uppercase stable code");
-            }
-        }
-    }
-}
+        String planHa²È="25½¥Ù…±¥‘…Ñ•=ÕÉÉ•¹•A…Ñ  (€€€€€€€MÑÉ¥¹œÙ…±Õ”°(€€€€€€€¥¹Ðµ…á•ÁÑ (€€€€¤ì(€€€€€€€¥˜€ …=UII9}AQ ¹µ…Ñ¡•È¡Ù…±Õ”¤¹µ…Ñ¡•Ì ¤¤ì(€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€‰½ÕÉÉ•¹”Á…Ñ ¥Ì¹½Ð…¹½¹¥…°ˆ¤ì(€€€€€€€ô(€€€€€€€¥¹Ð‘•ÁÑ €ôÙ…±Õ”¹•ÅÕ…±Ì ‰É½½Ðˆ¤(€€€€€€€€€€€€ü€À(€€€€€€€€€€€€èÙ…±Õ”¹ÍÁ±¥Ð ‰qp¸ˆ¤¹±•¹Ñ ì(€€€€€€€¥˜€¡‘•ÁÑ €øµ…á•ÁÑ ¤ì(€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€‰½ÕÉÉ•¹”Á…Ñ •á••‘Ì‘•ÁÑ ‰Õ‘•Ðˆ¤ì(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒÙ½¥Ù…±¥‘…Ñ•=ÕÉÉ•¹•A…¥È (€€€€€€€MÑÉ¥¹œÙ…±Õ”°(€€€€€€€¥¹Ðµ…á•ÁÑ (€€€€¤ì(€€€€€€€MÑÉ¥¹mtÁ…Ñ¡Ì€ôÙ…±Õ”¹ÍÁ±¥Ð ‰qqðˆ°€´Ä¤ì(€€€€€€€¥˜€¡Á…Ñ¡Ì¹±•¹Ñ €„ô€È¤ì(€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€‰½ÕÉÉ•¹”Á…¥ÈÉ•ÅÕ¥É•ÌÑÝ¼Á…Ñ¡Ìˆ¤ì(€€€€€€€ô(€€€€€€€Ù…±¥‘…Ñ•=ÕÉÉ•¹•A…Ñ ¡Á…Ñ¡ÍlÁt°µ…á•ÁÑ ¤ì(€€€€€€€Ù…±¥‘…Ñ•=ÕÉÉ•¹•A…Ñ ¡Á…Ñ¡ÍlÅt°µ…á•ÁÑ ¤ì(€€€€€€€¥˜€¡½µÁ…É•=ÕÉÉ•¹•A…Ñ¡Ì¡Á…Ñ¡ÍlÁt°Á…Ñ¡ÍlÅt¤€øô€À¤ì(€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€‰½ÕÉÉ•¹”Á…¥ÈµÕÍÐ‰”‘¥ÍÑ¥¹Ð…¹¹Õµ•É¥…±±ä½É‘•É•ˆ¤ì(€€€€€€€ô(€€€€€€€¥˜€¡½ÕÉÉ•¹•Í=Ù•É±…À¡Á…Ñ¡ÍlÁt°Á…Ñ¡ÍlÅt¤¤ì(€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€‰½ÕÉÉ•¹”Á…¥ÈÁ…Ñ¡ÌµÕÍÐ‰”‘¥Í©½¥¹Ðˆ¤ì(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ¥¹Ð½µÁ…É•=ÕÉÉ•¹•A…Ñ¡Ì (€€€€€€€MÑÉ¥¹œ±•™Ð°(€€€€€€€MÑÉ¥¹œÉ¥¡Ð(€€€€¤ì(€€€€€€€¥˜€¡±•™Ð¹•ÅÕ…±Ì¡É¥¡Ð¤¤ì(€€€€€€€€€€€É•ÑÕÉ¸€Àì(€€€€€€€ô(€€€€€€€¥˜€¡±•™Ð¹•ÅÕ…±Ì ‰É½½Ðˆ¤¤ì(€€€€€€€€€€€É•ÑÕÉ¸€´Äì(€€€€€€€ô(€€€€€€€¥˜€¡É¥¡Ð¹•ÅÕ…±Ì ‰É½½Ðˆ¤¤ì(€€€€€€€€€€€É•ÑÕÉ¸€Äì(€€€€€€€ô(€€€€€€€MÑÉ¥¹mt±•™Ñ%¹‘•á•Ì€ô±•™Ð¹ÍÁ±¥Ð ‰qp¸ˆ¤ì(€€€€€€€MÑÉ¥¹mtÉ¥¡Ñ%¹‘•á•Ì€ôÉ¥¡Ð¹ÍÁ±¥Ð ‰qp¸ˆ¤ì(€€€€€€€¥¹ÐÍ¡…É•€ô5…Ñ ¹µ¥¸ (€€€€€€€€€€€±•™Ñ%¹‘•á•Ì¹±•¹Ñ °(€€€€€€€€€€€É¥¡Ñ%¹‘•á•Ì¹±•¹Ñ ¤ì(€€€€€€€™½È€¡¥¹Ð¥¹‘•à€ô€Àì¥¹‘•à€ðÍ¡…É•ì¥¹‘•à¬¬¤ì(€€€€€€€€€€€¥¹Ð½µÁ…É¥Í½¸€ô½µÁ…É•…¹½¹¥…±%¹‘•à (€€€€€€€€€€€€€€€±•™Ñ%¹‘•á•Ím¥¹‘•át°(€€€€€€€€€€€€€€€É¥¡Ñ%¹‘•á•Ím¥¹‘•át¤ì(€€€€€€€€€€€¥˜€¡½µÁ…É¥Í½¸€„ô€À¤ì(€€€€€€€€€€€€€€€É•ÑÕÉ¸½µÁ…É¥Í½¸ì(€€€€€€€€€€€ô(€€€€€€€ô(€€€€€€€É•ÑÕÉ¸%¹Ñ••È¹½µÁ…É”¡±•™Ñ%¹‘•á•Ì¹±•¹Ñ °É¥¡Ñ%¹‘•á•Ì¹±•¹Ñ ¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ¥¹Ð½µÁ…É•…¹½¹¥…±%¹‘•à (€€€€€€€MÑÉ¥¹œ±•™Ð°(€€€€€€€MÑÉ¥¹œÉ¥¡Ð(€€€€¤ì(€€€€€€€¥¹Ð±•¹Ñ¡½µÁ…É¥Í½¸€ô%¹Ñ••È¹½µÁ…É” (€€€€€€€€€€€±•™Ð¹±•¹Ñ  ¤°(€€€€€€€€€€€É¥¡Ð¹±•¹Ñ  ¤¤ì(€€€€€€€É•ÑÕÉ¸±•¹Ñ¡½µÁ…É¥Í½¸€„ô€À(€€€€€€€€€€€€ü±•¹Ñ¡½µÁ…É¥Í½¸(€€€€€€€€€€€€è±•™Ð¹½µÁ…É•Q¼¡É¥¡Ð¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ‰½½±•…¸½ÕÉÉ•¹•Í=Ù•É±…À (€€€€€€€MÑÉ¥¹œ±•™Ð°(€€€€€€€MÑÉ¥¹œÉ¥¡Ð(€€€€¤ì(€€€€€€€É•ÑÕÉ¸±•™Ð¹•ÅÕ…±Ì ‰É½½Ðˆ¤(€€€€€€€€€€€ñðÉ¥¡Ð¹•ÅÕ…±Ì ‰É½½Ðˆ¤(€€€€€€€€€€€ñð±•™Ð¹ÍÑ…ÉÑÍ]¥Ñ ¡É¥¡Ð€¬€ˆ¸ˆ¤(€€€€€€€€€€€ñðÉ¥¡Ð¹ÍÑ…ÉÑÍ]¥Ñ ¡±•™Ð€¬€ˆ¸ˆ¤ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒÙ½¥Ù…±¥‘…Ñ•=ÕÑ½µ” (€€€€€€€=‰±¥…Ñ¥½¹=ÕÑ½µ”½ÕÑ½µ”°(€€€€€€€=‰±¥…Ñ¥½¸½‰±¥…Ñ¥½¸(€€€€¤ì(€€€€€€€¥˜€ …½ÕÑ½µ”¹¡•­•É…Á…‰¥±¥Ñä ¤¹•ÅÕ…±Ì (€€€€€€€€€€€€€€€½‰±¥…Ñ¥½¸¹¡•­•É…Á…‰¥±¥Ñä ¤¤¤ì(€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€‰¡•­•È…Á…‰¥±¥Ñä‘¥™™•ÉÌ™É½´½‰±¥…Ñ¥½¸ˆ¤ì(€€€€€€€ô(€€€€€€€¥˜€ …½ÕÑ½µ”¹¡•­•ÉI•Ù¥Í¥½¹!…Í  ¤¹•ÅÕ…±Ì (€€€€€€€€€€€€€€€½‰±¥…Ñ¥½¸¹¡•­•ÉI•Ù¥Í¥½¹!…Í  ¤¤¤ì(€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€‰¡•­•ÈÉ•Ù¥Í¥½¸‘¥™™•ÉÌ™É½´½‰±¥…Ñ¥½¸ˆ¤ì(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒI•Í½±ÕÑ¥½¹MÑ…Ñ”‘•É¥Ù•MÑ…Ñ” (€€€€€€€1¥ÍÐñMÑÉ¥¹œøÉ•ÅÕ¥É•‘!½±•%‘Ì°(€€€€€€€1¥ÍÐñMÑÉ¥¹œøÉ•ÅÕ¥É•‘=‰±¥…Ñ¥½¹%‘Ì°(€€€€€€€1¥ÍÐñ!½±•	¥¹‘¥¹œø‰¥¹‘¥¹Ì°(€€€€€€€1¥ÍÐñ=‰±¥…Ñ¥½¹=ÕÑ½µ”ø½ÕÑ½µ•Ì(€€€€¤ì(€€€€€€€¥˜€¡½ÕÑ½µ•Ì¹ÍÑÉ•…´ ¤¹…¹å5…Ñ ¡½ÕÑ½µ”€´ø(€€€€€€€€€€€€€€€½ÕÑ½µ”¹ÍÑ…ÑÕÌ ¤€„ô=ÕÑ½µ•MÑ…ÑÕÌ¹=9%I5¤¤ì(€€€€€€€€€€€É•ÑÕÉ¸I•Í½±ÕÑ¥½¹MÑ…Ñ”¹	1=-ì(€€€€€€€ô(€€€€€€€M•ÐñMÑÉ¥¹œø‰½Õ¹€ôM•Ð¹½Áå=˜ (€€€€€€€€€€€‰¥¹‘¥¹Ì¹ÍÑÉ•…´ ¤¹µ…À¡!½±•	¥¹‘¥¹œèé¡½±•%¤¹Ñ½1¥ÍÐ ¤¤ì(€€€€€€€M•ÐñMÑÉ¥¹œø‘•¥‘•€ôM•Ð¹½Áå=˜ (€€€€€€€€€€€½ÕÑ½µ•Ì¹ÍÑÉ•…´ ¤(€€€€€€€€€€€€€€€€¹µ…À¡=‰±¥…Ñ¥½¹=ÕÑ½µ”èé½‰±¥…Ñ¥½¹%¤(€€€€€€€€€€€€€€€€¹Ñ½1¥ÍÐ ¤¤ì(€€€€€€€É•ÑÕÉ¸‰½Õ¹¹•ÅÕ…±Ì¡M•Ð¹½Áå=˜¡É•ÅÕ¥É•‘!½±•%‘Ì¤¤(€€€€€€€€€€€€€€€€˜˜‘•¥‘•¹•ÅÕ…±Ì¡M•Ð¹½Áå=˜¡É•ÅÕ¥É•‘=‰±¥…Ñ¥½¹%‘Ì¤¤(€€€€€€€€€€€€üI•Í½±ÕÑ¥½¹MÑ…Ñ”¹=5A1Q}II9L(€€€€€€€€€€€€èI•Í½±ÕÑ¥½¹MÑ…Ñ”¹AIQ%0ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒÙ½¥É•ÅÕ¥É•MÕ‰Í•Ð (€€€€€€€1¥ÍÐñMÑÉ¥¹œø…ÑÕ…°°(€€€€€€€1¥ÍÐñMÑÉ¥¹œøÉ•ÅÕ¥É•°(€€€€€€€MÑÉ¥¹œ¹…µ”(€€€€¤ì(€€€€€€€¥˜€ …¹•Ü!…Í¡M•Ððø¡É•ÅÕ¥É•¤¹½¹Ñ…¥¹Í±°¡…ÑÕ…°¤¤ì(€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€¹…µ”€¬€ˆ½¹Ñ…¥¸Õ¹­¹½Ý¸%Ìˆ¤ì(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥Œ¥¹ÐÕÑ˜á1•¹Ñ  (€€€€€€€MÑÉ¥¹œÙ…±Õ”(€€€€¤ì(€€€€€€€É•ÑÕÉ¸Ù…±Õ”¹•Ñ	åÑ•Ì¡MÑ…¹‘…É‘¡…ÉÍ•ÑÌ¹UQ|à¤¹±•¹Ñ ì(€€€ô((€€€ÁÉ¥Ù…Ñ”ÍÑ…Ñ¥ŒÙ½¥É•ÅÕ¥É•M¥é” (€€€€€€€MÑÉ¥¹œÙ…±Õ”°(€€€€€€€¥¹Ðµ…á¥µÕµ	åÑ•Ì(€€€€¤ì(€€€€€€€¥˜€¡ÕÑ˜á1•¹Ñ ¡Ù…±Õ”¤€øµ…á¥µÕµ	åÑ•Ì¤ì(€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€‰…¹½¹¥…°É•Í½±ÕÑ¥½¸•á••‘Ì‰åÑ”±¥µ¥Ðˆ¤ì(€€€€€€€ô(€€€ô((€€€ÁÕ‰±¥Œ•¹Õ´I•Í½±ÕÑ¥½¹MÑ…Ñ”ì(€€€€€€€AIQ%0°(€€€€€€€	1=-°(€€€€€€€=5A1Q}II9L(€€€ô((€€€ÁÕ‰±¥Œ•¹Õ´=ÕÑ½µ•MÑ…ÑÕÌì(€€€€€€€=9%I5°(€€€€€€€IUQ°(€€€€€€€U9-9=]8°(€€€€€€€U9MUAA=IQ°(€€€€€€€	UQ}%9=91UM%Y°(€€€€€€€II=H(€€€ô((€€€ÁÕ‰±¥ŒÉ•½É!½±•	¥¹‘¥¹œ (€€€€€€€MÑÉ¥¹œ¡½±•%°(€€€€€€€!½±•M½ÉÐÍ½ÉÐ°(€€€€€€€MÑÉ¥¹œ…¹½¹¥…±Y…±Õ”°(€€€€€€€MÑÉ¥¹œ•Ù¥‘•¹•!…Í (€€€€¤ì(€€€€€€€ÁÕ‰±¥Œ!½±•	¥¹‘¥¹œì(€€€€€€€€€€€¡½±•%€ôM¡•µ…Ñ¥AÉ½½™A±…¸¹É•ÅÕ¥É•% (€€€€€€€€€€€€€€€¡½±•%°(€€€€€€€€€€€€€€€€‰¡½±•%ˆ¤ì(€€€€€€€€€€€Í½ÉÐ€ô=‰©•ÑÌ¹É•ÅÕ¥É•9½¹9Õ±°¡Í½ÉÐ°€‰Í½ÉÐˆ¤ì(€€€€€€€€€€€¥˜€¡…¹½¹¥…±Y…±Õ”€ôô¹Õ±°(€€€€€€€€€€€€€€€€€€€ñð…¹½¹¥…±Y…±Õ”¹¥Í	±…¹¬ ¤(€€€€€€€€€€€€€€€€€€€ñð€……¹½¹¥…±Y…±Õ”¹•ÅÕ…±Ì (€€€€€€€€€€€€€€€€€€€€€€€…¹½¹¥…±Y…±Õ”¹ÍÑÉ¥À ¤¤¤ì(€€€€€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€€€€€‰…¹½¹¥…±Y…±Õ”µÕÍÐ‰”¹½¹‰±…¹¬…¹ÑÉ¥µµ•ˆ¤ì(€€€€€€€€€€€ô(€€€€€€€€€€€¥˜€¡…¹½¹¥…±Y…±Õ”¹¡…ÉÌ ¤¹…¹å5…Ñ  (€€€€€€€€€€€€€€€€€€€¡…É…Ñ•Èèé¥Í%M=½¹ÑÉ½°¤¤ì(€€€€€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€€€€€‰…¹½¹¥…±Y…±Õ”½¹Ñ…¥¹Ì„½¹ÑÉ½°¡…É…Ñ•Èˆ¤ì(€€€€€€€€€€€ô(€€€€€€€€€€€¥˜€¡ÕÑ˜á1•¹Ñ ¡…¹½¹¥…±Y…±Õ”¤€ø5a}Y1U}	eQL¤ì(€€€€€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€€€€€‰…¹½¹¥…±Y…±Õ”•á••‘Ì…‰Í½±ÕÑ”‰åÑ”±¥µ¥Ðˆ¤ì(€€€€€€€€€€€ô(€€€€€€€€€€€•Ù¥‘•¹•!…Í €ôM¡•µ…Ñ¥AÉ½½™A±…¸¹É•ÅÕ¥É•M¡„ÈÔØ (€€€€€€€€€€€€€€€•Ù¥‘•¹•!…Í °(€€€€€€€€€€€€€€€€‰•Ù¥‘•¹•!…Í ˆ¤ì(€€€€€€€ô(€€€ô((€€€ÁÕ‰±¥ŒÉ•½É=‰±¥…Ñ¥½¹=ÕÑ½µ” (€€€€€€€MÑÉ¥¹œ½‰±¥…Ñ¥½¹%°(€€€€€€€=ÕÑ½µ•MÑ…ÑÕÌÍÑ…ÑÕÌ°(€€€€€€€MÑÉ¥¹œ¡•­•É…Á…‰¥±¥Ñä°(€€€€€€€MÑÉ¥¹œ¡•­•ÉI•Ù¥Í¥½¹!…Í °(€€€€€€€MÑÉ¥¹œ¡•­•Éá•ÕÑ¥½¹!…Í °(€€€€€€€MÑÉ¥¹œ‘•Ñ…¥±½‘”(€€€€¤ì(€€€€€€€ÁÕ‰±¥Œ=‰±¥…Ñ¥½¹=ÕÑ½µ”ì(€€€€€€€€€€€½‰±¥…Ñ¥½¹%€ôM¡•µ…Ñ¥AÉ½½™A±…¸¹É•ÅÕ¥É•% (€€€€€€€€€€€€€€€½‰±¥…Ñ¥½¹%°(€€€€€€€€€€€€€€€€‰½‰±¥…Ñ¥½¹%ˆ¤ì(€€€€€€€€€€€ÍÑ…ÑÕÌ€ô=‰©•ÑÌ¹É•ÅÕ¥É•9½¹9Õ±°¡ÍÑ…ÑÕÌ°€‰ÍÑ…ÑÕÌˆ¤ì(€€€€€€€€€€€¡•­•É…Á…‰¥±¥Ñä€ôM¡•µ…Ñ¥AÉ½½™A±…¸¹É•ÅÕ¥É•Q½­•¸ (€€€€€€€€€€€€€€€¡•­•É…Á…‰¥±¥Ñä°(€€€€€€€€€€€€€€€€‰¡•­•É…Á…‰¥±¥Ñäˆ¤ì(€€€€€€€€€€€¡•­•ÉI•Ù¥Í¥½¹!…Í €ô(€€€€€€€€€€€€€€€M¡•µ…Ñ¥AÉ½½™A±…¸¹É•ÅÕ¥É•M¡„ÈÔØ (€€€€€€€€€€€€€€€€€€€¡•­•ÉI•Ù¥Í¥½¹!…Í °(€€€€€€€€€€€€€€€€€€€€‰¡•­•ÉI•Ù¥Í¥½¹!…Í ˆ¤ì(€€€€€€€€€€€¡•­•Éá•ÕÑ¥½¹!…Í €ô(€€€€€€€€€€€€€€€M¡•µ…Ñ¥AÉ½½™A±…¸¹É•ÅÕ¥É•M¡„ÈÔØ (€€€€€€€€€€€€€€€€€€€¡•­•Éá•ÕÑ¥½¹!…Í °(€€€€€€€€€€€€€€€€€€€€‰¡•­•Éá•ÕÑ¥½¹!…Í ˆ¤ì(€€€€€€€€€€€¥˜€¡‘•Ñ…¥±½‘”€ôô¹Õ±°(€€€€€€€€€€€€€€€€€€€ñð€…Q%1}=¹µ…Ñ¡•È¡‘•Ñ…¥±½‘”¤¹µ…Ñ¡•Ì ¤¤ì(€€€€€€€€€€€€€€€Ñ¡É½Ü¹•Ü%±±•…±ÉÕµ•¹Ñá•ÁÑ¥½¸ (€€€€€€€€€€€€€€€€€€€€‰‘•Ñ…¥±½‘”µÕÍÐ‰”…¸ÕÁÁ•É…Í”ÍÑ…‰±”½‘”ˆ¤ì(€€€€€€€€€€€ô(€€€€€€€ô(€€€ô)ô(
