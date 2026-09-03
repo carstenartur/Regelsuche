@@ -211,7 +211,13 @@ class ExactFinitePolynomialPlanReplayVerifierTest {
     }
 
     @Test
-    void bindsTypedSolutionRevisionThroughResolverAndReplayVerifier() {
+    void bindsTypedSolutionRevisionThroughPlanRunAndReplayReceipt() {
+        String source = "x + 1";
+        String ansatz = "x + ${unit}";
+        List<HoleDomain> domains = List.of(
+            HoleDomain.integerRange("unit", 1, 1));
+        int retainedSolutionLimit = 4;
+
         String legacySolverRevision = legacySolverRevision();
         String currentSolverRevision =
             ExactFinitePolynomialHoleSolver.REVISION_HASH;
@@ -226,18 +232,98 @@ class ExactFinitePolynomialPlanReplayVerifierTest {
             ExactFinitePolynomialPlanResolver.REVISION_HASH);
         assertNotEquals(
             legacyResolverRevision,
-            ExactFinitePolynomialPlanResolver.REVISION_HASH);
+            currentResolverRevision);
 
+        String currentVerifierRevision = replayVerifierRevision(
+            currentSolverRevision,
+            currentResolverRevision);
+        String legacyVerifierRevision = replayVerifierRevision(
+            legacySolverRevision,
+            legacyResolverRevision);
         assertEquals(
-            replayVerifierRevision(
-                currentSolverRevision,
-                currentResolverRevision),
+            currentVerifierRevision,
             ExactFinitePolynomialPlanReplayVerifier.REVISION_HASH);
         assertNotEquals(
-            replayVerifierRevision(
+            legacyVerifierRevision,
+            currentVerifierRevision);
+
+        SchematicProofPlan currentPlan = resolver.createPlan(
+            "typed-solution-revision-plan",
+            source,
+            ansatz,
+            domains,
+            retainedSolutionLimit,
+            LIMITS);
+        HoleDomain domain = domains.getFirst();
+        String legacyScopeHash = SchematicProofPlan.hash(lengthPrefixed(
+            ExactFinitePolynomialPlanResolver.RESOLVER_ID,
+            legacyResolverRevision,
+            ExactFinitePolynomialHoleSolver.SOLVER_ID,
+            legacySolverRevision,
+            currentPlan.planId(),
+            Integer.toString(LIMITS.maxSteps()),
+            Integer.toString(LIMITS.maxHoles()),
+            Integer.toString(LIMITS.maxObligations()),
+            Integer.toString(LIMITS.maxCanonicalBytes()),
+            source,
+            ansatz,
+            Integer.toString(retainedSolutionLimit),
+            domain.holeId(),
+            domain.kind().name(),
+            domain.values().getFirst().canonicalText()));
+        assertNotEquals(
+            legacyScopeHash,
+            currentPlan.formationScopeHash());
+
+        SchematicProofPlan.Obligation currentObligation =
+            currentPlan.obligations().getFirst();
+        SchematicProofPlan.Obligation legacyObligation =
+            new SchematicProofPlan.Obligation(
+                currentObligation.id(),
+                currentObligation.kind(),
+                currentObligation.issuerStepId(),
+                currentObligation.dependentHoleIds(),
+                currentObligation.assumptions(),
+                currentObligation.checkerCapability(),
                 legacySolverRevision,
-                legacyResolverRevision),
-            ExactFinitePolynomialPlanReplayVerifier.REVISION_HASH);
+                currentObligation.initialStatus());
+        SchematicProofPlan legacyPlan = SchematicProofPlan.create(
+            currentPlan.planId(),
+            currentPlan.informationBoundary(),
+            legacyScopeHash,
+            currentPlan.steps(),
+            currentPlan.holes(),
+            List.of(legacyObligation),
+            currentPlan.limits());
+        assertNotEquals(
+            legacyPlan.contentHash(),
+            currentPlan.contentHash());
+
+        ExactFinitePolynomialPlanRun currentRun = resolver.resolve(
+            currentPlan,
+            source,
+            ansatz,
+            domains,
+            retainedSolutionLimit);
+        ReplayReceipt currentReceipt = verifier.verify(
+            currentPlan,
+            source,
+            ansatz,
+            domains,
+            retainedSolutionLimit,
+            currentRun);
+        assertEquals(
+            currentSolverRevision,
+            currentRun.solverResult().solverRevisionHash());
+        assertEquals(
+            currentResolverRevision,
+            currentRun.resolverRevisionHash());
+        assertEquals(
+            currentSolverRevision,
+            currentReceipt.solverRevisionHash());
+        assertEquals(
+            currentVerifierRevision,
+            currentReceipt.verifierRevisionHash());
     }
 
     @Test
