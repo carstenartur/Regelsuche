@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactFinitePolynomialPlanResolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExactFinitePolynomialPlanResolver.java</span></div><h1>ExactFinitePolynomialPlanResolver.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.SchematicProofPlan.Hole;
+import de.regelsuche.evolution.SchematicProofPlan.HoleBudget;
+import de.regelsuche.evolution.SchematicProofPlan.HoleKind;
+import de.regelsuche.evolution.SchematicProofPlan.HoleSort;
+import de.regelsuche.evolution.SchematicProofPlan.InformationBoundary;
+import de.regelsuche.evolution.SchematicProofPlan.InitialObligationStatus;
+import de.regelsuche.evolution.SchematicProofPlan.Obligation;
+import de.regelsuche.evolution.SchematicProofPlan.ObligationKind;
+import de.regelsuche.evolution.SchematicProofPlan.Step;
+import de.regelsuche.evolution.SchematicProofPlan.StepAction;
+import de.regelsuche.evolution.SchematicProofPlanResolution.HoleBinding;
+import de.regelsuche.evolution.SchematicProofPlanResolution.ObligationOutcome;
+import de.regelsuche.evolution.SchematicProofPlanResolution.OutcomeStatus;
+import de.regelsuche.evolution.SchematicProofPlanResolution.ResolutionState;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.Binding;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.SearchResult;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.Solution;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.scalar.ExactRationalDomain;
+import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Creates and replays the narrow schematic plan for one exact finite polynomial
+ * ansatz search.
+ *
+ * &lt;p&gt;The result retains checked plan-relative references, but remains neither
+ * formal proof nor production authorization nor independently dereferenced
+ * evidence.&lt;/p&gt;
+ */
+<span class="fc" id="L39">public final class ExactFinitePolynomialPlanResolver {</span>
+    public static final String RESOLVER_ID =
+        &quot;regelsuche.exact-finite-polynomial-plan-resolver/v1&quot;;
+<span class="fc" id="L42">    public static final String REVISION_HASH = SchematicProofPlan.hash(</span>
+        RESOLVER_ID
+            + &quot;|solver=&quot; + ExactFinitePolynomialHoleSolver.REVISION_HASH
+            + &quot;|plan=&quot; + SchematicProofPlan.SCHEMA
+            + &quot;|resolution=&quot; + SchematicProofPlanResolution.SCHEMA
+            + &quot;|topology=finite-domains-solve-discharge-emit&quot;
+            + &quot;|evidence=solution-binding-and-equivalence-outcome&quot;);
+    public static final String EQUIVALENCE_OBLIGATION_ID =
+        &quot;exact-ansatz-equivalence&quot;;
+    private static final String SOLVE_STEP_ID = &quot;solve-finite-holes&quot;;
+
+<span class="fc" id="L53">    private final ExactFinitePolynomialHoleSolver solver =</span>
+        new ExactFinitePolynomialHoleSolver();
+
+    public SchematicProofPlan createPlan(
+        String planId,
+        String sourceExpression,
+        String ansatzTemplate,
+        List&lt;HoleDomain&gt; domains,
+        int retainedSolutionLimit,
+        SchematicProofPlan.Limits planLimits
+    ) {
+<span class="fc" id="L64">        List&lt;HoleDomain&gt; normalizedDomains = normalizeDomains(domains);</span>
+<span class="fc" id="L65">        SchematicProofPlan.Limits limits = Objects.requireNonNull(</span>
+            planLimits,
+            &quot;planLimits&quot;);
+<span class="fc" id="L68">        String scopeHash = formationScopeHash(</span>
+            planId,
+            sourceExpression,
+            ansatzTemplate,
+            normalizedDomains,
+            retainedSolutionLimit,
+            limits);
+<span class="fc" id="L75">        List&lt;String&gt; holeIds = normalizedDomains.stream()</span>
+<span class="fc" id="L76">            .map(HoleDomain::holeId)</span>
+<span class="fc" id="L77">            .toList();</span>
+<span class="fc" id="L78">        List&lt;Hole&gt; holes = normalizedDomains.stream()</span>
+<span class="fc" id="L79">            .map(ExactFinitePolynomialPlanResolver::toPlanHole)</span>
+<span class="fc" id="L80">            .toList();</span>
+<span class="fc" id="L81">        Obligation obligation = new Obligation(</span>
+            EQUIVALENCE_OBLIGATION_ID,
+            ObligationKind.EQUIVALENT,
+            SOLVE_STEP_ID,
+            holeIds,
+<span class="fc" id="L86">            List.of(),</span>
+            ExactFinitePolynomialHoleSolver.SOLVER_ID,
+            ExactFinitePolynomialHoleSolver.REVISION_HASH,
+            InitialObligationStatus.OPEN);
+<span class="fc" id="L90">        return SchematicProofPlan.create(</span>
+            planId,
+            InformationBoundary.TARGET_FREE_FORMATION,
+            scopeHash,
+<span class="fc" id="L94">            planSteps(holeIds),</span>
+            holes,
+<span class="fc" id="L96">            List.of(obligation),</span>
+            limits);
+    }
+
+    public ExactFinitePolynomialPlanRun resolve(
+        SchematicProofPlan plan,
+        String sourceExpression,
+        String ansatzTemplate,
+        List&lt;HoleDomain&gt; domains,
+        int retainedSolutionLimit
+    ) {
+<span class="fc" id="L107">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L108">        List&lt;HoleDomain&gt; normalizedDomains = normalizeDomains(domains);</span>
+<span class="fc" id="L109">        validatePlan(</span>
+            plan,
+            sourceExpression,
+            ansatzTemplate,
+            normalizedDomains,
+            retainedSolutionLimit);
+<span class="fc" id="L115">        SearchResult solverResult = solver.solve(</span>
+            sourceExpression,
+            ansatzTemplate,
+            normalizedDomains,
+            retainedSolutionLimit);
+<span class="fc" id="L120">        List&lt;ExactFinitePolynomialResolvedCandidate&gt; candidates =</span>
+<span class="fc" id="L121">            solverResult.solutions().stream()</span>
+<span class="fc" id="L122">                .map(solution -&gt; resolveCandidate(</span>
+                    plan,
+                    solverResult,
+                    solution))
+<span class="fc" id="L126">                .toList();</span>
+<span class="fc" id="L127">        return ExactFinitePolynomialPlanRun.create(</span>
+<span class="fc" id="L128">            plan.contentHash(),</span>
+            solverResult,
+            candidates);
+    }
+
+    public boolean replay(
+        SchematicProofPlan plan,
+        String sourceExpression,
+        String ansatzTemplate,
+        List&lt;HoleDomain&gt; domains,
+        int retainedSolutionLimit,
+        ExactFinitePolynomialPlanRun expected
+    ) {
+<span class="fc" id="L141">        Objects.requireNonNull(expected, &quot;expected&quot;);</span>
+        try {
+<span class="fc" id="L143">            return expected.equals(resolve(</span>
+                plan,
+                sourceExpression,
+                ansatzTemplate,
+                domains,
+                retainedSolutionLimit));
+<span class="nc" id="L149">        } catch (IllegalArgumentException | IllegalStateException rejected) {</span>
+<span class="nc" id="L150">            return false;</span>
+        }
+    }
+
+    public String formationScopeHash(
+        String planId,
+        String sourceExpression,
+        String ansatzTemplate,
+        List&lt;HoleDomain&gt; domains,
+        int retainedSolutionLimit,
+        SchematicProofPlan.Limits planLimits
+    ) {
+<span class="fc" id="L162">        String normalizedPlanId = SchematicProofPlan.requireId(</span>
+            planId,
+            &quot;planId&quot;);
+<span class="fc" id="L165">        SchematicProofPlan.Limits limits = Objects.requireNonNull(</span>
+            planLimits,
+            &quot;planLimits&quot;);
+<span class="fc" id="L168">        String source = normalizeText(sourceExpression, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L169">        String template = normalizeText(ansatzTemplate, &quot;ansatzTemplate&quot;);</span>
+<span class="fc" id="L170">        List&lt;HoleDomain&gt; normalizedDomains = normalizeDomains(domains);</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (retainedSolutionLimit &lt; 1) {</span>
+<span class="nc" id="L172">            throw new IllegalArgumentException(</span>
+                &quot;retainedSolutionLimit must be positive&quot;);
+        }
+<span class="fc" id="L175">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L176">        append(material, RESOLVER_ID);</span>
+<span class="fc" id="L177">        append(material, REVISION_HASH);</span>
+<span class="fc" id="L178">        append(material, ExactFinitePolynomialHoleSolver.SOLVER_ID);</span>
+<span class="fc" id="L179">        append(material, ExactFinitePolynomialHoleSolver.REVISION_HASH);</span>
+<span class="fc" id="L180">        append(material, normalizedPlanId);</span>
+<span class="fc" id="L181">        append(material, Integer.toString(limits.maxSteps()));</span>
+<span class="fc" id="L182">        append(material, Integer.toString(limits.maxHoles()));</span>
+<span class="fc" id="L183">        append(material, Integer.toString(limits.maxObligations()));</span>
+<span class="fc" id="L184">        append(material, Integer.toString(limits.maxCanonicalBytes()));</span>
+<span class="fc" id="L185">        append(material, source);</span>
+<span class="fc" id="L186">        append(material, template);</span>
+<span class="fc" id="L187">        append(material, Integer.toString(retainedSolutionLimit));</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        for (HoleDomain domain : normalizedDomains) {</span>
+<span class="fc" id="L189">            append(material, domain.holeId());</span>
+<span class="fc" id="L190">            append(material, domain.kind().name());</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            for (ExactRational value : domain.values()) {</span>
+<span class="fc" id="L192">                append(material, value.canonicalText());</span>
+<span class="fc" id="L193">            }</span>
+<span class="fc" id="L194">        }</span>
+<span class="fc" id="L195">        return SchematicProofPlan.hash(material.toString());</span>
+    }
+
+    private ExactFinitePolynomialResolvedCandidate resolveCandidate(
+        SchematicProofPlan plan,
+        SearchResult solverResult,
+        Solution solution
+    ) {
+<span class="fc" id="L203">        Map&lt;String, Hole&gt; holes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L204">        plan.holes().forEach(hole -&gt; holes.put(hole.id(), hole));</span>
+<span class="fc" id="L205">        List&lt;HoleBinding&gt; bindings = solution.bindings().stream()</span>
+<span class="fc" id="L206">            .map(binding -&gt; toHoleBinding(</span>
+                plan,
+                solverResult,
+                solution,
+<span class="fc" id="L210">                holes.get(binding.holeId()),</span>
+                binding))
+<span class="fc" id="L212">            .toList();</span>
+<span class="fc" id="L213">        Obligation obligation = plan.obligations().getFirst();</span>
+<span class="fc" id="L214">        ObligationOutcome outcome = new ObligationOutcome(</span>
+<span class="fc" id="L215">            obligation.id(),</span>
+            OutcomeStatus.CONFIRMED,
+<span class="fc" id="L217">            obligation.checkerCapability(),</span>
+<span class="fc" id="L218">            obligation.checkerRevisionHash(),</span>
+<span class="fc" id="L219">            solverResult.contentHash(),</span>
+            &quot;EXACT_FINITE_POLYNOMIAL_EQUIVALENCE_CONFIRMED&quot;);
+<span class="fc" id="L221">        SchematicProofPlanResolution resolution =</span>
+<span class="fc" id="L222">            SchematicProofPlanResolution.create(</span>
+                plan,
+                bindings,
+<span class="fc" id="L225">                List.of(outcome));</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (resolution.state() != ResolutionState.COMPLETE_REFERENCES</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">                || !resolution.isStructurallyCompleteFor(plan)) {</span>
+<span class="nc" id="L228">            throw new IllegalStateException(</span>
+                &quot;exact solver did not produce a complete plan resolution&quot;);
+        }
+<span class="fc" id="L231">        return ExactFinitePolynomialResolvedCandidate.create(</span>
+            solution,
+            resolution,
+<span class="fc" id="L234">            solverResult.contentHash());</span>
+    }
+
+    private static HoleBinding toHoleBinding(
+        SchematicProofPlan plan,
+        SearchResult solverResult,
+        Solution solution,
+        Hole hole,
+        Binding binding
+    ) {
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (hole == null) {</span>
+<span class="nc" id="L245">            throw new IllegalStateException(</span>
+                &quot;solver returned a binding for an unknown plan hole&quot;);
+        }
+<span class="fc" id="L248">        return new HoleBinding(</span>
+<span class="fc" id="L249">            binding.holeId(),</span>
+<span class="fc" id="L250">            hole.sort(),</span>
+<span class="fc" id="L251">            binding.value().canonicalText(),</span>
+<span class="fc" id="L252">            bindingEvidenceHash(</span>
+<span class="fc" id="L253">                plan.contentHash(),</span>
+<span class="fc" id="L254">                solverResult.contentHash(),</span>
+<span class="fc" id="L255">                solution.contentHash(),</span>
+<span class="fc" id="L256">                binding.holeId(),</span>
+<span class="fc" id="L257">                binding.value().canonicalText()));</span>
+    }
+
+    static String bindingEvidenceHash(
+        String planHash,
+        String solverResultHash,
+        String solutionHash,
+        String holeId,
+        String canonicalValue
+    ) {
+<span class="fc" id="L267">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L268">        append(material, RESOLVER_ID);</span>
+<span class="fc" id="L269">        append(material, REVISION_HASH);</span>
+<span class="fc" id="L270">        append(material, planHash);</span>
+<span class="fc" id="L271">        append(material, solverResultHash);</span>
+<span class="fc" id="L272">        append(material, solutionHash);</span>
+<span class="fc" id="L273">        append(material, holeId);</span>
+<span class="fc" id="L274">        append(material, canonicalValue);</span>
+<span class="fc" id="L275">        return SchematicProofPlan.hash(material.toString());</span>
+    }
+
+    static String candidateHash(
+        String planHash,
+        String solverResultHash,
+        String solutionHash,
+        String resolutionHash
+    ) {
+<span class="fc" id="L284">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L285">        append(material, RESOLVER_ID);</span>
+<span class="fc" id="L286">        append(material, REVISION_HASH);</span>
+<span class="fc" id="L287">        append(material, planHash);</span>
+<span class="fc" id="L288">        append(material, solverResultHash);</span>
+<span class="fc" id="L289">        append(material, solutionHash);</span>
+<span class="fc" id="L290">        append(material, resolutionHash);</span>
+<span class="fc" id="L291">        return SchematicProofPlan.hash(material.toString());</span>
+    }
+
+    static String planRunHash(
+        String planHash,
+        SearchResult solverResult,
+        ExactFinitePolynomialPlanRun.Status status,
+        List&lt;ExactFinitePolynomialResolvedCandidate&gt; candidates
+    ) {
+<span class="fc" id="L300">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L301">        append(material, RESOLVER_ID);</span>
+<span class="fc" id="L302">        append(material, REVISION_HASH);</span>
+<span class="fc" id="L303">        append(material, planHash);</span>
+<span class="fc" id="L304">        append(material, solverResult.contentHash());</span>
+<span class="fc" id="L305">        append(material, status.name());</span>
+<span class="fc" id="L306">        candidates.stream()</span>
+<span class="fc" id="L307">            .sorted(Comparator.comparing(</span>
+                ExactFinitePolynomialResolvedCandidate::contentHash))
+<span class="fc" id="L309">            .forEach(candidate -&gt; append(material, candidate.contentHash()));</span>
+<span class="fc" id="L310">        return SchematicProofPlan.hash(material.toString());</span>
+    }
+
+    private static List&lt;Step&gt; planSteps(List&lt;String&gt; holeIds) {
+<span class="fc" id="L314">        return List.of(</span>
+            new Step(
+                &quot;form-finite-domains&quot;,
+                StepAction.FORM_CANDIDATES,
+                holeIds,
+<span class="fc" id="L319">                List.of()),</span>
+            new Step(
+                SOLVE_STEP_ID,
+                StepAction.SOLVE_HOLES,
+                holeIds,
+<span class="fc" id="L324">                List.of(EQUIVALENCE_OBLIGATION_ID)),</span>
+            new Step(
+                &quot;check-exact-equivalence&quot;,
+                StepAction.DISCHARGE_OBLIGATIONS,
+<span class="fc" id="L328">                List.of(),</span>
+<span class="fc" id="L329">                List.of(EQUIVALENCE_OBLIGATION_ID)),</span>
+            new Step(
+                &quot;emit-ansatz-candidate&quot;,
+                StepAction.EMIT_CANDIDATE,
+<span class="fc" id="L333">                List.of(),</span>
+<span class="fc" id="L334">                List.of(EQUIVALENCE_OBLIGATION_ID)));</span>
+    }
+
+    private void validatePlan(
+        SchematicProofPlan plan,
+        String sourceExpression,
+        String ansatzTemplate,
+        List&lt;HoleDomain&gt; domains,
+        int retainedSolutionLimit
+    ) {
+<span class="fc" id="L344">        String expectedScope = formationScopeHash(</span>
+<span class="fc" id="L345">            plan.planId(),</span>
+            sourceExpression,
+            ansatzTemplate,
+            domains,
+            retainedSolutionLimit,
+<span class="fc" id="L350">            plan.limits());</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        if (!expectedScope.equals(plan.formationScopeHash())) {</span>
+<span class="fc" id="L352">            throw new IllegalArgumentException(</span>
+                &quot;plan formation scope differs from solver input&quot;);
+        }
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">        if (plan.informationBoundary()</span>
+                != InformationBoundary.TARGET_FREE_FORMATION) {
+<span class="nc" id="L357">            throw new IllegalArgumentException(</span>
+                &quot;finite polynomial resolution requires target-free formation&quot;);
+        }
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (!plan.steps().equals(planSteps(plan.holeIds()))) {</span>
+<span class="fc" id="L361">            throw new IllegalArgumentException(</span>
+                &quot;plan topology differs from the finite resolver contract&quot;);
+        }
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">        if (plan.obligations().size() != 1) {</span>
+<span class="nc" id="L365">            throw new IllegalArgumentException(</span>
+                &quot;v1 resolver requires one equivalence obligation&quot;);
+        }
+<span class="fc" id="L368">        Obligation obligation = plan.obligations().getFirst();</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (!EQUIVALENCE_OBLIGATION_ID.equals(obligation.id())</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">                || obligation.kind() != ObligationKind.EQUIVALENT</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">                || !SOLVE_STEP_ID.equals(obligation.issuerStepId())</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                || !obligation.assumptions().isEmpty()</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">                || !obligation.dependentHoleIds().equals(plan.holeIds())</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">                || !ExactFinitePolynomialHoleSolver.SOLVER_ID.equals(</span>
+<span class="fc" id="L375">                    obligation.checkerCapability())</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">                || !ExactFinitePolynomialHoleSolver.REVISION_HASH.equals(</span>
+<span class="fc" id="L377">                    obligation.checkerRevisionHash())) {</span>
+<span class="fc" id="L378">            throw new IllegalArgumentException(</span>
+                &quot;plan does not contain the exact finite equivalence contract&quot;);
+        }
+<span class="fc" id="L381">        validateHoleDomains(plan.holes(), domains);</span>
+<span class="fc" id="L382">    }</span>
+
+    private static void validateHoleDomains(
+        List&lt;Hole&gt; holes,
+        List&lt;HoleDomain&gt; domains
+    ) {
+<span class="fc" id="L388">        List&lt;Hole&gt; expected = domains.stream()</span>
+<span class="fc" id="L389">            .map(ExactFinitePolynomialPlanResolver::toPlanHole)</span>
+<span class="fc" id="L390">            .toList();</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">        if (!holes.equals(expected)) {</span>
+<span class="fc" id="L392">            throw new IllegalArgumentException(</span>
+                &quot;plan holes differ from their finite solver domains&quot;);
+        }
+<span class="fc" id="L395">    }</span>
+
+    private static Hole toPlanHole(HoleDomain domain) {
+<span class="fc bfc" id="L398" title="All 2 branches covered.">        boolean sign = domain.kind()</span>
+            == ExactFinitePolynomialHoleSolver.HoleKind.SIGN;
+<span class="fc" id="L400">        int maxBytes = domain.values().stream()</span>
+<span class="fc" id="L401">            .map(ExactRational::canonicalText)</span>
+<span class="fc" id="L402">            .mapToInt(value -&gt;</span>
+<span class="fc" id="L403">                value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L404">            .max()</span>
+<span class="fc" id="L405">            .orElseThrow();</span>
+<span class="fc" id="L406">        int maxBits = domain.values().stream()</span>
+<span class="fc" id="L407">            .mapToInt(ExactFinitePolynomialPlanResolver::scalarBits)</span>
+<span class="fc" id="L408">            .max()</span>
+<span class="fc" id="L409">            .orElseThrow();</span>
+<span class="fc" id="L410">        return new Hole(</span>
+<span class="fc" id="L411">            domain.holeId(),</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">            sign ? HoleKind.SIGN : HoleKind.COEFFICIENT,</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">            sign ? HoleSort.SIGN : HoleSort.EXACT_RATIONAL,</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">            sign</span>
+<span class="fc" id="L415">                ? &quot;regelsuche.finite-sign/v1&quot;</span>
+<span class="fc" id="L416">                : ExactRationalDomain.DOMAIN_ID,</span>
+            &quot;finite-enumeration/v1&quot;,
+            new HoleBudget(
+<span class="fc" id="L419">                domain.values().size(),</span>
+                maxBytes,
+<span class="fc" id="L421">                Math.max(1, maxBits),</span>
+                0));
+    }
+
+    private static int scalarBits(ExactRational value) {
+<span class="fc" id="L426">        return Math.max(</span>
+<span class="fc" id="L427">            value.numerator().abs().bitLength(),</span>
+<span class="fc" id="L428">            value.denominator().bitLength());</span>
+    }
+
+    private static List&lt;HoleDomain&gt; normalizeDomains(
+        List&lt;HoleDomain&gt; domains
+    ) {
+<span class="fc" id="L434">        Objects.requireNonNull(domains, &quot;domains&quot;);</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">        if (domains.isEmpty()) {</span>
+<span class="nc" id="L436">            throw new IllegalArgumentException(</span>
+                &quot;finite domains must not be empty&quot;);
+        }
+<span class="fc" id="L439">        List&lt;HoleDomain&gt; result = domains.stream()</span>
+<span class="fc" id="L440">            .map(domain -&gt; Objects.requireNonNull(domain, &quot;domain&quot;))</span>
+<span class="fc" id="L441">            .sorted(Comparator.comparing(HoleDomain::holeId))</span>
+<span class="fc" id="L442">            .toList();</span>
+<span class="fc" id="L443">        if (result.stream().map(HoleDomain::holeId).distinct().count()</span>
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">                != result.size()) {</span>
+<span class="nc" id="L445">            throw new IllegalArgumentException(</span>
+                &quot;finite domain IDs must be unique&quot;);
+        }
+<span class="fc" id="L448">        return List.copyOf(result);</span>
+    }
+
+    private static String normalizeText(String value, String name) {
+<span class="pc bpc" id="L452" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L453">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L455">        return value.strip().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L459">        target.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L460">            .append(':')</span>
+<span class="fc" id="L461">            .append(value);</span>
+<span class="fc" id="L462">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -373,7 +373,7 @@ public record SchematicProofPlanResolution(
         HoleBinding binding
     ) {
 <span class="fc bfc" id="L375" title="All 2 branches covered.">        if (!binding.canonicalValue().equals(&quot;-1&quot;)</span>
-<span class="pc bpc" id="L376" title="1 of 2 branches missed.">                &amp;&amp; !binding.canonicalValue().equals(&quot;1&quot;)) {</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">                &amp;&amp; !binding.canonicalValue().equals(&quot;1&quot;)) {</span>
 <span class="fc" id="L377">            throw new IllegalArgumentException(</span>
                 &quot;sign binding must be -1 or 1&quot;);
         }

@@ -34,6 +34,7 @@ flowchart TD
     learning --> solverIr
     learning --> search
     learning --> validation
+    learning --> math
 
     persistenceHibernate --> persistence
 
@@ -94,8 +95,9 @@ rein testbezogenen Build-Eintrag.
 
 ### Learning, Discovery und Experimente
 
-- `:regelsuche-learning` verwendet mathematische und Search-Verträge, kennt aber
-  keine Web- oder App-Orchestrierung.
+- `:regelsuche-learning` verwendet mathematische und Search-Verträge, einschließlich
+  der exakten, technischen-losen Algorithmen aus `:regelsuche-math-algorithms`, kennt
+  aber keine Web- oder App-Orchestrierung.
 - `:regelsuche-discovery` enthält portable Domänen-, Pfad- und Handoff-Typen;
   konkrete Web- und Persistenzadapter bleiben außen.
 - `:regelsuche-experiments` darf eingefrorene Inputs, Budgets, Runner und

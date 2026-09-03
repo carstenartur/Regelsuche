@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactFinitePolynomialResolvedCandidate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExactFinitePolynomialResolvedCandidate.java</span></div><h1>ExactFinitePolynomialResolvedCandidate.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.SchematicProofPlan.HoleSort;
+import de.regelsuche.evolution.SchematicProofPlanResolution.HoleBinding;
+import de.regelsuche.evolution.SchematicProofPlanResolution.ObligationOutcome;
+import de.regelsuche.evolution.SchematicProofPlanResolution.OutcomeStatus;
+import de.regelsuche.evolution.SchematicProofPlanResolution.ResolutionState;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.Binding;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.Solution;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+
+/** One exact finite solver solution bound to one complete plan resolution. */
+public record ExactFinitePolynomialResolvedCandidate(
+    Solution solution,
+    SchematicProofPlanResolution resolution,
+    String solverResultHash,
+    String contentHash
+) {
+<span class="fc" id="L22">    public ExactFinitePolynomialResolvedCandidate {</span>
+<span class="fc" id="L23">        solution = Objects.requireNonNull(solution, &quot;solution&quot;);</span>
+<span class="fc" id="L24">        resolution = Objects.requireNonNull(resolution, &quot;resolution&quot;);</span>
+<span class="fc" id="L25">        solverResultHash = SchematicProofPlan.requireSha256(</span>
+            solverResultHash,
+            &quot;solverResultHash&quot;);
+<span class="fc" id="L28">        contentHash = SchematicProofPlan.requireSha256(</span>
+            contentHash,
+            &quot;contentHash&quot;);
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (resolution.state() != ResolutionState.COMPLETE_REFERENCES) {</span>
+<span class="nc" id="L32">            throw new IllegalArgumentException(</span>
+                &quot;resolved candidate requires complete references&quot;);
+        }
+<span class="fc" id="L35">        validateBindings(solution, resolution, solverResultHash);</span>
+<span class="fc" id="L36">        validateOutcome(resolution, solverResultHash);</span>
+<span class="fc" id="L37">        String expected = ExactFinitePolynomialPlanResolver.candidateHash(</span>
+<span class="fc" id="L38">            resolution.planHash(),</span>
+            solverResultHash,
+<span class="fc" id="L40">            solution.contentHash(),</span>
+<span class="fc" id="L41">            resolution.contentHash());</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L43">            throw new IllegalArgumentException(</span>
+                &quot;resolved candidate contentHash does not match contents&quot;);
+        }
+<span class="fc" id="L46">    }</span>
+
+    static ExactFinitePolynomialResolvedCandidate create(
+        Solution solution,
+        SchematicProofPlanResolution resolution,
+        String solverResultHash
+    ) {
+<span class="fc" id="L53">        return new ExactFinitePolynomialResolvedCandidate(</span>
+            solution,
+            resolution,
+            solverResultHash,
+<span class="fc" id="L57">            ExactFinitePolynomialPlanResolver.candidateHash(</span>
+<span class="fc" id="L58">                resolution.planHash(),</span>
+                solverResultHash,
+<span class="fc" id="L60">                solution.contentHash(),</span>
+<span class="fc" id="L61">                resolution.contentHash()));</span>
+    }
+
+    private static void validateBindings(
+        Solution solution,
+        SchematicProofPlanResolution resolution,
+        String solverResultHash
+    ) {
+<span class="fc" id="L69">        Map&lt;String, Binding&gt; expected = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (Binding binding : solution.bindings()) {</span>
+<span class="fc" id="L71">            expected.put(binding.holeId(), binding);</span>
+<span class="fc" id="L72">        }</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (expected.size() != resolution.bindings().size()) {</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(</span>
+                &quot;plan resolution bindings differ from solver solution&quot;);
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (HoleBinding actual : resolution.bindings()) {</span>
+<span class="fc" id="L78">            Binding binding = expected.get(actual.holeId());</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            HoleSort expectedSort = binding == null</span>
+<span class="nc" id="L80">                ? null</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                : binding.kind()</span>
+<span class="fc" id="L82">                    == ExactFinitePolynomialHoleSolver.HoleKind.SIGN</span>
+<span class="fc" id="L83">                        ? HoleSort.SIGN</span>
+<span class="fc" id="L84">                        : HoleSort.EXACT_RATIONAL;</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            if (binding == null</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                    || actual.sort() != expectedSort</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                    || !binding.value().canonicalText().equals(</span>
+<span class="fc" id="L88">                        actual.canonicalValue())</span>
+<span class="fc" id="L89">                    || !ExactFinitePolynomialPlanResolver.bindingEvidenceHash(</span>
+<span class="fc" id="L90">                        resolution.planHash(),</span>
+                        solverResultHash,
+<span class="fc" id="L92">                        solution.contentHash(),</span>
+<span class="fc" id="L93">                        actual.holeId(),</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                        actual.canonicalValue()).equals(</span>
+<span class="fc" id="L95">                            actual.evidenceHash())) {</span>
+<span class="fc" id="L96">                throw new IllegalArgumentException(</span>
+                    &quot;plan resolution bindings differ from solver solution&quot;);
+            }
+<span class="fc" id="L99">        }</span>
+<span class="fc" id="L100">    }</span>
+
+    private static void validateOutcome(
+        SchematicProofPlanResolution resolution,
+        String solverResultHash
+    ) {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (resolution.outcomes().size() != 1) {</span>
+<span class="nc" id="L107">            throw new IllegalArgumentException(</span>
+                &quot;resolved candidate requires one equivalence outcome&quot;);
+        }
+<span class="fc" id="L110">        ObligationOutcome outcome = resolution.outcomes().getFirst();</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (!ExactFinitePolynomialPlanResolver.EQUIVALENCE_OBLIGATION_ID.equals(</span>
+<span class="fc" id="L112">                outcome.obligationId())</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                || outcome.status() != OutcomeStatus.CONFIRMED</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                || !ExactFinitePolynomialHoleSolver.SOLVER_ID.equals(</span>
+<span class="fc" id="L115">                    outcome.checkerCapability())</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                || !ExactFinitePolynomialHoleSolver.REVISION_HASH.equals(</span>
+<span class="fc" id="L117">                    outcome.checkerRevisionHash())</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                || !solverResultHash.equals(outcome.checkerExecutionHash())</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                || !&quot;EXACT_FINITE_POLYNOMIAL_EQUIVALENCE_CONFIRMED&quot;.equals(</span>
+<span class="fc" id="L120">                    outcome.detailCode())) {</span>
+<span class="nc" id="L121">            throw new IllegalArgumentException(</span>
+                &quot;resolved candidate outcome differs from solver execution&quot;);
+        }
+<span class="fc" id="L124">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
