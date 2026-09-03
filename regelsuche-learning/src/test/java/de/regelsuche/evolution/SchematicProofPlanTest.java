@@ -41,7 +41,7 @@ class SchematicProofPlanTest {
         assertEquals(List.of("local-equivalence", "residual-zero"),
             forward.obligationIds());
         assertEquals("form-coefficients", forward.steps().getFirst().id());
-        assertEquals(StepAction.EMIT_CHECKED_CANDIDATE,
+        assertEquals(StepAction.EMIT_CANDIDATE,
             forward.steps().getLast().action());
         assertFalse(forward.toCanonicalJson().contains("\"referenceOutcome\""));
         assertFalse(forward.toCanonicalJson().contains("\"finalTest\""));
@@ -76,7 +76,7 @@ class SchematicProofPlanTest {
 
         List<Step> duplicateEmission = new ArrayList<>(valid.steps());
         duplicateEmission.add(new Step("second-emission",
-            StepAction.EMIT_CHECKED_CANDIDATE, List.of(), valid.obligationIds()));
+            StepAction.EMIT_CANDIDATE, List.of(), valid.obligationIds()));
         assertThrows(IllegalArgumentException.class,
             () -> createLike(valid, duplicateEmission, valid.obligations()));
     }
@@ -239,7 +239,7 @@ class SchematicProofPlanTest {
             new Step("compose-effects", StepAction.COMPOSE, holes, obligations),
             new Step("check-obligations", StepAction.DISCHARGE_OBLIGATIONS,
                 List.of(), obligations),
-            new Step("emit-candidate", StepAction.EMIT_CHECKED_CANDIDATE,
+            new Step("emit-candidate", StepAction.EMIT_CANDIDATE,
                 List.of(), obligations));
     }
 
@@ -261,7 +261,7 @@ class SchematicProofPlanTest {
                     List.of("term-pair"), List.of("pair-disjoint")),
                 new Step("check-pair", StepAction.DISCHARGE_OBLIGATIONS,
                     List.of(), List.of("pair-disjoint")),
-                new Step("emit-pair", StepAction.EMIT_CHECKED_CANDIDATE,
+                new Step("emit-pair", StepAction.EMIT_CANDIDATE,
                     List.of(), List.of("pair-disjoint"))),
             List.of(hole), List.of(obligation), LIMITS);
     }
@@ -282,7 +282,7 @@ class SchematicProofPlanTest {
                     List.of("alpha"), List.of("alpha-valid")),
                 new Step("check-alpha", StepAction.DISCHARGE_OBLIGATIONS,
                     List.of(), List.of("alpha-valid")),
-                new Step("emit-alpha", StepAction.EMIT_CHECKED_CANDIDATE,
+                new Step("emit-alpha", StepAction.EMIT_CANDIDATE,
                     List.of(), List.of("alpha-valid"))),
             List.of(hole), List.of(obligation), LIMITS);
     }
