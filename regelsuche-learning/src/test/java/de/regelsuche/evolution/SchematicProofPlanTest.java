@@ -52,6 +52,9 @@ class SchematicProofPlanTest {
         assertThrows(IllegalArgumentException.class, () -> new Hole(
             "alpha", HoleKind.COEFFICIENT, HoleSort.TERM,
             ExactRationalDomain.DOMAIN_ID, "bounded-rational/v1", scalarBudget()));
+        assertThrows(IllegalArgumentException.class, () -> new Step(
+            "bad-emission", StepAction.EMIT_CANDIDATE, List.of("alpha"),
+            List.of("local-equivalence")));
 
         SchematicProofPlan valid = plan(false);
         List<Step> unknownHole = new ArrayList<>(valid.steps());
@@ -79,6 +82,34 @@ class SchematicProofPlanTest {
             StepAction.EMIT_CANDIDATE, List.of(), valid.obligationIds()));
         assertThrows(IllegalArgumentException.class,
             () -> createLike(valid, duplicateEmission, valid.obligations()));
+
+        List<Step> noDischarge = valid.steps().stream()
+            .filter(step -> step.action() != StepAction.DISCHARGE_OBLIGATIONS)
+            .toList();
+        assertThrows(IllegalArgumentException.class,
+            () -> createLike(valid, noDischarge, valid.obligations()));
+
+        List<Step> earlyDischarge = new ArrayList<>(valid.steps());
+        Collections.swap(earlyDischarge, 3, 4);
+        assertThrows(IllegalArgumentException.class,
+            () -> createLike(valid, earlyDischarge, valid.obligations()));
+
+        List<Step> duplicateDischarge = new ArrayList<>(valid.steps());
+        duplicateDischarge.add(duplicateDischarge.size() - 1,
+            new Step("second-discharge", StepAction.DISCHARGE_OBLIGATIONS,
+                List.of(), valid.obligationIds()));
+        assertThrows(IllegalArgumentException.class,
+            () -> createLike(valid, duplicateDischarge, valid.obligations()));
+
+        List<Step> holesIntroducedByIssuer = List.of(
+            new Step("compose-effects", StepAction.COMPOSE, valid.holeIds(),
+                valid.obligationIds()),
+            new Step("check-obligations", StepAction.DISCHARGE_OBLIGATIONS,
+                List.of(), valid.obligationIds()),
+            new Step("emit-candidate", StepAction.EMIT_CANDIDATE,
+                List.of(), valid.obligationIds()));
+        assertThrows(IllegalArgumentException.class,
+            () -> createLike(valid, holesIntroducedByIssuer, valid.obligations()));
     }
 
     @Test
