@@ -22,14 +22,14 @@ TARGET-freie Formation
   -> strukturell vollständige Resolution mit bestätigten Referenzen
 ```
 
-Ein späterer unabhängiger Evidence-Verifier und ein Compiler zu einem gewöhnlichen,
-replaybaren `RewriteProgram` sind nicht Teil von v1.
+Ein späterer unabhängiger Evidence-Verifier und ein Compiler zu einem
+gewöhnlichen, replaybaren `RewriteProgram` sind nicht Teil von v1.
 
-## Informationsgrenze
+## Deklarierte Informationsgrenze
 
 Version 1 akzeptiert ausschließlich
 `informationBoundary = TARGET_FREE_FORMATION`. Der Plan enthält absichtlich
-keine Felder für:
+keine eigenen Felder für:
 
 - einen Zielausdruck;
 - historische Namen oder Familienlabels;
@@ -37,8 +37,13 @@ keine Felder für:
 - VALIDATION- oder FINAL-TEST-Ausgänge;
 - Promotion- oder Novelty-Entscheidungen.
 
-`formationScopeHash` bindet den Plan an die eingefrorene Formationseingabe,
-ohne deren mögliche spätere Holdouts in den Plan zu kopieren.
+`formationScopeHash` bindet den Plan an eine von außen eingefrorene
+Formationseingabe, ohne deren spätere Holdouts in den Plan zu kopieren. Die IR
+prüft in diesem Slice jedoch weder die Bytes hinter diesem Hash noch den
+vollständigen Informationsfluss des erzeugenden Prozesses. `TARGET_FREE_FORMATION`
+ist daher eine deklarierte, hashgebundene Grenze; ihre empirische
+Leakage-Freiheit benötigt weiterhin den separaten Freeze-, Manifest- und
+Reproduktionsvertrag aus den Discovery-Experimenten.
 
 ## Geordnete Planschritte
 
@@ -59,14 +64,24 @@ Jeder Schritt besitzt eine stabile ID und referenziert deklarierte Lücken und
 Obligationen. Der Vertrag verlangt:
 
 - eindeutige Schritt-, Lücken- und Obligation-IDs;
-- jede deklarierte Lücke und Obligation wird tatsächlich referenziert;
-- der in einer Obligation genannte Aussteller-Schritt referenziert genau diese
-  Obligation;
-- genau einen abschließenden `EMIT_CANDIDATE`-Schritt;
+- mindestens eine deklarierte Lücke und mindestens eine Obligation;
+- jede Lücke wird durch `FORM_CANDIDATES`, `SELECT_BINDINGS` oder
+  `SOLVE_HOLES` vorbereitet;
+- `COMPOSE` darf nur Lücken verwenden, die in einem früheren
+  Vorbereitungsschritt vorkamen;
+- jede Obligation ist mit genau einem Aussteller-Schritt verbunden;
+- eine Obligation darf von einem Hole-Solver in demselben Schritt ausgestellt
+  werden, in dem die betreffende Lücke vorbereitet wird;
+- `DISCHARGE_OBLIGATIONS` und `EMIT_CANDIDATE` dürfen keine Hole-IDs tragen;
+- jede Obligation wird genau einmal und erst nach ihrem Aussteller geprüft;
+- ein Prüf- oder Emissionsschritt darf nicht zugleich Aussteller der geprüften
+  Obligation sein;
+- genau ein abschließender `EMIT_CANDIDATE`-Schritt existiert;
 - der Emissionsschritt hängt von sämtlichen Obligationen ab.
 
-Diese Regeln verhindern, dass eine offene Verpflichtung durch eine nicht
-verbundene oder vorzeitige Ausgabe umgangen wird.
+Diese Regeln verhindern, dass ein `COMPOSE`-Schritt eine vorher nicht gebildete
+Lücke implizit erfindet oder eine offene Verpflichtung durch eine nicht
+verbundene, doppelte oder vorzeitige Prüfung umgangen wird.
 
 ## Typisierte Lücken
 
@@ -95,7 +110,9 @@ maxOccurrenceDepth
 ```
 
 Die Budgets beschränken bereits die Formation und die spätere Belegung. Sie
-sind keine nachträglichen Ausführungsdiagnosen.
+sind keine nachträglichen Ausführungsdiagnosen. Hole-freie Pläne gehören nicht
+zur v1-Sprache; direkte abgeschlossene Aussagen verbleiben in den vorhandenen
+Rewrite- und Solver-IRs.
 
 ## Offene Obligationen
 
@@ -163,6 +180,8 @@ Die erste Resolution-Grenze prüft bereits:
 - Vorzeichen ausschließlich als `-1` oder `1`;
 - kanonische AST-Pfade wie `root`, `0` oder `0.1.2`;
 - kanonisch geordnete Vorkommenspaare wie `0.1|1.0`;
+- echte Vorkommensdisjunktheit: identische Pfade, `root` und
+  Vorfahr-/Nachfahrpaare wie `0|0.1` werden abgelehnt;
 - Pfadtiefengrenzen;
 - exakte Übereinstimmung von Checker-Capability und Checker-Revision mit der
   Obligation.
@@ -219,19 +238,25 @@ bleiben nachfolgende, getrennte Review-Einheiten.
 ```bash
 ./gradlew \
   :regelsuche-learning:test \
-  --tests '*SchematicProofPlanTest'
+  --tests '*SchematicProofPlanTest' \
+  --tests '*SchematicProofPlanLifecycleTest'
 ```
 
 Die Tests decken unter anderem ab:
 
 - deterministische Definitionensortierung bei erhaltener Schrittfolge;
 - Sortfehler, unbekannte Referenzen und inkonsistente Obligation-Aussteller;
-- vorzeitige und doppelte Emission;
-- `PARTIAL`, sämtliche blockierenden Outcome-Status und `COMPLETE_REFERENCES`;
+- mindestens eine Lücke und ein positives Hole-Budget;
+- vorzeitige, doppelte oder fehlende Obligation-Prüfung;
+- `COMPOSE` vor Hole-Vorbereitung sowie zulässige Solver-Ausstellung im selben
+  Schritt;
+- `PARTIAL`, sämtliche blockierenden Outcome-Status und
+  `COMPLETE_REFERENCES`;
 - nichtkanonische Rationalzahlen und ungültige Vorzeichen;
 - ausgetauschte Checker-Revisionsgrenzen;
-- kanonische Vorkommenspaare und Tiefenbudgets;
-- Plan-Substitution, doppelte IDs, Größenüberschreitung und Hash-/State-Tampering.
+- kanonische, tiefenbegrenzte und tatsächlich disjunkte Vorkommenspaare;
+- Plan-Substitution, doppelte IDs, Größenüberschreitung und
+  Hash-/State-Tampering.
 
 ## Nächster Slice
 
