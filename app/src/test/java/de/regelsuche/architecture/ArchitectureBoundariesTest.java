@@ -78,7 +78,7 @@ class ArchitectureBoundariesTest {
         expectedProjectDependencies.put("regelsuche-persistence", List.of(":regelsuche-core"));
         expectedProjectDependencies.put("regelsuche-learning", List.of(
             ":regelsuche-core", ":regelsuche-search", ":regelsuche-validation",
-            ":regelsuche-solver-ir"));
+            ":regelsuche-solver-ir", ":regelsuche-math-algorithms"));
         expectedProjectDependencies.put("regelsuche-persistence-hibernate", List.of(":regelsuche-persistence",
             ":regelsuche-learning", ":regelsuche-validation", ":regelsuche-core"));
         expectedProjectDependencies.put("regelsuche-experiments", List.of(":regelsuche-search", ":regelsuche-validation",
