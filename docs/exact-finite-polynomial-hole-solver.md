@@ -83,6 +83,33 @@ führt dieselbe endliche Suche erneut aus und verlangt ein identisches
 Ergebnisobjekt. Das ist eine deterministische Laufreproduktion, aber noch kein
 unabhängig geladenes Evidence-Artefakt oder formaler Beweis.
 
+## Typisierte Lösungsidentität
+
+Der menschenlesbare `Solution.bindingKey()` bleibt bewusst bei der kompakten
+Darstellung `holeId=value`. Er ist eine Anzeige- und Sortierhilfe, nicht die
+vollständige kryptografische Identität.
+
+`Solution.contentHash()` verwendet seit
+`regelsuche.exact-finite-polynomial-solution-identity/v2` dagegen für jede nach
+Lücken-ID geordnete Belegung das vollständige Tupel
+
+```text
+holeId
+HoleKind
+kanonischer exakter Wert
+```
+
+und bindet anschließend den instanziierten Ausdruck sowie seine exakte
+Normalform. Eine `SIGN`- und eine `COEFFICIENT`-Belegung mit derselben ID und
+demselben Zahlenwert erhalten deshalb verschiedene Hashes. Benachbarte ganze
+Zahlen oberhalb der `binary64`-Präzision bleiben ebenfalls verschieden.
+
+Die Solverrevision enthält die Identitätsrevision ausdrücklich. Dadurch ändern
+sich `SearchResult`, Formation Scope, Plan, Resolverlauf und Replay-Receipt
+transitiv. Frühere untypisierte Hashes werden nicht als aktuelle Identitäten
+neu interpretiert. Unabhängig vom Hash prüft `SearchResult` weiterhin direkt,
+dass jede Belegung genau zur deklarierten Hole-Domäne und Hole-Art gehört.
+
 ## Charakterisierungen
 
 ### Quadratische Ergänzung
@@ -151,22 +178,29 @@ Vorzeichenbelegung innerhalb eines vorgegebenen Ansatzes. Er belegt noch nicht:
 - autonome Wahl oder Lernen der Ansatzgrammatik;
 - lineares symbolisches Koeffizientenlösen ohne endliche Enumeration;
 - unabhängige Evidence-Dereferenzierung;
-- Übernahme der Treffer als autorisierte `SchematicProofPlanResolution`;
 - Kompilation in `RewriteProgram`;
 - generationengetrennten Taktiktransfer;
 - mathematische Neuheit.
 
-Der nächste Slice bindet eine Solver-Lösung an die passenden
-`SchematicProofPlan`-Lücken, erzeugt eine exakte `EQUIVALENT`-Obligation und
-spielt die Solver-Evidence erneut ab, bevor eine Resolution als vollständig
-geprüft gelten darf.
+Die nachgelagerte `ExactFinitePolynomialPlanResolver`-Stufe bindet eine
+Solver-Lösung an die passenden `SchematicProofPlan`-Lücken und erzeugt eine
+exakte `EQUIVALENT`-Obligation. Der Replay-Verifier führt den vollständigen Lauf
+erneut aus und stellt nur bei identischer Reproduktion ein nicht ausführbares
+Receipt aus. Beide Stufen bleiben von unabhängiger Byte-Evidence und formaler
+Proof-Autorität getrennt.
 
 ## Reproduktion
 
 ```bash
 ./gradlew \
   :regelsuche-math-algorithms:test \
-  --tests '*ExactFinitePolynomialHoleSolverTest'
+  --tests '*ExactFinitePolynomialHoleSolverTest' \
+  --tests '*ExactFinitePolynomialSolutionIdentityTest'
+
+./gradlew \
+  :regelsuche-learning:test \
+  --tests '*ExactFinitePolynomialPlanRunSubstitutionTest' \
+  --tests '*ExactFinitePolynomialRevisionBindingTest'
 
 ./gradlew --no-configuration-cache ciCheck
 ```
