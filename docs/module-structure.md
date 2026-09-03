@@ -21,7 +21,7 @@ Verantwortung und darf keine abweichende zweite Dependency-Definition erzeugen.
 | `:regelsuche-math-sympy` | optionaler typisierter SymPy-Faktorisierungsadapter, eingebettete GraalPy-Runtime und CPython-Kontrolltransport | Core |
 | `:regelsuche-solver-ir` | solver-neutrale Obligationen, Übersetzungen, Ergebnisse und Executions | Core, Search, Validation, Math Algorithms |
 | `:regelsuche-solver-portfolio` | capability-aware Backend-Auswahl, Budgets, Cache und Konflikte | Solver IR |
-| `:regelsuche-learning` | Mining, Anti-Unification, Kandidaten und Rewrite-Program-Lernen | Core, Search, Validation, Solver IR |
+| `:regelsuche-learning` | Mining, Anti-Unification, Kandidaten, schematische Beweispläne und Rewrite-Program-Lernen | Core, Search, Validation, Math Algorithms, Solver IR |
 | `:regelsuche-discovery` | domänenneutrale Discovery-Typen, Profile und Lifecycle-Handoff | Core, Search, Validation |
 | `:regelsuche-experiments` | Experiment-, Corpus-, Budget- und Evidence-DAG-Verträge | Search, Validation, Discovery, Math Algorithms |
 | `:regelsuche-benchmarks` | track-spezifische Vergleiche und Informationsparität | Search, Solver IR, Solver Portfolio |
