@@ -194,12 +194,12 @@ Proof-Autorität getrennt.
 ```bash
 ./gradlew \
   :regelsuche-math-algorithms:test \
-  --tests '*ExactFinitePolynomialHoleSolverTest' \
-  --tests '*ExactFinitePolynomialSolutionIdentityTest'
+  --tests '*ExactFinitePolynomialHoleSolverTest'
 
 ./gradlew \
   :regelsuche-learning:test \
   --tests '*ExactFinitePolynomialPlanRunSubstitutionTest' \
+  --tests '*ExactFinitePolynomialPlanReplayVerifierTest' \
   --tests '*ExactFinitePolynomialRevisionBindingTest'
 
 ./gradlew --no-configuration-cache ciCheck
