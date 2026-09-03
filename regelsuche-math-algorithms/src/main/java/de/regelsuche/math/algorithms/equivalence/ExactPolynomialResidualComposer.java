@@ -3,8 +3,8 @@ package de.regelsuche.math.algorithms.equivalence;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
-import de.regelsuche.parse.ExpressionFormatter;
-import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.parse.ExactExpressionFormatter;
+import de.regelsuche.parse.ExactParsedTerm;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -27,7 +27,9 @@ import java.util.stream.Collectors;
  * reconstruct the source polynomial.</p>
  *
  * <p>The API accepts no target expression. Reference correspondence belongs
- * after the returned candidate set has been frozen.</p>
+ * after the returned candidate set has been frozen. Source numbers are resolved
+ * through parser-issued exact provenance. Primitive rule/application IDs are
+ * retained provenance, not independently replayed proof objects.
  */
 public final class ExactPolynomialResidualComposer {
     private static final int MAX_COMPONENTS = 64;
@@ -36,8 +38,8 @@ public final class ExactPolynomialResidualComposer {
     private static final int MAX_RESULTS = 1_024;
     private static final long MAX_COMBINATION_ATTEMPTS = 1_000_000L;
 
-    private final PolynomialArithmetic arithmetic = new PolynomialArithmetic();
-    private final ExpressionParser parser = new ExpressionParser();
+    private final ExactResidualPolynomialArithmetic arithmetic =
+        new ExactResidualPolynomialArithmetic();
 
     /**
      * Extracts the exact top-level additive occurrence partition used by v1.
@@ -52,8 +54,9 @@ public final class ExactPolynomialResidualComposer {
             sourceExpression,
             "sourceExpression");
         parsePolynomial(source, "sourceExpression");
+        ExactParsedTerm parsed = arithmetic.exactTerm(source);
         List<Expr> terms = new ArrayList<>();
-        collectAddition(parser.parseTerm(source), terms);
+        collectAddition(parsed.expression(), terms);
         if (terms.isEmpty() || terms.size() > MAX_COMPONENTS) {
             throw new IllegalArgumentException(
                 "additive component count must be in [1,"
@@ -69,7 +72,7 @@ public final class ExactPolynomialResidualComposer {
             components.add(new SourceComponent(
                 "term-" + ordinal,
                 "additive-term-v1:" + ordinal,
-                ExpressionFormatter.format(terms.get(index))));
+                ExactExpressionFormatter.format(terms.get(index), parsed)));
         }
         return List.copyOf(components);
     }
@@ -115,9 +118,9 @@ public final class ExactPolynomialResidualComposer {
             throw new IllegalArgumentException(
                 "transformed fragment must equal its source components");
         }
+        ExactParsedTerm transformedTerm = arithmetic.exactTerm(transformed);
         if (!containsSubtree(
-                parser.parseTerm(transformed),
-                parser.parseTerm(structured))) {
+                transformedTerm.expression(), transformedTerm, structured)) {
             throw new IllegalArgumentException(
                 "structured fragment must occur in transformed fragment");
         }
@@ -128,6 +131,7 @@ public final class ExactPolynomialResidualComposer {
             throw new IllegalArgumentException(
                 "v1 residual effects must be assumption-free");
         }
+
         List<String> normalizedApplicationKeys =
             texts(applicationKeys, "applicationKeys");
         requireUnique(
@@ -271,6 +275,9 @@ public final class ExactPolynomialResidualComposer {
                 retainedCandidates);
             coveredIds.removeAll(effect.componentIds());
             selected.removeLast();
+            if (results.size() >= maxResults) {
+                return;
+            }
         }
     }
 
@@ -420,15 +427,19 @@ public final class ExactPolynomialResidualComposer {
         String expression,
         String name
     ) {
-        return arithmetic.parse(expression).orElseThrow(() ->
-            new IllegalArgumentException(
-                name + " is outside the polynomial fragment"));
+        try {
+            return arithmetic.parse(expression);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                name + " is outside the bounded exact polynomial fragment",
+                exception);
+        }
     }
 
     private String normalizeSyntax(String expression, String name) {
         String text = requireText(expression, name);
         try {
-            return ExpressionFormatter.format(parser.parseTerm(text));
+            return arithmetic.syntax(text);
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException(
                 name + " is not a supported expression",
@@ -460,19 +471,20 @@ public final class ExactPolynomialResidualComposer {
 
     private static boolean containsSubtree(
         Expr expression,
-        Expr expected
+        ExactParsedTerm parsed,
+        String expected
     ) {
-        if (expression.equals(expected)) {
+        if (ExactExpressionFormatter.format(expression, parsed).equals(expected)) {
             return true;
         }
         if (expression instanceof BinaryExpr binary) {
-            return containsSubtree(binary.left(), expected)
-                || containsSubtree(binary.right(), expected);
+            return containsSubtree(binary.left(), parsed, expected)
+                || containsSubtree(binary.right(), parsed, expected);
         }
         if (expression instanceof FunctionExpr function) {
             return function.arguments().stream()
                 .anyMatch(argument ->
-                    containsSubtree(argument, expected));
+                    containsSubtree(argument, parsed, expected));
         }
         return false;
     }
