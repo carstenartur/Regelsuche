@@ -28,16 +28,19 @@ import java.util.regex.Pattern;
 <span class="fc" id="L28">public final class ExactFinitePolynomialHoleSolver {</span>
     public static final String SOLVER_ID =
         &quot;regelsuche.exact-finite-polynomial-hole-solver/v1&quot;;
-<span class="fc" id="L31">    public static final String REVISION_HASH = hash(lengthPrefixed(</span>
+    public static final String SOLUTION_IDENTITY_REVISION =
+        &quot;regelsuche.exact-finite-polynomial-solution-identity/v2&quot;;
+<span class="fc" id="L33">    public static final String REVISION_HASH = hash(lengthPrefixed(</span>
         SOLVER_ID,
         &quot;source-exact-polynomial-arithmetic&quot;,
         &quot;complete-finite-cartesian-enumeration&quot;,
         &quot;coefficient-and-sign-holes&quot;,
+        SOLUTION_IDENTITY_REVISION,
         &quot;unsupported-instantiation-fails-closed&quot;));
 
-<span class="fc" id="L38">    private static final Pattern HOLE_ID = Pattern.compile(</span>
+<span class="fc" id="L41">    private static final Pattern HOLE_ID = Pattern.compile(</span>
         &quot;[a-z][a-z0-9_-]{2,63}&quot;);
-<span class="fc" id="L40">    private static final Pattern PLACEHOLDER = Pattern.compile(</span>
+<span class="fc" id="L43">    private static final Pattern PLACEHOLDER = Pattern.compile(</span>
         &quot;\\$\\{([a-z][a-z0-9_-]{2,63})}&quot;);
     private static final int MAX_TEMPLATE_CHARS = 16_384;
     private static final int MAX_HOLES = 12;
@@ -46,7 +49,7 @@ import java.util.regex.Pattern;
     private static final long MAX_ASSIGNMENTS = 100_000L;
     private static final int MAX_RETAINED_SOLUTIONS = 256;
 
-<span class="fc" id="L49">    private final ExactResidualPolynomialArithmetic arithmetic =</span>
+<span class="fc" id="L52">    private final ExactResidualPolynomialArithmetic arithmetic =</span>
         new ExactResidualPolynomialArithmetic();
 
     public SearchResult solve(
@@ -55,25 +58,25 @@ import java.util.regex.Pattern;
         List&lt;HoleDomain&gt; holeDomains,
         int maxRetainedSolutions
     ) {
-<span class="pc bpc" id="L58" title="1 of 4 branches missed.">        if (maxRetainedSolutions &lt; 1</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">        if (maxRetainedSolutions &lt; 1</span>
                 || maxRetainedSolutions &gt; MAX_RETAINED_SOLUTIONS) {
-<span class="fc" id="L60">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L63">            throw new IllegalArgumentException(</span>
                 &quot;maxRetainedSolutions must be in [1,&quot;
                     + MAX_RETAINED_SOLUTIONS + &quot;]&quot;);
         }
 
-<span class="fc" id="L65">        String source = normalizePolynomial(</span>
+<span class="fc" id="L68">        String source = normalizePolynomial(</span>
             sourceExpression,
             &quot;sourceExpression&quot;);
-<span class="fc" id="L68">        Polynomial sourcePolynomial = arithmetic.parse(source);</span>
-<span class="fc" id="L69">        String template = normalizeTemplate(ansatzTemplate);</span>
-<span class="fc" id="L70">        List&lt;HoleDomain&gt; domains = normalizeDomains(holeDomains);</span>
-<span class="fc" id="L71">        validateTemplateHoles(template, domains);</span>
-<span class="fc" id="L72">        long totalAssignments = countAssignments(domains);</span>
+<span class="fc" id="L71">        Polynomial sourcePolynomial = arithmetic.parse(source);</span>
+<span class="fc" id="L72">        String template = normalizeTemplate(ansatzTemplate);</span>
+<span class="fc" id="L73">        List&lt;HoleDomain&gt; domains = normalizeDomains(holeDomains);</span>
+<span class="fc" id="L74">        validateTemplateHoles(template, domains);</span>
+<span class="fc" id="L75">        long totalAssignments = countAssignments(domains);</span>
 
-<span class="fc" id="L74">        SearchAccumulator accumulator = new SearchAccumulator(</span>
+<span class="fc" id="L77">        SearchAccumulator accumulator = new SearchAccumulator(</span>
             maxRetainedSolutions);
-<span class="fc" id="L76">        enumerate(</span>
+<span class="fc" id="L79">        enumerate(</span>
             sourcePolynomial,
             template,
             domains,
@@ -81,7 +84,7 @@ import java.util.regex.Pattern;
             new LinkedHashMap&lt;&gt;(),
             accumulator);
 
-<span class="fc" id="L84">        return new SearchResult(</span>
+<span class="fc" id="L87">        return new SearchResult(</span>
             SOLVER_ID,
             REVISION_HASH,
             source,
@@ -91,9 +94,9 @@ import java.util.regex.Pattern;
             accumulator.evaluatedAssignments,
             accumulator.matchingAssignments,
             maxRetainedSolutions,
-<span class="fc" id="L94">            deriveStatus(</span>
+<span class="fc" id="L97">            deriveStatus(</span>
                 accumulator.matchingAssignments,
-<span class="fc" id="L96">                accumulator.solutions.size()),</span>
+<span class="fc" id="L99">                accumulator.solutions.size()),</span>
             accumulator.solutions);
     }
 
@@ -104,16 +107,16 @@ import java.util.regex.Pattern;
      * proof object or an independently loaded evidence artifact.&lt;/p&gt;
      */
     public boolean replay(SearchResult expected) {
-<span class="fc" id="L107">        Objects.requireNonNull(expected, &quot;expected&quot;);</span>
+<span class="fc" id="L110">        Objects.requireNonNull(expected, &quot;expected&quot;);</span>
         try {
-<span class="fc" id="L109">            SearchResult actual = solve(</span>
-<span class="fc" id="L110">                expected.sourceExpression(),</span>
-<span class="fc" id="L111">                expected.ansatzTemplate(),</span>
-<span class="fc" id="L112">                expected.holeDomains(),</span>
-<span class="fc" id="L113">                expected.retainedSolutionLimit());</span>
-<span class="fc" id="L114">            return expected.equals(actual);</span>
-<span class="nc" id="L115">        } catch (IllegalArgumentException rejected) {</span>
-<span class="nc" id="L116">            return false;</span>
+<span class="fc" id="L112">            SearchResult actual = solve(</span>
+<span class="fc" id="L113">                expected.sourceExpression(),</span>
+<span class="fc" id="L114">                expected.ansatzTemplate(),</span>
+<span class="fc" id="L115">                expected.holeDomains(),</span>
+<span class="fc" id="L116">                expected.retainedSolutionLimit());</span>
+<span class="fc" id="L117">            return expected.equals(actual);</span>
+<span class="nc" id="L118">        } catch (IllegalArgumentException rejected) {</span>
+<span class="nc" id="L119">            return false;</span>
         }
     }
 
@@ -125,29 +128,29 @@ import java.util.regex.Pattern;
         Map&lt;String, Binding&gt; bindings,
         SearchAccumulator accumulator
     ) {
-<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (domainIndex == domains.size()) {</span>
-<span class="fc" id="L129">            evaluate(</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (domainIndex == domains.size()) {</span>
+<span class="fc" id="L132">            evaluate(</span>
                 sourcePolynomial,
                 template,
                 bindings,
                 accumulator);
-<span class="fc" id="L134">            return;</span>
+<span class="fc" id="L137">            return;</span>
         }
-<span class="fc" id="L136">        HoleDomain domain = domains.get(domainIndex);</span>
-<span class="fc bfc" id="L137" title="All 2 branches covered.">        for (ExactRational value : domain.values()) {</span>
-<span class="fc" id="L138">            bindings.put(</span>
-<span class="fc" id="L139">                domain.holeId(),</span>
-<span class="fc" id="L140">                new Binding(domain.holeId(), domain.kind(), value));</span>
-<span class="fc" id="L141">            enumerate(</span>
+<span class="fc" id="L139">        HoleDomain domain = domains.get(domainIndex);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (ExactRational value : domain.values()) {</span>
+<span class="fc" id="L141">            bindings.put(</span>
+<span class="fc" id="L142">                domain.holeId(),</span>
+<span class="fc" id="L143">                new Binding(domain.holeId(), domain.kind(), value));</span>
+<span class="fc" id="L144">            enumerate(</span>
                 sourcePolynomial,
                 template,
                 domains,
                 domainIndex + 1,
                 bindings,
                 accumulator);
-<span class="fc" id="L148">        }</span>
-<span class="fc" id="L149">        bindings.remove(domain.holeId());</span>
-<span class="fc" id="L150">    }</span>
+<span class="fc" id="L151">        }</span>
+<span class="fc" id="L152">        bindings.remove(domain.holeId());</span>
+<span class="fc" id="L153">    }</span>
 
     private void evaluate(
         Polynomial sourcePolynomial,
@@ -155,250 +158,250 @@ import java.util.regex.Pattern;
         Map&lt;String, Binding&gt; bindings,
         SearchAccumulator accumulator
     ) {
-<span class="fc" id="L158">        String instantiated = instantiate(template, bindings);</span>
+<span class="fc" id="L161">        String instantiated = instantiate(template, bindings);</span>
         String normalized;
         Polynomial candidate;
         try {
-<span class="fc" id="L162">            normalized = normalizePolynomial(</span>
+<span class="fc" id="L165">            normalized = normalizePolynomial(</span>
                 instantiated,
                 &quot;instantiated ansatz&quot;);
-<span class="fc" id="L165">            candidate = arithmetic.parse(normalized);</span>
-<span class="fc" id="L166">        } catch (IllegalArgumentException exception) {</span>
-<span class="fc" id="L167">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L168">            candidate = arithmetic.parse(normalized);</span>
+<span class="fc" id="L169">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L170">            throw new IllegalArgumentException(</span>
                 &quot;one finite assignment leaves the exact polynomial fragment&quot;,
                 exception);
-<span class="fc" id="L170">        }</span>
-<span class="fc" id="L171">        accumulator.evaluatedAssignments++;</span>
-<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (!candidate.equals(sourcePolynomial)) {</span>
-<span class="fc" id="L173">            return;</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        accumulator.evaluatedAssignments++;</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (!candidate.equals(sourcePolynomial)) {</span>
+<span class="fc" id="L176">            return;</span>
         }
-<span class="fc" id="L175">        accumulator.matchingAssignments++;</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (accumulator.solutions.size()</span>
+<span class="fc" id="L178">        accumulator.matchingAssignments++;</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (accumulator.solutions.size()</span>
                 &lt; accumulator.maxRetainedSolutions) {
-<span class="fc" id="L178">            accumulator.solutions.add(new Solution(</span>
-<span class="fc" id="L179">                List.copyOf(bindings.values()),</span>
+<span class="fc" id="L181">            accumulator.solutions.add(new Solution(</span>
+<span class="fc" id="L182">                List.copyOf(bindings.values()),</span>
                 normalized,
-<span class="fc" id="L181">                candidate.toCanonicalString()));</span>
+<span class="fc" id="L184">                candidate.toCanonicalString()));</span>
         }
-<span class="fc" id="L183">    }</span>
+<span class="fc" id="L186">    }</span>
 
     private String normalizePolynomial(
         String expression,
         String name
     ) {
-<span class="pc bpc" id="L189" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
-<span class="nc" id="L190">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L192" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L193">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
         try {
-<span class="fc" id="L193">            String normalized = arithmetic.syntax(expression.trim());</span>
-<span class="fc" id="L194">            arithmetic.parse(normalized);</span>
-<span class="fc" id="L195">            return normalized;</span>
-<span class="fc" id="L196">        } catch (IllegalArgumentException exception) {</span>
-<span class="fc" id="L197">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L196">            String normalized = arithmetic.syntax(expression.trim());</span>
+<span class="fc" id="L197">            arithmetic.parse(normalized);</span>
+<span class="fc" id="L198">            return normalized;</span>
+<span class="fc" id="L199">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L200">            throw new IllegalArgumentException(</span>
                 name + &quot; is outside the bounded exact polynomial fragment&quot;,
                 exception);
         }
     }
 
     private static String normalizeTemplate(String template) {
-<span class="pc bpc" id="L204" title="2 of 4 branches missed.">        if (template == null || template.isBlank()) {</span>
-<span class="nc" id="L205">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L207" title="2 of 4 branches missed.">        if (template == null || template.isBlank()) {</span>
+<span class="nc" id="L208">            throw new IllegalArgumentException(</span>
                 &quot;ansatzTemplate must not be blank&quot;);
         }
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (template.length() &gt; MAX_TEMPLATE_CHARS</span>
-<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                || template.chars().anyMatch(Character::isISOControl)) {</span>
-<span class="nc" id="L210">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (template.length() &gt; MAX_TEMPLATE_CHARS</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                || template.chars().anyMatch(Character::isISOControl)) {</span>
+<span class="nc" id="L213">            throw new IllegalArgumentException(</span>
                 &quot;ansatzTemplate exceeds the bounded text grammar&quot;);
         }
-<span class="fc" id="L213">        return template.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L216">        return template.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
     }
 
     private static void validateTemplateHoles(
         String template,
         List&lt;HoleDomain&gt; domains
     ) {
-<span class="fc" id="L220">        Matcher matcher = PLACEHOLDER.matcher(template);</span>
-<span class="fc" id="L221">        Set&lt;String&gt; referenced = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L222">        StringBuffer scrubbed = new StringBuffer();</span>
-<span class="fc bfc" id="L223" title="All 2 branches covered.">        while (matcher.find()) {</span>
-<span class="fc" id="L224">            referenced.add(matcher.group(1));</span>
-<span class="fc" id="L225">            matcher.appendReplacement(scrubbed, &quot;0&quot;);</span>
+<span class="fc" id="L223">        Matcher matcher = PLACEHOLDER.matcher(template);</span>
+<span class="fc" id="L224">        Set&lt;String&gt; referenced = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L225">        StringBuffer scrubbed = new StringBuffer();</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L227">            referenced.add(matcher.group(1));</span>
+<span class="fc" id="L228">            matcher.appendReplacement(scrubbed, &quot;0&quot;);</span>
         }
-<span class="fc" id="L227">        matcher.appendTail(scrubbed);</span>
-<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (scrubbed.indexOf(&quot;$&quot;) &gt;= 0</span>
-<span class="pc bpc" id="L229" title="1 of 2 branches missed.">                || scrubbed.indexOf(&quot;{&quot;) &gt;= 0</span>
-<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                || scrubbed.indexOf(&quot;}&quot;) &gt;= 0) {</span>
-<span class="fc" id="L231">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L230">        matcher.appendTail(scrubbed);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (scrubbed.indexOf(&quot;$&quot;) &gt;= 0</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">                || scrubbed.indexOf(&quot;{&quot;) &gt;= 0</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                || scrubbed.indexOf(&quot;}&quot;) &gt;= 0) {</span>
+<span class="fc" id="L234">            throw new IllegalArgumentException(</span>
                 &quot;ansatzTemplate contains a malformed placeholder&quot;);
         }
-<span class="fc" id="L234">        Set&lt;String&gt; declared = Set.copyOf(domains.stream()</span>
-<span class="fc" id="L235">            .map(HoleDomain::holeId)</span>
-<span class="fc" id="L236">            .toList());</span>
-<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (!referenced.equals(declared)) {</span>
-<span class="fc" id="L238">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L237">        Set&lt;String&gt; declared = Set.copyOf(domains.stream()</span>
+<span class="fc" id="L238">            .map(HoleDomain::holeId)</span>
+<span class="fc" id="L239">            .toList());</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (!referenced.equals(declared)) {</span>
+<span class="fc" id="L241">            throw new IllegalArgumentException(</span>
                 &quot;template and domains must reference exactly the same holes&quot;);
         }
-<span class="fc" id="L241">    }</span>
+<span class="fc" id="L244">    }</span>
 
     private static String instantiate(
         String template,
         Map&lt;String, Binding&gt; bindings
     ) {
-<span class="fc" id="L247">        Matcher matcher = PLACEHOLDER.matcher(template);</span>
-<span class="fc" id="L248">        StringBuffer result = new StringBuffer();</span>
-<span class="fc bfc" id="L249" title="All 2 branches covered.">        while (matcher.find()) {</span>
-<span class="fc" id="L250">            Binding binding = bindings.get(matcher.group(1));</span>
-<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            if (binding == null) {</span>
-<span class="nc" id="L252">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L250">        Matcher matcher = PLACEHOLDER.matcher(template);</span>
+<span class="fc" id="L251">        StringBuffer result = new StringBuffer();</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L253">            Binding binding = bindings.get(matcher.group(1));</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            if (binding == null) {</span>
+<span class="nc" id="L255">                throw new IllegalArgumentException(</span>
                     &quot;template references an unbound hole&quot;);
             }
-<span class="fc" id="L255">            matcher.appendReplacement(</span>
+<span class="fc" id="L258">            matcher.appendReplacement(</span>
                 result,
-<span class="fc" id="L257">                Matcher.quoteReplacement(</span>
-<span class="fc" id="L258">                    &quot;(&quot; + binding.value().canonicalText() + &quot;)&quot;));</span>
-<span class="fc" id="L259">        }</span>
-<span class="fc" id="L260">        matcher.appendTail(result);</span>
-<span class="fc" id="L261">        return result.toString();</span>
+<span class="fc" id="L260">                Matcher.quoteReplacement(</span>
+<span class="fc" id="L261">                    &quot;(&quot; + binding.value().canonicalText() + &quot;)&quot;));</span>
+<span class="fc" id="L262">        }</span>
+<span class="fc" id="L263">        matcher.appendTail(result);</span>
+<span class="fc" id="L264">        return result.toString();</span>
     }
 
     private static List&lt;HoleDomain&gt; normalizeDomains(
         List&lt;HoleDomain&gt; domains
     ) {
-<span class="fc" id="L267">        Objects.requireNonNull(domains, &quot;holeDomains&quot;);</span>
-<span class="pc bpc" id="L268" title="2 of 4 branches missed.">        if (domains.isEmpty() || domains.size() &gt; MAX_HOLES) {</span>
-<span class="nc" id="L269">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L270">        Objects.requireNonNull(domains, &quot;holeDomains&quot;);</span>
+<span class="pc bpc" id="L271" title="2 of 4 branches missed.">        if (domains.isEmpty() || domains.size() &gt; MAX_HOLES) {</span>
+<span class="nc" id="L272">            throw new IllegalArgumentException(</span>
                 &quot;holeDomains size must be in [1,&quot; + MAX_HOLES + &quot;]&quot;);
         }
-<span class="fc" id="L272">        List&lt;HoleDomain&gt; result = domains.stream()</span>
-<span class="fc" id="L273">            .map(domain -&gt; Objects.requireNonNull(domain, &quot;holeDomain&quot;))</span>
-<span class="fc" id="L274">            .sorted(Comparator.comparing(HoleDomain::holeId))</span>
-<span class="fc" id="L275">            .toList();</span>
-<span class="fc" id="L276">        requireUnique(</span>
-<span class="fc" id="L277">            result.stream().map(HoleDomain::holeId).toList(),</span>
+<span class="fc" id="L275">        List&lt;HoleDomain&gt; result = domains.stream()</span>
+<span class="fc" id="L276">            .map(domain -&gt; Objects.requireNonNull(domain, &quot;holeDomain&quot;))</span>
+<span class="fc" id="L277">            .sorted(Comparator.comparing(HoleDomain::holeId))</span>
+<span class="fc" id="L278">            .toList();</span>
+<span class="fc" id="L279">        requireUnique(</span>
+<span class="fc" id="L280">            result.stream().map(HoleDomain::holeId).toList(),</span>
             &quot;hole domain IDs&quot;);
-<span class="fc" id="L279">        return List.copyOf(result);</span>
+<span class="fc" id="L282">        return List.copyOf(result);</span>
     }
 
     private static long countAssignments(List&lt;HoleDomain&gt; domains) {
-<span class="fc" id="L283">        long result = 1L;</span>
-<span class="fc bfc" id="L284" title="All 2 branches covered.">        for (HoleDomain domain : domains) {</span>
-<span class="fc bfc" id="L285" title="All 2 branches covered.">            if (result &gt; MAX_ASSIGNMENTS / domain.values().size()) {</span>
-<span class="fc" id="L286">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L286">        long result = 1L;</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        for (HoleDomain domain : domains) {</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            if (result &gt; MAX_ASSIGNMENTS / domain.values().size()) {</span>
+<span class="fc" id="L289">                throw new IllegalArgumentException(</span>
                     &quot;finite hole search exceeds &quot; + MAX_ASSIGNMENTS
                         + &quot; assignments&quot;);
             }
-<span class="fc" id="L290">            result *= domain.values().size();</span>
-<span class="fc" id="L291">        }</span>
-<span class="fc" id="L292">        return result;</span>
+<span class="fc" id="L293">            result *= domain.values().size();</span>
+<span class="fc" id="L294">        }</span>
+<span class="fc" id="L295">        return result;</span>
     }
 
     private static SearchStatus deriveStatus(
         long matchingAssignments,
         int retainedSolutions
     ) {
-<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (matchingAssignments == 0) {</span>
-<span class="fc" id="L300">            return SearchStatus.COMPLETE_WITHOUT_SOLUTION;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (matchingAssignments == 0) {</span>
+<span class="fc" id="L303">            return SearchStatus.COMPLETE_WITHOUT_SOLUTION;</span>
         }
-<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (matchingAssignments &gt; retainedSolutions) {</span>
-<span class="fc" id="L303">            return SearchStatus.COMPLETE_SOLUTION_SET_TRUNCATED;</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (matchingAssignments &gt; retainedSolutions) {</span>
+<span class="fc" id="L306">            return SearchStatus.COMPLETE_SOLUTION_SET_TRUNCATED;</span>
         }
-<span class="fc" id="L305">        return SearchStatus.COMPLETE_WITH_SOLUTIONS;</span>
+<span class="fc" id="L308">        return SearchStatus.COMPLETE_WITH_SOLUTIONS;</span>
     }
 
     private static List&lt;ExactRational&gt; normalizeValues(
         HoleKind kind,
         List&lt;ExactRational&gt; values
     ) {
-<span class="fc" id="L312">        Objects.requireNonNull(values, &quot;values&quot;);</span>
-<span class="pc bpc" id="L313" title="2 of 4 branches missed.">        if (values.isEmpty() || values.size() &gt; MAX_VALUES_PER_HOLE) {</span>
-<span class="nc" id="L314">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L315">        Objects.requireNonNull(values, &quot;values&quot;);</span>
+<span class="pc bpc" id="L316" title="2 of 4 branches missed.">        if (values.isEmpty() || values.size() &gt; MAX_VALUES_PER_HOLE) {</span>
+<span class="nc" id="L317">            throw new IllegalArgumentException(</span>
                 &quot;hole values size must be in [1,&quot;
                     + MAX_VALUES_PER_HOLE + &quot;]&quot;);
         }
-<span class="fc" id="L318">        List&lt;ExactRational&gt; result = values.stream()</span>
-<span class="fc" id="L319">            .map(value -&gt; Objects.requireNonNull(value, &quot;hole value&quot;))</span>
-<span class="fc" id="L320">            .peek(ExactFinitePolynomialHoleSolver::requireBoundedScalar)</span>
-<span class="fc" id="L321">            .sorted()</span>
-<span class="fc" id="L322">            .toList();</span>
-<span class="pc bpc" id="L323" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(result).size() != result.size()) {</span>
-<span class="nc" id="L324">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L321">        List&lt;ExactRational&gt; result = values.stream()</span>
+<span class="fc" id="L322">            .map(value -&gt; Objects.requireNonNull(value, &quot;hole value&quot;))</span>
+<span class="fc" id="L323">            .peek(ExactFinitePolynomialHoleSolver::requireBoundedScalar)</span>
+<span class="fc" id="L324">            .sorted()</span>
+<span class="fc" id="L325">            .toList();</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(result).size() != result.size()) {</span>
+<span class="nc" id="L327">            throw new IllegalArgumentException(</span>
                 &quot;hole values must be unique&quot;);
         }
-<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (kind == HoleKind.SIGN</span>
-<span class="fc bfc" id="L328" title="All 2 branches covered.">                &amp;&amp; result.stream().anyMatch(value -&gt;</span>
-<span class="fc bfc" id="L329" title="All 4 branches covered.">                    !value.isOne() &amp;&amp; !value.isNegativeOne())) {</span>
-<span class="fc" id="L330">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        if (kind == HoleKind.SIGN</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">                &amp;&amp; result.stream().anyMatch(value -&gt;</span>
+<span class="fc bfc" id="L332" title="All 4 branches covered.">                    !value.isOne() &amp;&amp; !value.isNegativeOne())) {</span>
+<span class="fc" id="L333">            throw new IllegalArgumentException(</span>
                 &quot;sign holes admit only -1 and 1&quot;);
         }
-<span class="fc" id="L333">        return List.copyOf(result);</span>
+<span class="fc" id="L336">        return List.copyOf(result);</span>
     }
 
     private static void requireBoundedScalar(ExactRational value) {
-<span class="fc" id="L337">        int bits = Math.max(</span>
-<span class="fc" id="L338">            value.numerator().abs().bitLength(),</span>
-<span class="fc" id="L339">            value.denominator().bitLength());</span>
-<span class="fc bfc" id="L340" title="All 2 branches covered.">        if (bits &gt; MAX_SCALAR_BITS) {</span>
-<span class="fc" id="L341">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L340">        int bits = Math.max(</span>
+<span class="fc" id="L341">            value.numerator().abs().bitLength(),</span>
+<span class="fc" id="L342">            value.denominator().bitLength());</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (bits &gt; MAX_SCALAR_BITS) {</span>
+<span class="fc" id="L344">            throw new IllegalArgumentException(</span>
                 &quot;hole value exceeds the exact scalar bit limit&quot;);
         }
-<span class="fc" id="L344">    }</span>
+<span class="fc" id="L347">    }</span>
 
     private static String requireHoleId(String value) {
-<span class="pc bpc" id="L347" title="2 of 4 branches missed.">        if (value == null || !HOLE_ID.matcher(value).matches()) {</span>
-<span class="nc" id="L348">            throw new IllegalArgumentException(</span>
-<span class="nc" id="L349">                &quot;holeId must match &quot; + HOLE_ID.pattern());</span>
+<span class="pc bpc" id="L350" title="2 of 4 branches missed.">        if (value == null || !HOLE_ID.matcher(value).matches()) {</span>
+<span class="nc" id="L351">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L352">                &quot;holeId must match &quot; + HOLE_ID.pattern());</span>
         }
-<span class="fc" id="L351">        return value;</span>
+<span class="fc" id="L354">        return value;</span>
     }
 
     private static void requireUnique(
         List&lt;String&gt; values,
         String name
     ) {
-<span class="fc bfc" id="L358" title="All 2 branches covered.">        if (new HashSet&lt;&gt;(values).size() != values.size()) {</span>
-<span class="fc" id="L359">            throw new IllegalArgumentException(name + &quot; must be unique&quot;);</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        if (new HashSet&lt;&gt;(values).size() != values.size()) {</span>
+<span class="fc" id="L362">            throw new IllegalArgumentException(name + &quot; must be unique&quot;);</span>
         }
-<span class="fc" id="L361">    }</span>
+<span class="fc" id="L364">    }</span>
 
     private static String lengthPrefixed(String... values) {
-<span class="fc" id="L364">        StringBuilder result = new StringBuilder();</span>
-<span class="fc bfc" id="L365" title="All 2 branches covered.">        for (String value : values) {</span>
-<span class="fc" id="L366">            appendField(result, value);</span>
+<span class="fc" id="L367">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L369">            appendField(result, value);</span>
         }
-<span class="fc" id="L368">        return result.toString();</span>
+<span class="fc" id="L371">        return result.toString();</span>
     }
 
     private static void appendField(
         StringBuilder target,
         String value
     ) {
-<span class="fc" id="L375">        target.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
-<span class="fc" id="L376">            .append(':')</span>
-<span class="fc" id="L377">            .append(value);</span>
-<span class="fc" id="L378">    }</span>
+<span class="fc" id="L378">        target.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L379">            .append(':')</span>
+<span class="fc" id="L380">            .append(value);</span>
+<span class="fc" id="L381">    }</span>
 
     static String hash(String value) {
         try {
-<span class="fc" id="L382">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L383">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
-<span class="fc" id="L384">            return &quot;sha256:&quot;</span>
-<span class="fc" id="L385">                + java.util.HexFormat.of().formatHex(digest);</span>
-<span class="nc" id="L386">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L387">            throw new IllegalStateException(</span>
+<span class="fc" id="L385">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L386">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L387">            return &quot;sha256:&quot;</span>
+<span class="fc" id="L388">                + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L389">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L390">            throw new IllegalStateException(</span>
                 &quot;SHA-256 unavailable&quot;,
                 exception);
         }
     }
 
-<span class="fc" id="L393">    public enum HoleKind {</span>
-<span class="fc" id="L394">        COEFFICIENT,</span>
-<span class="fc" id="L395">        SIGN</span>
+<span class="fc" id="L396">    public enum HoleKind {</span>
+<span class="fc" id="L397">        COEFFICIENT,</span>
+<span class="fc" id="L398">        SIGN</span>
     }
 
-<span class="fc" id="L398">    public enum SearchStatus {</span>
-<span class="fc" id="L399">        COMPLETE_WITHOUT_SOLUTION,</span>
-<span class="fc" id="L400">        COMPLETE_WITH_SOLUTIONS,</span>
-<span class="fc" id="L401">        COMPLETE_SOLUTION_SET_TRUNCATED</span>
+<span class="fc" id="L401">    public enum SearchStatus {</span>
+<span class="fc" id="L402">        COMPLETE_WITHOUT_SOLUTION,</span>
+<span class="fc" id="L403">        COMPLETE_WITH_SOLUTIONS,</span>
+<span class="fc" id="L404">        COMPLETE_SOLUTION_SET_TRUNCATED</span>
     }
 
     public record HoleDomain(
@@ -406,37 +409,37 @@ import java.util.regex.Pattern;
         HoleKind kind,
         List&lt;ExactRational&gt; values
     ) {
-<span class="fc" id="L409">        public HoleDomain {</span>
-<span class="fc" id="L410">            holeId = requireHoleId(holeId);</span>
-<span class="fc" id="L411">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="fc" id="L412">            values = normalizeValues(kind, values);</span>
-<span class="fc" id="L413">        }</span>
+<span class="fc" id="L412">        public HoleDomain {</span>
+<span class="fc" id="L413">            holeId = requireHoleId(holeId);</span>
+<span class="fc" id="L414">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L415">            values = normalizeValues(kind, values);</span>
+<span class="fc" id="L416">        }</span>
 
         public static HoleDomain integerRange(
             String holeId,
             int minimum,
             int maximum
         ) {
-<span class="fc" id="L420">            long count = (long) maximum - minimum + 1L;</span>
-<span class="pc bpc" id="L421" title="1 of 4 branches missed.">            if (count &lt; 1 || count &gt; MAX_VALUES_PER_HOLE) {</span>
-<span class="fc" id="L422">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L423">            long count = (long) maximum - minimum + 1L;</span>
+<span class="pc bpc" id="L424" title="1 of 4 branches missed.">            if (count &lt; 1 || count &gt; MAX_VALUES_PER_HOLE) {</span>
+<span class="fc" id="L425">                throw new IllegalArgumentException(</span>
                     &quot;integer range exceeds one finite hole domain&quot;);
             }
-<span class="fc" id="L425">            List&lt;ExactRational&gt; values = new ArrayList&lt;&gt;((int) count);</span>
-<span class="fc bfc" id="L426" title="All 2 branches covered.">            for (long value = minimum; value &lt;= maximum; value++) {</span>
-<span class="fc" id="L427">                values.add(ExactRational.integer(value));</span>
+<span class="fc" id="L428">            List&lt;ExactRational&gt; values = new ArrayList&lt;&gt;((int) count);</span>
+<span class="fc bfc" id="L429" title="All 2 branches covered.">            for (long value = minimum; value &lt;= maximum; value++) {</span>
+<span class="fc" id="L430">                values.add(ExactRational.integer(value));</span>
             }
-<span class="fc" id="L429">            return new HoleDomain(</span>
+<span class="fc" id="L432">            return new HoleDomain(</span>
                 holeId,
                 HoleKind.COEFFICIENT,
                 values);
         }
 
         public static HoleDomain signs(String holeId) {
-<span class="fc" id="L436">            return new HoleDomain(</span>
+<span class="fc" id="L439">            return new HoleDomain(</span>
                 holeId,
                 HoleKind.SIGN,
-<span class="fc" id="L439">                List.of(</span>
+<span class="fc" id="L442">                List.of(</span>
                     ExactRational.NEGATIVE_ONE,
                     ExactRational.ONE));
         }
@@ -447,18 +450,18 @@ import java.util.regex.Pattern;
         HoleKind kind,
         ExactRational value
     ) {
-<span class="fc" id="L450">        public Binding {</span>
-<span class="fc" id="L451">            holeId = requireHoleId(holeId);</span>
-<span class="fc" id="L452">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="fc" id="L453">            value = Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="fc" id="L454">            requireBoundedScalar(value);</span>
-<span class="fc bfc" id="L455" title="All 2 branches covered.">            if (kind == HoleKind.SIGN</span>
-<span class="fc bfc" id="L456" title="All 2 branches covered.">                    &amp;&amp; !value.isOne()</span>
-<span class="pc bpc" id="L457" title="1 of 2 branches missed.">                    &amp;&amp; !value.isNegativeOne()) {</span>
-<span class="nc" id="L458">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L453">        public Binding {</span>
+<span class="fc" id="L454">            holeId = requireHoleId(holeId);</span>
+<span class="fc" id="L455">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L456">            value = Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L457">            requireBoundedScalar(value);</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">            if (kind == HoleKind.SIGN</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">                    &amp;&amp; !value.isOne()</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">                    &amp;&amp; !value.isNegativeOne()) {</span>
+<span class="nc" id="L461">                throw new IllegalArgumentException(</span>
                     &quot;sign binding must be -1 or 1&quot;);
             }
-<span class="fc" id="L461">        }</span>
+<span class="fc" id="L464">        }</span>
     }
 
     public record Solution(
@@ -466,38 +469,43 @@ import java.util.regex.Pattern;
         String instantiatedExpression,
         String exactNormalForm
     ) {
-<span class="fc" id="L469">        public Solution {</span>
-<span class="fc" id="L470">            Objects.requireNonNull(bindings, &quot;bindings&quot;);</span>
-<span class="fc" id="L471">            bindings = bindings.stream()</span>
-<span class="fc" id="L472">                .map(binding -&gt; Objects.requireNonNull(binding, &quot;binding&quot;))</span>
-<span class="fc" id="L473">                .sorted(Comparator.comparing(Binding::holeId))</span>
-<span class="fc" id="L474">                .toList();</span>
-<span class="fc" id="L475">            requireUnique(</span>
-<span class="fc" id="L476">                bindings.stream().map(Binding::holeId).toList(),</span>
+<span class="fc" id="L472">        public Solution {</span>
+<span class="fc" id="L473">            Objects.requireNonNull(bindings, &quot;bindings&quot;);</span>
+<span class="fc" id="L474">            bindings = bindings.stream()</span>
+<span class="fc" id="L475">                .map(binding -&gt; Objects.requireNonNull(binding, &quot;binding&quot;))</span>
+<span class="fc" id="L476">                .sorted(Comparator.comparing(Binding::holeId))</span>
+<span class="fc" id="L477">                .toList();</span>
+<span class="fc" id="L478">            requireUnique(</span>
+<span class="fc" id="L479">                bindings.stream().map(Binding::holeId).toList(),</span>
                 &quot;solution binding IDs&quot;);
-<span class="pc bpc" id="L478" title="1 of 2 branches missed.">            if (instantiatedExpression == null</span>
-<span class="pc bpc" id="L479" title="2 of 4 branches missed.">                    || instantiatedExpression.isBlank()</span>
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">            if (instantiatedExpression == null</span>
+<span class="pc bpc" id="L482" title="2 of 4 branches missed.">                    || instantiatedExpression.isBlank()</span>
                     || exactNormalForm == null
-<span class="pc bpc" id="L481" title="1 of 2 branches missed.">                    || exactNormalForm.isBlank()) {</span>
-<span class="nc" id="L482">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">                    || exactNormalForm.isBlank()) {</span>
+<span class="nc" id="L485">                throw new IllegalArgumentException(</span>
                     &quot;solution expressions must not be blank&quot;);
             }
-<span class="fc" id="L485">        }</span>
+<span class="fc" id="L488">        }</span>
 
         public String bindingKey() {
-<span class="fc" id="L488">            return bindings.stream()</span>
-<span class="fc" id="L489">                .map(binding -&gt; binding.holeId()</span>
-<span class="fc" id="L490">                    + &quot;=&quot; + binding.value().canonicalText())</span>
-<span class="fc" id="L491">                .reduce((left, right) -&gt; left + &quot;|&quot; + right)</span>
-<span class="fc" id="L492">                .orElse(&quot;&quot;);</span>
+<span class="fc" id="L491">            return bindings.stream()</span>
+<span class="fc" id="L492">                .map(binding -&gt; binding.holeId()</span>
+<span class="fc" id="L493">                    + &quot;=&quot; + binding.value().canonicalText())</span>
+<span class="fc" id="L494">                .reduce((left, right) -&gt; left + &quot;|&quot; + right)</span>
+<span class="fc" id="L495">                .orElse(&quot;&quot;);</span>
         }
 
         public String contentHash() {
-<span class="fc" id="L496">            StringBuilder material = new StringBuilder();</span>
-<span class="fc" id="L497">            appendField(material, bindingKey());</span>
-<span class="fc" id="L498">            appendField(material, instantiatedExpression);</span>
-<span class="fc" id="L499">            appendField(material, exactNormalForm);</span>
-<span class="fc" id="L500">            return hash(material.toString());</span>
+<span class="fc" id="L499">            StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L500">            appendField(material, SOLUTION_IDENTITY_REVISION);</span>
+<span class="fc bfc" id="L501" title="All 2 branches covered.">            for (Binding binding : bindings) {</span>
+<span class="fc" id="L502">                appendField(material, binding.holeId());</span>
+<span class="fc" id="L503">                appendField(material, binding.kind().name());</span>
+<span class="fc" id="L504">                appendField(material, binding.value().canonicalText());</span>
+<span class="fc" id="L505">            }</span>
+<span class="fc" id="L506">            appendField(material, instantiatedExpression);</span>
+<span class="fc" id="L507">            appendField(material, exactNormalForm);</span>
+<span class="fc" id="L508">            return hash(material.toString());</span>
         }
     }
 
@@ -514,116 +522,116 @@ import java.util.regex.Pattern;
         SearchStatus status,
         List&lt;Solution&gt; solutions
     ) {
-<span class="fc" id="L517">        public SearchResult {</span>
-<span class="pc bpc" id="L518" title="1 of 2 branches missed.">            if (!SOLVER_ID.equals(solverId)) {</span>
-<span class="nc" id="L519">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L525">        public SearchResult {</span>
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">            if (!SOLVER_ID.equals(solverId)) {</span>
+<span class="nc" id="L527">                throw new IllegalArgumentException(</span>
                     &quot;unexpected finite hole solver ID&quot;);
             }
-<span class="pc bpc" id="L522" title="1 of 2 branches missed.">            if (!REVISION_HASH.equals(solverRevisionHash)) {</span>
-<span class="nc" id="L523">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">            if (!REVISION_HASH.equals(solverRevisionHash)) {</span>
+<span class="nc" id="L531">                throw new IllegalArgumentException(</span>
                     &quot;unexpected finite hole solver revision&quot;);
             }
-<span class="pc bpc" id="L526" title="2 of 4 branches missed.">            if (sourceExpression == null || sourceExpression.isBlank()) {</span>
-<span class="nc" id="L527">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L534" title="2 of 4 branches missed.">            if (sourceExpression == null || sourceExpression.isBlank()) {</span>
+<span class="nc" id="L535">                throw new IllegalArgumentException(</span>
                     &quot;sourceExpression must not be blank&quot;);
             }
-<span class="fc" id="L530">            ansatzTemplate = normalizeTemplate(ansatzTemplate);</span>
-<span class="fc" id="L531">            holeDomains = normalizeDomains(holeDomains);</span>
-<span class="fc" id="L532">            validateTemplateHoles(ansatzTemplate, holeDomains);</span>
-<span class="pc bpc" id="L533" title="3 of 8 branches missed.">            if (totalAssignments != countAssignments(holeDomains)</span>
+<span class="fc" id="L538">            ansatzTemplate = normalizeTemplate(ansatzTemplate);</span>
+<span class="fc" id="L539">            holeDomains = normalizeDomains(holeDomains);</span>
+<span class="fc" id="L540">            validateTemplateHoles(ansatzTemplate, holeDomains);</span>
+<span class="pc bpc" id="L541" title="3 of 8 branches missed.">            if (totalAssignments != countAssignments(holeDomains)</span>
                     || evaluatedAssignments != totalAssignments
                     || matchingAssignments &lt; 0
                     || matchingAssignments &gt; evaluatedAssignments) {
-<span class="fc" id="L537">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L545">                throw new IllegalArgumentException(</span>
                     &quot;hole-search counts are inconsistent&quot;);
             }
-<span class="pc bpc" id="L540" title="2 of 4 branches missed.">            if (retainedSolutionLimit &lt; 1</span>
+<span class="pc bpc" id="L548" title="2 of 4 branches missed.">            if (retainedSolutionLimit &lt; 1</span>
                     || retainedSolutionLimit &gt; MAX_RETAINED_SOLUTIONS) {
-<span class="nc" id="L542">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L550">                throw new IllegalArgumentException(</span>
                     &quot;retainedSolutionLimit is outside limits&quot;);
             }
-<span class="fc" id="L545">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L546">            Objects.requireNonNull(solutions, &quot;solutions&quot;);</span>
-<span class="fc" id="L547">            solutions = solutions.stream()</span>
-<span class="fc" id="L548">                .map(solution -&gt; Objects.requireNonNull(solution, &quot;solution&quot;))</span>
-<span class="fc" id="L549">                .sorted(Comparator.comparing(Solution::bindingKey))</span>
-<span class="fc" id="L550">                .toList();</span>
-<span class="fc" id="L551">            requireUnique(</span>
-<span class="fc" id="L552">                solutions.stream().map(Solution::bindingKey).toList(),</span>
+<span class="fc" id="L553">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L554">            Objects.requireNonNull(solutions, &quot;solutions&quot;);</span>
+<span class="fc" id="L555">            solutions = solutions.stream()</span>
+<span class="fc" id="L556">                .map(solution -&gt; Objects.requireNonNull(solution, &quot;solution&quot;))</span>
+<span class="fc" id="L557">                .sorted(Comparator.comparing(Solution::bindingKey))</span>
+<span class="fc" id="L558">                .toList();</span>
+<span class="fc" id="L559">            requireUnique(</span>
+<span class="fc" id="L560">                solutions.stream().map(Solution::bindingKey).toList(),</span>
                 &quot;solution binding keys&quot;);
-<span class="fc" id="L554">            int expectedRetained = (int) Math.min(</span>
+<span class="fc" id="L562">            int expectedRetained = (int) Math.min(</span>
                 matchingAssignments,
                 retainedSolutionLimit);
-<span class="pc bpc" id="L557" title="1 of 2 branches missed.">            if (solutions.size() != expectedRetained</span>
-<span class="pc bpc" id="L558" title="1 of 2 branches missed.">                    || status != deriveStatus(</span>
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">            if (solutions.size() != expectedRetained</span>
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">                    || status != deriveStatus(</span>
                         matchingAssignments,
-<span class="fc" id="L560">                        solutions.size())) {</span>
-<span class="nc" id="L561">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L568">                        solutions.size())) {</span>
+<span class="nc" id="L569">                throw new IllegalArgumentException(</span>
                     &quot;hole-search status does not match solutions&quot;);
             }
-<span class="fc" id="L564">            validateSolutionDomains(holeDomains, solutions);</span>
-<span class="fc" id="L565">        }</span>
+<span class="fc" id="L572">            validateSolutionDomains(holeDomains, solutions);</span>
+<span class="fc" id="L573">        }</span>
 
         public String contentHash() {
-<span class="fc" id="L568">            StringBuilder material = new StringBuilder();</span>
-<span class="fc" id="L569">            appendField(material, solverId);</span>
-<span class="fc" id="L570">            appendField(material, solverRevisionHash);</span>
-<span class="fc" id="L571">            appendField(material, sourceExpression);</span>
-<span class="fc" id="L572">            appendField(material, ansatzTemplate);</span>
-<span class="fc" id="L573">            appendField(material, Long.toString(totalAssignments));</span>
-<span class="fc" id="L574">            appendField(material, Long.toString(evaluatedAssignments));</span>
-<span class="fc" id="L575">            appendField(material, Long.toString(matchingAssignments));</span>
-<span class="fc" id="L576">            appendField(material, Integer.toString(retainedSolutionLimit));</span>
-<span class="fc" id="L577">            appendField(material, status.name());</span>
-<span class="fc bfc" id="L578" title="All 2 branches covered.">            for (HoleDomain domain : holeDomains) {</span>
-<span class="fc" id="L579">                appendField(material, domain.holeId());</span>
-<span class="fc" id="L580">                appendField(material, domain.kind().name());</span>
-<span class="fc bfc" id="L581" title="All 2 branches covered.">                for (ExactRational value : domain.values()) {</span>
-<span class="fc" id="L582">                    appendField(material, value.canonicalText());</span>
-<span class="fc" id="L583">                }</span>
-<span class="fc" id="L584">            }</span>
-<span class="fc bfc" id="L585" title="All 2 branches covered.">            for (Solution solution : solutions) {</span>
-<span class="fc" id="L586">                appendField(material, solution.contentHash());</span>
-<span class="fc" id="L587">            }</span>
-<span class="fc" id="L588">            return hash(material.toString());</span>
+<span class="fc" id="L576">            StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L577">            appendField(material, solverId);</span>
+<span class="fc" id="L578">            appendField(material, solverRevisionHash);</span>
+<span class="fc" id="L579">            appendField(material, sourceExpression);</span>
+<span class="fc" id="L580">            appendField(material, ansatzTemplate);</span>
+<span class="fc" id="L581">            appendField(material, Long.toString(totalAssignments));</span>
+<span class="fc" id="L582">            appendField(material, Long.toString(evaluatedAssignments));</span>
+<span class="fc" id="L583">            appendField(material, Long.toString(matchingAssignments));</span>
+<span class="fc" id="L584">            appendField(material, Integer.toString(retainedSolutionLimit));</span>
+<span class="fc" id="L585">            appendField(material, status.name());</span>
+<span class="fc bfc" id="L586" title="All 2 branches covered.">            for (HoleDomain domain : holeDomains) {</span>
+<span class="fc" id="L587">                appendField(material, domain.holeId());</span>
+<span class="fc" id="L588">                appendField(material, domain.kind().name());</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">                for (ExactRational value : domain.values()) {</span>
+<span class="fc" id="L590">                    appendField(material, value.canonicalText());</span>
+<span class="fc" id="L591">                }</span>
+<span class="fc" id="L592">            }</span>
+<span class="fc bfc" id="L593" title="All 2 branches covered.">            for (Solution solution : solutions) {</span>
+<span class="fc" id="L594">                appendField(material, solution.contentHash());</span>
+<span class="fc" id="L595">            }</span>
+<span class="fc" id="L596">            return hash(material.toString());</span>
         }
 
         private static void validateSolutionDomains(
             List&lt;HoleDomain&gt; domains,
             List&lt;Solution&gt; solutions
         ) {
-<span class="fc" id="L595">            Map&lt;String, HoleDomain&gt; domainsById = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L596">            domains.forEach(domain -&gt;</span>
-<span class="fc" id="L597">                domainsById.put(domain.holeId(), domain));</span>
-<span class="fc bfc" id="L598" title="All 2 branches covered.">            for (Solution solution : solutions) {</span>
-<span class="fc" id="L599">                if (!solution.bindings().stream()</span>
-<span class="fc" id="L600">                        .map(Binding::holeId)</span>
-<span class="fc" id="L601">                        .collect(java.util.stream.Collectors.toSet())</span>
-<span class="pc bpc" id="L602" title="1 of 2 branches missed.">                        .equals(domainsById.keySet())) {</span>
-<span class="nc" id="L603">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L603">            Map&lt;String, HoleDomain&gt; domainsById = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L604">            domains.forEach(domain -&gt;</span>
+<span class="fc" id="L605">                domainsById.put(domain.holeId(), domain));</span>
+<span class="fc bfc" id="L606" title="All 2 branches covered.">            for (Solution solution : solutions) {</span>
+<span class="fc" id="L607">                if (!solution.bindings().stream()</span>
+<span class="fc" id="L608">                        .map(Binding::holeId)</span>
+<span class="fc" id="L609">                        .collect(java.util.stream.Collectors.toSet())</span>
+<span class="pc bpc" id="L610" title="1 of 2 branches missed.">                        .equals(domainsById.keySet())) {</span>
+<span class="nc" id="L611">                    throw new IllegalArgumentException(</span>
                         &quot;solution does not bind exactly the declared holes&quot;);
                 }
-<span class="fc bfc" id="L606" title="All 2 branches covered.">                for (Binding binding : solution.bindings()) {</span>
-<span class="fc" id="L607">                    HoleDomain domain = domainsById.get(binding.holeId());</span>
-<span class="pc bpc" id="L608" title="1 of 2 branches missed.">                    if (binding.kind() != domain.kind()</span>
-<span class="pc bpc" id="L609" title="1 of 2 branches missed.">                            || !domain.values().contains(binding.value())) {</span>
-<span class="nc" id="L610">                        throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L614" title="All 2 branches covered.">                for (Binding binding : solution.bindings()) {</span>
+<span class="fc" id="L615">                    HoleDomain domain = domainsById.get(binding.holeId());</span>
+<span class="pc bpc" id="L616" title="1 of 2 branches missed.">                    if (binding.kind() != domain.kind()</span>
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">                            || !domain.values().contains(binding.value())) {</span>
+<span class="nc" id="L618">                        throw new IllegalArgumentException(</span>
                             &quot;solution binding is outside its declared domain&quot;);
                     }
-<span class="fc" id="L613">                }</span>
-<span class="fc" id="L614">            }</span>
-<span class="fc" id="L615">        }</span>
+<span class="fc" id="L621">                }</span>
+<span class="fc" id="L622">            }</span>
+<span class="fc" id="L623">        }</span>
     }
 
     private static final class SearchAccumulator {
         private final int maxRetainedSolutions;
-<span class="fc" id="L620">        private final List&lt;Solution&gt; solutions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L628">        private final List&lt;Solution&gt; solutions = new ArrayList&lt;&gt;();</span>
         private long evaluatedAssignments;
         private long matchingAssignments;
 
-<span class="fc" id="L624">        private SearchAccumulator(int maxRetainedSolutions) {</span>
-<span class="fc" id="L625">            this.maxRetainedSolutions = maxRetainedSolutions;</span>
-<span class="fc" id="L626">        }</span>
+<span class="fc" id="L632">        private SearchAccumulator(int maxRetainedSolutions) {</span>
+<span class="fc" id="L633">            this.maxRetainedSolutions = maxRetainedSolutions;</span>
+<span class="fc" id="L634">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
