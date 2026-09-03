@@ -1,68 +1,30 @@
 # Exaktes Replay-Receipt für endliche Polynompläne
 
-`ExactFinitePolynomialPlanReplayVerifier` ersetzt die bisherige boolesche
-Replay-Aussage durch ein kanonisches Receipt:
+`ExactFinitePolynomialPlanReplayVerifier` führt einen gebundenen
+`ExactFinitePolynomialPlanRun` mit derselben Quelle, demselben Ansatz, denselben
+Hole-Domänen und demselben Retained-Limit vollständig erneut aus. Nur ein exakt
+gleicher Lauf erhält ein `ReplayReceipt`; jede Abweichung wird fail-closed
+abgelehnt.
 
-```text
-SchematicProofPlan
-  + eingefrorene Quelle, Ansatz, Hole-Domänen und Retained-Limit
-  + erwarteter ExactFinitePolynomialPlanRun
-  -> vollständige erneute Solverausführung
-  -> exakter Vergleich des gesamten Planlaufs
-  -> ReplayReceipt
-```
+Das öffentliche Receipt ist eine versiegelte, nur lesbare Schnittstelle mit
+einer einzigen privaten Implementierung, die ausschließlich `verify(...)`
+erzeugt. Es bindet Verifier- und Solverrevision, Plan-, Planlauf- und
+Solverresultat-Hash, Laufstatus, alle Belegungszähler, sämtliche gespeicherten
+Kandidatenhashes und den eigenen Content-Hash. Null-, vollständige und
+abgeschnittene Lösungsmengen bleiben unterscheidbar; widersprüchliche Zähler
+oder doppelte Kandidatenidentitäten werden abgelehnt.
 
-Abweichungen bei Plan, Formationseingaben oder erwartetem Lauf werden
-fail-closed abgelehnt.
-
-## Ausstellung und Inhalt
-
-`ReplayReceipt` ist eine versiegelte, nur lesbare Schnittstelle. Ihre einzige
-zugelassene Implementierung ist ein privater Record im Verifier. Ohne einen
-erfolgreichen Aufruf von `verify(...)` lässt sich daher regulär kein Receipt mit
-`CONFIRMED_IDENTICAL_REPLAY` konstruieren.
-
-Das Receipt bindet Verifier- und Solverrevision, Plan-, Planlauf- und
-Solverresultat-Hash, Laufstatus, vollständige/evaluierte/passende/gespeicherte
-Belegungszahlen, alle aufgelösten Kandidatenhashes und den eigenen Hash. Dabei
-bleiben folgende Zustände getrennt:
-
-```text
-COMPLETE_WITHOUT_SOLUTION
-COMPLETE_WITH_RESOLUTIONS
-COMPLETE_RESOLUTION_SET_TRUNCATED
-```
-
-Nullfunde dürfen keine Kandidaten enthalten; abgeschnittene Mengen müssen mehr
-passende als gespeicherte Lösungen ausweisen. Inkonsistente Zähler und doppelte
-Kandidatenhashes werden abgelehnt.
-
-## Vertrauensgrenze
-
-`CONFIRMED_IDENTICAL_REPLAY` bestätigt ausschließlich, dass derselbe
-kanonische Plan unter den gebundenen Resolver- und Solverrevisionen vollständig
-und exakt reproduziert wurde. Es ist keine formal unabhängige Proof-Evidence,
-lädt keine externen Evidence-Bytes, replayt keine primitiven Rewrite-Regeln,
-kompiliert kein `RewriteProgram`, lernt keine Ansatzgrammatik und autorisiert
-keine Promotion oder Public Evidence.
-
-Quelle, Ansatz, Zielausdruck und ausführbare Transformation stehen absichtlich
-nicht im Receipt; die Formationseingaben bleiben über Plan- und Planlaufhashes
-gebunden.
-
-## Charakterisierung
+`CONFIRMED_IDENTICAL_REPLAY` bestätigt nur die deterministische Reproduktion
+unter den gebundenen Revisionen. Es ist keine unabhängige Proof-Evidence, lädt
+keine externen Evidence-Bytes, replayt keine primitiven Rewrite-Regeln,
+kompiliert kein `RewriteProgram` und erteilt keine Promotion-Autorität. Quelle,
+Ansatz, Ziel und ausführbare Transformation stehen absichtlich nicht im
+Receipt.
 
 ```bash
-./gradlew \
-  :regelsuche-learning:test \
+./gradlew :regelsuche-learning:test \
   --tests '*ExactFinitePolynomialPlanReplayVerifierTest'
 ```
 
-Die Tests prüfen quadratische Ergänzung, deterministisches Replay,
-vollständige Null- und abgeschnittene Resultate, Eingabe-/Plan-/Laufsubstitution,
-kanonische Inhalte, die private versiegelte Ausstellung und das Fehlen von Ziel-
-oder Ausführungsfeldern.
-
-Ein späterer unabhängiger Evidence-Verifier muss gespeicherte Bytes selbst
-hashen und den Replaylauf unter einer eingefrorenen Runtime wiederholen, bevor
-eine stärkere Autorität ausgestellt werden darf.
+Eine spätere stärkere Evidence-Grenze muss gespeicherte Bytes selbst hashen und
+den Lauf unter einer eingefrorenen Runtime erneut ausführen.
