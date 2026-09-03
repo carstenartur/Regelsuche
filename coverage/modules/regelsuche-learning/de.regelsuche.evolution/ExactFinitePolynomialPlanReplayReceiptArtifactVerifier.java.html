@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactFinitePolynomialPlanReplayReceiptArtifactVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExactFinitePolynomialPlanReplayReceiptArtifactVerifier.java</span></div><h1>ExactFinitePolynomialPlanReplayReceiptArtifactVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayArtifactVerifier.ArtifactReference;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayArtifactVerifier.VerifiedArtifactBytes;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayVerifier.ReplayReceipt;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayVerifier.ReplayStatus;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Verifies the canonical semantics of independently loaded exact finite
+ * polynomial replay-receipt bytes.
+ *
+ * &lt;p&gt;The input must already have crossed the independent byte boundary. This
+ * verifier checks the exact receipt schema, current revisions, status/count
+ * invariants, candidate identities, receipt content hash and canonical JSON.
+ * It does not load a plan run, rerun the solver, replay primitive rewrites or
+ * issue proof, execution or promotion authority.&lt;/p&gt;
+ */
+<span class="fc" id="L27">public final class ExactFinitePolynomialPlanReplayReceiptArtifactVerifier {</span>
+    public static final String VERIFIER_ID =
+        &quot;regelsuche.exact-finite-polynomial-plan-replay-receipt-artifact-verifier/v1&quot;;
+<span class="fc" id="L30">    public static final String REVISION_HASH = SchematicProofPlan.hash(</span>
+<span class="fc" id="L31">        lengthPrefixed(</span>
+            VERIFIER_ID,
+            ExactFinitePolynomialPlanReplayArtifactVerifier.VERIFIER_ID,
+            ExactFinitePolynomialPlanReplayArtifactVerifier.REVISION_HASH,
+            ExactFinitePolynomialPlanReplayVerifier.VERIFIER_ID,
+            ExactFinitePolynomialPlanReplayVerifier.REVISION_HASH,
+            ExactFinitePolynomialHoleSolver.REVISION_HASH,
+            ReplayReceipt.SCHEMA,
+            &quot;strict-ordered-canonical-receipt-parser&quot;,
+            &quot;status-count-and-candidate-invariants&quot;,
+            &quot;receipt-content-hash-and-full-json-reconstruction&quot;,
+            &quot;sealed-verifier-owned-non-executable-semantic-view&quot;));
+
+    public VerifiedReplayReceiptArtifact verify(
+        VerifiedArtifactBytes artifact
+    ) {
+<span class="fc" id="L47">        Objects.requireNonNull(artifact, &quot;artifact&quot;);</span>
+<span class="fc" id="L48">        ArtifactReference reference = artifact.reference();</span>
+<span class="fc" id="L49">        requireReceiptReference(reference);</span>
+
+<span class="fc" id="L51">        byte[] bytes = artifact.copyBytes();</span>
+<span class="fc" id="L52">        String json = artifact.utf8();</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (!Arrays.equals(bytes, json.getBytes(StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(</span>
+                &quot;verified receipt bytes differ from their UTF-8 view&quot;);
+        }
+
+<span class="fc" id="L58">        ParsedReceipt receipt = new CanonicalReceiptReader(json).read();</span>
+<span class="fc" id="L59">        List&lt;String&gt; candidateHashes = validateReceipt(receipt);</span>
+<span class="fc" id="L60">        String payload = render(receipt, candidateHashes, null);</span>
+<span class="fc" id="L61">        String expectedContentHash = SchematicProofPlan.hash(payload);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (!expectedContentHash.equals(receipt.contentHash())) {</span>
+<span class="fc" id="L63">            throw new IllegalArgumentException(</span>
+                &quot;replay receipt contentHash does not match its contents&quot;);
+        }
+<span class="fc" id="L66">        String canonicalJson = render(</span>
+            receipt,
+            candidateHashes,
+<span class="fc" id="L69">            receipt.contentHash());</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (!canonicalJson.equals(json)) {</span>
+<span class="nc" id="L71">            throw new IllegalArgumentException(</span>
+                &quot;replay receipt bytes are not the canonical representation&quot;);
+        }
+
+<span class="fc" id="L75">        String verificationHash = SchematicProofPlan.hash(lengthPrefixed(</span>
+            VERIFIER_ID,
+            REVISION_HASH,
+<span class="fc" id="L78">            reference.artifactId(),</span>
+<span class="fc" id="L79">            reference.byteHash(),</span>
+<span class="fc" id="L80">            receipt.contentHash(),</span>
+<span class="fc" id="L81">            receipt.planHash(),</span>
+<span class="fc" id="L82">            receipt.planRunHash(),</span>
+<span class="fc" id="L83">            receipt.solverResultHash()));</span>
+<span class="fc" id="L84">        return new VerifiedReceiptArtifact(</span>
+            reference,
+<span class="fc" id="L86">            receipt.planHash(),</span>
+<span class="fc" id="L87">            receipt.planRunHash(),</span>
+<span class="fc" id="L88">            receipt.solverResultHash(),</span>
+<span class="fc" id="L89">            receipt.solverRevisionHash(),</span>
+<span class="fc" id="L90">            receipt.runStatus(),</span>
+<span class="fc" id="L91">            receipt.totalAssignments(),</span>
+<span class="fc" id="L92">            receipt.evaluatedAssignments(),</span>
+<span class="fc" id="L93">            receipt.matchingAssignments(),</span>
+<span class="fc" id="L94">            receipt.retainedSolutions(),</span>
+            candidateHashes,
+<span class="fc" id="L96">            receipt.replayStatus(),</span>
+<span class="fc" id="L97">            receipt.contentHash(),</span>
+            canonicalJson,
+            verificationHash);
+    }
+
+    private static void requireReceiptReference(
+        ArtifactReference reference
+    ) {
+<span class="fc" id="L105">        Objects.requireNonNull(reference, &quot;artifact reference&quot;);</span>
+<span class="fc" id="L106">        if (!ExactFinitePolynomialPlanReplayArtifactVerifier.REFERENCE_SCHEMA</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                .equals(reference.referenceSchema())</span>
+                || !ExactFinitePolynomialPlanReplayArtifactVerifier.RECEIPT_ROLE
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                    .equals(reference.role())</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                || !ReplayReceipt.SCHEMA.equals(reference.contentSchema())</span>
+                || !ExactFinitePolynomialPlanReplayArtifactVerifier
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                    .RECEIPT_MEDIA_TYPE.equals(reference.mediaType())) {</span>
+<span class="nc" id="L113">            throw new IllegalArgumentException(</span>
+                &quot;verified bytes are not an exact replay-receipt artifact&quot;);
+        }
+<span class="fc" id="L116">    }</span>
+
+    private static List&lt;String&gt; validateReceipt(ParsedReceipt receipt) {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (!ReplayReceipt.SCHEMA.equals(receipt.schema())) {</span>
+<span class="nc" id="L120">            throw new IllegalArgumentException(</span>
+                &quot;unsupported replay receipt schema&quot;);
+        }
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (!ExactFinitePolynomialPlanReplayVerifier.VERIFIER_ID.equals(</span>
+<span class="fc" id="L124">                receipt.replayVerifierId())) {</span>
+<span class="nc" id="L125">            throw new IllegalArgumentException(</span>
+                &quot;unexpected replay verifier ID&quot;);
+        }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (!ExactFinitePolynomialPlanReplayVerifier.REVISION_HASH.equals(</span>
+<span class="fc" id="L129">                receipt.replayVerifierRevisionHash())) {</span>
+<span class="fc" id="L130">            throw new IllegalArgumentException(</span>
+                &quot;unexpected replay verifier revision&quot;);
+        }
+<span class="fc" id="L133">        SchematicProofPlan.requireSha256(receipt.planHash(), &quot;planHash&quot;);</span>
+<span class="fc" id="L134">        SchematicProofPlan.requireSha256(receipt.planRunHash(), &quot;planRunHash&quot;);</span>
+<span class="fc" id="L135">        SchematicProofPlan.requireSha256(</span>
+<span class="fc" id="L136">            receipt.solverResultHash(),</span>
+            &quot;solverResultHash&quot;);
+<span class="fc" id="L138">        SchematicProofPlan.requireSha256(</span>
+<span class="fc" id="L139">            receipt.solverRevisionHash(),</span>
+            &quot;solverRevisionHash&quot;);
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (!ExactFinitePolynomialHoleSolver.REVISION_HASH.equals(</span>
+<span class="fc" id="L142">                receipt.solverRevisionHash())) {</span>
+<span class="nc" id="L143">            throw new IllegalArgumentException(</span>
+                &quot;receipt requires the current exact finite solver revision&quot;);
+        }
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (receipt.replayStatus()</span>
+                != ReplayStatus.CONFIRMED_IDENTICAL_REPLAY) {
+<span class="nc" id="L148">            throw new IllegalArgumentException(</span>
+                &quot;receipt does not report an identical confirmed replay&quot;);
+        }
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (receipt.totalAssignments() &lt; 1</span>
+<span class="fc" id="L152">                || receipt.evaluatedAssignments()</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                    != receipt.totalAssignments()</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                || receipt.matchingAssignments() &lt; 0</span>
+<span class="fc" id="L155">                || receipt.matchingAssignments()</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                    &gt; receipt.evaluatedAssignments()</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                || receipt.retainedSolutions() &lt; 0</span>
+<span class="fc" id="L158">                || receipt.retainedSolutions()</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                    &gt; receipt.matchingAssignments()) {</span>
+<span class="nc" id="L160">            throw new IllegalArgumentException(</span>
+                &quot;replay receipt assignment counts are inconsistent&quot;);
+        }
+
+<span class="fc" id="L164">        List&lt;String&gt; candidateHashes = receipt.resolvedCandidateHashes()</span>
+<span class="fc" id="L165">            .stream()</span>
+<span class="fc" id="L166">            .map(value -&gt; SchematicProofPlan.requireSha256(</span>
+                value,
+                &quot;resolved candidate hash&quot;))
+<span class="fc" id="L169">            .toList();</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (candidateHashes.size() != receipt.retainedSolutions()) {</span>
+<span class="nc" id="L171">            throw new IllegalArgumentException(</span>
+                &quot;replay receipt candidate count differs from retained count&quot;);
+        }
+<span class="fc" id="L174">        if (new HashSet&lt;&gt;(candidateHashes).size()</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">                != candidateHashes.size()) {</span>
+<span class="fc" id="L176">            throw new IllegalArgumentException(</span>
+                &quot;replay receipt candidate hashes must be unique&quot;);
+        }
+<span class="fc" id="L179">        List&lt;String&gt; sorted = candidateHashes.stream()</span>
+<span class="fc" id="L180">            .sorted(Comparator.naturalOrder())</span>
+<span class="fc" id="L181">            .toList();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (!candidateHashes.equals(sorted)) {</span>
+<span class="fc" id="L183">            throw new IllegalArgumentException(</span>
+                &quot;replay receipt candidate hashes are not canonically ordered&quot;);
+        }
+<span class="fc" id="L186">        validateStatusCounts(</span>
+<span class="fc" id="L187">            receipt.runStatus(),</span>
+<span class="fc" id="L188">            receipt.matchingAssignments(),</span>
+<span class="fc" id="L189">            receipt.retainedSolutions());</span>
+<span class="fc" id="L190">        SchematicProofPlan.requireSha256(</span>
+<span class="fc" id="L191">            receipt.contentHash(),</span>
+            &quot;contentHash&quot;);
+<span class="fc" id="L193">        return List.copyOf(candidateHashes);</span>
+    }
+
+    private static void validateStatusCounts(
+        ExactFinitePolynomialPlanRun.Status status,
+        long matchingAssignments,
+        int retainedSolutions
+    ) {
+<span class="fc bfc" id="L201" title="All 3 branches covered.">        boolean valid = switch (status) {</span>
+            case COMPLETE_WITHOUT_SOLUTION -&gt;
+<span class="pc bpc" id="L203" title="1 of 4 branches missed.">                matchingAssignments == 0 &amp;&amp; retainedSolutions == 0;</span>
+            case COMPLETE_WITH_RESOLUTIONS -&gt;
+<span class="pc bpc" id="L205" title="2 of 4 branches missed.">                matchingAssignments &gt; 0</span>
+                    &amp;&amp; matchingAssignments == retainedSolutions;
+            case COMPLETE_RESOLUTION_SET_TRUNCATED -&gt;
+<span class="pc bpc" id="L208" title="2 of 4 branches missed.">                matchingAssignments &gt; retainedSolutions</span>
+                    &amp;&amp; retainedSolutions &gt; 0;
+        };
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (!valid) {</span>
+<span class="fc" id="L212">            throw new IllegalArgumentException(</span>
+                &quot;replay receipt status differs from assignment counts&quot;);
+        }
+<span class="fc" id="L215">    }</span>
+
+    private static String render(
+        ParsedReceipt receipt,
+        List&lt;String&gt; candidateHashes,
+        String contentHash
+    ) {
+<span class="fc" id="L222">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L223">            .property(&quot;schema&quot;, receipt.schema())</span>
+<span class="fc" id="L224">            .property(&quot;verifierId&quot;, receipt.replayVerifierId())</span>
+<span class="fc" id="L225">            .property(</span>
+                &quot;verifierRevisionHash&quot;,
+<span class="fc" id="L227">                receipt.replayVerifierRevisionHash())</span>
+<span class="fc" id="L228">            .property(&quot;planHash&quot;, receipt.planHash())</span>
+<span class="fc" id="L229">            .property(&quot;planRunHash&quot;, receipt.planRunHash())</span>
+<span class="fc" id="L230">            .property(&quot;solverResultHash&quot;, receipt.solverResultHash())</span>
+<span class="fc" id="L231">            .property(&quot;solverRevisionHash&quot;, receipt.solverRevisionHash())</span>
+<span class="fc" id="L232">            .property(&quot;runStatus&quot;, receipt.runStatus().name())</span>
+<span class="fc" id="L233">            .property(&quot;totalAssignments&quot;, receipt.totalAssignments())</span>
+<span class="fc" id="L234">            .property(</span>
+                &quot;evaluatedAssignments&quot;,
+<span class="fc" id="L236">                receipt.evaluatedAssignments())</span>
+<span class="fc" id="L237">            .property(&quot;matchingAssignments&quot;, receipt.matchingAssignments())</span>
+<span class="fc" id="L238">            .property(&quot;retainedSolutions&quot;, receipt.retainedSolutions())</span>
+<span class="fc" id="L239">            .stringArray(&quot;resolvedCandidateHashes&quot;, candidateHashes)</span>
+<span class="fc" id="L240">            .property(&quot;replayStatus&quot;, receipt.replayStatus().name());</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L242">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L244">        return json.endObject().toString();</span>
+    }
+
+    private static String lengthPrefixed(String... values) {
+<span class="fc" id="L248">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L250">            result.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L251">                .append(':')</span>
+<span class="fc" id="L252">                .append(value);</span>
+        }
+<span class="fc" id="L254">        return result.toString();</span>
+    }
+
+    public sealed interface VerifiedReplayReceiptArtifact
+            permits VerifiedReceiptArtifact {
+        ArtifactReference reference();
+
+        String planHash();
+
+        String planRunHash();
+
+        String solverResultHash();
+
+        String solverRevisionHash();
+
+        ExactFinitePolynomialPlanRun.Status runStatus();
+
+        long totalAssignments();
+
+        long evaluatedAssignments();
+
+        long matchingAssignments();
+
+        int retainedSolutions();
+
+        List&lt;String&gt; resolvedCandidateHashes();
+
+        ReplayStatus replayStatus();
+
+        String receiptContentHash();
+
+        String canonicalJson();
+
+        String verificationHash();
+
+        boolean matches(ReplayReceipt receipt);
+    }
+
+    private record VerifiedReceiptArtifact(
+        ArtifactReference reference,
+        String planHash,
+        String planRunHash,
+        String solverResultHash,
+        String solverRevisionHash,
+        ExactFinitePolynomialPlanRun.Status runStatus,
+        long totalAssignments,
+        long evaluatedAssignments,
+        long matchingAssignments,
+        int retainedSolutions,
+        List&lt;String&gt; resolvedCandidateHashes,
+        ReplayStatus replayStatus,
+        String receiptContentHash,
+        String canonicalJson,
+        String verificationHash
+    ) implements VerifiedReplayReceiptArtifact {
+<span class="fc" id="L309">        private VerifiedReceiptArtifact {</span>
+<span class="fc" id="L310">            reference = Objects.requireNonNull(reference, &quot;reference&quot;);</span>
+<span class="fc" id="L311">            resolvedCandidateHashes = List.copyOf(</span>
+<span class="fc" id="L312">                Objects.requireNonNull(</span>
+                    resolvedCandidateHashes,
+                    &quot;resolvedCandidateHashes&quot;));
+<span class="fc" id="L315">            canonicalJson = Objects.requireNonNull(</span>
+                canonicalJson,
+                &quot;canonicalJson&quot;);
+<span class="fc" id="L318">            verificationHash = SchematicProofPlan.requireSha256(</span>
+                verificationHash,
+                &quot;verificationHash&quot;);
+<span class="fc" id="L321">        }</span>
+
+        @Override
+        public boolean matches(ReplayReceipt receipt) {
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            return receipt != null</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                &amp;&amp; receiptContentHash.equals(receipt.contentHash())</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                &amp;&amp; canonicalJson.equals(receipt.toCanonicalJson());</span>
+        }
+    }
+
+    private record ParsedReceipt(
+        String schema,
+        String replayVerifierId,
+        String replayVerifierRevisionHash,
+        String planHash,
+        String planRunHash,
+        String solverResultHash,
+        String solverRevisionHash,
+        ExactFinitePolynomialPlanRun.Status runStatus,
+        long totalAssignments,
+        long evaluatedAssignments,
+        long matchingAssignments,
+        int retainedSolutions,
+        List&lt;String&gt; resolvedCandidateHashes,
+        ReplayStatus replayStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L348">        private ParsedReceipt {</span>
+<span class="fc" id="L349">            resolvedCandidateHashes = List.copyOf(</span>
+                resolvedCandidateHashes);
+<span class="fc" id="L351">        }</span>
+    }
+
+    private static final class CanonicalReceiptReader {
+        private final String input;
+        private int index;
+
+<span class="fc" id="L358">        private CanonicalReceiptReader(String input) {</span>
+<span class="fc" id="L359">            this.input = Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L360">        }</span>
+
+        private ParsedReceipt read() {
+<span class="fc" id="L363">            expect(&quot;{\&quot;schema\&quot;:&quot;);</span>
+<span class="fc" id="L364">            String schema = string();</span>
+<span class="fc" id="L365">            expect(&quot;,\&quot;verifierId\&quot;:&quot;);</span>
+<span class="fc" id="L366">            String verifierId = string();</span>
+<span class="fc" id="L367">            expect(&quot;,\&quot;verifierRevisionHash\&quot;:&quot;);</span>
+<span class="fc" id="L368">            String verifierRevisionHash = string();</span>
+<span class="fc" id="L369">            expect(&quot;,\&quot;planHash\&quot;:&quot;);</span>
+<span class="fc" id="L370">            String planHash = string();</span>
+<span class="fc" id="L371">            expect(&quot;,\&quot;planRunHash\&quot;:&quot;);</span>
+<span class="fc" id="L372">            String planRunHash = string();</span>
+<span class="fc" id="L373">            expect(&quot;,\&quot;solverResultHash\&quot;:&quot;);</span>
+<span class="fc" id="L374">            String solverResultHash = string();</span>
+<span class="fc" id="L375">            expect(&quot;,\&quot;solverRevisionHash\&quot;:&quot;);</span>
+<span class="fc" id="L376">            String solverRevisionHash = string();</span>
+<span class="fc" id="L377">            expect(&quot;,\&quot;runStatus\&quot;:&quot;);</span>
+<span class="fc" id="L378">            ExactFinitePolynomialPlanRun.Status runStatus = runStatus();</span>
+<span class="fc" id="L379">            expect(&quot;,\&quot;totalAssignments\&quot;:&quot;);</span>
+<span class="fc" id="L380">            long totalAssignments = nonNegativeLong();</span>
+<span class="fc" id="L381">            expect(&quot;,\&quot;evaluatedAssignments\&quot;:&quot;);</span>
+<span class="fc" id="L382">            long evaluatedAssignments = nonNegativeLong();</span>
+<span class="fc" id="L383">            expect(&quot;,\&quot;matchingAssignments\&quot;:&quot;);</span>
+<span class="fc" id="L384">            long matchingAssignments = nonNegativeLong();</span>
+<span class="fc" id="L385">            expect(&quot;,\&quot;retainedSolutions\&quot;:&quot;);</span>
+<span class="fc" id="L386">            int retainedSolutions = nonNegativeInt();</span>
+<span class="fc" id="L387">            expect(&quot;,\&quot;resolvedCandidateHashes\&quot;:&quot;);</span>
+<span class="fc" id="L388">            List&lt;String&gt; candidateHashes = stringArray();</span>
+<span class="fc" id="L389">            expect(&quot;,\&quot;replayStatus\&quot;:&quot;);</span>
+<span class="fc" id="L390">            ReplayStatus replayStatus = replayStatus();</span>
+<span class="fc" id="L391">            expect(&quot;,\&quot;contentHash\&quot;:&quot;);</span>
+<span class="fc" id="L392">            String contentHash = string();</span>
+<span class="fc" id="L393">            expect(&quot;}&quot;);</span>
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">            if (index != input.length()) {</span>
+<span class="nc" id="L395">                throw malformed(&quot;trailing receipt content&quot;);</span>
+            }
+<span class="fc" id="L397">            return new ParsedReceipt(</span>
+                schema,
+                verifierId,
+                verifierRevisionHash,
+                planHash,
+                planRunHash,
+                solverResultHash,
+                solverRevisionHash,
+                runStatus,
+                totalAssignments,
+                evaluatedAssignments,
+                matchingAssignments,
+                retainedSolutions,
+                candidateHashes,
+                replayStatus,
+                contentHash);
+        }
+
+        private ExactFinitePolynomialPlanRun.Status runStatus() {
+<span class="fc" id="L416">            String value = string();</span>
+            try {
+<span class="fc" id="L418">                return ExactFinitePolynomialPlanRun.Status.valueOf(value);</span>
+<span class="nc" id="L419">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L420">                throw malformed(&quot;unknown plan-run status&quot;, exception);</span>
+            }
+        }
+
+        private ReplayStatus replayStatus() {
+<span class="fc" id="L425">            String value = string();</span>
+            try {
+<span class="fc" id="L427">                return ReplayStatus.valueOf(value);</span>
+<span class="nc" id="L428">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L429">                throw malformed(&quot;unknown replay status&quot;, exception);</span>
+            }
+        }
+
+        private List&lt;String&gt; stringArray() {
+<span class="fc" id="L434">            expect(&quot;[&quot;);</span>
+<span class="fc" id="L435">            List&lt;String&gt; values = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">            if (consume(']')) {</span>
+<span class="fc" id="L437">                return List.of();</span>
+            }
+            while (true) {
+<span class="fc" id="L440">                values.add(string());</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">                if (consume(']')) {</span>
+<span class="fc" id="L442">                    return List.copyOf(values);</span>
+                }
+<span class="fc" id="L444">                expect(&quot;,&quot;);</span>
+            }
+        }
+
+        private String string() {
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">            if (!consume('\&quot;')) {</span>
+<span class="nc" id="L450">                throw malformed(&quot;expected JSON string&quot;);</span>
+            }
+<span class="fc" id="L452">            int start = index;</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">            while (index &lt; input.length()) {</span>
+<span class="fc" id="L454">                char current = input.charAt(index++);</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">                if (current == '\&quot;') {</span>
+<span class="fc" id="L456">                    return input.substring(start, index - 1);</span>
+                }
+<span class="pc bpc" id="L458" title="3 of 6 branches missed.">                if (current == '\\'</span>
+                        || current &lt; 0x20
+                        || current &gt; 0x7e) {
+<span class="nc" id="L461">                    throw malformed(</span>
+                        &quot;receipt strings must use unescaped canonical ASCII&quot;);
+                }
+<span class="fc" id="L464">            }</span>
+<span class="nc" id="L465">            throw malformed(&quot;unterminated JSON string&quot;);</span>
+        }
+
+        private int nonNegativeInt() {
+<span class="fc" id="L469">            long value = nonNegativeLong();</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">            if (value &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L471">                throw malformed(&quot;integer exceeds signed 32-bit range&quot;);</span>
+            }
+<span class="fc" id="L473">            return (int) value;</span>
+        }
+
+        private long nonNegativeLong() {
+<span class="fc" id="L477">            int start = index;</span>
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">            while (index &lt; input.length()</span>
+<span class="fc bfc" id="L479" title="All 2 branches covered.">                    &amp;&amp; input.charAt(index) &gt;= '0'</span>
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">                    &amp;&amp; input.charAt(index) &lt;= '9') {</span>
+<span class="fc" id="L481">                index++;</span>
+            }
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">            if (start == index) {</span>
+<span class="nc" id="L484">                throw malformed(&quot;expected non-negative decimal integer&quot;);</span>
+            }
+<span class="fc" id="L486">            String value = input.substring(start, index);</span>
+<span class="pc bpc" id="L487" title="1 of 4 branches missed.">            if (value.length() &gt; 1 &amp;&amp; value.charAt(0) == '0') {</span>
+<span class="fc" id="L488">                throw malformed(&quot;decimal integers must not have leading zeros&quot;);</span>
+            }
+            try {
+<span class="fc" id="L491">                return Long.parseLong(value);</span>
+<span class="nc" id="L492">            } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L493">                throw malformed(&quot;integer exceeds signed 64-bit range&quot;, exception);</span>
+            }
+        }
+
+        private boolean consume(char expected) {
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">            if (index &lt; input.length()</span>
+<span class="fc bfc" id="L499" title="All 2 branches covered.">                    &amp;&amp; input.charAt(index) == expected) {</span>
+<span class="fc" id="L500">                index++;</span>
+<span class="fc" id="L501">                return true;</span>
+            }
+<span class="fc" id="L503">            return false;</span>
+        }
+
+        private void expect(String expected) {
+<span class="fc bfc" id="L507" title="All 2 branches covered.">            if (!input.startsWith(expected, index)) {</span>
+<span class="fc" id="L508">                throw malformed(&quot;expected &quot; + expected);</span>
+            }
+<span class="fc" id="L510">            index += expected.length();</span>
+<span class="fc" id="L511">        }</span>
+
+        private IllegalArgumentException malformed(String message) {
+<span class="fc" id="L514">            return new IllegalArgumentException(</span>
+                &quot;non-canonical replay receipt at offset &quot; + index
+                    + &quot;: &quot; + message);
+        }
+
+        private IllegalArgumentException malformed(
+            String message,
+            RuntimeException cause
+        ) {
+<span class="nc" id="L523">            return new IllegalArgumentException(</span>
+                &quot;non-canonical replay receipt at offset &quot; + index
+                    + &quot;: &quot; + message,
+                cause);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
