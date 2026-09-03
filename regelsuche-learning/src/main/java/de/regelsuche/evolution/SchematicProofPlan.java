@@ -224,7 +224,7 @@ public record SchematicProofPlan(
         Set<String> referencedHoles = new LinkedHashSet<>();
         Set<String> referencedObligations = new LinkedHashSet<>();
         List<Step> emitSteps = steps.stream()
-            .filter(step -> step.action() == StepAction.EMIT_CHECKED_CANDIDATE)
+            .filter(step -> step.action() == StepAction.EMIT_CANDIDATE)
             .toList();
 
         for (Step step : steps) {
@@ -361,7 +361,7 @@ public record SchematicProofPlan(
         SOLVE_HOLES,
         DISCHARGE_OBLIGATIONS,
         COMPOSE,
-        EMIT_CHECKED_CANDIDATE
+        EMIT_CANDIDATE
     }
 
     public enum HoleSort {
@@ -426,7 +426,7 @@ public record SchematicProofPlan(
             switch (action) {
                 case FORM_CANDIDATES, SELECT_BINDINGS, SOLVE_HOLES ->
                     requireNonEmpty(holeIds, action + " holeIds");
-                case DISCHARGE_OBLIGATIONS, EMIT_CHECKED_CANDIDATE ->
+                case DISCHARGE_OBLIGATIONS, EMIT_CANDIDATE ->
                     requireNonEmpty(obligationIds, action + " obligationIds");
                 case COMPOSE -> {
                     requireNonEmpty(holeIds, "COMPOSE holeIds");
