@@ -98,13 +98,12 @@ public record ExactFinitePolynomialPlanRun(
                     "resolved candidate differs from plan-run authority");
             }
         }
-        List<String> expectedSolutions = solverResult.solutions().stream()
-            .map(Solution::contentHash)
-            .sorted()
+        List<Solution> expectedSolutions = solverResult.solutions().stream()
+            .sorted(Comparator.comparing(Solution::bindingKey))
             .toList();
-        List<String> actualSolutions = candidates.stream()
-            .map(candidate -> candidate.solution().contentHash())
-            .sorted()
+        List<Solution> actualSolutions = candidates.stream()
+            .map(ExactFinitePolynomialResolvedCandidate::solution)
+            .sorted(Comparator.comparing(Solution::bindingKey))
             .toList();
         if (!expectedSolutions.equals(actualSolutions)) {
             throw new IllegalArgumentException(
