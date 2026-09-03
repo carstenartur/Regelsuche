@@ -1,0 +1,575 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchematicProofPlanResolution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">SchematicProofPlanResolution.java</span></div><h1>SchematicProofPlanResolution.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.SchematicProofPlan.Hole;
+import de.regelsuche.evolution.SchematicProofPlan.HoleSort;
+import de.regelsuche.evolution.SchematicProofPlan.Obligation;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.scalar.ExactRationalDomain;
+import de.regelsuche.scalar.ExactRationalParseEvidence;
+import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+/**
+ * Content-addressed bindings and checker-outcome references for one schematic
+ * proof plan.
+ *
+ * &lt;p&gt;This record does not load the referenced evidence, prove its contents,
+ * compile a plan or create an executable rewrite.&lt;/p&gt;
+ */
+public record SchematicProofPlanResolution(
+    String schema,
+    String planHash,
+    List&lt;String&gt; requiredHoleIds,
+    List&lt;String&gt; requiredObligationIds,
+    List&lt;HoleBinding&gt; bindings,
+    List&lt;ObligationOutcome&gt; outcomes,
+    ResolutionState state,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.schematic-proof-plan-resolution/v1&quot;;
+<span class="fc" id="L39">    private static final Pattern OCCURRENCE_PATH = Pattern.compile(</span>
+        &quot;root|(?:0|[1-9][0-9]*)(?:\\.(?:0|[1-9][0-9]*))*&quot;);
+<span class="fc" id="L41">    private static final Pattern DETAIL_CODE = Pattern.compile(</span>
+        &quot;[A-Z][A-Z0-9_]{2,127}&quot;);
+    private static final int MAX_BINDINGS = 1_024;
+    private static final int MAX_OUTCOMES = 2_048;
+    private static final int MAX_VALUE_BYTES = 1_000_000;
+    private static final int MAX_RESOLUTION_BYTES = 4_000_000;
+
+<span class="fc" id="L48">    public SchematicProofPlanResolution {</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(</span>
+                &quot;unsupported plan-resolution schema&quot;);
+        }
+<span class="fc" id="L53">        planHash = SchematicProofPlan.requireSha256(</span>
+            planHash,
+            &quot;planHash&quot;);
+<span class="fc" id="L56">        requiredHoleIds = SchematicProofPlan.normalizeIds(</span>
+            requiredHoleIds,
+            &quot;requiredHoleIds&quot;,
+            true);
+<span class="fc" id="L60">        requiredObligationIds = SchematicProofPlan.normalizeIds(</span>
+            requiredObligationIds,
+            &quot;requiredObligationIds&quot;,
+            false);
+<span class="fc" id="L64">        bindings = normalizeBindings(bindings);</span>
+<span class="fc" id="L65">        outcomes = normalizeOutcomes(outcomes);</span>
+<span class="fc" id="L66">        requireSubset(</span>
+<span class="fc" id="L67">            bindings.stream().map(HoleBinding::holeId).toList(),</span>
+            requiredHoleIds,
+            &quot;bindings&quot;);
+<span class="fc" id="L70">        requireSubset(</span>
+<span class="fc" id="L71">            outcomes.stream().map(ObligationOutcome::obligationId).toList(),</span>
+            requiredObligationIds,
+            &quot;outcomes&quot;);
+<span class="fc" id="L74">        ResolutionState expected = deriveState(</span>
+            requiredHoleIds,
+            requiredObligationIds,
+            bindings,
+            outcomes);
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (state != expected) {</span>
+<span class="fc" id="L80">            throw new IllegalArgumentException(</span>
+                &quot;resolution state does not match contents&quot;);
+        }
+<span class="fc" id="L83">        contentHash = SchematicProofPlan.requireSha256(</span>
+            contentHash,
+            &quot;contentHash&quot;);
+<span class="fc" id="L86">        String payload = render(</span>
+            planHash,
+            requiredHoleIds,
+            requiredObligationIds,
+            bindings,
+            outcomes,
+            state,
+            null);
+<span class="fc" id="L94">        requireSize(payload, MAX_RESOLUTION_BYTES);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (!SchematicProofPlan.hash(payload).equals(contentHash)) {</span>
+<span class="nc" id="L96">            throw new IllegalArgumentException(</span>
+                &quot;contentHash does not match resolution&quot;);
+        }
+<span class="fc" id="L99">        requireSize(</span>
+<span class="fc" id="L100">            render(</span>
+                planHash,
+                requiredHoleIds,
+                requiredObligationIds,
+                bindings,
+                outcomes,
+                state,
+                contentHash),
+            MAX_RESOLUTION_BYTES);
+<span class="fc" id="L109">    }</span>
+
+    public static SchematicProofPlanResolution create(
+        SchematicProofPlan plan,
+        List&lt;HoleBinding&gt; bindings,
+        List&lt;ObligationOutcome&gt; outcomes
+    ) {
+<span class="fc" id="L116">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L117">        List&lt;HoleBinding&gt; normalizedBindings = normalizeBindings(bindings);</span>
+<span class="fc" id="L118">        List&lt;ObligationOutcome&gt; normalizedOutcomes =</span>
+<span class="fc" id="L119">            normalizeOutcomes(outcomes);</span>
+<span class="fc" id="L120">        Map&lt;String, Hole&gt; holes = indexHoles(plan.holes());</span>
+<span class="fc" id="L121">        Map&lt;String, Obligation&gt; obligations =</span>
+<span class="fc" id="L122">            indexObligations(plan.obligations());</span>
+
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (HoleBinding binding : normalizedBindings) {</span>
+<span class="fc" id="L125">            Hole hole = holes.get(binding.holeId());</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            if (hole == null) {</span>
+<span class="nc" id="L127">                throw new IllegalArgumentException(</span>
+                    &quot;binding references unknown hole&quot;);
+            }
+<span class="fc" id="L130">            validateBinding(binding, hole);</span>
+<span class="fc" id="L131">        }</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (ObligationOutcome outcome : normalizedOutcomes) {</span>
+<span class="fc" id="L133">            Obligation obligation = obligations.get(</span>
+<span class="fc" id="L134">                outcome.obligationId());</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (obligation == null) {</span>
+<span class="nc" id="L136">                throw new IllegalArgumentException(</span>
+                    &quot;outcome references unknown obligation&quot;);
+            }
+<span class="fc" id="L139">            validateOutcome(outcome, obligation);</span>
+<span class="fc" id="L140">        }</span>
+
+<span class="fc" id="L142">        ResolutionState state = deriveState(</span>
+<span class="fc" id="L143">            plan.holeIds(),</span>
+<span class="fc" id="L144">            plan.obligationIds(),</span>
+            normalizedBindings,
+            normalizedOutcomes);
+<span class="fc" id="L147">        String payload = render(</span>
+<span class="fc" id="L148">            plan.contentHash(),</span>
+<span class="fc" id="L149">            plan.holeIds(),</span>
+<span class="fc" id="L150">            plan.obligationIds(),</span>
+            normalizedBindings,
+            normalizedOutcomes,
+            state,
+            null);
+<span class="fc" id="L155">        requireSize(payload, plan.limits().maxCanonicalBytes());</span>
+<span class="fc" id="L156">        SchematicProofPlanResolution result =</span>
+            new SchematicProofPlanResolution(
+                SCHEMA,
+<span class="fc" id="L159">                plan.contentHash(),</span>
+<span class="fc" id="L160">                plan.holeIds(),</span>
+<span class="fc" id="L161">                plan.obligationIds(),</span>
+                normalizedBindings,
+                normalizedOutcomes,
+                state,
+<span class="fc" id="L165">                SchematicProofPlan.hash(payload));</span>
+<span class="fc" id="L166">        requireSize(</span>
+<span class="fc" id="L167">            result.toCanonicalJson(),</span>
+<span class="fc" id="L168">            plan.limits().maxCanonicalBytes());</span>
+<span class="fc" id="L169">        return result;</span>
+    }
+
+    /**
+     * Replays all plan-relative structural checks. A true result is neither
+     * mathematical proof nor execution authorization.
+     */
+    public boolean isStructurallyCompleteFor(
+        SchematicProofPlan plan
+    ) {
+<span class="fc" id="L179">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+        try {
+<span class="fc" id="L181">            SchematicProofPlanResolution replayed = create(</span>
+                plan,
+                bindings,
+                outcomes);
+<span class="fc bfc" id="L185" title="All 4 branches covered.">            return equals(replayed)</span>
+                &amp;&amp; state == ResolutionState.COMPLETE_REFERENCES;
+<span class="fc" id="L187">        } catch (IllegalArgumentException rejected) {</span>
+<span class="fc" id="L188">            return false;</span>
+        }
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L193">        return render(</span>
+            planHash,
+            requiredHoleIds,
+            requiredObligationIds,
+            bindings,
+            outcomes,
+            state,
+            contentHash);
+    }
+
+    private static Map&lt;String, Hole&gt; indexHoles(
+        List&lt;Hole&gt; holes
+    ) {
+<span class="fc" id="L206">        Map&lt;String, Hole&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L207">        holes.forEach(hole -&gt; result.put(hole.id(), hole));</span>
+<span class="fc" id="L208">        return result;</span>
+    }
+
+    private static Map&lt;String, Obligation&gt; indexObligations(
+        List&lt;Obligation&gt; obligations
+    ) {
+<span class="fc" id="L214">        Map&lt;String, Obligation&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L215">        obligations.forEach(obligation -&gt;</span>
+<span class="fc" id="L216">            result.put(obligation.id(), obligation));</span>
+<span class="fc" id="L217">        return result;</span>
+    }
+
+    private static String render(
+        String planHash,
+        List&lt;String&gt; requiredHoleIds,
+        List&lt;String&gt; requiredObligationIds,
+        List&lt;HoleBinding&gt; bindings,
+        List&lt;ObligationOutcome&gt; outcomes,
+        ResolutionState state,
+        String contentHash
+    ) {
+<span class="fc" id="L229">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L230">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L231">            .property(&quot;planHash&quot;, planHash)</span>
+<span class="fc" id="L232">            .stringArray(&quot;requiredHoleIds&quot;, requiredHoleIds)</span>
+<span class="fc" id="L233">            .stringArray(</span>
+                &quot;requiredObligationIds&quot;,
+                requiredObligationIds)
+<span class="fc" id="L236">            .array(&quot;bindings&quot;, array -&gt; bindings.forEach(binding -&gt;</span>
+<span class="fc" id="L237">                array.objectValue(object -&gt;</span>
+<span class="fc" id="L238">                    writeBinding(object, binding))))</span>
+<span class="fc" id="L239">            .array(&quot;outcomes&quot;, array -&gt; outcomes.forEach(outcome -&gt;</span>
+<span class="fc" id="L240">                array.objectValue(object -&gt;</span>
+<span class="fc" id="L241">                    writeOutcome(object, outcome))))</span>
+<span class="fc" id="L242">            .property(&quot;state&quot;, state.name());</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L244">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L246">        return json.endObject().toString();</span>
+    }
+
+    private static void writeBinding(
+        JsonWriter json,
+        HoleBinding binding
+    ) {
+<span class="fc" id="L253">        json.property(&quot;holeId&quot;, binding.holeId())</span>
+<span class="fc" id="L254">            .property(&quot;sort&quot;, binding.sort().name())</span>
+<span class="fc" id="L255">            .property(&quot;canonicalValue&quot;, binding.canonicalValue())</span>
+<span class="fc" id="L256">            .property(&quot;evidenceHash&quot;, binding.evidenceHash());</span>
+<span class="fc" id="L257">    }</span>
+
+    private static void writeOutcome(
+        JsonWriter json,
+        ObligationOutcome outcome
+    ) {
+<span class="fc" id="L263">        json.property(&quot;obligationId&quot;, outcome.obligationId())</span>
+<span class="fc" id="L264">            .property(&quot;status&quot;, outcome.status().name())</span>
+<span class="fc" id="L265">            .property(</span>
+                &quot;checkerCapability&quot;,
+<span class="fc" id="L267">                outcome.checkerCapability())</span>
+<span class="fc" id="L268">            .property(</span>
+                &quot;checkerRevisionHash&quot;,
+<span class="fc" id="L270">                outcome.checkerRevisionHash())</span>
+<span class="fc" id="L271">            .property(</span>
+                &quot;checkerExecutionHash&quot;,
+<span class="fc" id="L273">                outcome.checkerExecutionHash())</span>
+<span class="fc" id="L274">            .property(&quot;detailCode&quot;, outcome.detailCode());</span>
+<span class="fc" id="L275">    }</span>
+
+    private static List&lt;HoleBinding&gt; normalizeBindings(
+        List&lt;HoleBinding&gt; values
+    ) {
+<span class="fc" id="L280">        Objects.requireNonNull(values, &quot;bindings&quot;);</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (values.size() &gt; MAX_BINDINGS) {</span>
+<span class="nc" id="L282">            throw new IllegalArgumentException(</span>
+                &quot;binding count exceeds absolute limit&quot;);
+        }
+<span class="fc" id="L285">        List&lt;HoleBinding&gt; result = values.stream()</span>
+<span class="fc" id="L286">            .map(value -&gt; Objects.requireNonNull(value, &quot;binding&quot;))</span>
+<span class="fc" id="L287">            .sorted(Comparator.comparing(HoleBinding::holeId))</span>
+<span class="fc" id="L288">            .toList();</span>
+<span class="fc" id="L289">        SchematicProofPlan.requireUnique(</span>
+<span class="fc" id="L290">            result.stream().map(HoleBinding::holeId).toList(),</span>
+            &quot;binding hole IDs&quot;);
+<span class="fc" id="L292">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;ObligationOutcome&gt; normalizeOutcomes(
+        List&lt;ObligationOutcome&gt; values
+    ) {
+<span class="fc" id="L298">        Objects.requireNonNull(values, &quot;outcomes&quot;);</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        if (values.size() &gt; MAX_OUTCOMES) {</span>
+<span class="nc" id="L300">            throw new IllegalArgumentException(</span>
+                &quot;outcome count exceeds absolute limit&quot;);
+        }
+<span class="fc" id="L303">        List&lt;ObligationOutcome&gt; result = values.stream()</span>
+<span class="fc" id="L304">            .map(value -&gt;</span>
+<span class="fc" id="L305">                Objects.requireNonNull(value, &quot;outcome&quot;))</span>
+<span class="fc" id="L306">            .sorted(Comparator.comparing(</span>
+                ObligationOutcome::obligationId))
+<span class="fc" id="L308">            .toList();</span>
+<span class="fc" id="L309">        SchematicProofPlan.requireUnique(</span>
+<span class="fc" id="L310">            result.stream()</span>
+<span class="fc" id="L311">                .map(ObligationOutcome::obligationId)</span>
+<span class="fc" id="L312">                .toList(),</span>
+            &quot;outcome obligation IDs&quot;);
+<span class="fc" id="L314">        return List.copyOf(result);</span>
+    }
+
+    private static void validateBinding(
+        HoleBinding binding,
+        Hole hole
+    ) {
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">        if (binding.sort() != hole.sort()) {</span>
+<span class="nc" id="L322">            throw new IllegalArgumentException(</span>
+                &quot;binding sort differs from hole sort&quot;);
+        }
+<span class="fc" id="L325">        if (utf8Length(binding.canonicalValue())</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">                &gt; hole.budget().maxCanonicalBytes()) {</span>
+<span class="fc" id="L327">            throw new IllegalArgumentException(</span>
+                &quot;binding exceeds hole byte budget&quot;);
+        }
+<span class="pc bpc" id="L330" title="2 of 5 branches missed.">        switch (binding.sort()) {</span>
+            case EXACT_RATIONAL -&gt;
+<span class="fc" id="L332">                validateExactRational(binding, hole);</span>
+<span class="fc" id="L333">            case SIGN -&gt; validateSign(binding);</span>
+<span class="nc" id="L334">            case OCCURRENCE_PATH -&gt; validateOccurrencePath(</span>
+<span class="nc" id="L335">                binding.canonicalValue(),</span>
+<span class="nc" id="L336">                hole.budget().maxOccurrenceDepth());</span>
+<span class="fc" id="L337">            case OCCURRENCE_PAIR -&gt; validateOccurrencePair(</span>
+<span class="fc" id="L338">                binding.canonicalValue(),</span>
+<span class="fc" id="L339">                hole.budget().maxOccurrenceDepth());</span>
+            case TERM, FORMULA -&gt; {
+                // Semantic validation belongs to referenced checker evidence.
+            }
+        }
+<span class="fc" id="L344">    }</span>
+
+    private static void validateExactRational(
+        HoleBinding binding,
+        Hole hole
+    ) {
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">        if (!ExactRationalDomain.DOMAIN_ID.equals(hole.domainId())) {</span>
+<span class="nc" id="L351">            throw new IllegalArgumentException(</span>
+                &quot;unsupported exact-rational domain&quot;);
+        }
+<span class="fc" id="L354">        ExactRationalParseEvidence parsed =</span>
+<span class="fc" id="L355">            new ExactRationalDomain().parse(binding.canonicalValue());</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">        if (!parsed.exact()</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                || !binding.canonicalValue().equals(</span>
+<span class="fc" id="L358">                    parsed.canonicalValue())) {</span>
+<span class="fc" id="L359">            throw new IllegalArgumentException(</span>
+                &quot;rational binding must be canonical and exact&quot;);
+        }
+<span class="fc" id="L362">        ExactRational value = parsed.value().orElseThrow();</span>
+<span class="fc" id="L363">        int bits = Math.max(</span>
+<span class="fc" id="L364">            value.numerator().abs().bitLength(),</span>
+<span class="fc" id="L365">            value.denominator().bitLength());</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        if (bits &gt; hole.budget().maxScalarBits()) {</span>
+<span class="fc" id="L367">            throw new IllegalArgumentException(</span>
+                &quot;rational binding exceeds scalar bit budget&quot;);
+        }
+<span class="fc" id="L370">    }</span>
+
+    private static void validateSign(
+        HoleBinding binding
+    ) {
+<span class="fc bfc" id="L375" title="All 2 branches covered.">        if (!binding.canonicalValue().equals(&quot;-1&quot;)</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">                &amp;&amp; !binding.canonicalValue().equals(&quot;1&quot;)) {</span>
+<span class="fc" id="L377">            throw new IllegalArgumentException(</span>
+                &quot;sign binding must be -1 or 1&quot;);
+        }
+<span class="fc" id="L380">    }</span>
+
+    private static void validateOccurrencePath(
+        String value,
+        int maxDepth
+    ) {
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (!OCCURRENCE_PATH.matcher(value).matches()) {</span>
+<span class="fc" id="L387">            throw new IllegalArgumentException(</span>
+                &quot;occurrence path is not canonical&quot;);
+        }
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        int depth = value.equals(&quot;root&quot;)</span>
+<span class="fc" id="L391">            ? 0</span>
+<span class="fc" id="L392">            : value.split(&quot;\\.&quot;).length;</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        if (depth &gt; maxDepth) {</span>
+<span class="fc" id="L394">            throw new IllegalArgumentException(</span>
+                &quot;occurrence path exceeds depth budget&quot;);
+        }
+<span class="fc" id="L397">    }</span>
+
+    private static void validateOccurrencePair(
+        String value,
+        int maxDepth
+    ) {
+<span class="fc" id="L403">        String[] paths = value.split(&quot;\\|&quot;, -1);</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">        if (paths.length != 2) {</span>
+<span class="nc" id="L405">            throw new IllegalArgumentException(</span>
+                &quot;occurrence pair requires two paths&quot;);
+        }
+<span class="fc" id="L408">        validateOccurrencePath(paths[0], maxDepth);</span>
+<span class="fc" id="L409">        validateOccurrencePath(paths[1], maxDepth);</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        if (paths[0].compareTo(paths[1]) &gt;= 0) {</span>
+<span class="fc" id="L411">            throw new IllegalArgumentException(</span>
+                &quot;occurrence pair must be distinct and ordered&quot;);
+        }
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        if (occurrencesOverlap(paths[0], paths[1])) {</span>
+<span class="fc" id="L415">            throw new IllegalArgumentException(</span>
+                &quot;occurrence pair paths must be disjoint&quot;);
+        }
+<span class="fc" id="L418">    }</span>
+
+    private static boolean occurrencesOverlap(
+        String left,
+        String right
+    ) {
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">        return left.equals(&quot;root&quot;)</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">            || right.equals(&quot;root&quot;)</span>
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">            || left.startsWith(right + &quot;.&quot;)</span>
+<span class="fc bfc" id="L427" title="All 2 branches covered.">            || right.startsWith(left + &quot;.&quot;);</span>
+    }
+
+    private static void validateOutcome(
+        ObligationOutcome outcome,
+        Obligation obligation
+    ) {
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        if (!outcome.checkerCapability().equals(</span>
+<span class="fc" id="L435">                obligation.checkerCapability())) {</span>
+<span class="fc" id="L436">            throw new IllegalArgumentException(</span>
+                &quot;checker capability differs from obligation&quot;);
+        }
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">        if (!outcome.checkerRevisionHash().equals(</span>
+<span class="fc" id="L440">                obligation.checkerRevisionHash())) {</span>
+<span class="nc" id="L441">            throw new IllegalArgumentException(</span>
+                &quot;checker revision differs from obligation&quot;);
+        }
+<span class="fc" id="L444">    }</span>
+
+    private static ResolutionState deriveState(
+        List&lt;String&gt; requiredHoleIds,
+        List&lt;String&gt; requiredObligationIds,
+        List&lt;HoleBinding&gt; bindings,
+        List&lt;ObligationOutcome&gt; outcomes
+    ) {
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        if (outcomes.stream().anyMatch(outcome -&gt;</span>
+<span class="fc bfc" id="L453" title="All 2 branches covered.">                outcome.status() != OutcomeStatus.CONFIRMED)) {</span>
+<span class="fc" id="L454">            return ResolutionState.BLOCKED;</span>
+        }
+<span class="fc" id="L456">        Set&lt;String&gt; bound = Set.copyOf(</span>
+<span class="fc" id="L457">            bindings.stream().map(HoleBinding::holeId).toList());</span>
+<span class="fc" id="L458">        Set&lt;String&gt; decided = Set.copyOf(</span>
+<span class="fc" id="L459">            outcomes.stream()</span>
+<span class="fc" id="L460">                .map(ObligationOutcome::obligationId)</span>
+<span class="fc" id="L461">                .toList());</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        return bound.equals(Set.copyOf(requiredHoleIds))</span>
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">                &amp;&amp; decided.equals(Set.copyOf(requiredObligationIds))</span>
+<span class="fc" id="L464">            ? ResolutionState.COMPLETE_REFERENCES</span>
+<span class="fc" id="L465">            : ResolutionState.PARTIAL;</span>
+    }
+
+    private static void requireSubset(
+        List&lt;String&gt; actual,
+        List&lt;String&gt; required,
+        String name
+    ) {
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">        if (!new HashSet&lt;&gt;(required).containsAll(actual)) {</span>
+<span class="nc" id="L474">            throw new IllegalArgumentException(</span>
+                name + &quot; contain unknown IDs&quot;);
+        }
+<span class="fc" id="L477">    }</span>
+
+    private static int utf8Length(
+        String value
+    ) {
+<span class="fc" id="L482">        return value.getBytes(StandardCharsets.UTF_8).length;</span>
+    }
+
+    private static void requireSize(
+        String value,
+        int maximumBytes
+    ) {
+<span class="pc bpc" id="L489" title="1 of 2 branches missed.">        if (utf8Length(value) &gt; maximumBytes) {</span>
+<span class="nc" id="L490">            throw new IllegalArgumentException(</span>
+                &quot;canonical resolution exceeds byte limit&quot;);
+        }
+<span class="fc" id="L493">    }</span>
+
+<span class="fc" id="L495">    public enum ResolutionState {</span>
+<span class="fc" id="L496">        PARTIAL,</span>
+<span class="fc" id="L497">        BLOCKED,</span>
+<span class="fc" id="L498">        COMPLETE_REFERENCES</span>
+    }
+
+<span class="fc" id="L501">    public enum OutcomeStatus {</span>
+<span class="fc" id="L502">        CONFIRMED,</span>
+<span class="fc" id="L503">        REFUTED,</span>
+<span class="fc" id="L504">        UNKNOWN,</span>
+<span class="fc" id="L505">        UNSUPPORTED,</span>
+<span class="fc" id="L506">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L507">        ERROR</span>
+    }
+
+    public record HoleBinding(
+        String holeId,
+        HoleSort sort,
+        String canonicalValue,
+        String evidenceHash
+    ) {
+<span class="fc" id="L516">        public HoleBinding {</span>
+<span class="fc" id="L517">            holeId = SchematicProofPlan.requireId(</span>
+                holeId,
+                &quot;holeId&quot;);
+<span class="fc" id="L520">            sort = Objects.requireNonNull(sort, &quot;sort&quot;);</span>
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">            if (canonicalValue == null</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">                    || canonicalValue.isBlank()</span>
+<span class="fc bfc" id="L523" title="All 2 branches covered.">                    || !canonicalValue.equals(</span>
+<span class="fc" id="L524">                        canonicalValue.strip())) {</span>
+<span class="fc" id="L525">                throw new IllegalArgumentException(</span>
+                    &quot;canonicalValue must be nonblank and trimmed&quot;);
+            }
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">            if (canonicalValue.chars().anyMatch(</span>
+                    Character::isISOControl)) {
+<span class="nc" id="L530">                throw new IllegalArgumentException(</span>
+                    &quot;canonicalValue contains a control character&quot;);
+            }
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">            if (utf8Length(canonicalValue) &gt; MAX_VALUE_BYTES) {</span>
+<span class="nc" id="L534">                throw new IllegalArgumentException(</span>
+                    &quot;canonicalValue exceeds absolute byte limit&quot;);
+            }
+<span class="fc" id="L537">            evidenceHash = SchematicProofPlan.requireSha256(</span>
+                evidenceHash,
+                &quot;evidenceHash&quot;);
+<span class="fc" id="L540">        }</span>
+    }
+
+    public record ObligationOutcome(
+        String obligationId,
+        OutcomeStatus status,
+        String checkerCapability,
+        String checkerRevisionHash,
+        String checkerExecutionHash,
+        String detailCode
+    ) {
+<span class="fc" id="L551">        public ObligationOutcome {</span>
+<span class="fc" id="L552">            obligationId = SchematicProofPlan.requireId(</span>
+                obligationId,
+                &quot;obligationId&quot;);
+<span class="fc" id="L555">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L556">            checkerCapability = SchematicProofPlan.requireToken(</span>
+                checkerCapability,
+                &quot;checkerCapability&quot;);
+<span class="fc" id="L559">            checkerRevisionHash =</span>
+<span class="fc" id="L560">                SchematicProofPlan.requireSha256(</span>
+                    checkerRevisionHash,
+                    &quot;checkerRevisionHash&quot;);
+<span class="fc" id="L563">            checkerExecutionHash =</span>
+<span class="fc" id="L564">                SchematicProofPlan.requireSha256(</span>
+                    checkerExecutionHash,
+                    &quot;checkerExecutionHash&quot;);
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">            if (detailCode == null</span>
+<span class="pc bpc" id="L568" title="1 of 2 branches missed.">                    || !DETAIL_CODE.matcher(detailCode).matches()) {</span>
+<span class="nc" id="L569">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must be an uppercase stable code&quot;);
+            }
+<span class="fc" id="L572">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

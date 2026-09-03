@@ -1,0 +1,684 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactPolynomialResidualComposer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">ExactPolynomialResidualComposer.java</span></div><h1>ExactPolynomialResidualComposer.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.parse.ExactExpressionFormatter;
+import de.regelsuche.parse.ExactParsedTerm;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Composes local polynomial transformations by balancing exact residuals.
+ *
+ * &lt;p&gt;An effect records
+ * {@code sourceFragment = structuredFragment + residual}. It is not an
+ * executable rewrite while the residual is non-zero. A composition is emitted
+ * only when selected effects cover a complete source partition without
+ * overlap, their residuals sum to zero and their structured fragments
+ * reconstruct the source polynomial.&lt;/p&gt;
+ *
+ * &lt;p&gt;The API accepts no target expression. Reference correspondence belongs
+ * after the returned candidate set has been frozen. Source numbers are resolved
+ * through parser-issued exact provenance. Primitive rule/application IDs are
+ * retained provenance, not independently replayed proof objects.
+ */
+<span class="fc" id="L34">public final class ExactPolynomialResidualComposer {</span>
+    private static final int MAX_COMPONENTS = 64;
+    private static final int MAX_EFFECTS = 128;
+    private static final int MAX_COMPOSITION_SIZE = 8;
+    private static final int MAX_RESULTS = 1_024;
+    private static final long MAX_COMBINATION_ATTEMPTS = 1_000_000L;
+
+<span class="fc" id="L41">    private final ExactResidualPolynomialArithmetic arithmetic =</span>
+        new ExactResidualPolynomialArithmetic();
+
+    /**
+     * Extracts the exact top-level additive occurrence partition used by v1.
+     *
+     * &lt;p&gt;Only addition is flattened. Subtraction and every other operator stay
+     * occurrence-visible and form one component.&lt;/p&gt;
+     */
+    public List&lt;SourceComponent&gt; additiveComponents(
+        String sourceExpression
+    ) {
+<span class="fc" id="L53">        String source = normalizeSyntax(</span>
+            sourceExpression,
+            &quot;sourceExpression&quot;);
+<span class="fc" id="L56">        parsePolynomial(source, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L57">        ExactParsedTerm parsed = arithmetic.exactTerm(source);</span>
+<span class="fc" id="L58">        List&lt;Expr&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L59">        collectAddition(parsed.expression(), terms);</span>
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">        if (terms.isEmpty() || terms.size() &gt; MAX_COMPONENTS) {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(</span>
+                &quot;additive component count must be in [1,&quot;
+                    + MAX_COMPONENTS + &quot;]&quot;);
+        }
+<span class="fc" id="L65">        List&lt;SourceComponent&gt; components =</span>
+<span class="fc" id="L66">            new ArrayList&lt;&gt;(terms.size());</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (int index = 0; index &lt; terms.size(); index++) {</span>
+<span class="fc" id="L68">            String ordinal = String.format(</span>
+                Locale.ROOT,
+                &quot;%02d&quot;,
+<span class="fc" id="L71">                index);</span>
+<span class="fc" id="L72">            components.add(new SourceComponent(</span>
+                &quot;term-&quot; + ordinal,
+                &quot;additive-term-v1:&quot; + ordinal,
+<span class="fc" id="L75">                ExactExpressionFormatter.format(terms.get(index), parsed)));</span>
+        }
+<span class="fc" id="L77">        return List.copyOf(components);</span>
+    }
+
+    public Effect effect(
+        String id,
+        Collection&lt;SourceComponent&gt; coveredComponents,
+        String transformedFragment,
+        String structuredFragment,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; primitiveRuleIds,
+        List&lt;String&gt; applicationKeys
+    ) {
+<span class="fc" id="L89">        List&lt;SourceComponent&gt; components =</span>
+<span class="fc" id="L90">            orderedComponents(coveredComponents);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (components.size() &gt; MAX_COMPONENTS) {</span>
+<span class="nc" id="L92">            throw new IllegalArgumentException(</span>
+                &quot;coveredComponents exceeds &quot; + MAX_COMPONENTS);
+        }
+<span class="fc" id="L95">        requireUnique(components.stream()</span>
+<span class="fc" id="L96">            .map(SourceComponent::id)</span>
+<span class="fc" id="L97">            .toList(), &quot;covered component IDs&quot;);</span>
+<span class="fc" id="L98">        requireUnique(components.stream()</span>
+<span class="fc" id="L99">            .map(SourceComponent::occurrenceKey)</span>
+<span class="fc" id="L100">            .toList(), &quot;covered occurrence keys&quot;);</span>
+<span class="fc" id="L101">        String sourceFragment = sum(components.stream()</span>
+<span class="fc" id="L102">            .map(SourceComponent::expression)</span>
+<span class="fc" id="L103">            .toList());</span>
+<span class="fc" id="L104">        String transformed = normalizeSyntax(</span>
+            transformedFragment,
+            &quot;transformedFragment&quot;);
+<span class="fc" id="L107">        String structured = normalizeSyntax(</span>
+            structuredFragment,
+            &quot;structuredFragment&quot;);
+<span class="fc" id="L110">        Polynomial source =</span>
+<span class="fc" id="L111">            parsePolynomial(sourceFragment, &quot;sourceFragment&quot;);</span>
+<span class="fc" id="L112">        Polynomial transformedPolynomial =</span>
+<span class="fc" id="L113">            parsePolynomial(transformed, &quot;transformedFragment&quot;);</span>
+<span class="fc" id="L114">        Polynomial structuredPolynomial =</span>
+<span class="fc" id="L115">            parsePolynomial(structured, &quot;structuredFragment&quot;);</span>
+
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (!source.equals(transformedPolynomial)) {</span>
+<span class="fc" id="L118">            throw new IllegalArgumentException(</span>
+                &quot;transformed fragment must equal its source components&quot;);
+        }
+<span class="fc" id="L121">        ExactParsedTerm transformedTerm = arithmetic.exactTerm(transformed);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (!containsSubtree(</span>
+<span class="fc" id="L123">                transformedTerm.expression(), transformedTerm, structured)) {</span>
+<span class="fc" id="L124">            throw new IllegalArgumentException(</span>
+                &quot;structured fragment must occur in transformed fragment&quot;);
+        }
+
+<span class="fc" id="L128">        List&lt;String&gt; normalizedAssumptions =</span>
+<span class="fc" id="L129">            optionalTexts(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (!normalizedAssumptions.isEmpty()) {</span>
+<span class="fc" id="L131">            throw new IllegalArgumentException(</span>
+                &quot;v1 residual effects must be assumption-free&quot;);
+        }
+
+<span class="fc" id="L135">        List&lt;String&gt; normalizedApplicationKeys =</span>
+<span class="fc" id="L136">            texts(applicationKeys, &quot;applicationKeys&quot;);</span>
+<span class="fc" id="L137">        requireUnique(</span>
+            normalizedApplicationKeys,
+            &quot;applicationKeys&quot;);
+<span class="fc" id="L140">        return new Effect(</span>
+<span class="fc" id="L141">            requireText(id, &quot;id&quot;),</span>
+            components,
+            sourceFragment,
+            transformed,
+            structured,
+<span class="fc" id="L146">            source.subtract(structuredPolynomial).toCanonicalString(),</span>
+            normalizedAssumptions,
+<span class="fc" id="L148">            texts(primitiveRuleIds, &quot;primitiveRuleIds&quot;),</span>
+            normalizedApplicationKeys);
+    }
+
+    public List&lt;Composition&gt; compose(
+        String sourceExpression,
+        List&lt;SourceComponent&gt; sourceComponents,
+        List&lt;Effect&gt; candidateEffects,
+        int compositionSize,
+        int maxResults
+    ) {
+<span class="fc" id="L159">        requireBounds(compositionSize, maxResults);</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (maxResults == 0) {</span>
+<span class="nc" id="L161">            return List.of();</span>
+        }
+
+<span class="fc" id="L164">        String source = normalizeSyntax(</span>
+            sourceExpression,
+            &quot;sourceExpression&quot;);
+<span class="fc" id="L167">        Polynomial sourcePolynomial =</span>
+<span class="fc" id="L168">            parsePolynomial(source, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L169">        List&lt;SourceComponent&gt; components =</span>
+<span class="fc" id="L170">            validatePartition(</span>
+                source,
+                sourcePolynomial,
+                sourceComponents);
+<span class="fc" id="L174">        Set&lt;String&gt; requiredIds = components.stream()</span>
+<span class="fc" id="L175">            .map(SourceComponent::id)</span>
+<span class="fc" id="L176">            .collect(Collectors.toUnmodifiableSet());</span>
+
+<span class="fc" id="L178">        List&lt;Effect&gt; effects = List.copyOf(</span>
+<span class="fc" id="L179">            Objects.requireNonNull(</span>
+                candidateEffects,
+                &quot;candidateEffects&quot;));
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (effects.size() &gt; MAX_EFFECTS) {</span>
+<span class="nc" id="L183">            throw new IllegalArgumentException(</span>
+                &quot;candidateEffects exceeds &quot; + MAX_EFFECTS);
+        }
+<span class="fc" id="L186">        effects = effects.stream()</span>
+<span class="fc" id="L187">            .map(effect -&gt; validateEffect(effect, components))</span>
+<span class="fc" id="L188">            .filter(effect -&gt; requiredIds.containsAll(</span>
+<span class="fc" id="L189">                effect.componentIds()))</span>
+<span class="fc" id="L190">            .sorted(Comparator</span>
+<span class="fc" id="L191">                .comparing(Effect::id)</span>
+<span class="fc" id="L192">                .thenComparing(Effect::structuredFragment))</span>
+<span class="fc" id="L193">            .toList();</span>
+<span class="fc" id="L194">        requireUnique(effects.stream()</span>
+<span class="fc" id="L195">            .map(Effect::id)</span>
+<span class="fc" id="L196">            .toList(), &quot;effect IDs&quot;);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (effects.size() &lt; compositionSize) {</span>
+<span class="nc" id="L198">            return List.of();</span>
+        }
+<span class="fc" id="L200">        requireCombinationBound(effects.size(), compositionSize);</span>
+
+<span class="fc" id="L202">        List&lt;Composition&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L203">        select(</span>
+            source,
+            sourcePolynomial,
+            components,
+            requiredIds,
+            effects,
+            compositionSize,
+            maxResults,
+            0,
+            new ArrayList&lt;&gt;(),
+            new LinkedHashSet&lt;&gt;(),
+            results,
+            new HashSet&lt;&gt;());
+<span class="fc" id="L216">        return List.copyOf(results);</span>
+    }
+
+    private void select(
+        String source,
+        Polynomial sourcePolynomial,
+        List&lt;SourceComponent&gt; components,
+        Set&lt;String&gt; requiredIds,
+        List&lt;Effect&gt; effects,
+        int compositionSize,
+        int maxResults,
+        int start,
+        List&lt;Effect&gt; selected,
+        Set&lt;String&gt; coveredIds,
+        List&lt;Composition&gt; results,
+        Set&lt;String&gt; retainedCandidates
+    ) {
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        if (results.size() &gt;= maxResults) {</span>
+<span class="nc" id="L234">            return;</span>
+        }
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (selected.size() == compositionSize) {</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            if (coveredIds.equals(requiredIds)) {</span>
+<span class="fc" id="L238">                Composition result = composeSelection(</span>
+                    source,
+                    sourcePolynomial,
+                    components,
+                    selected);
+<span class="fc bfc" id="L243" title="All 2 branches covered.">                if (result != null</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">                        &amp;&amp; retainedCandidates.add(</span>
+<span class="fc" id="L245">                            result.candidateExpression())) {</span>
+<span class="fc" id="L246">                    results.add(result);</span>
+                }
+            }
+<span class="fc" id="L249">            return;</span>
+        }
+
+<span class="fc" id="L252">        int missing = compositionSize - selected.size();</span>
+<span class="fc" id="L253">        for (int index = start;</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                index &lt;= effects.size() - missing;</span>
+<span class="fc" id="L255">                index++) {</span>
+<span class="fc" id="L256">            Effect effect = effects.get(index);</span>
+<span class="fc" id="L257">            if (effect.componentIds().stream()</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                    .anyMatch(coveredIds::contains)) {</span>
+<span class="fc" id="L259">                continue;</span>
+            }
+<span class="fc" id="L261">            selected.add(effect);</span>
+<span class="fc" id="L262">            coveredIds.addAll(effect.componentIds());</span>
+<span class="fc" id="L263">            select(</span>
+                source,
+                sourcePolynomial,
+                components,
+                requiredIds,
+                effects,
+                compositionSize,
+                maxResults,
+                index + 1,
+                selected,
+                coveredIds,
+                results,
+                retainedCandidates);
+<span class="fc" id="L276">            coveredIds.removeAll(effect.componentIds());</span>
+<span class="fc" id="L277">            selected.removeLast();</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            if (results.size() &gt;= maxResults) {</span>
+<span class="nc" id="L279">                return;</span>
+            }
+        }
+<span class="fc" id="L282">    }</span>
+
+    private Composition composeSelection(
+        String source,
+        Polynomial sourcePolynomial,
+        List&lt;SourceComponent&gt; components,
+        List&lt;Effect&gt; selected
+    ) {
+<span class="fc" id="L290">        Polynomial sourceSum = Polynomial.zero();</span>
+<span class="fc" id="L291">        Polynomial structureSum = Polynomial.zero();</span>
+<span class="fc" id="L292">        Polynomial residualSum = Polynomial.zero();</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        for (Effect effect : selected) {</span>
+<span class="fc" id="L294">            sourceSum = sourceSum.add(parsePolynomial(</span>
+<span class="fc" id="L295">                effect.sourceFragment(),</span>
+                &quot;effect source&quot;));
+<span class="fc" id="L297">            structureSum = structureSum.add(parsePolynomial(</span>
+<span class="fc" id="L298">                effect.structuredFragment(),</span>
+                &quot;effect structure&quot;));
+<span class="fc" id="L300">            residualSum = residualSum.add(parsePolynomial(</span>
+<span class="fc" id="L301">                effect.residualNormalForm(),</span>
+                &quot;effect residual&quot;));
+<span class="fc" id="L303">        }</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (!sourceSum.equals(sourcePolynomial)</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">                || !residualSum.isZero()</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">                || !structureSum.equals(sourcePolynomial)) {</span>
+<span class="fc" id="L307">            return null;</span>
+        }
+
+<span class="fc" id="L310">        List&lt;Effect&gt; ordered = selected.stream()</span>
+<span class="fc" id="L311">            .sorted(Comparator.comparing(effect -&gt;</span>
+<span class="fc" id="L312">                String.join(&quot;\u0001&quot;, effect.componentIds())))</span>
+<span class="fc" id="L313">            .toList();</span>
+<span class="fc" id="L314">        String candidate = sum(ordered.stream()</span>
+<span class="fc" id="L315">            .map(Effect::structuredFragment)</span>
+<span class="fc" id="L316">            .toList());</span>
+<span class="fc" id="L317">        if (!parsePolynomial(candidate, &quot;candidate&quot;)</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                .equals(sourcePolynomial)) {</span>
+<span class="nc" id="L319">            return null;</span>
+        }
+<span class="fc" id="L321">        List&lt;String&gt; primitiveRuleIds = ordered.stream()</span>
+<span class="fc" id="L322">            .flatMap(effect -&gt;</span>
+<span class="fc" id="L323">                effect.primitiveRuleIds().stream())</span>
+<span class="fc" id="L324">            .toList();</span>
+<span class="fc" id="L325">        List&lt;String&gt; applicationKeys = ordered.stream()</span>
+<span class="fc" id="L326">            .flatMap(effect -&gt;</span>
+<span class="fc" id="L327">                effect.applicationKeys().stream())</span>
+<span class="fc" id="L328">            .toList();</span>
+<span class="fc" id="L329">        requireUnique(applicationKeys, &quot;composition application keys&quot;);</span>
+<span class="fc" id="L330">        return new Composition(</span>
+            source,
+            components,
+            ordered,
+            candidate,
+            &quot;0&quot;,
+            primitiveRuleIds,
+            applicationKeys);
+    }
+
+    private List&lt;SourceComponent&gt; validatePartition(
+        String sourceExpression,
+        Polynomial source,
+        List&lt;SourceComponent&gt; sourceComponents
+    ) {
+<span class="fc" id="L345">        List&lt;SourceComponent&gt; components =</span>
+<span class="fc" id="L346">            orderedComponents(sourceComponents);</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">        if (components.size() &gt; MAX_COMPONENTS) {</span>
+<span class="nc" id="L348">            throw new IllegalArgumentException(</span>
+                &quot;sourceComponents exceeds &quot; + MAX_COMPONENTS);
+        }
+<span class="fc" id="L351">        requireUnique(components.stream()</span>
+<span class="fc" id="L352">            .map(SourceComponent::id)</span>
+<span class="fc" id="L353">            .toList(), &quot;component IDs&quot;);</span>
+<span class="fc" id="L354">        requireUnique(components.stream()</span>
+<span class="fc" id="L355">            .map(SourceComponent::occurrenceKey)</span>
+<span class="fc" id="L356">            .toList(), &quot;occurrence keys&quot;);</span>
+
+<span class="fc" id="L358">        List&lt;SourceComponent&gt; expected =</span>
+<span class="fc" id="L359">            additiveComponents(sourceExpression);</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (!components.equals(expected)) {</span>
+<span class="fc" id="L361">            throw new IllegalArgumentException(</span>
+                &quot;source components are not the exact additive occurrences&quot;);
+        }
+
+<span class="fc" id="L365">        Polynomial reconstructed = Polynomial.zero();</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        for (SourceComponent component : components) {</span>
+<span class="fc" id="L367">            reconstructed = reconstructed.add(parsePolynomial(</span>
+<span class="fc" id="L368">                component.expression(),</span>
+                &quot;source component&quot;));
+<span class="fc" id="L370">        }</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">        if (!reconstructed.equals(source)) {</span>
+<span class="nc" id="L372">            throw new IllegalArgumentException(</span>
+                &quot;source components do not reconstruct source expression&quot;);
+        }
+<span class="fc" id="L375">        return components;</span>
+    }
+
+    private Effect validateEffect(
+        Effect effect,
+        List&lt;SourceComponent&gt; sourceComponents
+    ) {
+<span class="fc" id="L382">        Objects.requireNonNull(effect, &quot;effect&quot;);</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        for (SourceComponent component : effect.components()) {</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">            if (!sourceComponents.contains(component)) {</span>
+<span class="nc" id="L385">                throw new IllegalArgumentException(</span>
+                    &quot;effect references an unknown source component&quot;);
+            }
+<span class="fc" id="L388">        }</span>
+<span class="fc" id="L389">        Effect validated = effect(</span>
+<span class="fc" id="L390">            effect.id(),</span>
+<span class="fc" id="L391">            effect.components(),</span>
+<span class="fc" id="L392">            effect.transformedFragment(),</span>
+<span class="fc" id="L393">            effect.structuredFragment(),</span>
+<span class="fc" id="L394">            effect.assumptions(),</span>
+<span class="fc" id="L395">            effect.primitiveRuleIds(),</span>
+<span class="fc" id="L396">            effect.applicationKeys());</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        if (!validated.equals(effect)) {</span>
+<span class="fc" id="L398">            throw new IllegalArgumentException(</span>
+                &quot;effect changed after certification&quot;);
+        }
+<span class="fc" id="L401">        return effect;</span>
+    }
+
+    private List&lt;SourceComponent&gt; orderedComponents(
+        Collection&lt;SourceComponent&gt; sourceComponents
+    ) {
+<span class="fc" id="L407">        Objects.requireNonNull(</span>
+            sourceComponents,
+            &quot;sourceComponents&quot;);
+<span class="fc" id="L410">        List&lt;SourceComponent&gt; components = sourceComponents.stream()</span>
+<span class="fc" id="L411">            .map(component -&gt;</span>
+<span class="fc" id="L412">                Objects.requireNonNull(</span>
+                    component,
+                    &quot;source component&quot;))
+<span class="fc" id="L415">            .sorted(Comparator</span>
+<span class="fc" id="L416">                .comparing(SourceComponent::id)</span>
+<span class="fc" id="L417">                .thenComparing(SourceComponent::occurrenceKey))</span>
+<span class="fc" id="L418">            .toList();</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">        if (components.isEmpty()) {</span>
+<span class="nc" id="L420">            throw new IllegalArgumentException(</span>
+                &quot;sourceComponents must not be empty&quot;);
+        }
+<span class="fc" id="L423">        return components;</span>
+    }
+
+    private Polynomial parsePolynomial(
+        String expression,
+        String name
+    ) {
+        try {
+<span class="fc" id="L431">            return arithmetic.parse(expression);</span>
+<span class="fc" id="L432">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L433">            throw new IllegalArgumentException(</span>
+                name + &quot; is outside the bounded exact polynomial fragment&quot;,
+                exception);
+        }
+    }
+
+    private String normalizeSyntax(String expression, String name) {
+<span class="fc" id="L440">        String text = requireText(expression, name);</span>
+        try {
+<span class="fc" id="L442">            return arithmetic.syntax(text);</span>
+<span class="nc" id="L443">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L444">            throw new IllegalArgumentException(</span>
+                name + &quot; is not a supported expression&quot;,
+                exception);
+        }
+    }
+
+    private String sum(List&lt;String&gt; expressions) {
+<span class="fc" id="L451">        return normalizeSyntax(</span>
+<span class="fc" id="L452">            expressions.stream()</span>
+<span class="fc" id="L453">                .map(expression -&gt; &quot;(&quot; + expression + &quot;)&quot;)</span>
+<span class="fc" id="L454">                .collect(Collectors.joining(&quot; + &quot;)),</span>
+            &quot;sum&quot;);
+    }
+
+    private static void collectAddition(
+        Expr expression,
+        List&lt;Expr&gt; terms
+    ) {
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">                &amp;&amp; binary.operator()</span>
+                    == de.regelsuche.ast.BinaryOperator.ADD) {
+<span class="fc" id="L465">            collectAddition(binary.left(), terms);</span>
+<span class="fc" id="L466">            collectAddition(binary.right(), terms);</span>
+        } else {
+<span class="fc" id="L468">            terms.add(expression);</span>
+        }
+<span class="fc" id="L470">    }</span>
+
+    private static boolean containsSubtree(
+        Expr expression,
+        ExactParsedTerm parsed,
+        String expected
+    ) {
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (ExactExpressionFormatter.format(expression, parsed).equals(expected)) {</span>
+<span class="fc" id="L478">            return true;</span>
+        }
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">            return containsSubtree(binary.left(), parsed, expected)</span>
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">                || containsSubtree(binary.right(), parsed, expected);</span>
+        }
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L485">            return function.arguments().stream()</span>
+<span class="nc" id="L486">                .anyMatch(argument -&gt;</span>
+<span class="nc" id="L487">                    containsSubtree(argument, parsed, expected));</span>
+        }
+<span class="fc" id="L489">        return false;</span>
+    }
+
+    private static void requireBounds(
+        int compositionSize,
+        int maxResults
+    ) {
+<span class="pc bpc" id="L496" title="2 of 4 branches missed.">        if (compositionSize &lt; 1</span>
+                || compositionSize &gt; MAX_COMPOSITION_SIZE) {
+<span class="nc" id="L498">            throw new IllegalArgumentException(</span>
+                &quot;compositionSize must be in [1,&quot;
+                    + MAX_COMPOSITION_SIZE + &quot;]&quot;);
+        }
+<span class="pc bpc" id="L502" title="1 of 4 branches missed.">        if (maxResults &lt; 0 || maxResults &gt; MAX_RESULTS) {</span>
+<span class="fc" id="L503">            throw new IllegalArgumentException(</span>
+                &quot;maxResults must be in [0,&quot; + MAX_RESULTS + &quot;]&quot;);
+        }
+<span class="fc" id="L506">    }</span>
+
+    private static void requireCombinationBound(
+        int effectCount,
+        int compositionSize
+    ) {
+<span class="fc" id="L512">        int selected = Math.min(</span>
+            compositionSize,
+            effectCount - compositionSize);
+<span class="fc" id="L515">        long combinations = 1L;</span>
+<span class="fc bfc" id="L516" title="All 2 branches covered.">        for (int index = 1; index &lt;= selected; index++) {</span>
+<span class="fc" id="L517">            combinations = combinations</span>
+                * (effectCount - selected + index)
+                / index;
+<span class="fc bfc" id="L520" title="All 2 branches covered.">            if (combinations &gt; MAX_COMBINATION_ATTEMPTS) {</span>
+<span class="fc" id="L521">                throw new IllegalArgumentException(</span>
+                    &quot;candidate effect combinations exceed &quot;
+                        + MAX_COMBINATION_ATTEMPTS);
+            }
+        }
+<span class="fc" id="L526">    }</span>
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L529" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L530">            throw new IllegalArgumentException(</span>
+                name + &quot; must not be blank&quot;);
+        }
+<span class="fc" id="L533">        return value.trim();</span>
+    }
+
+    private static List&lt;String&gt; optionalTexts(
+        Collection&lt;String&gt; values,
+        String name
+    ) {
+<span class="fc" id="L540">        Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L541">        return List.copyOf(values.stream()</span>
+<span class="fc" id="L542">            .map(value -&gt; requireText(</span>
+                value,
+                name + &quot; entry&quot;))
+<span class="fc" id="L545">            .toList());</span>
+    }
+
+    private static List&lt;String&gt; texts(
+        Collection&lt;String&gt; values,
+        String name
+    ) {
+<span class="fc" id="L552">        Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L553">        List&lt;String&gt; result = values.stream()</span>
+<span class="fc" id="L554">            .map(value -&gt; requireText(</span>
+                value,
+                name + &quot; entry&quot;))
+<span class="fc" id="L557">            .toList();</span>
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">        if (result.isEmpty()) {</span>
+<span class="nc" id="L559">            throw new IllegalArgumentException(</span>
+                name + &quot; must not be empty&quot;);
+        }
+<span class="fc" id="L562">        return List.copyOf(result);</span>
+    }
+
+    private static void requireUnique(
+        List&lt;String&gt; values,
+        String name
+    ) {
+<span class="fc bfc" id="L569" title="All 2 branches covered.">        if (new HashSet&lt;&gt;(values).size() != values.size()) {</span>
+<span class="fc" id="L570">            throw new IllegalArgumentException(</span>
+                name + &quot; must be unique&quot;);
+        }
+<span class="fc" id="L573">    }</span>
+
+    public record SourceComponent(
+        String id,
+        String occurrenceKey,
+        String expression
+    ) {
+<span class="fc" id="L580">        public SourceComponent {</span>
+<span class="fc" id="L581">            id = requireText(id, &quot;id&quot;);</span>
+<span class="fc" id="L582">            occurrenceKey = requireText(</span>
+                occurrenceKey,
+                &quot;occurrenceKey&quot;);
+<span class="fc" id="L585">            expression = requireText(</span>
+                expression,
+                &quot;expression&quot;);
+<span class="fc" id="L588">        }</span>
+    }
+
+    public record Effect(
+        String id,
+        List&lt;SourceComponent&gt; components,
+        String sourceFragment,
+        String transformedFragment,
+        String structuredFragment,
+        String residualNormalForm,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; primitiveRuleIds,
+        List&lt;String&gt; applicationKeys
+    ) {
+<span class="fc" id="L602">        public Effect {</span>
+<span class="fc" id="L603">            id = requireText(id, &quot;id&quot;);</span>
+<span class="fc" id="L604">            components = List.copyOf(</span>
+<span class="fc" id="L605">                Objects.requireNonNull(</span>
+                    components,
+                    &quot;components&quot;));
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">            if (components.isEmpty()) {</span>
+<span class="nc" id="L609">                throw new IllegalArgumentException(</span>
+                    &quot;components must not be empty&quot;);
+            }
+<span class="fc" id="L612">            sourceFragment = requireText(</span>
+                sourceFragment,
+                &quot;sourceFragment&quot;);
+<span class="fc" id="L615">            transformedFragment = requireText(</span>
+                transformedFragment,
+                &quot;transformedFragment&quot;);
+<span class="fc" id="L618">            structuredFragment = requireText(</span>
+                structuredFragment,
+                &quot;structuredFragment&quot;);
+<span class="fc" id="L621">            residualNormalForm = requireText(</span>
+                residualNormalForm,
+                &quot;residualNormalForm&quot;);
+<span class="fc" id="L624">            assumptions = optionalTexts(</span>
+                assumptions,
+                &quot;assumptions&quot;);
+<span class="pc bpc" id="L627" title="1 of 2 branches missed.">            if (!assumptions.isEmpty()) {</span>
+<span class="nc" id="L628">                throw new IllegalArgumentException(</span>
+                    &quot;v1 residual effects must be assumption-free&quot;);
+            }
+<span class="fc" id="L631">            primitiveRuleIds = texts(</span>
+                primitiveRuleIds,
+                &quot;primitiveRuleIds&quot;);
+<span class="fc" id="L634">            applicationKeys = texts(</span>
+                applicationKeys,
+                &quot;applicationKeys&quot;);
+<span class="fc" id="L637">        }</span>
+
+        public List&lt;String&gt; componentIds() {
+<span class="fc" id="L640">            return components.stream()</span>
+<span class="fc" id="L641">                .map(SourceComponent::id)</span>
+<span class="fc" id="L642">                .toList();</span>
+        }
+    }
+
+    public record Composition(
+        String sourceExpression,
+        List&lt;SourceComponent&gt; sourceComponents,
+        List&lt;Effect&gt; effects,
+        String candidateExpression,
+        String combinedResidualNormalForm,
+        List&lt;String&gt; primitiveRuleIds,
+        List&lt;String&gt; applicationKeys
+    ) {
+<span class="fc" id="L655">        public Composition {</span>
+<span class="fc" id="L656">            sourceExpression = requireText(</span>
+                sourceExpression,
+                &quot;sourceExpression&quot;);
+<span class="fc" id="L659">            sourceComponents = List.copyOf(</span>
+<span class="fc" id="L660">                Objects.requireNonNull(</span>
+                    sourceComponents,
+                    &quot;sourceComponents&quot;));
+<span class="fc" id="L663">            effects = List.copyOf(</span>
+<span class="fc" id="L664">                Objects.requireNonNull(effects, &quot;effects&quot;));</span>
+<span class="fc" id="L665">            candidateExpression = requireText(</span>
+                candidateExpression,
+                &quot;candidateExpression&quot;);
+<span class="fc" id="L668">            combinedResidualNormalForm = requireText(</span>
+                combinedResidualNormalForm,
+                &quot;combinedResidualNormalForm&quot;);
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">            if (!&quot;0&quot;.equals(combinedResidualNormalForm)) {</span>
+<span class="nc" id="L672">                throw new IllegalArgumentException(</span>
+                    &quot;composition residual must be zero&quot;);
+            }
+<span class="fc" id="L675">            primitiveRuleIds = texts(</span>
+                primitiveRuleIds,
+                &quot;primitiveRuleIds&quot;);
+<span class="fc" id="L678">            applicationKeys = texts(</span>
+                applicationKeys,
+                &quot;applicationKeys&quot;);
+<span class="fc" id="L681">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

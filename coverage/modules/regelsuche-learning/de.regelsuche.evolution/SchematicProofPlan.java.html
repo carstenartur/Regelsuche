@@ -1,0 +1,901 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchematicProofPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">SchematicProofPlan.java</span></div><h1>SchematicProofPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+/**
+ * Canonical bounded IR for an ordered target-free schematic proof plan.
+ *
+ * &lt;p&gt;A plan may declare typed holes and open obligations. It is neither an
+ * executable rewrite program nor proof evidence and deliberately has no target,
+ * historical-reference or held-out-outcome field.&lt;/p&gt;
+ */
+public record SchematicProofPlan(
+    String schema,
+    String planId,
+    InformationBoundary informationBoundary,
+    String formationScopeHash,
+    List&lt;Step&gt; steps,
+    List&lt;Hole&gt; holes,
+    List&lt;Obligation&gt; obligations,
+    Limits limits,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.schematic-proof-plan/v1&quot;;
+<span class="fc" id="L37">    private static final Pattern ID = Pattern.compile(</span>
+        &quot;[a-z][a-z0-9_-]{2,127}&quot;);
+<span class="fc" id="L39">    private static final Pattern TOKEN = Pattern.compile(</span>
+        &quot;[a-z][a-z0-9._/-]{1,127}&quot;);
+<span class="fc" id="L41">    private static final Pattern SHA256 = Pattern.compile(</span>
+        &quot;sha256:[0-9a-f]{64}&quot;);
+
+<span class="fc" id="L44">    public SchematicProofPlan {</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(</span>
+                &quot;unsupported schematic proof-plan schema&quot;);
+        }
+<span class="fc" id="L49">        planId = requireId(planId, &quot;planId&quot;);</span>
+<span class="fc" id="L50">        informationBoundary = requireBoundary(informationBoundary);</span>
+<span class="fc" id="L51">        formationScopeHash = requireSha256(</span>
+            formationScopeHash,
+            &quot;formationScopeHash&quot;);
+<span class="fc" id="L54">        limits = Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="fc" id="L55">        steps = normalizeSteps(steps, limits);</span>
+<span class="fc" id="L56">        holes = normalizeHoles(holes, limits);</span>
+<span class="fc" id="L57">        obligations = normalizeObligations(obligations, limits);</span>
+<span class="fc" id="L58">        validateTopology(steps, holes, obligations);</span>
+<span class="fc" id="L59">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+
+<span class="fc" id="L61">        String payload = render(</span>
+            planId,
+            informationBoundary,
+            formationScopeHash,
+            steps,
+            holes,
+            obligations,
+            limits,
+            null);
+<span class="fc" id="L70">        requireCanonicalSize(payload, limits);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (!hash(payload).equals(contentHash)) {</span>
+<span class="fc" id="L72">            throw new IllegalArgumentException(</span>
+                &quot;contentHash does not match schematic proof plan&quot;);
+        }
+<span class="fc" id="L75">        requireCanonicalSize(</span>
+<span class="fc" id="L76">            render(</span>
+                planId,
+                informationBoundary,
+                formationScopeHash,
+                steps,
+                holes,
+                obligations,
+                limits,
+                contentHash),
+            limits);
+<span class="fc" id="L86">    }</span>
+
+    public static SchematicProofPlan create(
+        String planId,
+        InformationBoundary informationBoundary,
+        String formationScopeHash,
+        List&lt;Step&gt; steps,
+        List&lt;Hole&gt; holes,
+        List&lt;Obligation&gt; obligations,
+        Limits limits
+    ) {
+<span class="fc" id="L97">        String normalizedId = requireId(planId, &quot;planId&quot;);</span>
+<span class="fc" id="L98">        InformationBoundary boundary = requireBoundary(</span>
+            informationBoundary);
+<span class="fc" id="L100">        String scopeHash = requireSha256(</span>
+            formationScopeHash,
+            &quot;formationScopeHash&quot;);
+<span class="fc" id="L103">        Limits bounded = Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="fc" id="L104">        List&lt;Step&gt; normalizedSteps = normalizeSteps(steps, bounded);</span>
+<span class="fc" id="L105">        List&lt;Hole&gt; normalizedHoles = normalizeHoles(holes, bounded);</span>
+<span class="fc" id="L106">        List&lt;Obligation&gt; normalizedObligations =</span>
+<span class="fc" id="L107">            normalizeObligations(obligations, bounded);</span>
+<span class="fc" id="L108">        validateTopology(</span>
+            normalizedSteps,
+            normalizedHoles,
+            normalizedObligations);
+<span class="fc" id="L112">        String payload = render(</span>
+            normalizedId,
+            boundary,
+            scopeHash,
+            normalizedSteps,
+            normalizedHoles,
+            normalizedObligations,
+            bounded,
+            null);
+<span class="fc" id="L121">        requireCanonicalSize(payload, bounded);</span>
+<span class="fc" id="L122">        return new SchematicProofPlan(</span>
+            SCHEMA,
+            normalizedId,
+            boundary,
+            scopeHash,
+            normalizedSteps,
+            normalizedHoles,
+            normalizedObligations,
+            bounded,
+<span class="fc" id="L131">            hash(payload));</span>
+    }
+
+    public List&lt;String&gt; holeIds() {
+<span class="fc" id="L135">        return holes.stream().map(Hole::id).toList();</span>
+    }
+
+    public List&lt;String&gt; obligationIds() {
+<span class="fc" id="L139">        return obligations.stream().map(Obligation::id).toList();</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L143">        return render(</span>
+            planId,
+            informationBoundary,
+            formationScopeHash,
+            steps,
+            holes,
+            obligations,
+            limits,
+            contentHash);
+    }
+
+    private static String render(
+        String planId,
+        InformationBoundary boundary,
+        String scopeHash,
+        List&lt;Step&gt; steps,
+        List&lt;Hole&gt; holes,
+        List&lt;Obligation&gt; obligations,
+        Limits limits,
+        String contentHash
+    ) {
+<span class="fc" id="L164">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L165">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L166">            .property(&quot;planId&quot;, planId)</span>
+<span class="fc" id="L167">            .property(&quot;informationBoundary&quot;, boundary.name())</span>
+<span class="fc" id="L168">            .property(&quot;formationScopeHash&quot;, scopeHash)</span>
+<span class="fc" id="L169">            .object(&quot;limits&quot;, object -&gt; writeLimits(object, limits))</span>
+<span class="fc" id="L170">            .array(&quot;steps&quot;, array -&gt; steps.forEach(step -&gt;</span>
+<span class="fc" id="L171">                array.objectValue(object -&gt; writeStep(object, step))))</span>
+<span class="fc" id="L172">            .array(&quot;holes&quot;, array -&gt; holes.forEach(hole -&gt;</span>
+<span class="fc" id="L173">                array.objectValue(object -&gt; writeHole(object, hole))))</span>
+<span class="fc" id="L174">            .array(&quot;obligations&quot;, array -&gt; obligations.forEach(obligation -&gt;</span>
+<span class="fc" id="L175">                array.objectValue(object -&gt;</span>
+<span class="fc" id="L176">                    writeObligation(object, obligation))));</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L178">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L180">        return json.endObject().toString();</span>
+    }
+
+    private static void writeLimits(
+        JsonWriter json,
+        Limits limits
+    ) {
+<span class="fc" id="L187">        json.property(&quot;maxSteps&quot;, limits.maxSteps())</span>
+<span class="fc" id="L188">            .property(&quot;maxHoles&quot;, limits.maxHoles())</span>
+<span class="fc" id="L189">            .property(&quot;maxObligations&quot;, limits.maxObligations())</span>
+<span class="fc" id="L190">            .property(&quot;maxCanonicalBytes&quot;, limits.maxCanonicalBytes());</span>
+<span class="fc" id="L191">    }</span>
+
+    private static void writeStep(
+        JsonWriter json,
+        Step step
+    ) {
+<span class="fc" id="L197">        json.property(&quot;id&quot;, step.id())</span>
+<span class="fc" id="L198">            .property(&quot;action&quot;, step.action().name())</span>
+<span class="fc" id="L199">            .stringArray(&quot;holeIds&quot;, step.holeIds())</span>
+<span class="fc" id="L200">            .stringArray(&quot;obligationIds&quot;, step.obligationIds());</span>
+<span class="fc" id="L201">    }</span>
+
+    private static void writeHole(
+        JsonWriter json,
+        Hole hole
+    ) {
+<span class="fc" id="L207">        json.property(&quot;id&quot;, hole.id())</span>
+<span class="fc" id="L208">            .property(&quot;kind&quot;, hole.kind().name())</span>
+<span class="fc" id="L209">            .property(&quot;sort&quot;, hole.sort().name())</span>
+<span class="fc" id="L210">            .property(&quot;domainId&quot;, hole.domainId())</span>
+<span class="fc" id="L211">            .property(&quot;grammarRevision&quot;, hole.grammarRevision())</span>
+<span class="fc" id="L212">            .object(&quot;budget&quot;, budget -&gt; budget</span>
+<span class="fc" id="L213">                .property(</span>
+                    &quot;maxCandidates&quot;,
+<span class="fc" id="L215">                    hole.budget().maxCandidates())</span>
+<span class="fc" id="L216">                .property(</span>
+                    &quot;maxCanonicalBytes&quot;,
+<span class="fc" id="L218">                    hole.budget().maxCanonicalBytes())</span>
+<span class="fc" id="L219">                .property(</span>
+                    &quot;maxScalarBits&quot;,
+<span class="fc" id="L221">                    hole.budget().maxScalarBits())</span>
+<span class="fc" id="L222">                .property(</span>
+                    &quot;maxOccurrenceDepth&quot;,
+<span class="fc" id="L224">                    hole.budget().maxOccurrenceDepth()));</span>
+<span class="fc" id="L225">    }</span>
+
+    private static void writeObligation(
+        JsonWriter json,
+        Obligation obligation
+    ) {
+<span class="fc" id="L231">        json.property(&quot;id&quot;, obligation.id())</span>
+<span class="fc" id="L232">            .property(&quot;kind&quot;, obligation.kind().name())</span>
+<span class="fc" id="L233">            .property(&quot;issuerStepId&quot;, obligation.issuerStepId())</span>
+<span class="fc" id="L234">            .stringArray(</span>
+                &quot;dependentHoleIds&quot;,
+<span class="fc" id="L236">                obligation.dependentHoleIds())</span>
+<span class="fc" id="L237">            .stringArray(&quot;assumptions&quot;, obligation.assumptions())</span>
+<span class="fc" id="L238">            .property(</span>
+                &quot;checkerCapability&quot;,
+<span class="fc" id="L240">                obligation.checkerCapability())</span>
+<span class="fc" id="L241">            .property(</span>
+                &quot;checkerRevisionHash&quot;,
+<span class="fc" id="L243">                obligation.checkerRevisionHash())</span>
+<span class="fc" id="L244">            .property(</span>
+                &quot;initialStatus&quot;,
+<span class="fc" id="L246">                obligation.initialStatus().name());</span>
+<span class="fc" id="L247">    }</span>
+
+    private static List&lt;Step&gt; normalizeSteps(
+        List&lt;Step&gt; values,
+        Limits limits
+    ) {
+<span class="fc" id="L253">        Objects.requireNonNull(values, &quot;steps&quot;);</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L255">            throw new IllegalArgumentException(</span>
+                &quot;schematic plan requires at least one step&quot;);
+        }
+<span class="fc" id="L258">        List&lt;Step&gt; result = values.stream()</span>
+<span class="fc" id="L259">            .map(value -&gt; Objects.requireNonNull(value, &quot;step&quot;))</span>
+<span class="fc" id="L260">            .toList();</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        if (result.size() &gt; limits.maxSteps()) {</span>
+<span class="nc" id="L262">            throw new IllegalArgumentException(</span>
+                &quot;step count exceeds plan limits&quot;);
+        }
+<span class="fc" id="L265">        requireUnique(</span>
+<span class="fc" id="L266">            result.stream().map(Step::id).toList(),</span>
+            &quot;step IDs&quot;);
+<span class="fc" id="L268">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;Hole&gt; normalizeHoles(
+        List&lt;Hole&gt; values,
+        Limits limits
+    ) {
+<span class="fc" id="L275">        Objects.requireNonNull(values, &quot;holes&quot;);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (values.isEmpty()) {</span>
+<span class="fc" id="L277">            throw new IllegalArgumentException(</span>
+                &quot;schematic plan v1 requires at least one hole&quot;);
+        }
+<span class="fc" id="L280">        List&lt;Hole&gt; result = values.stream()</span>
+<span class="fc" id="L281">            .map(value -&gt; Objects.requireNonNull(value, &quot;hole&quot;))</span>
+<span class="fc" id="L282">            .sorted(Comparator.comparing(Hole::id))</span>
+<span class="fc" id="L283">            .toList();</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (result.size() &gt; limits.maxHoles()) {</span>
+<span class="nc" id="L285">            throw new IllegalArgumentException(</span>
+                &quot;hole count exceeds plan limits&quot;);
+        }
+<span class="fc" id="L288">        requireUnique(</span>
+<span class="fc" id="L289">            result.stream().map(Hole::id).toList(),</span>
+            &quot;hole IDs&quot;);
+<span class="fc" id="L291">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;Obligation&gt; normalizeObligations(
+        List&lt;Obligation&gt; values,
+        Limits limits
+    ) {
+<span class="fc" id="L298">        Objects.requireNonNull(values, &quot;obligations&quot;);</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L300">            throw new IllegalArgumentException(</span>
+                &quot;schematic plan requires an obligation&quot;);
+        }
+<span class="fc" id="L303">        List&lt;Obligation&gt; result = values.stream()</span>
+<span class="fc" id="L304">            .map(value -&gt;</span>
+<span class="fc" id="L305">                Objects.requireNonNull(value, &quot;obligation&quot;))</span>
+<span class="fc" id="L306">            .sorted(Comparator.comparing(Obligation::id))</span>
+<span class="fc" id="L307">            .toList();</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">        if (result.size() &gt; limits.maxObligations()) {</span>
+<span class="nc" id="L309">            throw new IllegalArgumentException(</span>
+                &quot;obligation count exceeds plan limits&quot;);
+        }
+<span class="fc" id="L312">        requireUnique(</span>
+<span class="fc" id="L313">            result.stream().map(Obligation::id).toList(),</span>
+            &quot;obligation IDs&quot;);
+<span class="fc" id="L315">        return List.copyOf(result);</span>
+    }
+
+    private static void validateTopology(
+        List&lt;Step&gt; steps,
+        List&lt;Hole&gt; holes,
+        List&lt;Obligation&gt; obligations
+    ) {
+<span class="fc" id="L323">        Map&lt;String, Step&gt; stepsById = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L324">        Map&lt;String, Integer&gt; stepIndexes = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        for (int index = 0; index &lt; steps.size(); index++) {</span>
+<span class="fc" id="L326">            Step step = steps.get(index);</span>
+<span class="fc" id="L327">            stepsById.put(step.id(), step);</span>
+<span class="fc" id="L328">            stepIndexes.put(step.id(), index);</span>
+        }
+
+<span class="fc" id="L331">        Set&lt;String&gt; holeIds = Set.copyOf(</span>
+<span class="fc" id="L332">            holes.stream().map(Hole::id).toList());</span>
+<span class="fc" id="L333">        Set&lt;String&gt; obligationIds = Set.copyOf(</span>
+<span class="fc" id="L334">            obligations.stream().map(Obligation::id).toList());</span>
+<span class="fc" id="L335">        validateDeclaredReferences(</span>
+            steps,
+            holeIds,
+            obligationIds);
+<span class="fc" id="L339">        validateHoleLifecycle(steps, holeIds);</span>
+<span class="fc" id="L340">        validateFinalEmission(steps, obligationIds);</span>
+<span class="fc" id="L341">        validateObligationLifecycle(</span>
+            steps,
+            obligations,
+            stepsById,
+            stepIndexes,
+            holeIds);
+<span class="fc" id="L347">    }</span>
+
+    private static void validateDeclaredReferences(
+        List&lt;Step&gt; steps,
+        Set&lt;String&gt; holeIds,
+        Set&lt;String&gt; obligationIds
+    ) {
+<span class="fc" id="L354">        Set&lt;String&gt; referencedHoles = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L355">        Set&lt;String&gt; referencedObligations = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        for (Step step : steps) {</span>
+<span class="fc" id="L357">            requireKnown(</span>
+<span class="fc" id="L358">                step.holeIds(),</span>
+                holeIds,
+                &quot;plan step hole&quot;);
+<span class="fc" id="L361">            requireKnown(</span>
+<span class="fc" id="L362">                step.obligationIds(),</span>
+                obligationIds,
+                &quot;plan step obligation&quot;);
+<span class="fc" id="L365">            referencedHoles.addAll(step.holeIds());</span>
+<span class="fc" id="L366">            referencedObligations.addAll(step.obligationIds());</span>
+<span class="fc" id="L367">        }</span>
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">        if (!referencedHoles.equals(holeIds)) {</span>
+<span class="nc" id="L369">            throw new IllegalArgumentException(</span>
+                &quot;every hole must be referenced by a step&quot;);
+        }
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">        if (!referencedObligations.equals(obligationIds)) {</span>
+<span class="nc" id="L373">            throw new IllegalArgumentException(</span>
+                &quot;every obligation must be referenced by a step&quot;);
+        }
+<span class="fc" id="L376">    }</span>
+
+    private static void validateHoleLifecycle(
+        List&lt;Step&gt; steps,
+        Set&lt;String&gt; holeIds
+    ) {
+<span class="fc" id="L382">        Set&lt;String&gt; prepared = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        for (Step step : steps) {</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">            if (isPreparationStep(step.action())) {</span>
+<span class="fc" id="L385">                prepared.addAll(step.holeIds());</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            } else if (step.action() == StepAction.COMPOSE</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">                    &amp;&amp; !prepared.containsAll(step.holeIds())) {</span>
+<span class="fc" id="L388">                throw new IllegalArgumentException(</span>
+                    &quot;COMPOSE may use only holes prepared by an earlier &quot;
+                        + &quot;formation, selection or solving step&quot;);
+            }
+<span class="fc" id="L392">        }</span>
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">        if (!prepared.equals(holeIds)) {</span>
+<span class="nc" id="L394">            throw new IllegalArgumentException(</span>
+                &quot;every hole requires a formation, selection or solving step&quot;);
+        }
+<span class="fc" id="L397">    }</span>
+
+    private static void validateFinalEmission(
+        List&lt;Step&gt; steps,
+        Set&lt;String&gt; obligationIds
+    ) {
+<span class="fc" id="L403">        List&lt;Step&gt; emitSteps = steps.stream()</span>
+<span class="fc" id="L404">            .filter(step -&gt;</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">                step.action() == StepAction.EMIT_CANDIDATE)</span>
+<span class="fc" id="L406">            .toList();</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        if (emitSteps.size() != 1</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">                || !emitSteps.getFirst().equals(steps.getLast())) {</span>
+<span class="fc" id="L409">            throw new IllegalArgumentException(</span>
+                &quot;v1 requires one final candidate-emission step&quot;);
+        }
+<span class="fc" id="L412">        if (!Set.copyOf(emitSteps.getFirst().obligationIds())</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">                .equals(obligationIds)) {</span>
+<span class="nc" id="L414">            throw new IllegalArgumentException(</span>
+                &quot;emission must depend on every obligation&quot;);
+        }
+<span class="fc" id="L417">    }</span>
+
+    private static void validateObligationLifecycle(
+        List&lt;Step&gt; steps,
+        List&lt;Obligation&gt; obligations,
+        Map&lt;String, Step&gt; stepsById,
+        Map&lt;String, Integer&gt; stepIndexes,
+        Set&lt;String&gt; holeIds
+    ) {
+<span class="fc bfc" id="L426" title="All 2 branches covered.">        for (Obligation obligation : obligations) {</span>
+<span class="fc" id="L427">            Step issuer = stepsById.get(obligation.issuerStepId());</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">            if (issuer == null</span>
+<span class="fc bfc" id="L429" title="All 2 branches covered.">                    || !issuer.obligationIds().contains(</span>
+<span class="fc" id="L430">                        obligation.id())) {</span>
+<span class="fc" id="L431">                throw new IllegalArgumentException(</span>
+                    &quot;obligation issuer is not connected to obligation&quot;);
+            }
+<span class="fc bfc" id="L434" title="All 2 branches covered.">            if (issuer.action() == StepAction.DISCHARGE_OBLIGATIONS</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">                    || issuer.action() == StepAction.EMIT_CANDIDATE) {</span>
+<span class="fc" id="L436">                throw new IllegalArgumentException(</span>
+                    &quot;discharge and emission steps cannot issue obligations&quot;);
+            }
+<span class="fc" id="L439">            requireKnown(</span>
+<span class="fc" id="L440">                obligation.dependentHoleIds(),</span>
+                holeIds,
+                &quot;obligation hole&quot;);
+<span class="fc" id="L443">            int issuerIndex = stepIndexes.get(issuer.id());</span>
+<span class="fc bfc" id="L444" title="All 2 branches covered.">            for (String holeId : obligation.dependentHoleIds()) {</span>
+<span class="pc bpc" id="L445" title="1 of 2 branches missed.">                if (!isPreparedNoLaterThan(</span>
+                        steps,
+                        holeId,
+                        issuerIndex)) {
+<span class="nc" id="L449">                    throw new IllegalArgumentException(</span>
+                        &quot;obligation depends on a hole not prepared by its issuer&quot;);
+                }
+<span class="fc" id="L452">            }</span>
+<span class="fc" id="L453">            int dischargeIndex = uniqueDischargeIndex(</span>
+                steps,
+<span class="fc" id="L455">                obligation.id());</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">            if (dischargeIndex &lt;= issuerIndex) {</span>
+<span class="fc" id="L457">                throw new IllegalArgumentException(</span>
+                    &quot;obligation must be discharged after its issuer&quot;);
+            }
+<span class="fc" id="L460">        }</span>
+<span class="fc" id="L461">    }</span>
+
+    private static boolean isPreparedNoLaterThan(
+        List&lt;Step&gt; steps,
+        String holeId,
+        int inclusiveEnd
+    ) {
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        for (int index = 0; index &lt;= inclusiveEnd; index++) {</span>
+<span class="fc" id="L469">            Step step = steps.get(index);</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">            if (isPreparationStep(step.action())</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">                    &amp;&amp; step.holeIds().contains(holeId)) {</span>
+<span class="fc" id="L472">                return true;</span>
+            }
+        }
+<span class="nc" id="L475">        return false;</span>
+    }
+
+    private static boolean isPreparationStep(
+        StepAction action
+    ) {
+<span class="pc bpc" id="L481" title="1 of 6 branches missed.">        return action == StepAction.FORM_CANDIDATES</span>
+            || action == StepAction.SELECT_BINDINGS
+            || action == StepAction.SOLVE_HOLES;
+    }
+
+    private static int uniqueDischargeIndex(
+        List&lt;Step&gt; steps,
+        String obligationId
+    ) {
+<span class="fc" id="L490">        int result = -1;</span>
+<span class="fc bfc" id="L491" title="All 2 branches covered.">        for (int index = 0; index &lt; steps.size(); index++) {</span>
+<span class="fc" id="L492">            Step step = steps.get(index);</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">            if (step.action()</span>
+                    != StepAction.DISCHARGE_OBLIGATIONS
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">                    || !step.obligationIds().contains(obligationId)) {</span>
+<span class="nc" id="L496">                continue;</span>
+            }
+<span class="fc bfc" id="L498" title="All 2 branches covered.">            if (result &gt;= 0) {</span>
+<span class="fc" id="L499">                throw new IllegalArgumentException(</span>
+                    &quot;v1 requires one discharge step per obligation&quot;);
+            }
+<span class="fc" id="L502">            result = index;</span>
+        }
+<span class="fc bfc" id="L504" title="All 2 branches covered.">        if (result &lt; 0) {</span>
+<span class="fc" id="L505">            throw new IllegalArgumentException(</span>
+                &quot;every obligation requires a discharge step&quot;);
+        }
+<span class="fc" id="L508">        return result;</span>
+    }
+
+    private static void requireKnown(
+        List&lt;String&gt; actual,
+        Set&lt;String&gt; declared,
+        String name
+    ) {
+<span class="fc bfc" id="L516" title="All 2 branches covered.">        if (!declared.containsAll(actual)) {</span>
+<span class="fc" id="L517">            throw new IllegalArgumentException(</span>
+                name + &quot; references an unknown ID&quot;);
+        }
+<span class="fc" id="L520">    }</span>
+
+    private static InformationBoundary requireBoundary(
+        InformationBoundary value
+    ) {
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">        if (value != InformationBoundary.TARGET_FREE_FORMATION) {</span>
+<span class="nc" id="L526">            throw new IllegalArgumentException(</span>
+                &quot;v1 requires TARGET_FREE_FORMATION&quot;);
+        }
+<span class="fc" id="L529">        return value;</span>
+    }
+
+    private static void requireCanonicalSize(
+        String json,
+        Limits limits
+    ) {
+<span class="fc" id="L536">        if (json.getBytes(StandardCharsets.UTF_8).length</span>
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">                &gt; limits.maxCanonicalBytes()) {</span>
+<span class="nc" id="L538">            throw new IllegalArgumentException(</span>
+                &quot;canonical plan exceeds maxCanonicalBytes&quot;);
+        }
+<span class="fc" id="L541">    }</span>
+
+    static String hash(String value) {
+        try {
+<span class="fc" id="L545">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L546">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L547">            return &quot;sha256:&quot;</span>
+<span class="fc" id="L548">                + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L549">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L550">            throw new IllegalStateException(</span>
+                &quot;SHA-256 unavailable&quot;,
+                exception);
+        }
+    }
+
+    static String requireSha256(
+        String value,
+        String name
+    ) {
+<span class="pc bpc" id="L560" title="2 of 4 branches missed.">        if (value == null || !SHA256.matcher(value).matches()) {</span>
+<span class="nc" id="L561">            throw new IllegalArgumentException(</span>
+                name + &quot; must be SHA-256&quot;);
+        }
+<span class="fc" id="L564">        return value;</span>
+    }
+
+    static String requireId(
+        String value,
+        String name
+    ) {
+<span class="pc bpc" id="L571" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L572">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L573">                name + &quot; must match &quot; + ID.pattern());</span>
+        }
+<span class="fc" id="L575">        return value;</span>
+    }
+
+    static String requireToken(
+        String value,
+        String name
+    ) {
+<span class="pc bpc" id="L582" title="2 of 4 branches missed.">        if (value == null || !TOKEN.matcher(value).matches()) {</span>
+<span class="nc" id="L583">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L584">                name + &quot; must match &quot; + TOKEN.pattern());</span>
+        }
+<span class="fc" id="L586">        return value;</span>
+    }
+
+    static List&lt;String&gt; normalizeIds(
+        List&lt;String&gt; values,
+        String name,
+        boolean allowEmpty
+    ) {
+<span class="fc" id="L594">        Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L595">        List&lt;String&gt; result = values.stream()</span>
+<span class="fc" id="L596">            .map(value -&gt; requireId(value, name + &quot; entry&quot;))</span>
+<span class="fc" id="L597">            .sorted()</span>
+<span class="fc" id="L598">            .toList();</span>
+<span class="pc bpc" id="L599" title="1 of 4 branches missed.">        if (!allowEmpty &amp;&amp; result.isEmpty()) {</span>
+<span class="nc" id="L600">            throw new IllegalArgumentException(</span>
+                name + &quot; must not be empty&quot;);
+        }
+<span class="fc" id="L603">        requireUnique(result, name);</span>
+<span class="fc" id="L604">        return List.copyOf(result);</span>
+    }
+
+    static List&lt;String&gt; normalizeAssumptions(
+        List&lt;String&gt; values
+    ) {
+<span class="fc" id="L610">        Objects.requireNonNull(values, &quot;assumptions&quot;);</span>
+<span class="fc" id="L611">        List&lt;String&gt; result = values.stream()</span>
+<span class="fc" id="L612">            .map(value -&gt; {</span>
+<span class="nc bnc" id="L613" title="All 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L614">                    throw new IllegalArgumentException(</span>
+                        &quot;assumptions must not be blank&quot;);
+                }
+<span class="nc" id="L617">                return value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+            })
+<span class="fc" id="L619">            .sorted()</span>
+<span class="fc" id="L620">            .toList();</span>
+<span class="fc" id="L621">        requireUnique(result, &quot;assumptions&quot;);</span>
+<span class="fc" id="L622">        return List.copyOf(result);</span>
+    }
+
+    static void requireUnique(
+        List&lt;String&gt; values,
+        String name
+    ) {
+<span class="fc bfc" id="L629" title="All 2 branches covered.">        if (new HashSet&lt;&gt;(values).size() != values.size()) {</span>
+<span class="fc" id="L630">            throw new IllegalArgumentException(</span>
+                name + &quot; must be unique&quot;);
+        }
+<span class="fc" id="L633">    }</span>
+
+    private static void requireNonEmpty(
+        List&lt;?&gt; values,
+        String name
+    ) {
+<span class="pc bpc" id="L639" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L640">            throw new IllegalArgumentException(</span>
+                name + &quot; must not be empty&quot;);
+        }
+<span class="fc" id="L643">    }</span>
+
+    private static void requireEmpty(
+        List&lt;?&gt; values,
+        String name
+    ) {
+<span class="fc bfc" id="L649" title="All 2 branches covered.">        if (!values.isEmpty()) {</span>
+<span class="fc" id="L650">            throw new IllegalArgumentException(</span>
+                name + &quot; must be empty&quot;);
+        }
+<span class="fc" id="L653">    }</span>
+
+    private static void requireRange(
+        int value,
+        int minimum,
+        int maximum,
+        String name
+    ) {
+<span class="pc bpc" id="L661" title="1 of 4 branches missed.">        if (value &lt; minimum || value &gt; maximum) {</span>
+<span class="fc" id="L662">            throw new IllegalArgumentException(</span>
+                name + &quot; must be in [&quot;
+                    + minimum + &quot;,&quot; + maximum + &quot;]&quot;);
+        }
+<span class="fc" id="L666">    }</span>
+
+<span class="fc" id="L668">    public enum InformationBoundary {</span>
+<span class="fc" id="L669">        TARGET_FREE_FORMATION</span>
+    }
+
+<span class="fc" id="L672">    public enum StepAction {</span>
+<span class="fc" id="L673">        FORM_CANDIDATES,</span>
+<span class="fc" id="L674">        SELECT_BINDINGS,</span>
+<span class="fc" id="L675">        SOLVE_HOLES,</span>
+<span class="fc" id="L676">        DISCHARGE_OBLIGATIONS,</span>
+<span class="fc" id="L677">        COMPOSE,</span>
+<span class="fc" id="L678">        EMIT_CANDIDATE</span>
+    }
+
+<span class="fc" id="L681">    public enum HoleSort {</span>
+<span class="fc" id="L682">        EXACT_RATIONAL,</span>
+<span class="fc" id="L683">        SIGN,</span>
+<span class="fc" id="L684">        TERM,</span>
+<span class="fc" id="L685">        OCCURRENCE_PATH,</span>
+<span class="fc" id="L686">        OCCURRENCE_PAIR,</span>
+<span class="fc" id="L687">        FORMULA</span>
+    }
+
+<span class="fc" id="L690">    public enum HoleKind {</span>
+<span class="fc" id="L691">        COEFFICIENT(HoleSort.EXACT_RATIONAL),</span>
+<span class="fc" id="L692">        SIGN(HoleSort.SIGN),</span>
+<span class="fc" id="L693">        TERM(HoleSort.TERM),</span>
+<span class="fc" id="L694">        OCCURRENCE(HoleSort.OCCURRENCE_PATH),</span>
+<span class="fc" id="L695">        DISJOINT_TERM_PAIR(HoleSort.OCCURRENCE_PAIR),</span>
+<span class="fc" id="L696">        INVARIANT(HoleSort.TERM),</span>
+<span class="fc" id="L697">        MEASURE(HoleSort.TERM),</span>
+<span class="fc" id="L698">        WITNESS(HoleSort.TERM),</span>
+<span class="fc" id="L699">        FORMULA(HoleSort.FORMULA);</span>
+
+        private final HoleSort requiredSort;
+
+<span class="fc" id="L703">        HoleKind(HoleSort requiredSort) {</span>
+<span class="fc" id="L704">            this.requiredSort = requiredSort;</span>
+<span class="fc" id="L705">        }</span>
+
+        public HoleSort requiredSort() {
+<span class="fc" id="L708">            return requiredSort;</span>
+        }
+    }
+
+<span class="fc" id="L712">    public enum ObligationKind {</span>
+<span class="fc" id="L713">        EQUIVALENT,</span>
+<span class="fc" id="L714">        ZERO,</span>
+<span class="fc" id="L715">        NON_ZERO,</span>
+<span class="fc" id="L716">        DISJOINT_OCCURRENCES,</span>
+<span class="fc" id="L717">        COMPLETE_SOURCE_COVER,</span>
+<span class="fc" id="L718">        RESIDUAL_SUM_IS_ZERO,</span>
+<span class="fc" id="L719">        CAPABILITY_UNLOCKED,</span>
+<span class="fc" id="L720">        PRESERVES_INVARIANT,</span>
+<span class="fc" id="L721">        STRICTLY_DECREASES,</span>
+<span class="fc" id="L722">        PROVES</span>
+    }
+
+<span class="fc" id="L725">    public enum InitialObligationStatus {</span>
+<span class="fc" id="L726">        OPEN</span>
+    }
+
+    public record Step(
+        String id,
+        StepAction action,
+        List&lt;String&gt; holeIds,
+        List&lt;String&gt; obligationIds
+    ) {
+<span class="fc" id="L735">        public Step {</span>
+<span class="fc" id="L736">            id = requireId(id, &quot;step id&quot;);</span>
+<span class="fc" id="L737">            action = Objects.requireNonNull(action, &quot;action&quot;);</span>
+<span class="fc" id="L738">            holeIds = normalizeIds(</span>
+                holeIds,
+                &quot;holeIds&quot;,
+                true);
+<span class="fc" id="L742">            obligationIds = normalizeIds(</span>
+                obligationIds,
+                &quot;obligationIds&quot;,
+                true);
+<span class="pc bpc" id="L746" title="1 of 4 branches missed.">            switch (action) {</span>
+                case FORM_CANDIDATES,
+                        SELECT_BINDINGS,
+                        SOLVE_HOLES -&gt;
+<span class="fc" id="L750">                    requireNonEmpty(</span>
+                        holeIds,
+                        action + &quot; holeIds&quot;);
+                case DISCHARGE_OBLIGATIONS,
+                        EMIT_CANDIDATE -&gt; {
+<span class="fc" id="L755">                    requireNonEmpty(</span>
+                        obligationIds,
+                        action + &quot; obligationIds&quot;);
+<span class="fc" id="L758">                    requireEmpty(</span>
+                        holeIds,
+                        action + &quot; holeIds&quot;);
+<span class="fc" id="L761">                }</span>
+                case COMPOSE -&gt; {
+<span class="fc" id="L763">                    requireNonEmpty(</span>
+                        holeIds,
+                        &quot;COMPOSE holeIds&quot;);
+<span class="fc" id="L766">                    requireNonEmpty(</span>
+                        obligationIds,
+                        &quot;COMPOSE obligationIds&quot;);
+                }
+            }
+<span class="fc" id="L771">        }</span>
+    }
+
+    public record Hole(
+        String id,
+        HoleKind kind,
+        HoleSort sort,
+        String domainId,
+        String grammarRevision,
+        HoleBudget budget
+    ) {
+<span class="fc" id="L782">        public Hole {</span>
+<span class="fc" id="L783">            id = requireId(id, &quot;hole id&quot;);</span>
+<span class="fc" id="L784">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L785">            sort = Objects.requireNonNull(sort, &quot;sort&quot;);</span>
+<span class="fc bfc" id="L786" title="All 2 branches covered.">            if (sort != kind.requiredSort()) {</span>
+<span class="fc" id="L787">                throw new IllegalArgumentException(</span>
+                    &quot;hole kind &quot; + kind
+                        + &quot; requires sort &quot;
+<span class="fc" id="L790">                        + kind.requiredSort());</span>
+            }
+<span class="fc" id="L792">            domainId = requireToken(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L793">            grammarRevision = requireToken(</span>
+                grammarRevision,
+                &quot;grammarRevision&quot;);
+<span class="fc" id="L796">            budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc bfc" id="L797" title="All 4 branches covered.">            if ((sort == HoleSort.EXACT_RATIONAL</span>
+                    || sort == HoleSort.SIGN)
+<span class="pc bpc" id="L799" title="1 of 2 branches missed.">                    &amp;&amp; budget.maxScalarBits() &lt; 1) {</span>
+<span class="nc" id="L800">                throw new IllegalArgumentException(</span>
+                    &quot;scalar holes require maxScalarBits &gt; 0&quot;);
+            }
+<span class="fc" id="L803">        }</span>
+    }
+
+    public record HoleBudget(
+        int maxCandidates,
+        int maxCanonicalBytes,
+        int maxScalarBits,
+        int maxOccurrenceDepth
+    ) {
+<span class="fc" id="L812">        public HoleBudget {</span>
+<span class="fc" id="L813">            requireRange(</span>
+                maxCandidates,
+                1,
+                1_000_000,
+                &quot;maxCandidates&quot;);
+<span class="fc" id="L818">            requireRange(</span>
+                maxCanonicalBytes,
+                1,
+                1_000_000,
+                &quot;maxCanonicalBytes&quot;);
+<span class="fc" id="L823">            requireRange(</span>
+                maxScalarBits,
+                0,
+                1_000_000,
+                &quot;maxScalarBits&quot;);
+<span class="fc" id="L828">            requireRange(</span>
+                maxOccurrenceDepth,
+                0,
+                1_024,
+                &quot;maxOccurrenceDepth&quot;);
+<span class="fc" id="L833">        }</span>
+    }
+
+    public record Obligation(
+        String id,
+        ObligationKind kind,
+        String issuerStepId,
+        List&lt;String&gt; dependentHoleIds,
+        List&lt;String&gt; assumptions,
+        String checkerCapability,
+        String checkerRevisionHash,
+        InitialObligationStatus initialStatus
+    ) {
+<span class="fc" id="L846">        public Obligation {</span>
+<span class="fc" id="L847">            id = requireId(id, &quot;obligation id&quot;);</span>
+<span class="fc" id="L848">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L849">            issuerStepId = requireId(</span>
+                issuerStepId,
+                &quot;issuerStepId&quot;);
+<span class="fc" id="L852">            dependentHoleIds = normalizeIds(</span>
+                dependentHoleIds,
+                &quot;dependentHoleIds&quot;,
+                true);
+<span class="fc" id="L856">            assumptions = normalizeAssumptions(assumptions);</span>
+<span class="fc" id="L857">            checkerCapability = requireToken(</span>
+                checkerCapability,
+                &quot;checkerCapability&quot;);
+<span class="fc" id="L860">            checkerRevisionHash = requireSha256(</span>
+                checkerRevisionHash,
+                &quot;checkerRevisionHash&quot;);
+<span class="pc bpc" id="L863" title="1 of 2 branches missed.">            if (initialStatus</span>
+                    != InitialObligationStatus.OPEN) {
+<span class="nc" id="L865">                throw new IllegalArgumentException(</span>
+                    &quot;v1 obligations must begin OPEN&quot;);
+            }
+<span class="fc" id="L868">        }</span>
+    }
+
+    public record Limits(
+        int maxSteps,
+        int maxHoles,
+        int maxObligations,
+        int maxCanonicalBytes
+    ) {
+<span class="fc" id="L877">        public Limits {</span>
+<span class="fc" id="L878">            requireRange(</span>
+                maxSteps,
+                1,
+                1_024,
+                &quot;maxSteps&quot;);
+<span class="fc" id="L883">            requireRange(</span>
+                maxHoles,
+                1,
+                1_024,
+                &quot;maxHoles&quot;);
+<span class="fc" id="L888">            requireRange(</span>
+                maxObligations,
+                1,
+                2_048,
+                &quot;maxObligations&quot;);
+<span class="fc" id="L893">            requireRange(</span>
+                maxCanonicalBytes,
+                1,
+                4_000_000,
+                &quot;maxCanonicalBytes&quot;);
+<span class="fc" id="L898">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
