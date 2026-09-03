@@ -56,7 +56,7 @@ public record SchematicProofPlanResolution(
         requiredHoleIds = SchematicProofPlan.normalizeIds(
             requiredHoleIds,
             "requiredHoleIds",
-            true);
+            false);
         requiredObligationIds = SchematicProofPlan.normalizeIds(
             requiredObligationIds,
             "requiredObligationIds",
@@ -407,7 +407,7 @@ public record SchematicProofPlanResolution(
         }
         validateOccurrencePath(paths[0], maxDepth);
         validateOccurrencePath(paths[1], maxDepth);
-        if (paths[0].compareTo(paths[1]) >= 0) {
+        if (compareOccurrencePaths(paths[0], paths[1]) >= 0) {
             throw new IllegalArgumentException(
                 "occurrence pair must be distinct and ordered");
         }
@@ -415,6 +415,47 @@ public record SchematicProofPlanResolution(
             throw new IllegalArgumentException(
                 "occurrence pair paths must be disjoint");
         }
+    }
+
+    private static int compareOccurrencePaths(
+        String left,
+        String right
+    ) {
+        if (left.equals(right)) {
+            return 0;
+        }
+        if (left.equals("root")) {
+            return -1;
+        }
+        if (right.equals("root")) {
+            return 1;
+        }
+        String[] leftSegments = left.split("\\.");
+        String[] rightSegments = right.split("\\.");
+        int commonLength = Math.min(
+            leftSegments.length,
+            rightSegments.length);
+        for (int index = 0; index < commonLength; index++) {
+            int segmentOrder = compareCanonicalIndex(
+                leftSegments[index],
+                rightSegments[index]);
+            if (segmentOrder != 0) {
+                return segmentOrder;
+            }
+        }
+        return Integer.compare(
+            leftSegments.length,
+            rightSegments.length);
+    }
+
+    private static int compareCanonicalIndex(
+        String left,
+        String right
+    ) {
+        int lengthOrder = Integer.compare(left.length(), right.length());
+        return lengthOrder != 0
+            ? lengthOrder
+            : left.compareTo(right);
     }
 
     private static boolean occurrencesOverlap(
