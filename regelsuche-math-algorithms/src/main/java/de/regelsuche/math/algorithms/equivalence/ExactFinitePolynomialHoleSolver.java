@@ -28,11 +28,14 @@ import java.util.regex.Pattern;
 public final class ExactFinitePolynomialHoleSolver {
     public static final String SOLVER_ID =
         "regelsuche.exact-finite-polynomial-hole-solver/v1";
+    public static final String SOLUTION_IDENTITY_REVISION =
+        "regelsuche.exact-finite-polynomial-solution-identity/v2";
     public static final String REVISION_HASH = hash(lengthPrefixed(
         SOLVER_ID,
         "source-exact-polynomial-arithmetic",
         "complete-finite-cartesian-enumeration",
         "coefficient-and-sign-holes",
+        SOLUTION_IDENTITY_REVISION,
         "unsupported-instantiation-fails-closed"));
 
     private static final Pattern HOLE_ID = Pattern.compile(
@@ -494,7 +497,12 @@ public final class ExactFinitePolynomialHoleSolver {
 
         public String contentHash() {
             StringBuilder material = new StringBuilder();
-            appendField(material, bindingKey());
+            appendField(material, SOLUTION_IDENTITY_REVISION);
+            for (Binding binding : bindings) {
+                appendField(material, binding.holeId());
+                appendField(material, binding.kind().name());
+                appendField(material, binding.value().canonicalText());
+            }
             appendField(material, instantiatedExpression);
             appendField(material, exactNormalForm);
             return hash(material.toString());
