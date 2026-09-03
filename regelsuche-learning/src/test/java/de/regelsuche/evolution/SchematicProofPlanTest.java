@@ -143,7 +143,7 @@ class SchematicProofPlanTest {
     }
 
     @Test
-    void validatesOccurrencePairsDepthAndPlanBinding() {
+    void validatesOccurrencePairsDepthDisjointnessAndPlanBinding() {
         SchematicProofPlan occurrencePlan = occurrencePlan(2);
         HoleBinding pair = new HoleBinding("term-pair", HoleSort.OCCURRENCE_PAIR,
             "0.1|1.0", hash("pair-evidence"));
@@ -159,7 +159,16 @@ class SchematicProofPlanTest {
                 List.of(new HoleBinding("term-pair", HoleSort.OCCURRENCE_PAIR,
                     "1.0|0.1", hash("reversed-pair"))), List.of()));
         assertThrows(IllegalArgumentException.class, () ->
+            SchematicProofPlanResolution.create(occurrencePlan,
+                List.of(new HoleBinding("term-pair", HoleSort.OCCURRENCE_PAIR,
+                    "0|0.1", hash("ancestor-pair"))), List.of()));
+        assertThrows(IllegalArgumentException.class, () ->
+            SchematicProofPlanResolution.create(occurrencePlan,
+                List.of(new HoleBinding("term-pair", HoleSort.OCCURRENCE_PAIR,
+                    "0.1|root", hash("root-pair"))), List.of()));
+        assertThrows(IllegalArgumentException.class, () ->
             SchematicProofPlanResolution.create(occurrencePlan(1), List.of(pair), List.of()));
+        assertFalse(complete.isStructurallyCompleteFor(occurrencePlan(1)));
         assertThrows(IllegalArgumentException.class, () ->
             SchematicProofPlanResolution.create(occurrencePlan,
                 List.of(new HoleBinding("term-pair", HoleSort.OCCURRENCE_PAIR,
