@@ -169,19 +169,12 @@ class BrahmaguptaResidualCompositionIntegrationTest {
     private List<SourceComponent> sourceComponents(
         String expression
     ) {
-        List<Expr> terms = new ArrayList<>();
-        collectAddition(parser.parseTerm(expression), terms);
-        List<SourceComponent> components = new ArrayList<>();
-        for (int index = 0; index < terms.size(); index++) {
-            Expr term = terms.get(index);
-            assertTrue(isExplicitSquare(term), () ->
-                "prepared term is not an explicit square: " + term);
-            components.add(composer.component(
-                "term-" + index,
-                "additive-term-v1:" + index,
-                ExpressionFormatter.format(term)));
-        }
-        return List.copyOf(components);
+        List<SourceComponent> components =
+            composer.additiveComponents(expression);
+        assertTrue(components.stream().allMatch(component ->
+            isExplicitSquare(parser.parseTerm(
+                component.expression()))));
+        return components;
     }
 
     private Effect plusEffect(
@@ -242,19 +235,6 @@ class BrahmaguptaResidualCompositionIntegrationTest {
             candidates);
         assertEquals(1, candidates.size(), expression);
         return ExpressionFormatter.format(candidates.getFirst());
-    }
-
-    private static void collectAddition(
-        Expr expression,
-        List<Expr> terms
-    ) {
-        if (expression instanceof BinaryExpr binary
-                && binary.operator() == BinaryOperator.ADD) {
-            collectAddition(binary.left(), terms);
-            collectAddition(binary.right(), terms);
-        } else {
-            terms.add(expression);
-        }
     }
 
     private static void collectStructuredSquares(

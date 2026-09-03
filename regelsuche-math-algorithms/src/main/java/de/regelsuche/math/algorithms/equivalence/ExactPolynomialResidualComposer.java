@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -32,18 +33,45 @@ public final class ExactPolynomialResidualComposer {
     private static final int MAX_COMPONENTS = 64;
     private static final int MAX_EFFECTS = 128;
     private static final int MAX_COMPOSITION_SIZE = 8;
+    private static final int MAX_RESULTS = 1_024;
+    private static final long MAX_COMBINATION_ATTEMPTS = 1_000_000L;
 
     private final PolynomialArithmetic arithmetic = new PolynomialArithmetic();
     private final ExpressionParser parser = new ExpressionParser();
 
-    public SourceComponent component(
-        String id,
-        String occurrenceKey,
-        String expression
+    /**
+     * Extracts the exact top-level additive occurrence partition used by v1.
+     *
+     * <p>Only addition is flattened. Subtraction and every other operator stay
+     * occurrence-visible and form one component.</p>
+     */
+    public List<SourceComponent> additiveComponents(
+        String sourceExpression
     ) {
-        String normalized = normalizeSyntax(expression, "expression");
-        parsePolynomial(normalized, "expression");
-        return new SourceComponent(id, occurrenceKey, normalized);
+        String source = normalizeSyntax(
+            sourceExpression,
+            "sourceExpression");
+        parsePolynomial(source, "sourceExpression");
+        List<Expr> terms = new ArrayList<>();
+        collectAddition(parser.parseTerm(source), terms);
+        if (terms.isEmpty() || terms.size() > MAX_COMPONENTS) {
+            throw new IllegalArgumentException(
+                "additive component count must be in [1,"
+                    + MAX_COMPONENTS + "]");
+        }
+        List<SourceComponent> components =
+            new ArrayList<>(terms.size());
+        for (int index = 0; index < terms.size(); index++) {
+            String ordinal = String.format(
+                Locale.ROOT,
+                "%02d",
+                index);
+            components.add(new SourceComponent(
+                "term-" + ordinal,
+                "additive-term-v1:" + ordinal,
+                ExpressionFormatter.format(terms.get(index))));
+        }
+        return List.copyOf(components);
     }
 
     public Effect effect(
@@ -57,6 +85,16 @@ public final class ExactPolynomialResidualComposer {
     ) {
         List<SourceComponent> components =
             orderedComponents(coveredComponents);
+        if (components.size() > MAX_COMPONENTS) {
+            throw new IllegalArgumentException(
+                "coveredComponents exceeds " + MAX_COMPONENTS);
+        }
+        requireUnique(components.stream()
+            .map(SourceComponent::id)
+            .toList(), "covered component IDs");
+        requireUnique(components.stream()
+            .map(SourceComponent::occurrenceKey)
+            .toList(), "covered occurrence keys");
         String sourceFragment = sum(components.stream()
             .map(SourceComponent::expression)
             .toList());
@@ -90,6 +128,11 @@ public final class ExactPolynomialResidualComposer {
             throw new IllegalArgumentException(
                 "v1 residual effects must be assumption-free");
         }
+        List<String> normalizedApplicationKeys =
+            texts(applicationKeys, "applicationKeys");
+        requireUnique(
+            normalizedApplicationKeys,
+            "applicationKeys");
         return new Effect(
             requireText(id, "id"),
             components,
@@ -99,7 +142,7 @@ public final class ExactPolynomialResidualComposer {
             source.subtract(structuredPolynomial).toCanonicalString(),
             normalizedAssumptions,
             texts(primitiveRuleIds, "primitiveRuleIds"),
-            texts(applicationKeys, "applicationKeys"));
+            normalizedApplicationKeys);
     }
 
     public List<Composition> compose(
@@ -120,7 +163,10 @@ public final class ExactPolynomialResidualComposer {
         Polynomial sourcePolynomial =
             parsePolynomial(source, "sourceExpression");
         List<SourceComponent> components =
-            validatePartition(sourcePolynomial, sourceComponents);
+            validatePartition(
+                source,
+                sourcePolynomial,
+                sourceComponents);
         Set<String> requiredIds = components.stream()
             .map(SourceComponent::id)
             .collect(Collectors.toUnmodifiableSet());
@@ -141,6 +187,13 @@ public final class ExactPolynomialResidualComposer {
                 .comparing(Effect::id)
                 .thenComparing(Effect::structuredFragment))
             .toList();
+        requireUnique(effects.stream()
+            .map(Effect::id)
+            .toList(), "effect IDs");
+        if (effects.size() < compositionSize) {
+            return List.of();
+        }
+        requireCombinationBound(effects.size(), compositionSize);
 
         List<Composition> results = new ArrayList<>();
         select(
@@ -258,23 +311,27 @@ public final class ExactPolynomialResidualComposer {
                 .equals(sourcePolynomial)) {
             return null;
         }
+        List<String> primitiveRuleIds = ordered.stream()
+            .flatMap(effect ->
+                effect.primitiveRuleIds().stream())
+            .toList();
+        List<String> applicationKeys = ordered.stream()
+            .flatMap(effect ->
+                effect.applicationKeys().stream())
+            .toList();
+        requireUnique(applicationKeys, "composition application keys");
         return new Composition(
             source,
             components,
             ordered,
             candidate,
             "0",
-            ordered.stream()
-                .flatMap(effect ->
-                    effect.primitiveRuleIds().stream())
-                .toList(),
-            ordered.stream()
-                .flatMap(effect ->
-                    effect.applicationKeys().stream())
-                .toList());
+            primitiveRuleIds,
+            applicationKeys);
     }
 
     private List<SourceComponent> validatePartition(
+        String sourceExpression,
         Polynomial source,
         List<SourceComponent> sourceComponents
     ) {
@@ -291,16 +348,15 @@ public final class ExactPolynomialResidualComposer {
             .map(SourceComponent::occurrenceKey)
             .toList(), "occurrence keys");
 
+        List<SourceComponent> expected =
+            additiveComponents(sourceExpression);
+        if (!components.equals(expected)) {
+            throw new IllegalArgumentException(
+                "source components are not the exact additive occurrences");
+        }
+
         Polynomial reconstructed = Polynomial.zero();
         for (SourceComponent component : components) {
-            SourceComponent validated = component(
-                component.id(),
-                component.occurrenceKey(),
-                component.expression());
-            if (!validated.equals(component)) {
-                throw new IllegalArgumentException(
-                    "source component changed after certification");
-            }
             reconstructed = reconstructed.add(parsePolynomial(
                 component.expression(),
                 "source component"));
@@ -388,6 +444,20 @@ public final class ExactPolynomialResidualComposer {
             "sum");
     }
 
+    private static void collectAddition(
+        Expr expression,
+        List<Expr> terms
+    ) {
+        if (expression instanceof BinaryExpr binary
+                && binary.operator()
+                    == de.regelsuche.ast.BinaryOperator.ADD) {
+            collectAddition(binary.left(), terms);
+            collectAddition(binary.right(), terms);
+        } else {
+            terms.add(expression);
+        }
+    }
+
     private static boolean containsSubtree(
         Expr expression,
         Expr expected
@@ -417,9 +487,29 @@ public final class ExactPolynomialResidualComposer {
                 "compositionSize must be in [1,"
                     + MAX_COMPOSITION_SIZE + "]");
         }
-        if (maxResults < 0) {
+        if (maxResults < 0 || maxResults > MAX_RESULTS) {
             throw new IllegalArgumentException(
-                "maxResults must not be negative");
+                "maxResults must be in [0," + MAX_RESULTS + "]");
+        }
+    }
+
+    private static void requireCombinationBound(
+        int effectCount,
+        int compositionSize
+    ) {
+        int selected = Math.min(
+            compositionSize,
+            effectCount - compositionSize);
+        long combinations = 1L;
+        for (int index = 1; index <= selected; index++) {
+            combinations = combinations
+                * (effectCount - selected + index)
+                / index;
+            if (combinations > MAX_COMBINATION_ATTEMPTS) {
+                throw new IllegalArgumentException(
+                    "candidate effect combinations exceed "
+                        + MAX_COMBINATION_ATTEMPTS);
+            }
         }
     }
 

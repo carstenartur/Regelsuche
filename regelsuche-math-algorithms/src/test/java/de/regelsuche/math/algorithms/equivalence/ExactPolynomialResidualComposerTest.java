@@ -7,7 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialResidualComposer.Composition;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialResidualComposer.Effect;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialResidualComposer.SourceComponent;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 class ExactPolynomialResidualComposerTest {
@@ -161,6 +163,51 @@ class ExactPolynomialResidualComposerTest {
     }
 
     @Test
+    void rejectsDuplicateEffectOccurrencesAndUnboundedResultRequests() {
+        List<SourceComponent> components = components();
+
+        assertThrows(IllegalArgumentException.class, () ->
+            composer.effect(
+                "duplicate",
+                List.of(components.get(0), components.get(0)),
+                "2*(a*c)^2",
+                "(a*c)^2",
+                List.of(),
+                List.of("duplicate"),
+                List.of("duplicate-move")));
+        assertThrows(IllegalArgumentException.class, () ->
+            composer.compose(
+                source(),
+                components,
+                List.of(),
+                1,
+                1_025));
+    }
+
+    @Test
+    void rejectsACombinatorialPlanAboveTheFixedWorkCeiling() {
+        List<SourceComponent> components = components();
+        List<Effect> effects = IntStream.range(0, 128)
+            .mapToObj(index -> composer.effect(
+                "candidate-" + index,
+                List.of(components.get(0), components.get(3)),
+                "(a*c - b*d)^2 + 2*a*b*c*d",
+                "(a*c - b*d)^2",
+                List.of(),
+                List.of("complete-square"),
+                List.of("move-" + index)))
+            .toList();
+
+        assertThrows(IllegalArgumentException.class, () ->
+            composer.compose(
+                source(),
+                components,
+                effects,
+                8,
+                8));
+    }
+
+    @Test
     void requiresTheDeclaredComponentsToReconstructTheSource() {
         List<SourceComponent> components = components();
 
@@ -171,26 +218,25 @@ class ExactPolynomialResidualComposerTest {
                 List.of(),
                 1,
                 8));
+
+        SourceComponent first = components.getFirst();
+        List<SourceComponent> forged = new ArrayList<>(
+            components);
+        forged.set(0, new SourceComponent(
+            first.id(),
+            "invented-occurrence",
+            first.expression()));
+        assertThrows(IllegalArgumentException.class, () ->
+            composer.compose(
+                source(),
+                forged,
+                List.of(),
+                1,
+                8));
     }
 
     private List<SourceComponent> components() {
-        return List.of(
-            composer.component(
-                "term-0",
-                "term:0",
-                "(a*c)^2"),
-            composer.component(
-                "term-1",
-                "term:1",
-                "(a*d)^2"),
-            composer.component(
-                "term-2",
-                "term:2",
-                "(b*c)^2"),
-            composer.component(
-                "term-3",
-                "term:3",
-                "(b*d)^2"));
+        return composer.additiveComponents(source());
     }
 
     private static String source() {
