@@ -32,7 +32,8 @@ public record SchematicProofPlan(
     Limits limits,
     String contentHash
 ) {
-    public static final String SCHEMA = "regelsuche.schematic-proof-plan/v1";
+    public static final String SCHEMA =
+        "regelsuche.schematic-proof-plan/v1";
     private static final Pattern ID = Pattern.compile(
         "[a-z][a-z0-9_-]{2,127}");
     private static final Pattern TOKEN = Pattern.compile(
@@ -54,7 +55,7 @@ public record SchematicProofPlan(
         steps = normalizeSteps(steps, limits);
         holes = normalizeHoles(holes, limits);
         obligations = normalizeObligations(obligations, limits);
-        validateReferences(steps, holes, obligations);
+        validateTopology(steps, holes, obligations);
         contentHash = requireSha256(contentHash, "contentHash");
 
         String payload = render(
@@ -104,7 +105,7 @@ public record SchematicProofPlan(
         List<Hole> normalizedHoles = normalizeHoles(holes, bounded);
         List<Obligation> normalizedObligations =
             normalizeObligations(obligations, bounded);
-        validateReferences(
+        validateTopology(
             normalizedSteps,
             normalizedHoles,
             normalizedObligations);
@@ -272,6 +273,10 @@ public record SchematicProofPlan(
         Limits limits
     ) {
         Objects.requireNonNull(values, "holes");
+        if (values.isEmpty()) {
+            throw new IllegalArgumentException(
+                "schematic plan v1 requires at least one hole");
+        }
         List<Hole> result = values.stream()
             .map(value -> Objects.requireNonNull(value, "hole"))
             .sorted(Comparator.comparing(Hole::id))
@@ -310,7 +315,7 @@ public record SchematicProofPlan(
         return List.copyOf(result);
     }
 
-    private static void validateReferences(
+    private static void validateTopology(
         List<Step> steps,
         List<Hole> holes,
         List<Obligation> obligations
@@ -322,17 +327,32 @@ public record SchematicProofPlan(
             stepsById.put(step.id(), step);
             stepIndexes.put(step.id(), index);
         }
+
         Set<String> holeIds = Set.copyOf(
             holes.stream().map(Hole::id).toList());
         Set<String> obligationIds = Set.copyOf(
             obligations.stream().map(Obligation::id).toList());
+        validateDeclaredReferences(
+            steps,
+            holeIds,
+            obligationIds);
+        validateHoleLifecycle(steps, holeIds);
+        validateFinalEmission(steps, obligationIds);
+        validateObligationLifecycle(
+            steps,
+            obligations,
+            stepsById,
+            stepIndexes,
+            holeIds);
+    }
+
+    private static void validateDeclaredReferences(
+        List<Step> steps,
+        Set<String> holeIds,
+        Set<String> obligationIds
+    ) {
         Set<String> referencedHoles = new LinkedHashSet<>();
         Set<String> referencedObligations = new LinkedHashSet<>();
-        List<Step> emitSteps = steps.stream()
-            .filter(step ->
-                step.action() == StepAction.EMIT_CANDIDATE)
-            .toList();
-
         for (Step step : steps) {
             requireKnown(
                 step.holeIds(),
@@ -353,6 +373,37 @@ public record SchematicProofPlan(
             throw new IllegalArgumentException(
                 "every obligation must be referenced by a step");
         }
+    }
+
+    private static void validateHoleLifecycle(
+        List<Step> steps,
+        Set<String> holeIds
+    ) {
+        Set<String> prepared = new HashSet<>();
+        for (Step step : steps) {
+            if (isPreparationStep(step.action())) {
+                prepared.addAll(step.holeIds());
+            } else if (step.action() == StepAction.COMPOSE
+                    && !prepared.containsAll(step.holeIds())) {
+                throw new IllegalArgumentException(
+                    "COMPOSE may use only holes prepared by an earlier "
+                        + "formation, selection or solving step");
+            }
+        }
+        if (!prepared.equals(holeIds)) {
+            throw new IllegalArgumentException(
+                "every hole requires a formation, selection or solving step");
+        }
+    }
+
+    private static void validateFinalEmission(
+        List<Step> steps,
+        Set<String> obligationIds
+    ) {
+        List<Step> emitSteps = steps.stream()
+            .filter(step ->
+                step.action() == StepAction.EMIT_CANDIDATE)
+            .toList();
         if (emitSteps.size() != 1
                 || !emitSteps.getFirst().equals(steps.getLast())) {
             throw new IllegalArgumentException(
@@ -363,7 +414,15 @@ public record SchematicProofPlan(
             throw new IllegalArgumentException(
                 "emission must depend on every obligation");
         }
+    }
 
+    private static void validateObligationLifecycle(
+        List<Step> steps,
+        List<Obligation> obligations,
+        Map<String, Step> stepsById,
+        Map<String, Integer> stepIndexes,
+        Set<String> holeIds
+    ) {
         for (Obligation obligation : obligations) {
             Step issuer = stepsById.get(obligation.issuerStepId());
             if (issuer == null
@@ -372,18 +431,23 @@ public record SchematicProofPlan(
                 throw new IllegalArgumentException(
                     "obligation issuer is not connected to obligation");
             }
+            if (issuer.action() == StepAction.DISCHARGE_OBLIGATIONS
+                    || issuer.action() == StepAction.EMIT_CANDIDATE) {
+                throw new IllegalArgumentException(
+                    "discharge and emission steps cannot issue obligations");
+            }
             requireKnown(
                 obligation.dependentHoleIds(),
                 holeIds,
                 "obligation hole");
             int issuerIndex = stepIndexes.get(issuer.id());
             for (String holeId : obligation.dependentHoleIds()) {
-                if (!isReferencedBefore(
+                if (!isPreparedNoLaterThan(
                         steps,
                         holeId,
                         issuerIndex)) {
                     throw new IllegalArgumentException(
-                        "obligation depends on a hole not introduced before its issuer");
+                        "obligation depends on a hole not prepared by its issuer");
                 }
             }
             int dischargeIndex = uniqueDischargeIndex(
@@ -396,17 +460,27 @@ public record SchematicProofPlan(
         }
     }
 
-    private static boolean isReferencedBefore(
+    private static boolean isPreparedNoLaterThan(
         List<Step> steps,
         String holeId,
-        int exclusiveEnd
+        int inclusiveEnd
     ) {
-        for (int index = 0; index < exclusiveEnd; index++) {
-            if (steps.get(index).holeIds().contains(holeId)) {
+        for (int index = 0; index <= inclusiveEnd; index++) {
+            Step step = steps.get(index);
+            if (isPreparationStep(step.action())
+                    && step.holeIds().contains(holeId)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean isPreparationStep(
+        StepAction action
+    ) {
+        return action == StepAction.FORM_CANDIDATES
+            || action == StepAction.SELECT_BINDINGS
+            || action == StepAction.SOLVE_HOLES;
     }
 
     private static int uniqueDischargeIndex(
@@ -808,7 +882,7 @@ public record SchematicProofPlan(
                 "maxSteps");
             requireRange(
                 maxHoles,
-                0,
+                1,
                 1_024,
                 "maxHoles");
             requireRange(
