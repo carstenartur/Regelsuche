@@ -29,7 +29,7 @@ public final class ExactFinitePolynomialPlanReplayVerifier {
             ExactFinitePolynomialHoleSolver.REVISION_HASH,
             "complete-run-reexecution",
             "exact-plan-run-equality",
-            "verifier-owned-non-executable-receipt"));
+            "sealed-verifier-owned-non-executable-receipt"));
 
     private final ExactFinitePolynomialPlanResolver resolver =
         new ExactFinitePolynomialPlanResolver();
@@ -59,7 +59,57 @@ public final class ExactFinitePolynomialPlanReplayVerifier {
             throw new IllegalArgumentException(
                 "finite polynomial plan replay differs from expected run");
         }
-        return ReplayReceipt.create(plan, replayed);
+        return createReceipt(plan, replayed);
+    }
+
+    private static ReplayReceipt createReceipt(
+        SchematicProofPlan plan,
+        ExactFinitePolynomialPlanRun run
+    ) {
+        Objects.requireNonNull(plan, "plan");
+        Objects.requireNonNull(run, "run");
+        if (!plan.contentHash().equals(run.planHash())) {
+            throw new IllegalArgumentException(
+                "plan run is bound to a different schematic plan");
+        }
+        List<String> candidateHashes = run.candidates().stream()
+            .map(ExactFinitePolynomialResolvedCandidate::contentHash)
+            .sorted()
+            .toList();
+        var result = run.solverResult();
+        String payload = VerifiedReplayReceipt.render(
+            ReplayReceipt.SCHEMA,
+            VERIFIER_ID,
+            REVISION_HASH,
+            plan.contentHash(),
+            run.contentHash(),
+            result.contentHash(),
+            result.solverRevisionHash(),
+            run.status(),
+            result.totalAssignments(),
+            result.evaluatedAssignments(),
+            result.matchingAssignments(),
+            candidateHashes.size(),
+            candidateHashes,
+            ReplayStatus.CONFIRMED_IDENTICAL_REPLAY,
+            null);
+        VerifiedReplayReceipt.requireSize(payload);
+        return new VerifiedReplayReceipt(
+            ReplayReceipt.SCHEMA,
+            VERIFIER_ID,
+            REVISION_HASH,
+            plan.contentHash(),
+            run.contentHash(),
+            result.contentHash(),
+            result.solverRevisionHash(),
+            run.status(),
+            result.totalAssignments(),
+            result.evaluatedAssignments(),
+            result.matchingAssignments(),
+            candidateHashes.size(),
+            candidateHashes,
+            ReplayStatus.CONFIRMED_IDENTICAL_REPLAY,
+            SchematicProofPlan.hash(payload));
     }
 
     private static String lengthPrefixed(String... values) {
@@ -73,82 +123,105 @@ public final class ExactFinitePolynomialPlanReplayVerifier {
     }
 
     /**
-     * Immutable replay receipt whose construction is owned by the verifier.
-     *
-     * <p>There is intentionally no public or package-visible constructor and
-     * no parse/factory API that can assert replay without running
-     * {@link ExactFinitePolynomialPlanReplayVerifier#verify}.</p>
+     * Public read-only receipt surface with a single private permitted
+     * implementation. External code cannot construct another implementation
+     * that asserts a confirmed replay.
      */
-    public static final class ReplayReceipt {
-        public static final String SCHEMA =
+    public sealed interface ReplayReceipt permits VerifiedReplayReceipt {
+        String SCHEMA =
             "regelsuche.exact-finite-polynomial-plan-replay-receipt/v1";
+
+        String schema();
+
+        String verifierId();
+
+        String verifierRevisionHash();
+
+        String planHash();
+
+        String planRunHash();
+
+        String solverResultHash();
+
+        String solverRevisionHash();
+
+        ExactFinitePolynomialPlanRun.Status runStatus();
+
+        long totalAssignments();
+
+        long evaluatedAssignments();
+
+        long matchingAssignments();
+
+        int retainedSolutions();
+
+        List<String> resolvedCandidateHashes();
+
+        ReplayStatus replayStatus();
+
+        String contentHash();
+
+        boolean matches(
+            SchematicProofPlan plan,
+            ExactFinitePolynomialPlanRun run);
+
+        String toCanonicalJson();
+    }
+
+    private record VerifiedReplayReceipt(
+        String schema,
+        String verifierId,
+        String verifierRevisionHash,
+        String planHash,
+        String planRunHash,
+        String solverResultHash,
+        String solverRevisionHash,
+        ExactFinitePolynomialPlanRun.Status runStatus,
+        long totalAssignments,
+        long evaluatedAssignments,
+        long matchingAssignments,
+        int retainedSolutions,
+        List<String> resolvedCandidateHashes,
+        ReplayStatus replayStatus,
+        String contentHash
+    ) implements ReplayReceipt {
         private static final int MAX_RECEIPT_BYTES = 1_000_000;
 
-        private final String schema;
-        private final String verifierId;
-        private final String verifierRevisionHash;
-        private final String planHash;
-        private final String planRunHash;
-        private final String solverResultHash;
-        private final String solverRevisionHash;
-        private final ExactFinitePolynomialPlanRun.Status runStatus;
-        private final long totalAssignments;
-        private final long evaluatedAssignments;
-        private final long matchingAssignments;
-        private final int retainedSolutions;
-        private final List<String> resolvedCandidateHashes;
-        private final ReplayStatus replayStatus;
-        private final String contentHash;
-
-        private ReplayReceipt(
-            String verifierId,
-            String verifierRevisionHash,
-            String planHash,
-            String planRunHash,
-            String solverResultHash,
-            String solverRevisionHash,
-            ExactFinitePolynomialPlanRun.Status runStatus,
-            long totalAssignments,
-            long evaluatedAssignments,
-            long matchingAssignments,
-            int retainedSolutions,
-            List<String> resolvedCandidateHashes,
-            ReplayStatus replayStatus
-        ) {
-            this.schema = SCHEMA;
+        private VerifiedReplayReceipt {
+            if (!ReplayReceipt.SCHEMA.equals(schema)) {
+                throw new IllegalArgumentException(
+                    "unsupported finite polynomial replay receipt schema");
+            }
             if (!VERIFIER_ID.equals(verifierId)) {
                 throw new IllegalArgumentException(
                     "unexpected finite polynomial replay verifier ID");
             }
-            this.verifierId = verifierId;
             if (!REVISION_HASH.equals(verifierRevisionHash)) {
                 throw new IllegalArgumentException(
                     "unexpected finite polynomial replay verifier revision");
             }
-            this.verifierRevisionHash = verifierRevisionHash;
-            this.planHash = SchematicProofPlan.requireSha256(
+            planHash = SchematicProofPlan.requireSha256(
                 planHash,
                 "planHash");
-            this.planRunHash = SchematicProofPlan.requireSha256(
+            planRunHash = SchematicProofPlan.requireSha256(
                 planRunHash,
                 "planRunHash");
-            this.solverResultHash = SchematicProofPlan.requireSha256(
+            solverResultHash = SchematicProofPlan.requireSha256(
                 solverResultHash,
                 "solverResultHash");
-            this.solverRevisionHash = SchematicProofPlan.requireSha256(
+            solverRevisionHash = SchematicProofPlan.requireSha256(
                 solverRevisionHash,
                 "solverRevisionHash");
             if (!ExactFinitePolynomialHoleSolver.REVISION_HASH.equals(
-                    this.solverRevisionHash)) {
+                    solverRevisionHash)) {
                 throw new IllegalArgumentException(
                     "receipt requires the current exact finite solver revision");
             }
-            this.runStatus = Objects.requireNonNull(runStatus, "runStatus");
-            this.replayStatus = Objects.requireNonNull(
+            runStatus = Objects.requireNonNull(runStatus, "runStatus");
+            replayStatus = Objects.requireNonNull(
                 replayStatus,
                 "replayStatus");
-            if (this.replayStatus
-                    != ReplayStatus.CONFIRMED_IDENTICAL_REPLAY) {
+            if (replayStatus != ReplayStatus.CONFIRMED_IDENTICAL_REPLAY) {
                 throw new IllegalArgumentException(
                     "v1 receipts require an identical confirmed replay");
             }
@@ -161,145 +234,21 @@ public final class ExactFinitePolynomialPlanReplayVerifier {
                 throw new IllegalArgumentException(
                     "replay assignment counts are inconsistent");
             }
-            this.totalAssignments = totalAssignments;
-            this.evaluatedAssignments = evaluatedAssignments;
-            this.matchingAssignments = matchingAssignments;
-            this.retainedSolutions = retainedSolutions;
-            this.resolvedCandidateHashes = normalizeHashes(
+            resolvedCandidateHashes = normalizeHashes(
                 resolvedCandidateHashes);
-            if (this.resolvedCandidateHashes.size()
-                    != retainedSolutions) {
+            if (resolvedCandidateHashes.size() != retainedSolutions) {
                 throw new IllegalArgumentException(
                     "resolved candidate count differs from retained solutions");
             }
             validateStatusCounts(
-                this.runStatus,
+                runStatus,
                 matchingAssignments,
                 retainedSolutions);
+            contentHash = SchematicProofPlan.requireSha256(
+                contentHash,
+                "contentHash");
             String payload = render(
-                this.verifierId,
-                this.verifierRevisionHash,
-                this.planHash,
-                this.planRunHash,
-                this.solverResultHash,
-                this.solverRevisionHash,
-                this.runStatus,
-                this.totalAssignments,
-                this.evaluatedAssignments,
-                this.matchingAssignments,
-                this.retainedSolutions,
-                this.resolvedCandidateHashes,
-                this.replayStatus,
-                null);
-            requireSize(payload);
-            this.contentHash = SchematicProofPlan.hash(payload);
-            requireSize(toCanonicalJson());
-        }
-
-        private static ReplayReceipt create(
-            SchematicProofPlan plan,
-            ExactFinitePolynomialPlanRun run
-        ) {
-            Objects.requireNonNull(plan, "plan");
-            Objects.requireNonNull(run, "run");
-            if (!plan.contentHash().equals(run.planHash())) {
-                throw new IllegalArgumentException(
-                    "plan run is bound to a different schematic plan");
-            }
-            List<String> candidateHashes = run.candidates().stream()
-                .map(ExactFinitePolynomialResolvedCandidate::contentHash)
-                .sorted()
-                .toList();
-            var result = run.solverResult();
-            return new ReplayReceipt(
-                VERIFIER_ID,
-                REVISION_HASH,
-                plan.contentHash(),
-                run.contentHash(),
-                result.contentHash(),
-                result.solverRevisionHash(),
-                run.status(),
-                result.totalAssignments(),
-                result.evaluatedAssignments(),
-                result.matchingAssignments(),
-                candidateHashes.size(),
-                candidateHashes,
-                ReplayStatus.CONFIRMED_IDENTICAL_REPLAY);
-        }
-
-        public String schema() {
-            return schema;
-        }
-
-        public String verifierId() {
-            return verifierId;
-        }
-
-        public String verifierRevisionHash() {
-            return verifierRevisionHash;
-        }
-
-        public String planHash() {
-            return planHash;
-        }
-
-        public String planRunHash() {
-            return planRunHash;
-        }
-
-        public String solverResultHash() {
-            return solverResultHash;
-        }
-
-        public String solverRevisionHash() {
-            return solverRevisionHash;
-        }
-
-        public ExactFinitePolynomialPlanRun.Status runStatus() {
-            return runStatus;
-        }
-
-        public long totalAssignments() {
-            return totalAssignments;
-        }
-
-        public long evaluatedAssignments() {
-            return evaluatedAssignments;
-        }
-
-        public long matchingAssignments() {
-            return matchingAssignments;
-        }
-
-        public int retainedSolutions() {
-            return retainedSolutions;
-        }
-
-        public List<String> resolvedCandidateHashes() {
-            return resolvedCandidateHashes;
-        }
-
-        public ReplayStatus replayStatus() {
-            return replayStatus;
-        }
-
-        public String contentHash() {
-            return contentHash;
-        }
-
-        public boolean matches(
-            SchematicProofPlan plan,
-            ExactFinitePolynomialPlanRun run
-        ) {
-            try {
-                return equals(create(plan, run));
-            } catch (IllegalArgumentException rejected) {
-                return false;
-            }
-        }
-
-        public String toCanonicalJson() {
-            return render(
+                schema,
                 verifierId,
                 verifierRevisionHash,
                 planHash,
@@ -313,35 +262,45 @@ public final class ExactFinitePolynomialPlanReplayVerifier {
                 retainedSolutions,
                 resolvedCandidateHashes,
                 replayStatus,
-                contentHash);
+                null);
+            requireSize(payload);
+            if (!SchematicProofPlan.hash(payload).equals(contentHash)) {
+                throw new IllegalArgumentException(
+                    "replay receipt contentHash does not match contents");
+            }
+            requireSize(render(
+                schema,
+                verifierId,
+                verifierRevisionHash,
+                planHash,
+                planRunHash,
+                solverResultHash,
+                solverRevisionHash,
+                runStatus,
+                totalAssignments,
+                evaluatedAssignments,
+                matchingAssignments,
+                retainedSolutions,
+                resolvedCandidateHashes,
+                replayStatus,
+                contentHash));
         }
 
         @Override
-        public boolean equals(Object other) {
-            if (!(other instanceof ReplayReceipt receipt)) {
+        public boolean matches(
+            SchematicProofPlan plan,
+            ExactFinitePolynomialPlanRun run
+        ) {
+            try {
+                return equals(createReceipt(plan, run));
+            } catch (IllegalArgumentException rejected) {
                 return false;
             }
-            return schema.equals(receipt.schema)
-                && verifierId.equals(receipt.verifierId)
-                && verifierRevisionHash.equals(receipt.verifierRevisionHash)
-                && planHash.equals(receipt.planHash)
-                && planRunHash.equals(receipt.planRunHash)
-                && solverResultHash.equals(receipt.solverResultHash)
-                && solverRevisionHash.equals(receipt.solverRevisionHash)
-                && runStatus == receipt.runStatus
-                && totalAssignments == receipt.totalAssignments
-                && evaluatedAssignments == receipt.evaluatedAssignments
-                && matchingAssignments == receipt.matchingAssignments
-                && retainedSolutions == receipt.retainedSolutions
-                && resolvedCandidateHashes.equals(
-                    receipt.resolvedCandidateHashes)
-                && replayStatus == receipt.replayStatus
-                && contentHash.equals(receipt.contentHash);
         }
 
         @Override
-        public int hashCode() {
-            return Objects.hash(
+        public String toCanonicalJson() {
+            return render(
                 schema,
                 verifierId,
                 verifierRevisionHash,
@@ -396,6 +355,7 @@ public final class ExactFinitePolynomialPlanReplayVerifier {
         }
 
         private static String render(
+            String schema,
             String verifierId,
             String verifierRevisionHash,
             String planHash,
@@ -412,7 +372,7 @@ public final class ExactFinitePolynomialPlanReplayVerifier {
             String contentHash
         ) {
             JsonWriter json = new JsonWriter().beginObject()
-                .property("schema", SCHEMA)
+                .property("schema", schema)
                 .property("verifierId", verifierId)
                 .property("verifierRevisionHash", verifierRevisionHash)
                 .property("planHash", planHash)
