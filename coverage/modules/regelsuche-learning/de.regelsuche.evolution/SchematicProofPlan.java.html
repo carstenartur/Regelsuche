@@ -596,8 +596,8 @@ public record SchematicProofPlan(
 <span class="fc" id="L596">            .map(value -&gt; requireId(value, name + &quot; entry&quot;))</span>
 <span class="fc" id="L597">            .sorted()</span>
 <span class="fc" id="L598">            .toList();</span>
-<span class="pc bpc" id="L599" title="1 of 4 branches missed.">        if (!allowEmpty &amp;&amp; result.isEmpty()) {</span>
-<span class="nc" id="L600">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L599" title="All 4 branches covered.">        if (!allowEmpty &amp;&amp; result.isEmpty()) {</span>
+<span class="fc" id="L600">            throw new IllegalArgumentException(</span>
                 name + &quot; must not be empty&quot;);
         }
 <span class="fc" id="L603">        requireUnique(result, name);</span>
