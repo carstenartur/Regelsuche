@@ -23,6 +23,19 @@ Ein Receipt entsteht nur bei vollständiger Gleichheit. Ein abweichender Plan,
 eine andere Quelle, ein anderer Ansatz, andere Hole-Domänen, ein anderer
 Retained-Limit oder ein anderer Planlauf werden fail-closed abgelehnt.
 
+## Ausstellungsgrenze
+
+`ReplayReceipt` ist eine versiegelte, nur lesbare öffentliche Schnittstelle.
+Ihre einzige zugelassene Implementierung ist ein privater Record innerhalb des
+Verifiers. Es gibt keinen öffentlichen oder package-sichtbaren Konstruktor und
+keine Factory, die `CONFIRMED_IDENTICAL_REPLAY` ohne den vollständigen Aufruf
+von `verify(...)` ausstellen kann.
+
+Damit ist ein Receipt nicht lediglich ein frei konstruierbarer Datenrecord mit
+einem Erfolgsetikett. Seine normale Java-Ausstellung bleibt an die tatsächliche
+erneute Solverausführung und den exakten Vergleich des vollständigen Planlaufs
+gekoppelt.
+
 ## Gebundene Informationen
 
 Das Receipt bindet ausdrücklich:
@@ -53,7 +66,7 @@ COMPLETE_RESOLUTION_SET_TRUNCATED
 Ein vollständiger Nullfund erhält keine Kandidatenhashes. Ein abgeschnittener
 gespeicherter Lösungsraum muss mehr passende Belegungen als gespeicherte
 Lösungen ausweisen. Inkonsistente Zähler oder doppelte Kandidatenhashes werden
-abgelehnt.
+bei der privaten Konstruktion abgelehnt.
 
 ## Vertrauensgrenze
 
@@ -95,9 +108,8 @@ Die Tests decken ab:
 - abgeschnittene gespeicherte Lösungsmengen;
 - veränderte Quelle und Hole-Domänen;
 - Plan- und Planlaufsubstitution;
-- Hash-Manipulation;
-- inkonsistente Status-/Zählerkombinationen;
-- doppelte Kandidatenhashes;
+- kanonische Receipt-Inhalte;
+- die versiegelte private Implementierungs- und Konstruktionsgrenze;
 - das Fehlen von Ziel-, Ausdrucks- und RewriteProgram-Feldern.
 
 ## Nächster Schritt
