@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and verify the Regelsuche student-facing SDK from a clean consumer boundary."""
+"""Verify the student-facing SDK through a clean external consumer."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-from typing import Callable, Iterable
+from typing import Callable
 
 SDK_MODULES = (
     "regelsuche-core",
@@ -42,23 +42,22 @@ def run(command: list[str], cwd: Path) -> str:
         check=False,
         env={**os.environ, "LC_ALL": "C.UTF-8"},
     )
-    if completed.returncode != 0:
+    if completed.returncode:
         print(completed.stdout, file=sys.stderr)
         raise RuntimeError(
-            f"command failed with exit code {completed.returncode}: "
-            + " ".join(command)
+            f"command failed ({completed.returncode}): {' '.join(command)}"
         )
     return completed.stdout
 
 
 def read_version(root: Path) -> str:
-    entries = []
-    for line in (root / "release.properties").read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if stripped.startswith("version="):
-            entries.append(stripped.removeprefix("version=").strip())
+    entries = [
+        line.removeprefix("version=").strip()
+        for line in (root / "release.properties").read_text(encoding="utf-8").splitlines()
+        if line.strip().startswith("version=")
+    ]
     if len(entries) != 1 or not entries[0]:
-        raise RuntimeError("release.properties must declare exactly one version")
+        raise RuntimeError("release.properties must declare one version")
     return entries[0]
 
 
@@ -73,149 +72,109 @@ def sha256(path: Path) -> str:
 def one_artifact(
         directory: Path,
         pattern: str,
-        accept: Callable[[Path], bool] = lambda path: True
+        accept: Callable[[Path], bool] = lambda path: True,
 ) -> Path:
     candidates = sorted(path for path in directory.glob(pattern) if accept(path))
     if len(candidates) != 1:
-        names = [path.name for path in candidates]
         raise RuntimeError(
-            f"expected one artifact matching {pattern} in {directory}, got {names}"
+            f"expected one {pattern} artifact in {directory}, got "
+            f"{[path.name for path in candidates]}"
         )
     return candidates[0]
 
 
 def artifact_files(repository: Path, version: str) -> dict[str, Path]:
     base = repository / "de" / "regelsuche"
-    required: dict[str, Path] = {}
+    artifacts: dict[str, Path] = {}
     for module in SDK_MODULES:
         directory = base / module / version
-        jar = one_artifact(
+        artifacts[f"{module}:jar"] = one_artifact(
             directory,
             f"{module}-*.jar",
-            lambda path: not path.name.endswith("-sources.jar")
-                and not path.name.endswith("-javadoc.jar"),
+            lambda path: not path.name.endswith(("-sources.jar", "-javadoc.jar")),
         )
-        pom = one_artifact(directory, f"{module}-*.pom")
-        required[f"{module}:jar"] = jar
-        required[f"{module}:pom"] = pom
-    sdk_dir = base / "regelsuche-discovery-sdk" / version
+        artifacts[f"{module}:pom"] = one_artifact(directory, f"{module}-*.pom")
+    sdk = base / "regelsuche-discovery-sdk" / version
     for classifier in ("sources", "javadoc"):
-        path = one_artifact(
-            sdk_dir,
+        artifacts[f"regelsuche-discovery-sdk:{classifier}"] = one_artifact(
+            sdk,
             f"regelsuche-discovery-sdk-*-{classifier}.jar",
         )
-        required[f"regelsuche-discovery-sdk:{classifier}"] = path
-    return required
-
-
-def assert_no_forbidden_dependencies(report: str) -> None:
-    lowered = report.lower()
-    forbidden = [marker for marker in FORBIDDEN_RUNTIME_MARKERS if marker in lowered]
-    if forbidden:
-        raise RuntimeError(
-            "external consumer pulled forbidden application/infrastructure dependencies: "
-            + ", ".join(forbidden)
-        )
-
-
-def publication_tasks() -> Iterable[str]:
-    for module in SDK_MODULES:
-        yield f":{module}:publishMavenJavaPublicationToStudentSdkRepository"
+    return artifacts
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
+    parser.add_argument("--published-repository", type=Path, required=True)
     parser.add_argument("--gradle", default="gradle")
     parser.add_argument("--output", type=Path)
-    parser.add_argument(
-        "--published-repository",
-        type=Path,
-        help=(
-            "Use an SDK Maven repository prepared by checkout-owned Gradle task "
-            "dependencies instead of starting a nested publication build."
-        ),
-    )
     arguments = parser.parse_args()
 
     root = arguments.repository_root.resolve()
-    version = read_version(root)
-    output = (arguments.output or root / "build" / "reports" / "student-java-sdk").resolve()
-    supplied_repository = arguments.published_repository is not None
-    local_repository = (
-        arguments.published_repository.resolve()
-        if supplied_repository
-        else output / "repository"
-    )
-    consumer_checkout = output / "external-consumer"
-
-    if supplied_repository and (local_repository == output or output in local_repository.parents):
-        raise RuntimeError(
-            "--published-repository must be outside --output because output is rebuilt"
-        )
+    repository = arguments.published_repository.resolve()
+    output = (arguments.output or root / "build/reports/student-java-sdk").resolve()
+    if not repository.is_dir():
+        raise RuntimeError(f"SDK repository does not exist: {repository}")
+    if repository == output or output in repository.parents:
+        raise RuntimeError("published repository must be outside the rebuilt output")
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)
 
-    if supplied_repository:
-        if not local_repository.is_dir():
-            raise RuntimeError(
-                f"prepublished SDK repository does not exist: {local_repository}"
-            )
-        publish_output = (
-            "SDK publication supplied by checkout-owned Gradle task dependencies\n"
-        )
-        publication_mode = "PREPUBLISHED_BY_CALLER"
-    else:
-        local_repository.mkdir(parents=True)
-        publish_command = [
-            arguments.gradle,
-            "--no-daemon",
-            "--no-configuration-cache",
-            f"-PstudentSdkRepository={local_repository}",
-            *publication_tasks(),
-        ]
-        publish_output = run(publish_command, root)
-        publication_mode = "SCRIPT_OWNED_PUBLICATION"
+    version = read_version(root)
+    artifacts = artifact_files(repository, version)
+    source = root / "examples/external-consumers/geometric-sequence-domain-java25"
+    consumer = output / "external-consumer"
+    if not source.is_dir():
+        raise RuntimeError(f"external consumer example is missing: {source}")
+    shutil.copytree(source, consumer)
 
-    artifacts = artifact_files(local_repository, version)
-
-    source_example = root / "examples" / "external-consumers" / "geometric-sequence-domain-java25"
-    if not source_example.is_dir():
-        raise RuntimeError(f"missing external consumer example: {source_example}")
-    shutil.copytree(source_example, consumer_checkout)
-
-    consumer_properties = [
-        f"-PregelsucheRepository={local_repository}",
+    properties = [
+        f"-PregelsucheRepository={repository}",
         f"-PregelsucheVersion={version}",
     ]
-    test_output = run(
-        [arguments.gradle, "--no-daemon", "clean", "test", "run", *consumer_properties],
-        consumer_checkout,
+    execution = run(
+        [arguments.gradle, "--no-daemon", "clean", "test", "run", *properties],
+        consumer,
     )
-    if "provider=example-geometric-sequence-provider" not in test_output:
-        raise RuntimeError("ServiceLoader provider was not reported by the external example")
-    if "outcome=CONFIRMED" not in test_output:
-        raise RuntimeError("external example did not produce a confirmed run")
-    if "multiplier=2" not in test_output:
-        raise RuntimeError("external example did not recover multiplier 2")
+    expected = (
+        "provider=example-geometric-sequence-provider",
+        "outcome=CONFIRMED",
+        "multiplier=2",
+    )
+    missing = [value for value in expected if value not in execution]
+    if missing:
+        raise RuntimeError(f"external consumer output is incomplete: {missing}")
 
-    dependency_output = run(
+    dependencies = run(
         [
             arguments.gradle,
             "--no-daemon",
             "dependencies",
             "--configuration",
             "runtimeClasspath",
-            *consumer_properties,
+            *properties,
         ],
-        consumer_checkout,
+        consumer,
     )
-    assert_no_forbidden_dependencies(dependency_output)
+    lowered = dependencies.lower()
+    forbidden = [marker for marker in FORBIDDEN_RUNTIME_MARKERS if marker in lowered]
+    if forbidden:
+        raise RuntimeError(f"forbidden runtime dependencies: {forbidden}")
 
-    artifact_ledger = {
+    java_feature = int(
+        run(["java", "-XshowSettings:properties", "-version"], root)
+        .split("java.specification.version = ", 1)[1]
+        .splitlines()[0]
+        .strip()
+    )
+    if java_feature != 25:
+        raise RuntimeError(f"consumer verification requires Java 25, got {java_feature}")
+
+    ledger = {
         name: {
-            "path": "repository/" + path.relative_to(local_repository).as_posix(),
+            "path": "repository/" + path.relative_to(repository).as_posix(),
             "bytes": path.stat().st_size,
             "sha256": sha256(path),
         }
@@ -224,46 +183,36 @@ def main() -> int:
     report = {
         "schema": "regelsuche.student-java-sdk-consumer-verification/v1",
         "sdkVersion": version,
-        "publicationMode": publication_mode,
-        "javaFeature": int(
-            run(["java", "-XshowSettings:properties", "-version"], root)
-            .split("java.specification.version = ", 1)[1]
-            .splitlines()[0]
-            .strip()
-        ),
+        "publicationMode": "CHECKOUT_OWNED_TASK_DEPENDENCIES",
+        "javaFeature": java_feature,
         "externalConsumer": "geometric-sequence-domain-java25",
         "provider": "example-geometric-sequence-provider",
         "confirmedCandidate": "multiplier=2",
         "requiredOutcomes": ["CONFIRMED", "REFUTED", "BUDGET_EXHAUSTED"],
-        "forbiddenRuntimeDependencies": list(FORBIDDEN_RUNTIME_MARKERS),
-        "forbiddenRuntimeDependenciesObserved": [],
-        "artifacts": artifact_ledger,
+        "forbiddenRuntimeDependenciesObserved": forbidden,
+        "artifacts": ledger,
         "result": "success",
     }
-    if report["javaFeature"] != 25:
-        raise RuntimeError(f"consumer verification requires Java 25, got {report['javaFeature']}")
-
     (output / "consumer-report.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    (output / "consumer-report.md").write_text(
+    markdown = (
         "# Student Java SDK consumer verification\n\n"
         f"- SDK version: `{version}`\n"
-        f"- Publication mode: `{publication_mode}`\n"
+        "- Publication: checkout-owned Gradle task dependencies\n"
         "- Java: `25`\n"
         "- External consumer: `geometric-sequence-domain-java25`\n"
         "- ServiceLoader provider: `example-geometric-sequence-provider`\n"
         "- Confirmed candidate: `multiplier=2`\n"
         "- Negative paths: `REFUTED`, `BUDGET_EXHAUSTED`\n"
         "- App/Spring/Hibernate/Persistence dependencies: none observed\n"
-        "- Result: `success`\n",
-        encoding="utf-8",
+        "- Result: `success`\n"
     )
-    (output / "publish.log").write_text(publish_output, encoding="utf-8")
-    (output / "consumer.log").write_text(test_output, encoding="utf-8")
-    (output / "dependencies.log").write_text(dependency_output, encoding="utf-8")
-    print((output / "consumer-report.md").read_text(encoding="utf-8"))
+    (output / "consumer-report.md").write_text(markdown, encoding="utf-8")
+    (output / "consumer.log").write_text(execution, encoding="utf-8")
+    (output / "dependencies.log").write_text(dependencies, encoding="utf-8")
+    print(markdown)
     return 0
 
 
