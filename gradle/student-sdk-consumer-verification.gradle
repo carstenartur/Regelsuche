@@ -1,0 +1,76 @@
+import org.gradle.api.tasks.Delete
+import org.gradle.api.tasks.Exec
+
+/*
+ * Verifies the student-facing SDK through a separate Gradle consumer without
+ * adding another GitHub workflow or starting a nested Regelsuche build.
+ *
+ * The SDK artifacts are produced by ordinary task dependencies. The Python
+ * driver receives that prepublished repository and starts only the independent
+ * external consumer build.
+ */
+def sdkModules = [
+    'regelsuche-core',
+    'regelsuche-egraph',
+    'regelsuche-search',
+    'regelsuche-validation',
+    'regelsuche-discovery',
+    'regelsuche-discovery-sdk'
+]
+def publicationTaskPaths = sdkModules.collect {
+    ":${it}:publishMavenJavaPublicationToStudentSdkRepository"
+}
+def configuredRepository = providers.gradleProperty('studentSdkRepository').orNull
+def sdkRepository = configuredRepository == null
+    ? layout.buildDirectory.dir('student-sdk-repository').get().asFile
+    : file(configuredRepository)
+def reportDirectory = layout.buildDirectory.dir('reports/student-java-sdk').get().asFile
+def windows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+def pythonExecutable = windows ? 'python' : 'python3'
+def gradleExecutable = file(windows ? 'gradlew.bat' : 'gradlew').absolutePath
+
+def cleanStudentSdkVerificationRepository = tasks.register(
+    'cleanStudentSdkVerificationRepository',
+    Delete
+) {
+    group = 'verification'
+    description = 'Removes the isolated Maven repository used by the SDK consumer check.'
+    delete sdkRepository
+}
+
+gradle.projectsEvaluated {
+    publicationTaskPaths.each { taskPath ->
+        tasks.getByPath(taskPath).dependsOn(cleanStudentSdkVerificationRepository)
+    }
+}
+
+def verifyStudentJavaSdkConsumer = tasks.register(
+    'verifyStudentJavaSdkConsumer',
+    Exec
+) {
+    group = 'verification'
+    description = 'Publishes the narrow SDK closure and verifies a clean external Java 25 consumer.'
+    dependsOn publicationTaskPaths
+    workingDir rootDir
+    commandLine(
+        pythonExecutable,
+        file('scripts/verify-student-java-sdk-consumer.py').absolutePath,
+        '--repository-root',
+        rootDir.absolutePath,
+        '--gradle',
+        gradleExecutable,
+        '--published-repository',
+        sdkRepository.absolutePath,
+        '--output',
+        reportDirectory.absolutePath
+    )
+    inputs.file('release.properties')
+    inputs.file('scripts/verify-student-java-sdk-consumer.py')
+    inputs.dir('examples/external-consumers/geometric-sequence-domain-java25')
+    outputs.file(new File(reportDirectory, 'consumer-report.json'))
+    outputs.upToDateWhen { false }
+}
+
+tasks.named('ciCheck') {
+    dependsOn verifyStudentJavaSdkConsumer
+}
