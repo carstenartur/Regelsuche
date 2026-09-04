@@ -24,6 +24,15 @@ repositories {
 def regelsucheVersion = providers.gradleProperty('regelsucheVersion')
     .getOrElse('0.4.0-SNAPSHOT')
 
+def expectedRegelsucheRuntimeModules = [
+    'regelsuche-core',
+    'regelsuche-egraph',
+    'regelsuche-search',
+    'regelsuche-validation',
+    'regelsuche-discovery',
+    'regelsuche-discovery-sdk'
+] as Set
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)
@@ -42,6 +51,33 @@ application {
     mainClass = 'example.GeometricSequenceExample'
 }
 
+def verifyRegelsucheRuntimeModules = tasks.register(
+    'verifyRegelsucheRuntimeModules'
+) {
+    group = 'verification'
+    description = 'Rejects unexpected Regelsuche modules in the SDK runtime.'
+    doLast {
+        def observed = configurations.runtimeClasspath.incoming
+            .resolutionResult
+            .allComponents
+            .collect { component -> component.id }
+            .findAll { id ->
+                id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier
+                    && id.group == 'de.regelsuche'
+            }
+            .collect { id -> id.module }
+            .toSet()
+        if (observed != expectedRegelsucheRuntimeModules) {
+            throw new GradleException(
+                'Unexpected Regelsuche runtime modules. Expected '
+                    + "${expectedRegelsucheRuntimeModules.sort()}, observed "
+                    + "${observed.sort()}"
+            )
+        }
+    }
+}
+
 tasks.named('test') {
     useJUnitPlatform()
+    dependsOn verifyRegelsucheRuntimeModules
 }
