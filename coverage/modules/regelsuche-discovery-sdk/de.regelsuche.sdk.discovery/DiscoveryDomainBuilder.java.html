@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryDomainBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.discovery</a> &gt; <span class="el_source">DiscoveryDomainBuilder.java</span></div><h1>DiscoveryDomainBuilder.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.discovery;
+
+import de.regelsuche.discovery.domain.DiscoveryDomain;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateContext;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateEvaluator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateExtractor;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CanonicalCodec;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CertificateRenderer;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CertificateRendering;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleGenerator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleResult;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DomainPayload;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Evaluation;
+import de.regelsuche.discovery.domain.DiscoveryDomain.EvidenceAdapter;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Invariant;
+import de.regelsuche.discovery.domain.DiscoveryDomain.InvariantResult;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Objective;
+import de.regelsuche.discovery.domain.DiscoveryDomain.ObjectiveAssessment;
+import de.regelsuche.discovery.domain.DiscoveryDomain.StateGenerator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Successor;
+import de.regelsuche.discovery.domain.DiscoveryDomain.TransitionOperator;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+
+/**
+ * Builds a {@link DiscoveryDomain} from small, named Java functions.
+ *
+ * &lt;p&gt;The builder removes wiring boilerplate, but it deliberately does not infer
+ * mathematical validity. A caller must still provide an invariant, a
+ * counterexample search and an evaluator. A confirmed evaluator result must
+ * carry a certificate object.&lt;/p&gt;
+ */
+public final class DiscoveryDomainBuilder&lt;S, C, K&gt; {
+    private final String domainId;
+    private final String revision;
+<span class="fc" id="L42">    private final List&lt;Invariant&lt;S&gt;&gt; invariants = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L43">    private final List&lt;TransitionOperator&lt;S&gt;&gt; operators = new ArrayList&lt;&gt;();</span>
+
+    private StateGenerator&lt;S&gt; generator;
+    private CanonicalCodec&lt;S&gt; stateCodec;
+    private Objective&lt;S&gt; objective;
+    private CandidateExtractor&lt;S, C&gt; candidateExtractor;
+    private CanonicalCodec&lt;C&gt; candidateCodec;
+    private CounterexampleGenerator&lt;C&gt; counterexampleGenerator;
+    private CandidateEvaluator&lt;C, K&gt; evaluator;
+    private CanonicalCodec&lt;K&gt; certificateCodec;
+    private CertificateRenderer&lt;K&gt; certificateRenderer;
+
+<span class="fc" id="L55">    private DiscoveryDomainBuilder(String domainId, String revision) {</span>
+<span class="fc" id="L56">        this.domainId = requireIdentifier(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L57">        this.revision = requireIdentifier(revision, &quot;revision&quot;);</span>
+<span class="fc" id="L58">    }</span>
+
+    /**
+     * Starts a domain definition with stable domain and revision identifiers.
+     *
+     * &lt;p&gt;Changing mathematical semantics requires a new revision. Component
+     * identifiers and default type identifiers are derived from these two
+     * values.&lt;/p&gt;
+     */
+    public static &lt;S, C, K&gt; DiscoveryDomainBuilder&lt;S, C, K&gt; domain(
+            String domainId,
+            String revision
+    ) {
+<span class="fc" id="L71">        return new DiscoveryDomainBuilder&lt;&gt;(domainId, revision);</span>
+    }
+
+    /** Defines how a seed creates the initial search states. */
+    public DiscoveryDomainBuilder&lt;S, C, K&gt; generator(
+            Function&lt;DiscoverySeed, List&lt;S&gt;&gt; function
+    ) {
+<span class="fc" id="L78">        Objects.requireNonNull(function, &quot;function&quot;);</span>
+<span class="fc" id="L79">        String id = componentId(&quot;generator&quot;);</span>
+<span class="fc" id="L80">        this.generator = new StateGenerator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L83">                return id;</span>
+            }
+
+            @Override
+            public List&lt;S&gt; generate(DiscoverySeed seed) {
+<span class="fc" id="L88">                List&lt;S&gt; generated = Objects.requireNonNull(</span>
+<span class="fc" id="L89">                    function.apply(seed),</span>
+                    &quot;generator returned null&quot;
+                );
+<span class="fc" id="L92">                return List.copyOf(generated);</span>
+            }
+        };
+<span class="fc" id="L95">        return this;</span>
+    }
+
+    /** Defines the canonical, content-addressed form of a state. */
+    public DiscoveryDomainBuilder&lt;S, C, K&gt; stateCodec(
+            Function&lt;S, String&gt; canonicalForm
+    ) {
+<span class="fc" id="L102">        this.stateCodec = codec(&quot;state-codec&quot;, canonicalForm);</span>
+<span class="fc" id="L103">        return this;</span>
+    }
+
+    /** Adds one explicit state invariant. */
+    public DiscoveryDomainBuilder&lt;S, C, K&gt; invariant(
+            String name,
+            Function&lt;S, InvariantResult&gt; check
+    ) {
+<span class="fc" id="L111">        Objects.requireNonNull(check, &quot;check&quot;);</span>
+<span class="fc" id="L112">        String id = componentId(&quot;invariant-&quot; + requireSegment(name, &quot;invariant name&quot;));</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (invariants.stream().anyMatch(existing -&gt; existing.id().equals(id))) {</span>
+<span class="fc" id="L114">            throw new IllegalArgumentException(</span>
+                &quot;duplicate invariant component id: &quot; + id
+            );
+        }
+<span class="fc" id="L118">        invariants.add(new Invariant&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L121">                return id;</span>
+            }
+
+            @Override
+            public InvariantResult check(S state) {
+<span class="fc" id="L126">                return Objects.requireNonNull(</span>
+<span class="fc" id="L127">                    check.apply(state),</span>
+                    &quot;invariant returned null&quot;
+                );
+            }
+        });
+<span class="fc" id="L132">        return this;</span>
+    }
+
+    /** Adds one bounded state-transition operator. */
+    public DiscoveryDomainBuilder&lt;S, C, K&gt; operator(
+            String name,
+            Function&lt;S, List&lt;Successor&lt;S&gt;&gt;&gt; apply
+    ) {
+<span class="fc" id="L140">        Objects.requireNonNull(apply, &quot;apply&quot;);</span>
+<span class="fc" id="L141">        String id = componentId(&quot;operator-&quot; + requireSegment(name, &quot;operator name&quot;));</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (operators.stream().anyMatch(existing -&gt; existing.id().equals(id))) {</span>
+<span class="fc" id="L143">            throw new IllegalArgumentException(</span>
+                &quot;duplicate operator component id: &quot; + id
+            );
+        }
+<span class="fc" id="L147">        operators.add(new TransitionOperator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L150">                return id;</span>
+            }
+
+            @Override
+            public List&lt;Successor&lt;S&gt;&gt; apply(S state) {
+<span class="fc" id="L155">                List&lt;Successor&lt;S&gt;&gt; successors = Objects.requireNonNull(</span>
+<span class="fc" id="L156">                    apply.apply(state),</span>
+                    &quot;operator returned null&quot;
+                );
+<span class="fc" id="L159">                return List.copyOf(successors);</span>
+            }
+        });
+<span class="fc" id="L162">        return this;</span>
+    }
+
+    /** Defines search priority and the point at which a candidate is ready. */
+    public DiscoveryDomainBuilder&lt;S, C, K&gt; objective(
+            Function&lt;S, ObjectiveAssessment&gt; assess
+    ) {
+<span class="fc" id="L169">        Objects.requireNonNull(assess, &quot;assess&quot;);</span>
+<span class="fc" id="L170">        String id = componentId(&quot;objective&quot;);</span>
+<span class="fc" id="L171">        this.objective = new Objective&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L174">                return id;</span>
+            }
+
+            @Override
+            public ObjectiveAssessment assess(S state) {
+<span class="fc" id="L179">                return Objects.requireNonNull(</span>
+<span class="fc" id="L180">                    assess.apply(state),</span>
+                    &quot;objective returned null&quot;
+                );
+            }
+        };
+<span class="fc" id="L185">        return this;</span>
+    }
+
+    /** Defines candidate extraction and its canonical representation. */
+    public DiscoveryDomainBuilder&lt;S, C, K&gt; candidate(
+            Function&lt;CandidateContext&lt;S&gt;, C&gt; extract,
+            Function&lt;C, String&gt; canonicalForm
+    ) {
+<span class="fc" id="L193">        Objects.requireNonNull(extract, &quot;extract&quot;);</span>
+<span class="fc" id="L194">        String id = componentId(&quot;candidate-extractor&quot;);</span>
+<span class="fc" id="L195">        this.candidateExtractor = new CandidateExtractor&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L198">                return id;</span>
+            }
+
+            @Override
+            public C extract(CandidateContext&lt;S&gt; context) {
+<span class="fc" id="L203">                return Objects.requireNonNull(</span>
+<span class="fc" id="L204">                    extract.apply(context),</span>
+                    &quot;candidate extractor returned null&quot;
+                );
+            }
+        };
+<span class="fc" id="L209">        this.candidateCodec = codec(&quot;candidate-codec&quot;, canonicalForm);</span>
+<span class="fc" id="L210">        return this;</span>
+    }
+
+    /**
+     * Defines a bounded search for concrete counterexamples.
+     *
+     * &lt;p&gt;{@link CounterexampleResult#noneFound(int, Map)} is evidence only for
+     * the executed attempts. It is not converted into confirmation by this
+     * builder.&lt;/p&gt;
+     */
+    public DiscoveryDomainBuilder&lt;S, C, K&gt; counterexamples(
+            BiFunction&lt;C, Integer, CounterexampleResult&gt; search
+    ) {
+<span class="fc" id="L223">        Objects.requireNonNull(search, &quot;search&quot;);</span>
+<span class="fc" id="L224">        String id = componentId(&quot;counterexample-search&quot;);</span>
+<span class="fc" id="L225">        this.counterexampleGenerator = new CounterexampleGenerator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L228">                return id;</span>
+            }
+
+            @Override
+            public CounterexampleResult search(C candidate, int attemptBudget) {
+<span class="fc" id="L233">                return Objects.requireNonNull(</span>
+<span class="fc" id="L234">                    search.apply(candidate, attemptBudget),</span>
+                    &quot;counterexample search returned null&quot;
+                );
+            }
+        };
+<span class="fc" id="L239">        return this;</span>
+    }
+
+    /** Defines the independent candidate evaluator. */
+    public DiscoveryDomainBuilder&lt;S, C, K&gt; evaluator(
+            Function&lt;C, Evaluation&lt;K&gt;&gt; evaluate
+    ) {
+<span class="fc" id="L246">        Objects.requireNonNull(evaluate, &quot;evaluate&quot;);</span>
+<span class="fc" id="L247">        String id = componentId(&quot;evaluator&quot;);</span>
+<span class="fc" id="L248">        this.evaluator = new CandidateEvaluator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L251">                return id;</span>
+            }
+
+            @Override
+            public Evaluation&lt;K&gt; evaluate(C candidate) {
+<span class="fc" id="L256">                return Objects.requireNonNull(</span>
+<span class="fc" id="L257">                    evaluate.apply(candidate),</span>
+                    &quot;evaluator returned null&quot;
+                );
+            }
+        };
+<span class="fc" id="L262">        return this;</span>
+    }
+
+    /** Defines canonical certificate bytes and a plain-text rendering. */
+    public DiscoveryDomainBuilder&lt;S, C, K&gt; certificate(
+            String kind,
+            Function&lt;K, String&gt; canonicalForm,
+            Function&lt;K, String&gt; render
+    ) {
+<span class="fc" id="L271">        String checkedKind = requireIdentifier(kind, &quot;certificate kind&quot;);</span>
+<span class="fc" id="L272">        this.certificateCodec = codec(&quot;certificate-codec&quot;, canonicalForm);</span>
+<span class="fc" id="L273">        Objects.requireNonNull(render, &quot;render&quot;);</span>
+<span class="fc" id="L274">        String id = componentId(&quot;certificate-renderer&quot;);</span>
+<span class="fc" id="L275">        this.certificateRenderer = new CertificateRenderer&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L278">                return id;</span>
+            }
+
+            @Override
+            public CertificateRendering render(K certificate) {
+<span class="fc" id="L283">                return new CertificateRendering(</span>
+                    checkedKind,
+                    &quot;text/plain&quot;,
+<span class="fc" id="L286">                    Objects.requireNonNull(</span>
+<span class="fc" id="L287">                        render.apply(certificate),</span>
+                        &quot;certificate renderer returned null&quot;
+                    )
+                );
+            }
+        };
+<span class="fc" id="L293">        return this;</span>
+    }
+
+    /** Builds and eagerly validates the complete domain descriptor. */
+    public DiscoveryDomain&lt;S, C, K&gt; build() {
+<span class="fc" id="L298">        requireComponent(generator, &quot;generator&quot;);</span>
+<span class="fc" id="L299">        requireComponent(stateCodec, &quot;stateCodec&quot;);</span>
+<span class="fc" id="L300">        requireComponent(objective, &quot;objective&quot;);</span>
+<span class="fc" id="L301">        requireComponent(candidateExtractor, &quot;candidateExtractor&quot;);</span>
+<span class="fc" id="L302">        requireComponent(candidateCodec, &quot;candidateCodec&quot;);</span>
+<span class="fc" id="L303">        requireComponent(counterexampleGenerator, &quot;counterexampleGenerator&quot;);</span>
+<span class="fc" id="L304">        requireComponent(evaluator, &quot;evaluator&quot;);</span>
+<span class="fc" id="L305">        requireComponent(certificateCodec, &quot;certificateCodec&quot;);</span>
+<span class="fc" id="L306">        requireComponent(certificateRenderer, &quot;certificateRenderer&quot;);</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        if (invariants.isEmpty()) {</span>
+<span class="nc" id="L308">            throw new IllegalStateException(</span>
+                &quot;at least one explicit state invariant is required&quot;
+            );
+        }
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        if (operators.isEmpty()) {</span>
+<span class="nc" id="L313">            throw new IllegalStateException(</span>
+                &quot;at least one transition operator is required&quot;
+            );
+        }
+<span class="fc" id="L317">        DiscoveryDomain&lt;S, C, K&gt; domain = new BuiltDomain&lt;&gt;(</span>
+            domainId,
+            revision,
+<span class="fc" id="L320">            typeId(&quot;state&quot;),</span>
+<span class="fc" id="L321">            typeId(&quot;candidate&quot;),</span>
+<span class="fc" id="L322">            typeId(&quot;certificate&quot;),</span>
+            generator,
+            stateCodec,
+            invariants,
+            operators,
+            objective,
+            candidateExtractor,
+            candidateCodec,
+            counterexampleGenerator,
+            evaluator,
+            certificateCodec,
+            certificateRenderer,
+<span class="fc" id="L334">            defaultEvidenceAdapter()</span>
+        );
+<span class="fc" id="L336">        domain.descriptor();</span>
+<span class="fc" id="L337">        return domain;</span>
+    }
+
+    private EvidenceAdapter&lt;S, C, K&gt; defaultEvidenceAdapter() {
+<span class="fc" id="L341">        String id = componentId(&quot;evidence-adapter&quot;);</span>
+<span class="fc" id="L342">        String type = domainId + &quot;/sdk-evidence/&quot; + revision;</span>
+<span class="fc" id="L343">        return new EvidenceAdapter&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L346">                return id;</span>
+            }
+
+            @Override
+            public DomainPayload adapt(
+                    Optional&lt;S&gt; initialState,
+                    Optional&lt;C&gt; candidate,
+                    Optional&lt;K&gt; certificate
+            ) {
+<span class="fc" id="L355">                return new DomainPayload(type, Map.of(</span>
+<span class="fc" id="L356">                    &quot;initialStatePresent&quot;, Boolean.toString(initialState.isPresent()),</span>
+<span class="fc" id="L357">                    &quot;candidatePresent&quot;, Boolean.toString(candidate.isPresent()),</span>
+<span class="fc" id="L358">                    &quot;certificatePresent&quot;, Boolean.toString(certificate.isPresent()),</span>
+                    &quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;,
+                    &quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;
+                ));
+            }
+        };
+    }
+
+    private &lt;T&gt; CanonicalCodec&lt;T&gt; codec(
+            String role,
+            Function&lt;T, String&gt; canonicalForm
+    ) {
+<span class="fc" id="L370">        Objects.requireNonNull(canonicalForm, &quot;canonicalForm&quot;);</span>
+<span class="fc" id="L371">        String id = componentId(role);</span>
+<span class="fc" id="L372">        return new CanonicalCodec&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L375">                return id;</span>
+            }
+
+            @Override
+            public String canonicalForm(T value) {
+<span class="fc" id="L380">                String encoded = canonicalForm.apply(value);</span>
+<span class="pc bpc" id="L381" title="2 of 4 branches missed.">                if (encoded == null || encoded.isBlank()) {</span>
+<span class="nc" id="L382">                    throw new IllegalArgumentException(</span>
+                        role + &quot; canonical form must not be blank&quot;
+                    );
+                }
+<span class="fc" id="L386">                return encoded;</span>
+            }
+        };
+    }
+
+    private String componentId(String role) {
+<span class="fc" id="L392">        return domainId + &quot;/&quot; + role + &quot;/&quot; + revision;</span>
+    }
+
+    private String typeId(String role) {
+<span class="fc" id="L396">        return domainId + &quot;/&quot; + role + &quot;-type/&quot; + revision;</span>
+    }
+
+    private static String requireIdentifier(String value, String name) {
+<span class="pc bpc" id="L400" title="1 of 2 branches missed.">        if (value == null</span>
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">                || !value.matches(&quot;[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}&quot;)) {</span>
+<span class="nc" id="L402">            throw new IllegalArgumentException(name + &quot; is not a valid identifier&quot;);</span>
+        }
+<span class="fc" id="L404">        return value;</span>
+    }
+
+    private static String requireSegment(String value, String name) {
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">        if (value == null</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">                || !value.matches(&quot;[A-Za-z0-9][A-Za-z0-9._-]{0,63}&quot;)) {</span>
+<span class="nc" id="L410">            throw new IllegalArgumentException(name + &quot; is not a valid segment&quot;);</span>
+        }
+<span class="fc" id="L412">        return value;</span>
+    }
+
+    private static void requireComponent(Object value, String name) {
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L417">            throw new IllegalStateException(name + &quot; is required&quot;);</span>
+        }
+<span class="fc" id="L419">    }</span>
+
+    private record BuiltDomain&lt;S, C, K&gt;(
+        String domainId,
+        String revision,
+        String stateType,
+        String candidateType,
+        String certificateType,
+        StateGenerator&lt;S&gt; generator,
+        CanonicalCodec&lt;S&gt; stateCodec,
+        List&lt;Invariant&lt;S&gt;&gt; invariants,
+        List&lt;TransitionOperator&lt;S&gt;&gt; operators,
+        Objective&lt;S&gt; objective,
+        CandidateExtractor&lt;S, C&gt; candidateExtractor,
+        CanonicalCodec&lt;C&gt; candidateCodec,
+        CounterexampleGenerator&lt;C&gt; counterexampleGenerator,
+        CandidateEvaluator&lt;C, K&gt; evaluator,
+        CanonicalCodec&lt;K&gt; certificateCodec,
+        CertificateRenderer&lt;K&gt; certificateRenderer,
+        EvidenceAdapter&lt;S, C, K&gt; evidenceAdapter
+    ) implements DiscoveryDomain&lt;S, C, K&gt; {
+<span class="fc" id="L440">        private BuiltDomain {</span>
+<span class="fc" id="L441">            invariants = List.copyOf(invariants);</span>
+<span class="fc" id="L442">            operators = List.copyOf(operators);</span>
+<span class="fc" id="L443">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

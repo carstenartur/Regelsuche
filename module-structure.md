@@ -23,6 +23,7 @@ Verantwortung und darf keine abweichende zweite Dependency-Definition erzeugen.
 | `:regelsuche-solver-portfolio` | capability-aware Backend-Auswahl, Budgets, Cache und Konflikte | Solver IR |
 | `:regelsuche-learning` | Mining, Anti-Unification, Kandidaten, schematische Beweispläne und Rewrite-Program-Lernen | Core, Search, Validation, Math Algorithms, Solver IR |
 | `:regelsuche-discovery` | domänenneutrale Discovery-Typen, Profile und Lifecycle-Handoff | Core, Search, Validation |
+| `:regelsuche-discovery-sdk` | kleine externe Java-25-Fassade, Domain-Builder und ServiceLoader-SPI | Discovery |
 | `:regelsuche-experiments` | Experiment-, Corpus-, Budget- und Evidence-DAG-Verträge | Search, Validation, Discovery, Math Algorithms |
 | `:regelsuche-benchmarks` | track-spezifische Vergleiche und Informationsparität | Search, Solver IR, Solver Portfolio |
 | `:regelsuche-persistence` | technologiearme Persistenzports, Konfiguration und Checkpoints | Core |
@@ -39,6 +40,7 @@ Verantwortung und darf keine abweichende zweite Dependency-Definition erzeugen.
 flowchart TD
     app[app / Runtime Composition]
     release[Release / Autopilot / Benchmarks]
+    sdk[External Discovery SDK]
     capability[Learning / Discovery / Experiments / Persistence / Solver Portfolio]
     adapter[Math Adapter: JAS / SymPy]
     foundation[Search / Validation / Solver IR / Math Algorithms]
@@ -47,6 +49,7 @@ flowchart TD
     app --> release
     app --> capability
     app --> adapter
+    sdk --> capability
     release --> capability
     capability --> foundation
     adapter --> core
@@ -90,15 +93,24 @@ Ein externer oder eingebetteter CAS-Adapter darf Ergebnisse vorschlagen. Die
 issuer-eigene mathematische Evidence entsteht erst an der dafür zuständigen
 Verifier-Grenze.
 
-## Learning, Discovery und Experimente
+## Learning, Discovery, SDK und Experimente
 
 - `:regelsuche-learning` enthält portable Candidate- und Programmlernlogik;
 - `:regelsuche-discovery` enthält domänenneutrale Discovery- und Handoff-
   Verträge;
+- `:regelsuche-discovery-sdk` bietet darüber eine schmale externe Fassade,
+  einen boilerplatearmen Domain-Builder und die Provider-SPI, ohne Web- oder
+  Persistenzabhängigkeiten einzuführen;
 - `:regelsuche-experiments` beschreibt eingefrorene Inputs, Budgets, Runner und
   Evidence-DAGs;
 - `:regelsuche-autopilot` komponiert diese Bausteine zu einer begrenzten
   Campaign, ohne die inneren Verträge umzudefinieren.
+
+Das SDK ist eine äußere Benutzungsschicht. Es darf Statusbedeutungen,
+Gegenbeispielsemantik, Zertifikatsanforderungen oder kanonische Evidence nicht
+vereinfachend umdeuten. Externe Verbraucher werden aus einem isolierten
+Maven-Repository gebaut und dürfen `app`, Spring, Hibernate oder Persistenz
+nicht transitiv erhalten.
 
 ## Persistenzgrenze
 

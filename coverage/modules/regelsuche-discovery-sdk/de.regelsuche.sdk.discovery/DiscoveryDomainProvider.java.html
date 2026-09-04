@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryDomainProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.discovery</a> &gt; <span class="el_source">DiscoveryDomainProvider.java</span></div><h1>DiscoveryDomainProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.discovery;
+
+import de.regelsuche.discovery.domain.DiscoveryDomain;
+import java.util.Collection;
+
+/**
+ * Service-provider interface for externally packaged discovery domains.
+ *
+ * &lt;p&gt;Provider discovery only makes a domain available. It does not establish
+ * mathematical correctness, proof status, promotion or artifact trust.&lt;/p&gt;
+ */
+public interface DiscoveryDomainProvider {
+    /** Stable provider identity. */
+    String id();
+
+    /** Provider/API revision shown in diagnostics and catalogs. */
+    default String version() {
+<span class="fc" id="L18">        return &quot;1&quot;;</span>
+    }
+
+    /** Human-auditable source or release reference; may be empty locally. */
+    default String provenance() {
+<span class="fc" id="L23">        return &quot;&quot;;</span>
+    }
+
+    /** Domains supplied by this provider. */
+    Collection&lt;DiscoveryDomain&lt;?, ?, ?&gt;&gt; domains();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RegelsucheDiscovery.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.discovery</a> &gt; <span class="el_source">RegelsucheDiscovery.java</span></div><h1>RegelsucheDiscovery.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.discovery;
+
+import de.regelsuche.discovery.domain.DiscoveryDomain;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoveryBudget;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed;
+import de.regelsuche.discovery.domain.DomainDiscoveryRunner;
+import java.util.Objects;
+
+/**
+ * Headless entry point for one bounded discovery run.
+ *
+ * &lt;p&gt;The facade owns no mathematical authority. It delegates execution to the
+ * deterministic {@link DomainDiscoveryRunner} and returns the original
+ * canonical evidence together with typed candidate and certificate objects.&lt;/p&gt;
+ */
+public final class RegelsucheDiscovery {
+    private RegelsucheDiscovery() {
+    }
+
+    /** Starts a fluent request for the supplied domain. */
+    public static &lt;S, C, K&gt; Request&lt;S, C, K&gt; forDomain(
+            DiscoveryDomain&lt;S, C, K&gt; domain
+    ) {
+<span class="fc" id="L24">        return new Request&lt;&gt;(domain);</span>
+    }
+
+    /** Loads discovery-domain providers visible to the context class loader. */
+    public static DiscoveryDomainCatalog loadDomains() {
+<span class="nc" id="L29">        return DiscoveryDomainCatalog.load();</span>
+    }
+
+    /** Mutable request builder for one execution; not thread-safe. */
+    public static final class Request&lt;S, C, K&gt; {
+        private final DiscoveryDomain&lt;S, C, K&gt; domain;
+        private String campaignId;
+        private DiscoverySeed seed;
+<span class="fc" id="L37">        private DiscoveryBudget budget = DiscoveryBudgets.small();</span>
+
+<span class="fc" id="L39">        private Request(DiscoveryDomain&lt;S, C, K&gt; domain) {</span>
+<span class="fc" id="L40">            this.domain = Objects.requireNonNull(domain, &quot;domain&quot;);</span>
+<span class="fc" id="L41">        }</span>
+
+        /** Sets the stable run/campaign identity retained in evidence. */
+        public Request&lt;S, C, K&gt; campaign(String value) {
+<span class="fc" id="L45">            this.campaignId = requireText(value, &quot;campaignId&quot;);</span>
+<span class="fc" id="L46">            return this;</span>
+        }
+
+        /** Uses a fully constructed seed. */
+        public Request&lt;S, C, K&gt; seed(DiscoverySeed value) {
+<span class="nc" id="L51">            this.seed = Objects.requireNonNull(value, &quot;seed&quot;);</span>
+<span class="nc" id="L52">            return this;</span>
+        }
+
+        /** Creates a content-addressed seed for this domain. */
+        public Request&lt;S, C, K&gt; seed(
+                String seedId,
+                String payload,
+                String sourceReference
+        ) {
+<span class="fc" id="L61">            this.seed = DiscoverySeed.create(</span>
+                seedId,
+<span class="fc" id="L63">                domain.domainId(),</span>
+                payload,
+                sourceReference
+            );
+<span class="fc" id="L67">            return this;</span>
+        }
+
+        /** Replaces the documented small default budget. */
+        public Request&lt;S, C, K&gt; budget(DiscoveryBudget value) {
+<span class="fc" id="L72">            this.budget = Objects.requireNonNull(value, &quot;budget&quot;);</span>
+<span class="fc" id="L73">            return this;</span>
+        }
+
+        /** Executes the request synchronously. */
+        public DiscoveryRun&lt;C, K&gt; run() {
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if (campaignId == null) {</span>
+<span class="nc" id="L79">                throw new IllegalStateException(&quot;campaignId is required&quot;);</span>
+            }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            if (seed == null) {</span>
+<span class="nc" id="L82">                throw new IllegalStateException(&quot;seed is required&quot;);</span>
+            }
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (!domain.domainId().equals(seed.domainId())) {</span>
+<span class="nc" id="L85">                throw new IllegalStateException(</span>
+                    &quot;seed domain does not match the selected domain&quot;
+                );
+            }
+<span class="fc" id="L89">            DomainDiscoveryRunner.RunResult&lt;C, K&gt; result =</span>
+<span class="fc" id="L90">                new DomainDiscoveryRunner().run(</span>
+                    campaignId,
+                    domain,
+                    seed,
+                    budget
+                );
+<span class="fc" id="L96">            return new DiscoveryRun&lt;&gt;(</span>
+<span class="fc" id="L97">                result.selectedCandidate(),</span>
+<span class="fc" id="L98">                result.selectedCertificate(),</span>
+<span class="fc" id="L99">                result.evidence(),</span>
+<span class="fc" id="L100">                domain.candidateCodec(),</span>
+<span class="fc" id="L101">                domain.certificateCodec()</span>
+            );
+        }
+
+        private static String requireText(String value, String name) {
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L107">                throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+            }
+<span class="fc" id="L109">            return value;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

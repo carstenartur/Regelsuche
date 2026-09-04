@@ -18,6 +18,8 @@ flowchart TD
     app --> search
     app --> mathSympy
 
+    discoverySdk --> discovery
+
     release --> autopilot
     autopilot --> experiments
     autopilot --> learning
@@ -93,13 +95,20 @@ rein testbezogenen Build-Eintrag.
 - Ein Portfolio-, Planner- oder Benchmarkstatus ersetzt niemals die konkrete
   Solver Execution, die eine mathematische Aussage trägt.
 
-### Learning, Discovery und Experimente
+### Learning, Discovery, SDK und Experimente
 
 - `:regelsuche-learning` verwendet mathematische und Search-Verträge, einschließlich
   der exakten, technischen-losen Algorithmen aus `:regelsuche-math-algorithms`, kennt
   aber keine Web- oder App-Orchestrierung.
 - `:regelsuche-discovery` enthält portable Domänen-, Pfad- und Handoff-Typen;
   konkrete Web- und Persistenzadapter bleiben außen.
+- `:regelsuche-discovery-sdk` darf ausschließlich die portable Discovery-
+  Schicht und deren innere Abhängigkeiten als äußere Java-Fassade exportieren.
+  Es darf weder `app`, Spring, Hibernate, Persistenz, Web noch Release-
+  Orchestrierung transitiv einführen.
+- Das SDK darf Boilerplate reduzieren, aber keine Invariante erfinden, einen
+  leeren Gegenbeispielfund als Bestätigung interpretieren oder ein Zertifikat
+  ersetzen.
 - `:regelsuche-experiments` darf eingefrorene Inputs, Budgets, Runner und
   Evidence-DAGs verbinden, aber keine UI- oder Deploymentverantwortung
   übernehmen.
