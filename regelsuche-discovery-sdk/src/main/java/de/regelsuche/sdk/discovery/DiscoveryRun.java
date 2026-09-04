@@ -10,24 +10,29 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Typed result view over the canonical evidence of one discovery run. */
-public record DiscoveryRun<C, K>(
-    Optional<C> selectedCandidate,
-    Optional<K> selectedCertificate,
-    DomainDiscoveryEvidence evidence
-) {
-    public DiscoveryRun {
-        selectedCandidate = selectedCandidate == null
+/** Typed, read-only result view over the canonical evidence of one SDK run. */
+public final class DiscoveryRun<C, K> {
+    private final Optional<C> selectedCandidate;
+    private final Optional<K> selectedCertificate;
+    private final DomainDiscoveryEvidence evidence;
+
+    DiscoveryRun(
+        Optional<C> selectedCandidate,
+        Optional<K> selectedCertificate,
+        DomainDiscoveryEvidence evidence
+    ) {
+        this.selectedCandidate = selectedCandidate == null
             ? Optional.empty()
             : selectedCandidate;
-        selectedCertificate = selectedCertificate == null
+        this.selectedCertificate = selectedCertificate == null
             ? Optional.empty()
             : selectedCertificate;
-        Objects.requireNonNull(evidence, "evidence");
-        boolean objectsPresent =
-            selectedCandidate.isPresent() || selectedCertificate.isPresent();
+        this.evidence = Objects.requireNonNull(evidence, "evidence");
+        boolean objectsPresent = this.selectedCandidate.isPresent()
+            || this.selectedCertificate.isPresent();
         if (evidence.outcome() == Outcome.CONFIRMED) {
-            if (selectedCandidate.isEmpty() || selectedCertificate.isEmpty()) {
+            if (this.selectedCandidate.isEmpty()
+                    || this.selectedCertificate.isEmpty()) {
                 throw new IllegalArgumentException(
                     "confirmed run requires candidate and certificate objects"
                 );
@@ -37,6 +42,21 @@ public record DiscoveryRun<C, K>(
                 "non-confirmed run must not expose selected objects"
             );
         }
+    }
+
+    /** Selected candidate only for a confirmed run. */
+    public Optional<C> selectedCandidate() {
+        return selectedCandidate;
+    }
+
+    /** Selected certificate only for a confirmed run. */
+    public Optional<K> selectedCertificate() {
+        return selectedCertificate;
+    }
+
+    /** Canonical immutable evidence produced by the core runner. */
+    public DomainDiscoveryEvidence evidence() {
+        return evidence;
     }
 
     /** Terminal execution status. */
