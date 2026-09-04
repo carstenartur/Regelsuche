@@ -13,7 +13,7 @@ pluginManagement {
         providers.gradleProperty('useLocalAiKnowledgeExtractor').orNull == 'true'
     def aiKnowledgeExtractorVersion = providers
         .gradleProperty('aiKnowledgeExtractorVersion')
-        .getOrElse('0.1.7')
+        .getOrElse('0.1.9')
 
     if (useLocalAiKnowledgeExtractor) {
         def checkout = file(providers
