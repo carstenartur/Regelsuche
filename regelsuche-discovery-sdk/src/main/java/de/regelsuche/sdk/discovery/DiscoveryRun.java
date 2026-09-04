@@ -1,5 +1,6 @@
 package de.regelsuche.sdk.discovery;
 
+import de.regelsuche.discovery.domain.DiscoveryDomain.CanonicalCodec;
 import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleStatus;
 import de.regelsuche.discovery.domain.DomainDiscoveryEvidence;
 import de.regelsuche.discovery.domain.DomainDiscoveryEvidence.Outcome;
@@ -19,15 +20,22 @@ public final class DiscoveryRun<C, K> {
     DiscoveryRun(
         Optional<C> selectedCandidate,
         Optional<K> selectedCertificate,
-        DomainDiscoveryEvidence evidence
+        DomainDiscoveryEvidence evidence,
+        CanonicalCodec<C> candidateCodec,
+        CanonicalCodec<K> certificateCodec
     ) {
-        this.selectedCandidate = selectedCandidate == null
-            ? Optional.empty()
-            : selectedCandidate;
-        this.selectedCertificate = selectedCertificate == null
-            ? Optional.empty()
-            : selectedCertificate;
+        this.selectedCandidate = Objects.requireNonNull(
+            selectedCandidate,
+            "selectedCandidate"
+        );
+        this.selectedCertificate = Objects.requireNonNull(
+            selectedCertificate,
+            "selectedCertificate"
+        );
         this.evidence = Objects.requireNonNull(evidence, "evidence");
+        Objects.requireNonNull(candidateCodec, "candidateCodec");
+        Objects.requireNonNull(certificateCodec, "certificateCodec");
+
         boolean objectsPresent = this.selectedCandidate.isPresent()
             || this.selectedCertificate.isPresent();
         if (evidence.outcome() == Outcome.CONFIRMED) {
@@ -35,6 +43,24 @@ public final class DiscoveryRun<C, K> {
                     || this.selectedCertificate.isEmpty()) {
                 throw new IllegalArgumentException(
                     "confirmed run requires candidate and certificate objects"
+                );
+            }
+            String candidateHash = candidateCodec.contentHash(
+                this.selectedCandidate.orElseThrow()
+            );
+            if (!candidateHash.equals(evidence.selectedCandidateHash())) {
+                throw new IllegalArgumentException(
+                    "selected candidate object does not match canonical evidence"
+                );
+            }
+            String certificateObjectHash = certificateCodec.contentHash(
+                this.selectedCertificate.orElseThrow()
+            );
+            if (evidence.certificate() == null
+                    || !certificateObjectHash.equals(
+                        evidence.certificate().certificateObjectHash())) {
+                throw new IllegalArgumentException(
+                    "selected certificate object does not match canonical evidence"
                 );
             }
         } else if (objectsPresent) {
