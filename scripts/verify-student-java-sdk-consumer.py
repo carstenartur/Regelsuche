@@ -11,7 +11,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-from typing import Iterable
+from typing import Callable, Iterable
 
 SDK_MODULES = (
     "regelsuche-core",
@@ -70,22 +70,40 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def one_artifact(
+        directory: Path,
+        pattern: str,
+        accept: Callable[[Path], bool] = lambda path: True
+) -> Path:
+    candidates = sorted(path for path in directory.glob(pattern) if accept(path))
+    if len(candidates) != 1:
+        names = [path.name for path in candidates]
+        raise RuntimeError(
+            f"expected one artifact matching {pattern} in {directory}, got {names}"
+        )
+    return candidates[0]
+
+
 def artifact_files(repository: Path, version: str) -> dict[str, Path]:
     base = repository / "de" / "regelsuche"
     required: dict[str, Path] = {}
     for module in SDK_MODULES:
         directory = base / module / version
-        jar = directory / f"{module}-{version}.jar"
-        pom = directory / f"{module}-{version}.pom"
-        if not jar.is_file() or not pom.is_file():
-            raise RuntimeError(f"missing published artifact for {module}: {directory}")
+        jar = one_artifact(
+            directory,
+            f"{module}-*.jar",
+            lambda path: not path.name.endswith("-sources.jar")
+                and not path.name.endswith("-javadoc.jar"),
+        )
+        pom = one_artifact(directory, f"{module}-*.pom")
         required[f"{module}:jar"] = jar
         required[f"{module}:pom"] = pom
     sdk_dir = base / "regelsuche-discovery-sdk" / version
     for classifier in ("sources", "javadoc"):
-        path = sdk_dir / f"regelsuche-discovery-sdk-{version}-{classifier}.jar"
-        if not path.is_file():
-            raise RuntimeError(f"missing SDK {classifier} artifact: {path}")
+        path = one_artifact(
+            sdk_dir,
+            f"regelsuche-discovery-sdk-*-{classifier}.jar",
+        )
         required[f"regelsuche-discovery-sdk:{classifier}"] = path
     return required
 
