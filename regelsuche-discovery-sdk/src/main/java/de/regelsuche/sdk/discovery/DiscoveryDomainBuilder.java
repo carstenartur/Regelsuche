@@ -51,7 +51,6 @@ public final class DiscoveryDomainBuilder<S, C, K> {
     private CandidateEvaluator<C, K> evaluator;
     private CanonicalCodec<K> certificateCodec;
     private CertificateRenderer<K> certificateRenderer;
-    private EvidenceAdapter<S, C, K> evidenceAdapter;
 
     private DiscoveryDomainBuilder(String domainId, String revision) {
         this.domainId = requireIdentifier(domainId, "domainId");
@@ -284,33 +283,6 @@ public final class DiscoveryDomainBuilder<S, C, K> {
         return this;
     }
 
-    /** Replaces the conservative default domain-evidence summary. */
-    public DiscoveryDomainBuilder<S, C, K> evidence(
-            EvidenceFunction<S, C, K> adapt
-    ) {
-        Objects.requireNonNull(adapt, "adapt");
-        String id = componentId("evidence-adapter");
-        this.evidenceAdapter = new EvidenceAdapter<>() {
-            @Override
-            public String id() {
-                return id;
-            }
-
-            @Override
-            public DomainPayload adapt(
-                    Optional<S> initialState,
-                    Optional<C> candidate,
-                    Optional<K> certificate
-            ) {
-                return Objects.requireNonNull(
-                    adapt.adapt(initialState, candidate, certificate),
-                    "evidence adapter returned null"
-                );
-            }
-        };
-        return this;
-    }
-
     /** Builds and eagerly validates the complete domain descriptor. */
     public DiscoveryDomain<S, C, K> build() {
         requireComponent(generator, "generator");
@@ -332,9 +304,6 @@ public final class DiscoveryDomainBuilder<S, C, K> {
                 "at least one transition operator is required"
             );
         }
-        EvidenceAdapter<S, C, K> selectedEvidence = evidenceAdapter == null
-            ? defaultEvidenceAdapter()
-            : evidenceAdapter;
         DiscoveryDomain<S, C, K> domain = new BuiltDomain<>(
             domainId,
             revision,
@@ -352,7 +321,7 @@ public final class DiscoveryDomainBuilder<S, C, K> {
             evaluator,
             certificateCodec,
             certificateRenderer,
-            selectedEvidence
+            defaultEvidenceAdapter()
         );
         domain.descriptor();
         return domain;
@@ -437,16 +406,6 @@ public final class DiscoveryDomainBuilder<S, C, K> {
         if (value == null) {
             throw new IllegalStateException(name + " is required");
         }
-    }
-
-    /** Function used to construct domain-specific evidence properties. */
-    @FunctionalInterface
-    public interface EvidenceFunction<S, C, K> {
-        DomainPayload adapt(
-            Optional<S> initialState,
-            Optional<C> candidate,
-            Optional<K> certificate
-        );
     }
 
     private record BuiltDomain<S, C, K>(
