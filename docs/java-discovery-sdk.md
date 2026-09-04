@@ -165,6 +165,45 @@ keine Aussage über Artefaktvertrauen, mathematische Korrektheit, Proof oder
 Promotion. Die Einbettung der Provider-Artefaktprovenienz in jede kanonische
 Run-Evidence bleibt eine getrennte Restarbeit aus #904.
 
+## Eigenständiges Starterprojekt erzeugen
+
+Der Checkout enthält einen kleinen Generator, der das tatsächlich in der
+Consumer-CI gebaute Beispiel als Vorlage verwendet:
+
+```bash
+python3 scripts/create-student-discovery-domain.py \
+  --output ../my-first-regelsuche-domain \
+  --package org.example.discovery \
+  --project-name my-first-regelsuche-domain \
+  --domain-id my-first-domain \
+  --provider-id my-first-provider
+```
+
+Der Generator
+
+- überschreibt niemals ein vorhandenes Ziel;
+- validiert Java-Paket und stabile IDs;
+- erzeugt ein eigenständiges Java-25-Gradle-Projekt;
+- registriert den Provider über `META-INF/services`;
+- enthält positive, widerlegte und budgeterschöpfte Tests mit
+  `DiscoveryRunAssertions`;
+- schreibt die gewählten Identitäten nach `regelsuche-starter.json`.
+
+Nach Bereitstellung des SDK-Repositorys lässt sich das erzeugte Projekt ohne
+Änderung bauen:
+
+```bash
+cd ../my-first-regelsuche-domain
+gradle clean test run \
+  -PregelsucheRepository=/pfad/zum/repository \
+  -PregelsucheVersion=0.4.0-SNAPSHOT
+```
+
+Die autoritative Consumer-CI erzeugt zusätzlich ein Projekt mit von der Vorlage
+abweichenden Paket-, Domain- und Provider-IDs, startet es mit einem eigenen
+leeren Gradle-Cache und verweigert interne Projektabhängigkeiten sowie
+unerwünschte Runtime-Module.
+
 ## Reproduktion
 
 ```bash
@@ -173,9 +212,9 @@ Run-Evidence bleibt eine getrennte Restarbeit aus #904.
 ```
 
 Die Prüfung veröffentlicht SDK und innere Laufzeitabhängigkeiten in ein
-isoliertes Repository, baut und testet den externen Consumer mit isoliertem
-Dependency-Cache, kontrolliert Sources- und Javadoc-JARs, SHA-256-Werte sowie
-den Runtime-Abhängigkeitsbaum.
+isoliertes Repository, baut und testet den externen Consumer sowie einen frisch
+erzeugten Starter mit getrennten isolierten Dependency-Caches, kontrolliert
+Sources- und Javadoc-JARs, SHA-256-Werte sowie die Runtime-Abhängigkeitsbäume.
 
 ## Noch nicht enthalten
 
