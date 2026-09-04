@@ -1,14 +1,7 @@
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.Exec
 
-/*
- * Verifies the student-facing SDK through a separate Gradle consumer without
- * adding another GitHub workflow or starting a nested Regelsuche build.
- *
- * The SDK artifacts are produced by ordinary task dependencies. The Python
- * driver receives that prepublished repository and starts only the independent
- * external consumer build.
- */
+// Publishes the SDK by task dependency, then starts only the external consumer.
 def sdkModules = [
     'regelsuche-core',
     'regelsuche-egraph',
@@ -29,40 +22,30 @@ def windows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('w
 def pythonExecutable = windows ? 'python' : 'python3'
 def gradleExecutable = file(windows ? 'gradlew.bat' : 'gradlew').absolutePath
 
-def cleanStudentSdkVerificationRepository = tasks.register(
-    'cleanStudentSdkVerificationRepository',
-    Delete
-) {
+def cleanSdkRepository = tasks.register('cleanStudentSdkVerificationRepository', Delete) {
     group = 'verification'
-    description = 'Removes the isolated Maven repository used by the SDK consumer check.'
+    description = 'Removes the isolated SDK Maven repository.'
     delete sdkRepository
 }
 
 gradle.projectsEvaluated {
-    publicationTaskPaths.each { taskPath ->
-        tasks.getByPath(taskPath).dependsOn(cleanStudentSdkVerificationRepository)
+    publicationTaskPaths.each { path ->
+        tasks.getByPath(path).dependsOn(cleanSdkRepository)
     }
 }
 
-def verifyStudentJavaSdkConsumer = tasks.register(
-    'verifyStudentJavaSdkConsumer',
-    Exec
-) {
+def verifySdkConsumer = tasks.register('verifyStudentJavaSdkConsumer', Exec) {
     group = 'verification'
-    description = 'Publishes the narrow SDK closure and verifies a clean external Java 25 consumer.'
+    description = 'Verifies the published SDK through a clean Java 25 consumer.'
     dependsOn publicationTaskPaths
     workingDir rootDir
     commandLine(
         pythonExecutable,
         file('scripts/verify-student-java-sdk-consumer.py').absolutePath,
-        '--repository-root',
-        rootDir.absolutePath,
-        '--gradle',
-        gradleExecutable,
-        '--published-repository',
-        sdkRepository.absolutePath,
-        '--output',
-        reportDirectory.absolutePath
+        '--repository-root', rootDir.absolutePath,
+        '--gradle', gradleExecutable,
+        '--published-repository', sdkRepository.absolutePath,
+        '--output', reportDirectory.absolutePath
     )
     inputs.file('release.properties')
     inputs.file('scripts/verify-student-java-sdk-consumer.py')
@@ -72,5 +55,5 @@ def verifyStudentJavaSdkConsumer = tasks.register(
 }
 
 tasks.named('ciCheck') {
-    dependsOn verifyStudentJavaSdkConsumer
+    dependsOn verifySdkConsumer
 }
