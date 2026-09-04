@@ -13,18 +13,26 @@ def sdkModules = [
 def publicationTaskPaths = sdkModules.collect {
     ":${it}:publishMavenJavaPublicationToStudentSdkRepository"
 }
-def configuredRepository = providers.gradleProperty('studentSdkRepository').orNull
-def sdkRepository = configuredRepository == null
-    ? layout.buildDirectory.dir('student-sdk-repository').get().asFile
-    : file(configuredRepository)
-def reportDirectory = layout.buildDirectory.dir('reports/student-java-sdk').get().asFile
-def windows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+def sdkRepository = layout.buildDirectory
+    .dir('student-sdk-repository')
+    .get()
+    .asFile
+def reportDirectory = layout.buildDirectory
+    .dir('reports/student-java-sdk')
+    .get()
+    .asFile
+def windows = System.getProperty('os.name')
+    .toLowerCase(Locale.ROOT)
+    .contains('windows')
 def pythonExecutable = windows ? 'python' : 'python3'
 def gradleExecutable = file(windows ? 'gradlew.bat' : 'gradlew').absolutePath
 
-def cleanSdkRepository = tasks.register('cleanStudentSdkVerificationRepository', Delete) {
+def cleanSdkRepository = tasks.register(
+    'cleanStudentSdkVerificationRepository',
+    Delete
+) {
     group = 'verification'
-    description = 'Removes the isolated SDK Maven repository.'
+    description = 'Removes the checkout-owned SDK verification repository.'
     delete sdkRepository
 }
 
@@ -34,7 +42,10 @@ gradle.projectsEvaluated {
     }
 }
 
-def verifySdkConsumer = tasks.register('verifyStudentJavaSdkConsumer', Exec) {
+def verifySdkConsumer = tasks.register(
+    'verifyStudentJavaSdkConsumer',
+    Exec
+) {
     group = 'verification'
     description = 'Verifies the published SDK through a clean Java 25 consumer.'
     dependsOn publicationTaskPaths
