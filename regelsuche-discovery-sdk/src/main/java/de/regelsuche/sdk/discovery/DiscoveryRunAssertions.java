@@ -201,8 +201,8 @@ public final class DiscoveryRunAssertions {
             if (!first.equals(second)) {
                 fail("canonical evidence changed between repeated reads");
             }
-            if (!hash.matches("[0-9a-f]{64}")) {
-                fail("evidence content hash is not lowercase SHA-256: " + hash);
+            if (!hash.matches("sha256:[0-9a-f]{64}")) {
+                fail("evidence content hash is not canonical SHA-256: " + hash);
             }
             if (!first.contains("\"contentHash\":\"" + hash + "\"")) {
                 fail("canonical evidence does not contain its content hash");
