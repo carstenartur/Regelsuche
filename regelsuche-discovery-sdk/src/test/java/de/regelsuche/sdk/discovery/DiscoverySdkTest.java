@@ -21,8 +21,13 @@ import org.junit.jupiter.api.Test;
 class DiscoverySdkTest {
     @Test
     void runsABuilderDefinedDomainAndKeepsCounterexamples() {
+        DiscoveryDomain<
+            Integer,
+            MultiplierCandidate,
+            MultiplierCertificate
+        > domain = sampleDomain();
         DiscoveryRun<MultiplierCandidate, MultiplierCertificate> run =
-            RegelsucheDiscovery.forDomain(sampleDomain())
+            RegelsucheDiscovery.forDomain(domain)
                 .campaign("sdk-multiplier-success")
                 .seed(
                     "powers-of-two",
@@ -44,15 +49,36 @@ class DiscoverySdkTest {
             () -> new DiscoveryRun<>(
                 Optional.empty(),
                 Optional.empty(),
-                run.evidence()
+                run.evidence(),
+                domain.candidateCodec(),
+                domain.certificateCodec()
+            )
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new DiscoveryRun<>(
+                Optional.of(new MultiplierCandidate(
+                    3,
+                    List.of(2L, 4L, 8L, 16L),
+                    List.of(32L, 64L)
+                )),
+                run.selectedCertificate(),
+                run.evidence(),
+                domain.candidateCodec(),
+                domain.certificateCodec()
             )
         );
     }
 
     @Test
     void reportsBudgetExhaustionWithoutInventingACertificate() {
+        DiscoveryDomain<
+            Integer,
+            MultiplierCandidate,
+            MultiplierCertificate
+        > domain = sampleDomain();
         DiscoveryRun<MultiplierCandidate, MultiplierCertificate> run =
-            RegelsucheDiscovery.forDomain(sampleDomain())
+            RegelsucheDiscovery.forDomain(domain)
                 .campaign("sdk-multiplier-budget")
                 .seed(
                     "powers-of-two-budget",
@@ -69,9 +95,15 @@ class DiscoverySdkTest {
         assertThrows(
             IllegalArgumentException.class,
             () -> new DiscoveryRun<>(
-                Optional.of(new Object()),
+                Optional.of(new MultiplierCandidate(
+                    1,
+                    List.of(2L, 4L, 8L, 16L),
+                    List.of(32L, 64L)
+                )),
                 Optional.empty(),
-                run.evidence()
+                run.evidence(),
+                domain.candidateCodec(),
+                domain.certificateCodec()
             )
         );
     }
