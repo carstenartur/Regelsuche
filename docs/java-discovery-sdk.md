@@ -94,9 +94,11 @@ DiscoveryRun<Candidate, Certificate> run =
 `DiscoveryRun` stellt Ergebniszustand, ausgewählten Kandidaten, Zertifikat,
 Gegenbeispiele, verbrauchte Arbeit und kanonische Evidence getrennt bereit. Ein
 zu kleines Budget endet `BUDGET_EXHAUSTED` ohne erfundenes Zertifikat; ein
-widerlegter Kandidat endet `REFUTED`. Läufe werden nur durch die SDK-Fassade
-erzeugt: Fremder Code kann keine beliebigen Kandidatenobjekte um eine bereits
-vorhandene Evidence konstruieren.
+widerlegter Kandidat endet `REFUTED`. Die öffentliche API bietet keinen
+`DiscoveryRun`-Konstruktor; gewöhnliche Consumer erhalten Läufe über die
+SDK-Fassade. Das ist keine Sicherheitsgrenze gegen Reflection oder absichtlich
+erzeugte Split Packages. Maßgeblich bleiben die kanonische Evidence und ihre
+unabhängige Prüfung.
 
 ## Externe Provider
 
