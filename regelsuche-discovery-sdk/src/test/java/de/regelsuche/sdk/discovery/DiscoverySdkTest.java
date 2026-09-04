@@ -15,6 +15,7 @@ import de.regelsuche.discovery.domain.DomainDiscoveryEvidence.Outcome;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class DiscoverySdkTest {
@@ -38,6 +39,14 @@ class DiscoverySdkTest {
         assertTrue(run.counterexamples().getFirst().contains("multiplier 1"));
         assertFalse(run.executedWork().isEmpty());
         assertTrue(run.canonicalEvidence().contains("\"outcome\":\"CONFIRMED\""));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new DiscoveryRun<>(
+                Optional.empty(),
+                Optional.empty(),
+                run.evidence()
+            )
+        );
     }
 
     @Test
@@ -57,6 +66,14 @@ class DiscoverySdkTest {
         assertTrue(run.selectedCandidate().isEmpty());
         assertTrue(run.selectedCertificate().isEmpty());
         assertFalse(run.isConfirmed());
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new DiscoveryRun<>(
+                Optional.of(new Object()),
+                Optional.empty(),
+                run.evidence()
+            )
+        );
     }
 
     @Test
