@@ -14,6 +14,7 @@ import de.regelsuche.search.program.BudgetedTransformationSource.Result;
 import de.regelsuche.search.program.BudgetedTransformationSource.SourceIdentity;
 import de.regelsuche.search.program.BudgetedTransformationSource.Status;
 import de.regelsuche.search.program.BudgetedTransformationSourceProgramExecution.ExactTheoryCandidate;
+import de.regelsuche.search.program.BudgetedTransformationSourceProgramExecution.ProgramWork;
 import de.regelsuche.transform.Transformation;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -129,6 +130,48 @@ class BudgetedTransformationSourceRewriteProgramTest {
                 budgetedSource("top-level-budgeted", budgeted),
                 "x"));
         assertEquals(0, budgeted.invocations.get());
+    }
+
+    @Test
+    void publicExecutionRecordsRejectForgedCandidatesAndWorkLedgers() {
+        FixedSource source = new FixedSource();
+        BudgetedTransformationSourceProgramExecution execution =
+            interpreter.executeBudgetedSource(
+                budgetedSource("tamper-control", source),
+                "x",
+                REQUIRED_WORK);
+        ExactTheoryCandidate candidate = execution.candidates().getFirst();
+        ProgramWork work = execution.programWork();
+
+        assertThrows(IllegalArgumentException.class, () ->
+            new ExactTheoryCandidate(
+                candidate.originNodeId(),
+                candidate.transition(),
+                hash("forged-candidate")));
+        assertThrows(IllegalArgumentException.class, () ->
+            new ProgramWork(
+                work.interpreterInvocations(),
+                work.programNodeVisits(),
+                work.executorDelegations(),
+                work.candidateProjectionVisits(),
+                work.delegatedMechanicalWorkUnits(),
+                work.totalMechanicalWorkUnits() + 1));
+        assertThrows(IllegalArgumentException.class, () ->
+            new BudgetedTransformationSourceProgramExecution(
+                execution.executionRevision(),
+                execution.programMetadata(),
+                execution.sourceExecution(),
+                List.of(),
+                execution.programWork(),
+                hash("missing-candidate-projection")));
+        assertThrows(IllegalArgumentException.class, () ->
+            new BudgetedTransformationSourceProgramExecution(
+                execution.executionRevision(),
+                execution.programMetadata(),
+                execution.sourceExecution(),
+                execution.candidates(),
+                execution.programWork(),
+                hash("forged-execution")));
     }
 
     private static final class FixedSource
