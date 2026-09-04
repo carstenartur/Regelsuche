@@ -128,25 +128,56 @@ def main() -> int:
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
     parser.add_argument("--gradle", default="gradle")
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--published-repository",
+        type=Path,
+        help=(
+            "Use an SDK Maven repository prepared by checkout-owned Gradle task "
+            "dependencies instead of starting a nested publication build."
+        ),
+    )
     arguments = parser.parse_args()
 
     root = arguments.repository_root.resolve()
     version = read_version(root)
     output = (arguments.output or root / "build" / "reports" / "student-java-sdk").resolve()
-    local_repository = output / "repository"
+    supplied_repository = arguments.published_repository is not None
+    local_repository = (
+        arguments.published_repository.resolve()
+        if supplied_repository
+        else output / "repository"
+    )
     consumer_checkout = output / "external-consumer"
+
+    if supplied_repository and (local_repository == output or output in local_repository.parents):
+        raise RuntimeError(
+            "--published-repository must be outside --output because output is rebuilt"
+        )
     if output.exists():
         shutil.rmtree(output)
-    local_repository.mkdir(parents=True)
+    output.mkdir(parents=True)
 
-    publish_command = [
-        arguments.gradle,
-        "--no-daemon",
-        "--no-configuration-cache",
-        f"-PstudentSdkRepository={local_repository}",
-        *publication_tasks(),
-    ]
-    publish_output = run(publish_command, root)
+    if supplied_repository:
+        if not local_repository.is_dir():
+            raise RuntimeError(
+                f"prepublished SDK repository does not exist: {local_repository}"
+            )
+        publish_output = (
+            "SDK publication supplied by checkout-owned Gradle task dependencies\n"
+        )
+        publication_mode = "PREPUBLISHED_BY_CALLER"
+    else:
+        local_repository.mkdir(parents=True)
+        publish_command = [
+            arguments.gradle,
+            "--no-daemon",
+            "--no-configuration-cache",
+            f"-PstudentSdkRepository={local_repository}",
+            *publication_tasks(),
+        ]
+        publish_output = run(publish_command, root)
+        publication_mode = "SCRIPT_OWNED_PUBLICATION"
+
     artifacts = artifact_files(local_repository, version)
 
     source_example = root / "examples" / "external-consumers" / "geometric-sequence-domain-java25"
@@ -184,7 +215,7 @@ def main() -> int:
 
     artifact_ledger = {
         name: {
-            "path": str(path.relative_to(output)),
+            "path": "repository/" + path.relative_to(local_repository).as_posix(),
             "bytes": path.stat().st_size,
             "sha256": sha256(path),
         }
@@ -193,6 +224,7 @@ def main() -> int:
     report = {
         "schema": "regelsuche.student-java-sdk-consumer-verification/v1",
         "sdkVersion": version,
+        "publicationMode": publication_mode,
         "javaFeature": int(
             run(["java", "-XshowSettings:properties", "-version"], root)
             .split("java.specification.version = ", 1)[1]
@@ -211,7 +243,6 @@ def main() -> int:
     if report["javaFeature"] != 25:
         raise RuntimeError(f"consumer verification requires Java 25, got {report['javaFeature']}")
 
-    output.mkdir(parents=True, exist_ok=True)
     (output / "consumer-report.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -219,6 +250,7 @@ def main() -> int:
     (output / "consumer-report.md").write_text(
         "# Student Java SDK consumer verification\n\n"
         f"- SDK version: `{version}`\n"
+        f"- Publication mode: `{publication_mode}`\n"
         "- Java: `25`\n"
         "- External consumer: `geometric-sequence-domain-java25`\n"
         "- ServiceLoader provider: `example-geometric-sequence-provider`\n"
