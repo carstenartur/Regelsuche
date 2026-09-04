@@ -21,8 +21,6 @@ def verifyRegelsucheAiKnowledgeArtifacts = tasks.register(
         '--root', aiKnowledgeArtifactPath
     inputs.file(aiKnowledgeVerifierScript)
     inputs.dir(aiKnowledgeArtifactDirectory)
-    outputs.file(rootProject.file(
-        'build/ai-knowledge/verification-report.json'))
     outputs.upToDateWhen { false }
 }
 
