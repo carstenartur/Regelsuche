@@ -3,6 +3,7 @@ package de.regelsuche.sdk.discovery;
 import de.regelsuche.discovery.domain.DiscoveryDomain;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,13 +46,19 @@ public final class DiscoveryDomainCatalog {
         return fromProviders(providers);
     }
 
-    /** Builds a catalog from explicit providers, useful for tests and embedding. */
+    /**
+     * Builds a catalog from explicit providers, useful for tests and embedding.
+     *
+     * <p>Provider order and each provider's domain-collection order are not
+     * trusted. Both are normalized by stable identifiers before registrations
+     * are exposed or duplicate revisions are diagnosed.</p>
+     */
     public static DiscoveryDomainCatalog fromProviders(
             Iterable<? extends DiscoveryDomainProvider> providers
     ) {
         Objects.requireNonNull(providers, "providers");
+        List<ProviderEntry> normalizedProviders = new ArrayList<>();
         Map<String, DiscoveryDomainProvider> providerIds = new LinkedHashMap<>();
-        Map<String, Registration> domains = new LinkedHashMap<>();
 
         for (DiscoveryDomainProvider provider : providers) {
             Objects.requireNonNull(provider, "provider");
@@ -65,19 +72,37 @@ public final class DiscoveryDomainCatalog {
                     "duplicate discovery provider id: " + providerId
                 );
             }
+            normalizedProviders.add(new ProviderEntry(
+                providerId,
+                providerVersion,
+                normalizeProvenance(provider.provenance()),
+                provider
+            ));
+        }
+        normalizedProviders.sort(Comparator.comparing(ProviderEntry::id));
 
+        Map<String, Registration> domains = new LinkedHashMap<>();
+        for (ProviderEntry provider : normalizedProviders) {
             Collection<DiscoveryDomain<?, ?, ?>> supplied = Objects.requireNonNull(
-                provider.domains(),
+                provider.provider().domains(),
                 "provider domains"
             );
-            for (DiscoveryDomain<?, ?, ?> domain : supplied) {
+            List<DiscoveryDomain<?, ?, ?>> normalizedDomains = new ArrayList<>(supplied);
+            normalizedDomains.forEach(domain -> {
                 Objects.requireNonNull(domain, "provider domain");
                 domain.descriptor();
+            });
+            normalizedDomains.sort(
+                Comparator.comparing(DiscoveryDomain<?, ?, ?>::domainId)
+                    .thenComparing(DiscoveryDomain<?, ?, ?>::revision)
+            );
+
+            for (DiscoveryDomain<?, ?, ?> domain : normalizedDomains) {
                 String key = domain.domainId() + "@" + domain.revision();
                 Registration registration = new Registration(
-                    providerId,
-                    providerVersion,
-                    normalizeProvenance(provider.provenance()),
+                    provider.id(),
+                    provider.version(),
+                    provider.provenance(),
                     domain
                 );
                 Registration previous = domains.putIfAbsent(key, registration);
@@ -85,7 +110,7 @@ public final class DiscoveryDomainCatalog {
                     throw new IllegalArgumentException(
                         "duplicate discovery domain revision: " + key
                             + " from " + previous.providerId()
-                            + " and " + providerId
+                            + " and " + provider.id()
                     );
                 }
             }
@@ -119,6 +144,14 @@ public final class DiscoveryDomainCatalog {
             throw new IllegalArgumentException(name + " is not a valid identifier");
         }
         return value;
+    }
+
+    private record ProviderEntry(
+        String id,
+        String version,
+        String provenance,
+        DiscoveryDomainProvider provider
+    ) {
     }
 
     /** Provenance-bearing catalog entry. */
