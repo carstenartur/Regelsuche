@@ -16,6 +16,7 @@ können als neue Strategien wiederverwendet werden.
 [Demo starten](#schnellstart) ·
 [Workbench](docs/web-workbench.md) ·
 [Discovery Gallery](docs/demo-gallery.md) ·
+[Java Discovery SDK](docs/java-discovery-sdk.md) ·
 [Aktueller Forschungsstand](docs/discovery-status.md) ·
 [Architektur](docs/architecture.md) ·
 [Unabhängig reproduzieren](docs/independent-reproduction.md)
@@ -146,6 +147,44 @@ Kandidaten, verworfene Alternativen und reale Kürzungen sichtbar machen. Detail
 stehen unter [Java-internal Rewrite Programs](docs/java-rewrite-programs.md) und
 [Plugin-API](docs/plugin-api.md).
 
+### Eigene Discovery-Domänen mit dem Java-SDK
+
+Das headless nutzbare Java-25-SDK lässt eigene Zustände, Übergänge,
+Gegenbeispielsuchen und Zertifikate in normalem Java definieren, ohne Webserver
+oder Persistenz einzubinden. So sieht ein Lauf im
+[eigenständig gebauten Folgenbeispiel](examples/external-consumers/geometric-sequence-domain-java25/README.md)
+aus; der dort enthaltene Provider definiert die Domäne:
+
+```java
+import static de.regelsuche.sdk.discovery.DiscoveryRunAssertions.assertThat;
+import de.regelsuche.sdk.discovery.DiscoveryBudgets;
+import de.regelsuche.sdk.discovery.RegelsucheDiscovery;
+import example.GeometricSequenceDomainProvider;
+
+var run = RegelsucheDiscovery
+    .forDomain(GeometricSequenceDomainProvider.domain())
+    .campaign("external-geometric-sequence-demo")
+    .seed("powers-of-two",
+        "observed=2,4,8,16;holdout=32,64;maxMultiplier=6",
+        "external-java25-example")
+    .budget(DiscoveryBudgets.small())
+    .run();
+
+assertThat(run).isConfirmed().hasContentAddressedEvidence();
+System.out.println(run.selectedCandidate().orElseThrow().multiplier()); // 2
+```
+
+Der Lauf sucht den Multiplikator aus den beobachteten Werten, behält
+Gegenbeispiele und prüft den Kandidaten getrennt an den zurückgehaltenen Werten.
+`CONFIRMED` gilt für diesen endlichen Prüfbereich, nicht als Beweis einer
+allgemeinen Aussage über unendliche Folgen. Das vollständige Beispiel testet
+auch `REFUTED`, `BUDGET_EXHAUSTED` und das Laden über `ServiceLoader`.
+
+[Java Discovery SDK](docs/java-discovery-sdk.md) erklärt Builder, Budgets,
+Assertions und Provider-SPI. Die SDK-Artefakte werden derzeit aus dem Checkout
+lokal veröffentlicht; eine dauerhaft öffentliche Maven-Veröffentlichung und
+eine stabile API über Releases werden noch nicht zugesagt.
+
 ## Repräsentationsbrücken öffnen neue Mathematikbereiche
 
 Regelsuche behandelt geeignete Gleichungssysteme nicht nur als Listen skalarer
@@ -225,6 +264,7 @@ Details und Produktionsgrenzen stehen in
 | Gleichungssysteme | exaktes `A*x=b`, Blockzerlegung, RREF, Lösungsklassifikation und explizite Eigenproblemrollen | [Representation Bridges](docs/equation-system-matrix-representation.md) |
 | Proof | versionierte Obligationen, Z3/cvc5, optional Lean sowie getrennte Job- und mathematische Status | [Proof Workbench](docs/proof-workbench.md) |
 | Erweiterungen | Regeldateien, Knowledge Packs, Java-Plugins, Makros und typisierte Rewrite-Programme | [Extension System](docs/extension-system.md) |
+| Java-SDK | eigene Discovery-Domänen, fluente Fassade, Budgets, Assertions und externer ServiceLoader-Consumer | [Java Discovery SDK](docs/java-discovery-sdk.md) |
 | Reproduzierbarkeit | kanonische JSON-Artefakte, Manifeste, Hashes, Containerläufe und unabhängige Verifier | [Scientific Reproducibility](docs/scientific-reproducibility.md) |
 
 Nicht jede implementierte Fähigkeit ist bereits als allgemeines
@@ -339,7 +379,8 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
   [Developer Guide](docs/developer-guide.md), [Testing](docs/testing.md)
 - **Erweiterungen:** [Erweiterungssystem](docs/extension-system.md),
   [Plugin-API](docs/plugin-api.md), [Regeldateien](docs/rule-files.md),
-  [Java Rewrite Programs](docs/java-rewrite-programs.md)
+  [Java Rewrite Programs](docs/java-rewrite-programs.md),
+  [Java Discovery SDK](docs/java-discovery-sdk.md)
 - **Referenz:** [Dokumentationsindex](docs/README.md),
   [Glossar](docs/glossary.md), [Schema-Katalog](docs/schema-catalog.md),
   lokale Swagger UI unter `/static/openapi/index.html`

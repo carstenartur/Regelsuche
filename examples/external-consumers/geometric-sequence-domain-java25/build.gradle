@@ -1,0 +1,83 @@
+plugins {
+    id 'application'
+}
+
+def regelsucheRepository = providers.gradleProperty('regelsucheRepository')
+    .orElse(layout.projectDirectory.dir('repository').asFile.absolutePath)
+    .get()
+
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'checkoutOwnedRegelsuche'
+                url = uri(regelsucheRepository)
+            }
+        }
+        filter {
+            includeGroup 'de.regelsuche'
+        }
+    }
+    mavenCentral()
+}
+
+def regelsucheVersion = providers.gradleProperty('regelsucheVersion')
+    .getOrElse('0.4.0-SNAPSHOT')
+
+def expectedRegelsucheRuntimeModules = [
+    'regelsuche-core',
+    'regelsuche-egraph',
+    'regelsuche-search',
+    'regelsuche-validation',
+    'regelsuche-discovery',
+    'regelsuche-discovery-sdk'
+] as Set
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+dependencies {
+    implementation "de.regelsuche:regelsuche-discovery-sdk:${regelsucheVersion}"
+
+    testImplementation platform('org.junit:junit-bom:6.1.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'example.GeometricSequenceExample'
+}
+
+def verifyRegelsucheRuntimeModules = tasks.register(
+    'verifyRegelsucheRuntimeModules'
+) {
+    group = 'verification'
+    description = 'Rejects unexpected Regelsuche modules in the SDK runtime.'
+    doLast {
+        def observed = configurations.runtimeClasspath.incoming
+            .resolutionResult
+            .allComponents
+            .collect { component -> component.id }
+            .findAll { id ->
+                id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier
+                    && id.group == 'de.regelsuche'
+            }
+            .collect { id -> id.module }
+            .toSet()
+        if (observed != expectedRegelsucheRuntimeModules) {
+            throw new GradleException(
+                'Unexpected Regelsuche runtime modules. Expected '
+                    + "${expectedRegelsucheRuntimeModules.sort()}, observed "
+                    + "${observed.sort()}"
+            )
+        }
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    dependsOn verifyRegelsucheRuntimeModules
+}

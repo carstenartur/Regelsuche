@@ -75,6 +75,28 @@ final class DomainCanonical {
             .toList();
     }
 
+    static List<String> sortedUniqueIdentifiers(
+        List<String> values,
+        String name
+    ) {
+        Objects.requireNonNull(values, name);
+        ArrayList<String> result = new ArrayList<>(values.size());
+        for (String value : values) {
+            String checked = requireIdentifier(
+                Objects.requireNonNull(value, name + " value"),
+                name
+            );
+            if (result.contains(checked)) {
+                throw new IllegalArgumentException(
+                    "duplicate " + name + ": " + checked
+                );
+            }
+            result.add(checked);
+        }
+        result.sort(Comparator.naturalOrder());
+        return List.copyOf(result);
+    }
+
     static <T> List<T> sortedCopy(List<T> values, Comparator<? super T> comparator) {
         if (values == null || values.isEmpty()) {
             return List.of();

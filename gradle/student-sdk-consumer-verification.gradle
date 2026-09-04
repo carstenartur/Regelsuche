@@ -1,0 +1,69 @@
+import org.gradle.api.tasks.Delete
+import org.gradle.api.tasks.Exec
+
+// Publishes the SDK by task dependency, then starts only the external consumer.
+def sdkModules = [
+    'regelsuche-core',
+    'regelsuche-egraph',
+    'regelsuche-search',
+    'regelsuche-validation',
+    'regelsuche-discovery',
+    'regelsuche-discovery-sdk'
+]
+def publicationTaskPaths = sdkModules.collect {
+    ":${it}:publishMavenJavaPublicationToStudentSdkRepository"
+}
+def sdkRepository = layout.buildDirectory
+    .dir('student-sdk-repository')
+    .get()
+    .asFile
+def reportDirectory = layout.buildDirectory
+    .dir('reports/student-java-sdk')
+    .get()
+    .asFile
+def windows = System.getProperty('os.name')
+    .toLowerCase(Locale.ROOT)
+    .contains('windows')
+def pythonExecutable = windows ? 'python' : 'python3'
+def gradleExecutable = file(windows ? 'gradlew.bat' : 'gradlew').absolutePath
+
+def cleanSdkRepository = tasks.register(
+    'cleanStudentSdkVerificationRepository',
+    Delete
+) {
+    group = 'verification'
+    description = 'Removes the checkout-owned SDK verification repository.'
+    delete sdkRepository
+}
+
+gradle.projectsEvaluated {
+    publicationTaskPaths.each { path ->
+        tasks.getByPath(path).dependsOn(cleanSdkRepository)
+    }
+}
+
+def verifySdkConsumer = tasks.register(
+    'verifyStudentJavaSdkConsumer',
+    Exec
+) {
+    group = 'verification'
+    description = 'Verifies the published SDK through a clean Java 25 consumer.'
+    dependsOn publicationTaskPaths
+    workingDir rootDir
+    commandLine(
+        pythonExecutable,
+        file('scripts/verify-student-java-sdk-consumer.py').absolutePath,
+        '--repository-root', rootDir.absolutePath,
+        '--gradle', gradleExecutable,
+        '--published-repository', sdkRepository.absolutePath
+    )
+    inputs.file('release.properties')
+    inputs.file('scripts/verify-student-java-sdk-consumer.py')
+    inputs.dir('examples/external-consumers/geometric-sequence-domain-java25')
+    outputs.file(new File(reportDirectory, 'consumer-report.json'))
+    outputs.upToDateWhen { false }
+}
+
+tasks.named('ciCheck') {
+    dependsOn verifySdkConsumer
+}

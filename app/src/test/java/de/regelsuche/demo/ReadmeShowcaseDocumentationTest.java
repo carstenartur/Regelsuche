@@ -38,11 +38,22 @@ class ReadmeShowcaseDocumentationTest {
         );
         assertAppearsBeforeQuickstart(readme, quickstart, "rule difference_of_squares:");
         assertAppearsBeforeQuickstart(readme, quickstart, "firstApplicable(");
+        assertAppearsBeforeQuickstart(readme, quickstart, "docs/java-discovery-sdk.md");
+        assertAppearsBeforeQuickstart(
+            readme, quickstart, "GeometricSequenceDomainProvider.domain()"
+        );
+        assertAppearsBeforeQuickstart(
+            readme, quickstart, "assertThat(run).isConfirmed().hasContentAddressedEvidence()"
+        );
 
         String normalized = readme.replaceAll("\\s+", " ");
         assertTrue(
             normalized.contains("keine Behauptung externer mathematischer Neuheit"),
             "The showcase must retain the external-novelty claim boundary"
+        );
+        assertTrue(
+            normalized.contains("CONFIRMED` gilt für diesen endlichen Prüfbereich"),
+            "The SDK example must not present finite sequence checks as a general proof"
         );
 
         for (String relative : List.of(
@@ -51,7 +62,9 @@ class ReadmeShowcaseDocumentationTest {
             "docs/generated/autonomous-discovery-walkthrough/representative-search.svg",
             "docs/assets/screenshots/macro-learning-summary.png",
             "docs/assets/screenshots/rational-summary.png",
-            "docs/assets/screenshots/math-matrix-preview.png"
+            "docs/assets/screenshots/math-matrix-preview.png",
+            "docs/java-discovery-sdk.md",
+            "examples/external-consumers/geometric-sequence-domain-java25/README.md"
         )) {
             assertTrue(
                 Files.isRegularFile(REPO_ROOT.resolve(relative)),
