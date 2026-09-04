@@ -2,11 +2,21 @@ plugins {
     id 'application'
 }
 
+def regelsucheRepository = providers.gradleProperty('regelsucheRepository')
+    .orElse(layout.projectDirectory.dir('repository').asFile.absolutePath)
+    .get()
+
 repositories {
-    maven {
-        url = uri(providers.gradleProperty('regelsucheRepository')
-            .orElse(layout.projectDirectory.dir('repository').asFile.absolutePath)
-            .get())
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'checkoutOwnedRegelsuche'
+                url = uri(regelsucheRepository)
+            }
+        }
+        filter {
+            includeGroup 'de.regelsuche'
+        }
     }
     mavenCentral()
 }
