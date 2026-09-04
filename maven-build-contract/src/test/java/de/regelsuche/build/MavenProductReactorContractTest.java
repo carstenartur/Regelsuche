@@ -36,6 +36,7 @@ class MavenProductReactorContractTest {
           "regelsuche-solver-portfolio",
           "regelsuche-learning",
           "regelsuche-discovery",
+          "regelsuche-discovery-sdk",
           "regelsuche-experiments",
           "regelsuche-cli",
           "regelsuche-quality",
