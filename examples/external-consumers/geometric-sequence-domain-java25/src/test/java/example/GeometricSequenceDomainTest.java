@@ -59,7 +59,7 @@ class GeometricSequenceDomainTest {
     }
 
     private static de.regelsuche.sdk.discovery.DiscoveryRun<
-        GeometricSequenceDomainProvider.Candidate,
+        GeometricSequenceDomainProvider.Plan,
         GeometricSequenceDomainProvider.Certificate
     > run(
             String payload,
