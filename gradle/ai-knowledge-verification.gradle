@@ -48,8 +48,17 @@ def verifyComplexityHotspots = tasks.register(
     outputs.upToDateWhen { false }
 }
 
-tasks.register('verifyRegelsucheAiKnowledgeLifecycle') {
+def verifyRegelsucheAiKnowledgeLifecycle = tasks.register(
+    'verifyRegelsucheAiKnowledgeLifecycle'
+) {
     group = 'verification'
     description = 'Runs the plugin-native lifecycle, structural artifact verifier and Regelsuche-specific quality gates.'
     dependsOn pluginArtifactVerification, verifyComplexityHotspots
+}
+
+// The root task remains the stable checkout/CI entrypoint. Its existing
+// dependency runs the plugin-native lifecycle; this additional dependency adds
+// the read-only structural and Regelsuche-specific post-verification stages.
+rootProject.tasks.named('aiKnowledgeCheck') {
+    dependsOn verifyRegelsucheAiKnowledgeLifecycle
 }
