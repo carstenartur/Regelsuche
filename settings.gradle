@@ -136,6 +136,18 @@ gradle.beforeProject { candidate ->
             settingsDir,
             'gradle/separated-jmh-authority.gradle')
     }
+    if (candidate.path in [
+            ':regelsuche-core',
+            ':regelsuche-egraph',
+            ':regelsuche-search',
+            ':regelsuche-validation',
+            ':regelsuche-discovery',
+            ':regelsuche-discovery-sdk'
+        ]) {
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/student-sdk-publication.gradle')
+    }
     if (candidate.path == ':app') {
         candidate.apply from: new File(
             settingsDir,

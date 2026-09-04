@@ -1,0 +1,67 @@
+name: Validate student Java SDK consumer
+
+on:
+  push:
+    paths:
+      - 'settings.gradle'
+      - 'release.properties'
+      - 'gradle/student-sdk-publication.gradle'
+      - 'regelsuche-discovery-sdk/**'
+      - 'regelsuche-discovery/**'
+      - 'regelsuche-core/**'
+      - 'regelsuche-search/**'
+      - 'regelsuche-egraph/**'
+      - 'regelsuche-validation/**'
+      - 'examples/external-consumers/geometric-sequence-domain-java25/**'
+      - 'scripts/verify-student-java-sdk-consumer.py'
+      - '.github/workflows/validate-student-java-sdk.yml'
+  pull_request:
+    paths:
+      - 'settings.gradle'
+      - 'release.properties'
+      - 'gradle/student-sdk-publication.gradle'
+      - 'regelsuche-discovery-sdk/**'
+      - 'regelsuche-discovery/**'
+      - 'regelsuche-core/**'
+      - 'regelsuche-search/**'
+      - 'regelsuche-egraph/**'
+      - 'regelsuche-validation/**'
+      - 'examples/external-consumers/geometric-sequence-domain-java25/**'
+      - 'scripts/verify-student-java-sdk-consumer.py'
+      - '.github/workflows/validate-student-java-sdk.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: student-java-sdk-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  external-consumer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Set up Java 25
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle 9.7
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+        with:
+          gradle-version: '9.7.0'
+
+      - name: Publish the SDK and build the clean external consumer
+        run: >-
+          python3 scripts/verify-student-java-sdk-consumer.py
+          --repository-root .
+          --gradle gradle
+
+      - name: Print verification report
+        run: cat build/reports/student-java-sdk/consumer-report.md
