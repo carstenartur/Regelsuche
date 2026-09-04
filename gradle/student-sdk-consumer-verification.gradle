@@ -30,17 +30,19 @@ def gradleExecutable = file(windows ? 'gradlew.bat' : 'gradlew').absolutePath
 // Fast filesystem regressions complement, but do not replace, the real Java build.
 def verifySdkStarter = tasks.register('verifyStudentDiscoveryStarter', Exec) {
     group = 'verification'
-    description = 'Tests starter package relocation, identifiers and output safety.'
+    description = 'Tests starter generation and consumer cleanup boundaries.'
     workingDir rootDir
     environment 'PYTHONDONTWRITEBYTECODE', '1'
     commandLine(
         pythonExecutable, '-B', '-m', 'unittest', 'discover',
         '-s', file('scripts').absolutePath,
-        '-p', 'test_student_discovery_starter.py', '-v'
+        '-p', 'test_student_discovery_*.py', '-v'
     )
     inputs.files(
         'scripts/create-student-discovery-domain.py',
-        'scripts/test_student_discovery_starter.py'
+        'scripts/verify-student-java-sdk-consumer.py',
+        'scripts/test_student_discovery_starter.py',
+        'scripts/test_student_discovery_consumer.py'
     )
 }
 
