@@ -27,6 +27,26 @@ public final class RewritePrograms {
         return new RewriteProgram.Source(new NodeMetadata(id, label, location), engine);
     }
 
+    public static RewriteProgram.BudgetedSource budgetedSource(
+        String id,
+        BudgetedTransformationSource source
+    ) {
+        return new RewriteProgram.BudgetedSource(
+            NodeMetadata.named(id),
+            source);
+    }
+
+    public static RewriteProgram.BudgetedSource budgetedSource(
+        String id,
+        String label,
+        SourceLocation location,
+        BudgetedTransformationSource source
+    ) {
+        return new RewriteProgram.BudgetedSource(
+            new NodeMetadata(id, label, location),
+            source);
+    }
+
     public static RewriteProgram choice(String id, RewriteProgram... alternatives) {
         return new RewriteProgram.Choice(NodeMetadata.named(id), programs(alternatives));
     }
