@@ -1,7 +1,7 @@
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.Exec
 
-// Publishes the SDK by task dependency, then starts only the external consumer.
+// Publishes the SDK by task dependency, then starts only the external consumers.
 def sdkModules = [
     'regelsuche-core',
     'regelsuche-egraph',
@@ -27,6 +27,25 @@ def windows = System.getProperty('os.name')
 def pythonExecutable = windows ? 'python' : 'python3'
 def gradleExecutable = file(windows ? 'gradlew.bat' : 'gradlew').absolutePath
 
+// Fast filesystem regressions complement, but do not replace, the real Java build.
+def verifySdkStarter = tasks.register('verifyStudentDiscoveryStarter', Exec) {
+    group = 'verification'
+    description = 'Tests starter generation and consumer cleanup boundaries.'
+    workingDir rootDir
+    environment 'PYTHONDONTWRITEBYTECODE', '1'
+    commandLine(
+        pythonExecutable, '-B', '-m', 'unittest', 'discover',
+        '-s', file('scripts').absolutePath,
+        '-p', 'test_student_discovery_*.py', '-v'
+    )
+    inputs.files(
+        'scripts/create-student-discovery-domain.py',
+        'scripts/verify-student-java-sdk-consumer.py',
+        'scripts/test_student_discovery_starter.py',
+        'scripts/test_student_discovery_consumer.py'
+    )
+}
+
 def cleanSdkRepository = tasks.register(
     'cleanStudentSdkVerificationRepository',
     Delete
@@ -47,8 +66,9 @@ def verifySdkConsumer = tasks.register(
     Exec
 ) {
     group = 'verification'
-    description = 'Verifies the published SDK through a clean Java 25 consumer.'
+    description = 'Verifies the published SDK through clean Java 25 consumers.'
     dependsOn publicationTaskPaths
+    dependsOn verifySdkStarter
     workingDir rootDir
     commandLine(
         pythonExecutable,
@@ -58,7 +78,10 @@ def verifySdkConsumer = tasks.register(
         '--published-repository', sdkRepository.absolutePath
     )
     inputs.file('release.properties')
+    inputs.file('scripts/create-student-discovery-domain.py')
     inputs.file('scripts/verify-student-java-sdk-consumer.py')
+    inputs.files('gradlew', 'gradlew.bat', 'gradle/wrapper/gradle-wrapper.jar',
+        'gradle/wrapper/gradle-wrapper.properties')
     inputs.dir('examples/external-consumers/geometric-sequence-domain-java25')
     outputs.file(new File(reportDirectory, 'consumer-report.json'))
     outputs.upToDateWhen { false }
