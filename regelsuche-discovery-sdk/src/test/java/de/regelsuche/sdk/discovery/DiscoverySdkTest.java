@@ -12,6 +12,7 @@ import de.regelsuche.discovery.domain.DiscoveryDomain.InvariantResult;
 import de.regelsuche.discovery.domain.DiscoveryDomain.ObjectiveAssessment;
 import de.regelsuche.discovery.domain.DiscoveryDomain.Successor;
 import de.regelsuche.discovery.domain.DomainDiscoveryEvidence.Outcome;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -72,6 +73,25 @@ class DiscoverySdkTest {
     }
 
     @Test
+    void normalizesProviderAndDomainIterationOrder() {
+        DiscoveryDomainCatalog catalog = DiscoveryDomainCatalog.fromProviders(List.of(
+            provider("z-provider", sampleDomain("z-domain"), sampleDomain("a-domain")),
+            provider("a-provider", sampleDomain("m-domain"))
+        ));
+
+        assertEquals(
+            List.of(
+                "a-provider:m-domain",
+                "z-provider:a-domain",
+                "z-provider:z-domain"
+            ),
+            catalog.registrations().stream()
+                .map(entry -> entry.providerId() + ":" + entry.domain().domainId())
+                .toList()
+        );
+    }
+
+    @Test
     void rejectsIncompleteDomainDefinitions() {
         var builder =
             DiscoveryDomainBuilder.<Integer, Integer, Integer>domain(
@@ -91,12 +111,20 @@ class DiscoverySdkTest {
         MultiplierCandidate,
         MultiplierCertificate
     > sampleDomain() {
+        return sampleDomain("sdk-multiplier-search");
+    }
+
+    private static DiscoveryDomain<
+        Integer,
+        MultiplierCandidate,
+        MultiplierCertificate
+    > sampleDomain(String domainId) {
         List<Long> observed = List.of(2L, 4L, 8L, 16L);
         List<Long> holdout = List.of(32L, 64L);
 
         return DiscoveryDomainBuilder
             .<Integer, MultiplierCandidate, MultiplierCertificate>domain(
-                "sdk-multiplier-search",
+                domainId,
                 "v1"
             )
             .generator(seed -> List.of(1))
@@ -142,6 +170,23 @@ class DiscoverySdkTest {
                 MultiplierCertificate::canonical
             )
             .build();
+    }
+
+    private static DiscoveryDomainProvider provider(
+            String id,
+            DiscoveryDomain<?, ?, ?>... domains
+    ) {
+        return new DiscoveryDomainProvider() {
+            @Override
+            public String id() {
+                return id;
+            }
+
+            @Override
+            public Collection<DiscoveryDomain<?, ?, ?>> domains() {
+                return List.of(domains);
+            }
+        };
     }
 
     private static CounterexampleResult observedCounterexample(
