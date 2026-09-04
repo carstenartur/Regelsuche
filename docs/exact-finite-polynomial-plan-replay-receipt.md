@@ -25,7 +25,8 @@ Transformation stehen absichtlich nicht im Receipt.
 ## Unabhängig geladene Artifact-Bytes
 
 `ExactFinitePolynomialPlanReplayArtifactVerifier` ergänzt eine getrennte
-Speichergrenze. Ein Receipt wird zunächst durch eine versionierte
+Speichergrenze. Receipt und Planlauf besitzen unterschiedliche Rollen,
+Inhaltsschemata und Medientypen. Ein Artefakt wird durch eine versionierte
 `ArtifactReference` beschrieben:
 
 ```text
@@ -46,7 +47,8 @@ und metadata-gebundene Artifact-ID selbst erneut.
 `VerifiedArtifactBytes` ist eine versiegelte Schnittstelle mit einer einzigen
 privaten Implementierung. Alle Byte-Zugriffe liefern Kopien. Identische Bytes
 unter einer anderen Rolle oder einem anderen Inhaltsschema besitzen eine andere
-Artifact-ID.
+Artifact-ID. Receipt-Bytes können nicht als Planlauf und Planlauf-Bytes nicht
+als Receipt verifiziert werden.
 
 ## Kanonische semantische Receipt-Prüfung
 
@@ -79,27 +81,125 @@ die semantischen Receipt-Felder und eine eigene versionierte
 Verifikationsidentität. Die einzige Implementierung ist privat und wird nur nach
 vollständiger Prüfung erzeugt.
 
-## Präzise Vertrauensgrenze
+## Kanonische Planlauf-Projektion
 
-Die semantische Stufe bestätigt, dass unabhängig geladene Bytes genau ein
-kanonisches, intern konsistentes Receipt der aktuellen Revision darstellen. Sie
-bestätigt noch nicht, dass ein separat gespeicherter Planlauf geladen wurde oder
-dass dieser Planlauf unter den gebundenen Formationseingaben erneut ausführbar
-ist.
-
-Der nächste stärkere Schritt lautet daher:
+`ExactFinitePolynomialPlanRun` besitzt zusätzlich zu seinem semantischen
+`contentHash` eine eigenständig versionierte kanonische Artefaktdarstellung:
 
 ```text
-VerifiedReplayReceiptArtifact
-+ unabhängig geladener kanonischer Planlauf
-+ eingefrorener Plan, Quelle, Ansatz, Domänen und Limits
-  -> Bindung an receipt.planRunHash
-  -> vollständige Resolver-/Solverausführung
-  -> neues identisches Replay-Receipt
+schema
++ artifactRevisionHash
++ Resolver-, Solver- und Planidentitäten
++ normalisierte Quelle und Ansatzschablone
++ sämtliche typisierten Hole-Domänen und exakten Werte
++ vollständige Zähler, Limits und terminale Status
++ sämtliche gespeicherten Lösungen und typisierten Bindungen
++ sämtliche Kandidaten mit vollständiger Resolution und Evidence-Links
+  -> kanonisches kompaktes JSON
 ```
 
-Auch dieses Ergebnis bleibt von primitiver Rewrite-Evidence, einem ausführbaren
-`RewriteProgram`, formaler Proof-Evidence und Promotion-Autorität getrennt.
+Die Reihenfolge stammt ausschließlich aus den bereits validierten und
+kanonisch normalisierten Domänen, Lösungen, Kandidaten, Bindungen und
+Obligation-Outcomes. Die Darstellung wird vor ihrer Ausgabe erneut gegen die
+1.000.000-Byte-Grenze geprüft.
+
+Der semantische `planRunHash` und der SHA-256 der gespeicherten Bytes bleiben
+absichtlich verschiedene Identitäten. Der erste bindet die mathematisch
+relevante Laufstruktur; der zweite bindet exakt diese versionierte externe
+Darstellung. Eine Änderung des Artefaktschemas ändert die Byteadresse, ohne den
+alten semantischen Lauf stillschweigend umzudeuten.
+
+## Unabhängig aufbewahrter Planlauf
+
+Ein semantisch gültiges Receipt genügt noch nicht. Der zugehörige Planlauf muss
+unter einer getrennten `plan-run`-Artifact-ID geladen und an die aktuelle
+typisierte Repräsentation gebunden werden.
+
+`ExactFinitePolynomialPlanReplayConfirmationVerifier` behandelt deshalb auch
+ein bereits konstruiertes `ExactFinitePolynomialPlanRun` zunächst als
+unvertrauenswürdig. Es wird nur akzeptiert, wenn seine kanonische UTF-8-Ausgabe
+bytegenau dem unabhängig geladenen und metadata-geprüften Planlauf-Artefakt
+entspricht:
+
+```text
+unabhängig geladene VerifiedArtifactBytes(role=plan-run)
++ zunächst unvertrauenswürdiger typisierter Planlauf
+  -> kanonische JSON-Bytes des typisierten Werts
+  -> exakte Byte- und ArtifactReference-Gleichheit
+  -> erst danach darf der typisierte Wert verwendet werden
+```
+
+Damit ist kein toleranter Planlauf-Parser nötig, der zwei unterschiedliche
+JSON-Darstellungen als dieselbe Evidence behandeln könnte. Der typisierte Wert
+liefert nur eine Rekonstruktionsbehauptung; die separat geladenen Bytes bleiben
+die Speicherautorität.
+
+## Vollständige Cross-Bindung und erneute Ausführung
+
+Nach der Bytegleichheit prüft die Confirmation-Stufe:
+
+```text
+receipt.planHash                   == plan.contentHash
+receipt.planRunHash                == retainedPlanRun.contentHash
+receipt.solverResultHash           == retainedPlanRun.solverResult.contentHash
+receipt.solverRevisionHash         == retainedPlanRun.solverResult.solverRevisionHash
+receipt.runStatus und alle Zähler  == retainedPlanRun
+receipt.resolvedCandidateHashes    == retainedPlanRun.candidates
+```
+
+Anschließend erhält der bestehende Replay-Verifier den eingefrorenen Plan, die
+Quelle, den Ansatz, die Hole-Domänen, das Retained-Limit und den bytegebundenen
+Planlauf. Er führt Resolver und Solver **ein weiteres Mal vollständig** aus. Nur
+wenn das neu erzeugte Receipt exakt dem semantisch geprüften, unabhängig
+gespeicherten Receipt entspricht, entsteht ein privates, versiegeltes
+`ConfirmedReplay`.
+
+Die Bestätigung bindet beide Artifact-Referenzen, die semantische
+Receipt-Verifikationsidentität, Plan-, Planlauf-, Solverresultat- und
+Solverrevisionshash, Status, Zähler, die geordneten Kandidatenidentitäten, die
+Anzahl der frischen vollständigen Replayausführungen und einen eigenen
+`confirmationHash`.
+
+Damit werden Änderungen an Quelle, Ansatz, Domänenart, Domänenwerten,
+Domänenreihenfolge, Retained-Limit, Solverresultat oder Kandidatenidentitäten
+fail-closed erkannt. Vollständige Nullergebnisse, vollständige Lösungsmengen und
+abgeschnittene gespeicherte Lösungsmengen bleiben getrennte Zustände.
+
+## Präzise Vertrauensgrenze
+
+Die Confirmation-Stufe bestätigt gemeinsam:
+
+- unabhängige Speicheridentität der Receipt-Bytes;
+- kanonische semantische Gültigkeit des Receipts;
+- unabhängige Speicheridentität der Planlauf-Bytes;
+- bytegenaue Bindung des typisierten Planlaufs;
+- Cross-Bindung von Plan, Planlauf und Solverresultat;
+- eine frische vollständige Reproduktion unter den eingefrorenen
+  Formationseingaben.
+
+Auch dieses Ergebnis ist noch keine primitive Rewrite-Evidence. Der Solver hat
+einen äquivalenten instanziierten Ausdruck gefunden, aber keine Folge
+gewöhnlicher AST-Regelanwendungen erzeugt. Eine solche Folge nachträglich zu
+erfinden würde falsche Provenienz erzeugen.
+
+Der nächste ehrliche Schritt ist deshalb zunächst eine explizit ausgewählte,
+verifier-eigene **nicht ausführbare** Transformationsevidence für genau einen
+bestätigten Kandidaten:
+
+```text
+ConfirmedReplay
++ validierter Planlauf
++ expliziter Kandidatenhash
+  -> Mitgliedschaft und sämtliche Links erneut prüfen
+  -> Quelle und instanziierten Ausdruck binden
+  -> vollständige Solver-/Replayarbeit binden
+  -> non-executable VerifiedPlanCandidateEvidence
+```
+
+Erst ein späterer, work-aware Adapter darf daraus eine benannte exakte
+Theorieoperation für die vorhandene Such- und `RewriteProgram`-Infrastruktur
+machen. Formaler Beweis, primitive Regelhistorie, gelernte Ansatzgrammatik,
+Promotion, Neuheit und Publikation bleiben getrennt.
 
 ## Reproduktion
 
@@ -107,7 +207,9 @@ Auch dieses Ergebnis bleibt von primitiver Rewrite-Evidence, einem ausführbaren
 ./gradlew :regelsuche-learning:test \
   --tests '*ExactFinitePolynomialPlanReplayVerifierTest' \
   --tests '*ExactFinitePolynomialPlanReplayArtifactVerifierTest' \
-  --tests '*ExactFinitePolynomialPlanReplayReceiptArtifactVerifierTest'
+  --tests '*ExactFinitePolynomialPlanReplayReceiptArtifactVerifierTest' \
+  --tests '*ExactFinitePolynomialPlanRunArtifactVerifierTest' \
+  --tests '*ExactFinitePolynomialPlanReplayConfirmationVerifierTest'
 
 ./gradlew --no-configuration-cache ciCheck
 ```
