@@ -14,6 +14,21 @@ Folge. Die Tests decken ab:
 - zu kleines Budget mit Ergebnis `BUDGET_EXHAUSTED`;
 - Auffindbarkeit des Providers über `ServiceLoader`.
 
+Die Tests verwenden die JUnit-unabhängige SDK-Assertionsschicht:
+
+```java
+assertThat(run)
+    .isConfirmed()
+    .hasCounterexampleContaining("multiplier 1")
+    .candidateSatisfies(candidate ->
+        assertEquals(2, candidate.multiplier()))
+    .hasContentAddressedEvidence();
+```
+
+Dadurch bleiben Status-, Zertifikats- und Evidence-Semantik sichtbar, ohne dass
+ein externer Autor die internen Evidence-Records einzeln prüfen muss.
+Domänenspezifische Aussagen bleiben normale Java-Assertions.
+
 Nach Veröffentlichung der SDK-Artefakte in ein lokales Maven-Repository:
 
 ```bash

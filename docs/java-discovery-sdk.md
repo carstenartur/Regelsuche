@@ -100,6 +100,42 @@ SDK-Fassade. Das ist keine Sicherheitsgrenze gegen Reflection oder absichtlich
 erzeugte Split Packages. Maßgeblich bleiben die kanonische Evidence und ihre
 unabhängige Prüfung.
 
+## Ergebnisse verständlich prüfen
+
+`DiscoveryRunAssertions` bietet eine kleine, von JUnit unabhängige
+Assertionsschicht. Sie prüft ausschließlich die öffentliche Ergebnissicht und
+wirft bei einer Abweichung einen `AssertionError` mit dem Evidence-Hash. Sie
+verändert weder den Status noch die mathematische Bedeutung eines Laufs.
+
+```java
+import static de.regelsuche.sdk.discovery.DiscoveryRunAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+assertThat(run)
+    .isConfirmed()
+    .hasCounterexampleContaining("multiplier 1")
+    .candidateSatisfies(candidate ->
+        assertEquals(2, candidate.multiplier()))
+    .certificateSatisfies(certificate ->
+        assertEquals(2, certificate.multiplier()))
+    .hasContentAddressedEvidence();
+```
+
+Die terminalen Zustände bleiben ausdrücklich verschieden:
+
+```java
+assertThat(refutedRun).isRefuted();
+assertThat(inconclusiveRun).isInconclusive();
+assertThat(shortRun).isBudgetExhausted();
+```
+
+`isConfirmed()` verlangt Kandidat und Zertifikat. Alle nicht bestätigten
+Statusmethoden verlangen, dass keine ausgewählten Objekte veröffentlicht
+werden. Domänenspezifische Aussagen bleiben normale Java-Assertions innerhalb
+von `candidateSatisfies(...)` beziehungsweise `certificateSatisfies(...)`.
+Weitere Prüfungen decken Gegenbeispielanzahl, ausgeführte Ressourcen,
+Übergangsannahmen und die content-addressed Evidence ab.
+
 ## Externe Provider
 
 Eine Bibliothek registriert Domänen über `DiscoveryDomainProvider`:
