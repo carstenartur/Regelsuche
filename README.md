@@ -8,26 +8,203 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20951900.svg)](https://doi.org/10.5281/zenodo.20951900)
 
-**Regelsuche ist eine reproduzierbare Plattform zur Suche, Erklärung und
-Untersuchung symbolischer mathematischer Umformungen.** Mathematische Ausdrücke
-werden als AST-Zustände modelliert, Regeln als ausführbare Züge und Rechenwege
-als nachvollziehbare Pfade durch einen Suchraum.
-
-Die Plattform verbindet eine grafische Workbench, mehrere Suchverfahren,
-deklarative und programmatische Regeln, Discovery- und Lernverfahren,
-Validierungs- und Proof-Backends sowie hashgebundene Forschungsartefakte.
+**Mathematik als durchsuchbares Spiel:** Regelsuche zeigt nicht nur ein Ergebnis,
+sondern die möglichen Züge an jedem Teilausdruck, die untersuchten Alternativen
+und den nachvollziehbaren Weg zum Ergebnis. Erfolgreiche, qualifizierte Pfade
+können als neue Strategien wiederverwendet werden.
 
 [Demo starten](#schnellstart) ·
-[Dokumentation](docs/README.md) ·
+[Workbench](docs/web-workbench.md) ·
+[Discovery Gallery](docs/demo-gallery.md) ·
+[Java Discovery SDK](docs/java-discovery-sdk.md) ·
 [Aktueller Forschungsstand](docs/discovery-status.md) ·
 [Architektur](docs/architecture.md) ·
-[Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md) ·
-[Unabhängige Reproduktion](docs/independent-reproduction.md)
+[Unabhängig reproduzieren](docs/independent-reproduction.md)
 
-> Regelsuche ist weder ein allgemeiner Ersatz für ein Computer-Algebra-System
-> noch ein Automatismus für mathematische Neuheit. Sucherfolg, Validierung,
-> formaler Beweis, Projekt-Neuheit, externe Neuheit und Veröffentlichung sind
-> getrennte, fehlersicher sperrende Evidenzstufen.
+![AST-Regelradar: konkrete lokale Züge an den Knoten eines mathematischen Ausdrucks und ihr Übergang in den globalen Suchgraphen](docs/assets/ast-rule-radar.svg)
+
+*Ein Ausdruck ist eine Spielposition. Die Punkte an jedem AST-Knoten sind
+konkrete, dort ausführbare Regelanwendungen. Jeder ausgewählte Zug erzeugt einen
+neuen vollständigen Ausdruckszustand samt Position, Bindungen, Annahmen und
+Replay-Evidence.*
+
+## Was Regelsuche sichtbar macht
+
+| Statt einer Black Box | Regelsuche zeigt |
+| --- | --- |
+| nur das Endergebnis | alternative Rechenwege und den erkundeten Suchraum |
+| einen undurchsichtigen Simplifier-Aufruf | die konkrete Regel an der konkreten AST-Position |
+| ungebundene Heuristik | Kosten, Budgets, Pruninggründe und Annahmen |
+| eine neu gelernte Abkürzung ohne Herkunft | den expandierbaren primitiven Pfad und seine Lineage |
+| einen Solverstatus ohne Artefakte | Obligation, Backend-Ausgabe, Hashes und reproduzierbare Evidence |
+
+Best-First, Beam, `A*`, Monte Carlo und Equality Saturation können auf denselben
+expliziten Zuständen und Kanten arbeiten. Die grafische Workbench verbindet
+Suchgraph, Pfade, Replay, AST-Regelradar, Kandidaten, Proof-Jobs und Exporte in
+einem Ablauf.
+
+## Beispiel: eine versteckte Faktorisierung als Suchraum
+
+Ausgangspunkt und Ziel des generierten Sophie-Germain-Szenarios sind:
+
+```text
+x^4 + 4*y^4
+
+→ (x^2 - 2*x*y + 2*y^2) * (x^2 + 2*x*y + 2*y^2)
+```
+
+Interessant ist nicht, dass die bekannte Identität irgendwo hinterlegt werden
+könnte. Der Lauf behält vielmehr die tatsächlich untersuchten Zustände, die
+vorbereitende Bridge, die primitive Faktorisierung, das daraus gebildete Makro
+und dessen spätere Wiederverwendung. Die folgende Darstellung wird aus der
+kanonischen Evidence erzeugt, nicht für das README nachgezeichnet.
+
+![Generierter Suchraum des Sophie-Germain-Szenarios mit untersuchten Zuständen, Bridge- und Makrokanten](docs/generated/discovery/sophie-germain/search-space.svg)
+
+[Evidence dieses Laufs](docs/generated/discovery/sophie-germain/evidence.json) ·
+[visuelle Discovery Gallery](docs/demo-gallery.md) ·
+[domänenbewusste Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md)
+
+## Lernen muss sich auf unbekannten Fällen auszahlen
+
+Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen
+einen parametrisierten Kandidaten, trennt Kandidatenbildung und Prüfung und
+misst anschließend die Wiederverwendung auf zurückgehaltenen Aufgaben. Im vom
+Evidence-Bundle ausgewählten Beispiel erreicht die Baseline das Ziel innerhalb
+von 80 untersuchten Zuständen nicht; mit dem Kandidaten wird es in einem Schritt
+bei drei untersuchten Zuständen erreicht.
+
+![Evidence-basierter Held-out-Vergleich: Baseline ohne Treffer nach 80 Zuständen, Kandidat mit Treffer nach drei Zuständen](docs/generated/autonomous-discovery-walkthrough/representative-search.svg)
+
+Die vollständige Fallserie, Kandidaten-Lineage, Hashbindung und unabhängige
+Prüfung stehen im [Autonomous Discovery Walkthrough](docs/autonomous-discovery-walkthrough.md).
+Das ist projektinterne, symbolisch geprüfte Wiederverwendung — **keine
+Behauptung externer mathematischer Neuheit**.
+
+## Workbench statt Konsolenausgabe
+
+Browser-E2E-Tests prüfen die sichtbaren Abläufe und erzeugen dieselben
+Dokumentationsaufnahmen. Der folgende kompakte Ausschnitt zeigt einen Lauf, in
+dem ein mehrstufiger Pfad als Makro gelernt und erneut verwendet wird.
+
+![Testgenerierte Workbench-Zusammenfassung eines gelernten und wiederverwendeten Makros](docs/assets/screenshots/macro-learning-summary.png)
+
+<table>
+<tr>
+<td width="50%"><strong>Rationale Ausdrücke</strong><br><img src="docs/assets/screenshots/rational-summary.png" alt="Workbench-Zusammenfassung einer rationalen Umformung mit Ergebnis und Suchdaten"></td>
+<td width="50%"><strong>Matrizen</strong><br><img src="docs/assets/screenshots/math-matrix-preview.png" alt="Workbench-Vorschau einer Matrixdarstellung"></td>
+</tr>
+</table>
+
+Weitere sichtbare Abläufe: [Pfade, Graph und Replay](docs/web-ui-user-guide.md),
+[AST-Regelradar](docs/ast-rule-radar.md),
+[Proof Workbench](docs/proof-workbench.md) und
+[User Workflows](docs/user-workflows.md).
+
+## In wenigen Zeilen erweitern
+
+### Eine mathematische Regeldatei
+
+Regeln, Makros und Aktivierungsprofile können in einer kleinen DSL beschrieben
+werden:
+
+```text
+rule difference_of_squares:
+  pattern: A^2 - B^2
+  replace: (A - B) * (A + B)
+  direction: forward
+  priority: 5
+  tags:
+    - factorization
+  explanation: "Erkennt die Differenz zweier Quadrate."
+```
+
+Die Regel erscheint anschließend wie eine eingebaute Regel im Suchgraphen,
+Replay und AST-Regelradar. Bedingungen, Profile, Import, Export und Debugging
+beschreibt die Seite [Regeldateien](docs/rule-files.md).
+
+### Eine Suchstrategie als typisiertes Java-Programm
+
+Vorhandene Engines lassen sich ohne zweite Suchimplementierung kombinieren:
+
+```java
+import static de.regelsuche.search.program.RewritePrograms.*;
+
+RewriteProgram strategy = firstApplicable(
+    "learn-or-derive",
+    source("learned-macros", macroEngine),
+    sequence(
+        "normalize-then-factor",
+        source("normalization", normalizationEngine),
+        source("factorization", factorizationEngine)
+    ),
+    source("ordinary-rules", ordinaryRuleEngine)
+);
+```
+
+`Require`, `Prioritize` und `Prune` bleiben getrennte Operationen; Tracing kann
+Kandidaten, verworfene Alternativen und reale Kürzungen sichtbar machen. Details
+stehen unter [Java-internal Rewrite Programs](docs/java-rewrite-programs.md) und
+[Plugin-API](docs/plugin-api.md).
+
+### Eigene Discovery-Domänen mit dem Java-SDK
+
+Das headless nutzbare Java-25-SDK lässt eigene Zustände, Übergänge,
+Gegenbeispielsuchen und Zertifikate in normalem Java definieren, ohne Webserver
+oder Persistenz einzubinden. So sieht ein Lauf im
+[eigenständig gebauten Folgenbeispiel](examples/external-consumers/geometric-sequence-domain-java25/README.md)
+aus; der dort enthaltene Provider definiert die Domäne:
+
+```java
+import static de.regelsuche.sdk.discovery.DiscoveryRunAssertions.assertThat;
+import de.regelsuche.sdk.discovery.DiscoveryBudgets;
+import de.regelsuche.sdk.discovery.RegelsucheDiscovery;
+import example.GeometricSequenceDomainProvider;
+
+var run = RegelsucheDiscovery
+    .forDomain(GeometricSequenceDomainProvider.domain())
+    .campaign("external-geometric-sequence-demo")
+    .seed("powers-of-two",
+        "observed=2,4,8,16;holdout=32,64;maxMultiplier=6",
+        "external-java25-example")
+    .budget(DiscoveryBudgets.small())
+    .run();
+
+assertThat(run).isConfirmed().hasContentAddressedEvidence();
+System.out.println(run.selectedCandidate().orElseThrow().multiplier()); // 2
+```
+
+Der Lauf sucht den Multiplikator aus den beobachteten Werten, behält
+Gegenbeispiele und prüft den Kandidaten getrennt an den zurückgehaltenen Werten.
+`CONFIRMED` gilt für diesen endlichen Prüfbereich, nicht als Beweis einer
+allgemeinen Aussage über unendliche Folgen. Das vollständige Beispiel testet
+auch `REFUTED`, `BUDGET_EXHAUSTED` und das Laden über `ServiceLoader`.
+
+[Java Discovery SDK](docs/java-discovery-sdk.md) erklärt Builder, Budgets,
+Assertions und Provider-SPI. Die SDK-Artefakte werden derzeit aus dem Checkout
+lokal veröffentlicht; eine dauerhaft öffentliche Maven-Veröffentlichung und
+eine stabile API über Releases werden noch nicht zugesagt.
+
+## Repräsentationsbrücken öffnen neue Mathematikbereiche
+
+Regelsuche behandelt geeignete Gleichungssysteme nicht nur als Listen skalarer
+Zeilen. Mit explizit deklarierten Rollen kann beispielsweise
+
+```text
+a*x + b*y = lambda*x
+c*x + d*y = lambda*y
+```
+
+als Eigenproblem `A*v = lambda*v` erkannt, in die exakte Koeffizientenmatrix
+
+```text
+[[a-lambda, b],
+ [c, d-lambda]]
+```
+
+überführt und bis `det(A - lambda*I) = 0` weitergeführt werden. Variablennamen
+allein erzeugen keine physikalische Interpretation. Siehe
+[Symbolische Gleichungssysteme und Eigenprobleme](docs/symbolic-eigenproblem-representation.md).
 
 ## Schnellstart
 
@@ -43,9 +220,9 @@ Danach `http://127.0.0.1:8080/` öffnen und eine der geführten Demos starten.
 Suchgraph, gefundene Pfade, Replay, AST-Regelradar, Proof-Jobs und Exporte sind
 in derselben Workbench erreichbar.
 
-Die ungebundene Variante `docker run --rm -p 8080:8080 regelsuche` veröffentlicht
-die Demo auf allen Host-Interfaces. Sie ist für die lokale Standarddemo nicht
-empfohlen und nur in bewusst isolierten Umgebungen sinnvoll.
+Die ungebundene Variante `docker run --rm -p 8080:8080 regelsuche`
+veröffentlicht die Demo auf allen Host-Interfaces. Sie ist für die lokale
+Standarddemo nicht empfohlen und nur in bewusst isolierten Umgebungen sinnvoll.
 
 Ohne Docker genügt mit JDK 25:
 
@@ -72,252 +249,27 @@ Das optionale Neo4j-Profil startet mit:
 docker compose --profile neo4j up --build
 ```
 
-Details und Produktionsgrenzen stehen in [Persistenz und Full Mode](docs/persistence.md).
+Details und Produktionsgrenzen stehen in
+[Persistenz und Full Mode](docs/persistence.md).
 
-## Mathematik als Spiel
+## Implementierte Bausteine
 
-Das Projekt folgt einem einfachen Modell:
+| Bereich | Gegenwärtiger Stand | Vertiefung |
+| --- | --- | --- |
+| Suchraum und Erklärung | mehrere Suchverfahren, explizite Zustände und Kanten, Pfade, Replay und Exporte | [Search Intelligence](docs/search-intelligence.md) |
+| Lokale Regelanwendung | positionsbezogene Kandidaten, Bindungen, Annahmen, Vorschau und Suchstatus | [AST-Regelradar](docs/ast-rule-radar.md) |
+| Regelvorbereitung | direkte Anwendung, typisierte Guards, native Exact-Spezialisten und begrenzte lokale Bridges | [Safe Rule Preparation Coordinator](docs/safe-rule-preparation-coordinator.md) |
+| Lernen und Wiederverwendung | Kandidatenbildung, Counterexamples, Holdouts, Generationsbarrieren und Schatteninventare | [Generational Rule Mining](docs/generational-rule-mining.md) |
+| Polynome | exakte `Z[x]`-/`Q[x]`-Repräsentation, native univariate Faktorisierung, Vorschlagsadapter und unabhängige Produktprüfung | [Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md) |
+| Gleichungssysteme | exaktes `A*x=b`, Blockzerlegung, RREF, Lösungsklassifikation und explizite Eigenproblemrollen | [Representation Bridges](docs/equation-system-matrix-representation.md) |
+| Proof | versionierte Obligationen, Z3/cvc5, optional Lean sowie getrennte Job- und mathematische Status | [Proof Workbench](docs/proof-workbench.md) |
+| Erweiterungen | Regeldateien, Knowledge Packs, Java-Plugins, Makros und typisierte Rewrite-Programme | [Extension System](docs/extension-system.md) |
+| Java-SDK | eigene Discovery-Domänen, fluente Fassade, Budgets, Assertions und externer ServiceLoader-Consumer | [Java Discovery SDK](docs/java-discovery-sdk.md) |
+| Reproduzierbarkeit | kanonische JSON-Artefakte, Manifeste, Hashes, Containerläufe und unabhängige Verifier | [Scientific Reproducibility](docs/scientific-reproducibility.md) |
 
-- ein mathematischer Ausdruck ist eine **Position**;
-- eine anwendbare Transformationsregel ist ein **legaler Zug**;
-- eine Folge von Transformationen ist eine **Spielvariante** beziehungsweise
-  ein Rechenweg;
-- ein Suchverfahren untersucht mögliche Varianten unter expliziten Budgets;
-- wiederkehrende erfolgreiche Varianten können zu höheren Strategien werden.
-
-Der mathematische Raum ist im Gegensatz zu einem Brettspiel nicht endlich.
-Regelsuche enumeriert deshalb nicht Ausdrücke naiv, sondern erkennt
-parametrisierte Muster in abstrakten Syntaxbäumen. Eine endliche Regel kann so
-für unendlich viele konkrete Ausdrücke stehen.
-
-## Was sich mit Regelsuche untersuchen lässt
-
-- **Transformationsräume durchsuchen:** Best-First, Beam, `A*`, Monte Carlo und
-  Equality Saturation arbeiten auf denselben expliziten Zuständen und Kanten.
-- **Rechenwege erklären:** Jeder retained Pfad enthält Regelherkunft,
-  AST-Position, Bindungen, Annahmen und Kosten.
-- **Lokale Regelanwendungen prüfen:** Das AST-Regelradar zeigt, welche konkrete
-  Regel an welcher Baumposition anwendbar ist und welchen vollständigen
-  Folgeausdruck sie erzeugt.
-- **Regeln und Strategien erweitern:** Java-Plugins, Regeldateien, Knowledge
-  Packs, deklarative Makros und qualifizierte gelernte Makros besitzen getrennte
-  Vertrauens- und Aktivierungsgrenzen.
-- **Kandidaten bilden und falsifizieren:** Targetfreie Suchbeobachtungen können
-  zu parametrisierten Hypothesen verdichtet und gegen Holdouts sowie
-  Counterexamples geprüft werden.
-- **Gelernte Regeln generationenweise prüfen und wiederverwenden:** Akzeptierte
-  experimentelle Regeln werden erst nach Abschluss einer Generation in ein
-  eingefrorenes Schatteninventar der nächsten Generation übernommen. Gleichzeitiges
-  Lernen und Nutzen innerhalb derselben Generation ist ausgeschlossen.
-- **Mathematische Darstellungen und Faktorisierungen synthetisieren:** Der
-  exakte Parser erzeugt source-gebundene Literalprovenienz und kanonische
-  Polynome in expliziten Ringen. Native und optionale externe Engines liefern
-  zunächst untrusted Vorschläge; Produktrückprüfung, exaktes Rendering und
-  erneute Ringrekonstruktion bleiben getrennte, budgetierte Evidenzstufen.
-- **Beweisobligationen erzeugen:** Proof-Backends erhalten versionierte
-  Obligationen. Ein formaler Status wird nur aus tatsächlich bestätigter
-  Proof-Evidence abgeleitet.
-- **Ergebnisse reproduzieren:** Kanonische JSON-Artefakte, Manifeste, Hashes,
-  Containerläufe und unabhängige Verifier machen Konfiguration und Ergebnis
-  überprüfbar.
-
-## Regelgerichtete Vorbereitung fast passender Ausdrücke
-
-Eine Regel wird nicht mehr allein deshalb verworfen, weil ihr linkes Muster den
-aktuellen AST nicht unmittelbar trifft. Der produktnahe Unified Coordinator
-verwendet folgende Reihenfolge:
-
-```text
-konkrete direkte Regelanwendung
-  -> typisierte Guard-Prüfung
-  -> registrierter nativer Exact-Spezialist
-  -> begrenzte, mustergerichtete lokale Bridge-Suche
-  -> erneute konkrete Regelanwendung
-  -> unabhängige Verifikation
-```
-
-Direkte Ausführung bleibt der billigste und maßgebliche Pfad. Erst danach darf
-eine explizite `RewriteApplicabilitySchema` die Vorbereitung lenken. Das Schema
-enthält kein gewünschtes Ergebnis und keinen deklarativen Ersatz für eine
-algorithmische Java-Regel.
-
-Die content-addressed `SafePreparationEngineRegistry` bindet die vorhandenen
-exakten Spezialsolver für Polynomquotienten, AC-Faktorexposition, gemeinsame
-Monomfaktoren, perfekte Quadrate und gemeinsame Nenner an eine feste Reihenfolge
-und an ihre jeweilige native Hauptregel. Ein nur ähnlich aussehendes importiertes
-oder gelerntes Pattern erbt nicht automatisch den Solververtrag einer anderen
-Regel.
-
-Wo kein nativer Spezialist zuständig ist, untersucht der bounded local bridge
-ein eingefrorenes Inventar äquivalenzbewahrender Vorbereitungen. Jede positive
-Anwendung muss am retained End-AST nochmals durch den wirklichen Executor
-abgespielt werden. Die Evidence behält insbesondere:
-
-- Ausgangs-, Zwischen- und Ergebnis-AST;
-- Regel-, Schema-, Registry- und Inventar-Fingerprints;
-- partielle Bindungen und Restbedingungen;
-- typisierte Voraussetzungen und kumulierte Annahmen;
-- vollständige primitive Regellinie;
-- Work Accounting und erreichte Grenzen;
-- ein unabhängig erneut prüfbares Zertifikat.
-
-Unbekannte Voraussetzungen autorisieren keinen Zug. Beispielsweise wird die
-Teleskopidentität für `1/(n*(n+1))` nur unter den gebundenen Bedingungen
-`n != 0` und `n + 1 != 0` ausgeführt. Technische Exceptions werden als
-`TECHNICAL_FAILURE` retained und nicht als gewöhnlicher Nichttreffer behandelt.
-
-Eine exakt promovierte gelernte Pattern-Regel kann denselben lokalen
-Vorbereitungspfad nutzen. Der erste implementierte Promotionsadapter akzeptiert
-nur assumption-free Identitäten in einem begrenzten exakten Polynomfragment.
-Rohe evolutionär erzeugte Regeln bleiben dagegen bewusst
-`isEquivalencePreservingByConstruction() == false`. Gelernte
-`RewriteProgram`s aus Sequenzen, Alternativen und Wiederholungen benötigen ein
-eigenes programmbasiertes Applicability-/Replay-Schema.
-
-Details:
-
-- [Sicherer Regelvorbereitungskoordinator](docs/safe-rule-preparation-coordinator.md)
-- [Rule-directed Preparation Planning](docs/rule-directed-preparation-planning.md)
-- [Promotion gelernter Pattern-Regeln](docs/learned-pattern-rule-promotion.md)
-
-## Exakte Repräsentationsbrücken
-
-Gleichungssysteme werden im aktuellen Produktpfad als mathematische Objekte
-behandelt statt nur als lose skalare Gleichungen. Implementiert sind:
-
-```text
-skalare affine Gleichungen
-  -> exaktes A*x=b
-  -> unabhängige Matrixblöcke
-  -> exakte RREF
-  -> eindeutige, parametrisierte oder inkonsistente Lösung
-```
-
-Mit explizit deklarierten Rollen können symbolische Systeme außerdem als
-Eigenproblem erkannt und bis zum charakteristischen Polynom weitergeführt
-werden. Namen wie `H`, `psi` oder `lambda` erzeugen dabei keine physikalische
-Bedeutung; eine Quanteninterpretation benötigt einen ausdrücklichen
-Modellkontext.
-
-Diese typisierten Repräsentationsbrücken bleiben von skalaren AST-Rewrites
-getrennt. Ihre direkte Teilnahme am Unified Preparation Coordinator ist noch
-eine offene Integrationsstufe.
-
-## Generationenbasiertes, proof-gated Regelmining
-
-Die experimentelle Lernkampagne trennt Regelbildung und Regelverwendung durch
-harte Generationsbarrieren:
-
-```text
-eingefrorenes Inventar I_n
-  -> targetfreie Suchbeobachtungen
-  -> Kandidaten-Freeze
-  -> Validation, Counterexamples, Holdouts, Leakage-Audit und Exact Proof
-  -> akzeptiertes Schatteninventar I_(n+1)
-```
-
-Eine Regel darf erst von der folgenden Generation genutzt werden. Jede
-Schatteninventar-Revision ist content-addressed; verworfene Kandidaten und ihre
-terminalen Gründe bleiben erhalten. Ein kumulativer Audit vergleicht unter
-demselben maximalen Suchdepth `0+1` mit `0+1+2` und verlangt bei dem positiven
-Kontrollfall die tatsächliche Verwendung einer Regel aus Generation 2.
-
-Dieser Mechanismus verändert weder das normale Produktionsinventar noch den
-öffentlichen Capability-Status. `PROMOTION` bleibt `NOT_EVALUATED`; gezeigt ist
-eine begrenzte, intern verifizierte Wiederverwendung im experimentellen
-Schatteninventar, keine autonome mathematische Neuheit.
-
-Details: [Generational Rule Mining](docs/generational-rule-mining.md).
-
-## Domänenbewusste Polynomfaktorisierung
-
-Der Polynomkern trennt Quellvorkommen, mathematische Identität,
-Backend-Vorschläge und Regelsuche-Evidence:
-
-```text
-ExpressionParser.parseExactTerm
-  -> ExactParsedTerm mit node-identischer Literalprovenienz
-  -> ExactParsedUnivariatePolynomialView
-  -> PolynomialRing<ExactRational>
-  -> SparsePolynomial<ExactRational>
-  -> FactorizationRequest
-  -> FactorizationEngine: untrusted Proposals und Backend-Claims
-  -> FactorizationVerifier: Vertrags- und exakte Produktprüfung
-  -> verifier-ausgestellter Kandidat
-  -> deterministisches exaktes Faktorenrendering
-  -> erneutes parseExactTerm und Polynomrekonstruktion
-  -> autorisierte Wurzel-Transformation
-```
-
-Die native allgemeine univariate Engine verarbeitet das deklarierte begrenzte
-`Z[x]`-/`Q[x]`-Fragment. Ihr deterministischer Pfad umfasst Inhalt und
-Primitivteil, Ableitung/GGT und quadratfreie Zerlegung, geeignete
-Primzahlauswahl, vollständige Berlekamp-Faktorisierung in `F_p[x]`,
-Multifaktor-Hensel-Lifting, begrenzte Zassenhaus-Rekombination in `Z[x]` und
-exakte rationale Reassemblierung. Ein optionaler GraalPy/SymPy-Adapter liefert
-Vorschläge hinter derselben typisierten Engine-/Verifier-Grenze.
-
-Die `BinaryQuarticFactorizationEngine` bleibt als spezialisierter historischer
-Kontrollpfad erhalten. Der Sophie-Germain-Fall und weitere Quartikfamilien
-entstehen dort aus einer allgemeinen Koeffizientenbedingung; ein benannter
-Spezial-Bridge bleibt nur zur Reproduktion und Ablation deaktiviert erhalten.
-
-Jede positive Zerlegung wird durch `FactorizationVerifier` im Quellring exakt
-zurückmultipliziert. Der neue Wurzelpfad prüft zusätzlich Quell-/Literalbindung,
-rendert rationale Faktoren ohne `double`, parst die Ersatzdarstellung erneut
-exakt und verlangt Gleichheit im ursprünglichen Ring. Ein Backend-Miss ist kein
-Irreduzibilitätsbeweis, ein Backend-Claim keine unabhängig zertifizierte
-Vollständigkeit oder Irreduzibilität.
-
-Der Wurzel-Transformationspfad ist implementiert und charakterisiert, aber noch
-nicht als allgemeines Such- oder Workbench-Defaultprofil aktiviert.
-Verschachtelte Vorkommen müssen als nächste Stufe die vorhandene
-`TreePosition`-/Stalenessschutz- und Local-Rewrite-Infrastruktur
-wiederverwenden. Multivariate Faktorisierung und algorithmisch unabhängige
-Vollständigkeits-/Irreduzibilitätszertifikate bleiben offen.
-
-Details:
-
-- [Domänenbewusste Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md)
-- [Exakte Parser-zu-Faktorisierungs-Pipeline](docs/exact-parsed-factorization-pipeline.md)
-- [Exakte Faktorisierungs-Transformationspipeline](docs/exact-factorization-transformation-pipeline.md)
-- [Semantische Polynomansicht und quartische Kontrollengine](docs/polynomial-decomposition-synthesis.md)
-- [ADR: Domänenbewusster Polynomkern statt Quartik-API](docs/adr/domain-aware-polynomial-factorization.md)
-
-## Aktueller Stand
-
-Der gegenwärtige Stand ist bewusst mehrstufig:
-
-1. Die bestehende autonome Discovery- und Mehrdomänen-Evidence ist für ihre
-   jeweils eng begrenzten internen Claims qualifiziert.
-2. Exakte Gleichungssystem-Repräsentation, Blockzerlegung, RREF,
-   Eigenproblem-Erkennung und matched-work Vergleich sind implementiert.
-3. Direkte, native exakte und lokal mustergerichtete Regelvorbereitung sind
-   hinter reproduzierbaren Koordinator- und Registry-Grenzen implementiert,
-   aber noch nicht als allgemeines Workbench-/CLI-Defaultprofil qualifiziert.
-4. Ein enger Promotionsmechanismus für exakt bewiesene gelernte
-   Polynom-Pattern ist implementiert. Der öffentliche Capability-Claim
-   `PROMOTION` bleibt dennoch `NOT_EVALUATED`.
-5. Eine generationengetrennte Kampagne demonstriert proof-gated Regelbildung
-   und kumulative Wiederverwendung in content-addressed Schatteninventaren,
-   ohne das Produktionsinventar zu verändern.
-6. Die begrenzte native allgemeine univariate `Z[x]`-/`Q[x]`-Engine,
-   der optionale SymPy-Vorschlagsadapter und der exakte Parser-/Verifierpfad
-   sind implementiert. Verifier-ausgestellte Faktoren können am
-   Wurzelvorkommen deterministisch gerendert, exakt erneut geparst und im
-   ursprünglichen Ring rekonstruiert werden.
-7. Verschachtelte Vorkommen, Such-/Workbench-Aktivierung und der eingefrorene
-   On-Demand-/Cache-/No-Factorization-Vergleich bleiben offene
-   Produktqualifikationen.
-8. Das stärkere Flagship-Experiment zur proof-carrying Selbstverbesserung ist
-   technisch vorbereitet, aber noch nicht mit realem VALIDATION- und
-   FINAL-TEST-Material ausgeführt.
-
-Der targetfreie Simplification-Track erreicht mit dem eingefrorenen
-Standardinventar sechs von sieben Referenzformen; SymPy erreicht sieben von
-sieben. Dieser Track bleibt deshalb korrekt als **negatives Vergleichsergebnis**
-retained. Die vollständige Fallmatrix, Abgrenzung und Reproduktion stehen unter
-[Comparative Discovery Benchmarks](docs/discovery-benchmarks.md).
+Nicht jede implementierte Fähigkeit ist bereits als allgemeines
+Workbench-Defaultprofil qualifiziert. Der datierte Stand mit ausgeführten und
+noch offenen Prüfungen steht in [Discovery- und Forschungsstatus](docs/discovery-status.md).
 
 ## Discovery evidence
 
@@ -335,10 +287,9 @@ Evidence-Identität. Neue allgemeine Discovery-Profile verwenden für den
 unterstützten Quartikbereich den semantischen Syntheseoperator; der frühere
 benannte Bridge bleibt nur zur Reproduktion und Ablation erhalten.
 
-Die [Discovery Gallery](docs/demo-gallery.md) ordnet beide Beispiele visuell ein.
-Sie zeigt ausschließlich aus Tests beziehungsweise Evidence-Generatoren
-abgeleitete Darstellungen. Manuell nachgezeichnete Erfolgsbilder sind kein
-Ersatz für gebundene Artefakte.
+Die [Discovery Gallery](docs/demo-gallery.md) zeigt ausschließlich aus Tests
+beziehungsweise Evidence-Generatoren abgeleitete Darstellungen. Manuell
+nachgezeichnete Erfolgsbilder sind kein Ersatz für gebundene Artefakte.
 
 <!-- capability-status:start -->
 ## Verifizierter Capability- und Claim-Status
@@ -361,9 +312,10 @@ Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain- und Trust-Ver
 `QUALIFIED` autorisiert nur den jeweils benannten Claim. Externe mathematische Neuheit, formaler Beweis, Promotion und Public Evidence werden nicht aus einem anderen erfolgreichen Profil abgeleitet.
 <!-- capability-status:end -->
 
-Eine datierte Einordnung mit bereits belegten Ergebnissen, offenen Grenzen und
-dem nächsten irreversiblen Experiment-Schritt steht unter
-[Aktueller Discovery- und Forschungsstand](docs/discovery-status.md).
+Regelsuche ist weder ein allgemeiner Ersatz für ein Computer-Algebra-System noch
+ein Automatismus für mathematische Neuheit. Sucherfolg, Validierung, formaler
+Beweis, Projekt-Neuheit, externe Neuheit und Veröffentlichung bleiben getrennte,
+fehlersicher sperrende Evidenzstufen.
 
 ## Systemmodell
 
@@ -386,7 +338,7 @@ und [Dependency-Regeln](docs/dependency-rules.md) dokumentiert.
 
 | Modus | Zweck | Start |
 | --- | --- | --- |
-| Standarddemo | Lokale Workbench ohne externe Infrastruktur | `docker run` oder `./gradlew run` |
+| Standarddemo | lokale Workbench ohne externe Infrastruktur | `docker run` oder `./gradlew run` |
 | Full Mode | PostgreSQL, Hibernate ORM/Search und optionale Neo4j-Provenienz | `docker compose up --build` |
 | Proof-Image | Z3 und cvc5; Lean optional | `Dockerfile.proof` |
 | Forschungsreproduktion | Evidence- und Containerverträge aus dem Checkout | `./gradlew --no-configuration-cache ciCheck` und spezialisierte Reproduktionstasks |
@@ -417,21 +369,18 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
   [User Workflows](docs/user-workflows.md),
   [Demo Gallery](docs/demo-gallery.md)
 - **Forschung und Evidenz:** [Discovery-Status](docs/discovery-status.md),
+  [Autonomous Discovery Walkthrough](docs/autonomous-discovery-walkthrough.md),
   [Discovery Evidence](docs/discovery-evidence-v1.md),
-  [Sicherer Regelvorbereitungskoordinator](docs/safe-rule-preparation-coordinator.md),
-  [Promotion gelernter Pattern-Regeln](docs/learned-pattern-rule-promotion.md),
   [Generational Rule Mining](docs/generational-rule-mining.md),
-  [Domänenbewusste Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md),
-  [Exakte Parser-zu-Faktorisierungs-Pipeline](docs/exact-parsed-factorization-pipeline.md),
-  [Exakte Faktorisierungs-Transformationspipeline](docs/exact-factorization-transformation-pipeline.md),
-  [quartische Kontrollengine](docs/polynomial-decomposition-synthesis.md),
+  [Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md),
   [Benchmarks](docs/discovery-benchmarks.md),
   [Scientific Reproducibility](docs/scientific-reproducibility.md)
 - **Entwicklung:** [Architektur](docs/architecture.md),
   [Developer Guide](docs/developer-guide.md), [Testing](docs/testing.md)
 - **Erweiterungen:** [Erweiterungssystem](docs/extension-system.md),
   [Plugin-API](docs/plugin-api.md), [Regeldateien](docs/rule-files.md),
-  [Regel-Tiers und Ablation](docs/rule-tiers.md)
+  [Java Rewrite Programs](docs/java-rewrite-programs.md),
+  [Java Discovery SDK](docs/java-discovery-sdk.md)
 - **Referenz:** [Dokumentationsindex](docs/README.md),
   [Glossar](docs/glossary.md), [Schema-Katalog](docs/schema-catalog.md),
   lokale Swagger UI unter `/static/openapi/index.html`
