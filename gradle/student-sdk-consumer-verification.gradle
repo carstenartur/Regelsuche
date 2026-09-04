@@ -55,8 +55,7 @@ def verifySdkConsumer = tasks.register(
         file('scripts/verify-student-java-sdk-consumer.py').absolutePath,
         '--repository-root', rootDir.absolutePath,
         '--gradle', gradleExecutable,
-        '--published-repository', sdkRepository.absolutePath,
-        '--output', reportDirectory.absolutePath
+        '--published-repository', sdkRepository.absolutePath
     )
     inputs.file('release.properties')
     inputs.file('scripts/verify-student-java-sdk-consumer.py')
