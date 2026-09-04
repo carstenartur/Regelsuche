@@ -45,11 +45,12 @@ class TargetFreeIntrinsicCandidateValidatorTest {
         assertEquals(UNCONDITIONAL, validation.scope());
         assertTrue(validation.assumptions().isEmpty());
         assertTrue(validation.intrinsicallyVerified());
+        assertFalse(validation.intrinsicallyRejected());
         assertFalse(validation.conditionalValidityUnresolved());
     }
 
     @Test
-    void unconditionalAgreementAlsoCoversListedAssumptions() {
+    void unconditionalAgreementAlsoCoversCanonicalListedAssumptions() {
         FakeOracle oracle = new FakeOracle(
             OracleValidator.OracleValidationStatus.AGREE,
             "unconditional identity"
@@ -58,7 +59,11 @@ class TargetFreeIntrinsicCandidateValidatorTest {
         var validation = TargetFreeIntrinsicCandidateValidator.validate(
             "x / y",
             "x * (1 / y)",
-            List.of("y != 0", " x != 0 ", "y != 0"),
+            List.of(
+                "0 != y",
+                " x != 0 ",
+                "x ≠ 0",
+                "y != 0"),
             true,
             oracle
         );
@@ -67,11 +72,12 @@ class TargetFreeIntrinsicCandidateValidatorTest {
         assertEquals("unconditional identity", validation.oracleEvidence());
         assertEquals(UNCONDITIONAL, validation.scope());
         assertEquals(List.of("x != 0", "y != 0"), validation.assumptions());
+        assertFalse(validation.intrinsicallyRejected());
         assertFalse(validation.conditionalValidityUnresolved());
     }
 
     @Test
-    void reportsUnconditionalDisagreementWithoutAReferenceMatch() {
+    void rejectsUnconditionalDisagreementWithoutAssumptions() {
         FakeOracle oracle = new FakeOracle(
             OracleValidator.OracleValidationStatus.DISAGREE,
             "counterexample x=1"
@@ -81,11 +87,13 @@ class TargetFreeIntrinsicCandidateValidatorTest {
             "x + x", "3 * x", List.of(), true, oracle);
 
         assertTrue(oracle.invoked());
-        assertEquals(CandidateProofStatus.OBSERVED, validation.status());
+        assertEquals(CandidateProofStatus.REJECTED, validation.status());
+        assertFalse(validation.status().isPositive());
         assertEquals("DISAGREE", validation.oracleStatus());
         assertEquals("counterexample x=1", validation.oracleEvidence());
         assertEquals(UNCONDITIONAL, validation.scope());
         assertFalse(validation.intrinsicallyVerified());
+        assertTrue(validation.intrinsicallyRejected());
         assertFalse(validation.conditionalValidityUnresolved());
     }
 
@@ -117,6 +125,7 @@ class TargetFreeIntrinsicCandidateValidatorTest {
         );
         assertEquals(List.of("x != 0"), validation.assumptions());
         assertFalse(validation.intrinsicallyVerified());
+        assertFalse(validation.intrinsicallyRejected());
         assertTrue(validation.conditionalValidityUnresolved());
     }
 
@@ -135,13 +144,32 @@ class TargetFreeIntrinsicCandidateValidatorTest {
             oracle
         );
 
+        assertEquals(CandidateProofStatus.OBSERVED, validation.status());
         assertEquals("UNAVAILABLE", validation.oracleStatus());
         assertEquals("backend not configured", validation.oracleEvidence());
         assertEquals(
             CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED,
             validation.scope()
         );
+        assertFalse(validation.intrinsicallyRejected());
         assertTrue(validation.conditionalValidityUnresolved());
+    }
+
+    @Test
+    void unavailableUnconditionalValidationRemainsObserved() {
+        FakeOracle oracle = new FakeOracle(
+            OracleValidator.OracleValidationStatus.UNAVAILABLE,
+            "backend not configured"
+        );
+
+        var validation = TargetFreeIntrinsicCandidateValidator.validate(
+            "x + x", "2 * x", List.of(), true, oracle);
+
+        assertEquals(CandidateProofStatus.OBSERVED, validation.status());
+        assertEquals(UNCONDITIONAL, validation.scope());
+        assertFalse(validation.intrinsicallyVerified());
+        assertFalse(validation.intrinsicallyRejected());
+        assertFalse(validation.conditionalValidityUnresolved());
     }
 
     @Test
@@ -160,6 +188,7 @@ class TargetFreeIntrinsicCandidateValidatorTest {
         );
 
         assertFalse(oracle.invoked());
+        assertEquals(CandidateProofStatus.OBSERVED, validation.status());
         assertEquals(
             "NOT_RUN_NOT_EQUIVALENCE_PRESERVING_BY_CONSTRUCTION",
             validation.oracleStatus()
@@ -171,6 +200,7 @@ class TargetFreeIntrinsicCandidateValidatorTest {
         assertEquals(NOT_APPLICABLE, validation.scope());
         assertEquals(List.of("z != 0"), validation.assumptions());
         assertFalse(validation.intrinsicallyVerified());
+        assertFalse(validation.intrinsicallyRejected());
         assertFalse(validation.conditionalValidityUnresolved());
     }
 
@@ -196,7 +226,39 @@ class TargetFreeIntrinsicCandidateValidatorTest {
             CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED,
             validation.scope()
         );
+        assertFalse(validation.intrinsicallyRejected());
         assertTrue(validation.conditionalValidityUnresolved());
+    }
+
+    @Test
+    void reportsNullOracleResultsAsUnavailableValidationErrors() {
+        OracleValidator failing = (left, right) -> null;
+
+        var validation = TargetFreeIntrinsicCandidateValidator.validate(
+            "x + x", "2 * x", List.of(), true, failing);
+
+        assertEquals(CandidateProofStatus.OBSERVED, validation.status());
+        assertEquals(
+            "VALIDATOR_ERROR_NullPointerException",
+            validation.oracleStatus());
+        assertTrue(validation.oracleEvidence().contains("oracle validation"));
+        assertEquals(UNCONDITIONAL, validation.scope());
+        assertFalse(validation.intrinsicallyRejected());
+    }
+
+    @Test
+    void publicEvidenceCannotDowngradeAssumptionsFreeDisagreement() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new TargetFreeIntrinsicCandidateValidator
+                .IntrinsicValidation(
+                    CandidateProofStatus.OBSERVED,
+                    "DISAGREE",
+                    "counterexample x=1",
+                    UNCONDITIONAL,
+                    List.of()
+                )
+        );
     }
 
     @Test
@@ -210,6 +272,43 @@ class TargetFreeIntrinsicCandidateValidatorTest {
                     "counterexample x=0",
                     UNCONDITIONAL,
                     List.of("x != 0")
+                )
+        );
+    }
+
+    @Test
+    void publicEvidenceCannotInventRejectionOrVerification() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new TargetFreeIntrinsicCandidateValidator
+                .IntrinsicValidation(
+                    CandidateProofStatus.REJECTED,
+                    "UNAVAILABLE",
+                    "backend unavailable",
+                    UNCONDITIONAL,
+                    List.of()
+                )
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new TargetFreeIntrinsicCandidateValidator
+                .IntrinsicValidation(
+                    CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+                    "DISAGREE",
+                    "counterexample",
+                    UNCONDITIONAL,
+                    List.of()
+                )
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new TargetFreeIntrinsicCandidateValidator
+                .IntrinsicValidation(
+                    CandidateProofStatus.OBSERVED,
+                    "AGREE",
+                    "identity",
+                    UNCONDITIONAL,
+                    List.of()
                 )
         );
     }
@@ -241,12 +340,21 @@ class TargetFreeIntrinsicCandidateValidatorTest {
         assertThrows(NullPointerException.class, () ->
             TargetFreeIntrinsicCandidateValidator.validate(
                 "x + x", null, List.of(), true, oracle));
+        assertThrows(IllegalArgumentException.class, () ->
+            TargetFreeIntrinsicCandidateValidator.validate(
+                "  ", "2 * x", List.of(), true, oracle));
+        assertThrows(IllegalArgumentException.class, () ->
+            TargetFreeIntrinsicCandidateValidator.validate(
+                "x + x", "\t", List.of(), true, oracle));
         assertThrows(NullPointerException.class, () ->
             TargetFreeIntrinsicCandidateValidator.validate(
                 "x + x", "2 * x", null, true, oracle));
         assertThrows(NullPointerException.class, () ->
             TargetFreeIntrinsicCandidateValidator.validate(
                 "x + x", "2 * x", List.of(), true, null));
+        assertThrows(NullPointerException.class, () ->
+            TargetFreeIntrinsicCandidateValidator.validate(
+                "x + x", "2 * x", List.of((String) null), true, oracle));
         assertThrows(IllegalArgumentException.class, () ->
             TargetFreeIntrinsicCandidateValidator.validate(
                 "x + x", "2 * x", List.of("  "), true, oracle));
@@ -267,7 +375,9 @@ class TargetFreeIntrinsicCandidateValidatorTest {
 
         @Override
         public OracleValidation validateEquivalence(
-            String leftExpression, String rightExpression) {
+            String leftExpression,
+            String rightExpression
+        ) {
             invoked = true;
             return new OracleValidation(status, evidence);
         }
