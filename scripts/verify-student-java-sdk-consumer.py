@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the student-facing SDK through a clean external consumer."""
+"""Verify the student-facing SDK through clean external consumers."""
 
 from __future__ import annotations
 
@@ -31,6 +31,11 @@ FORBIDDEN_RUNTIME_MARKERS = (
     "jakarta.persistence",
 )
 OUTPUT_RELATIVE = Path("build/reports/student-java-sdk")
+GENERATOR_RELATIVE = Path("scripts/create-student-discovery-domain.py")
+GENERATED_PACKAGE = "org.example.generated"
+GENERATED_PROJECT = "generated-regelsuche-domain"
+GENERATED_DOMAIN = "generated-geometric-sequence"
+GENERATED_PROVIDER = "generated-geometric-sequence-provider"
 
 
 def run(
@@ -131,6 +136,91 @@ def artifact_files(repository: Path, version: str) -> dict[str, Path]:
     return artifacts
 
 
+def execute_consumer(
+    gradle: str,
+    consumer: Path,
+    repository: Path,
+    version: str,
+    gradle_user_home: Path,
+) -> tuple[str, str, list[str]]:
+    environment = {"GRADLE_USER_HOME": str(gradle_user_home)}
+    properties = [
+        f"-PregelsucheRepository={repository}",
+        f"-PregelsucheVersion={version}",
+    ]
+    execution = run(
+        [
+            gradle,
+            "--no-daemon",
+            "--refresh-dependencies",
+            "clean",
+            "test",
+            "run",
+            *properties,
+        ],
+        consumer,
+        environment,
+    )
+    dependencies = run(
+        [
+            gradle,
+            "--no-daemon",
+            "dependencies",
+            "--configuration",
+            "runtimeClasspath",
+            *properties,
+        ],
+        consumer,
+        environment,
+    )
+    lowered = dependencies.lower()
+    forbidden = [
+        marker for marker in FORBIDDEN_RUNTIME_MARKERS if marker in lowered
+    ]
+    return execution, dependencies, forbidden
+
+
+def require_output(execution: str, expected: tuple[str, ...], label: str) -> None:
+    missing = [value for value in expected if value not in execution]
+    if missing:
+        raise RuntimeError(f"{label} output is incomplete: {missing}")
+
+
+def verify_generated_project_shape(starter: Path) -> dict:
+    manifest_path = starter / "regelsuche-starter.json"
+    if not manifest_path.is_file():
+        raise RuntimeError("generated starter manifest is missing")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    expected = {
+        "schema": "regelsuche.student-discovery-starter/v1",
+        "projectName": GENERATED_PROJECT,
+        "package": GENERATED_PACKAGE,
+        "domainId": GENERATED_DOMAIN,
+        "providerId": GENERATED_PROVIDER,
+        "javaFeature": 25,
+        "sdkArtifact": "de.regelsuche:regelsuche-discovery-sdk",
+    }
+    observed = {key: manifest.get(key) for key in expected}
+    if observed != expected:
+        raise RuntimeError(
+            f"generated starter manifest mismatch: expected {expected}, got {observed}"
+        )
+
+    build_contract = "\n".join(
+        (starter / name).read_text(encoding="utf-8")
+        for name in ("settings.gradle", "build.gradle")
+    )
+    forbidden_shortcuts = [
+        marker for marker in ("includeBuild(", "project('", 'project("')
+        if marker in build_contract
+    ]
+    if forbidden_shortcuts:
+        raise RuntimeError(
+            f"generated starter contains internal build shortcuts: {forbidden_shortcuts}"
+        )
+    return manifest
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
@@ -142,10 +232,13 @@ def main() -> int:
     repository = arguments.published_repository.resolve()
     output = checkout_owned_output(root)
     source = root / "examples/external-consumers/geometric-sequence-domain-java25"
+    generator = root / GENERATOR_RELATIVE
     if not repository.is_dir():
         raise RuntimeError(f"SDK repository does not exist: {repository}")
     if not source.is_dir():
         raise RuntimeError(f"external consumer example is missing: {source}")
+    if not generator.is_file() or generator.is_symlink():
+        raise RuntimeError(f"starter generator is missing or unsafe: {generator}")
     if overlaps(repository, output):
         raise RuntimeError("published repository and rebuilt output must be disjoint")
     if overlaps(source, output):
@@ -156,54 +249,70 @@ def main() -> int:
 
     version = read_version(root)
     artifacts = artifact_files(repository, version)
+
     consumer = output / "external-consumer"
     shutil.copytree(source, consumer)
-    consumer_environment = {
-        "GRADLE_USER_HOME": str(output / "isolated-gradle-user-home"),
-    }
-
-    properties = [
-        f"-PregelsucheRepository={repository}",
-        f"-PregelsucheVersion={version}",
-    ]
-    execution = run(
-        [
-            arguments.gradle,
-            "--no-daemon",
-            "--refresh-dependencies",
-            "clean",
-            "test",
-            "run",
-            *properties,
-        ],
+    execution, dependencies, forbidden = execute_consumer(
+        arguments.gradle,
         consumer,
-        consumer_environment,
+        repository,
+        version,
+        output / "isolated-gradle-user-home",
     )
-    expected = (
-        "provider=example-geometric-sequence-provider",
-        "outcome=CONFIRMED",
-        "multiplier=2",
+    require_output(
+        execution,
+        (
+            "provider=example-geometric-sequence-provider",
+            "outcome=CONFIRMED",
+            "multiplier=2",
+        ),
+        "external consumer",
     )
-    missing = [value for value in expected if value not in execution]
-    if missing:
-        raise RuntimeError(f"external consumer output is incomplete: {missing}")
-
-    dependencies = run(
-        [
-            arguments.gradle,
-            "--no-daemon",
-            "dependencies",
-            "--configuration",
-            "runtimeClasspath",
-            *properties,
-        ],
-        consumer,
-        consumer_environment,
-    )
-    lowered = dependencies.lower()
-    forbidden = [marker for marker in FORBIDDEN_RUNTIME_MARKERS if marker in lowered]
     if forbidden:
         raise RuntimeError(f"forbidden runtime dependencies: {forbidden}")
+
+    starter = output / "generated-starter"
+    generator_output = run(
+        [
+            sys.executable,
+            str(generator),
+            "--repository-root",
+            str(root),
+            "--output",
+            str(starter),
+            "--package",
+            GENERATED_PACKAGE,
+            "--project-name",
+            GENERATED_PROJECT,
+            "--domain-id",
+            GENERATED_DOMAIN,
+            "--provider-id",
+            GENERATED_PROVIDER,
+        ],
+        root,
+    )
+    generated_manifest = verify_generated_project_shape(starter)
+    generated_execution, generated_dependencies, generated_forbidden = execute_consumer(
+        arguments.gradle,
+        starter,
+        repository,
+        version,
+        output / "generated-gradle-user-home",
+    )
+    require_output(
+        generated_execution,
+        (
+            f"provider={GENERATED_PROVIDER}",
+            "outcome=CONFIRMED",
+            "multiplier=2",
+        ),
+        "generated starter",
+    )
+    if generated_forbidden:
+        raise RuntimeError(
+            f"generated starter has forbidden runtime dependencies: "
+            f"{generated_forbidden}"
+        )
 
     java_feature = int(
         run(["java", "-XshowSettings:properties", "-version"], root)
@@ -223,16 +332,19 @@ def main() -> int:
         for name, path in sorted(artifacts.items())
     }
     report = {
-        "schema": "regelsuche.student-java-sdk-consumer-verification/v1",
+        "schema": "regelsuche.student-java-sdk-consumer-verification/v2",
         "sdkVersion": version,
         "publicationMode": "CHECKOUT_OWNED_TASK_DEPENDENCIES",
-        "dependencyCacheMode": "ISOLATED_EMPTY_GRADLE_USER_HOME",
+        "dependencyCacheMode": "ISOLATED_EMPTY_GRADLE_USER_HOME_PER_CONSUMER",
         "javaFeature": java_feature,
         "externalConsumer": "geometric-sequence-domain-java25",
         "provider": "example-geometric-sequence-provider",
         "confirmedCandidate": "multiplier=2",
         "requiredOutcomes": ["CONFIRMED", "REFUTED", "BUDGET_EXHAUSTED"],
-        "forbiddenRuntimeDependenciesObserved": forbidden,
+        "generatedStarter": generated_manifest,
+        "forbiddenRuntimeDependenciesObserved": sorted(
+            set(forbidden + generated_forbidden)
+        ),
         "artifacts": ledger,
         "result": "success",
     }
@@ -244,18 +356,31 @@ def main() -> int:
         "# Student Java SDK consumer verification\n\n"
         f"- SDK version: `{version}`\n"
         "- Publication: checkout-owned Gradle task dependencies\n"
-        "- Dependency cache: isolated empty Gradle user home\n"
+        "- Dependency caches: isolated and initially empty per consumer\n"
         "- Java: `25`\n"
         "- External consumer: `geometric-sequence-domain-java25`\n"
         "- ServiceLoader provider: `example-geometric-sequence-provider`\n"
         "- Confirmed candidate: `multiplier=2`\n"
         "- Negative paths: `REFUTED`, `BUDGET_EXHAUSTED`\n"
+        f"- Generated project: `{GENERATED_PROJECT}`\n"
+        f"- Generated package: `{GENERATED_PACKAGE}`\n"
+        f"- Generated provider: `{GENERATED_PROVIDER}`\n"
+        "- Generated project built and tested without modification: `yes`\n"
         "- App/Spring/Hibernate/Persistence dependencies: none observed\n"
         "- Result: `success`\n"
     )
     (output / "consumer-report.md").write_text(markdown, encoding="utf-8")
     (output / "consumer.log").write_text(execution, encoding="utf-8")
     (output / "dependencies.log").write_text(dependencies, encoding="utf-8")
+    (output / "generator.log").write_text(generator_output, encoding="utf-8")
+    (output / "generated-starter.log").write_text(
+        generated_execution,
+        encoding="utf-8",
+    )
+    (output / "generated-dependencies.log").write_text(
+        generated_dependencies,
+        encoding="utf-8",
+    )
     print(markdown)
     return 0
 
