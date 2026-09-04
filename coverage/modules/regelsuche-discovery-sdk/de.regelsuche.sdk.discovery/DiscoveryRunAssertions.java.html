@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryRunAssertions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.discovery</a> &gt; <span class="el_source">DiscoveryRunAssertions.java</span></div><h1>DiscoveryRunAssertions.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.discovery;
+
+import de.regelsuche.discovery.domain.DomainDiscoveryEvidence.Outcome;
+import de.regelsuche.discovery.domain.DomainDiscoveryEvidence.Resource;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Consumer;
+
+/**
+ * Dependency-free fluent assertions for examples and external SDK consumers.
+ *
+ * &lt;p&gt;The assertions inspect the public {@link DiscoveryRun} view and throw
+ * {@link AssertionError}. They deliberately do not reinterpret evidence or
+ * upgrade a non-confirmed result into mathematical confirmation.&lt;/p&gt;
+ */
+public final class DiscoveryRunAssertions {
+    private DiscoveryRunAssertions() {
+    }
+
+    /** Starts assertions for one completed discovery run. */
+    public static &lt;C, K&gt; RunAssert&lt;C, K&gt; assertThat(DiscoveryRun&lt;C, K&gt; actual) {
+<span class="fc" id="L22">        return new RunAssert&lt;&gt;(actual);</span>
+    }
+
+    /** Fluent assertion object bound to one immutable run. */
+    public static final class RunAssert&lt;C, K&gt; {
+        private final DiscoveryRun&lt;C, K&gt; actual;
+
+<span class="fc" id="L29">        private RunAssert(DiscoveryRun&lt;C, K&gt; actual) {</span>
+<span class="fc" id="L30">            this.actual = Objects.requireNonNull(actual, &quot;actual&quot;);</span>
+<span class="fc" id="L31">        }</span>
+
+        /** Returns the asserted run for domain-specific checks. */
+        public DiscoveryRun&lt;C, K&gt; actual() {
+<span class="fc" id="L35">            return actual;</span>
+        }
+
+        /** Requires one exact terminal outcome. */
+        public RunAssert&lt;C, K&gt; hasOutcome(Outcome expected) {
+<span class="fc" id="L40">            Objects.requireNonNull(expected, &quot;expected&quot;);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            if (actual.outcome() != expected) {</span>
+<span class="nc" id="L42">                fail(&quot;expected outcome &quot; + expected + &quot; but was &quot; + actual.outcome());</span>
+            }
+<span class="fc" id="L44">            return this;</span>
+        }
+
+        /** Requires a confirmed result with its mandatory selected objects. */
+        public RunAssert&lt;C, K&gt; isConfirmed() {
+<span class="fc" id="L49">            return hasOutcome(Outcome.CONFIRMED)</span>
+<span class="fc" id="L50">                .hasCandidate()</span>
+<span class="fc" id="L51">                .hasCertificate();</span>
+        }
+
+        /** Requires a refuted result without selected candidate or certificate. */
+        public RunAssert&lt;C, K&gt; isRefuted() {
+<span class="fc" id="L56">            return hasOutcome(Outcome.REFUTED)</span>
+<span class="fc" id="L57">                .hasNoCandidate()</span>
+<span class="fc" id="L58">                .hasNoCertificate();</span>
+        }
+
+        /** Requires an inconclusive result without selected objects. */
+        public RunAssert&lt;C, K&gt; isInconclusive() {
+<span class="fc" id="L63">            return hasOutcome(Outcome.INCONCLUSIVE)</span>
+<span class="fc" id="L64">                .hasNoCandidate()</span>
+<span class="fc" id="L65">                .hasNoCertificate();</span>
+        }
+
+        /** Requires an unsupported result without selected objects. */
+        public RunAssert&lt;C, K&gt; isUnsupported() {
+<span class="fc" id="L70">            return hasOutcome(Outcome.UNSUPPORTED)</span>
+<span class="fc" id="L71">                .hasNoCandidate()</span>
+<span class="fc" id="L72">                .hasNoCertificate();</span>
+        }
+
+        /** Requires budget exhaustion without a fabricated result. */
+        public RunAssert&lt;C, K&gt; isBudgetExhausted() {
+<span class="fc" id="L77">            return hasOutcome(Outcome.BUDGET_EXHAUSTED)</span>
+<span class="fc" id="L78">                .hasNoCandidate()</span>
+<span class="fc" id="L79">                .hasNoCertificate();</span>
+        }
+
+        /** Requires an invalid-seed result without selected objects. */
+        public RunAssert&lt;C, K&gt; isInvalidSeed() {
+<span class="fc" id="L84">            return hasOutcome(Outcome.INVALID_SEED)</span>
+<span class="fc" id="L85">                .hasNoCandidate()</span>
+<span class="fc" id="L86">                .hasNoCertificate();</span>
+        }
+
+        /** Requires a selected candidate. */
+        public RunAssert&lt;C, K&gt; hasCandidate() {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (actual.selectedCandidate().isEmpty()) {</span>
+<span class="nc" id="L92">                fail(&quot;expected a selected candidate&quot;);</span>
+            }
+<span class="fc" id="L94">            return this;</span>
+        }
+
+        /** Requires no selected candidate. */
+        public RunAssert&lt;C, K&gt; hasNoCandidate() {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (actual.selectedCandidate().isPresent()) {</span>
+<span class="pc" id="L100">                fail(&quot;expected no selected candidate but was &quot;</span>
+<span class="fc" id="L101">                    + actual.selectedCandidate().orElseThrow());</span>
+            }
+<span class="fc" id="L103">            return this;</span>
+        }
+
+        /** Requires a selected certificate. */
+        public RunAssert&lt;C, K&gt; hasCertificate() {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (actual.selectedCertificate().isEmpty()) {</span>
+<span class="nc" id="L109">                fail(&quot;expected a selected certificate&quot;);</span>
+            }
+<span class="fc" id="L111">            return this;</span>
+        }
+
+        /** Requires no selected certificate. */
+        public RunAssert&lt;C, K&gt; hasNoCertificate() {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (actual.selectedCertificate().isPresent()) {</span>
+<span class="pc" id="L117">                fail(&quot;expected no selected certificate but was &quot;</span>
+<span class="fc" id="L118">                    + actual.selectedCertificate().orElseThrow());</span>
+            }
+<span class="fc" id="L120">            return this;</span>
+        }
+
+        /** Applies domain-specific assertions to the selected candidate. */
+        public RunAssert&lt;C, K&gt; candidateSatisfies(Consumer&lt;? super C&gt; assertion) {
+<span class="fc" id="L125">            Objects.requireNonNull(assertion, &quot;assertion&quot;);</span>
+<span class="fc" id="L126">            C candidate = actual.selectedCandidate().orElseThrow(() -&gt;</span>
+<span class="fc" id="L127">                failure(&quot;expected a selected candidate for a domain-specific assertion&quot;));</span>
+<span class="fc" id="L128">            assertion.accept(candidate);</span>
+<span class="fc" id="L129">            return this;</span>
+        }
+
+        /** Applies domain-specific assertions to the selected certificate. */
+        public RunAssert&lt;C, K&gt; certificateSatisfies(Consumer&lt;? super K&gt; assertion) {
+<span class="fc" id="L134">            Objects.requireNonNull(assertion, &quot;assertion&quot;);</span>
+<span class="fc" id="L135">            K certificate = actual.selectedCertificate().orElseThrow(() -&gt;</span>
+<span class="fc" id="L136">                failure(&quot;expected a selected certificate for a domain-specific assertion&quot;));</span>
+<span class="fc" id="L137">            assertion.accept(certificate);</span>
+<span class="fc" id="L138">            return this;</span>
+        }
+
+        /** Requires exactly the expected number of retained counterexamples. */
+        public RunAssert&lt;C, K&gt; hasCounterexampleCount(int expected) {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (expected &lt; 0) {</span>
+<span class="fc" id="L144">                throw new IllegalArgumentException(&quot;expected must be non-negative&quot;);</span>
+            }
+<span class="fc" id="L146">            int observed = actual.counterexamples().size();</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (observed != expected) {</span>
+<span class="pc" id="L148">                fail(&quot;expected &quot; + expected + &quot; counterexamples but found &quot;</span>
+<span class="fc" id="L149">                    + observed + &quot;: &quot; + actual.counterexamples());</span>
+            }
+<span class="fc" id="L151">            return this;</span>
+        }
+
+        /** Requires at least one retained counterexample containing the fragment. */
+        public RunAssert&lt;C, K&gt; hasCounterexampleContaining(String fragment) {
+<span class="fc bfc" id="L156" title="All 4 branches covered.">            if (fragment == null || fragment.isBlank()) {</span>
+<span class="fc" id="L157">                throw new IllegalArgumentException(&quot;fragment must not be blank&quot;);</span>
+            }
+<span class="fc" id="L159">            List&lt;String&gt; counterexamples = actual.counterexamples();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (counterexamples.stream().noneMatch(value -&gt; value.contains(fragment))) {</span>
+<span class="nc" id="L161">                fail(&quot;expected a counterexample containing '&quot; + fragment</span>
+                    + &quot;' but found &quot; + counterexamples);
+            }
+<span class="fc" id="L164">            return this;</span>
+        }
+
+        /** Requires no retained counterexample. */
+        public RunAssert&lt;C, K&gt; hasNoCounterexamples() {
+<span class="fc" id="L169">            return hasCounterexampleCount(0);</span>
+        }
+
+        /** Requires one exact executed-work value. */
+        public RunAssert&lt;C, K&gt; hasExecutedWork(Resource resource, int expected) {
+<span class="fc" id="L174">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (expected &lt; 0) {</span>
+<span class="fc" id="L176">                throw new IllegalArgumentException(&quot;expected must be non-negative&quot;);</span>
+            }
+<span class="fc" id="L178">            int observed = actual.executedWork().getOrDefault(resource, 0);</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (observed != expected) {</span>
+<span class="nc" id="L180">                fail(&quot;expected work &quot; + resource + &quot;=&quot; + expected</span>
+                    + &quot; but was &quot; + observed);
+            }
+<span class="fc" id="L183">            return this;</span>
+        }
+
+        /** Requires positive executed work for the selected resource. */
+        public RunAssert&lt;C, K&gt; hasPositiveExecutedWork(Resource resource) {
+<span class="fc" id="L188">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="fc" id="L189">            int observed = actual.executedWork().getOrDefault(resource, 0);</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (observed &lt;= 0) {</span>
+<span class="nc" id="L191">                fail(&quot;expected positive work for &quot; + resource + &quot; but was &quot; + observed);</span>
+            }
+<span class="fc" id="L193">            return this;</span>
+        }
+
+        /** Requires deterministic canonical evidence with a SHA-256 content hash. */
+        public RunAssert&lt;C, K&gt; hasContentAddressedEvidence() {
+<span class="fc" id="L198">            String first = actual.canonicalEvidence();</span>
+<span class="fc" id="L199">            String second = actual.canonicalEvidence();</span>
+<span class="fc" id="L200">            String hash = actual.evidence().contentHash();</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            if (!first.equals(second)) {</span>
+<span class="nc" id="L202">                fail(&quot;canonical evidence changed between repeated reads&quot;);</span>
+            }
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            if (!hash.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L205">                fail(&quot;evidence content hash is not canonical SHA-256: &quot; + hash);</span>
+            }
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            if (!first.contains(&quot;\&quot;contentHash\&quot;:\&quot;&quot; + hash + &quot;\&quot;&quot;)) {</span>
+<span class="nc" id="L208">                fail(&quot;canonical evidence does not contain its content hash&quot;);</span>
+            }
+<span class="fc" id="L210">            return this;</span>
+        }
+
+        /** Requires that accepted and rejected transitions carry no assumptions. */
+        public RunAssert&lt;C, K&gt; hasNoTransitionAssumptions() {
+<span class="fc" id="L215">            List&lt;String&gt; assumptions = actual.evidence().transitions().stream()</span>
+<span class="fc" id="L216">                .flatMap(transition -&gt; transition.assumptions().stream())</span>
+<span class="fc" id="L217">                .distinct()</span>
+<span class="fc" id="L218">                .sorted()</span>
+<span class="fc" id="L219">                .toList();</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (!assumptions.isEmpty()) {</span>
+<span class="nc" id="L221">                fail(&quot;expected no transition assumptions but found &quot; + assumptions);</span>
+            }
+<span class="fc" id="L223">            return this;</span>
+        }
+
+        private void fail(String message) {
+<span class="fc" id="L227">            throw failure(message);</span>
+        }
+
+        private AssertionError failure(String message) {
+<span class="fc" id="L231">            return new AssertionError(message + &quot;; evidenceHash=&quot;</span>
+<span class="fc" id="L232">                + actual.evidence().contentHash());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
