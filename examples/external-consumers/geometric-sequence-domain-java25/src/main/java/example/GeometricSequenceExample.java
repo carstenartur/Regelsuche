@@ -17,7 +17,7 @@ public final class GeometricSequenceExample {
         ).orElseThrow();
 
         DiscoveryRun<
-            GeometricSequenceDomainProvider.Candidate,
+            GeometricSequenceDomainProvider.Plan,
             GeometricSequenceDomainProvider.Certificate
         > run = RegelsucheDiscovery
             .forDomain(GeometricSequenceDomainProvider.domain())
