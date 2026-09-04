@@ -153,6 +153,15 @@ public final class TargetFreeIntrinsicCandidateValidator {
             .normalizedAssumptions();
     }
 
+    private static void requireIntrinsicStatus(CandidateProofStatus status) {
+        if (status != CandidateProofStatus.OBSERVED
+                && status != CandidateProofStatus.SYMBOLICALLY_VERIFIED
+                && status != CandidateProofStatus.REJECTED) {
+            throw new IllegalArgumentException(
+                "intrinsic oracle validation cannot claim another proof status");
+        }
+    }
+
     private static String requireExpression(String value, String name) {
         Objects.requireNonNull(value, name);
         String normalized = value.trim().replaceAll("\\s+", " ");
@@ -178,6 +187,7 @@ public final class TargetFreeIntrinsicCandidateValidator {
     ) {
         public IntrinsicValidation {
             Objects.requireNonNull(status, "status");
+            requireIntrinsicStatus(status);
             if (oracleStatus == null || oracleStatus.isBlank()) {
                 throw new IllegalArgumentException(
                     "oracleStatus must not be blank");
@@ -187,8 +197,8 @@ public final class TargetFreeIntrinsicCandidateValidator {
                 "oracleEvidence");
             Objects.requireNonNull(scope, "scope");
             assumptions = normalizeAssumptions(assumptions);
-            boolean verified = status.atLeast(
-                CandidateProofStatus.SYMBOLICALLY_VERIFIED);
+            boolean verified =
+                status == CandidateProofStatus.SYMBOLICALLY_VERIFIED;
             boolean rejected = status == CandidateProofStatus.REJECTED;
             if (scope
                     == ValidationScope.CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED
@@ -249,7 +259,7 @@ public final class TargetFreeIntrinsicCandidateValidator {
          *     independent of historical reference matching
          */
         public boolean intrinsicallyVerified() {
-            return status.atLeast(CandidateProofStatus.SYMBOLICALLY_VERIFIED);
+            return status == CandidateProofStatus.SYMBOLICALLY_VERIFIED;
         }
 
         /**
