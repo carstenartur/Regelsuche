@@ -314,6 +314,32 @@ class TargetFreeIntrinsicCandidateValidatorTest {
     }
 
     @Test
+    void publicEvidenceCannotOverstateOrInventOtherProofStatuses() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new TargetFreeIntrinsicCandidateValidator
+                .IntrinsicValidation(
+                    CandidateProofStatus.FORMALLY_PROVED,
+                    "AGREE",
+                    "symbolic identity only",
+                    UNCONDITIONAL,
+                    List.of()
+                )
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new TargetFreeIntrinsicCandidateValidator
+                .IntrinsicValidation(
+                    CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+                    "UNAVAILABLE",
+                    "no intrinsic oracle decision",
+                    UNCONDITIONAL,
+                    List.of()
+                )
+        );
+    }
+
+    @Test
     void rejectsNullEvidence() {
         assertThrows(
             NullPointerException.class,
