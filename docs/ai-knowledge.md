@@ -5,8 +5,12 @@ the `carstenartur/ai-knowledge-extractor` GitHub Packages repository. The
 consumer version is pinned once in `gradle.properties`:
 
 ```properties
-aiKnowledgeExtractorVersion=0.1.7
+aiKnowledgeExtractorVersion=0.1.9
 ```
+
+Version 0.1.9 prunes generated `build/` and `target/` subtrees before repository
+inventory traversal. This keeps parallel verification deterministic while
+preserving the complete analysis of checkout-owned source and documentation.
 
 Regelsuche never consumes a snapshot implicitly. Updating the released
 dependency requires one explicit version change followed by the normal
