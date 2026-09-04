@@ -1,0 +1,481 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactFinitePolynomialPlanReplayConfirmationVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExactFinitePolynomialPlanReplayConfirmationVerifier.java</span></div><h1>ExactFinitePolynomialPlanReplayConfirmationVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayArtifactVerifier.ArtifactReference;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayArtifactVerifier.VerifiedArtifactBytes;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayReceiptArtifactVerifier.VerifiedReplayReceiptArtifact;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayVerifier.ReplayReceipt;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Confirms a complete exact finite polynomial replay from independently
+ * retained plan-run and replay-receipt evidence.
+ *
+ * &lt;p&gt;The supplied typed plan run is deliberately treated as untrusted. It
+ * becomes usable only when its canonical bytes equal the separately loaded,
+ * content-addressed plan-run bytes exactly. The current replay verifier then
+ * executes the frozen formation inputs again and must reproduce the retained
+ * receipt byte for byte.&lt;/p&gt;
+ *
+ * &lt;p&gt;This verifier does not replay primitive rewrite steps, compile an
+ * executable rewrite program, establish formal proof or authorize promotion.&lt;/p&gt;
+ */
+<span class="fc" id="L28">public final class ExactFinitePolynomialPlanReplayConfirmationVerifier {</span>
+    public static final String VERIFIER_ID =
+        &quot;regelsuche.exact-finite-polynomial-plan-replay-confirmation-verifier/v1&quot;;
+<span class="fc" id="L31">    public static final String REVISION_HASH = SchematicProofPlan.hash(</span>
+<span class="fc" id="L32">        lengthPrefixed(</span>
+            VERIFIER_ID,
+            ExactFinitePolynomialPlanReplayArtifactVerifier.VERIFIER_ID,
+            ExactFinitePolynomialPlanReplayArtifactVerifier.REVISION_HASH,
+            ExactFinitePolynomialPlanRun.SCHEMA,
+            ExactFinitePolynomialPlanRun.ARTIFACT_REVISION_HASH,
+            ExactFinitePolynomialPlanReplayReceiptArtifactVerifier.VERIFIER_ID,
+            ExactFinitePolynomialPlanReplayReceiptArtifactVerifier.REVISION_HASH,
+            ExactFinitePolynomialPlanReplayVerifier.VERIFIER_ID,
+            ExactFinitePolynomialPlanReplayVerifier.REVISION_HASH,
+            ExactFinitePolynomialPlanResolver.REVISION_HASH,
+            &quot;typed-plan-run-is-untrusted-until-canonical-byte-equality&quot;,
+            &quot;receipt-plan-run-and-frozen-input-cross-binding&quot;,
+            &quot;one-complete-current-resolver-and-solver-rerun&quot;,
+            &quot;sealed-verifier-owned-non-executable-confirmation&quot;));
+
+    private static final int EXACT_REPLAY_EXECUTIONS = 1;
+
+<span class="fc" id="L50">    private final ExactFinitePolynomialPlanReplayVerifier replayVerifier =</span>
+        new ExactFinitePolynomialPlanReplayVerifier();
+
+    public ConfirmedReplay verify(
+        VerifiedReplayReceiptArtifact receiptArtifact,
+        VerifiedArtifactBytes planRunArtifact,
+        ExactFinitePolynomialPlanRun untrustedPlanRun,
+        SchematicProofPlan plan,
+        String sourceExpression,
+        String ansatzTemplate,
+        List&lt;HoleDomain&gt; domains,
+        int retainedSolutionLimit
+    ) {
+<span class="fc" id="L63">        Objects.requireNonNull(receiptArtifact, &quot;receiptArtifact&quot;);</span>
+<span class="fc" id="L64">        Objects.requireNonNull(planRunArtifact, &quot;planRunArtifact&quot;);</span>
+<span class="fc" id="L65">        Objects.requireNonNull(untrustedPlanRun, &quot;untrustedPlanRun&quot;);</span>
+<span class="fc" id="L66">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L67">        sourceExpression = Objects.requireNonNull(</span>
+            sourceExpression,
+            &quot;sourceExpression&quot;);
+<span class="fc" id="L70">        ansatzTemplate = Objects.requireNonNull(</span>
+            ansatzTemplate,
+            &quot;ansatzTemplate&quot;);
+<span class="fc" id="L73">        domains = List.copyOf(Objects.requireNonNull(domains, &quot;domains&quot;));</span>
+
+<span class="fc" id="L75">        requireReceiptReference(receiptArtifact.reference());</span>
+<span class="fc" id="L76">        requirePlanRunReference(planRunArtifact.reference());</span>
+<span class="fc" id="L77">        requireCanonicalPlanRunBytes(planRunArtifact, untrustedPlanRun);</span>
+
+<span class="fc" id="L79">        List&lt;String&gt; candidateHashes = candidateHashes(untrustedPlanRun);</span>
+<span class="fc" id="L80">        requireReceiptMatchesRun(</span>
+            receiptArtifact,
+            plan,
+            untrustedPlanRun,
+            candidateHashes);
+
+<span class="fc" id="L86">        ReplayReceipt replayedReceipt = replayVerifier.verify(</span>
+            plan,
+            sourceExpression,
+            ansatzTemplate,
+            domains,
+            retainedSolutionLimit,
+            untrustedPlanRun);
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (!receiptArtifact.matches(replayedReceipt)) {</span>
+<span class="nc" id="L94">            throw new IllegalArgumentException(</span>
+                &quot;current exact replay does not reproduce the retained receipt&quot;);
+        }
+
+<span class="fc" id="L98">        var result = untrustedPlanRun.solverResult();</span>
+<span class="fc" id="L99">        String confirmationHash = confirmationHash(</span>
+<span class="fc" id="L100">            receiptArtifact.reference(),</span>
+<span class="fc" id="L101">            planRunArtifact.reference(),</span>
+<span class="fc" id="L102">            receiptArtifact.verificationHash(),</span>
+<span class="fc" id="L103">            plan.contentHash(),</span>
+<span class="fc" id="L104">            untrustedPlanRun.contentHash(),</span>
+<span class="fc" id="L105">            result.contentHash(),</span>
+<span class="fc" id="L106">            result.solverRevisionHash(),</span>
+<span class="fc" id="L107">            untrustedPlanRun.status(),</span>
+<span class="fc" id="L108">            result.totalAssignments(),</span>
+<span class="fc" id="L109">            result.evaluatedAssignments(),</span>
+<span class="fc" id="L110">            result.matchingAssignments(),</span>
+            candidateHashes,
+            EXACT_REPLAY_EXECUTIONS,
+<span class="fc" id="L113">            replayedReceipt.contentHash());</span>
+<span class="fc" id="L114">        return new VerifiedConfirmation(</span>
+<span class="fc" id="L115">            receiptArtifact.reference(),</span>
+<span class="fc" id="L116">            planRunArtifact.reference(),</span>
+<span class="fc" id="L117">            receiptArtifact.verificationHash(),</span>
+<span class="fc" id="L118">            plan.contentHash(),</span>
+<span class="fc" id="L119">            untrustedPlanRun.contentHash(),</span>
+<span class="fc" id="L120">            result.contentHash(),</span>
+<span class="fc" id="L121">            result.solverRevisionHash(),</span>
+<span class="fc" id="L122">            untrustedPlanRun.status(),</span>
+<span class="fc" id="L123">            result.totalAssignments(),</span>
+<span class="fc" id="L124">            result.evaluatedAssignments(),</span>
+<span class="fc" id="L125">            result.matchingAssignments(),</span>
+            candidateHashes,
+            EXACT_REPLAY_EXECUTIONS,
+<span class="fc" id="L128">            receiptArtifact.receiptContentHash(),</span>
+            confirmationHash);
+    }
+
+    private static void requireCanonicalPlanRunBytes(
+        VerifiedArtifactBytes planRunArtifact,
+        ExactFinitePolynomialPlanRun untrustedPlanRun
+    ) {
+<span class="fc" id="L136">        String canonicalJson = untrustedPlanRun.toCanonicalJson();</span>
+<span class="fc" id="L137">        byte[] canonicalBytes = canonicalJson.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (!Arrays.equals(canonicalBytes, planRunArtifact.copyBytes())</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">                || !canonicalJson.equals(planRunArtifact.utf8())) {</span>
+<span class="fc" id="L140">            throw new IllegalArgumentException(</span>
+                &quot;typed plan run differs from independently loaded bytes&quot;);
+        }
+<span class="fc" id="L143">        ArtifactReference expected = ArtifactReference.describe(</span>
+            ExactFinitePolynomialPlanReplayArtifactVerifier.PLAN_RUN_ROLE,
+            ExactFinitePolynomialPlanRun.SCHEMA,
+            ExactFinitePolynomialPlanReplayArtifactVerifier
+                .PLAN_RUN_MEDIA_TYPE,
+            canonicalBytes);
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!expected.equals(planRunArtifact.reference())) {</span>
+<span class="nc" id="L150">            throw new IllegalArgumentException(</span>
+                &quot;typed plan run differs from its artifact reference&quot;);
+        }
+<span class="fc" id="L153">    }</span>
+
+    private static void requireReceiptMatchesRun(
+        VerifiedReplayReceiptArtifact receipt,
+        SchematicProofPlan plan,
+        ExactFinitePolynomialPlanRun run,
+        List&lt;String&gt; candidateHashes
+    ) {
+<span class="fc" id="L161">        var result = run.solverResult();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (!plan.contentHash().equals(run.planHash())</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                || !plan.contentHash().equals(receipt.planHash())</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                || !run.contentHash().equals(receipt.planRunHash())</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                || !result.contentHash().equals(</span>
+<span class="fc" id="L166">                    receipt.solverResultHash())</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                || !result.solverRevisionHash().equals(</span>
+<span class="fc" id="L168">                    receipt.solverRevisionHash())</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                || run.status() != receipt.runStatus()</span>
+<span class="fc" id="L170">                || result.totalAssignments()</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                    != receipt.totalAssignments()</span>
+<span class="fc" id="L172">                || result.evaluatedAssignments()</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                    != receipt.evaluatedAssignments()</span>
+<span class="fc" id="L174">                || result.matchingAssignments()</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                    != receipt.matchingAssignments()</span>
+<span class="fc" id="L176">                || candidateHashes.size()</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                    != receipt.retainedSolutions()</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                || !candidateHashes.equals(</span>
+<span class="fc" id="L179">                    receipt.resolvedCandidateHashes())) {</span>
+<span class="fc" id="L180">            throw new IllegalArgumentException(</span>
+                &quot;retained receipt differs from the byte-bound plan run&quot;);
+        }
+<span class="fc" id="L183">    }</span>
+
+    private static String confirmationHash(
+        ArtifactReference receiptReference,
+        ArtifactReference planRunReference,
+        String receiptVerificationHash,
+        String planHash,
+        String planRunHash,
+        String solverResultHash,
+        String solverRevisionHash,
+        ExactFinitePolynomialPlanRun.Status runStatus,
+        long totalAssignments,
+        long evaluatedAssignments,
+        long matchingAssignments,
+        List&lt;String&gt; candidateHashes,
+        int exactReplayExecutions,
+        String receiptContentHash
+    ) {
+<span class="fc" id="L201">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L202">        append(material, VERIFIER_ID);</span>
+<span class="fc" id="L203">        append(material, REVISION_HASH);</span>
+<span class="fc" id="L204">        append(material, receiptReference.artifactId());</span>
+<span class="fc" id="L205">        append(material, receiptReference.byteHash());</span>
+<span class="fc" id="L206">        append(material, receiptVerificationHash);</span>
+<span class="fc" id="L207">        append(material, planRunReference.artifactId());</span>
+<span class="fc" id="L208">        append(material, planRunReference.byteHash());</span>
+<span class="fc" id="L209">        append(material, planHash);</span>
+<span class="fc" id="L210">        append(material, planRunHash);</span>
+<span class="fc" id="L211">        append(material, solverResultHash);</span>
+<span class="fc" id="L212">        append(material, solverRevisionHash);</span>
+<span class="fc" id="L213">        append(material, runStatus.name());</span>
+<span class="fc" id="L214">        append(material, Long.toString(totalAssignments));</span>
+<span class="fc" id="L215">        append(material, Long.toString(evaluatedAssignments));</span>
+<span class="fc" id="L216">        append(material, Long.toString(matchingAssignments));</span>
+<span class="fc" id="L217">        append(material, Integer.toString(candidateHashes.size()));</span>
+<span class="fc" id="L218">        candidateHashes.forEach(value -&gt; append(material, value));</span>
+<span class="fc" id="L219">        append(material, Integer.toString(exactReplayExecutions));</span>
+<span class="fc" id="L220">        append(material, receiptContentHash);</span>
+<span class="fc" id="L221">        return SchematicProofPlan.hash(material.toString());</span>
+    }
+
+    private static List&lt;String&gt; candidateHashes(
+        ExactFinitePolynomialPlanRun run
+    ) {
+<span class="fc" id="L227">        return run.candidates().stream()</span>
+<span class="fc" id="L228">            .map(ExactFinitePolynomialResolvedCandidate::contentHash)</span>
+<span class="fc" id="L229">            .sorted(Comparator.naturalOrder())</span>
+<span class="fc" id="L230">            .toList();</span>
+    }
+
+    private static void requireReceiptReference(
+        ArtifactReference reference
+    ) {
+<span class="fc" id="L236">        Objects.requireNonNull(reference, &quot;receipt reference&quot;);</span>
+<span class="fc" id="L237">        if (!ExactFinitePolynomialPlanReplayArtifactVerifier.REFERENCE_SCHEMA</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">                .equals(reference.referenceSchema())</span>
+                || !ExactFinitePolynomialPlanReplayArtifactVerifier.RECEIPT_ROLE
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                    .equals(reference.role())</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                || !ReplayReceipt.SCHEMA.equals(reference.contentSchema())</span>
+                || !ExactFinitePolynomialPlanReplayArtifactVerifier
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">                    .RECEIPT_MEDIA_TYPE.equals(reference.mediaType())) {</span>
+<span class="nc" id="L244">            throw new IllegalArgumentException(</span>
+                &quot;semantic receipt has the wrong artifact reference&quot;);
+        }
+<span class="fc" id="L247">    }</span>
+
+    private static void requirePlanRunReference(
+        ArtifactReference reference
+    ) {
+<span class="fc" id="L252">        Objects.requireNonNull(reference, &quot;plan-run reference&quot;);</span>
+<span class="fc" id="L253">        if (!ExactFinitePolynomialPlanReplayArtifactVerifier.REFERENCE_SCHEMA</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                .equals(reference.referenceSchema())</span>
+                || !ExactFinitePolynomialPlanReplayArtifactVerifier
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">                    .PLAN_RUN_ROLE.equals(reference.role())</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">                || !ExactFinitePolynomialPlanRun.SCHEMA.equals(</span>
+<span class="fc" id="L258">                    reference.contentSchema())</span>
+                || !ExactFinitePolynomialPlanReplayArtifactVerifier
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">                    .PLAN_RUN_MEDIA_TYPE.equals(reference.mediaType())) {</span>
+<span class="nc" id="L261">            throw new IllegalArgumentException(</span>
+                &quot;verified bytes are not an exact plan-run artifact&quot;);
+        }
+<span class="fc" id="L264">    }</span>
+
+    private static void validateStatusCounts(
+        ExactFinitePolynomialPlanRun.Status status,
+        long matchingAssignments,
+        int retainedSolutions
+    ) {
+<span class="fc bfc" id="L271" title="All 3 branches covered.">        boolean valid = switch (status) {</span>
+            case COMPLETE_WITHOUT_SOLUTION -&gt;
+<span class="pc bpc" id="L273" title="2 of 4 branches missed.">                matchingAssignments == 0 &amp;&amp; retainedSolutions == 0;</span>
+            case COMPLETE_WITH_RESOLUTIONS -&gt;
+<span class="pc bpc" id="L275" title="2 of 4 branches missed.">                matchingAssignments &gt; 0</span>
+                    &amp;&amp; matchingAssignments == retainedSolutions;
+            case COMPLETE_RESOLUTION_SET_TRUNCATED -&gt;
+<span class="pc bpc" id="L278" title="2 of 4 branches missed.">                matchingAssignments &gt; retainedSolutions</span>
+                    &amp;&amp; retainedSolutions &gt; 0;
+        };
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (!valid) {</span>
+<span class="nc" id="L282">            throw new IllegalArgumentException(</span>
+                &quot;confirmation status differs from assignment counts&quot;);
+        }
+<span class="fc" id="L285">    }</span>
+
+    private static List&lt;String&gt; normalizeCandidateHashes(
+        List&lt;String&gt; values
+    ) {
+<span class="fc" id="L290">        Objects.requireNonNull(values, &quot;resolvedCandidateHashes&quot;);</span>
+<span class="fc" id="L291">        List&lt;String&gt; normalized = values.stream()</span>
+<span class="fc" id="L292">            .map(value -&gt; SchematicProofPlan.requireSha256(</span>
+                value,
+                &quot;resolved candidate hash&quot;))
+<span class="fc" id="L295">            .toList();</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(normalized).size() != normalized.size()) {</span>
+<span class="nc" id="L297">            throw new IllegalArgumentException(</span>
+                &quot;resolved candidate hashes must be unique&quot;);
+        }
+<span class="fc" id="L300">        List&lt;String&gt; sorted = normalized.stream()</span>
+<span class="fc" id="L301">            .sorted(Comparator.naturalOrder())</span>
+<span class="fc" id="L302">            .toList();</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">        if (!normalized.equals(sorted)) {</span>
+<span class="nc" id="L304">            throw new IllegalArgumentException(</span>
+                &quot;resolved candidate hashes must be canonically ordered&quot;);
+        }
+<span class="fc" id="L307">        return List.copyOf(normalized);</span>
+    }
+
+    private static String lengthPrefixed(String... values) {
+<span class="fc" id="L311">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L313">            append(result, value);</span>
+        }
+<span class="fc" id="L315">        return result.toString();</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L319">        target.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L320">            .append(':')</span>
+<span class="fc" id="L321">            .append(value);</span>
+<span class="fc" id="L322">    }</span>
+
+    public sealed interface ConfirmedReplay permits VerifiedConfirmation {
+        ArtifactReference receiptReference();
+
+        ArtifactReference planRunReference();
+
+        String receiptVerificationHash();
+
+        String planHash();
+
+        String planRunHash();
+
+        String solverResultHash();
+
+        String solverRevisionHash();
+
+        ExactFinitePolynomialPlanRun.Status runStatus();
+
+        long totalAssignments();
+
+        long evaluatedAssignments();
+
+        long matchingAssignments();
+
+        List&lt;String&gt; resolvedCandidateHashes();
+
+        int exactReplayExecutions();
+
+        String receiptContentHash();
+
+        String confirmationHash();
+
+        default int retainedSolutions() {
+<span class="fc" id="L356">            return resolvedCandidateHashes().size();</span>
+        }
+
+        boolean matches(
+            ReplayReceipt receipt,
+            ExactFinitePolynomialPlanRun planRun);
+    }
+
+    private record VerifiedConfirmation(
+        ArtifactReference receiptReference,
+        ArtifactReference planRunReference,
+        String receiptVerificationHash,
+        String planHash,
+        String planRunHash,
+        String solverResultHash,
+        String solverRevisionHash,
+        ExactFinitePolynomialPlanRun.Status runStatus,
+        long totalAssignments,
+        long evaluatedAssignments,
+        long matchingAssignments,
+        List&lt;String&gt; resolvedCandidateHashes,
+        int exactReplayExecutions,
+        String receiptContentHash,
+        String confirmationHash
+    ) implements ConfirmedReplay {
+<span class="fc" id="L381">        private VerifiedConfirmation {</span>
+<span class="fc" id="L382">            requireReceiptReference(receiptReference);</span>
+<span class="fc" id="L383">            requirePlanRunReference(planRunReference);</span>
+<span class="fc" id="L384">            receiptVerificationHash = SchematicProofPlan.requireSha256(</span>
+                receiptVerificationHash,
+                &quot;receiptVerificationHash&quot;);
+<span class="fc" id="L387">            planHash = SchematicProofPlan.requireSha256(</span>
+                planHash,
+                &quot;planHash&quot;);
+<span class="fc" id="L390">            planRunHash = SchematicProofPlan.requireSha256(</span>
+                planRunHash,
+                &quot;planRunHash&quot;);
+<span class="fc" id="L393">            solverResultHash = SchematicProofPlan.requireSha256(</span>
+                solverResultHash,
+                &quot;solverResultHash&quot;);
+<span class="fc" id="L396">            solverRevisionHash = SchematicProofPlan.requireSha256(</span>
+                solverRevisionHash,
+                &quot;solverRevisionHash&quot;);
+<span class="fc" id="L399">            runStatus = Objects.requireNonNull(runStatus, &quot;runStatus&quot;);</span>
+<span class="pc bpc" id="L400" title="4 of 8 branches missed.">            if (totalAssignments &lt; 1</span>
+                    || evaluatedAssignments != totalAssignments
+                    || matchingAssignments &lt; 0
+                    || matchingAssignments &gt; evaluatedAssignments) {
+<span class="nc" id="L404">                throw new IllegalArgumentException(</span>
+                    &quot;confirmation assignment counts are inconsistent&quot;);
+            }
+<span class="fc" id="L407">            resolvedCandidateHashes = normalizeCandidateHashes(</span>
+                resolvedCandidateHashes);
+<span class="fc" id="L409">            validateStatusCounts(</span>
+                runStatus,
+                matchingAssignments,
+<span class="fc" id="L412">                resolvedCandidateHashes.size());</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">            if (exactReplayExecutions != EXACT_REPLAY_EXECUTIONS) {</span>
+<span class="nc" id="L414">                throw new IllegalArgumentException(</span>
+                    &quot;confirmation requires one complete exact replay&quot;);
+            }
+<span class="fc" id="L417">            receiptContentHash = SchematicProofPlan.requireSha256(</span>
+                receiptContentHash,
+                &quot;receiptContentHash&quot;);
+<span class="fc" id="L420">            confirmationHash = SchematicProofPlan.requireSha256(</span>
+                confirmationHash,
+                &quot;confirmationHash&quot;);
+<span class="fc" id="L423">            String expectedConfirmationHash =</span>
+                ExactFinitePolynomialPlanReplayConfirmationVerifier
+<span class="fc" id="L425">                    .confirmationHash(</span>
+                        receiptReference,
+                        planRunReference,
+                        receiptVerificationHash,
+                        planHash,
+                        planRunHash,
+                        solverResultHash,
+                        solverRevisionHash,
+                        runStatus,
+                        totalAssignments,
+                        evaluatedAssignments,
+                        matchingAssignments,
+                        resolvedCandidateHashes,
+                        exactReplayExecutions,
+                        receiptContentHash);
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">            if (!expectedConfirmationHash.equals(confirmationHash)) {</span>
+<span class="nc" id="L441">                throw new IllegalArgumentException(</span>
+                    &quot;confirmationHash does not match confirmation contents&quot;);
+            }
+<span class="fc" id="L444">        }</span>
+
+        @Override
+        public boolean matches(
+            ReplayReceipt receipt,
+            ExactFinitePolynomialPlanRun planRun
+        ) {
+<span class="fc bfc" id="L451" title="All 4 branches covered.">            if (receipt == null || planRun == null) {</span>
+<span class="fc" id="L452">                return false;</span>
+            }
+<span class="fc" id="L454">            var result = planRun.solverResult();</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">            return receiptContentHash.equals(receipt.contentHash())</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">                &amp;&amp; planHash.equals(receipt.planHash())</span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">                &amp;&amp; planRunHash.equals(receipt.planRunHash())</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">                &amp;&amp; solverResultHash.equals(receipt.solverResultHash())</span>
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">                &amp;&amp; solverRevisionHash.equals(</span>
+<span class="fc" id="L460">                    receipt.solverRevisionHash())</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">                &amp;&amp; runStatus == receipt.runStatus()</span>
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">                &amp;&amp; totalAssignments == receipt.totalAssignments()</span>
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">                &amp;&amp; evaluatedAssignments == receipt.evaluatedAssignments()</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">                &amp;&amp; matchingAssignments == receipt.matchingAssignments()</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">                &amp;&amp; resolvedCandidateHashes.equals(</span>
+<span class="fc" id="L466">                    receipt.resolvedCandidateHashes())</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">                &amp;&amp; planHash.equals(planRun.planHash())</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">                &amp;&amp; planRunHash.equals(planRun.contentHash())</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">                &amp;&amp; solverResultHash.equals(result.contentHash())</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">                &amp;&amp; solverRevisionHash.equals(</span>
+<span class="fc" id="L471">                    result.solverRevisionHash())</span>
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">                &amp;&amp; runStatus == planRun.status()</span>
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">                &amp;&amp; totalAssignments == result.totalAssignments()</span>
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">                &amp;&amp; evaluatedAssignments == result.evaluatedAssignments()</span>
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">                &amp;&amp; matchingAssignments == result.matchingAssignments()</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">                &amp;&amp; resolvedCandidateHashes.equals(</span>
+<span class="fc" id="L477">                    candidateHashes(planRun));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

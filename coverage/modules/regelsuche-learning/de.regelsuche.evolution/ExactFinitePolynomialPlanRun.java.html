@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactFinitePolynomialPlanRun.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExactFinitePolynomialPlanRun.java</span></div><h1>ExactFinitePolynomialPlanRun.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
 
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
 import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.SearchResult;
 import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.SearchStatus;
 import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.Solution;
+import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -17,72 +21,254 @@ public record ExactFinitePolynomialPlanRun(
     List&lt;ExactFinitePolynomialResolvedCandidate&gt; candidates,
     String contentHash
 ) {
-<span class="fc" id="L20">    public ExactFinitePolynomialPlanRun {</span>
-<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (!ExactFinitePolynomialPlanResolver.RESOLVER_ID.equals(resolverId)) {</span>
-<span class="nc" id="L22">            throw new IllegalArgumentException(</span>
+    public static final String SCHEMA =
+        &quot;regelsuche.exact-finite-polynomial-plan-run/v1&quot;;
+    public static final int MAX_CANONICAL_BYTES = 1_000_000;
+<span class="fc" id="L27">    public static final String ARTIFACT_REVISION_HASH =</span>
+<span class="fc" id="L28">        SchematicProofPlan.hash(lengthPrefixed(</span>
+            SCHEMA,
+            ExactFinitePolynomialPlanResolver.RESOLVER_ID,
+            ExactFinitePolynomialPlanResolver.REVISION_HASH,
+            ExactFinitePolynomialHoleSolver.SOLVER_ID,
+            ExactFinitePolynomialHoleSolver.REVISION_HASH,
+            ExactFinitePolynomialHoleSolver.SOLUTION_IDENTITY_REVISION,
+            SchematicProofPlanResolution.SCHEMA,
+<span class="fc" id="L36">            Integer.toString(MAX_CANONICAL_BYTES),</span>
+            &quot;ordered-complete-run-projection&quot;,
+            &quot;typed-domains-solutions-and-resolution-links&quot;,
+            &quot;plan-run-semantic-hash-plus-independent-byte-address&quot;));
+
+<span class="fc" id="L41">    public ExactFinitePolynomialPlanRun {</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (!ExactFinitePolynomialPlanResolver.RESOLVER_ID.equals(resolverId)) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(</span>
                 &quot;unexpected finite plan resolver ID&quot;);
         }
-<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        if (!ExactFinitePolynomialPlanResolver.REVISION_HASH.equals(</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (!ExactFinitePolynomialPlanResolver.REVISION_HASH.equals(</span>
                 resolverRevisionHash)) {
-<span class="nc" id="L27">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L48">            throw new IllegalArgumentException(</span>
                 &quot;unexpected finite plan resolver revision&quot;);
         }
-<span class="fc" id="L30">        planHash = SchematicProofPlan.requireSha256(planHash, &quot;planHash&quot;);</span>
-<span class="fc" id="L31">        solverResult = Objects.requireNonNull(solverResult, &quot;solverResult&quot;);</span>
-<span class="fc" id="L32">        status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L33">        Objects.requireNonNull(candidates, &quot;candidates&quot;);</span>
-<span class="fc" id="L34">        candidates = candidates.stream()</span>
-<span class="fc" id="L35">            .map(candidate -&gt; Objects.requireNonNull(candidate, &quot;candidate&quot;))</span>
-<span class="fc" id="L36">            .sorted(Comparator.comparing(</span>
+<span class="fc" id="L51">        planHash = SchematicProofPlan.requireSha256(planHash, &quot;planHash&quot;);</span>
+<span class="fc" id="L52">        solverResult = Objects.requireNonNull(solverResult, &quot;solverResult&quot;);</span>
+<span class="fc" id="L53">        status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L54">        Objects.requireNonNull(candidates, &quot;candidates&quot;);</span>
+<span class="fc" id="L55">        candidates = candidates.stream()</span>
+<span class="fc" id="L56">            .map(candidate -&gt; Objects.requireNonNull(candidate, &quot;candidate&quot;))</span>
+<span class="fc" id="L57">            .sorted(Comparator.comparing(</span>
                 ExactFinitePolynomialResolvedCandidate::contentHash))
-<span class="fc" id="L38">            .toList();</span>
-<span class="fc" id="L39">        if (candidates.stream()</span>
-<span class="fc" id="L40">                .map(ExactFinitePolynomialResolvedCandidate::contentHash)</span>
-<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                .distinct().count() != candidates.size()) {</span>
-<span class="nc" id="L42">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L59">            .toList();</span>
+<span class="fc" id="L60">        if (candidates.stream()</span>
+<span class="fc" id="L61">                .map(ExactFinitePolynomialResolvedCandidate::contentHash)</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                .distinct().count() != candidates.size()) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(</span>
                 &quot;resolved candidates must be unique&quot;);
         }
-<span class="fc" id="L45">        validateStatus(solverResult.status(), status, candidates.size());</span>
-<span class="fc" id="L46">        validateCandidateLinks(planHash, solverResult, candidates);</span>
-<span class="fc" id="L47">        contentHash = SchematicProofPlan.requireSha256(</span>
+<span class="fc" id="L66">        validateStatus(solverResult.status(), status, candidates.size());</span>
+<span class="fc" id="L67">        validateCandidateLinks(planHash, solverResult, candidates);</span>
+<span class="fc" id="L68">        contentHash = SchematicProofPlan.requireSha256(</span>
             contentHash,
             &quot;contentHash&quot;);
-<span class="fc" id="L50">        String expected = ExactFinitePolynomialPlanResolver.planRunHash(</span>
+<span class="fc" id="L71">        String expected = ExactFinitePolynomialPlanResolver.planRunHash(</span>
             planHash,
             solverResult,
             status,
             candidates);
-<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
-<span class="fc" id="L56">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L77">            throw new IllegalArgumentException(</span>
                 &quot;plan-run contentHash does not match contents&quot;);
         }
-<span class="fc" id="L59">    }</span>
+<span class="fc" id="L80">    }</span>
 
     static ExactFinitePolynomialPlanRun create(
         String planHash,
         SearchResult solverResult,
         List&lt;ExactFinitePolynomialResolvedCandidate&gt; candidates
     ) {
-<span class="fc bfc" id="L66" title="All 3 branches covered.">        Status status = switch (solverResult.status()) {</span>
+<span class="fc bfc" id="L87" title="All 3 branches covered.">        Status status = switch (solverResult.status()) {</span>
             case COMPLETE_WITHOUT_SOLUTION -&gt;
-<span class="fc" id="L68">                Status.COMPLETE_WITHOUT_SOLUTION;</span>
+<span class="fc" id="L89">                Status.COMPLETE_WITHOUT_SOLUTION;</span>
             case COMPLETE_WITH_SOLUTIONS -&gt;
-<span class="fc" id="L70">                Status.COMPLETE_WITH_RESOLUTIONS;</span>
+<span class="fc" id="L91">                Status.COMPLETE_WITH_RESOLUTIONS;</span>
             case COMPLETE_SOLUTION_SET_TRUNCATED -&gt;
-<span class="fc" id="L72">                Status.COMPLETE_RESOLUTION_SET_TRUNCATED;</span>
+<span class="fc" id="L93">                Status.COMPLETE_RESOLUTION_SET_TRUNCATED;</span>
         };
-<span class="fc" id="L74">        return new ExactFinitePolynomialPlanRun(</span>
+<span class="fc" id="L95">        return new ExactFinitePolynomialPlanRun(</span>
             ExactFinitePolynomialPlanResolver.RESOLVER_ID,
             ExactFinitePolynomialPlanResolver.REVISION_HASH,
             planHash,
             solverResult,
             status,
             candidates,
-<span class="fc" id="L81">            ExactFinitePolynomialPlanResolver.planRunHash(</span>
+<span class="fc" id="L102">            ExactFinitePolynomialPlanResolver.planRunHash(</span>
                 planHash,
                 solverResult,
                 status,
                 candidates));
+    }
+
+    /**
+     * Canonical retained-byte projection of this already validated plan run.
+     *
+     * &lt;p&gt;The semantic run hash and the independent artifact byte hash remain
+     * distinct identities. Parsing or replay authority is not granted by this
+     * representation alone.&lt;/p&gt;
+     */
+    public String toCanonicalJson() {
+<span class="fc" id="L117">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L118">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L119">            .property(&quot;artifactRevisionHash&quot;, ARTIFACT_REVISION_HASH)</span>
+<span class="fc" id="L120">            .property(&quot;resolverId&quot;, resolverId)</span>
+<span class="fc" id="L121">            .property(&quot;resolverRevisionHash&quot;, resolverRevisionHash)</span>
+<span class="fc" id="L122">            .property(&quot;planHash&quot;, planHash)</span>
+<span class="fc" id="L123">            .property(&quot;planRunHash&quot;, contentHash)</span>
+<span class="fc" id="L124">            .property(&quot;solverId&quot;, solverResult.solverId())</span>
+<span class="fc" id="L125">            .property(</span>
+                &quot;solverRevisionHash&quot;,
+<span class="fc" id="L127">                solverResult.solverRevisionHash())</span>
+<span class="fc" id="L128">            .property(&quot;solverResultHash&quot;, solverResult.contentHash())</span>
+<span class="fc" id="L129">            .property(</span>
+                &quot;sourceExpression&quot;,
+<span class="fc" id="L131">                solverResult.sourceExpression())</span>
+<span class="fc" id="L132">            .property(&quot;ansatzTemplate&quot;, solverResult.ansatzTemplate())</span>
+<span class="fc" id="L133">            .array(&quot;holeDomains&quot;, array -&gt;</span>
+<span class="fc" id="L134">                solverResult.holeDomains().forEach(domain -&gt;</span>
+<span class="fc" id="L135">                    array.objectValue(object -&gt;</span>
+<span class="fc" id="L136">                        writeDomain(object, domain))))</span>
+<span class="fc" id="L137">            .property(</span>
+                &quot;totalAssignments&quot;,
+<span class="fc" id="L139">                solverResult.totalAssignments())</span>
+<span class="fc" id="L140">            .property(</span>
+                &quot;evaluatedAssignments&quot;,
+<span class="fc" id="L142">                solverResult.evaluatedAssignments())</span>
+<span class="fc" id="L143">            .property(</span>
+                &quot;matchingAssignments&quot;,
+<span class="fc" id="L145">                solverResult.matchingAssignments())</span>
+<span class="fc" id="L146">            .property(</span>
+                &quot;retainedSolutionLimit&quot;,
+<span class="fc" id="L148">                solverResult.retainedSolutionLimit())</span>
+<span class="fc" id="L149">            .property(&quot;solverStatus&quot;, solverResult.status().name())</span>
+<span class="fc" id="L150">            .property(&quot;runStatus&quot;, status.name())</span>
+<span class="fc" id="L151">            .array(&quot;solutions&quot;, array -&gt;</span>
+<span class="fc" id="L152">                solverResult.solutions().forEach(solution -&gt;</span>
+<span class="fc" id="L153">                    array.objectValue(object -&gt;</span>
+<span class="fc" id="L154">                        writeSolution(object, solution))))</span>
+<span class="fc" id="L155">            .array(&quot;resolvedCandidates&quot;, array -&gt;</span>
+<span class="fc" id="L156">                candidates.forEach(candidate -&gt;</span>
+<span class="fc" id="L157">                    array.objectValue(object -&gt;</span>
+<span class="fc" id="L158">                        writeCandidate(object, candidate))));</span>
+<span class="fc" id="L159">        String result = json.endObject().toString();</span>
+<span class="fc" id="L160">        requireCanonicalSize(result);</span>
+<span class="fc" id="L161">        return result;</span>
+    }
+
+    private static void writeDomain(
+        JsonWriter json,
+        HoleDomain domain
+    ) {
+<span class="fc" id="L168">        json.property(&quot;holeId&quot;, domain.holeId())</span>
+<span class="fc" id="L169">            .property(&quot;kind&quot;, domain.kind().name())</span>
+<span class="fc" id="L170">            .stringArray(</span>
+                &quot;values&quot;,
+<span class="fc" id="L172">                domain.values().stream()</span>
+<span class="fc" id="L173">                    .map(value -&gt; value.canonicalText())</span>
+<span class="fc" id="L174">                    .toList());</span>
+<span class="fc" id="L175">    }</span>
+
+    private static void writeSolution(
+        JsonWriter json,
+        Solution solution
+    ) {
+<span class="fc" id="L181">        json.property(&quot;solutionHash&quot;, solution.contentHash())</span>
+<span class="fc" id="L182">            .array(&quot;bindings&quot;, array -&gt;</span>
+<span class="fc" id="L183">                solution.bindings().forEach(binding -&gt;</span>
+<span class="fc" id="L184">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L185">                        .property(&quot;holeId&quot;, binding.holeId())</span>
+<span class="fc" id="L186">                        .property(&quot;kind&quot;, binding.kind().name())</span>
+<span class="fc" id="L187">                        .property(</span>
+                            &quot;value&quot;,
+<span class="fc" id="L189">                            binding.value().canonicalText()))))</span>
+<span class="fc" id="L190">            .property(</span>
+                &quot;instantiatedExpression&quot;,
+<span class="fc" id="L192">                solution.instantiatedExpression())</span>
+<span class="fc" id="L193">            .property(&quot;exactNormalForm&quot;, solution.exactNormalForm());</span>
+<span class="fc" id="L194">    }</span>
+
+    private static void writeCandidate(
+        JsonWriter json,
+        ExactFinitePolynomialResolvedCandidate candidate
+    ) {
+<span class="fc" id="L200">        json.property(&quot;candidateHash&quot;, candidate.contentHash())</span>
+<span class="fc" id="L201">            .property(&quot;solutionHash&quot;, candidate.solution().contentHash())</span>
+<span class="fc" id="L202">            .property(&quot;solverResultHash&quot;, candidate.solverResultHash())</span>
+<span class="fc" id="L203">            .property(</span>
+                &quot;resolutionHash&quot;,
+<span class="fc" id="L205">                candidate.resolution().contentHash())</span>
+<span class="fc" id="L206">            .object(&quot;resolution&quot;, object -&gt;</span>
+<span class="fc" id="L207">                writeResolution(object, candidate.resolution()));</span>
+<span class="fc" id="L208">    }</span>
+
+    private static void writeResolution(
+        JsonWriter json,
+        SchematicProofPlanResolution resolution
+    ) {
+<span class="fc" id="L214">        json.property(&quot;schema&quot;, resolution.schema())</span>
+<span class="fc" id="L215">            .property(&quot;planHash&quot;, resolution.planHash())</span>
+<span class="fc" id="L216">            .stringArray(</span>
+                &quot;requiredHoleIds&quot;,
+<span class="fc" id="L218">                resolution.requiredHoleIds())</span>
+<span class="fc" id="L219">            .stringArray(</span>
+                &quot;requiredObligationIds&quot;,
+<span class="fc" id="L221">                resolution.requiredObligationIds())</span>
+<span class="fc" id="L222">            .array(&quot;bindings&quot;, array -&gt;</span>
+<span class="fc" id="L223">                resolution.bindings().forEach(binding -&gt;</span>
+<span class="fc" id="L224">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L225">                        .property(&quot;holeId&quot;, binding.holeId())</span>
+<span class="fc" id="L226">                        .property(&quot;sort&quot;, binding.sort().name())</span>
+<span class="fc" id="L227">                        .property(</span>
+                            &quot;canonicalValue&quot;,
+<span class="fc" id="L229">                            binding.canonicalValue())</span>
+<span class="fc" id="L230">                        .property(</span>
+                            &quot;evidenceHash&quot;,
+<span class="fc" id="L232">                            binding.evidenceHash()))))</span>
+<span class="fc" id="L233">            .array(&quot;outcomes&quot;, array -&gt;</span>
+<span class="fc" id="L234">                resolution.outcomes().forEach(outcome -&gt;</span>
+<span class="fc" id="L235">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L236">                        .property(</span>
+                            &quot;obligationId&quot;,
+<span class="fc" id="L238">                            outcome.obligationId())</span>
+<span class="fc" id="L239">                        .property(&quot;status&quot;, outcome.status().name())</span>
+<span class="fc" id="L240">                        .property(</span>
+                            &quot;checkerCapability&quot;,
+<span class="fc" id="L242">                            outcome.checkerCapability())</span>
+<span class="fc" id="L243">                        .property(</span>
+                            &quot;checkerRevisionHash&quot;,
+<span class="fc" id="L245">                            outcome.checkerRevisionHash())</span>
+<span class="fc" id="L246">                        .property(</span>
+                            &quot;checkerExecutionHash&quot;,
+<span class="fc" id="L248">                            outcome.checkerExecutionHash())</span>
+<span class="fc" id="L249">                        .property(</span>
+                            &quot;detailCode&quot;,
+<span class="fc" id="L251">                            outcome.detailCode()))))</span>
+<span class="fc" id="L252">            .property(&quot;state&quot;, resolution.state().name())</span>
+<span class="fc" id="L253">            .property(&quot;contentHash&quot;, resolution.contentHash());</span>
+<span class="fc" id="L254">    }</span>
+
+    private static void requireCanonicalSize(String value) {
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (value.getBytes(StandardCharsets.UTF_8).length</span>
+                &gt; MAX_CANONICAL_BYTES) {
+<span class="nc" id="L259">            throw new IllegalArgumentException(</span>
+                &quot;finite polynomial plan-run artifact exceeds byte limit&quot;);
+        }
+<span class="fc" id="L262">    }</span>
+
+    private static String lengthPrefixed(String... values) {
+<span class="fc" id="L265">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L267">            result.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L268">                .append(':')</span>
+<span class="fc" id="L269">                .append(value);</span>
+        }
+<span class="fc" id="L271">        return result.toString();</span>
     }
 
     private static void validateCandidateLinks(
@@ -90,54 +276,54 @@ public record ExactFinitePolynomialPlanRun(
         SearchResult solverResult,
         List&lt;ExactFinitePolynomialResolvedCandidate&gt; candidates
     ) {
-<span class="fc" id="L93">        String solverHash = solverResult.contentHash();</span>
-<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (ExactFinitePolynomialResolvedCandidate candidate : candidates) {</span>
-<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (!planHash.equals(candidate.resolution().planHash())</span>
-<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                    || !solverHash.equals(candidate.solverResultHash())) {</span>
-<span class="fc" id="L97">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L279">        String solverHash = solverResult.contentHash();</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        for (ExactFinitePolynomialResolvedCandidate candidate : candidates) {</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            if (!planHash.equals(candidate.resolution().planHash())</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">                    || !solverHash.equals(candidate.solverResultHash())) {</span>
+<span class="fc" id="L283">                throw new IllegalArgumentException(</span>
                     &quot;resolved candidate differs from plan-run authority&quot;);
             }
-<span class="fc" id="L100">        }</span>
-<span class="fc" id="L101">        List&lt;Solution&gt; expectedSolutions = solverResult.solutions().stream()</span>
-<span class="fc" id="L102">            .sorted(Comparator.comparing(Solution::bindingKey))</span>
-<span class="fc" id="L103">            .toList();</span>
-<span class="fc" id="L104">        List&lt;Solution&gt; actualSolutions = candidates.stream()</span>
-<span class="fc" id="L105">            .map(ExactFinitePolynomialResolvedCandidate::solution)</span>
-<span class="fc" id="L106">            .sorted(Comparator.comparing(Solution::bindingKey))</span>
-<span class="fc" id="L107">            .toList();</span>
-<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!expectedSolutions.equals(actualSolutions)) {</span>
-<span class="fc" id="L109">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L286">        }</span>
+<span class="fc" id="L287">        List&lt;Solution&gt; expectedSolutions = solverResult.solutions().stream()</span>
+<span class="fc" id="L288">            .sorted(Comparator.comparing(Solution::bindingKey))</span>
+<span class="fc" id="L289">            .toList();</span>
+<span class="fc" id="L290">        List&lt;Solution&gt; actualSolutions = candidates.stream()</span>
+<span class="fc" id="L291">            .map(ExactFinitePolynomialResolvedCandidate::solution)</span>
+<span class="fc" id="L292">            .sorted(Comparator.comparing(Solution::bindingKey))</span>
+<span class="fc" id="L293">            .toList();</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (!expectedSolutions.equals(actualSolutions)) {</span>
+<span class="fc" id="L295">            throw new IllegalArgumentException(</span>
                 &quot;resolved candidates do not cover solver solutions exactly&quot;);
         }
-<span class="fc" id="L112">    }</span>
+<span class="fc" id="L298">    }</span>
 
     private static void validateStatus(
         SearchStatus solverStatus,
         Status planStatus,
         int candidateCount
     ) {
-<span class="fc bfc" id="L119" title="All 3 branches covered.">        Status expected = switch (solverStatus) {</span>
+<span class="fc bfc" id="L305" title="All 3 branches covered.">        Status expected = switch (solverStatus) {</span>
             case COMPLETE_WITHOUT_SOLUTION -&gt;
-<span class="fc" id="L121">                Status.COMPLETE_WITHOUT_SOLUTION;</span>
+<span class="fc" id="L307">                Status.COMPLETE_WITHOUT_SOLUTION;</span>
             case COMPLETE_WITH_SOLUTIONS -&gt;
-<span class="fc" id="L123">                Status.COMPLETE_WITH_RESOLUTIONS;</span>
+<span class="fc" id="L309">                Status.COMPLETE_WITH_RESOLUTIONS;</span>
             case COMPLETE_SOLUTION_SET_TRUNCATED -&gt;
-<span class="fc" id="L125">                Status.COMPLETE_RESOLUTION_SET_TRUNCATED;</span>
+<span class="fc" id="L311">                Status.COMPLETE_RESOLUTION_SET_TRUNCATED;</span>
         };
         boolean candidateCountMatches =
-<span class="fc bfc" id="L128" title="All 2 branches covered.">            solverStatus == SearchStatus.COMPLETE_WITHOUT_SOLUTION</span>
-<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                ? candidateCount == 0</span>
-<span class="fc bfc" id="L130" title="All 2 branches covered.">                : candidateCount &gt; 0;</span>
-<span class="pc bpc" id="L131" title="1 of 4 branches missed.">        if (planStatus != expected || !candidateCountMatches) {</span>
-<span class="fc" id="L132">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            solverStatus == SearchStatus.COMPLETE_WITHOUT_SOLUTION</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">                ? candidateCount == 0</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">                : candidateCount &gt; 0;</span>
+<span class="pc bpc" id="L317" title="1 of 4 branches missed.">        if (planStatus != expected || !candidateCountMatches) {</span>
+<span class="fc" id="L318">            throw new IllegalArgumentException(</span>
                 &quot;plan status differs from exact solver result&quot;);
         }
-<span class="fc" id="L135">    }</span>
+<span class="fc" id="L321">    }</span>
 
-<span class="fc" id="L137">    public enum Status {</span>
-<span class="fc" id="L138">        COMPLETE_WITHOUT_SOLUTION,</span>
-<span class="fc" id="L139">        COMPLETE_WITH_RESOLUTIONS,</span>
-<span class="fc" id="L140">        COMPLETE_RESOLUTION_SET_TRUNCATED</span>
+<span class="fc" id="L323">    public enum Status {</span>
+<span class="fc" id="L324">        COMPLETE_WITHOUT_SOLUTION,</span>
+<span class="fc" id="L325">        COMPLETE_WITH_RESOLUTIONS,</span>
+<span class="fc" id="L326">        COMPLETE_RESOLUTION_SET_TRUNCATED</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

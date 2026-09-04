@@ -14,102 +14,159 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Independently loads and verifies content-addressed bytes for an exact finite
- * polynomial plan replay receipt.
+ * Independently loads and verifies content-addressed bytes for exact finite
+ * polynomial replay artifacts.
  *
- * &lt;p&gt;This verifier establishes storage identity and an immutable UTF-8 byte
- * snapshot only. It does not parse receipt fields, rerun the solver, replay
+ * &lt;p&gt;The verifier establishes storage identity and immutable UTF-8 byte
+ * snapshots only. Receipt and plan-run roles retain separate schemas and media
+ * types. This boundary does not parse fields, rerun the solver, replay
  * primitive rewrites or issue proof or promotion authority.&lt;/p&gt;
  */
-<span class="fc" id="L24">public final class ExactFinitePolynomialPlanReplayArtifactVerifier {</span>
+<span class="fc" id="L25">public final class ExactFinitePolynomialPlanReplayArtifactVerifier {</span>
     public static final String REFERENCE_SCHEMA =
         &quot;regelsuche.exact-finite-polynomial-plan-artifact-reference/v1&quot;;
     public static final String VERIFIER_ID =
-        &quot;regelsuche.exact-finite-polynomial-plan-artifact-verifier/v1&quot;;
+        &quot;regelsuche.exact-finite-polynomial-plan-artifact-verifier/v2&quot;;
     public static final String RECEIPT_ROLE = &quot;replay-receipt&quot;;
     public static final String RECEIPT_MEDIA_TYPE =
         &quot;application/vnd.regelsuche.exact-finite-polynomial-plan-replay-receipt+json&quot;;
+    public static final String PLAN_RUN_ROLE = &quot;plan-run&quot;;
+    public static final String PLAN_RUN_MEDIA_TYPE =
+        &quot;application/vnd.regelsuche.exact-finite-polynomial-plan-run+json&quot;;
     public static final int MAX_ARTIFACT_BYTES = 1_000_000;
-<span class="fc" id="L33">    public static final String REVISION_HASH = SchematicProofPlan.hash(</span>
-<span class="fc" id="L34">        lengthPrefixed(</span>
+<span class="fc" id="L37">    public static final String REVISION_HASH = SchematicProofPlan.hash(</span>
+<span class="fc" id="L38">        lengthPrefixed(</span>
             VERIFIER_ID,
             REFERENCE_SCHEMA,
             RECEIPT_ROLE,
             ReplayReceipt.SCHEMA,
             RECEIPT_MEDIA_TYPE,
-<span class="fc" id="L40">            Integer.toString(MAX_ARTIFACT_BYTES),</span>
+            PLAN_RUN_ROLE,
+            ExactFinitePolynomialPlanRun.SCHEMA,
+            ExactFinitePolynomialPlanRun.ARTIFACT_REVISION_HASH,
+            PLAN_RUN_MEDIA_TYPE,
+<span class="fc" id="L48">            Integer.toString(MAX_ARTIFACT_BYTES),</span>
             &quot;load-by-expected-artifact-id&quot;,
+            &quot;role-schema-media-type-separation&quot;,
             &quot;verify-returned-key-length-sha256-and-metadata-id&quot;,
             &quot;strict-utf8-no-bom-compact-object-boundary&quot;,
             &quot;sealed-verifier-owned-immutable-byte-snapshot&quot;));
 
-<span class="fc" id="L46">    private static final Pattern MEDIA_TYPE = Pattern.compile(</span>
+<span class="fc" id="L55">    private static final Pattern MEDIA_TYPE = Pattern.compile(</span>
         &quot;[a-z0-9][a-z0-9.+-]{0,63}/[a-z0-9][a-z0-9.+-]{0,127}&quot;);
-<span class="fc" id="L48">    private static final byte[] UTF8_BOM = {</span>
+<span class="fc" id="L57">    private static final byte[] UTF8_BOM = {</span>
         (byte) 0xef,
         (byte) 0xbb,
         (byte) 0xbf
     };
 
     public ArtifactReference describeReceipt(ReplayReceipt receipt) {
-<span class="fc" id="L55">        Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
-<span class="fc" id="L56">        return ArtifactReference.describe(</span>
+<span class="fc" id="L64">        Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc" id="L65">        return ArtifactReference.describe(</span>
             RECEIPT_ROLE,
             ReplayReceipt.SCHEMA,
             RECEIPT_MEDIA_TYPE,
-<span class="fc" id="L60">            receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L69">            receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    public ArtifactReference describePlanRun(
+        ExactFinitePolynomialPlanRun planRun
+    ) {
+<span class="fc" id="L75">        Objects.requireNonNull(planRun, &quot;planRun&quot;);</span>
+<span class="fc" id="L76">        return ArtifactReference.describe(</span>
+            PLAN_RUN_ROLE,
+            ExactFinitePolynomialPlanRun.SCHEMA,
+            PLAN_RUN_MEDIA_TYPE,
+<span class="fc" id="L80">            planRun.toCanonicalJson().getBytes(StandardCharsets.UTF_8));</span>
     }
 
     public VerifiedArtifactBytes verifyReceipt(
         ArtifactReference expected,
         ArtifactSource source
     ) {
-<span class="fc" id="L67">        requireReceiptMetadata(expected);</span>
-<span class="fc" id="L68">        Objects.requireNonNull(source, &quot;source&quot;);</span>
-<span class="fc" id="L69">        LoadedArtifact loaded = Objects.requireNonNull(</span>
-<span class="fc" id="L70">            source.load(expected.artifactId()),</span>
+<span class="fc" id="L87">        return verify(</span>
+            expected,
+            source,
+            RECEIPT_ROLE,
+            ReplayReceipt.SCHEMA,
+            RECEIPT_MEDIA_TYPE);
+    }
+
+    public VerifiedArtifactBytes verifyPlanRun(
+        ArtifactReference expected,
+        ArtifactSource source
+    ) {
+<span class="fc" id="L99">        return verify(</span>
+            expected,
+            source,
+            PLAN_RUN_ROLE,
+            ExactFinitePolynomialPlanRun.SCHEMA,
+            PLAN_RUN_MEDIA_TYPE);
+    }
+
+    private static VerifiedArtifactBytes verify(
+        ArtifactReference expected,
+        ArtifactSource source,
+        String requiredRole,
+        String requiredContentSchema,
+        String requiredMediaType
+    ) {
+<span class="fc" id="L114">        requireMetadata(</span>
+            expected,
+            requiredRole,
+            requiredContentSchema,
+            requiredMediaType);
+<span class="fc" id="L119">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L120">        LoadedArtifact loaded = Objects.requireNonNull(</span>
+<span class="fc" id="L121">            source.load(expected.artifactId()),</span>
             &quot;loaded artifact&quot;);
-<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (!expected.artifactId().equals(loaded.key())) {</span>
-<span class="fc" id="L73">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (!expected.artifactId().equals(loaded.key())) {</span>
+<span class="fc" id="L124">            throw new IllegalArgumentException(</span>
                 &quot;artifact source returned a different key&quot;);
         }
 
-<span class="fc" id="L77">        byte[] bytes = loaded.bytes();</span>
-<span class="fc" id="L78">        requireByteLength(bytes);</span>
-<span class="fc" id="L79">        String utf8 = decodeStrictUtf8(bytes);</span>
-<span class="fc" id="L80">        requireCompactObjectBoundary(bytes, utf8);</span>
-<span class="fc" id="L81">        ArtifactReference actual = ArtifactReference.describe(</span>
-<span class="fc" id="L82">            expected.role(),</span>
-<span class="fc" id="L83">            expected.contentSchema(),</span>
-<span class="fc" id="L84">            expected.mediaType(),</span>
+<span class="fc" id="L128">        byte[] bytes = loaded.bytes();</span>
+<span class="fc" id="L129">        requireByteLength(bytes);</span>
+<span class="fc" id="L130">        String utf8 = decodeStrictUtf8(bytes);</span>
+<span class="fc" id="L131">        requireCompactObjectBoundary(bytes, utf8);</span>
+<span class="fc" id="L132">        ArtifactReference actual = ArtifactReference.describe(</span>
+<span class="fc" id="L133">            expected.role(),</span>
+<span class="fc" id="L134">            expected.contentSchema(),</span>
+<span class="fc" id="L135">            expected.mediaType(),</span>
             bytes);
-<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (!expected.equals(actual)) {</span>
-<span class="fc" id="L87">            throw new IllegalArgumentException(</span>
-                &quot;loaded replay artifact differs from its reference&quot;);
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (!expected.equals(actual)) {</span>
+<span class="fc" id="L138">            throw new IllegalArgumentException(</span>
+                &quot;loaded exact plan artifact differs from its reference&quot;);
         }
-<span class="fc" id="L90">        return new VerifiedBytes(expected, bytes, utf8);</span>
+<span class="fc" id="L141">        return new VerifiedBytes(expected, bytes, utf8);</span>
     }
 
-    private static void requireReceiptMetadata(ArtifactReference reference) {
-<span class="fc" id="L94">        Objects.requireNonNull(reference, &quot;expected&quot;);</span>
-<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (!RECEIPT_ROLE.equals(reference.role())</span>
-<span class="fc bfc" id="L96" title="All 2 branches covered.">                || !ReplayReceipt.SCHEMA.equals(reference.contentSchema())</span>
-<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                || !RECEIPT_MEDIA_TYPE.equals(reference.mediaType())) {</span>
-<span class="fc" id="L98">            throw new IllegalArgumentException(</span>
-                &quot;artifact reference is not an exact replay receipt&quot;);
+    private static void requireMetadata(
+        ArtifactReference reference,
+        String requiredRole,
+        String requiredContentSchema,
+        String requiredMediaType
+    ) {
+<span class="fc" id="L150">        Objects.requireNonNull(reference, &quot;expected&quot;);</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (!REFERENCE_SCHEMA.equals(reference.referenceSchema())</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                || !requiredRole.equals(reference.role())</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">                || !requiredContentSchema.equals(reference.contentSchema())</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                || !requiredMediaType.equals(reference.mediaType())) {</span>
+<span class="fc" id="L155">            throw new IllegalArgumentException(</span>
+                &quot;artifact reference has the wrong exact plan role or schema&quot;);
         }
-<span class="fc" id="L101">    }</span>
+<span class="fc" id="L158">    }</span>
 
     private static String decodeStrictUtf8(byte[] bytes) {
         try {
-<span class="fc" id="L105">            return StandardCharsets.UTF_8.newDecoder()</span>
-<span class="fc" id="L106">                .onMalformedInput(CodingErrorAction.REPORT)</span>
-<span class="fc" id="L107">                .onUnmappableCharacter(CodingErrorAction.REPORT)</span>
-<span class="fc" id="L108">                .decode(ByteBuffer.wrap(bytes))</span>
-<span class="fc" id="L109">                .toString();</span>
-<span class="fc" id="L110">        } catch (CharacterCodingException exception) {</span>
-<span class="fc" id="L111">            throw new IllegalArgumentException(</span>
-                &quot;replay artifact is not valid UTF-8&quot;,
+<span class="fc" id="L162">            return StandardCharsets.UTF_8.newDecoder()</span>
+<span class="fc" id="L163">                .onMalformedInput(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L164">                .onUnmappableCharacter(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L165">                .decode(ByteBuffer.wrap(bytes))</span>
+<span class="fc" id="L166">                .toString();</span>
+<span class="fc" id="L167">        } catch (CharacterCodingException exception) {</span>
+<span class="fc" id="L168">            throw new IllegalArgumentException(</span>
+                &quot;exact plan artifact is not valid UTF-8&quot;,
                 exception);
         }
     }
@@ -118,37 +175,37 @@ import java.util.regex.Pattern;
         byte[] bytes,
         String text
     ) {
-<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (startsWith(bytes, UTF8_BOM)) {</span>
-<span class="fc" id="L122">            throw new IllegalArgumentException(</span>
-                &quot;replay artifact must not contain a UTF-8 BOM&quot;);
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (startsWith(bytes, UTF8_BOM)) {</span>
+<span class="fc" id="L179">            throw new IllegalArgumentException(</span>
+                &quot;exact plan artifact must not contain a UTF-8 BOM&quot;);
         }
-<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (!text.equals(text.strip())</span>
-<span class="fc bfc" id="L126" title="All 2 branches covered.">                || !text.startsWith(&quot;{&quot;)</span>
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                || !text.endsWith(&quot;}&quot;)) {</span>
-<span class="fc" id="L128">            throw new IllegalArgumentException(</span>
-                &quot;replay artifact must be one compact JSON object&quot;);
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (!text.equals(text.strip())</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">                || !text.startsWith(&quot;{&quot;)</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                || !text.endsWith(&quot;}&quot;)) {</span>
+<span class="fc" id="L185">            throw new IllegalArgumentException(</span>
+                &quot;exact plan artifact must be one compact JSON object&quot;);
         }
-<span class="fc" id="L131">    }</span>
+<span class="fc" id="L188">    }</span>
 
     private static boolean startsWith(byte[] value, byte[] prefix) {
-<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (value.length &lt; prefix.length) {</span>
-<span class="fc" id="L135">            return false;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (value.length &lt; prefix.length) {</span>
+<span class="fc" id="L192">            return false;</span>
         }
-<span class="fc bfc" id="L137" title="All 2 branches covered.">        for (int index = 0; index &lt; prefix.length; index++) {</span>
-<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (value[index] != prefix[index]) {</span>
-<span class="fc" id="L139">                return false;</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        for (int index = 0; index &lt; prefix.length; index++) {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            if (value[index] != prefix[index]) {</span>
+<span class="fc" id="L196">                return false;</span>
             }
         }
-<span class="fc" id="L142">        return true;</span>
+<span class="fc" id="L199">        return true;</span>
     }
 
     private static void requireByteLength(byte[] bytes) {
-<span class="fc" id="L146">        Objects.requireNonNull(bytes, &quot;bytes&quot;);</span>
-<span class="pc bpc" id="L147" title="2 of 4 branches missed.">        if (bytes.length &lt; 1 || bytes.length &gt; MAX_ARTIFACT_BYTES) {</span>
-<span class="nc" id="L148">            throw new IllegalArgumentException(</span>
-                &quot;replay artifact byte length is outside limits&quot;);
+<span class="fc" id="L203">        Objects.requireNonNull(bytes, &quot;bytes&quot;);</span>
+<span class="pc bpc" id="L204" title="2 of 4 branches missed.">        if (bytes.length &lt; 1 || bytes.length &gt; MAX_ARTIFACT_BYTES) {</span>
+<span class="nc" id="L205">            throw new IllegalArgumentException(</span>
+                &quot;exact plan artifact byte length is outside limits&quot;);
         }
-<span class="fc" id="L151">    }</span>
+<span class="fc" id="L208">    }</span>
 
     private static String artifactId(
         String role,
@@ -157,35 +214,35 @@ import java.util.regex.Pattern;
         String byteHash,
         int byteLength
     ) {
-<span class="fc" id="L160">        return SchematicProofPlan.hash(lengthPrefixed(</span>
+<span class="fc" id="L217">        return SchematicProofPlan.hash(lengthPrefixed(</span>
             REFERENCE_SCHEMA,
             role,
             contentSchema,
             mediaType,
             byteHash,
-<span class="fc" id="L166">            Integer.toString(byteLength)));</span>
+<span class="fc" id="L223">            Integer.toString(byteLength)));</span>
     }
 
     private static String sha256(byte[] bytes) {
         try {
-<span class="fc" id="L171">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L172">                .digest(bytes);</span>
-<span class="fc" id="L173">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
-<span class="nc" id="L174">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L175">            throw new IllegalStateException(</span>
+<span class="fc" id="L228">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L229">                .digest(bytes);</span>
+<span class="fc" id="L230">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L231">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L232">            throw new IllegalStateException(</span>
                 &quot;SHA-256 unavailable&quot;,
                 exception);
         }
     }
 
     private static String lengthPrefixed(String... values) {
-<span class="fc" id="L182">        StringBuilder result = new StringBuilder();</span>
-<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (String value : values) {</span>
-<span class="fc" id="L184">            result.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
-<span class="fc" id="L185">                .append(':')</span>
-<span class="fc" id="L186">                .append(value);</span>
+<span class="fc" id="L239">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L241">            result.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L242">                .append(':')</span>
+<span class="fc" id="L243">                .append(value);</span>
         }
-<span class="fc" id="L188">        return result.toString();</span>
+<span class="fc" id="L245">        return result.toString();</span>
     }
 
     public record ArtifactReference(
@@ -197,41 +254,41 @@ import java.util.regex.Pattern;
         String byteHash,
         int byteLength
     ) {
-<span class="fc" id="L200">        public ArtifactReference {</span>
-<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            if (!REFERENCE_SCHEMA.equals(referenceSchema)) {</span>
-<span class="nc" id="L202">                throw new IllegalArgumentException(</span>
-                    &quot;unsupported replay artifact reference schema&quot;);
+<span class="fc" id="L257">        public ArtifactReference {</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (!REFERENCE_SCHEMA.equals(referenceSchema)) {</span>
+<span class="nc" id="L259">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported exact plan artifact reference schema&quot;);
             }
-<span class="fc" id="L205">            artifactId = SchematicProofPlan.requireSha256(</span>
+<span class="fc" id="L262">            artifactId = SchematicProofPlan.requireSha256(</span>
                 artifactId,
                 &quot;artifactId&quot;);
-<span class="fc" id="L208">            role = SchematicProofPlan.requireToken(role, &quot;artifact role&quot;);</span>
-<span class="fc" id="L209">            contentSchema = SchematicProofPlan.requireToken(</span>
+<span class="fc" id="L265">            role = SchematicProofPlan.requireToken(role, &quot;artifact role&quot;);</span>
+<span class="fc" id="L266">            contentSchema = SchematicProofPlan.requireToken(</span>
                 contentSchema,
                 &quot;artifact content schema&quot;);
-<span class="pc bpc" id="L212" title="2 of 4 branches missed.">            if (mediaType == null || !MEDIA_TYPE.matcher(mediaType).matches()) {</span>
-<span class="nc" id="L213">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L269" title="2 of 4 branches missed.">            if (mediaType == null || !MEDIA_TYPE.matcher(mediaType).matches()) {</span>
+<span class="nc" id="L270">                throw new IllegalArgumentException(</span>
                     &quot;artifact media type is not canonical&quot;);
             }
-<span class="fc" id="L216">            byteHash = SchematicProofPlan.requireSha256(</span>
+<span class="fc" id="L273">            byteHash = SchematicProofPlan.requireSha256(</span>
                 byteHash,
                 &quot;byteHash&quot;);
-<span class="pc bpc" id="L219" title="2 of 4 branches missed.">            if (byteLength &lt; 1 || byteLength &gt; MAX_ARTIFACT_BYTES) {</span>
-<span class="nc" id="L220">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L276" title="2 of 4 branches missed.">            if (byteLength &lt; 1 || byteLength &gt; MAX_ARTIFACT_BYTES) {</span>
+<span class="nc" id="L277">                throw new IllegalArgumentException(</span>
                     &quot;artifact byte length is outside limits&quot;);
             }
-<span class="fc" id="L223">            String expectedId =</span>
-<span class="fc" id="L224">                ExactFinitePolynomialPlanReplayArtifactVerifier.artifactId(</span>
+<span class="fc" id="L280">            String expectedId =</span>
+<span class="fc" id="L281">                ExactFinitePolynomialPlanReplayArtifactVerifier.artifactId(</span>
                     role,
                     contentSchema,
                     mediaType,
                     byteHash,
                     byteLength);
-<span class="fc bfc" id="L230" title="All 2 branches covered.">            if (!expectedId.equals(artifactId)) {</span>
-<span class="fc" id="L231">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">            if (!expectedId.equals(artifactId)) {</span>
+<span class="fc" id="L288">                throw new IllegalArgumentException(</span>
                     &quot;artifactId does not match reference metadata&quot;);
             }
-<span class="fc" id="L234">        }</span>
+<span class="fc" id="L291">        }</span>
 
         public static ArtifactReference describe(
             String role,
@@ -239,12 +296,12 @@ import java.util.regex.Pattern;
             String mediaType,
             byte[] bytes
         ) {
-<span class="fc" id="L242">            requireByteLength(bytes);</span>
-<span class="fc" id="L243">            byte[] snapshot = Arrays.copyOf(bytes, bytes.length);</span>
-<span class="fc" id="L244">            String byteHash = sha256(snapshot);</span>
-<span class="fc" id="L245">            return new ArtifactReference(</span>
+<span class="fc" id="L299">            requireByteLength(bytes);</span>
+<span class="fc" id="L300">            byte[] snapshot = Arrays.copyOf(bytes, bytes.length);</span>
+<span class="fc" id="L301">            String byteHash = sha256(snapshot);</span>
+<span class="fc" id="L302">            return new ArtifactReference(</span>
                 REFERENCE_SCHEMA,
-<span class="fc" id="L247">                ExactFinitePolynomialPlanReplayArtifactVerifier.artifactId(</span>
+<span class="fc" id="L304">                ExactFinitePolynomialPlanReplayArtifactVerifier.artifactId(</span>
                     role,
                     contentSchema,
                     mediaType,
@@ -258,16 +315,16 @@ import java.util.regex.Pattern;
         }
 
         public String toCanonicalJson() {
-<span class="nc" id="L261">            return new JsonWriter().beginObject()</span>
-<span class="nc" id="L262">                .property(&quot;referenceSchema&quot;, referenceSchema)</span>
-<span class="nc" id="L263">                .property(&quot;artifactId&quot;, artifactId)</span>
-<span class="nc" id="L264">                .property(&quot;role&quot;, role)</span>
-<span class="nc" id="L265">                .property(&quot;contentSchema&quot;, contentSchema)</span>
-<span class="nc" id="L266">                .property(&quot;mediaType&quot;, mediaType)</span>
-<span class="nc" id="L267">                .property(&quot;byteHash&quot;, byteHash)</span>
-<span class="nc" id="L268">                .property(&quot;byteLength&quot;, byteLength)</span>
-<span class="nc" id="L269">                .endObject()</span>
-<span class="nc" id="L270">                .toString();</span>
+<span class="nc" id="L318">            return new JsonWriter().beginObject()</span>
+<span class="nc" id="L319">                .property(&quot;referenceSchema&quot;, referenceSchema)</span>
+<span class="nc" id="L320">                .property(&quot;artifactId&quot;, artifactId)</span>
+<span class="nc" id="L321">                .property(&quot;role&quot;, role)</span>
+<span class="nc" id="L322">                .property(&quot;contentSchema&quot;, contentSchema)</span>
+<span class="nc" id="L323">                .property(&quot;mediaType&quot;, mediaType)</span>
+<span class="nc" id="L324">                .property(&quot;byteHash&quot;, byteHash)</span>
+<span class="nc" id="L325">                .property(&quot;byteLength&quot;, byteLength)</span>
+<span class="nc" id="L326">                .endObject()</span>
+<span class="nc" id="L327">                .toString();</span>
         }
     }
 
@@ -277,16 +334,16 @@ import java.util.regex.Pattern;
     }
 
     public record LoadedArtifact(String key, byte[] bytes) {
-<span class="fc" id="L280">        public LoadedArtifact {</span>
-<span class="fc" id="L281">            key = Objects.requireNonNull(key, &quot;key&quot;);</span>
-<span class="fc" id="L282">            bytes = Arrays.copyOf(</span>
-<span class="fc" id="L283">                Objects.requireNonNull(bytes, &quot;bytes&quot;),</span>
+<span class="fc" id="L337">        public LoadedArtifact {</span>
+<span class="fc" id="L338">            key = Objects.requireNonNull(key, &quot;key&quot;);</span>
+<span class="fc" id="L339">            bytes = Arrays.copyOf(</span>
+<span class="fc" id="L340">                Objects.requireNonNull(bytes, &quot;bytes&quot;),</span>
                 bytes.length);
-<span class="fc" id="L285">        }</span>
+<span class="fc" id="L342">        }</span>
 
         @Override
         public byte[] bytes() {
-<span class="fc" id="L289">            return Arrays.copyOf(bytes, bytes.length);</span>
+<span class="fc" id="L346">            return Arrays.copyOf(bytes, bytes.length);</span>
         }
     }
 
@@ -314,30 +371,30 @@ import java.util.regex.Pattern;
             ArtifactReference reference,
             byte[] bytes,
             String utf8
-<span class="fc" id="L317">        ) {</span>
-<span class="fc" id="L318">            this.reference = Objects.requireNonNull(reference, &quot;reference&quot;);</span>
-<span class="fc" id="L319">            this.bytes = Arrays.copyOf(bytes, bytes.length);</span>
-<span class="fc" id="L320">            this.utf8 = Objects.requireNonNull(utf8, &quot;utf8&quot;);</span>
-<span class="fc" id="L321">        }</span>
+<span class="fc" id="L374">        ) {</span>
+<span class="fc" id="L375">            this.reference = Objects.requireNonNull(reference, &quot;reference&quot;);</span>
+<span class="fc" id="L376">            this.bytes = Arrays.copyOf(bytes, bytes.length);</span>
+<span class="fc" id="L377">            this.utf8 = Objects.requireNonNull(utf8, &quot;utf8&quot;);</span>
+<span class="fc" id="L378">        }</span>
 
         @Override
         public ArtifactReference reference() {
-<span class="fc" id="L325">            return reference;</span>
+<span class="fc" id="L382">            return reference;</span>
         }
 
         @Override
         public int byteLength() {
-<span class="fc" id="L330">            return bytes.length;</span>
+<span class="fc" id="L387">            return bytes.length;</span>
         }
 
         @Override
         public String utf8() {
-<span class="fc" id="L335">            return utf8;</span>
+<span class="fc" id="L392">            return utf8;</span>
         }
 
         @Override
         public byte[] copyBytes() {
-<span class="fc" id="L340">            return Arrays.copyOf(bytes, bytes.length);</span>
+<span class="fc" id="L397">            return Arrays.copyOf(bytes, bytes.length);</span>
         }
     }
 }
