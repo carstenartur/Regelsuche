@@ -16,6 +16,7 @@ import java.util.function.Predicate;
  */
 public sealed interface RewriteProgram permits
         RewriteProgram.Source,
+        RewriteProgram.BudgetedSource,
         RewriteProgram.Choice,
         RewriteProgram.FirstApplicable,
         RewriteProgram.Sequence,
@@ -35,6 +36,24 @@ public sealed interface RewriteProgram permits
         public Source {
             Objects.requireNonNull(metadata, "metadata");
             Objects.requireNonNull(engine, "engine");
+        }
+    }
+
+    /**
+     * Explicitly budgeted exact-theory source.
+     *
+     * <p>Version 1 is executable only as the top-level argument of
+     * {@link RewriteProgramInterpreter#executeBudgetedSource}. Ordinary
+     * unbudgeted interpretation and composition reject this node before any
+     * source is invoked.</p>
+     */
+    record BudgetedSource(
+        NodeMetadata metadata,
+        BudgetedTransformationSource source
+    ) implements RewriteProgram {
+        public BudgetedSource {
+            Objects.requireNonNull(metadata, "metadata");
+            Objects.requireNonNull(source, "source");
         }
     }
 
