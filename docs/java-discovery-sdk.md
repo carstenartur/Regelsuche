@@ -50,7 +50,7 @@ Die Checkout-Prüfung baut das Beispiel aus einer frischen Kopie außerhalb des
 Multi-Projekts und mit einem leeren eigenen `GRADLE_USER_HOME`. Interne
 Projektabhängigkeiten, ein globaler Dependency-Cache oder gleichnamige
 Central-Artefakte können das checkout-eigene SDK deshalb nicht unbemerkt
-er­setzen.
+ersetzen.
 
 ## Domäne definieren
 
