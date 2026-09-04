@@ -7,7 +7,7 @@ gewöhnlicher AST-Regelanwendungen. Seine Ausführung darf deshalb weder eine
 fiktive `primitiveRuleIds`-Liste erhalten noch als kostenlose Makrokante in die
 Suche gelangen.
 
-Dieser Slice führt zunächst eine eigenständige Source-Grenze ein:
+Die eigenständige Source-Grenze lautet:
 
 ```text
 explizite mathematische Arbeitsautorität
@@ -17,8 +17,10 @@ explizite mathematische Arbeitsautorität
   -> BUDGET_INCONCLUSIVE
 ```
 
-Er integriert die Source noch nicht in zusammengesetzte `RewriteProgram`-Knoten
-oder eine gewöhnliche Search Frontier.
+Die Source kann zusätzlich als expliziter top-level
+`RewriteProgram.BudgetedSource` ausgeführt werden. Zusammengesetzte
+Programmknoten und eine gewöhnliche Search Frontier bleiben bis zur
+Pfadbudget-Propagation ausgeschlossen.
 
 ## `BudgetedTransformationSource`
 
@@ -115,27 +117,78 @@ Die Source-Mechanik zählt getrennt:
 - bei passender Quelle einen Budgetvergleich;
 - bei Erfolg eine Kandidatenmaterialisierung.
 
+## Explizite Programmausführung
+
+Der Programmknoten
+
+```text
+RewriteProgram.BudgetedSource
+```
+
+bindet gewöhnliche `NodeMetadata` an genau eine
+`BudgetedTransformationSource`. Er wird nur über den explizit budgetierten
+Einstieg ausgeführt:
+
+```java
+interpreter.executeBudgetedSource(
+    program,
+    expression,
+    availableMathematicalWorkUnits
+);
+```
+
+Das Ergebnis ist ein `BudgetedTransformationSourceProgramExecution`, kein
+gewöhnliches `RewriteExecution` und keine Liste von `Transformation`-Objekten.
+Jeder Kandidat bewahrt den vollständigen `ExactTheoryTransition` sowie seine
+Evidence- und Anwendungsidentitäten. Die Schrittzahlen bleiben ausdrücklich
+getrennt:
+
+```text
+primitiveRewriteSteps = 0
+exactTheorySteps = 1
+```
+
+Die mathematische Arbeit bleibt auf dem Kandidaten. `ProgramWork` hält davon
+getrennt den Interpreter-Aufruf, den besuchten Programmknoten, die Delegation an
+den Source-Executor, die Kandidatenprojektionen und die vollständige delegierte
+Mechanik fest. Öffentliche Record-Rekonstruktionen, inkonsistente Summen und
+Überläufe schlagen geschlossen fehl.
+
+Der gewöhnliche unbudgetierte Interpreter prüft den vollständigen Programmbaum,
+bevor er eine gewöhnliche oder budgetierte Source aufruft. Jeder enthaltene
+`BudgetedSource`-Knoten wird abgelehnt. Dadurch kann weder ein direkter noch ein
+hinter `Choice`, `FirstApplicable`, `Sequence`, `Repeat`, `Require`,
+`Prioritize` oder `Prune` verborgener Theorieschritt ohne explizite
+Arbeitsautorität ausgeführt werden.
+
+Die vollständige Programmknoten- und Arbeitssemantik ist in
+`docs/budgeted-rewrite-program-source.md` beschrieben.
+
 ## Claim-Grenze
 
 Diese Stufe etabliert einen ehrlichen, budgetierten Transport eines verifizierten
-exakten Theorieschritts. Sie etabliert noch nicht:
+exakten Theorieschritts und seine explizite top-level Einbindung in die
+`RewriteProgram`-IR. Sie etabliert noch nicht:
 
-- einen `RewriteProgram.BudgetedSource`-Knoten;
-- Budgetpropagation durch `Choice`, `Sequence` oder `Repeat`;
+- Budgetpropagation durch `Choice`, `FirstApplicable`, `Sequence` oder `Repeat`;
 - gewöhnliche Search-Frontier-Integration;
-- primitive Rewrite-Provenienz;
+- primitive Rewrite-Provenienz für einen exakten Theorieschritt;
 - formale Proof-Evidence;
+- gelernte Programmautorisierung;
 - Promotion oder mathematische Neuheit.
 
-Der nächste Slice darf die Source erst dann in `RewriteProgram` integrieren,
-wenn der Interpreter das mathematische Pfadbudget ohne Reset durch die
-Kompositionsknoten trägt. Mechanische Explorationsarbeit bleibt davon getrennt.
+Der nächste Slice muss das mathematische Pfadbudget ohne Reset durch die
+Kompositionsknoten tragen. Alternativen sehen dasselbe eingehende Budget;
+Fortsetzungen und Wiederholungen sehen nur den nach der jeweiligen
+Präfixarbeit verbleibenden Rest. Mechanische Explorationsarbeit bleibt davon
+getrennt.
 
 ## Reproduktion
 
 ```bash
 ./gradlew :regelsuche-search:test \
-  --tests '*BudgetedTransformationSourceExecutorTest'
+  --tests '*BudgetedTransformationSourceExecutorTest' \
+  --tests '*BudgetedTransformationSourceRewriteProgramTest'
 
 ./gradlew :regelsuche-learning:test \
   --tests '*VerifiedFinitePolynomialCandidateSourceTest'
