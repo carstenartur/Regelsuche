@@ -30,6 +30,7 @@ FORBIDDEN_RUNTIME_MARKERS = (
     "hibernate-core",
     "jakarta.persistence",
 )
+OUTPUT_RELATIVE = Path("build/reports/student-java-sdk")
 
 
 def run(
@@ -80,6 +81,22 @@ def overlaps(left: Path, right: Path) -> bool:
     return left == right or left in right.parents or right in left.parents
 
 
+def checkout_owned_output(root: Path) -> Path:
+    """Return the only removable output tree and reject symlink escapes."""
+    output = root / OUTPUT_RELATIVE
+    for candidate in (root / "build", root / "build/reports", output):
+        if candidate.is_symlink():
+            raise RuntimeError(
+                f"checkout-owned output path must not traverse symlinks: {candidate}"
+            )
+    resolved = output.resolve()
+    if resolved != output:
+        raise RuntimeError(
+            f"checkout-owned output escaped its fixed location: {resolved}"
+        )
+    return output
+
+
 def one_artifact(
         directory: Path,
         pattern: str,
@@ -119,12 +136,11 @@ def main() -> int:
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
     parser.add_argument("--published-repository", type=Path, required=True)
     parser.add_argument("--gradle", default="gradle")
-    parser.add_argument("--output", type=Path)
     arguments = parser.parse_args()
 
     root = arguments.repository_root.resolve()
     repository = arguments.published_repository.resolve()
-    output = (arguments.output or root / "build/reports/student-java-sdk").resolve()
+    output = checkout_owned_output(root)
     source = root / "examples/external-consumers/geometric-sequence-domain-java25"
     if not repository.is_dir():
         raise RuntimeError(f"SDK repository does not exist: {repository}")
