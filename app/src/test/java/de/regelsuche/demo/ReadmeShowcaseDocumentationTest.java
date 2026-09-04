@@ -67,7 +67,8 @@ class ReadmeShowcaseDocumentationTest {
     }
 
     private static Path locateRepoRoot() {
-        Path candidate = Paths.get(".").toAbsolutePath().normalize();
+        Path start = Paths.get(".").toAbsolutePath().normalize();
+        Path candidate = start;
         for (int i = 0; i < 6; i++) {
             if (Files.exists(candidate.resolve("README.md"))
                 && Files.exists(candidate.resolve("settings.gradle"))) {
@@ -79,6 +80,8 @@ class ReadmeShowcaseDocumentationTest {
             }
             candidate = parent;
         }
-        throw new IllegalStateException("Could not locate repository root");
+        throw new IllegalStateException(
+            "Could not locate repository root from " + start
+        );
     }
 }
