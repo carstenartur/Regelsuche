@@ -122,6 +122,9 @@ gradle.beforeProject { candidate ->
             'gradle/ci-verification.gradle')
         candidate.apply from: new File(
             settingsDir,
+            'gradle/student-sdk-consumer-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
             'gradle/sympy-factorization-verification.gradle')
         candidate.apply from: new File(
             settingsDir,
