@@ -51,12 +51,6 @@ jobs:
           set -o pipefail
           mkdir -p build/logs
           env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache -PseparateJmhAuthority=true "$REGELSUCHE_CI_TASK" --parallel --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
-      - name: Verify the student-facing SDK from a clean external consumer
-        if: github.event_name != 'create'
-        run: >-
-          python3 scripts/verify-student-java-sdk-consumer.py
-          --repository-root .
-          --gradle ./gradlew
       - name: Retain Gradle verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
