@@ -1,10 +1,9 @@
 package example;
 
+import static de.regelsuche.sdk.discovery.DiscoveryRunAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.regelsuche.discovery.domain.DomainDiscoveryEvidence.Outcome;
 import de.regelsuche.sdk.discovery.DiscoveryBudgets;
 import de.regelsuche.sdk.discovery.RegelsucheDiscovery;
 import org.junit.jupiter.api.Test;
@@ -18,10 +17,15 @@ class GeometricSequenceDomainTest {
             "success"
         );
 
-        assertEquals(Outcome.CONFIRMED, run.outcome());
-        assertEquals(2, run.selectedCandidate().orElseThrow().multiplier());
-        assertEquals(1, run.counterexamples().size());
-        assertTrue(run.counterexamples().getFirst().contains("multiplier 1"));
+        assertThat(run)
+            .isConfirmed()
+            .hasCounterexampleCount(1)
+            .hasCounterexampleContaining("multiplier 1")
+            .candidateSatisfies(candidate ->
+                assertEquals(2, candidate.multiplier()))
+            .certificateSatisfies(certificate ->
+                assertEquals(2, certificate.multiplier()))
+            .hasContentAddressedEvidence();
     }
 
     @Test
@@ -32,8 +36,7 @@ class GeometricSequenceDomainTest {
             "refuted"
         );
 
-        assertEquals(Outcome.REFUTED, run.outcome());
-        assertTrue(run.selectedCertificate().isEmpty());
+        assertThat(run).isRefuted();
     }
 
     @Test
@@ -44,8 +47,7 @@ class GeometricSequenceDomainTest {
             "budget"
         );
 
-        assertEquals(Outcome.BUDGET_EXHAUSTED, run.outcome());
-        assertFalse(run.isConfirmed());
+        assertThat(run).isBudgetExhausted();
     }
 
     @Test
