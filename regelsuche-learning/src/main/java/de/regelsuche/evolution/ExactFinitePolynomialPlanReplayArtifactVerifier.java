@@ -14,21 +14,25 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Independently loads and verifies content-addressed bytes for an exact finite
- * polynomial plan replay receipt.
+ * Independently loads and verifies content-addressed bytes for exact finite
+ * polynomial replay artifacts.
  *
- * <p>This verifier establishes storage identity and an immutable UTF-8 byte
- * snapshot only. It does not parse receipt fields, rerun the solver, replay
+ * <p>The verifier establishes storage identity and immutable UTF-8 byte
+ * snapshots only. Receipt and plan-run roles retain separate schemas and media
+ * types. This boundary does not parse fields, rerun the solver, replay
  * primitive rewrites or issue proof or promotion authority.</p>
  */
 public final class ExactFinitePolynomialPlanReplayArtifactVerifier {
     public static final String REFERENCE_SCHEMA =
         "regelsuche.exact-finite-polynomial-plan-artifact-reference/v1";
     public static final String VERIFIER_ID =
-        "regelsuche.exact-finite-polynomial-plan-artifact-verifier/v1";
+        "regelsuche.exact-finite-polynomial-plan-artifact-verifier/v2";
     public static final String RECEIPT_ROLE = "replay-receipt";
     public static final String RECEIPT_MEDIA_TYPE =
         "application/vnd.regelsuche.exact-finite-polynomial-plan-replay-receipt+json";
+    public static final String PLAN_RUN_ROLE = "plan-run";
+    public static final String PLAN_RUN_MEDIA_TYPE =
+        "application/vnd.regelsuche.exact-finite-polynomial-plan-run+json";
     public static final int MAX_ARTIFACT_BYTES = 1_000_000;
     public static final String REVISION_HASH = SchematicProofPlan.hash(
         lengthPrefixed(
@@ -37,8 +41,13 @@ public final class ExactFinitePolynomialPlanReplayArtifactVerifier {
             RECEIPT_ROLE,
             ReplayReceipt.SCHEMA,
             RECEIPT_MEDIA_TYPE,
+            PLAN_RUN_ROLE,
+            ExactFinitePolynomialPlanRun.SCHEMA,
+            ExactFinitePolynomialPlanRun.ARTIFACT_REVISION_HASH,
+            PLAN_RUN_MEDIA_TYPE,
             Integer.toString(MAX_ARTIFACT_BYTES),
             "load-by-expected-artifact-id",
+            "role-schema-media-type-separation",
             "verify-returned-key-length-sha256-and-metadata-id",
             "strict-utf8-no-bom-compact-object-boundary",
             "sealed-verifier-owned-immutable-byte-snapshot"));
@@ -60,11 +69,53 @@ public final class ExactFinitePolynomialPlanReplayArtifactVerifier {
             receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8));
     }
 
+    public ArtifactReference describePlanRun(
+        ExactFinitePolynomialPlanRun planRun
+    ) {
+        Objects.requireNonNull(planRun, "planRun");
+        return ArtifactReference.describe(
+            PLAN_RUN_ROLE,
+            ExactFinitePolynomialPlanRun.SCHEMA,
+            PLAN_RUN_MEDIA_TYPE,
+            planRun.toCanonicalJson().getBytes(StandardCharsets.UTF_8));
+    }
+
     public VerifiedArtifactBytes verifyReceipt(
         ArtifactReference expected,
         ArtifactSource source
     ) {
-        requireReceiptMetadata(expected);
+        return verify(
+            expected,
+            source,
+            RECEIPT_ROLE,
+            ReplayReceipt.SCHEMA,
+            RECEIPT_MEDIA_TYPE);
+    }
+
+    public VerifiedArtifactBytes verifyPlanRun(
+        ArtifactReference expected,
+        ArtifactSource source
+    ) {
+        return verify(
+            expected,
+            source,
+            PLAN_RUN_ROLE,
+            ExactFinitePolynomialPlanRun.SCHEMA,
+            PLAN_RUN_MEDIA_TYPE);
+    }
+
+    private static VerifiedArtifactBytes verify(
+        ArtifactReference expected,
+        ArtifactSource source,
+        String requiredRole,
+        String requiredContentSchema,
+        String requiredMediaType
+    ) {
+        requireMetadata(
+            expected,
+            requiredRole,
+            requiredContentSchema,
+            requiredMediaType);
         Objects.requireNonNull(source, "source");
         LoadedArtifact loaded = Objects.requireNonNull(
             source.load(expected.artifactId()),
@@ -85,18 +136,24 @@ public final class ExactFinitePolynomialPlanReplayArtifactVerifier {
             bytes);
         if (!expected.equals(actual)) {
             throw new IllegalArgumentException(
-                "loaded replay artifact differs from its reference");
+                "loaded exact plan artifact differs from its reference");
         }
         return new VerifiedBytes(expected, bytes, utf8);
     }
 
-    private static void requireReceiptMetadata(ArtifactReference reference) {
+    private static void requireMetadata(
+        ArtifactReference reference,
+        String requiredRole,
+        String requiredContentSchema,
+        String requiredMediaType
+    ) {
         Objects.requireNonNull(reference, "expected");
-        if (!RECEIPT_ROLE.equals(reference.role())
-                || !ReplayReceipt.SCHEMA.equals(reference.contentSchema())
-                || !RECEIPT_MEDIA_TYPE.equals(reference.mediaType())) {
+        if (!REFERENCE_SCHEMA.equals(reference.referenceSchema())
+                || !requiredRole.equals(reference.role())
+                || !requiredContentSchema.equals(reference.contentSchema())
+                || !requiredMediaType.equals(reference.mediaType())) {
             throw new IllegalArgumentException(
-                "artifact reference is not an exact replay receipt");
+                "artifact reference has the wrong exact plan role or schema");
         }
     }
 
@@ -109,7 +166,7 @@ public final class ExactFinitePolynomialPlanReplayArtifactVerifier {
                 .toString();
         } catch (CharacterCodingException exception) {
             throw new IllegalArgumentException(
-                "replay artifact is not valid UTF-8",
+                "exact plan artifact is not valid UTF-8",
                 exception);
         }
     }
@@ -120,13 +177,13 @@ public final class ExactFinitePolynomialPlanReplayArtifactVerifier {
     ) {
         if (startsWith(bytes, UTF8_BOM)) {
             throw new IllegalArgumentException(
-                "replay artifact must not contain a UTF-8 BOM");
+                "exact plan artifact must not contain a UTF-8 BOM");
         }
         if (!text.equals(text.strip())
                 || !text.startsWith("{")
                 || !text.endsWith("}")) {
             throw new IllegalArgumentException(
-                "replay artifact must be one compact JSON object");
+                "exact plan artifact must be one compact JSON object");
         }
     }
 
@@ -146,7 +203,7 @@ public final class ExactFinitePolynomialPlanReplayArtifactVerifier {
         Objects.requireNonNull(bytes, "bytes");
         if (bytes.length < 1 || bytes.length > MAX_ARTIFACT_BYTES) {
             throw new IllegalArgumentException(
-                "replay artifact byte length is outside limits");
+                "exact plan artifact byte length is outside limits");
         }
     }
 
@@ -200,7 +257,7 @@ public final class ExactFinitePolynomialPlanReplayArtifactVerifier {
         public ArtifactReference {
             if (!REFERENCE_SCHEMA.equals(referenceSchema)) {
                 throw new IllegalArgumentException(
-                    "unsupported replay artifact reference schema");
+                    "unsupported exact plan artifact reference schema");
             }
             artifactId = SchematicProofPlan.requireSha256(
                 artifactId,
