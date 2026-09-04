@@ -1,7 +1,7 @@
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.Exec
 
-// Publishes the SDK by task dependency, then starts only the external consumer.
+// Publishes the SDK by task dependency, then starts only the external consumers.
 def sdkModules = [
     'regelsuche-core',
     'regelsuche-egraph',
@@ -47,7 +47,7 @@ def verifySdkConsumer = tasks.register(
     Exec
 ) {
     group = 'verification'
-    description = 'Verifies the published SDK through a clean Java 25 consumer.'
+    description = 'Verifies the published SDK through clean Java 25 consumers.'
     dependsOn publicationTaskPaths
     workingDir rootDir
     commandLine(
@@ -58,6 +58,7 @@ def verifySdkConsumer = tasks.register(
         '--published-repository', sdkRepository.absolutePath
     )
     inputs.file('release.properties')
+    inputs.file('scripts/create-student-discovery-domain.py')
     inputs.file('scripts/verify-student-java-sdk-consumer.py')
     inputs.dir('examples/external-consumers/geometric-sequence-domain-java25')
     outputs.file(new File(reportDirectory, 'consumer-report.json'))
