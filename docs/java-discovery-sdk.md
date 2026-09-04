@@ -27,11 +27,17 @@ de.regelsuche:regelsuche-discovery-sdk:0.4.0-SNAPSHOT
 ```
 
 in ein isoliertes lokales Maven-Repository. Ein externer Gradle-Verbraucher
-benötigt Java 25 und:
+benötigt Java 25. Die Regelsuche-Gruppe sollte exklusiv aus diesem Repository
+bezogen werden, während Fremdabhängigkeiten weiterhin aus Maven Central kommen:
 
 ```gradle
 repositories {
-    maven { url = uri(regelsucheRepository) }
+    exclusiveContent {
+        forRepository {
+            maven { url = uri(regelsucheRepository) }
+        }
+        filter { includeGroup "de.regelsuche" }
+    }
     mavenCentral()
 }
 
@@ -40,9 +46,11 @@ dependencies {
 }
 ```
 
-Die Checkout-Prüfung baut das Beispiel aus einer Kopie außerhalb des
-Multi-Projekts. Interne Gradle-Projektabhängigkeiten können das veröffentlichte
-Artefakt deshalb nicht unbemerkt ersetzen.
+Die Checkout-Prüfung baut das Beispiel aus einer frischen Kopie außerhalb des
+Multi-Projekts und mit einem leeren eigenen `GRADLE_USER_HOME`. Interne
+Projektabhängigkeiten, ein globaler Dependency-Cache oder gleichnamige
+Central-Artefakte können das checkout-eigene SDK deshalb nicht unbemerkt
+er­setzen.
 
 ## Domäne definieren
 
@@ -66,9 +74,10 @@ var domain = DiscoveryDomainBuilder
     .build();
 ```
 
-Unvollständige Definitionen werden abgewiesen. Invariante,
-Gegenbeispielsuche, Evaluator und Zertifikatsvertrag sind nicht optional. Die
-vollständige, ausführbare Beispieldomäne liegt unter
+Unvollständige Definitionen und doppelte Operator- oder Invariantenidentitäten
+werden abgewiesen. Invariante, Gegenbeispielsuche, Evaluator und
+Zertifikatsvertrag sind nicht optional. Die vollständige, ausführbare
+Beispieldomäne liegt unter
 `examples/external-consumers/geometric-sequence-domain-java25`.
 
 ## Lauf ausführen
@@ -85,7 +94,9 @@ DiscoveryRun<Candidate, Certificate> run =
 `DiscoveryRun` stellt Ergebniszustand, ausgewählten Kandidaten, Zertifikat,
 Gegenbeispiele, verbrauchte Arbeit und kanonische Evidence getrennt bereit. Ein
 zu kleines Budget endet `BUDGET_EXHAUSTED` ohne erfundenes Zertifikat; ein
-widerlegter Kandidat endet `REFUTED`.
+widerlegter Kandidat endet `REFUTED`. Läufe werden nur durch die SDK-Fassade
+erzeugt: Fremder Code kann keine beliebigen Kandidatenobjekte um eine bereits
+vorhandene Evidence konstruieren.
 
 ## Externe Provider
 
@@ -109,10 +120,12 @@ Der vollständig qualifizierte Providername steht in
 META-INF/services/de.regelsuche.sdk.discovery.DiscoveryDomainProvider
 ```
 
-`RegelsucheDiscovery.loadDomains()` lädt den Katalog. Doppelte Provider-IDs und
-doppelte Kombinationen aus Domain-ID und Revision werden abgewiesen. Die
-Auffindbarkeit eines Providers ist keine Aussage über Artefaktvertrauen,
-mathematische Korrektheit, Proof oder Promotion.
+`RegelsucheDiscovery.loadDomains()` lädt den Katalog. Doppelte Provider-IDs,
+doppelte Kombinationen aus Domain-ID und Revision sowie mehrdeutige
+Komponentenidentitäten werden abgewiesen. Die Auffindbarkeit eines Providers ist
+keine Aussage über Artefaktvertrauen, mathematische Korrektheit, Proof oder
+Promotion. Die Einbettung der Provider-Artefaktprovenienz in jede kanonische
+Run-Evidence bleibt eine getrennte Restarbeit aus #904.
 
 ## Reproduktion
 
@@ -122,12 +135,14 @@ mathematische Korrektheit, Proof oder Promotion.
 ```
 
 Die Prüfung veröffentlicht SDK und innere Laufzeitabhängigkeiten in ein
-isoliertes Repository, baut und testet den externen Consumer, kontrolliert
-Sources- und Javadoc-JARs, SHA-256-Werte sowie den Runtime-Abhängigkeitsbaum.
+isoliertes Repository, baut und testet den externen Consumer mit isoliertem
+Dependency-Cache, kontrolliert Sources- und Javadoc-JARs, SHA-256-Werte sowie
+den Runtime-Abhängigkeitsbaum.
 
 ## Noch nicht enthalten
 
 - ein öffentliches Maven-Central- oder GitHub-Packages-Release;
+- content-addressed Provider-Artefaktprovenienz in jeder Run-Evidence;
 - Workbench-/CLI-Auswahl externer Provider;
 - allgemeine Pareto- oder Optimalitätssuche;
 - eine fertige mathematische Objektbibliothek;
