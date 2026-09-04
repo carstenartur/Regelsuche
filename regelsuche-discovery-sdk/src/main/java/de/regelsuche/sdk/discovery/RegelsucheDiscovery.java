@@ -96,7 +96,9 @@ public final class RegelsucheDiscovery {
             return new DiscoveryRun<>(
                 result.selectedCandidate(),
                 result.selectedCertificate(),
-                result.evidence()
+                result.evidence(),
+                domain.candidateCodec(),
+                domain.certificateCodec()
             );
         }
 
