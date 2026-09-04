@@ -1,7 +1,9 @@
 package de.regelsuche.evolution;
 
+import static de.regelsuche.search.program.RewritePrograms.budgetedSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.evolution.ExactFinitePolynomialPlanCandidateEvidenceVerifier.VerifiedCandidateEvidence;
@@ -14,6 +16,7 @@ import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayVerifier.ReplayRec
 import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
 import de.regelsuche.search.program.BudgetedTransformationSource.Status;
 import de.regelsuche.search.program.BudgetedTransformationSourceExecutor;
+import de.regelsuche.search.program.RewriteProgramInterpreter;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
@@ -42,6 +45,8 @@ class VerifiedFinitePolynomialCandidateSourceTest {
             new ExactFinitePolynomialPlanCandidateEvidenceVerifier();
     private final BudgetedTransformationSourceExecutor executor =
         new BudgetedTransformationSourceExecutor();
+    private final RewriteProgramInterpreter programInterpreter =
+        new RewriteProgramInterpreter();
 
     @Test
     void exposesOnlyTheEvidenceSelectedCandidateUnderExplicitWorkAuthority() {
@@ -74,6 +79,51 @@ class VerifiedFinitePolynomialCandidateSourceTest {
         assertEquals(
             execution,
             executor.execute(source, canonicalSource, required));
+    }
+
+    @Test
+    void executesVerifiedCandidateThroughExplicitTopLevelProgramSource() {
+        Fixture fixture = fixture();
+        VerifiedCandidateEvidence evidence = evidence(fixture);
+        var source = new VerifiedFinitePolynomialCandidateSource(evidence);
+        var program = budgetedSource("verified-finite-plan", source);
+        long required = evidence.data().canonicalWork().totalWorkUnits();
+        String canonicalSource = evidence.data().sourceExpression();
+
+        var execution = programInterpreter.executeBudgetedSource(
+            program,
+            canonicalSource,
+            required);
+
+        assertEquals(Status.CANDIDATES, execution.status());
+        assertTrue(execution.complete());
+        assertEquals(evidence.evidenceHash(),
+            execution.sourceExecution().sourceIdentity().authorityHash());
+        assertEquals(1, execution.candidates().size());
+        var candidate = execution.candidates().getFirst();
+        assertEquals("verified-finite-plan", candidate.originNodeId());
+        assertEquals(canonicalSource, candidate.sourceExpression());
+        assertEquals(evidence.data().transformedExpression(),
+            candidate.transformedExpression());
+        assertEquals(evidence.data().theoryStepId(), candidate.theoryStepId());
+        assertEquals(evidence.evidenceHash(), candidate.evidenceHash());
+        assertEquals(required, candidate.mathematicalWorkUnits());
+        assertEquals(0, candidate.primitiveRewriteSteps());
+        assertEquals(1, candidate.exactTheorySteps());
+        assertEquals(8,
+            execution.programWork().delegatedMechanicalWorkUnits());
+        assertEquals(12,
+            execution.programWork().totalMechanicalWorkUnits());
+        assertEquals(
+            execution,
+            programInterpreter.executeBudgetedSource(
+                program,
+                canonicalSource,
+                required));
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> programInterpreter.execute(program, canonicalSource));
     }
 
     @Test

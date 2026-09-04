@@ -12,10 +12,10 @@ import java.util.Objects;
 /**
  * Deterministic interpreter for the Java-internal rewrite program model.
  *
- * <p>The interpreter is intentionally independent of a concrete search
- * strategy. It composes ordinary {@link Transformation} instances and exposes
- * the resulting candidates through the same {@code TransformationEngine}
- * boundary used by best-first, beam, A* and the other existing strategies.</p>
+ * <p>The ordinary interpreter composes primitive or proof-expandable
+ * {@link Transformation} instances. Exact-theory sources use a separate,
+ * explicitly budgeted top-level entry and are never converted into ordinary
+ * transformations by this class.</p>
  */
 public final class RewriteProgramInterpreter {
     private static final Comparator<Transformation> TRANSFORMATION_ORDER =
@@ -23,6 +23,9 @@ public final class RewriteProgramInterpreter {
             .thenComparing(Transformation::transformedExpression)
             .thenComparing(Transformation::applicationKey)
             .thenComparing(transformation -> transformation.kind().name());
+
+    private final BudgetedTransformationSourceExecutor
+        budgetedSourceExecutor = new BudgetedTransformationSourceExecutor();
 
     public RewriteExecution execute(RewriteProgram program, String expression) {
         return execute(
@@ -42,6 +45,7 @@ public final class RewriteProgramInterpreter {
         Objects.requireNonNull(program, "program");
         Objects.requireNonNull(traceLevel, "traceLevel");
         Objects.requireNonNull(traceSink, "traceSink");
+        rejectBudgetedSources(program);
         String normalizedExpression = normalizeExpression(expression);
         Context context = new Context(traceLevel, traceSink);
         Evaluation evaluation = evaluate(program, normalizedExpression, context);
@@ -52,6 +56,34 @@ public final class RewriteProgramInterpreter {
             evaluation.complete(),
             context.workMetrics()
         );
+    }
+
+    /**
+     * Executes one explicitly budgeted exact-theory source as a top-level
+     * program node.
+     *
+     * <p>Composition nodes are intentionally not accepted by this v1 entry.
+     * Their path-budget propagation requires a separate contract.</p>
+     */
+    public BudgetedTransformationSourceProgramExecution executeBudgetedSource(
+        RewriteProgram.BudgetedSource program,
+        String expression,
+        long availableMathematicalWorkUnits
+    ) {
+        Objects.requireNonNull(program, "program");
+        if (availableMathematicalWorkUnits < 0) {
+            throw new IllegalArgumentException(
+                "availableMathematicalWorkUnits must not be negative");
+        }
+        String normalizedExpression = normalizeExpression(expression);
+        BudgetedTransformationSourceExecutor.Execution execution =
+            budgetedSourceExecutor.execute(
+                program.source(),
+                normalizedExpression,
+                availableMathematicalWorkUnits);
+        return BudgetedTransformationSourceProgramExecution.create(
+            program,
+            execution);
     }
 
     private Evaluation evaluate(
@@ -74,6 +106,9 @@ public final class RewriteProgramInterpreter {
         Evaluation evaluation = switch (program) {
             case RewriteProgram.Source source ->
                 evaluateSource(source, inputExpression, context);
+            case RewriteProgram.BudgetedSource ignored ->
+                throw new IllegalStateException(
+                    "budgeted source passed the unbudgeted preflight");
             case RewriteProgram.Choice choice ->
                 evaluateChoice(choice, inputExpression, context);
             case RewriteProgram.FirstApplicable firstApplicable ->
@@ -366,6 +401,35 @@ public final class RewriteProgramInterpreter {
             prune.reason()
         );
         return new Evaluation(retained, false);
+    }
+
+    private static void rejectBudgetedSources(RewriteProgram program) {
+        switch (program) {
+            case RewriteProgram.Source ignored -> {
+                // Ordinary source: admitted by the ordinary interpreter.
+            }
+            case RewriteProgram.BudgetedSource ignored ->
+                throw new IllegalArgumentException(
+                    "budgeted exact-theory sources require "
+                        + "executeBudgetedSource and cannot be composed yet");
+            case RewriteProgram.Choice choice ->
+                choice.alternatives().forEach(
+                    RewriteProgramInterpreter::rejectBudgetedSources);
+            case RewriteProgram.FirstApplicable firstApplicable ->
+                firstApplicable.alternatives().forEach(
+                    RewriteProgramInterpreter::rejectBudgetedSources);
+            case RewriteProgram.Sequence sequence ->
+                sequence.steps().forEach(
+                    RewriteProgramInterpreter::rejectBudgetedSources);
+            case RewriteProgram.Repeat repeat ->
+                rejectBudgetedSources(repeat.body());
+            case RewriteProgram.Require require ->
+                rejectBudgetedSources(require.body());
+            case RewriteProgram.Prioritize prioritize ->
+                rejectBudgetedSources(prioritize.body());
+            case RewriteProgram.Prune prune ->
+                rejectBudgetedSources(prune.body());
+        }
     }
 
     private static List<RewriteCandidate> distinct(
