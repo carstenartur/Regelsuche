@@ -5,8 +5,12 @@ the `carstenartur/ai-knowledge-extractor` GitHub Packages repository. The
 consumer version is pinned once in `gradle.properties`:
 
 ```properties
-aiKnowledgeExtractorVersion=0.1.7
+aiKnowledgeExtractorVersion=0.1.9
 ```
+
+Version 0.1.9 prunes generated `build/` and `target/` subtrees before repository
+inventory traversal. This keeps parallel verification deterministic while
+preserving the complete analysis of checkout-owned source and documentation.
 
 Regelsuche never consumes a snapshot implicitly. Updating the released
 dependency requires one explicit version change followed by the normal
@@ -60,23 +64,29 @@ explicit and visible in the command line.
 
 ## Complete verification lifecycle
 
-`aiKnowledgeCheck` executes:
+The root `aiKnowledgeCheck` task composes, without duplicating task names:
 
-1. `generateAiKnowledgeIndex`;
-2. `analyzeAiComplexity`;
-3. `optimizeAiKnowledge`;
-4. `benchmarkAiKnowledge`;
-5. `checkAiKnowledgeIndex`;
-6. `verifyAiKnowledgeArtifacts`.
+1. the plugin-native `:ai-knowledge-verification:aiKnowledgeCheck`, which creates
+   one complete repository snapshot and emits the index, complexity,
+   optimization, benchmark and quality-gate artifacts;
+2. the plugin-native, read-only `verifyAiKnowledgeArtifacts`, which validates
+   the complete structural artifact set;
+3. `verifyRegelsucheAiKnowledgeArtifacts`, which checks evidence and the
+   measured schema-v3 context-footprint contract;
+4. `verifyComplexityHotspots`, which rejects new or materially worsened method
+   hotspots unless a finite policy exception exists.
 
-The extractor currently requires configuration-cache opt-out. All pass/fail
-semantics nevertheless live in the checkout rather than in GitHub Actions.
+The two post-verifiers only read the snapshot after the plugin-native lifecycle
+has completed. They therefore neither rescan generated build trees nor compete
+with artifact writers. The extractor currently requires configuration-cache
+opt-out. All pass/fail semantics nevertheless live in the checkout rather than
+in GitHub Actions.
 
-The final task runs `scripts/verify-ai-knowledge-artifacts.py`. It rejects
-missing or empty files, malformed or duplicate-field JSON, empty evidence,
-missing context packs, unresolved capability references and drift from the
-measured schema-v3 context-footprint contract. A missing `methodFacts` section
-remains an explicit warning rather than a build failure.
+`scripts/verify-ai-knowledge-artifacts.py` rejects missing or empty files,
+malformed or duplicate-field JSON, empty evidence, missing context packs,
+unresolved capability references and drift from the measured context-footprint
+contract. A missing `methodFacts` section remains an explicit warning rather
+than a build failure.
 
 The generated files are written to:
 
@@ -103,7 +113,7 @@ context-packs/index.json
 
 ## Individual extractor tasks
 
-Root-project aliases preserve the familiar commands while delegating to the
+Root-project aliases preserve the plugin commands while delegating to the
 optional versioned consumer project:
 
 ```bash
@@ -114,6 +124,16 @@ optional versioned consumer project:
 ./gradlew checkAiKnowledgeIndex
 ./gradlew verifyAiKnowledgeArtifacts
 ./gradlew publishAiKnowledgeIndex
+```
+
+`verifyAiKnowledgeArtifacts` is deliberately a read-only verifier for an
+existing complete artifact set. Use `aiKnowledgeCheck` for the full generated
+and Regelsuche-qualified lifecycle. The repository-specific stages can also be
+addressed directly when diagnosing a failure:
+
+```bash
+./gradlew :ai-knowledge-verification:verifyRegelsucheAiKnowledgeArtifacts
+./gradlew :ai-knowledge-verification:verifyComplexityHotspots
 ```
 
 These commands require the same enablement flag as `aiKnowledgeCheck`.
@@ -129,9 +149,10 @@ extractor is deterministic and does not require external LLM or SaaS calls.
 
 AI Knowledge no longer owns a separate workflow. The single verification
 workflow invokes the checkout entrypoint `ciCheck` with
-`AI_KNOWLEDGE_EXTRACTOR_ENABLED=true`. The Gradle task then includes
-`aiKnowledgeCheck` in the same graph as the rest of the repository verification.
-Generated files are retained by the generic repository-verification artifact.
+`AI_KNOWLEDGE_EXTRACTOR_ENABLED=true`. The Gradle task then includes the root
+`aiKnowledgeCheck` aggregate in the same graph as the rest of repository
+verification. Generated files are retained by the generic
+repository-verification artifact.
 
 The exact GitHub execution can be reproduced locally with the released package
 command above, or without package credentials by selecting the explicit local

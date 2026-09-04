@@ -1,0 +1,52 @@
+import org.gradle.api.publish.maven.MavenPublication
+
+/*
+ * Publishes the narrow Java SDK dependency closure to an isolated Maven
+ * repository. This script is applied only to the explicitly listed SDK
+ * projects from settings.gradle.
+ */
+pluginManager.apply('maven-publish')
+
+def releaseProperties = new Properties()
+rootProject.file('release.properties').withInputStream {
+    releaseProperties.load(it)
+}
+def sdkVersion = releaseProperties.getProperty('version')
+if (sdkVersion == null || sdkVersion.isBlank()) {
+    throw new GradleException('release.properties does not declare version')
+}
+
+group = 'de.regelsuche'
+version = sdkVersion
+
+pluginManager.withPlugin('java') {
+    if (project.path == ':regelsuche-discovery-sdk') {
+        java {
+            withSourcesJar()
+            withJavadocJar()
+        }
+    }
+
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+                pom {
+                    name = project.name
+                    description = project.path == ':regelsuche-discovery-sdk'
+                        ? 'Student-facing Java 25 API for bounded Regelsuche discovery domains.'
+                        : 'Runtime dependency of the Regelsuche student discovery SDK.'
+                }
+            }
+        }
+        repositories {
+            maven {
+                name = 'studentSdk'
+                def configured = providers.gradleProperty('studentSdkRepository').orNull
+                url = configured == null
+                    ? rootProject.layout.buildDirectory.dir('student-sdk-repository').get().asFile
+                    : file(configured)
+            }
+        }
+    }
+}

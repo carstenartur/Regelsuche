@@ -5,35 +5,23 @@ def aiKnowledgeVerifierScript = rootProject.layout.projectDirectory.file(
 def aiKnowledgeVerifierPath = aiKnowledgeVerifierScript.asFile.absolutePath
 def aiKnowledgeArtifactPath = aiKnowledgeArtifactDirectory.get().asFile.absolutePath
 
-def extractorTasks = [
-    'generateAiKnowledgeIndex',
-    'analyzeAiComplexity',
-    'optimizeAiKnowledge',
-    'benchmarkAiKnowledge',
-    'checkAiKnowledgeIndex'
-]
+def pluginLifecycle = tasks.named('aiKnowledgeCheck')
+def pluginArtifactVerification = tasks.named('verifyAiKnowledgeArtifacts')
 
-tasks.named('checkAiKnowledgeIndex').configure {
-    mustRunAfter(
-        'generateAiKnowledgeIndex',
-        'analyzeAiComplexity',
-        'optimizeAiKnowledge',
-        'benchmarkAiKnowledge')
-}
-
-def verifyAiKnowledgeArtifacts = tasks.register(
-    'verifyAiKnowledgeArtifacts',
+def verifyRegelsucheAiKnowledgeArtifacts = tasks.register(
+    'verifyRegelsucheAiKnowledgeArtifacts',
     Exec
 ) {
     group = 'verification'
-    description = 'Verifies generated AI knowledge files, evidence and measured context-footprint contracts.'
-    dependsOn extractorTasks
+    description = 'Verifies generated AI knowledge evidence and Regelsuche context-footprint contracts.'
+    dependsOn pluginLifecycle
     workingDir rootProject.projectDir
     commandLine aiKnowledgePython,
         aiKnowledgeVerifierPath,
         '--root', aiKnowledgeArtifactPath
     inputs.file(aiKnowledgeVerifierScript)
     inputs.dir(aiKnowledgeArtifactDirectory)
+    outputs.upToDateWhen { false }
 }
 
 def verifyComplexityHotspots = tasks.register(
@@ -42,7 +30,7 @@ def verifyComplexityHotspots = tasks.register(
 ) {
     group = 'verification'
     description = 'Rejects new or materially worsened method-complexity hotspots without a finite exception.'
-    dependsOn verifyAiKnowledgeArtifacts
+    dependsOn verifyRegelsucheAiKnowledgeArtifacts
     workingDir rootProject.projectDir
     commandLine aiKnowledgePython,
         rootProject.file('scripts/verify-complexity-hotspots.py').absolutePath,
@@ -55,10 +43,20 @@ def verifyComplexityHotspots = tasks.register(
     inputs.file(rootProject.file('ai-knowledge/complexity-baseline.json'))
     outputs.file(rootProject.file('build/reports/quality/complexity-hotspot-report.json'))
     outputs.file(rootProject.file('build/reports/quality/complexity-hotspot-report.md'))
+    outputs.upToDateWhen { false }
 }
 
-tasks.register('aiKnowledgeCheck') {
+def verifyRegelsucheAiKnowledgeLifecycle = tasks.register(
+    'verifyRegelsucheAiKnowledgeLifecycle'
+) {
     group = 'verification'
-    description = 'Runs the complete checkout-local AI knowledge generation and verification lifecycle.'
-    dependsOn verifyAiKnowledgeArtifacts, verifyComplexityHotspots
+    description = 'Runs the plugin-native lifecycle, structural artifact verifier and Regelsuche-specific quality gates.'
+    dependsOn pluginArtifactVerification, verifyComplexityHotspots
+}
+
+// The root task remains the stable checkout/CI entrypoint. Its existing
+// dependency runs the plugin-native lifecycle; this additional dependency adds
+// the read-only structural and Regelsuche-specific post-verification stages.
+rootProject.tasks.named('aiKnowledgeCheck') {
+    dependsOn verifyRegelsucheAiKnowledgeLifecycle
 }

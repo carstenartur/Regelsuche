@@ -66,8 +66,14 @@ public final class DiscoveryDomainDescriptor {
         this.certificateType = DomainCanonical.requireIdentifier(certificateType, "certificateType");
         this.generatorId = DomainCanonical.requireIdentifier(generatorId, "generatorId");
         this.stateCodecId = DomainCanonical.requireIdentifier(stateCodecId, "stateCodecId");
-        this.operatorIds = DomainCanonical.sortedDistinct(operatorIds);
-        this.invariantIds = DomainCanonical.sortedDistinct(invariantIds);
+        this.operatorIds = DomainCanonical.sortedUniqueIdentifiers(
+            operatorIds,
+            "operator id"
+        );
+        this.invariantIds = DomainCanonical.sortedUniqueIdentifiers(
+            invariantIds,
+            "invariant id"
+        );
         this.objectiveId = DomainCanonical.requireIdentifier(objectiveId, "objectiveId");
         this.candidateExtractorId = DomainCanonical.requireIdentifier(
             candidateExtractorId, "candidateExtractorId");

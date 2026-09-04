@@ -13,7 +13,7 @@ pluginManagement {
         providers.gradleProperty('useLocalAiKnowledgeExtractor').orNull == 'true'
     def aiKnowledgeExtractorVersion = providers
         .gradleProperty('aiKnowledgeExtractorVersion')
-        .getOrElse('0.1.7')
+        .getOrElse('0.1.9')
 
     if (useLocalAiKnowledgeExtractor) {
         def checkout = file(providers
@@ -122,6 +122,9 @@ gradle.beforeProject { candidate ->
             'gradle/ci-verification.gradle')
         candidate.apply from: new File(
             settingsDir,
+            'gradle/student-sdk-consumer-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
             'gradle/sympy-factorization-verification.gradle')
         candidate.apply from: new File(
             settingsDir,
@@ -135,6 +138,18 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/separated-jmh-authority.gradle')
+    }
+    if (candidate.path in [
+            ':regelsuche-core',
+            ':regelsuche-egraph',
+            ':regelsuche-search',
+            ':regelsuche-validation',
+            ':regelsuche-discovery',
+            ':regelsuche-discovery-sdk'
+        ]) {
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/student-sdk-publication.gradle')
     }
     if (candidate.path == ':app') {
         candidate.apply from: new File(
@@ -168,6 +183,7 @@ include(
     'regelsuche-release',
     'regelsuche-cli',
     'regelsuche-discovery',
+    'regelsuche-discovery-sdk',
     'regelsuche-quality',
     'regelsuche-benchmarks',
     'app'
