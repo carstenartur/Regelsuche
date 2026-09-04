@@ -36,6 +36,7 @@ GENERATED_PACKAGE = "org.example.generated"
 GENERATED_PROJECT = "generated-regelsuche-domain"
 GENERATED_DOMAIN = "generated-geometric-sequence"
 GENERATED_PROVIDER = "generated-geometric-sequence-provider"
+GENERATED_GRADLE_WRAPPER = "9.7.1"
 
 
 def run(
@@ -198,6 +199,7 @@ def verify_generated_project_shape(starter: Path) -> dict:
         "domainId": GENERATED_DOMAIN,
         "providerId": GENERATED_PROVIDER,
         "javaFeature": 25,
+        "gradleWrapperVersion": GENERATED_GRADLE_WRAPPER,
         "sdkArtifact": "de.regelsuche:regelsuche-discovery-sdk",
     }
     observed = {key: manifest.get(key) for key in expected}
@@ -205,6 +207,27 @@ def verify_generated_project_shape(starter: Path) -> dict:
         raise RuntimeError(
             f"generated starter manifest mismatch: expected {expected}, got {observed}"
         )
+
+    required_wrapper_files = (
+        starter / "gradlew",
+        starter / "gradlew.bat",
+        starter / "gradle/wrapper/gradle-wrapper.jar",
+        starter / "gradle/wrapper/gradle-wrapper.properties",
+    )
+    missing_wrapper_files = [
+        path.relative_to(starter).as_posix()
+        for path in required_wrapper_files
+        if path.is_symlink() or not path.is_file()
+    ]
+    if missing_wrapper_files:
+        raise RuntimeError(
+            f"generated starter wrapper is incomplete: {missing_wrapper_files}"
+        )
+    wrapper_properties = required_wrapper_files[-1].read_text(encoding="utf-8")
+    if f"gradle-{GENERATED_GRADLE_WRAPPER}-bin.zip" not in wrapper_properties:
+        raise RuntimeError("generated starter uses the wrong Gradle wrapper version")
+    if "distributionSha256Sum=" not in wrapper_properties:
+        raise RuntimeError("generated starter wrapper lacks a distribution SHA-256")
 
     build_contract = "\n".join(
         (starter / name).read_text(encoding="utf-8")
@@ -292,8 +315,9 @@ def main() -> int:
         root,
     )
     generated_manifest = verify_generated_project_shape(starter)
+    generated_gradle = starter / ("gradlew.bat" if os.name == "nt" else "gradlew")
     generated_execution, generated_dependencies, generated_forbidden = execute_consumer(
-        arguments.gradle,
+        str(generated_gradle),
         starter,
         repository,
         version,
@@ -342,6 +366,7 @@ def main() -> int:
         "confirmedCandidate": "multiplier=2",
         "requiredOutcomes": ["CONFIRMED", "REFUTED", "BUDGET_EXHAUSTED"],
         "generatedStarter": generated_manifest,
+        "generatedBuildTool": "PINNED_GRADLE_WRAPPER",
         "forbiddenRuntimeDependenciesObserved": sorted(
             set(forbidden + generated_forbidden)
         ),
@@ -365,7 +390,8 @@ def main() -> int:
         f"- Generated project: `{GENERATED_PROJECT}`\n"
         f"- Generated package: `{GENERATED_PACKAGE}`\n"
         f"- Generated provider: `{GENERATED_PROVIDER}`\n"
-        "- Generated project built and tested without modification: `yes`\n"
+        f"- Generated Gradle wrapper: `{GENERATED_GRADLE_WRAPPER}`\n"
+        "- Generated project built through its wrapper without modification: `yes`\n"
         "- App/Spring/Hibernate/Persistence dependencies: none observed\n"
         "- Result: `success`\n"
     )
