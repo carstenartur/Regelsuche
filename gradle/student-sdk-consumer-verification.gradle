@@ -27,6 +27,23 @@ def windows = System.getProperty('os.name')
 def pythonExecutable = windows ? 'python' : 'python3'
 def gradleExecutable = file(windows ? 'gradlew.bat' : 'gradlew').absolutePath
 
+// Fast filesystem regressions complement, but do not replace, the real Java build.
+def verifySdkStarter = tasks.register('verifyStudentDiscoveryStarter', Exec) {
+    group = 'verification'
+    description = 'Tests starter package relocation, identifiers and output safety.'
+    workingDir rootDir
+    environment 'PYTHONDONTWRITEBYTECODE', '1'
+    commandLine(
+        pythonExecutable, '-B', '-m', 'unittest', 'discover',
+        '-s', file('scripts').absolutePath,
+        '-p', 'test_student_discovery_starter.py', '-v'
+    )
+    inputs.files(
+        'scripts/create-student-discovery-domain.py',
+        'scripts/test_student_discovery_starter.py'
+    )
+}
+
 def cleanSdkRepository = tasks.register(
     'cleanStudentSdkVerificationRepository',
     Delete
@@ -49,6 +66,7 @@ def verifySdkConsumer = tasks.register(
     group = 'verification'
     description = 'Verifies the published SDK through clean Java 25 consumers.'
     dependsOn publicationTaskPaths
+    dependsOn verifySdkStarter
     workingDir rootDir
     commandLine(
         pythonExecutable,
@@ -60,6 +78,8 @@ def verifySdkConsumer = tasks.register(
     inputs.file('release.properties')
     inputs.file('scripts/create-student-discovery-domain.py')
     inputs.file('scripts/verify-student-java-sdk-consumer.py')
+    inputs.files('gradlew', 'gradlew.bat', 'gradle/wrapper/gradle-wrapper.jar',
+        'gradle/wrapper/gradle-wrapper.properties')
     inputs.dir('examples/external-consumers/geometric-sequence-domain-java25')
     outputs.file(new File(reportDirectory, 'consumer-report.json'))
     outputs.upToDateWhen { false }

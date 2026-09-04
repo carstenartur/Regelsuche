@@ -181,23 +181,33 @@ python3 scripts/create-student-discovery-domain.py \
 
 Der Generator
 
-- überschreibt niemals ein vorhandenes Ziel;
-- validiert Java-Paket und stabile IDs;
-- erzeugt ein eigenständiges Java-25-Gradle-Projekt;
+- überschreibt kein vorhandenes Ziel, auch keinen symbolischen Link;
+- validiert Java-Paket und stabile IDs vor dem Schreiben;
+- erzeugt ein eigenständiges Java-25-Projekt mit gepinntem Gradle Wrapper;
 - registriert den Provider über `META-INF/services`;
 - enthält positive, widerlegte und budgeterschöpfte Tests mit
   `DiscoveryRunAssertions`;
 - schreibt die gewählten Identitäten nach `regelsuche-starter.json`.
 
+Auch `--package example` und `--package example.student` sind zulässig.
+Gewählte IDs bleiben unverändert, selbst wenn sie Text der Vorlage enthalten.
+Fehlende Wrapper-Dateien, eine falsche Distributions-URL oder eine fehlende,
+kommentierte beziehungsweise ungültige SHA-256-Konfiguration werden vor dem
+Anlegen des Zielverzeichnisses abgewiesen.
+
 Nach Bereitstellung des SDK-Repositorys lässt sich das erzeugte Projekt ohne
-Änderung bauen:
+Änderung und ohne separate Gradle-Installation bauen:
 
 ```bash
 cd ../my-first-regelsuche-domain
-gradle clean test run \
+./gradlew clean test run \
   -PregelsucheRepository=/pfad/zum/repository \
   -PregelsucheVersion=0.4.0-SNAPSHOT
 ```
+
+Unter Windows wird `gradlew.bat` statt `./gradlew` verwendet. Java 25 und ein
+bereitgestelltes SDK-Repository bleiben Voraussetzungen; beim ersten Build
+werden Gradle und Fremdabhängigkeiten heruntergeladen.
 
 Die autoritative Consumer-CI erzeugt zusätzlich ein Projekt mit von der Vorlage
 abweichenden Paket-, Domain- und Provider-IDs, startet es mit einem eigenen
@@ -215,6 +225,18 @@ Die Prüfung veröffentlicht SDK und innere Laufzeitabhängigkeiten in ein
 isoliertes Repository, baut und testet den externen Consumer sowie einen frisch
 erzeugten Starter mit getrennten isolierten Dependency-Caches, kontrolliert
 Sources- und Javadoc-JARs, SHA-256-Werte sowie die Runtime-Abhängigkeitsbäume.
+
+Die schnellen Generator-Regressionstests sind über
+`verifyStudentDiscoveryStarter` eine Voraussetzung derselben Consumer-Prüfung
+und können auch ohne Java-Build ausgeführt werden:
+
+```bash
+python3 -B -m unittest discover -s scripts \
+  -p 'test_student_discovery_starter.py' -v
+```
+
+Diese Dateisystemtests verwenden eine kleine Vorlage und Wrapper-Platzhalter.
+Sie ersetzen nicht den separaten echten Java-25-Build des generierten Projekts.
 
 ## Noch nicht enthalten
 

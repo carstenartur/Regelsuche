@@ -8,11 +8,10 @@ import json
 import re
 import shutil
 import stat
+import tempfile
 from pathlib import Path
 
-SOURCE_RELATIVE = Path(
-    "examples/external-consumers/geometric-sequence-domain-java25"
-)
+SOURCE_RELATIVE = Path("examples/external-consumers/geometric-sequence-domain-java25")
 WRAPPER_FILES = (
     Path("gradlew"),
     Path("gradlew.bat"),
@@ -31,6 +30,7 @@ JAVA_KEYWORDS = {
     "protected", "public", "return", "short", "static", "strictfp",
     "super", "switch", "synchronized", "this", "throw", "throws",
     "transient", "try", "void", "volatile", "while", "_",
+    "true", "false", "null",
 }
 
 
@@ -44,19 +44,14 @@ def validate_package(value: str) -> str:
         not PACKAGE_SEGMENT.fullmatch(part) or part in JAVA_KEYWORDS
         for part in parts
     ):
-        fail(
-            "--package must contain lowercase Java identifier segments, "
-            f"got {value!r}"
-        )
+        fail(f"--package must contain lowercase Java identifier segments, got {value!r}")
     return value
 
 
 def validate_slug(value: str, option: str) -> str:
     if not SLUG.fullmatch(value):
-        fail(
-            f"{option} must start with a lowercase letter and contain only "
-            f"lowercase letters, digits and hyphens, got {value!r}"
-        )
+        fail(f"{option} must start with a lowercase letter and contain only "
+             f"lowercase letters, digits and hyphens, got {value!r}")
     return value
 
 
@@ -65,40 +60,63 @@ def overlaps(left: Path, right: Path) -> bool:
 
 
 def replace_text(path: Path, replacements: tuple[tuple[str, str], ...]) -> None:
-    value = path.read_text(encoding="utf-8")
-    for source, target in replacements:
-        value = value.replace(source, target)
+    """Replace original template tokens once; never reinterpret user-supplied IDs."""
+    mapping = dict(replacements)
+    pattern = re.compile("|".join(
+        re.escape(token) for token in sorted(mapping, key=len, reverse=True)
+    ))
+    value = pattern.sub(lambda match: mapping[match.group(0)],
+                        path.read_text(encoding="utf-8"))
     path.write_text(value, encoding="utf-8")
+
+
+def validate_wrapper(repository_root: Path) -> None:
+    for relative in WRAPPER_FILES:
+        source = repository_root / relative
+        if source.is_symlink() or not source.is_file():
+            fail(f"pinned Gradle wrapper file is missing or unsafe: {source}")
+    properties = (repository_root / WRAPPER_FILES[-1]).read_text(encoding="utf-8")
+    parsed: dict[str, str] = {}
+    for line in properties.splitlines():
+        if not line.strip() or line.lstrip().startswith(("#", "!")):
+            continue
+        key, separator, value = line.partition("=")
+        key = key.strip()
+        if key not in ("distributionUrl", "distributionSha256Sum"):
+            continue
+        if not separator or key in parsed:
+            fail(f"Gradle wrapper property must occur exactly once: {key}")
+        parsed[key] = value.strip()
+    expected = ("https://services.gradle.org/distributions/"
+                f"gradle-{GRADLE_WRAPPER_VERSION}-bin.zip")
+    if parsed.get("distributionUrl", "").replace(r"\:", ":") != expected:
+        fail(f"Gradle wrapper distribution must be {expected}")
+    if not re.fullmatch(r"[0-9a-f]{64}", parsed.get("distributionSha256Sum", "")):
+        fail("Gradle wrapper must pin a lowercase 64-digit distribution SHA-256")
 
 
 def copy_wrapper(repository_root: Path, output: Path) -> None:
     for relative in WRAPPER_FILES:
-        source = repository_root / relative
         target = output / relative
-        if source.is_symlink() or not source.is_file():
-            fail(f"pinned Gradle wrapper file is missing or unsafe: {source}")
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
-
+        shutil.copy2(repository_root / relative, target)
     unix_launcher = output / "gradlew"
-    unix_launcher.chmod(
-        unix_launcher.stat().st_mode
-        | stat.S_IXUSR
-        | stat.S_IXGRP
-        | stat.S_IXOTH
-    )
+    unix_launcher.chmod(unix_launcher.stat().st_mode
+                        | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-    properties = (
-        output / "gradle/wrapper/gradle-wrapper.properties"
-    ).read_text(encoding="utf-8")
-    expected_distribution = f"gradle-{GRADLE_WRAPPER_VERSION}-bin.zip"
-    if expected_distribution not in properties:
-        fail(
-            "Gradle wrapper version does not match the generator contract: "
-            f"expected {expected_distribution}"
-        )
-    if "distributionSha256Sum=" not in properties:
-        fail("Gradle wrapper must pin the distribution SHA-256")
+
+def relocate_package(output: Path, source_set: str, package_name: str) -> None:
+    java_root = output / "src" / source_set / "java"
+    old = java_root / "example"
+    target = java_root.joinpath(*package_name.split("."))
+    if old == target:
+        return
+    # Move out first so that example.child does not rename a directory into itself.
+    with tempfile.TemporaryDirectory(prefix=".starter-package-", dir=java_root) as stage:
+        staged = Path(stage) / "package"
+        old.rename(staged)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        staged.rename(target)
 
 
 def generate(
@@ -109,91 +127,62 @@ def generate(
     domain_id: str,
     provider_id: str,
 ) -> None:
+    # Enforce the same contract for CLI and imported callers, before creating output.
+    validate_package(package_name)
+    validate_slug(project_name, "--project-name")
+    validate_slug(domain_id, "--domain-id")
+    validate_slug(provider_id, "--provider-id")
     repository_root = repository_root.resolve()
-    source = (repository_root / SOURCE_RELATIVE).resolve()
-    output = output.expanduser().resolve()
-
-    if not source.is_dir():
-        fail(f"verified starter source is missing: {source}")
+    source = repository_root / SOURCE_RELATIVE
+    output = output.expanduser().absolute()
     if output.exists() or output.is_symlink():
         fail(f"output already exists; refusing to overwrite it: {output}")
-    if overlaps(source, output):
+    output = output.resolve()
+    if source.is_symlink() or not source.is_dir():
+        fail(f"verified starter source is missing or unsafe: {source}")
+    if overlaps(source.resolve(), output):
         fail("output must not overlap the verified starter source")
+    for path in source.rglob("*"):
+        if path.is_symlink():
+            fail(f"starter source must not contain symlinks: {path}")
+    required = [source / name for name in ("build.gradle", "settings.gradle", "README.md")]
+    for path in required:
+        if not path.is_file():
+            fail(f"starter source file is missing: {path}")
+    for source_set in ("main", "test"):
+        old = source / "src" / source_set / "java" / "example"
+        if not old.is_dir() or not list(old.rglob("*.java")):
+            fail(f"starter source package is missing or empty: {old}")
+    validate_wrapper(repository_root)
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(
-        source,
-        output,
-        ignore=shutil.ignore_patterns("build", ".gradle", "repository"),
-    )
+    shutil.copytree(source, output,
+                    ignore=shutil.ignore_patterns("build", ".gradle", "repository"))
     copy_wrapper(repository_root, output)
-
-    package_path = Path(*package_name.split("."))
     for source_set in ("main", "test"):
-        old = output / "src" / source_set / "java" / "example"
-        target = output / "src" / source_set / "java" / package_path
-        if not old.is_dir():
-            fail(f"starter source package is missing: {old}")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        old.rename(target)
+        relocate_package(output, source_set, package_name)
 
     replacements = (
-        (
-            "example-geometric-sequence-provider",
-            provider_id,
-        ),
-        (
-            "example-geometric-sequence",
-            domain_id,
-        ),
-        (
-            "external-geometric-sequence",
-            project_name,
-        ),
-        (
-            "Regelsuche external-consumer example",
-            "Generated Regelsuche student discovery starter",
-        ),
-        (
-            "package example;",
-            f"package {package_name};",
-        ),
-        (
-            "example.GeometricSequenceExample",
-            f"{package_name}.GeometricSequenceExample",
-        ),
-        (
-            "example.GeometricSequenceDomainProvider",
-            f"{package_name}.GeometricSequenceDomainProvider",
-        ),
-        (
-            "rootProject.name = 'regelsuche-geometric-sequence-example'",
-            f"rootProject.name = '{project_name}'",
-        ),
-        (
-            "# Geometric sequence discovery domain",
-            f"# {project_name} — Regelsuche discovery starter",
-        ),
+        ("example-geometric-sequence-provider", provider_id),
+        ("example-geometric-sequence", domain_id),
+        ("external-geometric-sequence", project_name),
+        ("Regelsuche external-consumer example", "Generated Regelsuche student discovery starter"),
+        ("package example;", f"package {package_name};"),
+        ("example.GeometricSequenceExample", f"{package_name}.GeometricSequenceExample"),
+        ("example.GeometricSequenceDomainProvider", f"{package_name}.GeometricSequenceDomainProvider"),
+        ("rootProject.name = 'regelsuche-geometric-sequence-example'",
+         f"rootProject.name = '{project_name}'"),
+        ("# Geometric sequence discovery domain", f"# {project_name} — Regelsuche discovery starter"),
+        ("\ngradle clean test run", "\n./gradlew clean test run"),
     )
-
-    text_files = [
-        output / "build.gradle",
-        output / "settings.gradle",
-        output / "README.md",
-        *sorted((output / "src").rglob("*.java")),
-    ]
+    text_files = [output / "build.gradle", output / "settings.gradle",
+                  output / "README.md", *sorted((output / "src").rglob("*.java"))]
     for path in text_files:
         replace_text(path, replacements)
-
-    service = output / (
-        "src/main/resources/META-INF/services/"
-        "de.regelsuche.sdk.discovery.DiscoveryDomainProvider"
-    )
-    service.write_text(
-        f"{package_name}.GeometricSequenceDomainProvider\n",
-        encoding="utf-8",
-    )
-
+    service = output / ("src/main/resources/META-INF/services/"
+                        "de.regelsuche.sdk.discovery.DiscoveryDomainProvider")
+    service.parent.mkdir(parents=True, exist_ok=True)
+    service.write_text(f"{package_name}.GeometricSequenceDomainProvider\n", encoding="utf-8")
     manifest = {
         "schema": "regelsuche.student-discovery-starter/v1",
         "template": SOURCE_RELATIVE.as_posix(),
@@ -206,83 +195,42 @@ def generate(
         "sdkArtifact": "de.regelsuche:regelsuche-discovery-sdk",
     }
     (output / "regelsuche-starter.json").write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-
-    unresolved = []
-    for path in [*text_files, service]:
-        value = path.read_text(encoding="utf-8")
-        if "package example;" in value or "example.GeometricSequence" in value:
-            unresolved.append(path.relative_to(output).as_posix())
-    if unresolved:
-        fail(f"unresolved starter placeholders in {unresolved}")
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # The original package or original ID may be an intentional user choice.
+    for path in (output / "src").rglob("*.java"):
+        expected = f"package {package_name};"
+        if expected not in path.read_text(encoding="utf-8"):
+            fail(f"generated Java source lacks {expected!r}: {path.relative_to(output)}")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--repository-root",
-        type=Path,
-        default=Path.cwd(),
-        help="Regelsuche checkout containing the verified external example",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        required=True,
-        help="new output directory; existing paths are never overwritten",
-    )
-    parser.add_argument(
-        "--package",
-        dest="package_name",
-        default="org.example.discovery",
-        help="lowercase Java package for the generated sources",
-    )
-    parser.add_argument(
-        "--project-name",
-        default="my-regelsuche-domain",
-        help="Gradle root project name",
-    )
-    parser.add_argument(
-        "--domain-id",
-        default="my-discovery-domain",
-        help="stable Regelsuche discovery-domain identifier",
-    )
-    parser.add_argument(
-        "--provider-id",
-        default="my-discovery-provider",
-        help="stable ServiceLoader provider identifier",
-    )
+    parser.add_argument("--repository-root", type=Path, default=Path.cwd(),
+                        help="Regelsuche checkout containing the verified external example")
+    parser.add_argument("--output", type=Path, required=True,
+                        help="new output directory; existing paths are never overwritten")
+    parser.add_argument("--package", dest="package_name", default="org.example.discovery",
+                        help="lowercase Java package for the generated sources")
+    parser.add_argument("--project-name", default="my-regelsuche-domain",
+                        help="Gradle root project name")
+    parser.add_argument("--domain-id", default="my-discovery-domain",
+                        help="stable Regelsuche discovery-domain identifier")
+    parser.add_argument("--provider-id", default="my-discovery-provider",
+                        help="stable ServiceLoader provider identifier")
     return parser.parse_args()
 
 
 def main() -> int:
     arguments = parse_args()
-    package_name = validate_package(arguments.package_name)
-    project_name = validate_slug(arguments.project_name, "--project-name")
-    domain_id = validate_slug(arguments.domain_id, "--domain-id")
-    provider_id = validate_slug(arguments.provider_id, "--provider-id")
-    output = arguments.output.expanduser().resolve()
-
-    generate(
-        arguments.repository_root,
-        output,
-        package_name,
-        project_name,
-        domain_id,
-        provider_id,
-    )
-    print(f"created={output}")
-    print(f"package={package_name}")
-    print(f"domainId={domain_id}")
-    print(f"providerId={provider_id}")
+    generate(arguments.repository_root, arguments.output, arguments.package_name,
+             arguments.project_name, arguments.domain_id, arguments.provider_id)
+    print(f"created={arguments.output.expanduser().resolve()}")
+    print(f"package={arguments.package_name}")
+    print(f"domainId={arguments.domain_id}")
+    print(f"providerId={arguments.provider_id}")
     print(f"gradleWrapper={GRADLE_WRAPPER_VERSION}")
-    print(
-        "next=./gradlew clean test run "
-        "-PregelsucheRepository=/path/to/sdk-repository "
-        "-PregelsucheVersion=<version>"
-    )
+    print("next=./gradlew clean test run "
+          "-PregelsucheRepository=/path/to/sdk-repository -PregelsucheVersion=<version>")
     return 0
 
 
