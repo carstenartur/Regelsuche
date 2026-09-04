@@ -31,7 +31,11 @@ class ReadmeShowcaseDocumentationTest {
             quickstart,
             "docs/generated/autonomous-discovery-walkthrough/representative-search.svg"
         );
-        assertAppearsBeforeQuickstart(readme, quickstart, "docs/assets/screenshots/macro-learning-summary.png");
+        assertAppearsBeforeQuickstart(
+            readme,
+            quickstart,
+            "docs/assets/screenshots/macro-learning-summary.png"
+        );
         assertAppearsBeforeQuickstart(readme, quickstart, "rule difference_of_squares:");
         assertAppearsBeforeQuickstart(readme, quickstart, "firstApplicable(");
 
@@ -49,7 +53,10 @@ class ReadmeShowcaseDocumentationTest {
             "docs/assets/screenshots/rational-summary.png",
             "docs/assets/screenshots/math-matrix-preview.png"
         )) {
-            assertTrue(Files.isRegularFile(REPO_ROOT.resolve(relative)), "README showcase asset must exist: " + relative);
+            assertTrue(
+                Files.isRegularFile(REPO_ROOT.resolve(relative)),
+                "README showcase asset must exist: " + relative
+            );
         }
     }
 
