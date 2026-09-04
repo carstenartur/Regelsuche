@@ -52,7 +52,8 @@ class DiscoveryRunAssertionsTest {
             .hasOutcome(Outcome.BUDGET_EXHAUSTED)
             .hasNoCandidate()
             .hasNoCertificate()
-            .hasNoCounterexamples()
+            .hasCounterexampleCount(1)
+            .hasCounterexampleContaining("multiplier 1")
             .hasContentAddressedEvidence();
 
         assertThrows(AssertionError.class, () -> assertThat(run).isConfirmed());
