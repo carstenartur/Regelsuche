@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BudgetedTransformationSourceProgramExecution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">BudgetedTransformationSourceProgramExecution.java</span></div><h1>BudgetedTransformationSourceProgramExecution.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import de.regelsuche.search.program.BudgetedTransformationSource.ExactTheoryTransition;
+import de.regelsuche.search.program.BudgetedTransformationSource.Status;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Content-addressed result of executing one top-level
+ * {@link RewriteProgram.BudgetedSource}.
+ *
+ * &lt;p&gt;The exact-theory candidates remain separate from ordinary
+ * {@code Transformation} instances. Mathematical work stays on each transition;
+ * interpreter and delegated source mechanics are retained in a separate
+ * ledger.&lt;/p&gt;
+ */
+public record BudgetedTransformationSourceProgramExecution(
+    String executionRevision,
+    RewriteProgram.NodeMetadata programMetadata,
+    BudgetedTransformationSourceExecutor.Execution sourceExecution,
+    List&lt;ExactTheoryCandidate&gt; candidates,
+    ProgramWork programWork,
+    String contentHash
+) {
+    public static final String EXECUTION_REVISION =
+        &quot;regelsuche.budgeted-transformation-source-program-execution/v1&quot;;
+
+<span class="fc" id="L34">    public BudgetedTransformationSourceProgramExecution {</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (!EXECUTION_REVISION.equals(executionRevision)) {</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(</span>
+                &quot;unsupported budgeted program execution revision&quot;);
+        }
+<span class="fc" id="L39">        programMetadata = Objects.requireNonNull(</span>
+            programMetadata,
+            &quot;programMetadata&quot;);
+<span class="fc" id="L42">        sourceExecution = Objects.requireNonNull(</span>
+            sourceExecution,
+            &quot;sourceExecution&quot;);
+<span class="fc" id="L45">        candidates = normalizeCandidates(candidates);</span>
+<span class="fc" id="L46">        requireCandidateProjection(</span>
+<span class="fc" id="L47">            programMetadata.id(),</span>
+            sourceExecution,
+            candidates);
+<span class="fc" id="L50">        programWork = Objects.requireNonNull(programWork, &quot;programWork&quot;);</span>
+<span class="fc" id="L51">        ProgramWork expectedWork = ProgramWork.forExecution(sourceExecution);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (!expectedWork.equals(programWork)) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(</span>
+                &quot;budgeted program work differs from delegated execution&quot;);
+        }
+<span class="fc" id="L56">        contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L57">        String expectedHash = executionHash(</span>
+            executionRevision,
+            programMetadata,
+            sourceExecution,
+            candidates,
+            programWork);
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (!expectedHash.equals(contentHash)) {</span>
+<span class="fc" id="L64">            throw new IllegalArgumentException(</span>
+                &quot;budgeted program execution contentHash differs from contents&quot;);
+        }
+<span class="fc" id="L67">    }</span>
+
+    static BudgetedTransformationSourceProgramExecution create(
+        RewriteProgram.BudgetedSource program,
+        BudgetedTransformationSourceExecutor.Execution sourceExecution
+    ) {
+<span class="fc" id="L73">        Objects.requireNonNull(program, &quot;program&quot;);</span>
+<span class="fc" id="L74">        Objects.requireNonNull(sourceExecution, &quot;sourceExecution&quot;);</span>
+<span class="fc" id="L75">        List&lt;ExactTheoryCandidate&gt; candidates = sourceExecution.candidates()</span>
+<span class="fc" id="L76">            .stream()</span>
+<span class="fc" id="L77">            .map(transition -&gt; ExactTheoryCandidate.create(</span>
+<span class="fc" id="L78">                program.id(),</span>
+                transition))
+<span class="fc" id="L80">            .sorted(Comparator.comparing(ExactTheoryCandidate::contentHash))</span>
+<span class="fc" id="L81">            .toList();</span>
+<span class="fc" id="L82">        ProgramWork work = ProgramWork.forExecution(sourceExecution);</span>
+<span class="fc" id="L83">        return new BudgetedTransformationSourceProgramExecution(</span>
+            EXECUTION_REVISION,
+<span class="fc" id="L85">            program.metadata(),</span>
+            sourceExecution,
+            candidates,
+            work,
+<span class="fc" id="L89">            executionHash(</span>
+                EXECUTION_REVISION,
+<span class="fc" id="L91">                program.metadata(),</span>
+                sourceExecution,
+                candidates,
+                work));
+    }
+
+    public Status status() {
+<span class="fc" id="L98">        return sourceExecution.status();</span>
+    }
+
+    public boolean complete() {
+<span class="fc" id="L102">        return sourceExecution.complete();</span>
+    }
+
+    public String inputExpression() {
+<span class="fc" id="L106">        return sourceExecution.inputExpression();</span>
+    }
+
+    public long availableMathematicalWorkUnits() {
+<span class="fc" id="L110">        return sourceExecution.availableMathematicalWorkUnits();</span>
+    }
+
+    public long minimumRequiredMathematicalWorkUnits() {
+<span class="fc" id="L114">        return sourceExecution.sourceResult()</span>
+<span class="fc" id="L115">            .minimumRequiredMathematicalWorkUnits();</span>
+    }
+
+    public String detailCode() {
+<span class="fc" id="L119">        return sourceExecution.sourceResult().detailCode();</span>
+    }
+
+    private static List&lt;ExactTheoryCandidate&gt; normalizeCandidates(
+        List&lt;ExactTheoryCandidate&gt; candidates
+    ) {
+<span class="fc" id="L125">        Objects.requireNonNull(candidates, &quot;candidates&quot;);</span>
+<span class="fc" id="L126">        List&lt;ExactTheoryCandidate&gt; normalized = candidates.stream()</span>
+<span class="fc" id="L127">            .map(candidate -&gt; Objects.requireNonNull(candidate, &quot;candidate&quot;))</span>
+<span class="fc" id="L128">            .sorted(Comparator.comparing(ExactTheoryCandidate::contentHash))</span>
+<span class="fc" id="L129">            .toList();</span>
+<span class="fc" id="L130">        if (new HashSet&lt;&gt;(normalized.stream()</span>
+<span class="fc" id="L131">                .map(ExactTheoryCandidate::contentHash)</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                .toList()).size() != normalized.size()) {</span>
+<span class="nc" id="L133">            throw new IllegalArgumentException(</span>
+                &quot;budgeted program candidate identities must be unique&quot;);
+        }
+<span class="fc" id="L136">        return List.copyOf(normalized);</span>
+    }
+
+    private static void requireCandidateProjection(
+        String programId,
+        BudgetedTransformationSourceExecutor.Execution execution,
+        List&lt;ExactTheoryCandidate&gt; candidates
+    ) {
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (candidates.stream().anyMatch(candidate -&gt;</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                !programId.equals(candidate.originNodeId()))) {</span>
+<span class="nc" id="L146">            throw new IllegalArgumentException(</span>
+                &quot;budgeted program candidate has another origin node&quot;);
+        }
+<span class="fc" id="L149">        List&lt;String&gt; expected = execution.candidates().stream()</span>
+<span class="fc" id="L150">            .map(ExactTheoryTransition::contentHash)</span>
+<span class="fc" id="L151">            .sorted()</span>
+<span class="fc" id="L152">            .toList();</span>
+<span class="fc" id="L153">        List&lt;String&gt; actual = candidates.stream()</span>
+<span class="fc" id="L154">            .map(candidate -&gt; candidate.transition().contentHash())</span>
+<span class="fc" id="L155">            .sorted()</span>
+<span class="fc" id="L156">            .toList();</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (!expected.equals(actual)) {</span>
+<span class="fc" id="L158">            throw new IllegalArgumentException(</span>
+                &quot;budgeted program candidates differ from source execution&quot;);
+        }
+<span class="fc" id="L161">    }</span>
+
+    private static String executionHash(
+        String revision,
+        RewriteProgram.NodeMetadata metadata,
+        BudgetedTransformationSourceExecutor.Execution sourceExecution,
+        List&lt;ExactTheoryCandidate&gt; candidates,
+        ProgramWork work
+    ) {
+<span class="fc" id="L170">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L171">        append(material, revision);</span>
+<span class="fc" id="L172">        append(material, metadata.id());</span>
+<span class="fc" id="L173">        append(material, metadata.label());</span>
+<span class="fc" id="L174">        append(material, metadata.sourceLocation().sourceName());</span>
+<span class="fc" id="L175">        append(material, Integer.toString(metadata.sourceLocation().line()));</span>
+<span class="fc" id="L176">        append(material, Integer.toString(metadata.sourceLocation().column()));</span>
+<span class="fc" id="L177">        append(material, sourceExecution.contentHash());</span>
+<span class="fc" id="L178">        candidates.forEach(candidate -&gt;</span>
+<span class="fc" id="L179">            append(material, candidate.contentHash()));</span>
+<span class="fc" id="L180">        append(material, Long.toString(work.interpreterInvocations()));</span>
+<span class="fc" id="L181">        append(material, Long.toString(work.programNodeVisits()));</span>
+<span class="fc" id="L182">        append(material, Long.toString(work.executorDelegations()));</span>
+<span class="fc" id="L183">        append(material, Long.toString(work.candidateProjectionVisits()));</span>
+<span class="fc" id="L184">        append(material, Long.toString(</span>
+<span class="fc" id="L185">            work.delegatedMechanicalWorkUnits()));</span>
+<span class="fc" id="L186">        append(material, Long.toString(work.totalMechanicalWorkUnits()));</span>
+<span class="fc" id="L187">        return sha256(material.toString());</span>
+    }
+
+    /** One program-origin-bound exact-theory candidate. */
+    public record ExactTheoryCandidate(
+        String originNodeId,
+        ExactTheoryTransition transition,
+        String contentHash
+    ) {
+<span class="fc" id="L196">        public ExactTheoryCandidate {</span>
+<span class="fc" id="L197">            originNodeId = requireText(originNodeId, &quot;originNodeId&quot;);</span>
+<span class="fc" id="L198">            transition = Objects.requireNonNull(transition, &quot;transition&quot;);</span>
+<span class="fc" id="L199">            contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L200">            String expected = candidateHash(originNodeId, transition);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L202">                throw new IllegalArgumentException(</span>
+                    &quot;exact-theory program candidate hash differs from contents&quot;);
+            }
+<span class="fc" id="L205">        }</span>
+
+        private static ExactTheoryCandidate create(
+            String originNodeId,
+            ExactTheoryTransition transition
+        ) {
+<span class="fc" id="L211">            String origin = requireText(originNodeId, &quot;originNodeId&quot;);</span>
+<span class="fc" id="L212">            ExactTheoryTransition checked = Objects.requireNonNull(</span>
+                transition,
+                &quot;transition&quot;);
+<span class="fc" id="L215">            return new ExactTheoryCandidate(</span>
+                origin,
+                checked,
+<span class="fc" id="L218">                candidateHash(origin, checked));</span>
+        }
+
+        public String sourceExpression() {
+<span class="fc" id="L222">            return transition.sourceExpression();</span>
+        }
+
+        public String transformedExpression() {
+<span class="fc" id="L226">            return transition.transformedExpression();</span>
+        }
+
+        public String theoryStepId() {
+<span class="fc" id="L230">            return transition.theoryStepId();</span>
+        }
+
+        public String evidenceHash() {
+<span class="fc" id="L234">            return transition.evidenceHash();</span>
+        }
+
+        public List&lt;String&gt; assumptions() {
+<span class="nc" id="L238">            return transition.assumptions();</span>
+        }
+
+        public long mathematicalWorkUnits() {
+<span class="fc" id="L242">            return transition.mathematicalWorkUnits();</span>
+        }
+
+        public String applicationKey() {
+<span class="nc" id="L246">            return transition.applicationKey();</span>
+        }
+
+        public int primitiveRewriteSteps() {
+<span class="fc" id="L250">            return 0;</span>
+        }
+
+        public List&lt;String&gt; primitiveRuleIds() {
+<span class="fc" id="L254">            return List.of();</span>
+        }
+
+        public int exactTheorySteps() {
+<span class="fc" id="L258">            return 1;</span>
+        }
+
+        public List&lt;String&gt; exactTheoryStepIds() {
+<span class="fc" id="L262">            return List.of(transition.theoryStepId());</span>
+        }
+
+        private static String candidateHash(
+            String originNodeId,
+            ExactTheoryTransition transition
+        ) {
+<span class="fc" id="L269">            StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L270">            append(material, EXECUTION_REVISION);</span>
+<span class="fc" id="L271">            append(material, &quot;exact-theory-program-candidate&quot;);</span>
+<span class="fc" id="L272">            append(material, originNodeId);</span>
+<span class="fc" id="L273">            append(material, transition.contentHash());</span>
+<span class="fc" id="L274">            return sha256(material.toString());</span>
+        }
+    }
+
+    /**
+     * Mechanical work introduced by the top-level program layer.
+     *
+     * &lt;p&gt;The delegated executor work remains a separately identified component;
+     * candidate mathematical work is not included here.&lt;/p&gt;
+     */
+    public record ProgramWork(
+        long interpreterInvocations,
+        long programNodeVisits,
+        long executorDelegations,
+        long candidateProjectionVisits,
+        long delegatedMechanicalWorkUnits,
+        long totalMechanicalWorkUnits
+    ) {
+<span class="fc" id="L292">        public ProgramWork {</span>
+<span class="pc bpc" id="L293" title="5 of 10 branches missed.">            if (interpreterInvocations != 1</span>
+                    || programNodeVisits != 1
+                    || executorDelegations != 1
+                    || candidateProjectionVisits &lt; 0
+                    || delegatedMechanicalWorkUnits &lt; 0) {
+<span class="nc" id="L298">                throw new IllegalArgumentException(</span>
+                    &quot;budgeted program mechanical work is inconsistent&quot;);
+            }
+<span class="fc" id="L301">            long expected = Math.addExact(</span>
+<span class="fc" id="L302">                Math.addExact(</span>
+                    interpreterInvocations,
+                    programNodeVisits),
+<span class="fc" id="L305">                Math.addExact(</span>
+                    executorDelegations,
+<span class="fc" id="L307">                    Math.addExact(</span>
+                        candidateProjectionVisits,
+                        delegatedMechanicalWorkUnits)));
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            if (totalMechanicalWorkUnits != expected) {</span>
+<span class="fc" id="L311">                throw new IllegalArgumentException(</span>
+                    &quot;budgeted program total mechanical work is inconsistent&quot;);
+            }
+<span class="fc" id="L314">        }</span>
+
+        private static ProgramWork forExecution(
+            BudgetedTransformationSourceExecutor.Execution execution
+        ) {
+<span class="fc" id="L319">            long candidateCount = execution.candidates().size();</span>
+<span class="fc" id="L320">            long delegated = execution.mechanicalWork()</span>
+<span class="fc" id="L321">                .totalMechanicalWorkUnits();</span>
+<span class="fc" id="L322">            long total = Math.addExact(</span>
+                3L,
+<span class="fc" id="L324">                Math.addExact(candidateCount, delegated));</span>
+<span class="fc" id="L325">            return new ProgramWork(</span>
+                1,
+                1,
+                1,
+                candidateCount,
+                delegated,
+                total);
+        }
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L336" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L337">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L339">        return value;</span>
+    }
+
+    private static String requireSha256(String value, String name) {
+<span class="pc bpc" id="L343" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L344">            throw new IllegalArgumentException(</span>
+                name + &quot; must be a lowercase SHA-256 identifier&quot;);
+        }
+<span class="fc" id="L347">        return value;</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L351">        target.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L352">            .append(':')</span>
+<span class="fc" id="L353">            .append(value);</span>
+<span class="fc" id="L354">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L358">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L359">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L360">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L361">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L362">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

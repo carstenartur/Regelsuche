@@ -16,6 +16,7 @@ import java.util.function.Predicate;
  */
 public sealed interface RewriteProgram permits
         RewriteProgram.Source,
+        RewriteProgram.BudgetedSource,
         RewriteProgram.Choice,
         RewriteProgram.FirstApplicable,
         RewriteProgram.Sequence,
@@ -27,41 +28,59 @@ public sealed interface RewriteProgram permits
     NodeMetadata metadata();
 
     default String id() {
-<span class="fc" id="L30">        return metadata().id();</span>
+<span class="fc" id="L31">        return metadata().id();</span>
     }
 
     record Source(NodeMetadata metadata, TransformationEngine engine)
             implements RewriteProgram {
-<span class="fc" id="L35">        public Source {</span>
-<span class="fc" id="L36">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
-<span class="fc" id="L37">            Objects.requireNonNull(engine, &quot;engine&quot;);</span>
-<span class="fc" id="L38">        }</span>
+<span class="fc" id="L36">        public Source {</span>
+<span class="fc" id="L37">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
+<span class="fc" id="L38">            Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="fc" id="L39">        }</span>
+    }
+
+    /**
+     * Explicitly budgeted exact-theory source.
+     *
+     * &lt;p&gt;Version 1 is executable only as the top-level argument of
+     * {@link RewriteProgramInterpreter#executeBudgetedSource}. Ordinary
+     * unbudgeted interpretation and composition reject this node before any
+     * source is invoked.&lt;/p&gt;
+     */
+    record BudgetedSource(
+        NodeMetadata metadata,
+        BudgetedTransformationSource source
+    ) implements RewriteProgram {
+<span class="fc" id="L54">        public BudgetedSource {</span>
+<span class="fc" id="L55">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
+<span class="fc" id="L56">            Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L57">        }</span>
     }
 
     record Choice(NodeMetadata metadata, List&lt;RewriteProgram&gt; alternatives)
             implements RewriteProgram {
-<span class="fc" id="L43">        public Choice {</span>
-<span class="fc" id="L44">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
-<span class="fc" id="L45">            alternatives = nonEmptyCopy(alternatives, &quot;alternatives&quot;);</span>
-<span class="fc" id="L46">        }</span>
+<span class="fc" id="L62">        public Choice {</span>
+<span class="fc" id="L63">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
+<span class="fc" id="L64">            alternatives = nonEmptyCopy(alternatives, &quot;alternatives&quot;);</span>
+<span class="fc" id="L65">        }</span>
     }
 
     /** Selects the first child that produces at least one candidate. */
     record FirstApplicable(NodeMetadata metadata, List&lt;RewriteProgram&gt; alternatives)
             implements RewriteProgram {
-<span class="fc" id="L52">        public FirstApplicable {</span>
-<span class="fc" id="L53">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
-<span class="fc" id="L54">            alternatives = nonEmptyCopy(alternatives, &quot;alternatives&quot;);</span>
-<span class="fc" id="L55">        }</span>
+<span class="fc" id="L71">        public FirstApplicable {</span>
+<span class="fc" id="L72">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
+<span class="fc" id="L73">            alternatives = nonEmptyCopy(alternatives, &quot;alternatives&quot;);</span>
+<span class="fc" id="L74">        }</span>
     }
 
     /** Applies every step to every candidate produced by its predecessor. */
     record Sequence(NodeMetadata metadata, List&lt;RewriteProgram&gt; steps)
             implements RewriteProgram {
-<span class="fc" id="L61">        public Sequence {</span>
-<span class="fc" id="L62">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
-<span class="fc" id="L63">            steps = nonEmptyCopy(steps, &quot;steps&quot;);</span>
-<span class="fc" id="L64">        }</span>
+<span class="fc" id="L80">        public Sequence {</span>
+<span class="fc" id="L81">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
+<span class="fc" id="L82">            steps = nonEmptyCopy(steps, &quot;steps&quot;);</span>
+<span class="fc" id="L83">        }</span>
     }
 
     /** Bounded repetition; all endpoints between min and max are retained. */
@@ -71,14 +90,14 @@ public sealed interface RewriteProgram permits
         int minIterations,
         int maxIterations
     ) implements RewriteProgram {
-<span class="fc" id="L74">        public Repeat {</span>
-<span class="fc" id="L75">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
-<span class="fc" id="L76">            Objects.requireNonNull(body, &quot;body&quot;);</span>
-<span class="pc bpc" id="L77" title="2 of 4 branches missed.">            if (minIterations &lt; 1 || maxIterations &lt; minIterations) {</span>
-<span class="nc" id="L78">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L93">        public Repeat {</span>
+<span class="fc" id="L94">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
+<span class="fc" id="L95">            Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="pc bpc" id="L96" title="2 of 4 branches missed.">            if (minIterations &lt; 1 || maxIterations &lt; minIterations) {</span>
+<span class="nc" id="L97">                throw new IllegalArgumentException(</span>
                     &quot;repeat requires 1 &lt;= minIterations &lt;= maxIterations&quot;);
             }
-<span class="fc" id="L81">        }</span>
+<span class="fc" id="L100">        }</span>
     }
 
     /** Hard semantic filter. Rejected candidates are not executed by search. */
@@ -88,12 +107,12 @@ public sealed interface RewriteProgram permits
         String conditionDescription,
         Predicate&lt;RewriteCandidate&gt; condition
     ) implements RewriteProgram {
-<span class="fc" id="L91">        public Require {</span>
-<span class="fc" id="L92">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
-<span class="fc" id="L93">            Objects.requireNonNull(body, &quot;body&quot;);</span>
-<span class="fc" id="L94">            conditionDescription = requireText(conditionDescription, &quot;conditionDescription&quot;);</span>
-<span class="fc" id="L95">            Objects.requireNonNull(condition, &quot;condition&quot;);</span>
-<span class="fc" id="L96">        }</span>
+<span class="fc" id="L110">        public Require {</span>
+<span class="fc" id="L111">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
+<span class="fc" id="L112">            Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="fc" id="L113">            conditionDescription = requireText(conditionDescription, &quot;conditionDescription&quot;);</span>
+<span class="fc" id="L114">            Objects.requireNonNull(condition, &quot;condition&quot;);</span>
+<span class="fc" id="L115">        }</span>
     }
 
     /** Soft ordering only; it must not add or remove candidates. */
@@ -103,12 +122,12 @@ public sealed interface RewriteProgram permits
         String orderingDescription,
         Comparator&lt;RewriteCandidate&gt; comparator
     ) implements RewriteProgram {
-<span class="fc" id="L106">        public Prioritize {</span>
-<span class="fc" id="L107">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
-<span class="fc" id="L108">            Objects.requireNonNull(body, &quot;body&quot;);</span>
-<span class="fc" id="L109">            orderingDescription = requireText(orderingDescription, &quot;orderingDescription&quot;);</span>
-<span class="fc" id="L110">            Objects.requireNonNull(comparator, &quot;comparator&quot;);</span>
-<span class="fc" id="L111">        }</span>
+<span class="fc" id="L125">        public Prioritize {</span>
+<span class="fc" id="L126">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
+<span class="fc" id="L127">            Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="fc" id="L128">            orderingDescription = requireText(orderingDescription, &quot;orderingDescription&quot;);</span>
+<span class="fc" id="L129">            Objects.requireNonNull(comparator, &quot;comparator&quot;);</span>
+<span class="fc" id="L130">        }</span>
     }
 
     /** Explicitly incomplete candidate truncation. */
@@ -118,52 +137,52 @@ public sealed interface RewriteProgram permits
         int maxCandidates,
         String reason
     ) implements RewriteProgram {
-<span class="fc" id="L121">        public Prune {</span>
-<span class="fc" id="L122">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
-<span class="fc" id="L123">            Objects.requireNonNull(body, &quot;body&quot;);</span>
-<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (maxCandidates &lt; 1) {</span>
-<span class="nc" id="L125">                throw new IllegalArgumentException(&quot;maxCandidates must be positive&quot;);</span>
+<span class="fc" id="L140">        public Prune {</span>
+<span class="fc" id="L141">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
+<span class="fc" id="L142">            Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            if (maxCandidates &lt; 1) {</span>
+<span class="nc" id="L144">                throw new IllegalArgumentException(&quot;maxCandidates must be positive&quot;);</span>
             }
-<span class="fc" id="L127">            reason = requireText(reason, &quot;reason&quot;);</span>
-<span class="fc" id="L128">        }</span>
+<span class="fc" id="L146">            reason = requireText(reason, &quot;reason&quot;);</span>
+<span class="fc" id="L147">        }</span>
     }
 
     record NodeMetadata(String id, String label, SourceLocation sourceLocation) {
-<span class="fc" id="L132">        public NodeMetadata {</span>
-<span class="fc" id="L133">            id = requireText(id, &quot;id&quot;);</span>
-<span class="pc bpc" id="L134" title="2 of 4 branches missed.">            label = label == null || label.isBlank() ? id : label;</span>
-<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            sourceLocation = sourceLocation == null</span>
-<span class="nc" id="L136">                ? SourceLocation.unknown()</span>
-<span class="fc" id="L137">                : sourceLocation;</span>
-<span class="fc" id="L138">        }</span>
+<span class="fc" id="L151">        public NodeMetadata {</span>
+<span class="fc" id="L152">            id = requireText(id, &quot;id&quot;);</span>
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">            label = label == null || label.isBlank() ? id : label;</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            sourceLocation = sourceLocation == null</span>
+<span class="nc" id="L155">                ? SourceLocation.unknown()</span>
+<span class="fc" id="L156">                : sourceLocation;</span>
+<span class="fc" id="L157">        }</span>
 
         public static NodeMetadata named(String id) {
-<span class="fc" id="L141">            return new NodeMetadata(id, id, SourceLocation.unknown());</span>
+<span class="fc" id="L160">            return new NodeMetadata(id, id, SourceLocation.unknown());</span>
         }
     }
 
     record SourceLocation(String sourceName, int line, int column) {
-<span class="fc" id="L146">        public SourceLocation {</span>
-<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            sourceName = sourceName == null ? &quot;&quot; : sourceName;</span>
-<span class="pc bpc" id="L148" title="2 of 4 branches missed.">            if (line &lt; 0 || column &lt; 0) {</span>
-<span class="nc" id="L149">                throw new IllegalArgumentException(&quot;line and column must not be negative&quot;);</span>
+<span class="fc" id="L165">        public SourceLocation {</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            sourceName = sourceName == null ? &quot;&quot; : sourceName;</span>
+<span class="pc bpc" id="L167" title="2 of 4 branches missed.">            if (line &lt; 0 || column &lt; 0) {</span>
+<span class="nc" id="L168">                throw new IllegalArgumentException(&quot;line and column must not be negative&quot;);</span>
             }
-<span class="pc bpc" id="L151" title="2 of 6 branches missed.">            if (sourceName.isBlank() &amp;&amp; (line != 0 || column != 0)) {</span>
-<span class="nc" id="L152">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L170" title="2 of 6 branches missed.">            if (sourceName.isBlank() &amp;&amp; (line != 0 || column != 0)) {</span>
+<span class="nc" id="L171">                throw new IllegalArgumentException(</span>
                     &quot;unknown source locations must use line=0 and column=0&quot;);
             }
-<span class="fc" id="L155">        }</span>
+<span class="fc" id="L174">        }</span>
 
         public static SourceLocation unknown() {
-<span class="fc" id="L158">            return new SourceLocation(&quot;&quot;, 0, 0);</span>
+<span class="fc" id="L177">            return new SourceLocation(&quot;&quot;, 0, 0);</span>
         }
 
         public static SourceLocation at(String sourceName, int line, int column) {
-<span class="fc" id="L162">            return new SourceLocation(requireText(sourceName, &quot;sourceName&quot;), line, column);</span>
+<span class="fc" id="L181">            return new SourceLocation(requireText(sourceName, &quot;sourceName&quot;), line, column);</span>
         }
 
         public boolean known() {
-<span class="nc bnc" id="L166" title="All 2 branches missed.">            return !sourceName.isBlank();</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">            return !sourceName.isBlank();</span>
         }
     }
 
@@ -171,19 +190,19 @@ public sealed interface RewriteProgram permits
         List&lt;RewriteProgram&gt; values,
         String name
     ) {
-<span class="fc" id="L174">        Objects.requireNonNull(values, name);</span>
-<span class="fc" id="L175">        List&lt;RewriteProgram&gt; copy = List.copyOf(values);</span>
-<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (copy.isEmpty()) {</span>
-<span class="nc" id="L177">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+<span class="fc" id="L193">        Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L194">        List&lt;RewriteProgram&gt; copy = List.copyOf(values);</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (copy.isEmpty()) {</span>
+<span class="nc" id="L196">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
         }
-<span class="fc" id="L179">        return copy;</span>
+<span class="fc" id="L198">        return copy;</span>
     }
 
     private static String requireText(String value, String name) {
-<span class="pc bpc" id="L183" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L184">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L202" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L203">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L186">        return value;</span>
+<span class="fc" id="L205">        return value;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

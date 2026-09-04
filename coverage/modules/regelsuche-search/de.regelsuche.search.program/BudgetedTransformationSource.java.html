@@ -1,0 +1,454 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BudgetedTransformationSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">BudgetedTransformationSource.java</span></div><h1>BudgetedTransformationSource.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * A transformation source whose mathematical work authority is supplied
+ * explicitly for every invocation.
+ *
+ * &lt;p&gt;The source does not emit ordinary primitive rewrites. Its candidates are
+ * typed exact-theory transitions with their own evidence and mathematical work.
+ * The protocol itself does not prove that a source is trustworthy; concrete
+ * adapters must bind their {@link SourceIdentity#authorityHash()} to
+ * independently verified evidence.&lt;/p&gt;
+ */
+public interface BudgetedTransformationSource {
+    String PROTOCOL_REVISION =
+        &quot;regelsuche.budgeted-transformation-source/v1&quot;;
+
+    SourceIdentity identity();
+
+    Result transform(String expression, long availableMathematicalWorkUnits);
+
+<span class="fc" id="L31">    enum Status {</span>
+<span class="fc" id="L32">        CANDIDATES,</span>
+<span class="fc" id="L33">        NO_MATCH,</span>
+<span class="fc" id="L34">        BUDGET_INCONCLUSIVE</span>
+    }
+
+    /** Immutable identity captured before a source invocation. */
+    record SourceIdentity(
+        String sourceId,
+        String revisionHash,
+        String authorityHash
+    ) {
+<span class="fc" id="L43">        public SourceIdentity {</span>
+<span class="fc" id="L44">            sourceId = requireText(sourceId, &quot;sourceId&quot;);</span>
+<span class="fc" id="L45">            revisionHash = requireSha256(revisionHash, &quot;revisionHash&quot;);</span>
+<span class="fc" id="L46">            authorityHash = requireSha256(authorityHash, &quot;authorityHash&quot;);</span>
+<span class="fc" id="L47">        }</span>
+    }
+
+    /** One non-primitive exact-theory transition proposed by the source. */
+    record ExactTheoryTransition(
+        String sourceExpression,
+        String transformedExpression,
+        String theoryStepId,
+        String evidenceHash,
+        List&lt;String&gt; assumptions,
+        long mathematicalWorkUnits,
+        String applicationKey,
+        String contentHash
+    ) {
+<span class="fc" id="L61">        public ExactTheoryTransition {</span>
+<span class="fc" id="L62">            sourceExpression = normalizeExpression(</span>
+                sourceExpression,
+                &quot;sourceExpression&quot;);
+<span class="fc" id="L65">            transformedExpression = normalizeExpression(</span>
+                transformedExpression,
+                &quot;transformedExpression&quot;);
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            if (sourceExpression.equals(transformedExpression)) {</span>
+<span class="nc" id="L69">                throw new IllegalArgumentException(</span>
+                    &quot;exact-theory transition must change the representation&quot;);
+            }
+<span class="fc" id="L72">            theoryStepId = requireText(theoryStepId, &quot;theoryStepId&quot;);</span>
+<span class="fc" id="L73">            evidenceHash = requireSha256(evidenceHash, &quot;evidenceHash&quot;);</span>
+<span class="fc" id="L74">            assumptions = normalizeAssumptions(assumptions);</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            if (mathematicalWorkUnits &lt; 1) {</span>
+<span class="nc" id="L76">                throw new IllegalArgumentException(</span>
+                    &quot;mathematicalWorkUnits must be positive&quot;);
+            }
+<span class="fc" id="L79">            applicationKey = requireText(applicationKey, &quot;applicationKey&quot;);</span>
+<span class="fc" id="L80">            contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L81">            String expected = transitionHash(</span>
+                sourceExpression,
+                transformedExpression,
+                theoryStepId,
+                evidenceHash,
+                assumptions,
+                mathematicalWorkUnits,
+                applicationKey);
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L90">                throw new IllegalArgumentException(</span>
+                    &quot;exact-theory transition contentHash differs from contents&quot;);
+            }
+<span class="fc" id="L93">        }</span>
+
+        public static ExactTheoryTransition create(
+            String sourceExpression,
+            String transformedExpression,
+            String theoryStepId,
+            String evidenceHash,
+            List&lt;String&gt; assumptions,
+            long mathematicalWorkUnits,
+            String applicationKey
+        ) {
+<span class="fc" id="L104">            String source = normalizeExpression(</span>
+                sourceExpression,
+                &quot;sourceExpression&quot;);
+<span class="fc" id="L107">            String transformed = normalizeExpression(</span>
+                transformedExpression,
+                &quot;transformedExpression&quot;);
+<span class="fc" id="L110">            String step = requireText(theoryStepId, &quot;theoryStepId&quot;);</span>
+<span class="fc" id="L111">            String evidence = requireSha256(evidenceHash, &quot;evidenceHash&quot;);</span>
+<span class="fc" id="L112">            List&lt;String&gt; normalizedAssumptions =</span>
+<span class="fc" id="L113">                normalizeAssumptions(assumptions);</span>
+<span class="fc" id="L114">            String key = requireText(applicationKey, &quot;applicationKey&quot;);</span>
+<span class="fc" id="L115">            return new ExactTheoryTransition(</span>
+                source,
+                transformed,
+                step,
+                evidence,
+                normalizedAssumptions,
+                mathematicalWorkUnits,
+                key,
+<span class="fc" id="L123">                transitionHash(</span>
+                    source,
+                    transformed,
+                    step,
+                    evidence,
+                    normalizedAssumptions,
+                    mathematicalWorkUnits,
+                    key));
+        }
+    }
+
+    /** Complete terminal result for one explicit source budget. */
+    record Result(
+        SourceIdentity sourceIdentity,
+        String sourceExpression,
+        long availableMathematicalWorkUnits,
+        Status status,
+        List&lt;ExactTheoryTransition&gt; candidates,
+        long minimumRequiredMathematicalWorkUnits,
+        long mechanicalWorkUnits,
+        String detailCode,
+        String contentHash
+    ) {
+<span class="fc" id="L146">        public Result {</span>
+<span class="fc" id="L147">            sourceIdentity = Objects.requireNonNull(</span>
+                sourceIdentity,
+                &quot;sourceIdentity&quot;);
+<span class="fc" id="L150">            sourceExpression = normalizeExpression(</span>
+                sourceExpression,
+                &quot;sourceExpression&quot;);
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (availableMathematicalWorkUnits &lt; 0) {</span>
+<span class="nc" id="L154">                throw new IllegalArgumentException(</span>
+                    &quot;availableMathematicalWorkUnits must not be negative&quot;);
+            }
+<span class="fc" id="L157">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L158">            candidates = normalizeCandidates(candidates);</span>
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">            if (minimumRequiredMathematicalWorkUnits &lt; 0</span>
+                    || mechanicalWorkUnits &lt; 0) {
+<span class="nc" id="L161">                throw new IllegalArgumentException(</span>
+                    &quot;source work values must not be negative&quot;);
+            }
+<span class="fc" id="L164">            detailCode = requireText(detailCode, &quot;detailCode&quot;);</span>
+<span class="fc" id="L165">            validateState(</span>
+                sourceExpression,
+                availableMathematicalWorkUnits,
+                status,
+                candidates,
+                minimumRequiredMathematicalWorkUnits);
+<span class="fc" id="L171">            contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L172">            String expected = resultHash(</span>
+                sourceIdentity,
+                sourceExpression,
+                availableMathematicalWorkUnits,
+                status,
+                candidates,
+                minimumRequiredMathematicalWorkUnits,
+                mechanicalWorkUnits,
+                detailCode);
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L182">                throw new IllegalArgumentException(</span>
+                    &quot;budgeted source result contentHash differs from contents&quot;);
+            }
+<span class="fc" id="L185">        }</span>
+
+        public static Result candidates(
+            SourceIdentity sourceIdentity,
+            String sourceExpression,
+            long availableMathematicalWorkUnits,
+            List&lt;ExactTheoryTransition&gt; candidates,
+            long mechanicalWorkUnits,
+            String detailCode
+        ) {
+<span class="fc" id="L195">            List&lt;ExactTheoryTransition&gt; normalized =</span>
+<span class="fc" id="L196">                normalizeCandidates(candidates);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            if (normalized.isEmpty()) {</span>
+<span class="nc" id="L198">                throw new IllegalArgumentException(</span>
+                    &quot;candidate result requires at least one transition&quot;);
+            }
+<span class="fc" id="L201">            long minimum = normalized.stream()</span>
+<span class="fc" id="L202">                .mapToLong(ExactTheoryTransition::mathematicalWorkUnits)</span>
+<span class="fc" id="L203">                .min()</span>
+<span class="fc" id="L204">                .orElseThrow();</span>
+<span class="fc" id="L205">            return create(</span>
+                sourceIdentity,
+                sourceExpression,
+                availableMathematicalWorkUnits,
+                Status.CANDIDATES,
+                normalized,
+                minimum,
+                mechanicalWorkUnits,
+                detailCode);
+        }
+
+        public static Result noMatch(
+            SourceIdentity sourceIdentity,
+            String sourceExpression,
+            long availableMathematicalWorkUnits,
+            long mechanicalWorkUnits,
+            String detailCode
+        ) {
+<span class="fc" id="L223">            return create(</span>
+                sourceIdentity,
+                sourceExpression,
+                availableMathematicalWorkUnits,
+                Status.NO_MATCH,
+<span class="fc" id="L228">                List.of(),</span>
+                0,
+                mechanicalWorkUnits,
+                detailCode);
+        }
+
+        public static Result budgetInconclusive(
+            SourceIdentity sourceIdentity,
+            String sourceExpression,
+            long availableMathematicalWorkUnits,
+            long minimumRequiredMathematicalWorkUnits,
+            long mechanicalWorkUnits,
+            String detailCode
+        ) {
+<span class="fc" id="L242">            return create(</span>
+                sourceIdentity,
+                sourceExpression,
+                availableMathematicalWorkUnits,
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L247">                List.of(),</span>
+                minimumRequiredMathematicalWorkUnits,
+                mechanicalWorkUnits,
+                detailCode);
+        }
+
+        public boolean complete() {
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            return status != Status.BUDGET_INCONCLUSIVE;</span>
+        }
+
+        private static Result create(
+            SourceIdentity identity,
+            String expression,
+            long available,
+            Status status,
+            List&lt;ExactTheoryTransition&gt; candidates,
+            long minimumRequired,
+            long mechanicalWork,
+            String detailCode
+        ) {
+<span class="fc" id="L267">            SourceIdentity checkedIdentity = Objects.requireNonNull(</span>
+                identity,
+                &quot;sourceIdentity&quot;);
+<span class="fc" id="L270">            String normalizedExpression = normalizeExpression(</span>
+                expression,
+                &quot;sourceExpression&quot;);
+<span class="fc" id="L273">            Status checkedStatus = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L274">            List&lt;ExactTheoryTransition&gt; normalizedCandidates =</span>
+<span class="fc" id="L275">                normalizeCandidates(candidates);</span>
+<span class="fc" id="L276">            String detail = requireText(detailCode, &quot;detailCode&quot;);</span>
+<span class="fc" id="L277">            return new Result(</span>
+                checkedIdentity,
+                normalizedExpression,
+                available,
+                checkedStatus,
+                normalizedCandidates,
+                minimumRequired,
+                mechanicalWork,
+                detail,
+<span class="fc" id="L286">                resultHash(</span>
+                    checkedIdentity,
+                    normalizedExpression,
+                    available,
+                    checkedStatus,
+                    normalizedCandidates,
+                    minimumRequired,
+                    mechanicalWork,
+                    detail));
+        }
+    }
+
+    private static void validateState(
+        String sourceExpression,
+        long availableWork,
+        Status status,
+        List&lt;ExactTheoryTransition&gt; candidates,
+        long minimumRequiredWork
+    ) {
+<span class="pc bpc" id="L305" title="1 of 4 branches missed.">        switch (status) {</span>
+            case CANDIDATES -&gt; {
+<span class="fc" id="L307">                long actualMinimum = candidates.stream()</span>
+<span class="fc" id="L308">                    .mapToLong(ExactTheoryTransition::mathematicalWorkUnits)</span>
+<span class="fc" id="L309">                    .min()</span>
+<span class="fc" id="L310">                    .orElse(0);</span>
+<span class="pc bpc" id="L311" title="2 of 8 branches missed.">                if (candidates.isEmpty()</span>
+                        || minimumRequiredWork != actualMinimum
+                        || minimumRequiredWork &lt; 1
+                        || minimumRequiredWork &gt; availableWork
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">                        || candidates.stream().anyMatch(candidate -&gt;</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                            !sourceExpression.equals(</span>
+<span class="fc" id="L317">                                candidate.sourceExpression())</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                                || candidate.mathematicalWorkUnits()</span>
+                                    &gt; availableWork)) {
+<span class="fc" id="L320">                    throw new IllegalArgumentException(</span>
+                        &quot;candidate result is inconsistent with its source budget&quot;);
+                }
+<span class="fc" id="L323">            }</span>
+            case NO_MATCH -&gt; {
+<span class="pc bpc" id="L325" title="2 of 4 branches missed.">                if (!candidates.isEmpty() || minimumRequiredWork != 0) {</span>
+<span class="nc" id="L326">                    throw new IllegalArgumentException(</span>
+                        &quot;no-match result must be complete and candidate-free&quot;);
+                }
+            }
+            case BUDGET_INCONCLUSIVE -&gt; {
+<span class="pc bpc" id="L331" title="1 of 4 branches missed.">                if (!candidates.isEmpty()</span>
+                        || minimumRequiredWork &lt;= availableWork) {
+<span class="fc" id="L333">                    throw new IllegalArgumentException(</span>
+                        &quot;budget-inconclusive result requires more work than offered&quot;);
+                }
+            }
+        }
+<span class="fc" id="L338">    }</span>
+
+    private static List&lt;ExactTheoryTransition&gt; normalizeCandidates(
+        List&lt;ExactTheoryTransition&gt; candidates
+    ) {
+<span class="fc" id="L343">        Objects.requireNonNull(candidates, &quot;candidates&quot;);</span>
+<span class="fc" id="L344">        List&lt;ExactTheoryTransition&gt; normalized = candidates.stream()</span>
+<span class="fc" id="L345">            .map(candidate -&gt; Objects.requireNonNull(candidate, &quot;candidate&quot;))</span>
+<span class="fc" id="L346">            .sorted(Comparator.comparing(ExactTheoryTransition::contentHash))</span>
+<span class="fc" id="L347">            .toList();</span>
+<span class="fc" id="L348">        if (new HashSet&lt;&gt;(normalized.stream()</span>
+<span class="fc" id="L349">                .map(ExactTheoryTransition::contentHash)</span>
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">                .toList()).size() != normalized.size()) {</span>
+<span class="nc" id="L351">            throw new IllegalArgumentException(</span>
+                &quot;exact-theory transition identities must be unique&quot;);
+        }
+<span class="fc" id="L354">        return List.copyOf(normalized);</span>
+    }
+
+    private static List&lt;String&gt; normalizeAssumptions(List&lt;String&gt; assumptions) {
+<span class="fc" id="L358">        Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L359">        return AssumptionSignature.ofExpressions(assumptions)</span>
+<span class="fc" id="L360">            .normalizedAssumptions();</span>
+    }
+
+    private static String transitionHash(
+        String source,
+        String transformed,
+        String theoryStepId,
+        String evidenceHash,
+        List&lt;String&gt; assumptions,
+        long mathematicalWorkUnits,
+        String applicationKey
+    ) {
+<span class="fc" id="L372">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L373">        append(material, PROTOCOL_REVISION);</span>
+<span class="fc" id="L374">        append(material, &quot;exact-theory-transition&quot;);</span>
+<span class="fc" id="L375">        append(material, source);</span>
+<span class="fc" id="L376">        append(material, transformed);</span>
+<span class="fc" id="L377">        append(material, theoryStepId);</span>
+<span class="fc" id="L378">        append(material, evidenceHash);</span>
+<span class="fc" id="L379">        append(material, Long.toString(mathematicalWorkUnits));</span>
+<span class="fc" id="L380">        append(material, applicationKey);</span>
+<span class="pc" id="L381">        assumptions.forEach(value -&gt; append(material, value));</span>
+<span class="fc" id="L382">        return sha256(material.toString());</span>
+    }
+
+    private static String resultHash(
+        SourceIdentity identity,
+        String expression,
+        long available,
+        Status status,
+        List&lt;ExactTheoryTransition&gt; candidates,
+        long minimumRequired,
+        long mechanicalWork,
+        String detailCode
+    ) {
+<span class="fc" id="L395">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L396">        append(material, PROTOCOL_REVISION);</span>
+<span class="fc" id="L397">        append(material, &quot;source-result&quot;);</span>
+<span class="fc" id="L398">        append(material, identity.sourceId());</span>
+<span class="fc" id="L399">        append(material, identity.revisionHash());</span>
+<span class="fc" id="L400">        append(material, identity.authorityHash());</span>
+<span class="fc" id="L401">        append(material, expression);</span>
+<span class="fc" id="L402">        append(material, Long.toString(available));</span>
+<span class="fc" id="L403">        append(material, status.name());</span>
+<span class="fc" id="L404">        append(material, Long.toString(minimumRequired));</span>
+<span class="fc" id="L405">        append(material, Long.toString(mechanicalWork));</span>
+<span class="fc" id="L406">        append(material, detailCode);</span>
+<span class="fc" id="L407">        candidates.forEach(candidate -&gt;</span>
+<span class="fc" id="L408">            append(material, candidate.contentHash()));</span>
+<span class="fc" id="L409">        return sha256(material.toString());</span>
+    }
+
+    private static String normalizeExpression(String value, String name) {
+<span class="fc" id="L413">        String normalized = requireText(value, name)</span>
+<span class="fc" id="L414">            .trim()</span>
+<span class="fc" id="L415">            .replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">        if (normalized.chars().anyMatch(Character::isISOControl)) {</span>
+<span class="nc" id="L417">            throw new IllegalArgumentException(</span>
+                name + &quot; contains a control character&quot;);
+        }
+<span class="fc" id="L420">        return normalized;</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L424" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L425">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L427">        return value;</span>
+    }
+
+    private static String requireSha256(String value, String name) {
+<span class="pc bpc" id="L431" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L432">            throw new IllegalArgumentException(</span>
+                name + &quot; must be a lowercase SHA-256 identifier&quot;);
+        }
+<span class="fc" id="L435">        return value;</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L439">        target.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L440">            .append(':')</span>
+<span class="fc" id="L441">            .append(value);</span>
+<span class="fc" id="L442">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L446">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L447">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L448">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L449">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L450">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

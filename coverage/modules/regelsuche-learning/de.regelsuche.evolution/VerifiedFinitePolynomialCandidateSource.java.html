@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VerifiedFinitePolynomialCandidateSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">VerifiedFinitePolynomialCandidateSource.java</span></div><h1>VerifiedFinitePolynomialCandidateSource.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.ExactFinitePolynomialPlanCandidateEvidenceVerifier.EvidenceData;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanCandidateEvidenceVerifier.VerifiedCandidateEvidence;
+import de.regelsuche.search.program.BudgetedTransformationSource;
+import de.regelsuche.search.program.BudgetedTransformationSource.ExactTheoryTransition;
+import de.regelsuche.search.program.BudgetedTransformationSource.Result;
+import de.regelsuche.search.program.BudgetedTransformationSource.SourceIdentity;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Exposes exactly one verifier-issued finite-polynomial candidate through the
+ * explicit budgeted exact-theory source protocol.
+ *
+ * &lt;p&gt;No target, candidate ordering or hidden best-of choice is consulted. The
+ * adapter is bound to the candidate already selected by its evidence.&lt;/p&gt;
+ */
+public final class VerifiedFinitePolynomialCandidateSource
+        implements BudgetedTransformationSource {
+    public static final String SOURCE_ID =
+        &quot;regelsuche.verified-finite-polynomial-candidate-source/v1&quot;;
+<span class="fc" id="L24">    public static final String REVISION_HASH = SchematicProofPlan.hash(</span>
+<span class="fc" id="L25">        lengthPrefixed(</span>
+            SOURCE_ID,
+            BudgetedTransformationSource.PROTOCOL_REVISION,
+            ExactFinitePolynomialPlanCandidateEvidenceVerifier.VERIFIER_ID,
+            ExactFinitePolynomialPlanCandidateEvidenceVerifier.REVISION_HASH,
+            &quot;one-evidence-one-transition&quot;,
+            &quot;exact-source-match-before-budget-admission&quot;,
+            &quot;no-primitive-rewrite-claim&quot;));
+
+    private static final long SOURCE_MATCH_WORK = 1;
+    private static final long BUDGET_CHECK_WORK = 1;
+    private static final long CANDIDATE_MATERIALIZATION_WORK = 1;
+
+    private final EvidenceData evidence;
+    private final String evidenceHash;
+    private final SourceIdentity identity;
+    private final String applicationKey;
+
+    public VerifiedFinitePolynomialCandidateSource(
+        VerifiedCandidateEvidence verifiedEvidence
+<span class="fc" id="L45">    ) {</span>
+<span class="fc" id="L46">        VerifiedCandidateEvidence checked = Objects.requireNonNull(</span>
+            verifiedEvidence,
+            &quot;verifiedEvidence&quot;);
+<span class="fc" id="L49">        evidence = Objects.requireNonNull(checked.data(), &quot;evidence data&quot;);</span>
+<span class="fc" id="L50">        evidenceHash = SchematicProofPlan.requireSha256(</span>
+<span class="fc" id="L51">            checked.evidenceHash(),</span>
+            &quot;evidenceHash&quot;);
+<span class="fc" id="L53">        if (!ExactFinitePolynomialPlanCandidateEvidenceVerifier.THEORY_STEP_ID</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                .equals(evidence.theoryStepId())</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                || !evidence.assumptions().isEmpty()</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                || evidence.canonicalWork().totalWorkUnits() &lt; 1) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(</span>
+                &quot;candidate evidence is outside the v1 exact-theory source contract&quot;);
+        }
+<span class="fc" id="L60">        identity = new SourceIdentity(SOURCE_ID, REVISION_HASH, evidenceHash);</span>
+<span class="fc" id="L61">        applicationKey = SchematicProofPlan.hash(lengthPrefixed(</span>
+            SOURCE_ID,
+            REVISION_HASH,
+            evidenceHash,
+<span class="fc" id="L65">            evidence.candidateHash(),</span>
+<span class="fc" id="L66">            evidence.sourceExpression(),</span>
+<span class="fc" id="L67">            evidence.transformedExpression()));</span>
+<span class="fc" id="L68">    }</span>
+
+    @Override
+    public SourceIdentity identity() {
+<span class="fc" id="L72">        return identity;</span>
+    }
+
+    @Override
+    public Result transform(
+        String expression,
+        long availableMathematicalWorkUnits
+    ) {
+<span class="fc" id="L80">        String normalized = normalizeExpression(expression);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (availableMathematicalWorkUnits &lt; 0) {</span>
+<span class="nc" id="L82">            throw new IllegalArgumentException(</span>
+                &quot;availableMathematicalWorkUnits must not be negative&quot;);
+        }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (!evidence.sourceExpression().equals(normalized)) {</span>
+<span class="fc" id="L86">            return Result.noMatch(</span>
+                identity,
+                normalized,
+                availableMathematicalWorkUnits,
+                SOURCE_MATCH_WORK,
+                &quot;SOURCE_MISMATCH&quot;);
+        }
+
+<span class="fc" id="L94">        long required = evidence.canonicalWork().totalWorkUnits();</span>
+<span class="fc" id="L95">        long checkedWork = Math.addExact(</span>
+            SOURCE_MATCH_WORK,
+            BUDGET_CHECK_WORK);
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (availableMathematicalWorkUnits &lt; required) {</span>
+<span class="fc" id="L99">            return Result.budgetInconclusive(</span>
+                identity,
+                normalized,
+                availableMathematicalWorkUnits,
+                required,
+                checkedWork,
+                &quot;INSUFFICIENT_MATHEMATICAL_WORK_AUTHORITY&quot;);
+        }
+
+<span class="fc" id="L108">        ExactTheoryTransition candidate = ExactTheoryTransition.create(</span>
+<span class="fc" id="L109">            evidence.sourceExpression(),</span>
+<span class="fc" id="L110">            evidence.transformedExpression(),</span>
+<span class="fc" id="L111">            evidence.theoryStepId(),</span>
+            evidenceHash,
+<span class="fc" id="L113">            evidence.assumptions(),</span>
+            required,
+            applicationKey);
+<span class="fc" id="L116">        return Result.candidates(</span>
+            identity,
+            normalized,
+            availableMathematicalWorkUnits,
+<span class="fc" id="L120">            List.of(candidate),</span>
+<span class="fc" id="L121">            Math.addExact(checkedWork, CANDIDATE_MATERIALIZATION_WORK),</span>
+            &quot;VERIFIED_EXACT_THEORY_CANDIDATE&quot;);
+    }
+
+    public String evidenceHash() {
+<span class="fc" id="L126">        return evidenceHash;</span>
+    }
+
+    public String candidateHash() {
+<span class="nc" id="L130">        return evidence.candidateHash();</span>
+    }
+
+    private static String normalizeExpression(String expression) {
+<span class="pc bpc" id="L134" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L135">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+        }
+<span class="fc" id="L137">        String normalized = expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (normalized.chars().anyMatch(Character::isISOControl)) {</span>
+<span class="nc" id="L139">            throw new IllegalArgumentException(</span>
+                &quot;expression contains a control character&quot;);
+        }
+<span class="fc" id="L142">        return normalized;</span>
+    }
+
+    private static String lengthPrefixed(String... values) {
+<span class="fc" id="L146">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L148">            result.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L149">                .append(':')</span>
+<span class="fc" id="L150">                .append(value);</span>
+        }
+<span class="fc" id="L152">        return result.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
