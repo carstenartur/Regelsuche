@@ -110,6 +110,11 @@ public final class DiscoveryDomainBuilder<S, C, K> {
     ) {
         Objects.requireNonNull(check, "check");
         String id = componentId("invariant-" + requireSegment(name, "invariant name"));
+        if (invariants.stream().anyMatch(existing -> existing.id().equals(id))) {
+            throw new IllegalArgumentException(
+                "duplicate invariant component id: " + id
+            );
+        }
         invariants.add(new Invariant<>() {
             @Override
             public String id() {
@@ -134,6 +139,11 @@ public final class DiscoveryDomainBuilder<S, C, K> {
     ) {
         Objects.requireNonNull(apply, "apply");
         String id = componentId("operator-" + requireSegment(name, "operator name"));
+        if (operators.stream().anyMatch(existing -> existing.id().equals(id))) {
+            throw new IllegalArgumentException(
+                "duplicate operator component id: " + id
+            );
+        }
         operators.add(new TransitionOperator<>() {
             @Override
             public String id() {
