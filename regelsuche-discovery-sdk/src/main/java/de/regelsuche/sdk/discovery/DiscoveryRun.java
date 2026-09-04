@@ -24,10 +24,17 @@ public record DiscoveryRun<C, K>(
             ? Optional.empty()
             : selectedCertificate;
         Objects.requireNonNull(evidence, "evidence");
-        if (evidence.outcome() == Outcome.CONFIRMED
-                && (selectedCandidate.isEmpty() || selectedCertificate.isEmpty())) {
+        boolean objectsPresent =
+            selectedCandidate.isPresent() || selectedCertificate.isPresent();
+        if (evidence.outcome() == Outcome.CONFIRMED) {
+            if (selectedCandidate.isEmpty() || selectedCertificate.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "confirmed run requires candidate and certificate objects"
+                );
+            }
+        } else if (objectsPresent) {
             throw new IllegalArgumentException(
-                "confirmed run requires candidate and certificate objects"
+                "non-confirmed run must not expose selected objects"
             );
         }
     }
