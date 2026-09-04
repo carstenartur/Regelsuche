@@ -1,10 +1,10 @@
 package de.regelsuche.discovery.representation;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.OracleValidator;
 import java.util.List;
 import java.util.Objects;
-import java.util.TreeSet;
 
 /**
  * Validates a frozen target-free candidate against its own source
@@ -22,7 +22,8 @@ import java.util.TreeSet;
  * <p>This validator first asks the available oracle the unconditional
  * question "is the candidate equivalent to the frozen source expression?".
  * An unconditional {@code AGREE} also establishes validity under any listed
- * assumptions. A non-agreement does not refute a candidate whose derivation
+ * assumptions. An unconditional {@code DISAGREE} with no assumptions rejects
+ * the candidate. A non-agreement does not refute a candidate whose derivation
  * depends on assumptions, because {@link OracleValidator} has no
  * assumption-aware entry point. Such evidence is retained explicitly as
  * {@link ValidationScope#CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED} rather than
@@ -68,8 +69,10 @@ public final class TargetFreeIntrinsicCandidateValidator {
         boolean equivalencePreserving,
         OracleValidator oracle
     ) {
-        Objects.requireNonNull(sourceExpression, "sourceExpression");
-        Objects.requireNonNull(candidateExpression, "candidateExpression");
+        String source = requireExpression(sourceExpression, "sourceExpression");
+        String candidate = requireExpression(
+            candidateExpression,
+            "candidateExpression");
         List<String> normalizedAssumptions = normalizeAssumptions(assumptions);
         Objects.requireNonNull(oracle, "oracle");
         if (!equivalencePreserving) {
@@ -83,8 +86,9 @@ public final class TargetFreeIntrinsicCandidateValidator {
         }
         try {
             OracleValidator.OracleValidation validation =
-                oracle.validateEquivalence(
-                    sourceExpression, candidateExpression);
+                Objects.requireNonNull(
+                    oracle.validateEquivalence(source, candidate),
+                    "oracle validation");
             if (validation.status()
                     == OracleValidator.OracleValidationStatus.AGREE) {
                 return new IntrinsicValidation(
@@ -95,11 +99,17 @@ public final class TargetFreeIntrinsicCandidateValidator {
                     normalizedAssumptions
                 );
             }
+            ValidationScope scope = unresolvedScope(normalizedAssumptions);
+            CandidateProofStatus proofStatus = validation.status()
+                    == OracleValidator.OracleValidationStatus.DISAGREE
+                    && normalizedAssumptions.isEmpty()
+                ? CandidateProofStatus.REJECTED
+                : CandidateProofStatus.OBSERVED;
             return new IntrinsicValidation(
-                CandidateProofStatus.OBSERVED,
+                proofStatus,
                 validation.status().name(),
                 validation.evidence(),
-                unresolvedScope(normalizedAssumptions),
+                scope,
                 normalizedAssumptions
             );
         } catch (RuntimeException exception) {
@@ -130,17 +140,30 @@ public final class TargetFreeIntrinsicCandidateValidator {
         List<String> assumptions
     ) {
         Objects.requireNonNull(assumptions, "assumptions");
-        TreeSet<String> normalized = new TreeSet<>();
         for (String assumption : assumptions) {
             String value = Objects.requireNonNull(
-                assumption, "assumption").trim();
-            if (value.isEmpty()) {
+                assumption,
+                "assumption");
+            if (value.isBlank()) {
                 throw new IllegalArgumentException(
                     "assumption must not be blank");
             }
-            normalized.add(value);
         }
-        return List.copyOf(normalized);
+        return AssumptionSignature.ofExpressions(assumptions)
+            .normalizedAssumptions();
+    }
+
+    private static String requireExpression(String value, String name) {
+        Objects.requireNonNull(value, name);
+        String normalized = value.trim().replaceAll("\\s+", " ");
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException(name + " must not be blank");
+        }
+        if (normalized.chars().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException(
+                name + " contains a control character");
+        }
+        return normalized;
     }
 
     /**
@@ -160,17 +183,19 @@ public final class TargetFreeIntrinsicCandidateValidator {
                     "oracleStatus must not be blank");
             }
             oracleEvidence = Objects.requireNonNull(
-                oracleEvidence, "oracleEvidence");
+                oracleEvidence,
+                "oracleEvidence");
             Objects.requireNonNull(scope, "scope");
             assumptions = normalizeAssumptions(assumptions);
             boolean verified = status.atLeast(
                 CandidateProofStatus.SYMBOLICALLY_VERIFIED);
+            boolean rejected = status == CandidateProofStatus.REJECTED;
             if (scope
                     == ValidationScope.CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED
-                    && (assumptions.isEmpty() || verified)) {
+                    && (assumptions.isEmpty() || verified || rejected)) {
                 throw new IllegalArgumentException(
                     "conditional unresolved evidence requires assumptions "
-                        + "and must not be verified"
+                        + "and must remain unresolved"
                 );
             }
             if (scope == ValidationScope.UNCONDITIONAL
@@ -181,14 +206,40 @@ public final class TargetFreeIntrinsicCandidateValidator {
                 );
             }
             if (scope == ValidationScope.NOT_APPLICABLE
-                    && !oracleStatus.startsWith("NOT_RUN_")) {
+                    && (!oracleStatus.startsWith("NOT_RUN_")
+                        || status != CandidateProofStatus.OBSERVED)) {
                 throw new IllegalArgumentException(
-                    "not-applicable validation must not claim an oracle run"
+                    "not-applicable validation must be an observed non-run"
                 );
             }
-            if (verified && scope != ValidationScope.UNCONDITIONAL) {
+            if (verified
+                    && (scope != ValidationScope.UNCONDITIONAL
+                        || !"AGREE".equals(oracleStatus))) {
                 throw new IllegalArgumentException(
-                    "verified intrinsic evidence must be unconditional"
+                    "verified intrinsic evidence requires unconditional "
+                        + "oracle agreement"
+                );
+            }
+            if ("AGREE".equals(oracleStatus) && !verified) {
+                throw new IllegalArgumentException(
+                    "oracle agreement must be retained as verified evidence"
+                );
+            }
+            if (rejected
+                    && (scope != ValidationScope.UNCONDITIONAL
+                        || !assumptions.isEmpty()
+                        || !"DISAGREE".equals(oracleStatus))) {
+                throw new IllegalArgumentException(
+                    "rejected intrinsic evidence requires assumptions-free "
+                        + "unconditional disagreement"
+                );
+            }
+            if ("DISAGREE".equals(oracleStatus)
+                    && scope == ValidationScope.UNCONDITIONAL
+                    && assumptions.isEmpty()
+                    && !rejected) {
+                throw new IllegalArgumentException(
+                    "assumptions-free unconditional disagreement must reject"
                 );
             }
         }
@@ -199,6 +250,14 @@ public final class TargetFreeIntrinsicCandidateValidator {
          */
         public boolean intrinsicallyVerified() {
             return status.atLeast(CandidateProofStatus.SYMBOLICALLY_VERIFIED);
+        }
+
+        /**
+         * @return whether unconditional source equivalence was contradicted in
+         *     the absence of assumptions
+         */
+        public boolean intrinsicallyRejected() {
+            return status == CandidateProofStatus.REJECTED;
         }
 
         /**
