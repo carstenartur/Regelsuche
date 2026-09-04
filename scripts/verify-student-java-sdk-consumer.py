@@ -11,7 +11,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-from typing import Callable
+from typing import Callable, Mapping
 
 SDK_MODULES = (
     "regelsuche-core",
@@ -32,7 +32,14 @@ FORBIDDEN_RUNTIME_MARKERS = (
 )
 
 
-def run(command: list[str], cwd: Path) -> str:
+def run(
+        command: list[str],
+        cwd: Path,
+        extra_environment: Mapping[str, str] | None = None,
+) -> str:
+    environment = {**os.environ, "LC_ALL": "C.UTF-8"}
+    if extra_environment:
+        environment.update(extra_environment)
     completed = subprocess.run(
         command,
         cwd=cwd,
@@ -40,7 +47,7 @@ def run(command: list[str], cwd: Path) -> str:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         check=False,
-        env={**os.environ, "LC_ALL": "C.UTF-8"},
+        env=environment,
     )
     if completed.returncode:
         print(completed.stdout, file=sys.stderr)
@@ -52,7 +59,7 @@ def run(command: list[str], cwd: Path) -> str:
 
 def read_version(root: Path) -> str:
     entries = [
-        line.removeprefix("version=").strip()
+        line.strip().removeprefix("version=").strip()
         for line in (root / "release.properties").read_text(encoding="utf-8").splitlines()
         if line.strip().startswith("version=")
     ]
@@ -67,6 +74,10 @@ def sha256(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def overlaps(left: Path, right: Path) -> bool:
+    return left == right or left in right.parents or right in left.parents
 
 
 def one_artifact(
@@ -114,29 +125,43 @@ def main() -> int:
     root = arguments.repository_root.resolve()
     repository = arguments.published_repository.resolve()
     output = (arguments.output or root / "build/reports/student-java-sdk").resolve()
+    source = root / "examples/external-consumers/geometric-sequence-domain-java25"
     if not repository.is_dir():
         raise RuntimeError(f"SDK repository does not exist: {repository}")
-    if repository == output or output in repository.parents:
-        raise RuntimeError("published repository must be outside the rebuilt output")
+    if not source.is_dir():
+        raise RuntimeError(f"external consumer example is missing: {source}")
+    if overlaps(repository, output):
+        raise RuntimeError("published repository and rebuilt output must be disjoint")
+    if overlaps(source, output):
+        raise RuntimeError("external consumer source and rebuilt output must be disjoint")
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)
 
     version = read_version(root)
     artifacts = artifact_files(repository, version)
-    source = root / "examples/external-consumers/geometric-sequence-domain-java25"
     consumer = output / "external-consumer"
-    if not source.is_dir():
-        raise RuntimeError(f"external consumer example is missing: {source}")
     shutil.copytree(source, consumer)
+    consumer_environment = {
+        "GRADLE_USER_HOME": str(output / "isolated-gradle-user-home"),
+    }
 
     properties = [
         f"-PregelsucheRepository={repository}",
         f"-PregelsucheVersion={version}",
     ]
     execution = run(
-        [arguments.gradle, "--no-daemon", "clean", "test", "run", *properties],
+        [
+            arguments.gradle,
+            "--no-daemon",
+            "--refresh-dependencies",
+            "clean",
+            "test",
+            "run",
+            *properties,
+        ],
         consumer,
+        consumer_environment,
     )
     expected = (
         "provider=example-geometric-sequence-provider",
@@ -157,6 +182,7 @@ def main() -> int:
             *properties,
         ],
         consumer,
+        consumer_environment,
     )
     lowered = dependencies.lower()
     forbidden = [marker for marker in FORBIDDEN_RUNTIME_MARKERS if marker in lowered]
@@ -184,6 +210,7 @@ def main() -> int:
         "schema": "regelsuche.student-java-sdk-consumer-verification/v1",
         "sdkVersion": version,
         "publicationMode": "CHECKOUT_OWNED_TASK_DEPENDENCIES",
+        "dependencyCacheMode": "ISOLATED_EMPTY_GRADLE_USER_HOME",
         "javaFeature": java_feature,
         "externalConsumer": "geometric-sequence-domain-java25",
         "provider": "example-geometric-sequence-provider",
@@ -201,6 +228,7 @@ def main() -> int:
         "# Student Java SDK consumer verification\n\n"
         f"- SDK version: `{version}`\n"
         "- Publication: checkout-owned Gradle task dependencies\n"
+        "- Dependency cache: isolated empty Gradle user home\n"
         "- Java: `25`\n"
         "- External consumer: `geometric-sequence-domain-java25`\n"
         "- ServiceLoader provider: `example-geometric-sequence-provider`\n"
