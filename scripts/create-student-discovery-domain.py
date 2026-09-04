@@ -7,11 +7,19 @@ import argparse
 import json
 import re
 import shutil
+import stat
 from pathlib import Path
 
 SOURCE_RELATIVE = Path(
     "examples/external-consumers/geometric-sequence-domain-java25"
 )
+WRAPPER_FILES = (
+    Path("gradlew"),
+    Path("gradlew.bat"),
+    Path("gradle/wrapper/gradle-wrapper.jar"),
+    Path("gradle/wrapper/gradle-wrapper.properties"),
+)
+GRADLE_WRAPPER_VERSION = "9.7.1"
 PACKAGE_SEGMENT = re.compile(r"[a-z][a-z0-9_]*\Z")
 SLUG = re.compile(r"[a-z][a-z0-9-]*\Z")
 JAVA_KEYWORDS = {
@@ -63,6 +71,36 @@ def replace_text(path: Path, replacements: tuple[tuple[str, str], ...]) -> None:
     path.write_text(value, encoding="utf-8")
 
 
+def copy_wrapper(repository_root: Path, output: Path) -> None:
+    for relative in WRAPPER_FILES:
+        source = repository_root / relative
+        target = output / relative
+        if source.is_symlink() or not source.is_file():
+            fail(f"pinned Gradle wrapper file is missing or unsafe: {source}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+
+    unix_launcher = output / "gradlew"
+    unix_launcher.chmod(
+        unix_launcher.stat().st_mode
+        | stat.S_IXUSR
+        | stat.S_IXGRP
+        | stat.S_IXOTH
+    )
+
+    properties = (
+        output / "gradle/wrapper/gradle-wrapper.properties"
+    ).read_text(encoding="utf-8")
+    expected_distribution = f"gradle-{GRADLE_WRAPPER_VERSION}-bin.zip"
+    if expected_distribution not in properties:
+        fail(
+            "Gradle wrapper version does not match the generator contract: "
+            f"expected {expected_distribution}"
+        )
+    if "distributionSha256Sum=" not in properties:
+        fail("Gradle wrapper must pin the distribution SHA-256")
+
+
 def generate(
     repository_root: Path,
     output: Path,
@@ -88,6 +126,7 @@ def generate(
         output,
         ignore=shutil.ignore_patterns("build", ".gradle", "repository"),
     )
+    copy_wrapper(repository_root, output)
 
     package_path = Path(*package_name.split("."))
     for source_set in ("main", "test"):
@@ -163,6 +202,7 @@ def generate(
         "domainId": domain_id,
         "providerId": provider_id,
         "javaFeature": 25,
+        "gradleWrapperVersion": GRADLE_WRAPPER_VERSION,
         "sdkArtifact": "de.regelsuche:regelsuche-discovery-sdk",
     }
     (output / "regelsuche-starter.json").write_text(
@@ -237,8 +277,9 @@ def main() -> int:
     print(f"package={package_name}")
     print(f"domainId={domain_id}")
     print(f"providerId={provider_id}")
+    print(f"gradleWrapper={GRADLE_WRAPPER_VERSION}")
     print(
-        "next=gradle clean test run "
+        "next=./gradlew clean test run "
         "-PregelsucheRepository=/path/to/sdk-repository "
         "-PregelsucheVersion=<version>"
     )
