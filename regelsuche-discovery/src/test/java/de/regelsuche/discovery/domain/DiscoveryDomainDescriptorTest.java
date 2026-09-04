@@ -2,8 +2,10 @@ package de.regelsuche.discovery.domain;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class DiscoveryDomainDescriptorTest {
@@ -28,5 +30,23 @@ class DiscoveryDomainDescriptorTest {
         assertNotEquals(expression.contentHash(), sequence.contentHash());
         assertTrue(expression.toCanonicalJson().contains(
             "\"contentHash\":\"" + expression.contentHash() + "\""));
+    }
+
+    @Test
+    void canonicalComponentIdentityRejectsDuplicatesAndHiddenNormalization() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> DomainCanonical.sortedUniqueIdentifiers(
+                List.of("domain/operator/v1", "domain/operator/v1"),
+                "operator id"
+            )
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> DomainCanonical.sortedUniqueIdentifiers(
+                List.of(" domain/operator/v1"),
+                "operator id"
+            )
+        );
     }
 }
