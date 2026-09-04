@@ -67,6 +67,8 @@ jobs:
             **/build/test-results/**
             **/build/discovery-artifacts/**
             docs/generated/**
+            !build/reports/student-java-sdk/isolated-gradle-user-home/**
+            !build/reports/student-java-sdk/generated-gradle-user-home/**
           include-hidden-files: true
           if-no-files-found: warn
 
