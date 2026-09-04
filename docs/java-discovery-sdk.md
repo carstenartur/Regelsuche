@@ -165,6 +165,55 @@ keine Aussage über Artefaktvertrauen, mathematische Korrektheit, Proof oder
 Promotion. Die Einbettung der Provider-Artefaktprovenienz in jede kanonische
 Run-Evidence bleibt eine getrennte Restarbeit aus #904.
 
+## Eigenständiges Starterprojekt erzeugen
+
+Der Checkout enthält einen kleinen Generator, der das tatsächlich in der
+Consumer-CI gebaute Beispiel als Vorlage verwendet:
+
+```bash
+python3 scripts/create-student-discovery-domain.py \
+  --output ../my-first-regelsuche-domain \
+  --package org.example.discovery \
+  --project-name my-first-regelsuche-domain \
+  --domain-id my-first-domain \
+  --provider-id my-first-provider
+```
+
+Der Generator
+
+- überschreibt kein vorhandenes Ziel, auch keinen symbolischen Link;
+- validiert Java-Paket und stabile IDs vor dem Schreiben;
+- erzeugt ein eigenständiges Java-25-Projekt mit gepinntem Gradle Wrapper;
+- registriert den Provider über `META-INF/services`;
+- enthält positive, widerlegte und budgeterschöpfte Tests mit
+  `DiscoveryRunAssertions`;
+- schreibt die gewählten Identitäten nach `regelsuche-starter.json`.
+
+Auch `--package example` und `--package example.student` sind zulässig.
+Gewählte IDs bleiben unverändert, selbst wenn sie Text der Vorlage enthalten.
+Fehlende Wrapper-Dateien, eine falsche Distributions-URL oder eine fehlende,
+kommentierte beziehungsweise ungültige SHA-256-Konfiguration werden vor dem
+Anlegen des Zielverzeichnisses abgewiesen.
+
+Nach Bereitstellung des SDK-Repositorys lässt sich das erzeugte Projekt ohne
+Änderung und ohne separate Gradle-Installation bauen:
+
+```bash
+cd ../my-first-regelsuche-domain
+./gradlew clean test run \
+  -PregelsucheRepository=/pfad/zum/repository \
+  -PregelsucheVersion=0.4.0-SNAPSHOT
+```
+
+Unter Windows wird `gradlew.bat` statt `./gradlew` verwendet. Java 25 und ein
+bereitgestelltes SDK-Repository bleiben Voraussetzungen; beim ersten Build
+werden Gradle und Fremdabhängigkeiten heruntergeladen.
+
+Die autoritative Consumer-CI erzeugt zusätzlich ein Projekt mit von der Vorlage
+abweichenden Paket-, Domain- und Provider-IDs, startet es mit einem eigenen
+leeren Gradle-Cache und verweigert interne Projektabhängigkeiten sowie
+unerwünschte Runtime-Module.
+
 ## Reproduktion
 
 ```bash
@@ -173,9 +222,21 @@ Run-Evidence bleibt eine getrennte Restarbeit aus #904.
 ```
 
 Die Prüfung veröffentlicht SDK und innere Laufzeitabhängigkeiten in ein
-isoliertes Repository, baut und testet den externen Consumer mit isoliertem
-Dependency-Cache, kontrolliert Sources- und Javadoc-JARs, SHA-256-Werte sowie
-den Runtime-Abhängigkeitsbaum.
+isoliertes Repository, baut und testet den externen Consumer sowie einen frisch
+erzeugten Starter mit getrennten isolierten Dependency-Caches, kontrolliert
+Sources- und Javadoc-JARs, SHA-256-Werte sowie die Runtime-Abhängigkeitsbäume.
+
+Die schnellen Generator-Regressionstests sind über
+`verifyStudentDiscoveryStarter` eine Voraussetzung derselben Consumer-Prüfung
+und können auch ohne Java-Build ausgeführt werden:
+
+```bash
+python3 -B -m unittest discover -s scripts \
+  -p 'test_student_discovery_starter.py' -v
+```
+
+Diese Dateisystemtests verwenden eine kleine Vorlage und Wrapper-Platzhalter.
+Sie ersetzen nicht den separaten echten Java-25-Build des generierten Projekts.
 
 ## Noch nicht enthalten
 
