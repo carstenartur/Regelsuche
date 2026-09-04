@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetFreeIntrinsicCandidateValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">TargetFreeIntrinsicCandidateValidator.java</span></div><h1>TargetFreeIntrinsicCandidateValidator.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.OracleValidator;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Validates a frozen target-free candidate against its own source
+ * expression, independent of whether the candidate happens to match any
+ * historical reference expression.
+ *
+ * &lt;p&gt;{@link TargetFreeHeldOutQualifier} only invokes the symbolic oracle
+ * once a candidate has matched a known historical reference expression;
+ * every non-reference candidate is left at {@code OBSERVED /
+ * NOT_RUN_REFERENCE_MISS} without ever being checked for soundness. That
+ * reference gate is correct for historical-target qualification, but it
+ * makes the qualifier unable to validate a genuinely unknown candidate,
+ * since an unknown candidate has no reference by definition.&lt;/p&gt;
+ *
+ * &lt;p&gt;This validator first asks the available oracle the unconditional
+ * question &quot;is the candidate equivalent to the frozen source expression?&quot;.
+ * An unconditional {@code AGREE} also establishes validity under any listed
+ * assumptions. An unconditional {@code DISAGREE} with no assumptions rejects
+ * the candidate. A non-agreement does not refute a candidate whose derivation
+ * depends on assumptions, because {@link OracleValidator} has no
+ * assumption-aware entry point. Such evidence is retained explicitly as
+ * {@link ValidationScope#CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED} rather than
+ * silently treating conditional validity as disproved. Both the stable
+ * oracle status and its complete evidence string are retained. Historical
+ * matching and later literature/novelty search remain separate steps.&lt;/p&gt;
+ */
+public final class TargetFreeIntrinsicCandidateValidator {
+    private TargetFreeIntrinsicCandidateValidator() {
+    }
+
+    /** Describes the logical scope actually established by the evidence. */
+<span class="fc" id="L39">    public enum ValidationScope {</span>
+        /** The oracle result concerns unconditional source equivalence. */
+<span class="fc" id="L41">        UNCONDITIONAL,</span>
+        /**
+         * Listed assumptions may matter, but the available oracle did not
+         * establish unconditional equivalence and cannot evaluate them.
+         */
+<span class="fc" id="L46">        CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED,</span>
+        /** No equivalence claim was made by the formation process. */
+<span class="fc" id="L48">        NOT_APPLICABLE</span>
+    }
+
+    /**
+     * @param sourceExpression the frozen source expression the candidate was
+     *     derived from
+     * @param candidateExpression the frozen candidate expression to validate
+     * @param assumptions the candidate's frozen assumptions; the current
+     *     oracle can prove unconditional equivalence but cannot consume them
+     * @param equivalencePreserving whether the candidate was formed only
+     *     through equivalence-preserving formation rules; when {@code false}
+     *     the oracle is intentionally not consulted because the candidate is
+     *     not claimed to be equivalence-preserving by construction
+     * @param oracle the symbolic oracle used to independently test
+     *     unconditional equivalence between source and candidate
+     * @return reference-independent validation evidence with its exact scope
+     */
+    public static IntrinsicValidation validate(
+        String sourceExpression,
+        String candidateExpression,
+        List&lt;String&gt; assumptions,
+        boolean equivalencePreserving,
+        OracleValidator oracle
+    ) {
+<span class="fc" id="L72">        String source = requireExpression(sourceExpression, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L73">        String candidate = requireExpression(</span>
+            candidateExpression,
+            &quot;candidateExpression&quot;);
+<span class="fc" id="L76">        List&lt;String&gt; normalizedAssumptions = normalizeAssumptions(assumptions);</span>
+<span class="fc" id="L77">        Objects.requireNonNull(oracle, &quot;oracle&quot;);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (!equivalencePreserving) {</span>
+<span class="fc" id="L79">            return new IntrinsicValidation(</span>
+                CandidateProofStatus.OBSERVED,
+                &quot;NOT_RUN_NOT_EQUIVALENCE_PRESERVING_BY_CONSTRUCTION&quot;,
+                &quot;The formation process did not claim source equivalence.&quot;,
+                ValidationScope.NOT_APPLICABLE,
+                normalizedAssumptions
+            );
+        }
+        try {
+<span class="fc" id="L88">            OracleValidator.OracleValidation validation =</span>
+<span class="fc" id="L89">                Objects.requireNonNull(</span>
+<span class="fc" id="L90">                    oracle.validateEquivalence(source, candidate),</span>
+                    &quot;oracle validation&quot;);
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (validation.status()</span>
+                    == OracleValidator.OracleValidationStatus.AGREE) {
+<span class="fc" id="L94">                return new IntrinsicValidation(</span>
+                    CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+<span class="fc" id="L96">                    validation.status().name(),</span>
+<span class="fc" id="L97">                    validation.evidence(),</span>
+                    ValidationScope.UNCONDITIONAL,
+                    normalizedAssumptions
+                );
+            }
+<span class="fc" id="L102">            ValidationScope scope = unresolvedScope(normalizedAssumptions);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            CandidateProofStatus proofStatus = validation.status()</span>
+                    == OracleValidator.OracleValidationStatus.DISAGREE
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                    &amp;&amp; normalizedAssumptions.isEmpty()</span>
+<span class="fc" id="L106">                ? CandidateProofStatus.REJECTED</span>
+<span class="fc" id="L107">                : CandidateProofStatus.OBSERVED;</span>
+<span class="fc" id="L108">            return new IntrinsicValidation(</span>
+                proofStatus,
+<span class="fc" id="L110">                validation.status().name(),</span>
+<span class="fc" id="L111">                validation.evidence(),</span>
+                scope,
+                normalizedAssumptions
+            );
+<span class="fc" id="L115">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L116">            return new IntrinsicValidation(</span>
+                CandidateProofStatus.OBSERVED,
+<span class="fc" id="L118">                &quot;VALIDATOR_ERROR_&quot; + exception.getClass().getSimpleName(),</span>
+<span class="fc" id="L119">                errorEvidence(exception),</span>
+<span class="fc" id="L120">                unresolvedScope(normalizedAssumptions),</span>
+                normalizedAssumptions
+            );
+        }
+    }
+
+    private static String errorEvidence(RuntimeException exception) {
+<span class="fc" id="L127">        String message = exception.getMessage();</span>
+<span class="pc bpc" id="L128" title="2 of 4 branches missed.">        return message == null || message.isBlank()</span>
+<span class="nc" id="L129">            ? exception.getClass().getName()</span>
+<span class="fc" id="L130">            : exception.getClass().getName() + &quot;: &quot; + message.trim();</span>
+    }
+
+    private static ValidationScope unresolvedScope(List&lt;String&gt; assumptions) {
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        return assumptions.isEmpty()</span>
+<span class="fc" id="L135">            ? ValidationScope.UNCONDITIONAL</span>
+<span class="fc" id="L136">            : ValidationScope.CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED;</span>
+    }
+
+    private static List&lt;String&gt; normalizeAssumptions(
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L142">        Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (String assumption : assumptions) {</span>
+<span class="fc" id="L144">            String value = Objects.requireNonNull(</span>
+                assumption,
+                &quot;assumption&quot;);
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (value.isBlank()) {</span>
+<span class="fc" id="L148">                throw new IllegalArgumentException(</span>
+                    &quot;assumption must not be blank&quot;);
+            }
+<span class="fc" id="L151">        }</span>
+<span class="fc" id="L152">        return AssumptionSignature.ofExpressions(assumptions)</span>
+<span class="fc" id="L153">            .normalizedAssumptions();</span>
+    }
+
+    private static void requireIntrinsicStatus(CandidateProofStatus status) {
+<span class="fc bfc" id="L157" title="All 6 branches covered.">        if (status != CandidateProofStatus.OBSERVED</span>
+                &amp;&amp; status != CandidateProofStatus.SYMBOLICALLY_VERIFIED
+                &amp;&amp; status != CandidateProofStatus.REJECTED) {
+<span class="fc" id="L160">            throw new IllegalArgumentException(</span>
+                &quot;intrinsic oracle validation cannot claim another proof status&quot;);
+        }
+<span class="fc" id="L163">    }</span>
+
+    private static String requireExpression(String value, String name) {
+<span class="fc" id="L166">        Objects.requireNonNull(value, name);</span>
+<span class="fc" id="L167">        String normalized = value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (normalized.isEmpty()) {</span>
+<span class="fc" id="L169">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (normalized.chars().anyMatch(Character::isISOControl)) {</span>
+<span class="nc" id="L172">            throw new IllegalArgumentException(</span>
+                name + &quot; contains a control character&quot;);
+        }
+<span class="fc" id="L175">        return normalized;</span>
+    }
+
+    /**
+     * Outcome of an intrinsic, reference-independent candidate validation.
+     */
+    public record IntrinsicValidation(
+        CandidateProofStatus status,
+        String oracleStatus,
+        String oracleEvidence,
+        ValidationScope scope,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L188">        public IntrinsicValidation {</span>
+<span class="fc" id="L189">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L190">            requireIntrinsicStatus(status);</span>
+<span class="pc bpc" id="L191" title="2 of 4 branches missed.">            if (oracleStatus == null || oracleStatus.isBlank()) {</span>
+<span class="nc" id="L192">                throw new IllegalArgumentException(</span>
+                    &quot;oracleStatus must not be blank&quot;);
+            }
+<span class="fc" id="L195">            oracleEvidence = Objects.requireNonNull(</span>
+                oracleEvidence,
+                &quot;oracleEvidence&quot;);
+<span class="fc" id="L198">            Objects.requireNonNull(scope, &quot;scope&quot;);</span>
+<span class="fc" id="L199">            assumptions = normalizeAssumptions(assumptions);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            boolean verified =</span>
+                status == CandidateProofStatus.SYMBOLICALLY_VERIFIED;
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            boolean rejected = status == CandidateProofStatus.REJECTED;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            if (scope</span>
+                    == ValidationScope.CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED
+<span class="pc bpc" id="L205" title="3 of 6 branches missed.">                    &amp;&amp; (assumptions.isEmpty() || verified || rejected)) {</span>
+<span class="nc" id="L206">                throw new IllegalArgumentException(</span>
+                    &quot;conditional unresolved evidence requires assumptions &quot;
+                        + &quot;and must remain unresolved&quot;
+                );
+            }
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (scope == ValidationScope.UNCONDITIONAL</span>
+<span class="fc bfc" id="L212" title="All 4 branches covered.">                    &amp;&amp; !assumptions.isEmpty() &amp;&amp; !verified) {</span>
+<span class="fc" id="L213">                throw new IllegalArgumentException(</span>
+                    &quot;non-verified evidence with assumptions must preserve &quot;
+                        + &quot;conditional uncertainty&quot;
+                );
+            }
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (scope == ValidationScope.NOT_APPLICABLE</span>
+<span class="pc bpc" id="L219" title="2 of 4 branches missed.">                    &amp;&amp; (!oracleStatus.startsWith(&quot;NOT_RUN_&quot;)</span>
+                        || status != CandidateProofStatus.OBSERVED)) {
+<span class="nc" id="L221">                throw new IllegalArgumentException(</span>
+                    &quot;not-applicable validation must be an observed non-run&quot;
+                );
+            }
+<span class="pc bpc" id="L225" title="1 of 4 branches missed.">            if (verified</span>
+                    &amp;&amp; (scope != ValidationScope.UNCONDITIONAL
+<span class="fc bfc" id="L227" title="All 2 branches covered.">                        || !&quot;AGREE&quot;.equals(oracleStatus))) {</span>
+<span class="fc" id="L228">                throw new IllegalArgumentException(</span>
+                    &quot;verified intrinsic evidence requires unconditional &quot;
+                        + &quot;oracle agreement&quot;
+                );
+            }
+<span class="fc bfc" id="L233" title="All 4 branches covered.">            if (&quot;AGREE&quot;.equals(oracleStatus) &amp;&amp; !verified) {</span>
+<span class="fc" id="L234">                throw new IllegalArgumentException(</span>
+                    &quot;oracle agreement must be retained as verified evidence&quot;
+                );
+            }
+<span class="pc bpc" id="L238" title="1 of 4 branches missed.">            if (rejected</span>
+                    &amp;&amp; (scope != ValidationScope.UNCONDITIONAL
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                        || !assumptions.isEmpty()</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                        || !&quot;DISAGREE&quot;.equals(oracleStatus))) {</span>
+<span class="fc" id="L242">                throw new IllegalArgumentException(</span>
+                    &quot;rejected intrinsic evidence requires assumptions-free &quot;
+                        + &quot;unconditional disagreement&quot;
+                );
+            }
+<span class="fc bfc" id="L247" title="All 4 branches covered.">            if (&quot;DISAGREE&quot;.equals(oracleStatus)</span>
+                    &amp;&amp; scope == ValidationScope.UNCONDITIONAL
+<span class="pc bpc" id="L249" title="1 of 4 branches missed.">                    &amp;&amp; assumptions.isEmpty()</span>
+                    &amp;&amp; !rejected) {
+<span class="fc" id="L251">                throw new IllegalArgumentException(</span>
+                    &quot;assumptions-free unconditional disagreement must reject&quot;
+                );
+            }
+<span class="fc" id="L255">        }</span>
+
+        /**
+         * @return whether unconditional source equivalence was confirmed,
+         *     independent of historical reference matching
+         */
+        public boolean intrinsicallyVerified() {
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            return status == CandidateProofStatus.SYMBOLICALLY_VERIFIED;</span>
+        }
+
+        /**
+         * @return whether unconditional source equivalence was contradicted in
+         *     the absence of assumptions
+         */
+        public boolean intrinsicallyRejected() {
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            return status == CandidateProofStatus.REJECTED;</span>
+        }
+
+        /**
+         * @return whether listed assumptions still require an assumption-aware
+         *     evaluator before validity can be accepted or rejected
+         */
+        public boolean conditionalValidityUnresolved() {
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            return scope</span>
+                == ValidationScope.CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED;
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

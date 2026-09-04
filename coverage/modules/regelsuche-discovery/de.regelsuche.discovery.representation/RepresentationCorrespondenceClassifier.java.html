@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationCorrespondenceClassifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">RepresentationCorrespondenceClassifier.java</span></div><h1>RepresentationCorrespondenceClassifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Classifies target-free search trace occurrences by structural
+ * representation correspondence to a target expression, as distinct from
+ * value/semantic equivalence.
+ *
+ * &lt;p&gt;The historical-rediscovery atlas previously qualified a hit through
+ * {@code SymPyEquivalenceService.areEquivalent(candidate, target)} for
+ * {@code VALUE_EQUIVALENT} cases. That relation is true whenever the source
+ * and target denote the same value by a standing algebraic identity, which
+ * for identities such as Sophie Germain's is true of the unchanged source
+ * expression at depth 0. Crediting that depth-0 hit as a rediscovery
+ * conflates semantic truth with representation occurrence: the search never
+ * had to change the representation to satisfy value equivalence.&lt;/p&gt;
+ *
+ * &lt;p&gt;This classifier therefore uses an AC-structural signature rather than
+ * the repository's strong algebraic canonicalizer. It ignores only
+ * associative regrouping and commutative ordering of additions and
+ * multiplications, while preserving multiplicity, coefficients, neutral
+ * terms, powers, division and factorization boundaries. In particular,
+ * {@code x + x}, {@code 2 * x} and {@code x^2} remain three different
+ * representation classes.&lt;/p&gt;
+ *
+ * &lt;p&gt;Additive structure is flattened only in positive position. A direct
+ * subtraction contributes one negative term, so reordering such as
+ * {@code a - b + c} versus {@code c + a - b} is accepted. The classifier
+ * never distributes a negative sign through a grouped expression:
+ * {@code a - (b + c)} remains distinct from {@code a - b - c}, and
+ * {@code a - (b - c)} remains distinct from {@code a - b + c}. This keeps
+ * subtraction grouping visible while still permitting harmless AC
+ * regrouping. A match found at depth 0 is reported as a false-positive
+ * diagnostic rather than as a genuine representation rediscovery.&lt;/p&gt;
+ */
+public final class RepresentationCorrespondenceClassifier {
+    private final ExpressionParser parser;
+
+    public RepresentationCorrespondenceClassifier() {
+<span class="fc" id="L50">        this(new ExpressionParser());</span>
+<span class="fc" id="L51">    }</span>
+
+<span class="fc" id="L53">    RepresentationCorrespondenceClassifier(ExpressionParser parser) {</span>
+<span class="fc" id="L54">        this.parser = Objects.requireNonNull(parser, &quot;parser&quot;);</span>
+<span class="fc" id="L55">    }</span>
+
+    /**
+     * Whether two expressions belong to the same AC-structural
+     * representation class.
+     */
+<span class="fc" id="L61">    public enum Correspondence {</span>
+<span class="fc" id="L62">        SAME_REPRESENTATION_CLASS,</span>
+<span class="fc" id="L63">        DIFFERENT_REPRESENTATION_CLASS</span>
+    }
+
+    /**
+     * Terminal localization of a single trace evaluation against a target
+     * representation class.
+     */
+<span class="fc" id="L70">    public enum RediscoveryStatus {</span>
+        /**
+         * The frozen source expression, at depth 0, already belongs to the
+         * target's representation class; no representation change was
+         * required, so this is a false-positive rediscovery diagnostic.
+         */
+<span class="fc" id="L76">        SOURCE_ALREADY_MATCHES_FALSE_POSITIVE,</span>
+        /** A later trace step first reached the target representation class. */
+<span class="fc" id="L78">        REPRESENTATION_REDISCOVERED,</span>
+        /** No trace step reached the target representation class. */
+<span class="fc" id="L80">        NOT_REACHED</span>
+    }
+
+    /** A single frozen search-trace occurrence at a given depth. */
+    public record TraceStep(int depth, String expression) {
+<span class="fc" id="L85">        public TraceStep {</span>
+<span class="pc bpc" id="L86" title="2 of 4 branches missed.">            if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L87">                throw new IllegalArgumentException(</span>
+                    &quot;expression must not be blank&quot;);
+            }
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if (depth &lt; 0) {</span>
+<span class="nc" id="L91">                throw new IllegalArgumentException(</span>
+                    &quot;depth must not be negative&quot;);
+            }
+<span class="fc" id="L94">        }</span>
+    }
+
+    /** Evidence produced by {@link #evaluateTrace(List, String)}. */
+    public record RediscoveryEvidence(
+        RediscoveryStatus status,
+        Integer matchedDepth,
+        String matchedExpression
+    ) {
+<span class="fc" id="L103">        public RediscoveryEvidence {</span>
+<span class="fc" id="L104">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (status == RediscoveryStatus.NOT_REACHED) {</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">                if (matchedDepth != null || matchedExpression != null) {</span>
+<span class="nc" id="L107">                    throw new IllegalArgumentException(</span>
+                        &quot;NOT_REACHED must not carry a matched occurrence&quot;);
+                }
+            } else {
+<span class="fc" id="L111">                Objects.requireNonNull(matchedDepth, &quot;matchedDepth&quot;);</span>
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">                if (matchedExpression == null || matchedExpression.isBlank()) {</span>
+<span class="nc" id="L113">                    throw new IllegalArgumentException(</span>
+                        &quot;matchedExpression must not be blank&quot;);
+                }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                if (status</span>
+                    == RediscoveryStatus.SOURCE_ALREADY_MATCHES_FALSE_POSITIVE
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                    &amp;&amp; matchedDepth != 0) {</span>
+<span class="nc" id="L119">                    throw new IllegalArgumentException(</span>
+                        &quot;source-match evidence must have depth zero&quot;);
+                }
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                if (status == RediscoveryStatus.REPRESENTATION_REDISCOVERED</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                    &amp;&amp; matchedDepth &lt;= 0) {</span>
+<span class="nc" id="L124">                    throw new IllegalArgumentException(</span>
+                        &quot;rediscovery evidence must have positive depth&quot;);
+                }
+            }
+<span class="fc" id="L128">        }</span>
+    }
+
+    public Correspondence classify(
+        String candidateExpression,
+        String targetExpression
+    ) {
+<span class="fc" id="L135">        Objects.requireNonNull(candidateExpression, &quot;candidateExpression&quot;);</span>
+<span class="fc" id="L136">        Objects.requireNonNull(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        return signature(candidateExpression).equals(signature(targetExpression))</span>
+<span class="fc" id="L138">            ? Correspondence.SAME_REPRESENTATION_CLASS</span>
+<span class="fc" id="L139">            : Correspondence.DIFFERENT_REPRESENTATION_CLASS;</span>
+    }
+
+    /**
+     * Evaluates a frozen search trace including exactly one source expression
+     * at depth 0 against the target's representation class. The shallowest
+     * matching occurrence is selected deterministically.
+     */
+    public RediscoveryEvidence evaluateTrace(
+        List&lt;TraceStep&gt; trace,
+        String targetExpression
+    ) {
+<span class="fc" id="L151">        List&lt;TraceStep&gt; frozenTrace = List.copyOf(</span>
+<span class="fc" id="L152">            Objects.requireNonNull(trace, &quot;trace&quot;));</span>
+<span class="fc" id="L153">        Objects.requireNonNull(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (frozenTrace.isEmpty()) {</span>
+<span class="fc" id="L155">            throw new IllegalArgumentException(&quot;trace must not be empty&quot;);</span>
+        }
+<span class="fc" id="L157">        long sourceOccurrenceCount = frozenTrace.stream()</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            .filter(step -&gt; step.depth() == 0)</span>
+<span class="fc" id="L159">            .count();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (sourceOccurrenceCount != 1) {</span>
+<span class="fc" id="L161">            throw new IllegalArgumentException(</span>
+                &quot;trace must include exactly one source expression at depth zero&quot;
+            );
+        }
+
+<span class="fc" id="L166">        String targetSignature = signature(targetExpression);</span>
+<span class="fc" id="L167">        TraceStep match = frozenTrace.stream()</span>
+<span class="fc" id="L168">            .filter(step -&gt; signature(step.expression())</span>
+<span class="fc" id="L169">                .equals(targetSignature))</span>
+<span class="fc" id="L170">            .min(Comparator.comparingInt(TraceStep::depth)</span>
+<span class="fc" id="L171">                .thenComparing(TraceStep::expression))</span>
+<span class="fc" id="L172">            .orElse(null);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (match == null) {</span>
+<span class="fc" id="L174">            return new RediscoveryEvidence(</span>
+                RediscoveryStatus.NOT_REACHED, null, null);
+        }
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        RediscoveryStatus status = match.depth() == 0</span>
+<span class="fc" id="L178">            ? RediscoveryStatus.SOURCE_ALREADY_MATCHES_FALSE_POSITIVE</span>
+<span class="fc" id="L179">            : RediscoveryStatus.REPRESENTATION_REDISCOVERED;</span>
+<span class="fc" id="L180">        return new RediscoveryEvidence(</span>
+<span class="fc" id="L181">            status, match.depth(), match.expression());</span>
+    }
+
+    private String signature(String expression) {
+<span class="fc" id="L185">        return signature(parser.parseTerm(expression));</span>
+    }
+
+    private String signature(Expr expression) {
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L190">            return atom(&quot;number&quot;, Double.toHexString(number.value()));</span>
+        }
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L193">            return atom(&quot;variable&quot;, variable.name());</span>
+        }
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L196">            List&lt;String&gt; arguments = function.arguments().stream()</span>
+<span class="nc" id="L197">                .map(this::signature)</span>
+<span class="nc" id="L198">                .toList();</span>
+<span class="nc" id="L199">            List&lt;String&gt; components = new ArrayList&lt;&gt;(arguments.size() + 1);</span>
+<span class="nc" id="L200">            components.add(atom(&quot;name&quot;, function.name()));</span>
+<span class="nc" id="L201">            components.addAll(arguments);</span>
+<span class="nc" id="L202">            return sequence(&quot;function&quot;, components);</span>
+        }
+<span class="fc" id="L204">        BinaryExpr binary = (BinaryExpr) expression;</span>
+<span class="pc bpc" id="L205" title="1 of 4 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L206">            case ADD, SUB -&gt; additiveSignature(binary);</span>
+<span class="fc" id="L207">            case MUL -&gt; multiplicativeSignature(binary);</span>
+<span class="nc" id="L208">            case DIV -&gt; sequence(</span>
+                &quot;division&quot;,
+<span class="nc" id="L210">                List.of(signature(binary.left()), signature(binary.right()))</span>
+            );
+<span class="fc" id="L212">            case POW -&gt; sequence(</span>
+                &quot;power&quot;,
+<span class="fc" id="L214">                List.of(signature(binary.left()), signature(binary.right()))</span>
+            );
+        };
+    }
+
+    private String additiveSignature(Expr expression) {
+<span class="fc" id="L220">        List&lt;SignedTerm&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L221">        collectPositiveAdditiveTerms(expression, terms);</span>
+<span class="fc" id="L222">        List&lt;String&gt; components = terms.stream()</span>
+<span class="fc" id="L223">            .map(term -&gt; atom(</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                term.sign() &gt; 0 ? &quot;positive&quot; : &quot;negative&quot;,</span>
+<span class="fc" id="L225">                signature(term.expression())</span>
+            ))
+<span class="fc" id="L227">            .sorted()</span>
+<span class="fc" id="L228">            .toList();</span>
+<span class="fc" id="L229">        return sequence(&quot;addition&quot;, components);</span>
+    }
+
+    /**
+     * Flattens addition and the left spine of subtraction, but keeps every
+     * right-hand subtraction operand intact as one negative term. Recursing
+     * into that operand would distribute a negative sign through explicit
+     * grouping and incorrectly identify non-associative subtraction forms.
+     */
+    private void collectPositiveAdditiveTerms(
+        Expr expression,
+        List&lt;SignedTerm&gt; terms
+    ) {
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            if (binary.operator() == de.regelsuche.ast.BinaryOperator.ADD) {</span>
+<span class="fc" id="L244">                collectPositiveAdditiveTerms(binary.left(), terms);</span>
+<span class="fc" id="L245">                collectPositiveAdditiveTerms(binary.right(), terms);</span>
+<span class="fc" id="L246">                return;</span>
+            }
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            if (binary.operator() == de.regelsuche.ast.BinaryOperator.SUB) {</span>
+<span class="fc" id="L249">                collectPositiveAdditiveTerms(binary.left(), terms);</span>
+<span class="fc" id="L250">                terms.add(new SignedTerm(-1, binary.right()));</span>
+<span class="fc" id="L251">                return;</span>
+            }
+        }
+<span class="fc" id="L254">        terms.add(new SignedTerm(1, expression));</span>
+<span class="fc" id="L255">    }</span>
+
+    private String multiplicativeSignature(Expr expression) {
+<span class="fc" id="L258">        List&lt;Expr&gt; factors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L259">        collectFactors(expression, factors);</span>
+<span class="fc" id="L260">        List&lt;String&gt; components = factors.stream()</span>
+<span class="fc" id="L261">            .map(this::signature)</span>
+<span class="fc" id="L262">            .sorted()</span>
+<span class="fc" id="L263">            .toList();</span>
+<span class="fc" id="L264">        return sequence(&quot;multiplication&quot;, components);</span>
+    }
+
+    private void collectFactors(Expr expression, List&lt;Expr&gt; factors) {
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">            &amp;&amp; binary.operator() == de.regelsuche.ast.BinaryOperator.MUL) {</span>
+<span class="fc" id="L270">            collectFactors(binary.left(), factors);</span>
+<span class="fc" id="L271">            collectFactors(binary.right(), factors);</span>
+<span class="fc" id="L272">            return;</span>
+        }
+<span class="fc" id="L274">        factors.add(expression);</span>
+<span class="fc" id="L275">    }</span>
+
+    private static String atom(String tag, String value) {
+<span class="fc" id="L278">        return tag + '[' + value.length() + ':' + value + ']';</span>
+    }
+
+    private static String sequence(String tag, List&lt;String&gt; components) {
+<span class="fc" id="L282">        StringBuilder result = new StringBuilder(tag).append('[');</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        for (String component : components) {</span>
+<span class="fc" id="L284">            result.append(component.length()).append(':').append(component);</span>
+<span class="fc" id="L285">        }</span>
+<span class="fc" id="L286">        return result.append(']').toString();</span>
+    }
+
+<span class="fc" id="L289">    private record SignedTerm(int sign, Expr expression) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
