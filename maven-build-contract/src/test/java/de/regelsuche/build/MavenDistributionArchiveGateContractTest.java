@@ -4,8 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.nio.file.Path;
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 import org.junit.jupiter.api.Test;
@@ -42,12 +40,7 @@ class MavenDistributionArchiveGateContractTest {
 
     private static Element execution(String file, String id) throws Exception {
         Path root = MavenPomTestSupport.repositoryRoot();
-        var factory = DocumentBuilderFactory.newInstance();
-        factory.setNamespaceAware(true);
-        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-        var document = factory.newDocumentBuilder().parse(root.resolve(file).toFile());
+        var document = MavenPomTestSupport.parse(root.resolve(file));
         String query = "//*[local-name()='execution'][*[local-name()='id']='" + id + "']";
         NodeList matches = (NodeList) XPathFactory.newInstance().newXPath().evaluate(
             query, document, XPathConstants.NODESET);
