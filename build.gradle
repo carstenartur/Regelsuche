@@ -293,3 +293,20 @@ gradle.projectsEvaluated {
         mustRunAfter repositoryTest
     }
 }
+
+// Exercise the real release CLI before a release-only preflight can discover drift.
+// Mutating transitions use temporary fixtures; the working checkout is read-only.
+def verifyReleaseMetadata = tasks.register('verifyReleaseMetadata', Exec) {
+    group = 'verification'
+    description = 'Checks current release metadata and tests reactor-aware version transitions.'
+    workingDir rootDir
+    commandLine pythonExecutable, '-B', '-m', 'unittest', 'discover',
+        '-s', '.github/scripts', '-p', 'test_release_metadata.py', '-v'
+    inputs.files('.github/scripts/update-release-metadata.py',
+        '.github/scripts/test_release_metadata.py')
+    // No output declaration: a previous pass must not replace a current check.
+}
+
+repositoryCheck.configure {
+    dependsOn verifyReleaseMetadata
+}
