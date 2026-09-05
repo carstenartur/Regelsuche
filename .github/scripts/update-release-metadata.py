@@ -193,7 +193,7 @@ def update_release_properties(version: str) -> None:
     if not replaced:
         if updated and updated[-1].strip():
             updated.append('')
-        updated.append(line)
+        updated.append(f'version={version}')
     path.write_text('\n'.join(updated) + '\n', encoding='utf-8')
 
 
