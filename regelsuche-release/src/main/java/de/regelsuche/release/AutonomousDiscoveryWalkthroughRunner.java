@@ -102,7 +102,7 @@ public final class AutonomousDiscoveryWalkthroughRunner {
         write(figures.resolve("paired-utility.svg"), utilitySvg(cases));
         write(figures.resolve("candidate-lineage.svg"), lineageSvg(document));
         write(figures.resolve("representative-search.svg"),
-            representativeSvg(representative));
+            representativeSvg(representative, document));
     }
 
     private static String sequenceSvg(JsonNode card) {
@@ -226,48 +226,23 @@ public final class AutonomousDiscoveryWalkthroughRunner {
         return svgEnd(svg);
     }
 
-    private static String representativeSvg(UtilityCase item) {
-        StringBuilder svg = svgStart(1200, 500);
-        banner(svg, 1200);
-        svg.append("<text class=\"title\" x=\"60\" y=\"92\">")
-            .append("Representative held-out search: ")
-            .append(xml(item.id())).append("</text>")
-            .append("<rect class=\"box\" x=\"70\" y=\"135\" width=\"470\" ")
-            .append("height=\"240\"/>")
-            .append("<rect class=\"candidateBox\" x=\"660\" y=\"135\" ")
-            .append("width=\"470\" height=\"240\"/>")
-            .append("<text class=\"title\" x=\"305\" y=\"180\" ")
-            .append("text-anchor=\"middle\">Baseline</text>")
-            .append("<text class=\"title\" x=\"895\" y=\"180\" ")
-            .append("text-anchor=\"middle\">Candidate enabled</text>")
-            .append(metric("Reached", Boolean.toString(item.baselineReached()),
-                Boolean.toString(item.candidateReached()), 225))
-            .append(metric("Path length",
-                Integer.toString(item.baselinePathLength()),
-                Integer.toString(item.candidatePathLength()), 275))
-            .append(metric("Explored states",
-                Long.toString(item.baselineExploredStates()),
-                Long.toString(item.candidateExploredStates()), 325))
-            .append("<path class=\"arrowWide\" d=\"M540 255 H660\"/>")
-            .append("<text class=\"small\" x=\"600\" y=\"415\" ")
-            .append("text-anchor=\"middle\">")
-            .append(item.materialGain() ? "Material gain retained" : "No material gain")
-            .append(item.regression() ? " · correctness regression" : " · no regression")
-            .append("</text>");
-        return svgEnd(svg);
-    }
-
-    private static String metric(
-        String name,
-        String baseline,
-        String candidate,
-        int y
-    ) {
-        return "<text class=\"label\" x=\"305\" y=\"" + y
-            + "\" text-anchor=\"middle\">" + xml(name + ": " + baseline)
-            + "</text><text class=\"label\" x=\"895\" y=\"" + y
-            + "\" text-anchor=\"middle\">" + xml(name + ": " + candidate)
-            + "</text>";
+    private static String representativeSvg(UtilityCase item, JsonNode card) {
+        var task = ProductionCandidateQualificationCatalog.positives().stream()
+            .filter(candidate -> candidate.id().equals(item.id()))
+            .findFirst().orElseThrow(() -> new IllegalArgumentException(
+                "No qualification task for representative case: " + item.id()));
+        JsonNode candidate = card.path("candidate");
+        return AutonomousDiscoveryComparisonSvg.render(
+            new AutonomousDiscoveryComparisonSvg.Comparison(
+                item.id(), task.inputExpression(), task.targetExpression(),
+                candidate.path("leftPattern").asText(),
+                candidate.path("rightPattern").asText(),
+                new AutonomousDiscoveryComparisonSvg.Outcome(
+                    item.baselineReached(), item.baselinePathLength(),
+                    item.baselineExploredStates()),
+                new AutonomousDiscoveryComparisonSvg.Outcome(
+                    item.candidateReached(), item.candidatePathLength(),
+                    item.candidateExploredStates())));
     }
 
     private static StringBuilder svgStart(int width, int height) {

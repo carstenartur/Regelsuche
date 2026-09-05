@@ -21,12 +21,13 @@ können als neue Strategien wiederverwendet werden.
 [Architektur](docs/architecture.md) ·
 [Unabhängig reproduzieren](docs/independent-reproduction.md)
 
-![AST-Regelradar: konkrete lokale Züge an den Knoten eines mathematischen Ausdrucks und ihr Übergang in den globalen Suchgraphen](docs/assets/ast-rule-radar.svg)
+![Schema des AST-Regelradars: eine lokale Regelanwendung erzeugt einen neuen vollständigen Ausdruckszustand](docs/assets/ast-rule-radar.svg)
 
-*Ein Ausdruck ist eine Spielposition. Die Punkte an jedem AST-Knoten sind
-konkrete, dort ausführbare Regelanwendungen. Jeder ausgewählte Zug erzeugt einen
-neuen vollständigen Ausdruckszustand samt Position, Bindungen, Annahmen und
-Replay-Evidence.*
+*Schematische Erklärung, kein Suchprotokoll: Ein Ausdruck ist eine Spielposition.
+Die Punkte an den AST-Knoten stehen für konkrete Regelanwendungen. Der gewählte
+Zug entfernt die Addition von null; eine andere Regel am Potenzknoten erzeugt
+einen anderen vollständigen Ausdruck. Position, Bindungen und Ergebnis bleiben
+nachvollziehbar.*
 
 ## Was Regelsuche sichtbar macht
 
@@ -56,11 +57,10 @@ x^4 + 4*y^4
 Interessant ist nicht, dass die bekannte Identität irgendwo hinterlegt werden
 könnte. Der Lauf behält vielmehr die tatsächlich untersuchten Zustände, die
 vorbereitende Bridge, die primitive Faktorisierung, das daraus gebildete Makro
-und dessen spätere Wiederverwendung. Die folgende Darstellung wird aus der
+und dessen spätere Wiederverwendung. Der detaillierte Suchgraph wird aus der
 kanonischen Evidence erzeugt, nicht für das README nachgezeichnet.
 
-![Generierter Suchraum des Sophie-Germain-Szenarios mit untersuchten Zuständen, Bridge- und Makrokanten](docs/generated/discovery/sophie-germain/search-space.svg)
-
+[Suchgraph zur Detailinspektion in voller Größe](docs/generated/discovery/sophie-germain/search-space.svg) ·
 [Evidence dieses Laufs](docs/generated/discovery/sophie-germain/evidence.json) ·
 [visuelle Discovery Gallery](docs/demo-gallery.md) ·
 [domänenbewusste Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md)
@@ -74,7 +74,13 @@ Evidence-Bundle ausgewählten Beispiel erreicht die Baseline das Ziel innerhalb
 von 80 untersuchten Zuständen nicht; mit dem Kandidaten wird es in einem Schritt
 bei drei untersuchten Zuständen erreicht.
 
-![Evidence-basierter Held-out-Vergleich: Baseline ohne Treffer nach 80 Zuständen, Kandidat mit Treffer nach drei Zuständen](docs/generated/autonomous-discovery-walkthrough/representative-search.svg)
+![Konkrete gelernte Regel, zurückgehaltene Aufgabe und Zieldarstellung: ohne Zusatzregel kein Zielpfad nach 80 Zuständen, mit Zusatzregel ein Schritt bei drei Zuständen](docs/generated/autonomous-discovery-walkthrough/representative-search.svg)
+
+*Hier wird die gelernte Regel mit `A = 20` und `x = i*j + k` wiederverwendet.
+Gesucht ist eine bestimmte syntaktische Zieldarstellung, nicht irgendein
+äquivalenter Ausdruck. Die Zahlen vergleichen untersuchte Zustände, keine
+Laufzeiten; sie belegen keinen allgemeinen Geschwindigkeitsvorteil gegenüber
+anderen Algebra-Systemen.*
 
 Die vollständige Fallserie, Kandidaten-Lineage, Hashbindung und unabhängige
 Prüfung stehen im [Autonomous Discovery Walkthrough](docs/autonomous-discovery-walkthrough.md).
@@ -89,12 +95,8 @@ dem ein mehrstufiger Pfad als Makro gelernt und erneut verwendet wird.
 
 ![Testgenerierte Workbench-Zusammenfassung eines gelernten und wiederverwendeten Makros](docs/assets/screenshots/macro-learning-summary.png)
 
-<table>
-<tr>
-<td width="50%"><strong>Rationale Ausdrücke</strong><br><img src="docs/assets/screenshots/rational-summary.png" alt="Workbench-Zusammenfassung einer rationalen Umformung mit Ergebnis und Suchdaten"></td>
-<td width="50%"><strong>Matrizen</strong><br><img src="docs/assets/screenshots/math-matrix-preview.png" alt="Workbench-Vorschau einer Matrixdarstellung"></td>
-</tr>
-</table>
+Weitere Aufnahmen in voller Größe: [rationale Umformung mit Ergebnis und Suchdaten](docs/assets/screenshots/rational-summary.png)
+und [Vorschau einer Matrixdarstellung](docs/assets/screenshots/math-matrix-preview.png).
 
 Weitere sichtbare Abläufe: [Pfade, Graph und Replay](docs/web-ui-user-guide.md),
 [AST-Regelradar](docs/ast-rule-radar.md),
