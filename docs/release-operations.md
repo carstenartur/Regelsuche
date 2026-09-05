@@ -6,6 +6,13 @@ verwechseln: `release-readiness.md` begrenzt wissenschaftliche Claims und
 Evidence Profiles; diese Seite beschreibt Versionierung, Prüfung, Paketierung,
 Publikation und Nachkontrolle.
 
+Die konkreten Beispiele gelten für die Vorbereitung von **0.4.0** mit der
+anschließenden Entwicklungslinie **0.5.0-SNAPSHOT**. Maßgeblich bleibt immer die
+im jeweiligen Checkout deklarierte Version; ein Beispiel ist weder ein
+Release-Auftrag noch der Nachweis einer bereits erfolgten Veröffentlichung.
+Die [Release Notes für 0.4.0](releases/0.4.0.md) beschreiben den vorgesehenen
+Lieferumfang. Historische Notes und Tags werden nicht umgeschrieben.
+
 ## Maßgebliche Quellen
 
 Der Release-Ablauf besitzt fünf zusammengehörige, maschinell geprüfte Quellen:
@@ -25,7 +32,7 @@ Die Versionsangaben in `CITATION.cff`, `CITATION.md`, `.zenodo.json`,
 `codemeta.json` und OpenAPI müssen ebenfalls übereinstimmen. Der Befehl
 
 ```bash
-python3 .github/scripts/update-release-metadata.py 0.3.0-SNAPSHOT --check
+python3 .github/scripts/update-release-metadata.py 0.4.0-SNAPSHOT --check
 ```
 
 prüft diese Invariante einschließlich sämtlicher POMs und der öffentlichen
@@ -33,11 +40,11 @@ OpenAPI-Metadaten, ohne Dateien zu ändern. Die gleiche Hilfsroutine stellt beim
 Release und beim Wechsel auf die nächste Entwicklungsversion alle Quellen
 gemeinsam um.
 
-Bei `version=0.3.0-SNAPSHOT` ist die zu veröffentlichende Version `0.3.0` und
-der Tag `v0.3.0`. Die Angabe der nächsten Version verändert nicht die zu
+Bei `version=0.4.0-SNAPSHOT` ist die zu veröffentlichende Version `0.4.0` und
+der Tag `v0.4.0`. Die Angabe der nächsten Version verändert nicht die zu
 veröffentlichende Version; sie bestimmt ausschließlich die anschließende
-Entwicklungslinie. Für den nach 0.3.0 vorgesehenen Funktionszweig lautet sie
-`0.4.0-SNAPSHOT`.
+Entwicklungslinie. Für den hier beschriebenen nächsten Funktionszweig lautet sie
+`0.5.0-SNAPSHOT`.
 
 ## Build-Vertrag
 
@@ -55,7 +62,7 @@ erzeugt:
 
 ```bash
 mvn --batch-mode --no-transfer-progress \
-  -DreleaseVersion=0.3.0 \
+  -DreleaseVersion=0.4.0 \
   -DskipTests \
   package
 ```
@@ -63,10 +70,12 @@ mvn --batch-mode --no-transfer-progress \
 Das zweite Kommando erzeugt unter `app/target/` genau diese drei
 Release-Kandidaten:
 
-- `regelsuche-0.3.0.jar`;
-- `regelsuche-0.3.0.zip`;
-- `regelsuche-0.3.0.tar`.
+- `regelsuche-0.4.0.jar`;
+- `regelsuche-0.4.0.zip`;
+- `regelsuche-0.4.0.tar`.
 
+Das Überspringen der Tests im zweiten Kommando vermeidet nur ihre Wiederholung
+bei der Paketierung. Es ersetzt niemals die vorherige vollständige Prüfung.
 Der Release-Workflow kontrolliert zusätzlich die `Implementation-Version` im
 JAR, das gemeinsame Wurzelverzeichnis der Archive und die vollständige,
 vorhersehbare Asset-Liste.
@@ -101,14 +110,23 @@ Vor einem Release müssen folgende Bedingungen erfüllt sein:
 Offene Forschungs- und Roadmap-Issues blockieren einen Release nicht allein
 aufgrund ihres offenen Zustands. Entscheidend sind die dokumentierte
 Claim-Grenze, ein grüner Checkout und ein vollständig erfolgreicher
-Release-Lauf.
+Release-Lauf. Ein grüner PR-Lauf, ein grüner Nach-Merge-Lauf und ein erfolgreich
+auditierter Release-Trockenlauf sind unterschiedliche Nachweise.
 
 ## Release-Notes- und Issue-Audit
 
 Jeder Release verwendet das eindeutige semantische Intervall
 `previousTag..releaseTag`. `previousTag` ist der unmittelbar vorhergehende
 veröffentlichte SemVer-Tag. Ist er nicht eindeutig bestimmbar, wird die
-Veröffentlichung nicht freigegeben.
+Veröffentlichung nicht freigegeben. Für den 0.4.0-Kandidaten wird gegen
+`v0.3.0` geprüft; unmittelbar vor der Veröffentlichung ist erneut zu prüfen,
+dass kein anderer veröffentlichter SemVer-Tag dazwischengetreten ist.
+
+Ein Veröffentlichungs-Tag kann auf einem separaten Release-Metadaten-Commit
+liegen, der nicht in `main` zurückgemergt wurde. Deshalb sind Tag-Commit,
+Merge-Base und Kandidaten-Commit getrennt festzuhalten. Eine reine Datumsabfrage
+nach PRs oder GitHubs Anzeige `diverged` ersetzt keinen semantischen Audit.
+Der historische Tag wird nicht allein zur Bereinigung dieser Anzeige gemergt.
 
 Vor der Veröffentlichung werden alle Issues geprüft, die im Intervall durch
 Closing-Referenzen oder Erwähnungen in PRs, Commits und Reviews berührt wurden.
@@ -131,7 +149,9 @@ offener Teilfortschritt in die Release Notes aufgenommen. Stattdessen gilt:
 
 Offene Issues erscheinen weder als abgeschlossen noch als teilweise
 Release-Bestandteil. `not planned`, Duplikat- und Ersetzt-Klassifikationen sind
-keine ausgelieferten Merkmale.
+keine ausgelieferten Merkmale. Ein bereits geschlossenes Sammel-Issue mit
+unerfülltem breitem Body wird nicht ungeprüft übernommen; seine Restarbeit
+bleibt beim Eingrenzen ausdrücklich erhalten.
 
 Die versionierte Datei `docs/releases/X.Y.Z.md` trennt mindestens:
 
@@ -151,9 +171,10 @@ zurückgelieferten Body mit der Quelldatei.
 Vor dem echten Release werden beide Tags und Commit-SHAs, die im Intervall als
 `completed` geschlossenen Liefer-Issues, deren Abschlusskommentare und
 Nachfolgezuordnungen, ausgeschlossene Verwaltungsentscheidungen, die PR-Liste
-und die geprüfte Release-Notes-Fassung festgehalten. Nach GitHub- und
-Zenodo-Publikation wird kontrolliert, dass kein offenes Issue als ausgeliefert
-und keine PR außerhalb des Intervalls dargestellt wird.
+und die geprüfte Release-Notes-Fassung festgehalten. Nach der Publikation wird
+kontrolliert, dass kein offenes Issue als ausgeliefert und keine PR außerhalb
+des Intervalls dargestellt wird. Ein noch nicht veröffentlichter Zenodo-Eintrag
+wird dabei als ausstehend erfasst, nicht als vorhandene Archivierung behauptet.
 
 ## Verpflichtender Trockenlauf
 
@@ -162,10 +183,10 @@ auditierbare Branch-Auslöser, weil er Versionen und Quell-SHA explizit im
 Repositoryzustand bindet. Alternativ kann der Workflow auf `main` per
 `workflow_dispatch` mit denselben Werten gestartet werden.
 
-Für 0.3.0 und die nächste Entwicklungslinie 0.4.0 lautet der Branch:
+Für 0.4.0 und die nächste Entwicklungslinie 0.5.0 lautet der Branch:
 
 ```text
-release/dry-run-v0.3.0-next-v0.4.0-SNAPSHOT
+release/dry-run-v0.4.0-next-v0.5.0-SNAPSHOT
 ```
 
 Der einzige zusätzliche Nicht-Merge-Commit darf ausschließlich
@@ -173,8 +194,8 @@ Der einzige zusätzliche Nicht-Merge-Commit darf ausschließlich
 
 ```text
 mode=dry-run
-release=0.3.0
-next=0.4.0-SNAPSHOT
+release=0.4.0
+next=0.5.0-SNAPSHOT
 ```
 
 Der Trockenlauf führt dieselbe Versionsauflösung, Notes-Prüfung,
@@ -199,21 +220,21 @@ exakt einen zusätzlichen Nicht-Merge-Commit besitzen. Dieser Commit darf nur
 Trockenlauf:
 
 ```text
-release/dry-run-v0.3.0-next-v0.4.0-SNAPSHOT
+release/dry-run-v0.4.0-next-v0.5.0-SNAPSHOT
 ```
 
 Echter Lauf:
 
 ```text
-release/run-v0.3.0-next-v0.4.0-SNAPSHOT
+release/run-v0.4.0-next-v0.5.0-SNAPSHOT
 ```
 
 Die Datei muss beim echten Lauf entsprechend enthalten:
 
 ```text
 mode=run
-release=0.3.0
-next=0.4.0-SNAPSHOT
+release=0.4.0
+next=0.5.0-SNAPSHOT
 ```
 
 Der Workflow vergleicht Branchname, Payload, Trigger-SHA, einzigen
@@ -230,8 +251,8 @@ Ein Trockenlauf gilt nur dann als erfolgreich, wenn:
 - der Job **Verify, package and publish** vollständig grün ist;
 - `ciCheck` und `mvn -Pfull verify` erfolgreich sind;
 - der Checkout nach den Prüfungen unverändert ist;
-- `docs/releases/0.3.0.md` geprüft und im Manifest per SHA-256 gebunden ist;
-- das Workflow-Artefakt `regelsuche-0.3.0-artifacts` vorhanden ist;
+- `docs/releases/0.4.0.md` geprüft und im Manifest per SHA-256 gebunden ist;
+- das Workflow-Artefakt `regelsuche-0.4.0-artifacts` vorhanden ist;
 - ZIP, TAR und JAR sowie `RELEASE-MANIFEST.txt` und `SHA256SUMS.txt` enthalten
   sind;
 - Manifest-Version, Tag, Quell-Commit, Release-Commit und Notes-Hash dem
@@ -242,11 +263,13 @@ Ein Trockenlauf gilt nur dann als erfolgreich, wenn:
 Die im Trockenlauf erzeugten Binärartefakte dienen als Nachweis des
 Release-Kandidaten. Der echte Lauf baut sie erneut aus demselben autoritativen
 `main`; die Artefakte des Trockenlaufs werden nicht nachträglich publiziert.
+Ändert sich der eingefrorene Hauptstand, muss auch die Qualifikation des neuen
+Kandidaten erneut nachvollziehbar erfolgen.
 
 ## Echten Release ausführen
 
 Nach einem vollständig auditierten Trockenlauf wird der eine Commit umfassende
-Branch `release/run-v0.3.0-next-v0.4.0-SNAPSHOT` aus demselben eingefrorenen
+Branch `release/run-v0.4.0-next-v0.5.0-SNAPSHOT` aus demselben eingefrorenen
 `main` erzeugt. Die Request-Datei unterscheidet sich nur durch `mode=run`.
 
 Der Workflow:
@@ -254,17 +277,17 @@ Der Workflow:
 1. prüft Notes, Metadaten und Checkout erneut vollständig;
 2. führt `ciCheck` und `mvn -Pfull verify` aus;
 3. erzeugt einen lokalen Commit, in dem Release-Metadaten, OpenAPI und sämtliche
-   POMs gemeinsam auf `0.3.0` stehen;
+   POMs gemeinsam auf `0.4.0` stehen;
 4. baut JAR, ZIP und TAR mit Maven;
 5. erzeugt ein Herkunftsmanifest einschließlich Notes-Hash und die
    SHA-256-Summen der fünf Assets;
-6. erstellt und pusht den annotierten Tag `v0.3.0`;
-7. aktualisiert `maintenance/0.3.x` auf den getaggten Release-Commit;
-8. erstellt den GitHub Release mit `docs/releases/0.3.0.md` als Body und lädt
+6. erstellt und pusht den annotierten Tag `v0.4.0`;
+7. aktualisiert `maintenance/0.4.x` auf den getaggten Release-Commit;
+8. erstellt den GitHub Release mit `docs/releases/0.4.0.md` als Body und lädt
    genau die fünf vereinbarten Assets hoch;
 9. prüft Body, Asset-Liste, Draft- und Pre-Release-Status;
 10. stellt den autoritativen Stand von `main` wieder her;
-11. öffnet bei Bedarf einen Pull Request für `0.4.0-SNAPSHOT` einschließlich
+11. öffnet bei Bedarf einen Pull Request für `0.5.0-SNAPSHOT` einschließlich
     aller POMs und Metadaten.
 
 Die nächste Entwicklungsversion muss numerisch größer als die veröffentlichte
@@ -275,48 +298,65 @@ Version sein. Freie Eingaben werden getrimmt und strikt gegen das Format
 
 Der veröffentlichte GitHub Release enthält exakt fünf Dateien:
 
-- `regelsuche-0.3.0.jar`;
-- `regelsuche-0.3.0.zip`;
-- `regelsuche-0.3.0.tar`;
+- `regelsuche-0.4.0.jar`;
+- `regelsuche-0.4.0.zip`;
+- `regelsuche-0.4.0.tar`;
 - `RELEASE-MANIFEST.txt`;
 - `SHA256SUMS.txt`.
 
 Die kuratierten Release Notes sind keine sechste Binärdatei. Sie liegen im
 getaggten Quellbaum, sind als GitHub-Release-Body veröffentlicht und werden
 über `release_notes_file` sowie `release_notes_sha256` im Manifest gebunden.
+Eine GitHub-Produktveröffentlichung ist nicht automatisch eine separate
+Veröffentlichung des Discovery SDK auf Maven Central oder GitHub Packages.
 
 ## Zenodo
 
-Zenodo ist ein nachgelagerter Publikationsschritt der GitHub-Integration. Erst
-ein erfolgreich angelegter, nicht als Entwurf markierter GitHub Release kann
-eine neue Zenodo-Version auslösen. Deshalb wird Zenodo niemals als Beleg für
-einen nur lokal gebauten oder lediglich getaggten Kandidaten verwendet.
+Zenodo ist ein nachgelagerter Publikationsschritt der GitHub-Integration. Ein
+GitHub Release und seine Zenodo-Archivierung sind getrennte Zustände. Ein lokal
+gebauter oder lediglich getaggter Kandidat ist noch keine Zenodo-Veröffentlichung.
 
-Nach dem GitHub Release ist zu prüfen:
+Die Metadaten werden **vor** Tag und GitHub Release gemeinsam geprüft und im
+Release-Commit gespeichert. Nach einem erfolgreichen GitHub Release wird die
+GitHub-Zenodo-Integration beobachtet:
 
-- Zenodo hat eine neue Version für `v0.3.0` angelegt;
-- Version, Titel, Autoren, Veröffentlichungsdatum und Dateien stimmen mit den
-  Release-Metadaten überein;
-- die Konzept-DOI verweist auf die neue jüngste Version;
-- die vorherige Zenodo-Version bleibt unverändert und zitierfähig.
+- Ist eine neue Version für `v0.4.0` öffentlich vorhanden?
+- Stimmen Version, Titel, Autoren, Veröffentlichungsdatum und Dateien mit den
+  getaggten Release-Metadaten überein?
+- Verweist die Konzept-DOI auf die neue jüngste Version, während frühere
+  Versionen unverändert zitierfähig bleiben?
+
+Ist die Archivierung ausstehend oder fehlgeschlagen, wird das mit Zeitpunkt,
+beobachtetem Zustand und gegebenenfalls konkreter Fehlermeldung dokumentiert.
+Die noch fehlende Versions-DOI darf nicht erfunden werden. Integrations- oder
+Webhook-Probleme werden getrennt nachverfolgt; sie machen die erfolgreich
+geprüfte GitHub-Veröffentlichung nicht nachträglich zu einem fehlgeschlagenen
+Produktrelease. Ein alter ausstehender Zenodo-Eintrag blockiert nicht die
+Weiterentwicklung oder den nächsten Release.
+
+Diese Seite beschreibt die Nachkontrolle, nicht eine bereits implementierte
+zusätzliche automatische Polling- oder Reparaturpipeline. Es wird kein alter
+Release-Tag nachträglich verändert, um die Archivierung erneut anzustoßen.
 
 ## Nachkontrolle
 
-Nach dem echten Lauf sind folgende Punkte zu prüfen:
+Nach dem echten Lauf sind folgende Produktpunkte zu prüfen:
 
-- Tag `v0.3.0` existiert und zeigt auf den Release-Metadaten-Commit;
-- der öffentliche Body entspricht `docs/releases/0.3.0.md`;
+- Tag `v0.4.0` existiert und zeigt auf den Release-Metadaten-Commit;
+- der öffentliche Body entspricht `docs/releases/0.4.0.md`;
 - der GitHub Release enthält JAR, ZIP, TAR, Manifest und Prüfsummen;
 - die fünf Asset-Hashes und der im Manifest angegebene Notes-Hash stimmen;
-- `maintenance/0.3.x` zeigt auf denselben getaggten Commit;
-- der Folge-PR enthält ausschließlich `0.4.0-SNAPSHOT` in
-  `release.properties`, `CITATION.cff`, `CITATION.md`, `.zenodo.json`,
-  `codemeta.json`, OpenAPI, dem Root-POM und allen Modul-POMs;
-- nach Merge des Folge-PRs ist `main` erneut grün;
-- GitHub und Zenodo zeigen die tatsächlich veröffentlichte Version.
+- `maintenance/0.4.x` zeigt auf denselben getaggten Commit;
+- der Folge-PR enthält ausschließlich die koordinierten Änderungen für
+  `0.5.0-SNAPSHOT` in `release.properties`, `CITATION.cff`, `CITATION.md`,
+  `.zenodo.json`, `codemeta.json`, OpenAPI, dem Root-POM und allen Modul-POMs;
+- nach Merge des Folge-PRs ist `main` erneut grün.
 
-Ein Release-Issue oder eine Checkliste darf erst geschlossen werden, wenn diese
-Nachkontrolle abgeschlossen ist.
+Ein Produktrelease-Issue darf erst nach dieser Produktnachkontrolle geschlossen
+werden. Der Zenodo-Status wird separat und wahrheitsgemäß festgehalten; nur ein
+tatsächlich geprüfter öffentlicher Datensatz zählt als abgeschlossene
+Archivierung. Ausstehende Archivierung und ihre Nacharbeit bleiben sichtbar,
+blockieren aber nicht den Abschluss eines erfolgreich geprüften GitHub-Releases.
 
 ## Fehler- und Wiederholungssemantik
 
@@ -340,19 +380,19 @@ Maintenance-Branch und Folge-PR. Einzelne Zustände dürfen nicht manuell
 „zurechtgebogen“ werden, ohne die Versions- und Provenienzprüfungen des
 Workflows erneut zu erfüllen.
 
-## Lokale Vorprüfung für 0.3.0
+## Lokale Vorprüfung für 0.4.0
 
 ```bash
-python3 .github/scripts/update-release-metadata.py 0.3.0-SNAPSHOT --check
+python3 .github/scripts/update-release-metadata.py 0.4.0-SNAPSHOT --check
 ./gradlew --no-daemon --no-configuration-cache ciCheck
 mvn --batch-mode --no-transfer-progress -Pfull verify
 mvn --batch-mode --no-transfer-progress \
-  -DreleaseVersion=0.3.0 \
+  -DreleaseVersion=0.4.0 \
   -DskipTests \
   package
 git status --short
 ```
 
 Eine leere Ausgabe des letzten Befehls ist Teil der Release-Invariante. Vor dem
-Trockenlauf ist außerdem zu prüfen, dass `docs/releases/0.3.0.md` die final
+Trockenlauf ist außerdem zu prüfen, dass `docs/releases/0.4.0.md` die final
 auditierten Notes enthält und keine offene Release-Blocker-PR mehr existiert.
