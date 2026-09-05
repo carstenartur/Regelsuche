@@ -111,6 +111,18 @@
               <overWriteSnapshots>true</overWriteSnapshots>
             </configuration>
           </execution>
+          <execution>
+            <id>record-current-runtime-classpath</id>
+            <phase>prepare-package</phase>
+            <goals><goal>build-classpath</goal></goals>
+            <configuration>
+              <includeScope>runtime</includeScope>
+              <excludeTransitive>false</excludeTransitive>
+              <outputFile>${project.build.directory}/runtime-classpath.txt</outputFile>
+              <outputEncoding>UTF-8</outputEncoding>
+              <regenerateFile>true</regenerateFile>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
 

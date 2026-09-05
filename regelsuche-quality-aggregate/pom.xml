@@ -71,6 +71,26 @@
             <regelsuche.slowTestReport.modules>${regelsuche.slow-test-report.modules}</regelsuche.slowTestReport.modules>
           </systemPropertyVariables>
         </configuration>
+        <executions>
+          <!-- This is a package-integrity gate, not a repeat of the test suite.
+               The release workflow's -DskipTests package must still inspect
+               the actual archives after the SNAPSHOT-to-release transition. -->
+          <execution>
+            <id>verify-distribution-archives</id>
+            <phase>package</phase>
+            <goals><goal>test</goal></goals>
+            <configuration>
+              <test>de.regelsuche.quality.aggregate.MavenDistributionArchiveAuditIT</test>
+              <skip>false</skip>
+              <skipTests>false</skipTests>
+              <failIfNoTests>true</failIfNoTests>
+              <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+              <systemPropertyVariables combine.children="append">
+                <regelsuche.distributionVersion>${releaseVersion}</regelsuche.distributionVersion>
+              </systemPropertyVariables>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
