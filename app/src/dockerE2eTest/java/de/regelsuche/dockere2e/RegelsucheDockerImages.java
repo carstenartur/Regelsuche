@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import org.testcontainers.images.builder.ImageFromDockerfile;
+import org.testcontainers.utility.LazyFuture;
 
 /**
  * Shared lazy Docker-image builds for the repository integration-test JVM.
@@ -20,7 +21,9 @@ import org.testcontainers.images.builder.ImageFromDockerfile;
  *
  * <p>Both web-workbench test classes consume the same {@link ImageFromDockerfile}
  * future, so Gradle's complete {@code test} lifecycle builds the standard image
- * once instead of compiling the full distribution independently per class.</p>
+ * once instead of compiling the full distribution independently per class.
+ * The observer records a bounded Docker event window only after a build fails;
+ * it neither retries the build nor changes image cleanup.</p>
  */
 final class RegelsucheDockerImages {
     private static final Path PROJECT_ROOT = Path.of(System.getProperty(
@@ -30,12 +33,12 @@ final class RegelsucheDockerImages {
 
     private static final Path BUILD_CONTEXT = createTrackedBuildContext();
 
-    static final ImageFromDockerfile APPLICATION = new ImageFromDockerfile()
-        .withFileFromPath(".", BUILD_CONTEXT);
+    static final LazyFuture<String> APPLICATION = DockerBuildDiagnostics.observe(
+        new ImageFromDockerfile().withFileFromPath(".", BUILD_CONTEXT), "Dockerfile");
 
-    static final ImageFromDockerfile PROOF = new ImageFromDockerfile()
-        .withFileFromPath(".", BUILD_CONTEXT)
-        .withDockerfilePath("./Dockerfile.proof");
+    static final LazyFuture<String> PROOF = DockerBuildDiagnostics.observe(
+        new ImageFromDockerfile().withFileFromPath(".", BUILD_CONTEXT)
+            .withDockerfilePath("./Dockerfile.proof"), "Dockerfile.proof");
 
     private RegelsucheDockerImages() {
     }
