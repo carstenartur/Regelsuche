@@ -121,6 +121,16 @@ regulären Dateien und Verzeichnissen. Links, Geräte, PAX-/GNU-Erweiterungen un
 angehängte weitere Archive werden nicht stillschweigend interpretiert. Ein
 künftiger Formatwechsel muss den Vertrag ausdrücklich erweitern und testen.
 
+Das Modusfeld darf entweder nur die erwarteten Rechte enthalten oder zusätzlich
+die zum Header-Typ passenden Unix-Dateityp-Bits, wie sie Plexus beim Schreiben
+beibehält. Konkret sind reguläre Dateien `0644` oder `0100644`, der Unix-Launcher
+`0755` oder `0100755` und Verzeichnisse `0755` oder `040755` erlaubt. Der Vergleich
+ist exakt: Setuid-, Setgid-, Sticky- und unbekannte Bits sowie widersprüchliche
+Dateitypen werden nicht durch eine Bitmaske versteckt. Die Fixture schreibt
+standardmäßig die Plexus-Modi; zusätzliche Tests prüfen beide Darstellungen,
+beide zulässigen Regular-File-Typmarker sowie absichtlich falsche Rechte und
+Dateityp-Bits. Eine Modusfehlermeldung enthält Ist- und Sollwerte in Oktal.
+
 Die endlichen Grenzen betragen ein GiB pro gelesener Payload-Datei, vier GiB
 für die gesamte erwartete Payload, zwei MiB pro Metadateneingabe und höchstens
 8192 Archiveinträge. Ein Überschreiten ist ein Fehler, kein Teil-Erfolg und kein

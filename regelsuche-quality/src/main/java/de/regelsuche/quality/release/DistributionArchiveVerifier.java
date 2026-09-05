@@ -238,17 +238,30 @@ public final class DistributionArchiveVerifier {
         long size = octal(header, 124, 12);
         if (directory) {
             check(size == 0, "TAR directory has a payload: " + name);
+            verifyTarMode(header, name, 0755, 040000, "directory");
             return;
         }
         Fingerprint wanted = expected.get(name);
         check(size == wanted.size(), "TAR size mismatch: " + name);
-        check(octal(header, 100, 8) == (name.equals(prefix + "bin/regelsuche") ? 0755 : 0644),
-            "TAR file mode mismatch: " + name);
+        verifyTarMode(header, name, name.equals(prefix + "bin/regelsuche") ? 0755 : 0644,
+            0100000, "file");
         check(wanted.equals(fingerprint(input, size)), "TAR payload mismatch: " + name);
         int padding = (int) ((BLOCK - size % BLOCK) % BLOCK);
         byte[] bytes = input.readNBytes(padding);
         check(bytes.length == padding && allZero(bytes), "Invalid TAR padding: " + name);
         files.add(name);
+    }
+
+    private static void verifyTarMode(byte[] header, String name, long permissions,
+            long fileType, String kind) throws IOException {
+        long mode = octal(header, 100, 8);
+        // Plexus preserves Unix file-type bits; other ustar writers store only permissions.
+        // Accept exactly these two encodings, not a mask that hides special or foreign bits.
+        long typedMode = fileType | permissions;
+        check(mode == permissions || mode == typedMode,
+            "TAR " + kind + " mode mismatch: " + name + " (got " + Long.toOctalString(mode)
+                + ", expected " + Long.toOctalString(permissions) + " or "
+                + Long.toOctalString(typedMode) + ")");
     }
 
     private static String checkedName(String raw, boolean directory, String prefix,

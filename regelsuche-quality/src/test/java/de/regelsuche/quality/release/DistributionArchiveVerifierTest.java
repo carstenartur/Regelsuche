@@ -46,6 +46,70 @@ class DistributionArchiveVerifierTest {
     }
 
     @Test
+    void acceptsPermissionOnlyAndMatchingUnixTypeTarModes() throws Exception {
+        Fixture f = fixture(VERSION);
+        var expected = DistributionArchiveVerifier.verify(f.root, VERSION);
+        for (int directoryMode : new int[] {0755, 040755}) {
+            for (int regularMode : new int[] {0644, 0100644}) {
+                for (int launcherMode : new int[] {0755, 0100755}) {
+                    for (char regularType : new char[] {'0', 0}) {
+                        f.directoryMode = directoryMode;
+                        f.regularMode = regularMode;
+                        f.launcherMode = launcherMode;
+                        f.regularType = regularType;
+                        f.writeArchives();
+                        assertEquals(expected, DistributionArchiveVerifier.verify(f.root, VERSION));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void rejectsWrongTarPermissionsAndSpecialBitsInBothEncodings() throws Exception {
+        Fixture f = fixture(VERSION);
+        for (int type : new int[] {0, 0100000}) {
+            for (int permissions : new int[] {0600, 0664, 0755, 04644, 02644, 01644}) {
+                f.regularMode = type | permissions;
+                f.writeArchives();
+                rejected(f, "TAR file mode mismatch");
+            }
+        }
+        f.regularMode = 0100644;
+        for (int type : new int[] {0, 0100000}) {
+            for (int permissions : new int[] {0644, 0700, 0777, 04755, 02755, 01755}) {
+                f.launcherMode = type | permissions;
+                f.writeArchives();
+                rejected(f, "TAR file mode mismatch");
+            }
+        }
+        f.launcherMode = 0100755;
+        for (int type : new int[] {0, 040000}) {
+            for (int permissions : new int[] {0644, 0700, 0777, 04755, 02755, 01755}) {
+                f.directoryMode = type | permissions;
+                f.writeArchives();
+                rejected(f, "TAR directory mode mismatch");
+            }
+        }
+    }
+
+    @Test
+    void rejectsContradictoryAndUnknownTarModeTypeBits() throws Exception {
+        Fixture f = fixture(VERSION);
+        for (int type : new int[] {040000, 0120000, 010000, 020000, 060000, 0140000, 0200000}) {
+            f.regularMode = type | 0644;
+            f.writeArchives();
+            rejected(f, "TAR file mode mismatch");
+        }
+        f.regularMode = 0100644;
+        for (int type : new int[] {0100000, 0120000, 010000, 020000, 060000, 0140000, 0200000}) {
+            f.directoryMode = type | 0755;
+            f.writeArchives();
+            rejected(f, "TAR directory mode mismatch");
+        }
+    }
+
+    @Test
     void checksAnIndependentlyCopiedArtifactDirectory() throws Exception {
         Fixture f = fixture(VERSION);
         Path copy = temporary.resolve("retained");
@@ -263,7 +327,11 @@ class DistributionArchiveVerifierTest {
         final Map<String, byte[]> zipFiles = new TreeMap<>();
         final Map<String, byte[]> tarFiles = new TreeMap<>();
         final List<TarMember> extras = new ArrayList<>();
-        int launcherMode = 0755;
+        // Match Plexus ArchiveEntry/TarArchiver, including the Unix file-type bits.
+        int directoryMode = 040755;
+        int regularMode = 0100644;
+        int launcherMode = 0100755;
+        char regularType = '0';
 
         Fixture(Path root, String version) throws Exception {
             this.root = root;
@@ -313,11 +381,11 @@ class DistributionArchiveVerifierTest {
             }
             ByteArrayOutputStream tar = new ByteArrayOutputStream();
             for (String dir : List.of(prefix, prefix + "bin/", prefix + "lib/")) {
-                tarMember(tar, new TarMember(dir, new byte[0], '5', 0755));
+                tarMember(tar, new TarMember(dir, new byte[0], '5', directoryMode));
             }
             for (var entry : tarFiles.entrySet()) {
-                tarMember(tar, new TarMember(entry.getKey(), entry.getValue(), '0',
-                    entry.getKey().equals(prefix + "bin/regelsuche") ? launcherMode : 0644));
+                tarMember(tar, new TarMember(entry.getKey(), entry.getValue(), regularType,
+                    entry.getKey().equals(prefix + "bin/regelsuche") ? launcherMode : regularMode));
             }
             for (TarMember extra : extras) tarMember(tar, extra);
             tar.write(new byte[1024]);
