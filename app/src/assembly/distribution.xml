@@ -29,12 +29,19 @@
       <fileMode>0644</fileMode>
     </file>
   </files>
-  <fileSets>
-    <fileSet>
-      <directory>${project.build.directory}/distribution/lib</directory>
+  <!-- Resolve the current runtime graph, never a persistent staging directory.
+       A version switch or removed dependency must not retain obsolete JARs. -->
+  <dependencySets>
+    <dependencySet>
       <outputDirectory>lib</outputDirectory>
+      <scope>runtime</scope>
+      <useProjectArtifact>false</useProjectArtifact>
+      <useTransitiveDependencies>true</useTransitiveDependencies>
+      <unpack>false</unpack>
       <fileMode>0644</fileMode>
-    </fileSet>
+    </dependencySet>
+  </dependencySets>
+  <fileSets>
     <fileSet>
       <directory>${project.parent.basedir}</directory>
       <outputDirectory>.</outputDirectory>

@@ -80,6 +80,23 @@ Der Release-Workflow kontrolliert zusätzlich die `Implementation-Version` im
 JAR, das gemeinsame Wurzelverzeichnis der Archive und die vollständige,
 vorhersehbare Asset-Liste.
 
+Das `lib`-Verzeichnis wird unmittelbar aus den aktuell aufgelösten
+Maven-Laufzeitabhängigkeiten einschließlich transitiver Abhängigkeiten
+zusammengestellt. Ein liegen gebliebenes `target/distribution/lib` ist keine
+Paketquelle. Das ist insbesondere beim Übergang vom geprüften SNAPSHOT zum
+Release im selben Checkout wichtig: Alte Versionen und entfernte Bibliotheken
+dürfen nicht zusätzlich auf dem Wildcard-Classpath landen. Ein vorheriges
+`clean` darf dafür keine Voraussetzung sein.
+
+`MavenDistributionAssemblyContractTest` führt die echte Assembly-Konfiguration
+in einer kleinen isolierten Maven-Fixture zweimal ohne `clean` aus. Er prüft
+ZIP und TAR beim SNAPSHOT-/Release-Wechsel, entfernte Abhängigkeiten,
+transitive Laufzeitbibliotheken, ausgeschlossene Testbibliotheken und einen
+absichtlich verschmutzten alten Staging-Pfad. Die Fixture ersetzt keinen
+vollständigen Produktbuild. Bei der anschließenden Artefaktprüfung muss jedes
+Produktmodul genau einmal mit der Release-Version vorhanden sein; ein grüner
+Workflow mit falschem Paketinhalt ist kein erfolgreicher Release-Audit.
+
 Der bestehende Gradle-Aufruf
 
 ```bash
