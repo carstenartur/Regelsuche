@@ -8,6 +8,7 @@ import datetime as dt
 import json
 from pathlib import Path
 import re
+import xml.etree.ElementTree as ET
 
 ROOT = Path.cwd()
 OPENAPI_PATH = ROOT / 'app/src/main/resources/web/openapi/openapi.json'
@@ -51,8 +52,54 @@ def write_json(path: Path, data: dict) -> None:
 
 
 def pom_paths() -> tuple[Path, ...]:
-    paths = [ROOT / 'pom.xml']
-    paths.extend(sorted(ROOT.glob('*/pom.xml')))
+    """Return the product reactor, not independent builds beside it.
+
+    Every declared profile participates even when inactive in the current
+    Maven invocation. Repeated profile membership is deduplicated; missing or
+    malformed declared modules are errors, never exemptions from versioning.
+    This repository contract requires literal relative module directories.
+    """
+    root = ROOT.resolve()
+    namespace = {'m': 'http://maven.apache.org/POM/4.0.0'}
+    paths: list[Path] = []
+    visited: set[Path] = set()
+    active: set[Path] = set()
+
+    def visit(path: Path) -> None:
+        if path in active:
+            raise RuntimeError(f'Cyclic Maven module reference: {path.relative_to(root)}')
+        if path in visited:
+            return
+        relative = path.relative_to(root)
+        current = root
+        for part in relative.parts:
+            current = current / part
+            if current.is_symlink():
+                raise RuntimeError(f'Symbolic link in Maven module path: {relative}')
+        if not path.is_file():
+            raise RuntimeError(f'Missing declared Maven module POM: {relative}')
+        text = path.read_text(encoding='utf-8')
+        if '<!DOCTYPE' in text:
+            raise RuntimeError(f'DOCTYPE is not allowed in Maven module POM: {relative}')
+        document = ET.fromstring(text)
+        if document.tag != '{' + namespace['m'] + '}project':
+            raise RuntimeError(f'Invalid Maven module POM namespace: {relative}')
+        active.add(path)
+        paths.append(path)
+        modules = document.findall('./m:modules/m:module', namespace)
+        modules += document.findall(
+            './m:profiles/m:profile/m:modules/m:module', namespace)
+        names = sorted({(module.text or '').strip() for module in modules})
+        for name in names:
+            module = Path(name)
+            if (not name or module.is_absolute() or '..' in module.parts
+                    or not re.fullmatch(r'[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*', name)):
+                raise RuntimeError(f'Invalid Maven module directory {name!r} in {relative}')
+            visit(path.parent / module / 'pom.xml')
+        active.remove(path)
+        visited.add(path)
+
+    visit(root / 'pom.xml')
     return tuple(paths)
 
 
@@ -146,7 +193,7 @@ def update_release_properties(version: str) -> None:
     if not replaced:
         if updated and updated[-1].strip():
             updated.append('')
-        updated.append(f'version={version}')
+        updated.append(line)
     path.write_text('\n'.join(updated) + '\n', encoding='utf-8')
 
 
