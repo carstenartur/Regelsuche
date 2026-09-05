@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from xml.sax.saxutils import escape
 import xml.etree.ElementTree as ET
@@ -39,6 +42,17 @@ def snapshot(root: Path) -> dict[str, bytes]:
         str(path.relative_to(root)): path.read_bytes()
         for path in root.rglob('*') if path.is_file() and not path.is_symlink()
     }
+
+
+def workflow_step(workflow: str, name: str) -> str:
+    """Read a named top-level step in the checked-in, fixed-indentation workflow."""
+    matches = re.findall(
+        r'^      - name: ' + re.escape(name) + r'\n.*?(?=^      - name: |\Z)',
+        workflow, re.MULTILINE | re.DOTALL,
+    )
+    if len(matches) != 1:
+        raise ValueError('Expected exactly one workflow step: ' + name)
+    return matches[0]
 
 
 class ReleaseMetadataTest(unittest.TestCase):
@@ -198,6 +212,192 @@ class ReleaseMetadataTest(unittest.TestCase):
         pom.rename(saved)
         pom.symlink_to(saved)
         self.assert_rejected_read_only('Symbolic link in Maven module path')
+
+    def assert_follow_up_binding(self, workflow: str) -> None:
+        initial = workflow_step(workflow, 'Checkout authoritative source')
+        checkout = workflow_step(workflow, 'Restore authoritative main for follow-up')
+        prepare = workflow_step(workflow, 'Prepare next development metadata')
+        publish = workflow_step(workflow, 'Open next development metadata PR')
+        action = re.search(r'^        uses: (actions/checkout@[0-9a-f]{40})',
+                           initial, re.MULTILINE).group(1)
+        self.assertIn('        uses: ' + action, checkout)
+        self.assertIn('          ref: main\n', checkout)
+        self.assertIn('          fetch-depth: 0\n', checkout)
+        self.assertIn('          path: .release-follow-up\n', checkout)
+        self.assertIn('        working-directory: .release-follow-up\n', prepare)
+        self.assertIn('          path: .release-follow-up\n', publish)
+        for step in (checkout, prepare):
+            self.assertIn("steps.release-state.outputs.dry_run != 'true'", step)
+            self.assertIn("steps.release-state.outputs.managed_release == 'true'", step)
+            for forbidden in ('git clean', 'sudo ', '|| true'):
+                self.assertNotIn(forbidden, step)
+        self.assertIn('          test -d .git\n', prepare)
+        self.assertIn('          test "$(git rev-parse --show-toplevel)" = "$(pwd -P)"\n', prepare)
+        self.assertIn('          test -z "$(git status --porcelain --untracked-files=all)"\n', prepare)
+        self.assertIn("if: steps.next-development.outputs.required == 'true'", publish)
+        paths = publish.partition('          add-paths: |\n')[2]
+        self.assertEqual(set(METADATA) | {'pom.xml', '*/pom.xml'},
+                         {line.strip() for line in paths.splitlines() if line.strip()})
+
+    def test_follow_up_workflow_uses_an_isolated_checkout(self) -> None:
+        self.assert_follow_up_binding(self.release_workflow())
+
+    def test_follow_up_route_and_guard_mutations_are_rejected(self) -> None:
+        workflow = self.release_workflow()
+        for step_name, old, new in (
+            ('Restore authoritative main for follow-up',
+             '          path: .release-follow-up\n', '          path: .\n'),
+            ('Prepare next development metadata',
+             '        working-directory: .release-follow-up\n', '        working-directory: .\n'),
+            ('Open next development metadata PR',
+             '          path: .release-follow-up\n', '          path: .\n'),
+            ('Restore authoritative main for follow-up',
+             "managed_release == 'true'", "managed_release != 'true'"),
+            ('Prepare next development metadata', '          test -d .git\n', ''),
+            ('Prepare next development metadata',
+             '          test -z "$(git status --porcelain --untracked-files=all)"\n', ''),
+        ):
+            with self.subTest(step=step_name, removed=old):
+                step = workflow_step(workflow, step_name)
+                self.assertIn(old, step)
+                mutated = workflow.replace(step, step.replace(old, new, 1), 1)
+                with self.assertRaises(AssertionError):
+                    self.assert_follow_up_binding(mutated)
+
+    @staticmethod
+    def release_workflow() -> str:
+        return (REPOSITORY / '.github/workflows/release.yml').read_text(encoding='utf-8')
+
+    def git(self, root: Path, *arguments: str) -> str:
+        result = subprocess.run(
+            ['git', '-c', 'commit.gpgsign=false', '-c', 'core.autocrlf=false', *arguments],
+            cwd=root, capture_output=True, text=True, encoding='utf-8', timeout=20,
+            env={**os.environ, 'GIT_CONFIG_GLOBAL': os.devnull,
+                 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_TERMINAL_PROMPT': '0'},
+        )
+        self.assert_success(result)
+        return result.stdout.strip()
+
+    def follow_up_fixture(self, upstream_version: str) -> tuple[Path, Path]:
+        # The local bare remote models checkout@... with ref=main and a separate path.
+        # Neither an Actions service nor a GitHub write is used by this regression.
+        self.assert_success(invoke(self.root, upstream_version))
+        helper = self.root / '.github/scripts/update-release-metadata.py'
+        helper.parent.mkdir(parents=True)
+        shutil.copyfile(SCRIPT, helper)
+        (self.root / '.gitignore').write_text('build/\n.release-follow-up/\n', encoding='utf-8')
+        self.git(self.root, 'init', '--initial-branch=main')
+        self.git(self.root, 'config', 'user.name', 'Release fixture')
+        self.git(self.root, 'config', 'user.email', 'fixture@example.invalid')
+        self.git(self.root, 'add', '--all')
+        self.git(self.root, 'commit', '-m', 'Development metadata')
+        external = tempfile.TemporaryDirectory(prefix='regelsuche-release-origin-')
+        self.addCleanup(external.cleanup)
+        remote = Path(external.name) / 'origin.git'
+        self.git(self.root, 'clone', '--bare', '--no-local', str(self.root), str(remote))
+        self.git(self.root, 'remote', 'add', 'origin', str(remote))
+        self.git(self.root, 'checkout', '--detach')
+        self.assert_success(invoke(self.root, '9.8.7', '--release'))
+        self.git(self.root, 'add', '--all')
+        self.git(self.root, 'commit', '-m', 'Published release metadata')
+        self.git(self.root, 'tag', 'fixture-release')
+        self.source_head = self.git(self.root, 'rev-parse', 'HEAD')
+        self.source_files = {
+            name: (self.root / name).read_bytes()
+            for name in self.git(self.root, 'ls-files').splitlines()
+        }
+        self.locked = self.root / 'build/container-output/campaign'
+        self.locked.mkdir(parents=True)
+        self.evidence = self.locked / 'receipt.json'
+        self.evidence.write_bytes(b'{"evidence":"must survive follow-up"}\n')
+        self.locked.chmod(0o555)
+        self.addCleanup(self.locked.chmod, 0o755)
+        self.assertEqual(0o555, stat.S_IMODE(self.locked.stat().st_mode))
+        follow_up = self.root / '.release-follow-up'
+        self.git(self.root, 'clone', '--no-local', '--branch', 'main', str(remote), str(follow_up))
+        self.assertEqual(str(follow_up.resolve()), self.git(follow_up, 'rev-parse', '--show-toplevel'))
+        return follow_up, Path(external.name) / 'step-output.txt'
+
+    def run_follow_up(self, directory: Path, output: Path) -> subprocess.CompletedProcess:
+        step = workflow_step(self.release_workflow(), 'Prepare next development metadata')
+        _, marker, body = step.partition('        run: |\n')
+        self.assertTrue(marker, 'the regression must run the actual preparation shell')
+        return subprocess.run(
+            ['bash', '--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', textwrap.dedent(body)],
+            cwd=directory, capture_output=True, text=True, encoding='utf-8', timeout=20,
+            env={**os.environ, 'RELEASE_VERSION': '9.8.7', 'NEXT_VERSION': '9.9.0-SNAPSHOT',
+                 'GITHUB_OUTPUT': str(output), 'PYTHONDONTWRITEBYTECODE': '1'},
+        )
+
+    def assert_source_preserved(self) -> None:
+        self.assertEqual(self.source_head, self.git(self.root, 'rev-parse', 'HEAD'))
+        self.assertEqual(self.source_head, self.git(self.root, 'rev-parse', 'fixture-release'))
+        self.assertEqual('', self.git(self.root, 'diff', '--name-only'))
+        self.assertEqual(self.source_files,
+                         {name: (self.root / name).read_bytes() for name in self.source_files})
+        self.assertEqual(b'{"evidence":"must survive follow-up"}\n', self.evidence.read_bytes())
+        self.assertEqual(0o555, stat.S_IMODE(self.locked.stat().st_mode))
+
+    def test_follow_up_retains_protected_output_and_changes_only_metadata(self) -> None:
+        follow_up, output = self.follow_up_fixture('9.8.7-SNAPSHOT')
+        # Root can bypass DAC. On the unprivileged release/CI runner, assert the
+        # actual deletion failure as well as the preserved modes/bytes tested everywhere.
+        if hasattr(os, 'geteuid') and os.geteuid() != 0:
+            with self.assertRaises(PermissionError):
+                self.evidence.unlink()
+        self.assert_success(self.run_follow_up(follow_up, output))
+        self.assertEqual('required=true\n', output.read_text(encoding='utf-8'))
+        self.assert_success(invoke(follow_up, '9.9.0-SNAPSHOT', '--check'))
+        expected = set(METADATA) | {
+            'pom.xml', 'component/pom.xml', 'component/nested/pom.xml', 'integration/pom.xml',
+        }
+        self.assertEqual(expected, set(self.git(follow_up, 'diff', '--name-only').splitlines()))
+        self.assert_source_preserved()
+
+    def test_follow_up_already_at_next_version_is_read_only(self) -> None:
+        follow_up, output = self.follow_up_fixture('9.9.0-SNAPSHOT')
+        self.assert_success(self.run_follow_up(follow_up, output))
+        self.assertEqual('required=false\n', output.read_text(encoding='utf-8'))
+        self.assertEqual('', self.git(follow_up, 'status', '--porcelain', '--untracked-files=all'))
+        self.assert_source_preserved()
+
+    def test_follow_up_does_not_overwrite_another_development_line(self) -> None:
+        follow_up, output = self.follow_up_fixture('10.0.0-SNAPSHOT')
+        result = self.run_follow_up(follow_up, output)
+        self.assert_success(result)
+        self.assertIn('not creating a follow-up version PR', result.stdout)
+        self.assertEqual('required=false\n', output.read_text(encoding='utf-8'))
+        self.assertEqual('', self.git(follow_up, 'status', '--porcelain', '--untracked-files=all'))
+        self.assert_source_preserved()
+
+    def test_follow_up_rejects_a_dirty_checkout_before_changing_metadata(self) -> None:
+        follow_up, output = self.follow_up_fixture('9.8.7-SNAPSHOT')
+        for name in ('CITATION.md', 'unexpected.txt'):
+            with self.subTest(path=name):
+                path = follow_up / name
+                original = path.read_bytes() if path.exists() else None
+                path.write_bytes(b'Unrelated pending change\n')
+                before = {relative: (follow_up / relative).read_bytes() for relative in METADATA}
+                result = self.run_follow_up(follow_up, output)
+                self.assertNotEqual(0, result.returncode)
+                self.assertFalse(output.exists(), 'no follow-up may be authorized on failure')
+                self.assertEqual(before, {relative: (follow_up / relative).read_bytes()
+                                          for relative in METADATA})
+                self.assertEqual(b'Unrelated pending change\n', path.read_bytes())
+                if original is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(original)
+        self.assert_source_preserved()
+
+    def test_follow_up_rejects_parent_repository_fallback(self) -> None:
+        _, output = self.follow_up_fixture('9.8.7-SNAPSHOT')
+        wrong = self.root / 'not-a-checkout'
+        wrong.mkdir()
+        result = self.run_follow_up(wrong, output)
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(output.exists())
+        self.assert_source_preserved()
 
 
 if __name__ == '__main__':
