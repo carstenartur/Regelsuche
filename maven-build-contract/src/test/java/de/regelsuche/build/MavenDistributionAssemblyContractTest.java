@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
+import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import org.xml.sax.InputSource;
 
 /** Exercises the production descriptor with real Maven resolution, not a copied assembly model. */
 class MavenDistributionAssemblyContractTest {
@@ -56,6 +58,27 @@ class MavenDistributionAssemblyContractTest {
     Element dependencyPlugin = plugin(parse(root.resolve("app/pom.xml")), "maven-dependency-plugin");
     assertTrue(children(child(dependencyPlugin, "executions"), "execution").stream()
         .noneMatch(execution -> "copy-runtime-dependencies".equals(text(execution, "id"))));
+  }
+
+  @Test
+  void fixturePreservesProductionPluginWithinTheProjectNamespace(@TempDir Path fixture)
+      throws Exception {
+    Path root = repositoryRoot();
+    configureFixture(root, fixture, "de.regelsuche.assemblyfixture.namespace", "0.4.0", false);
+    Element project = parse(fixture.resolve("app/pom.xml"));
+    assertEquals("http://maven.apache.org/POM/4.0.0", project.getNamespaceURI());
+    assertEquals(project.getNamespaceURI(), project.getAttribute("xmlns"));
+    List<Element> plugins = children(child(child(project, "build"), "plugins"), "plugin");
+    assertFalse(plugins.isEmpty());
+    for (Element imported : plugins) {
+      assertEquals(project.getNamespaceURI(), imported.getNamespaceURI());
+      assertFalse(imported.hasAttribute("xmlns"),
+          "Maven model plugins must inherit the project namespace, not redeclare it");
+    }
+    Element expected = configuredPlugin(parse(root.resolve("app/pom.xml")),
+        child(parse(root.resolve("pom.xml")), "properties"), "maven-assembly-plugin");
+    assertTrue(expected.isEqualNode(plugin(project, "maven-assembly-plugin")),
+        "fixture serialization must preserve the production plugin configuration and pinned version");
   }
 
   @Test
@@ -130,7 +153,8 @@ class MavenDistributionAssemblyContractTest {
         + "</version><packaging>pom</packaging></project>");
     Element sourceApp = parse(root.resolve("app/pom.xml"));
     Element sourceProperties = child(parse(root.resolve("pom.xml")), "properties");
-    String plugins = configuredPlugin(sourceApp, sourceProperties, "maven-assembly-plugin");
+    List<Element> plugins = new ArrayList<>();
+    plugins.add(configuredPlugin(sourceApp, sourceProperties, "maven-assembly-plugin"));
     // Include any old staging-copy execution so the test also fails against the original build.
     Element copy = plugin(sourceApp, "maven-dependency-plugin");
     for (Element execution : new ArrayList<>(children(child(copy, "executions"), "execution"))) {
@@ -140,7 +164,7 @@ class MavenDistributionAssemblyContractTest {
     }
     if (!children(child(copy, "executions"), "execution").isEmpty()) {
       setVersion(copy, text(sourceProperties, "maven.dependency.plugin.version"));
-      plugins += xml(copy);
+      plugins.add(copy);
     }
     String appPom = POM + "<parent><groupId>" + group
         + "</groupId><artifactId>fixture-parent</artifactId><version>" + version
@@ -154,8 +178,16 @@ class MavenDistributionAssemblyContractTest {
         + dependency(group, "test-only", version, "test")
         + (includeRetired ? dependency(group, "retired", version, "compile") : "")
         + "</dependencies><build><finalName>" + text(child(sourceApp, "build"), "finalName")
-        + "</finalName><plugins>" + plugins + "</plugins></build></project>";
-    Files.writeString(fixture.resolve("app/pom.xml"), appPom);
+        + "</finalName><plugins/></build></project>";
+    // Serialize the complete POM once. A standalone plugin fragment gains an xmlns
+    // attribute which Maven's strict model reader rejects when pasted into a POM.
+    Element project = parse(new InputSource(new StringReader(appPom)));
+    Element targetPlugins = child(child(project, "build"), "plugins");
+    assertNotNull(targetPlugins);
+    for (Element configured : plugins) {
+      targetPlugins.appendChild(project.getOwnerDocument().importNode(configured, true));
+    }
+    Files.writeString(fixture.resolve("app/pom.xml"), xml(project));
     // A tiny application artifact replaces product compilation; the assembly/resolver is real.
     writeJar(fixture.resolve("app/target/regelsuche-" + version + ".jar"), "app:" + version);
     return libraries;
@@ -270,14 +302,18 @@ class MavenDistributionAssemblyContractTest {
   }
 
   private static Element parse(Path path) throws Exception {
+    try (InputStream input = Files.newInputStream(path)) {
+      return parse(new InputSource(input));
+    }
+  }
+
+  private static Element parse(InputSource input) throws Exception {
     DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
     factory.setNamespaceAware(true);
     factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
     factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
     factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-    try (InputStream input = Files.newInputStream(path)) {
-      return factory.newDocumentBuilder().parse(input).getDocumentElement();
-    }
+    return factory.newDocumentBuilder().parse(input).getDocumentElement();
   }
 
   private static Element plugin(Element project, String id) {
@@ -285,10 +321,10 @@ class MavenDistributionAssemblyContractTest {
         .filter(candidate -> id.equals(text(candidate, "artifactId"))).findFirst().orElseThrow();
   }
 
-  private static String configuredPlugin(Element app, Element properties, String id) throws Exception {
+  private static Element configuredPlugin(Element app, Element properties, String id) {
     Element plugin = (Element) plugin(app, id).cloneNode(true);
     setVersion(plugin, text(properties, id.replace('-', '.') + ".version"));
-    return xml(plugin);
+    return plugin;
   }
 
   private static void setVersion(Element plugin, String version) {
