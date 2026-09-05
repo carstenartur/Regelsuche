@@ -102,7 +102,7 @@ import java.util.Objects;
 <span class="fc" id="L102">        write(figures.resolve(&quot;paired-utility.svg&quot;), utilitySvg(cases));</span>
 <span class="fc" id="L103">        write(figures.resolve(&quot;candidate-lineage.svg&quot;), lineageSvg(document));</span>
 <span class="fc" id="L104">        write(figures.resolve(&quot;representative-search.svg&quot;),</span>
-<span class="fc" id="L105">            representativeSvg(representative));</span>
+<span class="fc" id="L105">            representativeSvg(representative, document));</span>
 <span class="fc" id="L106">    }</span>
 
     private static String sequenceSvg(JsonNode card) {
@@ -226,123 +226,98 @@ import java.util.Objects;
 <span class="fc" id="L226">        return svgEnd(svg);</span>
     }
 
-    private static String representativeSvg(UtilityCase item) {
-<span class="fc" id="L230">        StringBuilder svg = svgStart(1200, 500);</span>
-<span class="fc" id="L231">        banner(svg, 1200);</span>
-<span class="fc" id="L232">        svg.append(&quot;&lt;text class=\&quot;title\&quot; x=\&quot;60\&quot; y=\&quot;92\&quot;&gt;&quot;)</span>
-<span class="fc" id="L233">            .append(&quot;Representative held-out search: &quot;)</span>
-<span class="fc" id="L234">            .append(xml(item.id())).append(&quot;&lt;/text&gt;&quot;)</span>
-<span class="fc" id="L235">            .append(&quot;&lt;rect class=\&quot;box\&quot; x=\&quot;70\&quot; y=\&quot;135\&quot; width=\&quot;470\&quot; &quot;)</span>
-<span class="fc" id="L236">            .append(&quot;height=\&quot;240\&quot;/&gt;&quot;)</span>
-<span class="fc" id="L237">            .append(&quot;&lt;rect class=\&quot;candidateBox\&quot; x=\&quot;660\&quot; y=\&quot;135\&quot; &quot;)</span>
-<span class="fc" id="L238">            .append(&quot;width=\&quot;470\&quot; height=\&quot;240\&quot;/&gt;&quot;)</span>
-<span class="fc" id="L239">            .append(&quot;&lt;text class=\&quot;title\&quot; x=\&quot;305\&quot; y=\&quot;180\&quot; &quot;)</span>
-<span class="fc" id="L240">            .append(&quot;text-anchor=\&quot;middle\&quot;&gt;Baseline&lt;/text&gt;&quot;)</span>
-<span class="fc" id="L241">            .append(&quot;&lt;text class=\&quot;title\&quot; x=\&quot;895\&quot; y=\&quot;180\&quot; &quot;)</span>
-<span class="fc" id="L242">            .append(&quot;text-anchor=\&quot;middle\&quot;&gt;Candidate enabled&lt;/text&gt;&quot;)</span>
-<span class="fc" id="L243">            .append(metric(&quot;Reached&quot;, Boolean.toString(item.baselineReached()),</span>
-<span class="fc" id="L244">                Boolean.toString(item.candidateReached()), 225))</span>
-<span class="fc" id="L245">            .append(metric(&quot;Path length&quot;,</span>
-<span class="fc" id="L246">                Integer.toString(item.baselinePathLength()),</span>
-<span class="fc" id="L247">                Integer.toString(item.candidatePathLength()), 275))</span>
-<span class="fc" id="L248">            .append(metric(&quot;Explored states&quot;,</span>
-<span class="fc" id="L249">                Long.toString(item.baselineExploredStates()),</span>
-<span class="fc" id="L250">                Long.toString(item.candidateExploredStates()), 325))</span>
-<span class="fc" id="L251">            .append(&quot;&lt;path class=\&quot;arrowWide\&quot; d=\&quot;M540 255 H660\&quot;/&gt;&quot;)</span>
-<span class="fc" id="L252">            .append(&quot;&lt;text class=\&quot;small\&quot; x=\&quot;600\&quot; y=\&quot;415\&quot; &quot;)</span>
-<span class="fc" id="L253">            .append(&quot;text-anchor=\&quot;middle\&quot;&gt;&quot;)</span>
-<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            .append(item.materialGain() ? &quot;Material gain retained&quot; : &quot;No material gain&quot;)</span>
-<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            .append(item.regression() ? &quot; · correctness regression&quot; : &quot; · no regression&quot;)</span>
-<span class="fc" id="L256">            .append(&quot;&lt;/text&gt;&quot;);</span>
-<span class="fc" id="L257">        return svgEnd(svg);</span>
-    }
-
-    private static String metric(
-        String name,
-        String baseline,
-        String candidate,
-        int y
-    ) {
-<span class="fc" id="L266">        return &quot;&lt;text class=\&quot;label\&quot; x=\&quot;305\&quot; y=\&quot;&quot; + y</span>
-<span class="fc" id="L267">            + &quot;\&quot; text-anchor=\&quot;middle\&quot;&gt;&quot; + xml(name + &quot;: &quot; + baseline)</span>
-            + &quot;&lt;/text&gt;&lt;text class=\&quot;label\&quot; x=\&quot;895\&quot; y=\&quot;&quot; + y
-<span class="fc" id="L269">            + &quot;\&quot; text-anchor=\&quot;middle\&quot;&gt;&quot; + xml(name + &quot;: &quot; + candidate)</span>
-            + &quot;&lt;/text&gt;&quot;;
+    private static String representativeSvg(UtilityCase item, JsonNode card) {
+<span class="fc" id="L230">        var task = ProductionCandidateQualificationCatalog.positives().stream()</span>
+<span class="fc" id="L231">            .filter(candidate -&gt; candidate.id().equals(item.id()))</span>
+<span class="pc" id="L232">            .findFirst().orElseThrow(() -&gt; new IllegalArgumentException(</span>
+<span class="nc" id="L233">                &quot;No qualification task for representative case: &quot; + item.id()));</span>
+<span class="fc" id="L234">        JsonNode candidate = card.path(&quot;candidate&quot;);</span>
+<span class="fc" id="L235">        return AutonomousDiscoveryComparisonSvg.render(</span>
+            new AutonomousDiscoveryComparisonSvg.Comparison(
+<span class="fc" id="L237">                item.id(), task.inputExpression(), task.targetExpression(),</span>
+<span class="fc" id="L238">                candidate.path(&quot;leftPattern&quot;).asText(),</span>
+<span class="fc" id="L239">                candidate.path(&quot;rightPattern&quot;).asText(),</span>
+                new AutonomousDiscoveryComparisonSvg.Outcome(
+<span class="fc" id="L241">                    item.baselineReached(), item.baselinePathLength(),</span>
+<span class="fc" id="L242">                    item.baselineExploredStates()),</span>
+                new AutonomousDiscoveryComparisonSvg.Outcome(
+<span class="fc" id="L244">                    item.candidateReached(), item.candidatePathLength(),</span>
+<span class="fc" id="L245">                    item.candidateExploredStates())));</span>
     }
 
     private static StringBuilder svgStart(int width, int height) {
-<span class="fc" id="L274">        return new StringBuilder()</span>
-<span class="fc" id="L275">            .append(&quot;&lt;svg xmlns=\&quot;http://www.w3.org/2000/svg\&quot; viewBox=\&quot;0 0 &quot;)</span>
-<span class="fc" id="L276">            .append(width).append(' ').append(height).append(&quot;\&quot;&gt;&quot;)</span>
-<span class="fc" id="L277">            .append(&quot;&lt;style&gt;&quot;)</span>
-<span class="fc" id="L278">            .append(&quot;.box{fill:#f7f7f7;stroke:#222;stroke-width:2}&quot;)</span>
-<span class="fc" id="L279">            .append(&quot;.candidateBox{fill:#eef8ee;stroke:#222;stroke-width:2}&quot;)</span>
-<span class="fc" id="L280">            .append(&quot;.label{font:18px sans-serif;fill:#111}&quot;)</span>
-<span class="fc" id="L281">            .append(&quot;.title{font:bold 22px sans-serif;fill:#111}&quot;)</span>
-<span class="fc" id="L282">            .append(&quot;.small{font:14px monospace;fill:#111}&quot;)</span>
-<span class="fc" id="L283">            .append(&quot;.banner{fill:#fff3f3;stroke:#9b1c1c;stroke-width:2}&quot;)</span>
-<span class="fc" id="L284">            .append(&quot;.bannerText{font:bold 25px sans-serif;fill:#9b1c1c}&quot;)</span>
-<span class="fc" id="L285">            .append(&quot;.arrow,.arrowWide{fill:none;stroke:#222;stroke-width:3}&quot;)</span>
-<span class="fc" id="L286">            .append(&quot;.line{fill:none;stroke:#555;stroke-width:1.5}&quot;)</span>
-<span class="fc" id="L287">            .append(&quot;.baseline{fill:#c8c8c8;stroke:#222}&quot;)</span>
-<span class="fc" id="L288">            .append(&quot;.candidate{fill:#9dd39d;stroke:#222}&quot;)</span>
-<span class="fc" id="L289">            .append(&quot;&lt;/style&gt;&quot;);</span>
+<span class="fc" id="L249">        return new StringBuilder()</span>
+<span class="fc" id="L250">            .append(&quot;&lt;svg xmlns=\&quot;http://www.w3.org/2000/svg\&quot; viewBox=\&quot;0 0 &quot;)</span>
+<span class="fc" id="L251">            .append(width).append(' ').append(height).append(&quot;\&quot;&gt;&quot;)</span>
+<span class="fc" id="L252">            .append(&quot;&lt;style&gt;&quot;)</span>
+<span class="fc" id="L253">            .append(&quot;.box{fill:#f7f7f7;stroke:#222;stroke-width:2}&quot;)</span>
+<span class="fc" id="L254">            .append(&quot;.candidateBox{fill:#eef8ee;stroke:#222;stroke-width:2}&quot;)</span>
+<span class="fc" id="L255">            .append(&quot;.label{font:18px sans-serif;fill:#111}&quot;)</span>
+<span class="fc" id="L256">            .append(&quot;.title{font:bold 22px sans-serif;fill:#111}&quot;)</span>
+<span class="fc" id="L257">            .append(&quot;.small{font:14px monospace;fill:#111}&quot;)</span>
+<span class="fc" id="L258">            .append(&quot;.banner{fill:#fff3f3;stroke:#9b1c1c;stroke-width:2}&quot;)</span>
+<span class="fc" id="L259">            .append(&quot;.bannerText{font:bold 25px sans-serif;fill:#9b1c1c}&quot;)</span>
+<span class="fc" id="L260">            .append(&quot;.arrow,.arrowWide{fill:none;stroke:#222;stroke-width:3}&quot;)</span>
+<span class="fc" id="L261">            .append(&quot;.line{fill:none;stroke:#555;stroke-width:1.5}&quot;)</span>
+<span class="fc" id="L262">            .append(&quot;.baseline{fill:#c8c8c8;stroke:#222}&quot;)</span>
+<span class="fc" id="L263">            .append(&quot;.candidate{fill:#9dd39d;stroke:#222}&quot;)</span>
+<span class="fc" id="L264">            .append(&quot;&lt;/style&gt;&quot;);</span>
     }
 
     private static void banner(StringBuilder svg, int width) {
-<span class="fc" id="L293">        svg.append(&quot;&lt;rect class=\&quot;banner\&quot; x=\&quot;20\&quot; y=\&quot;15\&quot; width=\&quot;&quot;)</span>
-<span class="fc" id="L294">            .append(width - 40).append(&quot;\&quot; height=\&quot;55\&quot;/&gt;&quot;)</span>
-<span class="fc" id="L295">            .append(&quot;&lt;text class=\&quot;bannerText\&quot; x=\&quot;&quot;)</span>
-<span class="fc" id="L296">            .append(width / 2).append(&quot;\&quot; y=\&quot;51\&quot; text-anchor=\&quot;middle\&quot;&gt;&quot;)</span>
-<span class="fc" id="L297">            .append(AutonomousDiscoveryResultCard.CLAIM_BANNER)</span>
-<span class="fc" id="L298">            .append(&quot;&lt;/text&gt;&quot;);</span>
-<span class="fc" id="L299">    }</span>
+<span class="fc" id="L268">        svg.append(&quot;&lt;rect class=\&quot;banner\&quot; x=\&quot;20\&quot; y=\&quot;15\&quot; width=\&quot;&quot;)</span>
+<span class="fc" id="L269">            .append(width - 40).append(&quot;\&quot; height=\&quot;55\&quot;/&gt;&quot;)</span>
+<span class="fc" id="L270">            .append(&quot;&lt;text class=\&quot;bannerText\&quot; x=\&quot;&quot;)</span>
+<span class="fc" id="L271">            .append(width / 2).append(&quot;\&quot; y=\&quot;51\&quot; text-anchor=\&quot;middle\&quot;&gt;&quot;)</span>
+<span class="fc" id="L272">            .append(AutonomousDiscoveryResultCard.CLAIM_BANNER)</span>
+<span class="fc" id="L273">            .append(&quot;&lt;/text&gt;&quot;);</span>
+<span class="fc" id="L274">    }</span>
 
     private static String svgEnd(StringBuilder svg) {
-<span class="fc" id="L302">        return svg.append(&quot;&lt;/svg&gt;\n&quot;).toString();</span>
+<span class="fc" id="L277">        return svg.append(&quot;&lt;/svg&gt;\n&quot;).toString();</span>
     }
 
     private static String xml(String value) {
-<span class="fc" id="L306">        return value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;)</span>
-<span class="fc" id="L307">            .replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
-<span class="fc" id="L308">            .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;)</span>
-<span class="fc" id="L309">            .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;)</span>
-<span class="fc" id="L310">            .replace(&quot;'&quot;, &quot;&amp;apos;&quot;);</span>
+<span class="fc" id="L281">        return value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;)</span>
+<span class="fc" id="L282">            .replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
+<span class="fc" id="L283">            .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;)</span>
+<span class="fc" id="L284">            .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;)</span>
+<span class="fc" id="L285">            .replace(&quot;'&quot;, &quot;&amp;apos;&quot;);</span>
     }
 
     private static void reset(Path outputDirectory) {
-<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (!Files.exists(outputDirectory)) {</span>
-<span class="nc" id="L315">            return;</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (!Files.exists(outputDirectory)) {</span>
+<span class="nc" id="L290">            return;</span>
         }
-<span class="nc" id="L317">        try (var paths = Files.walk(outputDirectory)) {</span>
-<span class="nc bnc" id="L318" title="All 2 branches missed.">            paths.filter(path -&gt; !path.equals(outputDirectory))</span>
-<span class="nc" id="L319">                .sorted(Comparator.reverseOrder()).forEach(path -&gt; {</span>
+<span class="nc" id="L292">        try (var paths = Files.walk(outputDirectory)) {</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">            paths.filter(path -&gt; !path.equals(outputDirectory))</span>
+<span class="nc" id="L294">                .sorted(Comparator.reverseOrder()).forEach(path -&gt; {</span>
                     try {
-<span class="nc" id="L321">                        Files.delete(path);</span>
-<span class="nc" id="L322">                    } catch (IOException exception) {</span>
-<span class="nc" id="L323">                        throw new UncheckedIOException(exception);</span>
-<span class="nc" id="L324">                    }</span>
-<span class="nc" id="L325">                });</span>
-<span class="nc" id="L326">        } catch (IOException exception) {</span>
-<span class="nc" id="L327">            throw new UncheckedIOException(</span>
+<span class="nc" id="L296">                        Files.delete(path);</span>
+<span class="nc" id="L297">                    } catch (IOException exception) {</span>
+<span class="nc" id="L298">                        throw new UncheckedIOException(exception);</span>
+<span class="nc" id="L299">                    }</span>
+<span class="nc" id="L300">                });</span>
+<span class="nc" id="L301">        } catch (IOException exception) {</span>
+<span class="nc" id="L302">            throw new UncheckedIOException(</span>
                 &quot;Could not reset walkthrough output&quot;, exception);
-<span class="nc" id="L329">        }</span>
-<span class="nc" id="L330">    }</span>
+<span class="nc" id="L304">        }</span>
+<span class="nc" id="L305">    }</span>
 
     private static void preserveFailure(Path outputDirectory, Throwable failure) {
         try {
-<span class="nc" id="L334">            Files.createDirectories(outputDirectory);</span>
-<span class="nc" id="L335">            StringWriter details = new StringWriter();</span>
-<span class="nc" id="L336">            failure.printStackTrace(new PrintWriter(details));</span>
-<span class="nc" id="L337">            write(outputDirectory.resolve(&quot;walkthrough-failure.txt&quot;),</span>
-<span class="nc" id="L338">                details.toString());</span>
-<span class="nc" id="L339">        } catch (IOException ignored) {</span>
-<span class="nc" id="L340">            failure.addSuppressed(ignored);</span>
-<span class="nc" id="L341">        }</span>
-<span class="nc" id="L342">    }</span>
+<span class="nc" id="L309">            Files.createDirectories(outputDirectory);</span>
+<span class="nc" id="L310">            StringWriter details = new StringWriter();</span>
+<span class="nc" id="L311">            failure.printStackTrace(new PrintWriter(details));</span>
+<span class="nc" id="L312">            write(outputDirectory.resolve(&quot;walkthrough-failure.txt&quot;),</span>
+<span class="nc" id="L313">                details.toString());</span>
+<span class="nc" id="L314">        } catch (IOException ignored) {</span>
+<span class="nc" id="L315">            failure.addSuppressed(ignored);</span>
+<span class="nc" id="L316">        }</span>
+<span class="nc" id="L317">    }</span>
 
     private static void write(Path path, String content) throws IOException {
-<span class="fc" id="L345">        Files.writeString(path, content, StandardCharsets.UTF_8);</span>
-<span class="fc" id="L346">    }</span>
+<span class="fc" id="L320">        Files.writeString(path, content, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L321">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

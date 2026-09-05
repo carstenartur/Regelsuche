@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousDiscoveryComparisonSvg.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">AutonomousDiscoveryComparisonSvg.java</span></div><h1>AutonomousDiscoveryComparisonSvg.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Presentation only: renders paired measurements without inventing a search trace. */
+final class AutonomousDiscoveryComparisonSvg {
+    private static final int WIDTH = 1000;
+    private static final int FORMULA_COLUMNS = 72;
+
+    private AutonomousDiscoveryComparisonSvg() {
+    }
+
+    static String render(Comparison comparison) {
+<span class="fc" id="L16">        Objects.requireNonNull(comparison, &quot;comparison&quot;);</span>
+<span class="fc" id="L17">        StringBuilder body = new StringBuilder();</span>
+<span class="fc" id="L18">        text(body, &quot;heading&quot;, 32, 44, &quot;Was bringt die gelernte Regel?&quot;);</span>
+<span class="fc" id="L19">        text(body, &quot;label&quot;, 32, 76,</span>
+            &quot;Dieselbe zurückgehaltene Aufgabe, mit und ohne zusätzliche Regel.&quot;);
+<span class="fc" id="L21">        int y = formula(body, 100, &quot;Gelernte Regel&quot;,</span>
+<span class="fc" id="L22">            comparison.leftPattern() + &quot;  →  &quot; + comparison.rightPattern());</span>
+<span class="fc" id="L23">        y = formula(body, y, &quot;Ausgangsausdruck der zurückgehaltenen Aufgabe&quot;,</span>
+<span class="fc" id="L24">            comparison.inputExpression());</span>
+<span class="fc" id="L25">        y = formula(body, y, &quot;Gesuchte Zieldarstellung (exakter Syntaxvergleich)&quot;,</span>
+<span class="fc" id="L26">            comparison.targetExpression());</span>
+<span class="fc" id="L27">        outcome(body, 32, y, &quot;Ohne gelernte Regel&quot;, comparison.baseline());</span>
+<span class="fc" id="L28">        outcome(body, 512, y, &quot;Mit gelernter Regel&quot;, comparison.candidate());</span>
+<span class="fc" id="L29">        y += 248;</span>
+<span class="fc" id="L30">        text(body, &quot;note&quot;, 32, y,</span>
+            &quot;Verglichen werden Suchzustände, nicht gemessene Laufzeiten.&quot;);
+<span class="fc" id="L32">        text(body, &quot;note&quot;, 32, y + 28,</span>
+            &quot;Ein ausgewählter Holdout-Fall; die vollständige Fallserie steht in der Evidence.&quot;);
+<span class="fc" id="L34">        text(body, &quot;claim&quot;, 32, y + 58, &quot;NO EXTERNAL NOVELTY CLAIM&quot;);</span>
+<span class="fc" id="L35">        y += 90;</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (String line : wrap(&quot;Fall: &quot; + comparison.id(), 100)) {</span>
+<span class="fc" id="L37">            text(body, &quot;source&quot;, 32, y, line);</span>
+<span class="fc" id="L38">            y += 20;</span>
+<span class="fc" id="L39">        }</span>
+<span class="fc" id="L40">        int height = y + 16;</span>
+<span class="fc" id="L41">        return &quot;&lt;svg xmlns=\&quot;http://www.w3.org/2000/svg\&quot; width=\&quot;&quot; + WIDTH</span>
+            + &quot;\&quot; height=\&quot;&quot; + height + &quot;\&quot; viewBox=\&quot;0 0 &quot; + WIDTH + &quot; &quot; + height
+            + &quot;\&quot; role=\&quot;img\&quot; aria-labelledby=\&quot;title desc\&quot; xml:lang=\&quot;de\&quot;&quot;
+            + &quot; data-generated-by=\&quot;AutonomousDiscoveryComparisonSvg\&quot;&quot;
+<span class="fc" id="L45">            + &quot; data-case-id=\&quot;&quot; + xml(comparison.id()) + &quot;\&quot;&gt;\n&quot;</span>
+            + &quot;&lt;title id=\&quot;title\&quot;&gt;Gelernte Regel im Held-out-Vergleich&lt;/title&gt;\n&quot;
+<span class="fc" id="L47">            + &quot;&lt;desc id=\&quot;desc\&quot;&gt;&quot; + xml(description(comparison)) + &quot;&lt;/desc&gt;\n&quot;</span>
+            + &quot;&quot;&quot;
+                &lt;style&gt;
+                text{font-family:Arial,Helvetica,sans-serif;fill:#172033}
+                .heading{font-size:28px;font-weight:700}
+                .label{font-size:18px}.formula{font-family:monospace;font-size:20px}
+                .cardTitle{font-size:20px;font-weight:700}.count{font-size:52px;font-weight:700}
+                .countLong{font-size:28px;font-weight:700}
+                .result{font-size:22px;font-weight:700}.note{font-size:17px}
+                .claim{font-size:16px;font-weight:700;fill:#73402b}
+                .source{font-family:monospace;font-size:14px}
+                &lt;/style&gt;
+                &lt;rect width=&quot;100%&quot; height=&quot;100%&quot; fill=&quot;#ffffff&quot;/&gt;
+                &quot;&quot;&quot;
+            + body + &quot;&lt;/svg&gt;\n&quot;;
+    }
+
+    private static int formula(StringBuilder svg, int y, String label, String expression) {
+<span class="fc" id="L65">        List&lt;String&gt; lines = wrap(expression, FORMULA_COLUMNS);</span>
+<span class="fc" id="L66">        int height = 50 + lines.size() * 26;</span>
+<span class="fc" id="L67">        rect(svg, 32, y, 936, height, &quot;#f7f8fa&quot;);</span>
+<span class="fc" id="L68">        text(svg, &quot;label&quot;, 56, y + 26, label);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (int index = 0; index &lt; lines.size(); index++) {</span>
+<span class="fc" id="L70">            text(svg, &quot;formula&quot;, 56, y + 58 + index * 26, lines.get(index));</span>
+        }
+<span class="fc" id="L72">        return y + height + 16;</span>
+    }
+
+    private static void outcome(StringBuilder svg, int x, int y, String label, Outcome result) {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        rect(svg, x, y, 456, 214, result.reached() ? &quot;#eef8ee&quot; : &quot;#fff6ed&quot;);</span>
+<span class="fc" id="L77">        text(svg, &quot;cardTitle&quot;, x + 24, y + 34, label);</span>
+<span class="fc" id="L78">        String count = Long.toString(result.exploredStates());</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        text(svg, count.length() &gt; 12 ? &quot;countLong&quot; : &quot;count&quot;, x + 24, y + 94, count);</span>
+<span class="fc" id="L80">        text(svg, &quot;label&quot;, x + 24, y + 123, &quot;untersuchte Zustände&quot;);</span>
+<span class="fc" id="L81">        text(svg, &quot;result&quot;, x + 24, y + 160,</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            result.reached() ? &quot;Ziel erreicht&quot; : &quot;Ziel im Lauf nicht erreicht&quot;);</span>
+<span class="fc" id="L83">        text(svg, &quot;label&quot;, x + 24, y + 191, pathLabel(result));</span>
+<span class="fc" id="L84">    }</span>
+
+    private static String pathLabel(Outcome result) {
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (!result.reached()) {</span>
+<span class="fc" id="L88">            return &quot;Kein Zielpfad gefunden&quot;;</span>
+        }
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        return result.pathLength() + (result.pathLength() == 1</span>
+<span class="fc" id="L91">            ? &quot; Umformung im Zielpfad&quot; : &quot; Umformungen im Zielpfad&quot;);</span>
+    }
+
+    private static String description(Comparison comparison) {
+<span class="fc" id="L95">        return &quot;Fall &quot; + comparison.id() + &quot;. Regel: &quot; + comparison.leftPattern()</span>
+<span class="fc" id="L96">            + &quot; → &quot; + comparison.rightPattern() + &quot;. Ausgangsausdruck: &quot;</span>
+<span class="fc" id="L97">            + comparison.inputExpression() + &quot;. Gesuchte Zieldarstellung: &quot;</span>
+<span class="fc" id="L98">            + comparison.targetExpression() + &quot;. Ohne Regel: &quot;</span>
+<span class="fc" id="L99">            + comparison.baseline().exploredStates() + &quot; untersuchte Zustände; &quot;</span>
+<span class="fc" id="L100">            + pathLabel(comparison.baseline()) + &quot;. Mit Regel: &quot;</span>
+<span class="fc" id="L101">            + comparison.candidate().exploredStates() + &quot; untersuchte Zustände; &quot;</span>
+<span class="fc" id="L102">            + pathLabel(comparison.candidate())</span>
+            + &quot;. Kein Laufzeitvergleich und keine Behauptung externer mathematischer Neuheit.&quot;;
+    }
+
+    /** Conservative monospace wrapping; never truncates formula tokens or case identifiers. */
+    private static List&lt;String&gt; wrap(String value, int columns) {
+<span class="fc" id="L108">        List&lt;String&gt; lines = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L109">        String remaining = value;</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        while (remaining.codePointCount(0, remaining.length()) &gt; columns) {</span>
+<span class="fc" id="L111">            int end = remaining.offsetByCodePoints(0, columns);</span>
+<span class="fc" id="L112">            int space = remaining.lastIndexOf(' ', end);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (space &gt; 0) {</span>
+<span class="fc" id="L114">                end = space;</span>
+            }
+<span class="fc" id="L116">            lines.add(remaining.substring(0, end));</span>
+<span class="fc" id="L117">            remaining = remaining.substring(end).stripLeading();</span>
+<span class="fc" id="L118">        }</span>
+<span class="fc" id="L119">        lines.add(remaining);</span>
+<span class="fc" id="L120">        return lines;</span>
+    }
+
+    private static void rect(StringBuilder svg, int x, int y, int width, int height, String fill) {
+<span class="fc" id="L124">        svg.append(&quot;&lt;rect x=\&quot;&quot;).append(x).append(&quot;\&quot; y=\&quot;&quot;).append(y)</span>
+<span class="fc" id="L125">            .append(&quot;\&quot; width=\&quot;&quot;).append(width).append(&quot;\&quot; height=\&quot;&quot;).append(height)</span>
+<span class="fc" id="L126">            .append(&quot;\&quot; rx=\&quot;12\&quot; fill=\&quot;&quot;).append(fill)</span>
+<span class="fc" id="L127">            .append(&quot;\&quot; stroke=\&quot;#c5cad3\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L128">    }</span>
+
+    private static void text(StringBuilder svg, String css, int x, int y, String value) {
+<span class="fc" id="L131">        svg.append(&quot;&lt;text class=\&quot;&quot;).append(css).append(&quot;\&quot; x=\&quot;&quot;).append(x)</span>
+<span class="fc" id="L132">            .append(&quot;\&quot; y=\&quot;&quot;).append(y).append(&quot;\&quot;&gt;&quot;).append(xml(value))</span>
+<span class="fc" id="L133">            .append(&quot;&lt;/text&gt;\n&quot;);</span>
+<span class="fc" id="L134">    }</span>
+
+    private static String xml(String value) {
+<span class="fc" id="L137">        return value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;)</span>
+<span class="fc" id="L138">            .replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;).replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;).replace(&quot;'&quot;, &quot;&amp;apos;&quot;);</span>
+    }
+
+    record Outcome(boolean reached, int pathLength, long exploredStates) {
+<span class="fc" id="L142">        Outcome {</span>
+<span class="fc bfc" id="L143" title="All 8 branches covered.">            if (exploredStates &lt; 0 || (reached ? pathLength &lt; 0 : pathLength != -1)) {</span>
+<span class="fc" id="L144">                throw new IllegalArgumentException(&quot;inconsistent search outcome&quot;);</span>
+            }
+<span class="fc" id="L146">        }</span>
+    }
+
+    record Comparison(
+        String id, String inputExpression, String targetExpression,
+        String leftPattern, String rightPattern, Outcome baseline, Outcome candidate
+    ) {
+<span class="fc" id="L153">        Comparison {</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            for (String value : new String[]{id, inputExpression, targetExpression,</span>
+                    leftPattern, rightPattern}) {
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L157">                    throw new IllegalArgumentException(&quot;comparison text must not be blank&quot;);</span>
+                }
+            }
+<span class="fc" id="L160">            Objects.requireNonNull(baseline, &quot;baseline&quot;);</span>
+<span class="fc" id="L161">            Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L162">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
