@@ -484,7 +484,7 @@ import java.util.Objects;
 <span class="nc" id="L484">                throw malformed(&quot;expected non-negative decimal integer&quot;);</span>
             }
 <span class="fc" id="L486">            String value = input.substring(start, index);</span>
-<span class="pc bpc" id="L487" title="1 of 4 branches missed.">            if (value.length() &gt; 1 &amp;&amp; value.charAt(0) == '0') {</span>
+<span class="fc bfc" id="L487" title="All 4 branches covered.">            if (value.length() &gt; 1 &amp;&amp; value.charAt(0) == '0') {</span>
 <span class="fc" id="L488">                throw malformed(&quot;decimal integers must not have leading zeros&quot;);</span>
             }
             try {
