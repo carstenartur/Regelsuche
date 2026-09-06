@@ -2,7 +2,7 @@
 
 Datum: 2026-09-06
 
-Status: Zielrichtung beschlossen; erster begrenzter Sicherheits-Schnitt
+Status: laufende Konsolidierung; erster und zweiter begrenzter Schnitt
 
 Ausgangsrevision: `4a52e933594c4eca9adb10f6f601e325bc624f2e`
 
@@ -44,14 +44,16 @@ Der gewoehnliche Formatter verengt grosse ganzzahlige Double-Werte auf `long`:
 `100000000000000000000` erscheint dadurch als `9223372036854775807`. Bei kleinen
 Werten erzeugt er ausserdem Exponentialnotation, die der Parser nicht akzeptiert.
 
-Direktes Literal-Matching verwendet eine numerische Toleranz: Das Pattern
-`A + 0` kann deshalb `1 + 0.0000000001` akzeptieren. Auch der bisherige
-`exactPositiveInteger`-Helfer rundet fast-ganzzahlige Exponenten und kann an der
-`int`-Grenze durch Verengung einen anderen Exponenten liefern.
+Direktes Literal-Matching verwendet historisch eine numerische Toleranz: Das
+Pattern `A + 0` konnte deshalb `1 + 0.0000000001` akzeptieren. Die fruehere
+algebraische Monomial-Inferenz nutzte dieselbe Art von Toleranz sowie
+Gleitkomma-Wurzeln und konnte dadurch beispielsweise eine gerundete `sqrt(2)`-
+Naeherung als exakte Bindung behandeln. Symbolische Division konnte ausserdem
+`x/x` ohne Nichtnull-Annahme wie die Konstante `1` erscheinen lassen.
 
 ## Erster Sicherheits-Schnitt: bewusst nicht die exakte AST-Migration
 
-Der erste Schnitt aendert nur die drei bestehenden Produktionsklassen:
+Der erste Schnitt aendert nur bestehende numerische Randbedingungen:
 
 - `ExpressionParser`: Im gewoehnlichen Pfad muss ein Literal unter der
   bestehenden kuerzesten Dezimaldarstellung des Double-Werts wertgleich
@@ -75,13 +77,47 @@ Sicherheitskorrektur. Im Zielmodell muss der normale exakte Pfad grosse Zahlen
 innerhalb ausdruecklicher Ressourcenlimits korrekt verarbeiten, nicht dauerhaft
 abweisen. Dann wird diese temporaere Zulassungsschranke ersetzt.
 
+## Zweiter Schnitt: exakte, begrenzte Monomial-Inferenz
+
+Die algebraische Inferenz des `EquivalenceAwarePatternMatcher` verwendet fuer
+Monomialkoeffizienten den vorhandenen `ExactRational`-Vertrag. Der
+package-private Helfer `BoundedExactMonomial` besitzt nur die eng begrenzte
+Verantwortung fuer Monomialprojektion, exakte Koeffizientenrechnung und
+ueberpruefte Potenzbindungen. Es gibt keinen zweiten Parser, Suchalgorithmus,
+oeffentlichen Zahlentyp oder konkurrierenden Matcher.
+
+Produkte, konstante Divisionen und positive ganzzahlige Potenzen werden rational
+exakt ausgewertet. Symbolische Nenner bleiben ohne explizite Nichtnull-Annahme
+ausserhalb dieser Inferenz; `x/x` wird daher nicht stillschweigend zu `1`.
+Strukturelles Matching von `A/A` bleibt davon getrennt und kann nur durch eine
+Regel mit eigener Annahmenpruefung mathematische Kuerzung autorisieren.
+
+Wurzeln autorisieren Bindungen nur, wenn Zaehler und Nenner perfekte
+ganzzahlige Potenzen sind und alle Variablenexponenten teilbar sind. Eine
+endliche binaere Ganzzahlsuche mit exaktem Potenzvergleich ersetzt
+Gleitkomma-Wurzelvorschlaege. Die erzeugte Bindung wird danach erneut gegen den
+Quellausdruck geprueft. Ein exakter nichtterminierender Bruch bleibt Bruchsyntax;
+eine endliche Dezimaldarstellung wird nur ausgegeben, wenn der exakte
+Rueckvergleich denselben rationalen Wert bestaetigt. So bleibt `3/2` im
+syntaxgerichteten Suchpfad als `1.5` darstellbar, waehrend `2/3` Bruchsyntax
+behaelt.
+
+Alle algebraischen Vorfilter und Inferenzversuche eines `matchDetailed`-Aufrufs
+teilen ein Budget von 10.000 Besuchen/Operationen, eine Projektionstiefe von 128
+und konservative Koeffizientengrenzen von 4.096 Bit. Exponenten werden vor der
+Verengung geprueft. Ueberschreitungen oder im Legacy-AST nicht exakt
+darstellbare Bindungen liefern `INCONCLUSIVE` mit typisiertem Grund und
+unveraenderten Caller-Bindings; Negation darf diesen Zustand nicht zu einem
+Treffer machen. Diese Grenzen sind kein vollstaendiges CPU-/Sucharbeits-Ledger.
+
 ## Noch offene mathematische Grenzen
 
 `NumberExpr`, `PatternExpr.LiteralNumber` und die allgemeine Wertprojektion
-bleiben in diesem Schnitt Double-basiert. Insbesondere sind algebraische
-Monomialkoeffizienten, Wurzelinferenz, numerisches Falten und die allgemeine
-Kanonisierung dadurch noch nicht insgesamt exakt. Die Beseitigung der direkten
-Literal-Toleranz ist keine Freigabe beliebiger algebraischer Inferenz.
+bleiben Double-basiert. Der zweite Schnitt macht nur die deklarierte
+Monomial-Koeffizientenrechnung und Wurzelinferenz rational exakt; bereits vor
+dieser Grenze verlorene Quelltextpraezision kann er nicht rekonstruieren.
+Numerisches Falten, allgemeine Kanonisierung, Suchidentitaet, E-Graph,
+Serialisierung und weitere Adapter sind damit noch nicht insgesamt exakt.
 
 Die Migration muss den vorhandenen exakten Werttyp weiterverwenden. Sie darf
 keinen weiteren Zahlen-Sidecar und keine dauerhafte `value(): double`-Fassade
@@ -105,6 +141,13 @@ eine reale `PatternRewriteRule` mit Replay/Wertprojektion, fraktionale und
 uebergrosse Integerexponenten sowie begrenztes AC-Matching mit unveraenderten
 Caller-Bindings und explizitem `INCONCLUSIVE`.
 
+`ExactMonomialInferenceTest` prueft irrationale Wurzeln, rationale Bindungen,
+exakte Dezimalprodukte, symbolische Nenner, Grenzfaelle, Replay und die skalierte
+quadratische Ergaenzung. Eine separate endliche Referenz prueft 3.078
+ganzzahlige und 1.300 rationale Wurzelfaelle durch wiederholte Multiplikation.
+Die bestehenden Ableitungs- und Benchmarktests bleiben unveraendert und muessen
+dieselben Suchziele und Budgets weiterhin erreichen.
+
 Die abschliessende exakte Migration braucht darueber hinaus gemeinsame
 Regressionen fuer Erzeugung neuer Zahlen durch Umformungen, exakte Brueche,
 Patterninstanziierung, Canonicalizer, Suchcache, E-Graph, Serialisierung,
@@ -112,8 +155,8 @@ Persistenz, Solveradapter und Replay. Verschiedene exakte Werte duerfen in
 keinem dieser exakten Verarbeitungspfade zusammenfallen.
 
 ```sh
-mvn -pl regelsuche-core -Dtest=NumericBoundaryRegressionTest test
-./gradlew :regelsuche-core:test --tests '*NumericBoundaryRegressionTest'
+mvn -pl regelsuche-core -Dtest=NumericBoundaryRegressionTest,ExactMonomialInferenceTest,EquivalenceAwarePatternMatcherTest test
+./gradlew :regelsuche-core:test --tests '*NumericBoundaryRegressionTest' --tests '*ExactMonomialInferenceTest' --tests '*EquivalenceAwarePatternMatcherTest'
 ./gradlew --no-configuration-cache ciCheck
 ```
 
