@@ -169,3 +169,19 @@ Die einzelnen mathematischen und technischen Dokumentationen geben die
 fokussierten Befehle an. Softwareprüfung, ausgeführtes Forschungsprotokoll,
 unabhängiger mathematischer Beweis und öffentliche Release-Artefakte bleiben
 getrennt nachzusehen.
+
+## Aus Spuren abgeleitete Planvorlagen
+
+`ExactFinitePolynomialTraceLearner` bildet aus mehreren vollständigen,
+verifier-gebundenen Trainingspfaden parametrisierte Ansatzfolgen. Die neue
+[Vorlagendokumentation](trace-derived-polynomial-plans.md) beschreibt die
+exakten Koeffizientenlücken, bewahrten Wiederholungsbeziehungen und erneute
+Prüfung jeder Anwendung. Semantisch gleiche Trainingspolynome zählen auch nach
+Umordnung oder Faktorisierung nicht mehrfach; der erste Anwendungsschritt
+weist zum Training äquivalente Eingaben ab.
+
+Dies ergänzt die Ausführungsmechanik, lernt aber noch keine neue Stufenfolge
+oder Verzweigungsstrategie. Die neuen Koeffizienteninstanzen sind bekannte
+Entwicklungsfälle derselben Familie, kein frischer FINAL TEST. Eine gemeinsame
+Strategieauswahl, vollständige Kostenbilanz und Produktionspromotion bleiben
+separate Aufgaben unter #874/#750.
