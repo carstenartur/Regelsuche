@@ -11,7 +11,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * Matches expression patterns modulo a deliberately bounded set of
@@ -25,8 +24,6 @@ import java.util.TreeMap;
 public final class EquivalenceAwarePatternMatcher {
     public static final int DEFAULT_MAX_COMMUTATIVE_OPERANDS = 8;
     public static final int DEFAULT_MAX_BACKTRACKING_BRANCHES = 10_000;
-
-    private static final double EPSILON = 1.0e-9;
 
     private EquivalenceAwarePatternMatcher() {
     }
@@ -85,7 +82,8 @@ public final class EquivalenceAwarePatternMatcher {
         }
         Map<String, Expr> original = Map.copyOf(bindings);
         Map<String, Expr> working = new HashMap<>(bindings);
-        MatchBudget budget = new MatchBudget(maxBacktrackingBranches);
+        MatchBudget budget = new MatchBudget(
+            maxBacktrackingBranches, profile.inferAlgebraicBindings());
         try {
             boolean matched = matchInternal(
                 pattern,
@@ -100,6 +98,9 @@ public final class EquivalenceAwarePatternMatcher {
                 budget.usedBranches(),
                 ""
             );
+        } catch (BoundedExactMonomial.LimitExceeded limit) {
+            return new MatchAttempt(
+                AttemptStatus.INCONCLUSIVE, original, budget.usedBranches(), limit.code);
         } catch (MatchLimitExceeded limit) {
             return new MatchAttempt(
                 AttemptStatus.INCONCLUSIVE,
@@ -123,7 +124,7 @@ public final class EquivalenceAwarePatternMatcher {
                 bindings.put(placeholder.name(), expression);
                 return true;
             }
-            return equivalent(bound, expression, profile);
+            return equivalent(bound, expression, profile, budget);
         }
         if (pattern instanceof PatternExpr.LiteralNumber number) {
             if (expression instanceof NumberExpr numberExpr) {
@@ -132,7 +133,7 @@ public final class EquivalenceAwarePatternMatcher {
                     && numberExpr.value() == number.value();
             }
             return profile.inferAlgebraicBindings()
-                && Monomial.from(expression)
+                && BoundedExactMonomial.from(expression, budget.algebraic)
                     .map(monomial -> monomial.isConstant(number.value()))
                     .orElse(false);
         }
@@ -164,7 +165,7 @@ public final class EquivalenceAwarePatternMatcher {
         if (profile.inferAlgebraicBindings()
                 && allPlaceholdersBound(operation, bindings)) {
             Expr instantiated = operation.instantiate(bindings);
-            if (equivalent(instantiated, expression, profile)) {
+            if (equivalent(instantiated, expression, profile, budget)) {
                 return true;
             }
         }
@@ -173,7 +174,8 @@ public final class EquivalenceAwarePatternMatcher {
                     operation,
                     expression,
                     bindings,
-                    profile)) {
+                    profile,
+                    budget)) {
             return true;
         }
         if (!(expression instanceof BinaryExpr binaryExpr)
@@ -238,7 +240,8 @@ public final class EquivalenceAwarePatternMatcher {
         PatternExpr.Operation operation,
         Expr expression,
         Map<String, Expr> bindings,
-        RecognitionProfile profile
+        RecognitionProfile profile,
+        MatchBudget budget
     ) {
         if (operation.operator() != BinaryOperator.POW
                 || !(operation.left()
@@ -247,7 +250,7 @@ public final class EquivalenceAwarePatternMatcher {
                     instanceof PatternExpr.LiteralNumber exponentLiteral)) {
             return false;
         }
-        int exponent = exactPositiveInteger(exponentLiteral.value());
+        int exponent = BoundedExactMonomial.positiveInteger(exponentLiteral.value());
         if (exponent < 1) {
             return false;
         }
@@ -256,14 +259,15 @@ public final class EquivalenceAwarePatternMatcher {
             return equivalent(
                 operation.instantiate(bindings),
                 expression,
-                profile
+                profile,
+                budget
             );
         }
-        var monomial = Monomial.from(expression);
+        var monomial = BoundedExactMonomial.from(expression, budget.algebraic);
         if (monomial.isEmpty()) {
             return false;
         }
-        var root = monomial.get().exactRoot(exponent);
+        var root = monomial.get().exactRoot(exponent, budget.algebraic);
         if (root.isEmpty()) {
             return false;
         }
@@ -271,7 +275,8 @@ public final class EquivalenceAwarePatternMatcher {
         return equivalent(
             operation.instantiate(bindings),
             expression,
-            profile
+            profile,
+            budget
         );
     }
 
@@ -314,7 +319,8 @@ public final class EquivalenceAwarePatternMatcher {
     private static boolean equivalent(
         Expr left,
         Expr right,
-        RecognitionProfile profile
+        RecognitionProfile profile,
+        MatchBudget budget
     ) {
         if (left.equals(right)) {
             return true;
@@ -322,8 +328,8 @@ public final class EquivalenceAwarePatternMatcher {
         if (!profile.inferAlgebraicBindings()) {
             return false;
         }
-        var leftMonomial = Monomial.from(left);
-        var rightMonomial = Monomial.from(right);
+        var leftMonomial = BoundedExactMonomial.from(left, budget.algebraic);
+        var rightMonomial = BoundedExactMonomial.from(right, budget.algebraic);
         return leftMonomial.isPresent()
             && rightMonomial.isPresent()
             && leftMonomial.get().equivalentTo(rightMonomial.get());
@@ -343,7 +349,7 @@ public final class EquivalenceAwarePatternMatcher {
         PatternExpr pattern = patterns.get(patternIndex);
         for (int index = 0; index < expressions.size(); index++) {
             Expr candidate = expressions.get(index);
-            if (!couldStructurallyMatch(pattern, candidate, profile)) {
+            if (!couldStructurallyMatch(pattern, candidate, profile, budget)) {
                 continue;
             }
             budget.consumeBranch();
@@ -376,7 +382,8 @@ public final class EquivalenceAwarePatternMatcher {
     private static boolean couldStructurallyMatch(
         PatternExpr pattern,
         Expr expression,
-        RecognitionProfile profile
+        RecognitionProfile profile,
+        MatchBudget budget
     ) {
         if (pattern instanceof PatternExpr.Placeholder) {
             return true;
@@ -384,7 +391,7 @@ public final class EquivalenceAwarePatternMatcher {
         if (pattern instanceof PatternExpr.LiteralNumber) {
             return expression instanceof NumberExpr
                 || profile.inferAlgebraicBindings()
-                    && Monomial.from(expression).isPresent();
+                    && BoundedExactMonomial.from(expression, budget.algebraic).isPresent();
         }
         if (pattern instanceof PatternExpr.LiteralVariable) {
             return expression instanceof VariableExpr;
@@ -398,7 +405,7 @@ public final class EquivalenceAwarePatternMatcher {
         PatternExpr.Operation operation = (PatternExpr.Operation) pattern;
         if (profile.inferAlgebraicBindings()
                 && operation.operator() == BinaryOperator.POW) {
-            return Monomial.from(expression).isPresent()
+            return BoundedExactMonomial.from(expression, budget.algebraic).isPresent()
                 || expression instanceof BinaryExpr binary
                     && binary.operator() == BinaryOperator.POW;
         }
@@ -432,23 +439,6 @@ public final class EquivalenceAwarePatternMatcher {
         } else {
             result.add(expression);
         }
-    }
-
-    private static int exactPositiveInteger(double value) {
-        // Neither rounding nor narrowing may turn a fractional or oversized
-        // exponent into authority for an integer-power inference.
-        return value > 0 && value <= Integer.MAX_VALUE
-                && value == Math.rint(value)
-            ? (int) value
-            : -1;
-    }
-
-    private static boolean nearlyEqual(double left, double right) {
-        return Math.abs(left - right)
-            <= EPSILON * Math.max(
-                1.0,
-                Math.max(Math.abs(left), Math.abs(right))
-            );
     }
 
     public enum AttemptStatus {
@@ -495,10 +485,12 @@ public final class EquivalenceAwarePatternMatcher {
     }
 
     private static final class MatchBudget {
+        private final BoundedExactMonomial.Budget algebraic;
         private final int initialBranches;
         private int remainingBranches;
 
-        private MatchBudget(int remainingBranches) {
+        private MatchBudget(int remainingBranches, boolean inferAlgebraicBindings) {
+            this.algebraic = inferAlgebraicBindings ? new BoundedExactMonomial.Budget() : null;
             this.initialBranches = remainingBranches;
             this.remainingBranches = remainingBranches;
         }
@@ -526,138 +518,4 @@ public final class EquivalenceAwarePatternMatcher {
         }
     }
 
-    private record Monomial(
-        double coefficient,
-        Map<String, Integer> powers
-    ) {
-        private Monomial {
-            powers = Map.copyOf(new TreeMap<>(powers));
-        }
-
-        static java.util.Optional<Monomial> from(Expr expression) {
-            if (expression instanceof NumberExpr number) {
-                return java.util.Optional.of(
-                    new Monomial(number.value(), Map.of()));
-            }
-            if (expression instanceof VariableExpr variable) {
-                return java.util.Optional.of(
-                    new Monomial(1.0, Map.of(variable.name(), 1)));
-            }
-            if (!(expression instanceof BinaryExpr binary)) {
-                return java.util.Optional.empty();
-            }
-            if (binary.operator() == BinaryOperator.MUL
-                    || binary.operator() == BinaryOperator.DIV) {
-                var left = from(binary.left());
-                var right = from(binary.right());
-                if (left.isEmpty() || right.isEmpty()) {
-                    return java.util.Optional.empty();
-                }
-                if (binary.operator() == BinaryOperator.DIV
-                        && nearlyEqual(right.get().coefficient, 0.0)) {
-                    return java.util.Optional.empty();
-                }
-                return java.util.Optional.of(
-                    binary.operator() == BinaryOperator.MUL
-                        ? left.get().multiply(right.get())
-                        : left.get().divide(right.get()));
-            }
-            if (binary.operator() == BinaryOperator.POW
-                    && binary.right() instanceof NumberExpr exponentExpr) {
-                int exponent = exactPositiveInteger(exponentExpr.value());
-                var base = from(binary.left());
-                if (exponent < 1 || base.isEmpty()) {
-                    return java.util.Optional.empty();
-                }
-                return java.util.Optional.of(base.get().pow(exponent));
-            }
-            return java.util.Optional.empty();
-        }
-
-        Monomial multiply(Monomial other) {
-            Map<String, Integer> result = new TreeMap<>(powers);
-            other.powers.forEach((name, exponent) ->
-                result.merge(name, exponent, Integer::sum));
-            return new Monomial(coefficient * other.coefficient, result);
-        }
-
-        Monomial divide(Monomial other) {
-            Map<String, Integer> result = new TreeMap<>(powers);
-            other.powers.forEach((name, exponent) ->
-                result.merge(name, -exponent, Integer::sum));
-            result.entrySet().removeIf(entry -> entry.getValue() == 0);
-            return new Monomial(coefficient / other.coefficient, result);
-        }
-
-        Monomial pow(int exponent) {
-            Map<String, Integer> result = new TreeMap<>();
-            powers.forEach((name, power) ->
-                result.put(name, power * exponent));
-            return new Monomial(
-                Math.pow(coefficient, exponent),
-                result
-            );
-        }
-
-        java.util.Optional<Monomial> exactRoot(int exponent) {
-            if (coefficient < 0.0 && exponent % 2 == 0) {
-                return java.util.Optional.empty();
-            }
-            Map<String, Integer> result = new TreeMap<>();
-            for (var entry : powers.entrySet()) {
-                if (entry.getValue() % exponent != 0) {
-                    return java.util.Optional.empty();
-                }
-                result.put(
-                    entry.getKey(),
-                    entry.getValue() / exponent
-                );
-            }
-            double rootCoefficient = coefficient < 0.0
-                ? -Math.pow(-coefficient, 1.0 / exponent)
-                : Math.pow(coefficient, 1.0 / exponent);
-            if (!nearlyEqual(
-                    Math.pow(rootCoefficient, exponent),
-                    coefficient)) {
-                return java.util.Optional.empty();
-            }
-            return java.util.Optional.of(
-                new Monomial(rootCoefficient, result));
-        }
-
-        boolean equivalentTo(Monomial other) {
-            return nearlyEqual(coefficient, other.coefficient)
-                && powers.equals(other.powers);
-        }
-
-        boolean isConstant(double expected) {
-            return powers.isEmpty()
-                && nearlyEqual(coefficient, expected);
-        }
-
-        Expr toExpr() {
-            Expr result = null;
-            if (!nearlyEqual(coefficient, 1.0) || powers.isEmpty()) {
-                result = new NumberExpr(coefficient);
-            }
-            for (var entry : powers.entrySet()) {
-                Expr factor = new VariableExpr(entry.getKey());
-                if (entry.getValue() != 1) {
-                    factor = new BinaryExpr(
-                        factor,
-                        BinaryOperator.POW,
-                        new NumberExpr(entry.getValue())
-                    );
-                }
-                result = result == null
-                    ? factor
-                    : new BinaryExpr(
-                        result,
-                        BinaryOperator.MUL,
-                        factor
-                    );
-            }
-            return result == null ? new NumberExpr(1.0) : result;
-        }
-    }
 }
