@@ -63,6 +63,22 @@ oder gewöhnliche Suchkante. Die [Kompositionsdokumentation](budgeted-rewrite-pr
 enthält Vertrag, Prüfungen und Reproduktionsbefehle. Testdefinitionen und lokale
 Teilprüfungen ersetzen nicht die vollständige CI zum jeweiligen Commit.
 
+## Begrenzte Auswahl von Polynomstrategien
+
+Der experimentelle Baustein `FinitePolynomialStrategySearch` erzeugt alle
+Ansatzfolgen innerhalb einer vorgegebenen endlichen Grammatik, bewertet sie
+auf TRAIN-Eingaben und friert die Auswahl vor weiteren Anwendungen ein.
+Neue Koeffizienten werden bei der Wiederverwendung neu gelöst und geprüft;
+die Trainingsdaten und ihre bloß umbenannten Äquivalente sind dabei gesperrt.
+
+Im Entwicklungsfall gewinnt direkte Faktorisierung gegen eine unnötige
+quadratische Ergänzung davor. Alle 18 Trainingszeilen und die Kosten der
+Auswahl bleiben erhalten. Andere Trainingsdaten können eine andere Vorlage
+wählen. Das ist datenabhängige Auswahl, nicht das Erlernen der Ansatzgrammatik,
+einer verzweigenden Taktik oder der allgemeinen Resttermstrategie. Neue
+Koeffizienten derselben Familie ersetzen keinen unberührten FINAL TEST.
+Reproduktion und Grenzen: [Polynomstrategien aus Trainingsaufgaben](finite-polynomial-strategy-selection.md).
+
 ## Was historische Wiederentdeckung hier bedeutet
 
 Sophie-Germain besitzt einen begrenzten Entwicklungsnachweis mit eingefrorenen
