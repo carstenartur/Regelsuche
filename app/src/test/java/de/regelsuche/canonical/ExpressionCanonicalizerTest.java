@@ -142,6 +142,78 @@ class ExpressionCanonicalizerTest {
     }
 
     @Test
+    void assumptionFreeCancellationDoesNotErasePartialTerms() {
+        for (String source : List.of(
+                "x/x - x/x",
+                "1/0 - 1/0",
+                "1/(x + 1) - 1/(x + 1)",
+                "x^(-1) - x^(-1)",
+                "x^0.5 - x^0.5")) {
+            String canonical = canonicalizer.canonicalize(source);
+            assertNotEquals(
+                canonicalizer.stableHash(source),
+                canonicalizer.stableHash("0"),
+                "partial expression must not acquire the total value 0: " + source);
+            assertEquals(
+                canonical,
+                canonicalizer.canonicalize(canonical),
+                "guarded fallback must be a canonical fixpoint: " + source);
+        }
+    }
+
+    @Test
+    void definednessPreservingCoefficientReductionRemainsAvailable() {
+        assertEquals("0", canonicalizer.canonicalize("x - x"));
+        assertEquals("0", canonicalizer.canonicalize("sin(x) - sin(x)"));
+        assertEquals(
+            canonicalizer.canonicalize("1/x"),
+            canonicalizer.canonicalize("2*(1/x) - 1/x"));
+    }
+
+    @Test
+    void assumptionAwareCancellationRecordsRequiredDefinednessGuards() {
+        AssumptionContext quotientContext = new AssumptionContext();
+        assertEquals(
+            "0",
+            canonicalizer.canonicalizeWith(
+                "1/(x + 1) - 1/(x + 1)",
+                quotientContext));
+        assertTrue(quotientContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
+                && assumption.expression().equals("x + 1 != 0")));
+
+        AssumptionContext inverseContext = new AssumptionContext();
+        assertEquals(
+            "0",
+            canonicalizer.canonicalizeWith(
+                "x^(-1) - x^(-1)",
+                inverseContext));
+        assertTrue(inverseContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
+                && assumption.expression().equals("x != 0")));
+    }
+
+    @Test
+    void zeroPowersDoNotErasePartialBasesWithoutGuards() {
+        String undefined = "(1/0)^0";
+        String conditional = "(1/x)^0";
+
+        assertNotEquals(
+            canonicalizer.stableHash(undefined),
+            canonicalizer.stableHash("1"));
+        assertNotEquals(
+            canonicalizer.stableHash(conditional),
+            canonicalizer.stableHash("1"));
+        assertEquals("1", canonicalizer.canonicalize("x^0"));
+
+        AssumptionContext context = new AssumptionContext();
+        assertEquals("1", canonicalizer.canonicalizeWith(conditional, context));
+        assertTrue(context.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
+                && assumption.expression().equals("x != 0")));
+    }
+
+    @Test
     void unrepresentableExactCoefficientSumFallsBackWithoutRounding() {
         String source = "sin(x) + 0.00000000000000001*sin(x)";
         String canonical = canonicalizer.canonicalize(source);
