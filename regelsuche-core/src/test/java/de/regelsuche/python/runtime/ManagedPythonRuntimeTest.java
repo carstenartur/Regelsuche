@@ -14,5 +14,6 @@ class ManagedPythonRuntimeTest {
     @Test void interruptRestoresFlagAndRetiresOwner() throws Exception { ManagedPythonRuntimeChecks.interruptRestoresFlagAndRetiresOwner(); }
     @Test void concurrentCallsUseOneWorker() throws Exception { ManagedPythonRuntimeChecks.concurrentCallsUseOneWorker(); }
     @Test void cleanupCannotMaskExecutionFailure() throws Exception { ManagedPythonRuntimeChecks.cleanupCannotMaskExecutionFailure(); }
+    @Test void closeStopsNewAndQueuedAdmissions() throws Exception { ManagedPythonRuntimeChecks.closeStopsNewAndQueuedAdmissions(); }
     @Test void invalidConfigurationAndDeadline() throws Exception { ManagedPythonRuntimeChecks.invalidConfigurationAndDeadline(); }
 }

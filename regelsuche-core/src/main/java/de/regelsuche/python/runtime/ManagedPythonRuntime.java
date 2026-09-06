@@ -78,9 +78,10 @@ public final class ManagedPythonRuntime implements AutoCloseable {
     private final int maximumOutputBytes;
     private final String threadName;
     private final ReentrantLock gate = new ReentrantLock();
-    // Only the caller holding gate may change these two fields.
+    // The gate owns generations; admission closes immediately, before cleanup waits for that gate.
     private Generation generation;
-    private boolean closed;
+    private final AtomicBoolean closed = new AtomicBoolean();
+    private boolean cleanupComplete;
 
     /** Integer.MAX_VALUE delegates that data limit to a separately bounded adapter policy. */
     public ManagedPythonRuntime(SessionFactory factory, int maximumInputBytes, int maximumOutputBytes,
@@ -108,6 +109,7 @@ public final class ManagedPythonRuntime implements AutoCloseable {
         catch (ArithmeticException exception) {
             throw new IllegalArgumentException("timeout exceeds monotonic clock range", exception);
         }
+        if (closed.get()) throw failure(Failure.CLOSED, "Python runtime is closed", null);
         checkSize(input, maximumInputBytes);
         long started = System.nanoTime();
         boolean acquired = false;
@@ -116,7 +118,7 @@ public final class ManagedPythonRuntime implements AutoCloseable {
         try {
             acquired = gate.tryLock(budget, TimeUnit.NANOSECONDS);
             if (!acquired) throw failure(Failure.TIMEOUT, "Python runtime queue deadline exceeded", null);
-            if (closed) throw failure(Failure.CLOSED, "Python runtime is closed", null);
+            if (closed.get()) throw failure(Failure.CLOSED, "Python runtime is closed", null);
             if (remaining(started, budget) <= 0) {
                 // We now own the idle generation. Preserve cancellation semantics even when the
                 // deadline expired just before submission. A waiter without the gate never retires it.
@@ -172,12 +174,16 @@ public final class ManagedPythonRuntime implements AutoCloseable {
         catch (RuntimeException cleanup) { authoritative.addSuppressed(cleanup); }
     }
 
-    /** Idempotent; waits for the serialized caller and then releases its session. */
+    /** True as soon as admission closes, even when an earlier invocation is still being drained. */
+    public boolean isClosed() { return closed.get(); }
+
+    /** Idempotent; closes admission first, waits for the owner, then releases its session. */
     @Override public void close() {
+        closed.set(true);
         gate.lock();
         try {
-            if (closed) return;
-            closed = true;
+            if (cleanupComplete) return;
+            cleanupComplete = true;
             Generation owned = generation;
             generation = null;
             if (owned != null) owned.close();

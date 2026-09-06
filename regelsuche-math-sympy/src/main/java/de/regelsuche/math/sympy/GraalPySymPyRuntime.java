@@ -37,7 +37,7 @@ final class GraalPySymPyRuntime implements AutoCloseable {
     private final Engine engine;
     private final Path externalResourcesDirectory;
     private final ManagedPythonRuntime runtime;
-    private boolean closed;
+    private volatile boolean closed;
 
     GraalPySymPyRuntime() {
         Path extracted = extractResources();
@@ -65,6 +65,10 @@ final class GraalPySymPyRuntime implements AutoCloseable {
     SymPyInvocation invoke(String input, Duration timeout) {
         Objects.requireNonNull(input, "input");
         Objects.requireNonNull(timeout, "timeout");
+        if (closed) {
+            return SymPyInvocation.failure(SymPyInvocation.Status.UNAVAILABLE,
+                    "GRAALPY_RUNTIME_CLOSED", RUNTIME_ID, 0);
+        }
         long started = System.nanoTime();
         try {
             var result = runtime.invoke(input, timeout);

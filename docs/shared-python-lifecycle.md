@@ -34,6 +34,14 @@ holder. A caller that times out while waiting for the gate never cancels the
 owner's invocation. Once a caller owns the gate, an expired invocation deadline
 retires that idle generation even when no new task could be submitted.
 
+`close()` shuts admission atomically **before** waiting for an in-flight owner.
+New invocations fail `CLOSED` without queueing; already queued calls recheck the
+admission state after acquiring the gate and never enter a new Python invocation.
+`isClosed()` reports this admission state, not completion of resource cleanup.
+The SymPy facade additionally uses a volatile admission guard. A second synchronized
+monitor around invoke would reintroduce unbounded queue waiting outside the common
+deadline and is deliberately not used.
+
 The same monotonic deadline covers queue waiting, worker submission, imports and
 execution. Invalid durations fail before allocation. Cleanup/cancellation is
 best-effort and can outlast the nominal deadline. `close()` waits for the serialized
@@ -77,14 +85,15 @@ Future timeout. Invalid nonpositive timeouts are rejected explicitly. Cold/warm
 initialization and invocation timings remain diagnostics, not certificate inputs.
 No end-to-end speedup is claimed.
 
-Twelve dependency-free lifecycle scenarios are called by twelve JUnit methods:
+Thirteen dependency-free lifecycle scenarios are called by thirteen JUnit methods:
 warm reuse/close, UTF-8 boundaries, output rejection, execution failure, bootstrap
 failure, blocked invocation cancellation, delayed startup retirement, queue
-ownership, interrupted caller, concurrent callers, cleanup failure and invalid
-configuration. Latches establish ordering; no production thread sleeps are used.
-The dependency-free scenarios were compiled with `javac 21 -Xlint:all` and executed
-locally. That is not a local Java-25/GraalPy execution; the actual CI is authoritative
-for both real adapters.
+ownership, interrupted caller, concurrent callers, cleanup failure, atomic close
+admission and invalid configuration. Latches establish ordering; no production
+thread sleeps are used. The dependency-free scenarios were compiled with
+`javac 21 -Xlint:all` and executed locally, including five consecutive runs after
+the close-admission fix. That is not a local Java-25/GraalPy execution; the actual
+CI is authoritative for both real adapters.
 
 ```bash
 mvn --batch-mode --no-transfer-progress -pl regelsuche-core -am \

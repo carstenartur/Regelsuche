@@ -221,6 +221,47 @@ public final class ManagedPythonRuntimeChecks {
         }
     }
 
+    public static void closeStopsNewAndQueuedAdmissions() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        AtomicInteger invocations = new AtomicInteger();
+        Echo echo = new Echo() {
+            @Override public String invoke(String input) {
+                invocations.incrementAndGet();
+                entered.countDown(); awaitIgnoringInterrupt(release);
+                return super.invoke(input);
+            }
+        };
+        ManagedPythonRuntime runtime = runtime(() -> echo);
+        AtomicReference<Throwable> error = new AtomicReference<>();
+        Thread waiter = Thread.ofPlatform().unstarted(() -> {
+            try { fails(Failure.CLOSED, () -> runtime.invoke("queued", NORMAL)); }
+            catch (Throwable failure) { error.set(failure); }
+        });
+        Thread closer = Thread.ofPlatform().unstarted(runtime::close);
+        try (var caller = Executors.newSingleThreadExecutor()) {
+            Future<?> owner = caller.submit(() -> runtime.invoke("owner", NORMAL));
+            try {
+                await(entered);
+                waiter.start();
+                long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                while (waiter.getState() != Thread.State.TIMED_WAITING && System.nanoTime() < until) Thread.onSpinWait();
+                check(waiter.getState() == Thread.State.TIMED_WAITING, "waiter did not queue behind owner");
+                closer.start();
+                until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                while (!runtime.isClosed() && System.nanoTime() < until) Thread.onSpinWait();
+                check(runtime.isClosed(), "close did not close admission before waiting");
+                // The current owner remains blocked. A new call must fail CLOSED, not wait and time out.
+                fails(Failure.CLOSED, () -> runtime.invoke("new", SHORT));
+                check(echo.closed.get() == 0, "close must drain the active owner");
+            } finally { release.countDown(); }
+            owner.get(10, TimeUnit.SECONDS);
+            waiter.join(10_000); closer.join(10_000);
+            check(!waiter.isAlive() && !closer.isAlive(), "closing threads stuck");
+            check(error.get() == null, "queued caller failed: " + error.get());
+            check(invocations.get() == 1 && echo.closed.get() == 1, "closed runtime admitted queued work");
+        } finally { release.countDown(); runtime.close(); }
+    }
+
     public static void invalidConfigurationAndDeadline() {
         rejects(() -> runtime(null));
         rejects(() -> new ManagedPythonRuntime(Echo::new, 0, 1, "runtime-"));
@@ -254,7 +295,7 @@ public final class ManagedPythonRuntimeChecks {
         executionFailureRetiresSession(); initializationFailureRetiresSession(); blockedInvocationIsCancelled();
         cancelledStartupCannotReplaceNewGeneration(); queueTimeoutDoesNotCancelOwner();
         interruptRestoresFlagAndRetiresOwner(); concurrentCallsUseOneWorker();
-        cleanupCannotMaskExecutionFailure(); invalidConfigurationAndDeadline();
-        System.out.println("12 shared lifecycle scenarios passed");
+        cleanupCannotMaskExecutionFailure(); closeStopsNewAndQueuedAdmissions(); invalidConfigurationAndDeadline();
+        System.out.println("13 shared lifecycle scenarios passed");
     }
 }
