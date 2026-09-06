@@ -41,7 +41,7 @@ import java.util.Objects;
 <span class="fc" id="L41">        SourceIdentity after = Objects.requireNonNull(</span>
 <span class="fc" id="L42">            source.identity(),</span>
             &quot;BudgetedTransformationSource.identity must not return null&quot;);
-<span class="pc bpc" id="L44" title="1 of 4 branches missed.">        if (!before.equals(after) || !before.equals(result.sourceIdentity())) {</span>
+<span class="fc bfc" id="L44" title="All 4 branches covered.">        if (!before.equals(after) || !before.equals(result.sourceIdentity())) {</span>
 <span class="fc" id="L45">            throw new IllegalArgumentException(</span>
                 &quot;budgeted source identity changed during execution&quot;);
         }

@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BudgetedRewriteProgramEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">BudgetedRewriteProgramEvaluator.java</span></div><h1>BudgetedRewriteProgramEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import static de.regelsuche.search.program.BudgetedRewriteProgramExecution.WorkKind.*;
+
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.ExactTheoryPath;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.ExplorationLimits;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.LimitBlock;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.LimitKind;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.Material;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.PathBudget;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.Pruning;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.SourceCall;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.Step;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.WorkKind;
+import de.regelsuche.search.program.BudgetedTransformationSource.SourceIdentity;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Package-private typed lane of RewriteProgramInterpreter; no second search engine. */
+final class BudgetedRewriteProgramEvaluator {
+    private static final int MAX_PROGRAM_NODES = 4096;
+    private static final int MAX_PROGRAM_DEPTH = 128;
+
+    private final BudgetedTransformationSourceExecutor sourceExecutor;
+
+<span class="fc" id="L32">    BudgetedRewriteProgramEvaluator(BudgetedTransformationSourceExecutor sourceExecutor) {</span>
+<span class="fc" id="L33">        this.sourceExecutor = Objects.requireNonNull(sourceExecutor, &quot;sourceExecutor&quot;);</span>
+<span class="fc" id="L34">    }</span>
+
+    BudgetedRewriteProgramExecution execute(
+        RewriteProgram program, String expression, PathBudget budget, ExplorationLimits limits
+    ) {
+<span class="fc" id="L39">        Objects.requireNonNull(program, &quot;program&quot;);</span>
+<span class="fc" id="L40">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L41">        Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="pc bpc" id="L42" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+        }
+<span class="fc" id="L45">        String input = expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (input.chars().anyMatch(Character::isISOControl)) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(&quot;expression contains a control character&quot;);</span>
+        }
+        // Validate Unicode before any source callback, including identity().
+<span class="fc" id="L50">        new Material(&quot;input&quot;).add(input);</span>
+<span class="fc" id="L51">        Context context = new Context(budget, limits);</span>
+<span class="fc" id="L52">        context.add(INTERPRETER_INVOCATIONS, 1);</span>
+<span class="fc" id="L53">        List&lt;RewriteProgram&gt; nodes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L54">        collect(program, 1, new HashSet&lt;&gt;(), nodes, context);</span>
+<span class="fc" id="L55">        context.freezeSources(nodes);</span>
+<span class="fc" id="L56">        Material programMaterial = new Material(&quot;topology&quot;)</span>
+<span class="fc" id="L57">            .add(BudgetedTransformationSource.PROTOCOL_REVISION)</span>
+<span class="fc" id="L58">            .add(BudgetedTransformationSourceExecutor.EXECUTOR_REVISION)</span>
+<span class="fc" id="L59">            .add(&quot;exact-theory-only;program-order/source-hash;full-path-dedup&quot;)</span>
+<span class="fc" id="L60">            .add(nodes.size());</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (RewriteProgram node : nodes) { appendNode(programMaterial, node, context); }</span>
+        // Identity callbacks cannot retroactively change an earlier source.
+<span class="fc" id="L63">        context.verifySources();</span>
+<span class="fc" id="L64">        Evaluation result = evaluate(program, ExactTheoryPath.seed(input), context);</span>
+<span class="fc" id="L65">        context.verifySources();</span>
+<span class="fc" id="L66">        return new BudgetedRewriteProgramExecution(</span>
+<span class="fc" id="L67">            programMaterial.encoding(), input, budget, limits, result.complete(),</span>
+<span class="fc" id="L68">            result.paths(), context.calls, context.limitBlocks, context.pruning, context.work);</span>
+    }
+
+    /** A purely structural first pass rejects unsupported nodes before callbacks. */
+    private static void collect(
+        RewriteProgram node, int depth, Set&lt;String&gt; ids, List&lt;RewriteProgram&gt; nodes, Context context
+    ) {
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">        if (depth &gt; MAX_PROGRAM_DEPTH || nodes.size() &gt;= MAX_PROGRAM_NODES) {</span>
+<span class="fc" id="L76">            throw new IllegalArgumentException(&quot;budgeted program exceeds structural preflight limits&quot;);</span>
+        }
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (!ids.add(node.id())) { throw new IllegalArgumentException(&quot;duplicate program node id: &quot; + node.id()); }</span>
+<span class="fc" id="L79">        context.add(PREFLIGHT_NODE_VISITS, 1);</span>
+<span class="fc" id="L80">        nodes.add(node);</span>
+<span class="fc" id="L81">        List&lt;RewriteProgram&gt; children = children(node);</span>
+        // Reject malformed metadata before the identity callback phase as well.
+<span class="fc" id="L83">        appendMetadata(new Material(&quot;metadata-preflight&quot;), node.metadata());</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (RewriteProgram child : children) { collect(child, depth + 1, ids, nodes, context); }</span>
+<span class="fc" id="L85">    }</span>
+
+    private static List&lt;RewriteProgram&gt; children(RewriteProgram node) {
+<span class="fc bfc" id="L88" title="All 7 branches covered.">        return switch (node) {</span>
+<span class="fc" id="L89">            case RewriteProgram.BudgetedSource ignored -&gt; List.of();</span>
+<span class="fc" id="L90">            case RewriteProgram.Choice choice -&gt; choice.alternatives();</span>
+<span class="fc" id="L91">            case RewriteProgram.FirstApplicable first -&gt; first.alternatives();</span>
+<span class="fc" id="L92">            case RewriteProgram.Sequence sequence -&gt; sequence.steps();</span>
+<span class="fc" id="L93">            case RewriteProgram.Repeat repeat -&gt; List.of(repeat.body());</span>
+<span class="fc" id="L94">            case RewriteProgram.Prune prune -&gt; List.of(prune.body());</span>
+<span class="fc" id="L95">            default -&gt; throw new IllegalArgumentException(</span>
+<span class="fc" id="L96">                &quot;budgeted composition rejects ordinary Source, Require and Prioritize: &quot; + node.id());</span>
+        };
+    }
+
+    private static void appendNode(Material material, RewriteProgram node, Context context) {
+<span class="fc" id="L101">        material.add(node.getClass().getSimpleName());</span>
+<span class="fc" id="L102">        appendMetadata(material, node.metadata());</span>
+<span class="fc" id="L103">        List&lt;RewriteProgram&gt; children = children(node);</span>
+<span class="fc" id="L104">        material.add(children.size());</span>
+<span class="fc" id="L105">        children.forEach(child -&gt; material.add(child.id()));</span>
+<span class="fc bfc" id="L106" title="All 4 branches covered.">        switch (node) {</span>
+<span class="fc" id="L107">            case RewriteProgram.BudgetedSource source -&gt; {</span>
+<span class="fc" id="L108">                SourceIdentity identity = context.identities.get(source.id());</span>
+<span class="fc" id="L109">                material.add(identity.sourceId()).add(identity.revisionHash()).add(identity.authorityHash());</span>
+<span class="fc" id="L110">            }</span>
+<span class="fc" id="L111">            case RewriteProgram.Repeat repeat -&gt; material.add(repeat.minIterations()).add(repeat.maxIterations());</span>
+<span class="fc" id="L112">            case RewriteProgram.Prune prune -&gt; material.add(prune.maxCandidates()).add(prune.reason());</span>
+            default -&gt; { /* Child order and complete metadata are already bound. */ }
+        }
+<span class="fc" id="L115">    }</span>
+
+    private static void appendMetadata(Material material, RewriteProgram.NodeMetadata metadata) {
+<span class="fc" id="L118">        material.add(metadata.id()).add(metadata.label()).add(metadata.sourceLocation().sourceName())</span>
+<span class="fc" id="L119">            .add(metadata.sourceLocation().line()).add(metadata.sourceLocation().column());</span>
+<span class="fc" id="L120">    }</span>
+
+    private Evaluation evaluate(RewriteProgram node, ExactTheoryPath prefix, Context context) {
+<span class="fc" id="L123">        context.add(EVALUATOR_CALLS, 1);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (!context.enter(node, prefix)) { return Evaluation.incomplete(); }</span>
+<span class="pc bpc" id="L125" title="1 of 7 branches missed.">        return switch (node) {</span>
+<span class="fc" id="L126">            case RewriteProgram.BudgetedSource source -&gt; leaf(source, prefix, context);</span>
+<span class="fc" id="L127">            case RewriteProgram.Choice choice -&gt; alternatives(choice.alternatives(), prefix, context, false);</span>
+<span class="fc" id="L128">            case RewriteProgram.FirstApplicable first -&gt; alternatives(first.alternatives(), prefix, context, true);</span>
+<span class="fc" id="L129">            case RewriteProgram.Sequence sequence -&gt; sequence(sequence, prefix, context);</span>
+<span class="fc" id="L130">            case RewriteProgram.Repeat repeat -&gt; repeat(repeat, prefix, context);</span>
+<span class="fc" id="L131">            case RewriteProgram.Prune prune -&gt; prune(prune, prefix, context);</span>
+<span class="nc" id="L132">            default -&gt; throw new IllegalStateException(&quot;unsupported node passed preflight&quot;);</span>
+        };
+    }
+
+    private Evaluation leaf(RewriteProgram.BudgetedSource source, ExactTheoryPath prefix, Context context) {
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (prefix.steps().size() &gt;= context.limits.maxPathSteps()) {</span>
+<span class="fc" id="L138">            context.limit(source, prefix, LimitKind.PATH_STEPS);</span>
+<span class="fc" id="L139">            return Evaluation.incomplete();</span>
+        }
+<span class="fc" id="L141">        context.verifySource(source);</span>
+<span class="fc" id="L142">        PathBudget available = context.remaining(prefix);</span>
+<span class="fc" id="L143">        context.add(LEAF_EXECUTIONS, 1);</span>
+<span class="fc" id="L144">        BudgetedTransformationSourceExecutor.Execution execution = sourceExecutor.execute(</span>
+<span class="fc" id="L145">            source.source(), prefix.transformedExpression(), available.exactTheoryWorkUnits());</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (!context.identities.get(source.id()).equals(execution.sourceIdentity())) {</span>
+<span class="nc" id="L147">            throw new IllegalArgumentException(&quot;source execution differs from frozen program identity&quot;);</span>
+        }
+<span class="fc" id="L149">        context.verifySource(source);</span>
+<span class="fc" id="L150">        context.add(DELEGATED_MECHANICAL_WORK, execution.mechanicalWork().totalMechanicalWorkUnits());</span>
+<span class="fc" id="L151">        context.calls.add(new SourceCall(source.metadata(), prefix.contentHash(),</span>
+<span class="fc" id="L152">            available.primitiveRewriteUnits(), execution));</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (!execution.complete()) { context.add(BUDGET_BLOCKS, 1); }</span>
+<span class="fc" id="L154">        List&lt;ExactTheoryPath&gt; paths = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L155">        boolean complete = execution.complete();</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        for (BudgetedTransformationSource.ExactTheoryTransition transition : execution.candidates()) {</span>
+<span class="fc" id="L157">            context.add(CANDIDATE_PROJECTIONS, 1);</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (context.count(PATH_EXTENSIONS) &gt;= context.limits.maxPathExtensions()) {</span>
+<span class="fc" id="L159">                context.limit(source, prefix, LimitKind.PATH_EXTENSIONS);</span>
+<span class="fc" id="L160">                context.halted = true;</span>
+<span class="fc" id="L161">                complete = false;</span>
+<span class="fc" id="L162">                break;</span>
+            }
+<span class="fc" id="L164">            context.add(PATH_EXTENSIONS, 1);</span>
+<span class="fc" id="L165">            ExactTheoryPath path = prefix.append(new Step(source.metadata(), execution, transition));</span>
+<span class="fc" id="L166">            context.remaining(path); // Validate before admission, not after returning a candidate.</span>
+<span class="fc" id="L167">            paths.add(path);</span>
+<span class="fc" id="L168">        }</span>
+<span class="fc" id="L169">        return new Evaluation(paths, complete);</span>
+    }
+
+    private Evaluation alternatives(
+        List&lt;RewriteProgram&gt; alternatives, ExactTheoryPath prefix, Context context, boolean firstOnly
+    ) {
+<span class="fc" id="L175">        List&lt;ExactTheoryPath&gt; paths = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L176">        boolean complete = true;</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        for (int index = 0; index &lt; alternatives.size(); index++) {</span>
+<span class="fc" id="L178">            context.add(ALTERNATIVES_EVALUATED, 1);</span>
+<span class="fc" id="L179">            Evaluation result = evaluate(alternatives.get(index), prefix, context);</span>
+<span class="fc" id="L180">            complete &amp;= result.complete();</span>
+<span class="fc" id="L181">            paths.addAll(result.paths());</span>
+<span class="fc bfc" id="L182" title="All 6 branches covered.">            if (firstOnly &amp;&amp; (!result.paths().isEmpty() || !result.complete())) {</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">                if (!result.paths().isEmpty()) { context.add(ALTERNATIVES_SELECTED, 1); }</span>
+<span class="fc" id="L184">                context.add(ALTERNATIVES_SKIPPED, alternatives.size() - index - 1L);</span>
+<span class="fc" id="L185">                break;</span>
+            }
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (context.halted) {</span>
+<span class="fc" id="L188">                context.add(ALTERNATIVES_SKIPPED, alternatives.size() - index - 1L);</span>
+<span class="fc" id="L189">                complete = false;</span>
+<span class="fc" id="L190">                break;</span>
+            }
+        }
+<span class="fc" id="L193">        return new Evaluation(distinct(paths, context), complete);</span>
+    }
+
+    private Evaluation sequence(RewriteProgram.Sequence sequence, ExactTheoryPath prefix, Context context) {
+<span class="fc" id="L197">        List&lt;ExactTheoryPath&gt; current = List.of(prefix);</span>
+<span class="fc" id="L198">        boolean complete = true;</span>
+<span class="fc bfc" id="L199" title="All 4 branches covered.">        for (int index = 0; index &lt; sequence.steps().size() &amp;&amp; !current.isEmpty(); index++) {</span>
+<span class="fc" id="L200">            List&lt;ExactTheoryPath&gt; next = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            for (ExactTheoryPath path : current) {</span>
+<span class="fc" id="L202">                Evaluation result = evaluate(sequence.steps().get(index), path, context);</span>
+<span class="fc" id="L203">                complete &amp;= result.complete();</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                if (index &gt; 0) { context.add(COMPOSITIONS, result.paths().size()); }</span>
+<span class="fc" id="L205">                next.addAll(result.paths());</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                if (context.halted) { complete = false; break; }</span>
+<span class="fc" id="L207">            }</span>
+<span class="fc" id="L208">            current = distinct(next, context);</span>
+        }
+<span class="fc" id="L210">        return new Evaluation(current, complete);</span>
+    }
+
+    private Evaluation repeat(RewriteProgram.Repeat repeat, ExactTheoryPath prefix, Context context) {
+<span class="fc" id="L214">        List&lt;ExactTheoryPath&gt; frontier = List.of(prefix);</span>
+<span class="fc" id="L215">        List&lt;ExactTheoryPath&gt; endpoints = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L216">        boolean complete = true;</span>
+        // Zero-based form avoids overflow for maxIterations == Integer.MAX_VALUE.
+<span class="fc bfc" id="L218" title="All 4 branches covered.">        for (int index = 0; index &lt; repeat.maxIterations() &amp;&amp; !frontier.isEmpty(); index++) {</span>
+<span class="fc" id="L219">            context.add(REPEAT_ITERATIONS, 1);</span>
+<span class="fc" id="L220">            List&lt;ExactTheoryPath&gt; next = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            for (ExactTheoryPath path : frontier) {</span>
+<span class="fc" id="L222">                Evaluation result = evaluate(repeat.body(), path, context);</span>
+<span class="fc" id="L223">                complete &amp;= result.complete();</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                if (index &gt; 0) { context.add(COMPOSITIONS, result.paths().size()); }</span>
+<span class="fc" id="L225">                next.addAll(result.paths());</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                if (context.halted) { complete = false; break; }</span>
+<span class="fc" id="L227">            }</span>
+<span class="fc" id="L228">            frontier = distinct(next, context);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (index &gt;= repeat.minIterations() - 1) {</span>
+<span class="fc" id="L230">                context.add(REPEAT_ENDPOINTS, frontier.size());</span>
+<span class="fc" id="L231">                endpoints.addAll(frontier);</span>
+            }
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            if (context.halted) { complete = false; break; }</span>
+        }
+<span class="fc" id="L235">        return new Evaluation(distinct(endpoints, context), complete);</span>
+    }
+
+    private Evaluation prune(RewriteProgram.Prune prune, ExactTheoryPath prefix, Context context) {
+<span class="fc" id="L239">        Evaluation result = evaluate(prune.body(), prefix, context);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (result.paths().size() &lt;= prune.maxCandidates()) { return result; }</span>
+<span class="fc" id="L241">        List&lt;ExactTheoryPath&gt; removed = result.paths().subList(prune.maxCandidates(), result.paths().size());</span>
+<span class="fc" id="L242">        context.add(PRUNED_PATHS, removed.size());</span>
+<span class="fc" id="L243">        context.pruning.add(new Pruning(prune.id(), prefix.contentHash(), prune.reason(), removed));</span>
+<span class="fc" id="L244">        return new Evaluation(result.paths().subList(0, prune.maxCandidates()), false);</span>
+    }
+
+    private static List&lt;ExactTheoryPath&gt; distinct(List&lt;ExactTheoryPath&gt; paths, Context context) {
+<span class="fc" id="L248">        Map&lt;String, ExactTheoryPath&gt; retained = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        for (ExactTheoryPath path : paths) {</span>
+<span class="fc" id="L250">            context.add(DEDUP_VISITS, 1);</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            if (retained.putIfAbsent(path.contentHash(), path) != null) { context.add(DUPLICATES_DROPPED, 1); }</span>
+<span class="fc" id="L252">        }</span>
+<span class="fc" id="L253">        return List.copyOf(retained.values());</span>
+    }
+
+    private record Evaluation(List&lt;ExactTheoryPath&gt; paths, boolean complete) {
+<span class="fc" id="L257">        private Evaluation { paths = List.copyOf(paths); }</span>
+<span class="fc" id="L258">        static Evaluation incomplete() { return new Evaluation(List.of(), false); }</span>
+    }
+
+    private static final class Context {
+        private final PathBudget budget;
+        private final ExplorationLimits limits;
+<span class="fc" id="L264">        private final Map&lt;WorkKind, Long&gt; work = new EnumMap&lt;&gt;(WorkKind.class);</span>
+<span class="fc" id="L265">        private final Map&lt;String, SourceIdentity&gt; identities = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L266">        private final List&lt;RewriteProgram.BudgetedSource&gt; sources = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L267">        private final List&lt;SourceCall&gt; calls = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L268">        private final List&lt;LimitBlock&gt; limitBlocks = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L269">        private final List&lt;Pruning&gt; pruning = new ArrayList&lt;&gt;();</span>
+        private boolean halted;
+
+<span class="fc" id="L272">        private Context(PathBudget budget, ExplorationLimits limits) { this.budget = budget; this.limits = limits; }</span>
+<span class="fc" id="L273">        private long count(WorkKind kind) { return work.getOrDefault(kind, 0L); }</span>
+        private void add(WorkKind kind, long value) {
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">            if (value &lt; 0) { throw new IllegalArgumentException(&quot;negative mechanical work&quot;); }</span>
+<span class="fc" id="L276">            work.put(kind, Math.addExact(count(kind), value));</span>
+<span class="fc" id="L277">        }</span>
+        private PathBudget remaining(ExactTheoryPath path) {
+<span class="fc" id="L279">            return budget.afterExactTheoryWork(path.mathematicalWorkUnits());</span>
+        }
+        private boolean enter(RewriteProgram node, ExactTheoryPath prefix) {
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">            if (halted) { return false; }</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">            if (count(NODE_VISITS) &gt;= limits.maxNodeVisits()) {</span>
+<span class="fc" id="L284">                limit(node, prefix, LimitKind.NODE_VISITS);</span>
+<span class="fc" id="L285">                halted = true;</span>
+<span class="fc" id="L286">                return false;</span>
+            }
+<span class="fc" id="L288">            add(NODE_VISITS, 1);</span>
+<span class="fc" id="L289">            return true;</span>
+        }
+        private void limit(RewriteProgram node, ExactTheoryPath prefix, LimitKind kind) {
+<span class="fc" id="L292">            add(LIMIT_BLOCKS, 1);</span>
+<span class="fc" id="L293">            limitBlocks.add(new LimitBlock(node.id(), prefix.contentHash(),</span>
+<span class="fc" id="L294">                prefix.transformedExpression(), remaining(prefix), kind));</span>
+<span class="fc" id="L295">        }</span>
+        private void freezeSources(List&lt;RewriteProgram&gt; nodes) {
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            for (RewriteProgram node : nodes) {</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">                if (node instanceof RewriteProgram.BudgetedSource source) {</span>
+<span class="fc" id="L299">                    sources.add(source);</span>
+<span class="fc" id="L300">                    identities.put(source.id(), readIdentity(source));</span>
+                }
+<span class="fc" id="L302">            }</span>
+<span class="fc" id="L303">        }</span>
+        private SourceIdentity readIdentity(RewriteProgram.BudgetedSource source) {
+<span class="fc" id="L305">            add(SOURCE_IDENTITY_READS, 1);</span>
+<span class="fc" id="L306">            return Objects.requireNonNull(source.source().identity(), &quot;source identity&quot;);</span>
+        }
+        private void verifySource(RewriteProgram.BudgetedSource source) {
+<span class="fc bfc" id="L309" title="All 2 branches covered.">            if (!identities.get(source.id()).equals(readIdentity(source))) {</span>
+<span class="fc" id="L310">                throw new IllegalArgumentException(&quot;source identity differs from frozen program: &quot; + source.id());</span>
+            }
+<span class="fc" id="L312">        }</span>
+<span class="fc" id="L313">        private void verifySources() { sources.forEach(this::verifySource); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

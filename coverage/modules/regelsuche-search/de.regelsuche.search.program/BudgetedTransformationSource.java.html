@@ -378,7 +378,7 @@ public interface BudgetedTransformationSource {
 <span class="fc" id="L378">        append(material, evidenceHash);</span>
 <span class="fc" id="L379">        append(material, Long.toString(mathematicalWorkUnits));</span>
 <span class="fc" id="L380">        append(material, applicationKey);</span>
-<span class="pc" id="L381">        assumptions.forEach(value -&gt; append(material, value));</span>
+<span class="fc" id="L381">        assumptions.forEach(value -&gt; append(material, value));</span>
 <span class="fc" id="L382">        return sha256(material.toString());</span>
     }
 
