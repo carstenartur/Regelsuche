@@ -223,9 +223,6 @@ public class ExpressionCanonicalizer {
         Map<String, FactorBucket> buckets = new LinkedHashMap<>();
         for (Expr factor : factors) {
             Expr normalized = canonicalize(factor, context);
-            if (isNumber(normalized, 0)) {
-                return new NumberExpr(0);
-            }
             if (normalized instanceof NumberExpr numberExpr) {
                 ExactRational exact = PolynomialNormalizer.legacyExact(
                     numberExpr.value());
@@ -403,7 +400,7 @@ public class ExpressionCanonicalizer {
     private void collectTerms(Expr expression, int sign, List<SignedTerm> terms) {
         if (expression instanceof BinaryExpr binaryExpr && binaryExpr.operator() == BinaryOperator.ADD) {
             collectTerms(binaryExpr.left(), sign, terms);
-        collectTerms(binaryExpr.right(), sign, terms);
+            collectTerms(binaryExpr.right(), sign, terms);
         } else if (expression instanceof BinaryExpr binaryExpr && binaryExpr.operator() == BinaryOperator.SUB) {
             collectTerms(binaryExpr.left(), sign, terms);
             collectTerms(binaryExpr.right(), -sign, terms);
@@ -427,7 +424,7 @@ public class ExpressionCanonicalizer {
                 && product.left() instanceof NumberExpr numberExpr) {
             ExactRational exact = PolynomialNormalizer.legacyExact(
                 numberExpr.value());
-            if (exact != null) {
+            if (exact != null && !exact.isZero()) {
                 return new Coefficient(exact, product.right());
             }
         }
