@@ -127,7 +127,9 @@ public final class EquivalenceAwarePatternMatcher {
         }
         if (pattern instanceof PatternExpr.LiteralNumber number) {
             if (expression instanceof NumberExpr numberExpr) {
-                return nearlyEqual(numberExpr.value(), number.value());
+                // A literal is a constraint, not a numerical sampling tolerance.
+                return Double.isFinite(numberExpr.value())
+                    && numberExpr.value() == number.value();
             }
             return profile.inferAlgebraicBindings()
                 && Monomial.from(expression)
@@ -433,9 +435,11 @@ public final class EquivalenceAwarePatternMatcher {
     }
 
     private static int exactPositiveInteger(double value) {
-        int integer = (int) Math.rint(value);
-        return integer > 0 && nearlyEqual(value, integer)
-            ? integer
+        // Neither rounding nor narrowing may turn a fractional or oversized
+        // exponent into authority for an integer-power inference.
+        return value > 0 && value <= Integer.MAX_VALUE
+                && value == Math.rint(value)
+            ? (int) value
             : -1;
     }
 
