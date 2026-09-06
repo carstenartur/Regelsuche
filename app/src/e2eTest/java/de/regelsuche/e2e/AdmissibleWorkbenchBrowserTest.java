@@ -191,6 +191,42 @@ class AdmissibleWorkbenchBrowserTest {
         assertTrue(page.locator("#error").innerText().contains("8 MB"));
         assertFalse(page.locator("#result").isVisible());
     }
+    private void deliverLocal(String text) {
+        page.evaluate("text => window.dispatchEvent(new CustomEvent('admissible:local-result', {detail: text}))", text);
+    }
+    @Test void liveResultAndReimportPreserveExploratoryScope() throws IOException {
+        String original = Files.readString(fixture());
+        deliverLocal(original);
+        page.waitForFunction("document.querySelector('#status').textContent.includes('2 Optimalitätszertifikate')");
+        assertTrue(page.locator("#summary").innerText().contains("Neue explorative Aufgabe"));
+        assertTrue(page.locator("#proofStatus").innerText().contains("Maximum 28"));
+        String live = (String) page.evaluate("""
+            text => {
+                const old = JSON.parse(text);
+                return JSON.stringify({schema: 'admissible-workbench/v2', scope: 'exploratory',
+                    sourceManifestSha256: old.sourceManifestSha256, selectedPolicy: old.selectedPolicy, runs: old.runs});
+            }
+            """, original);
+        Path file = temporary.resolve("live.json"); Files.writeString(file, live);
+        page.locator("#clear").click(); page.locator("#bundle").setInputFiles(file);
+        page.waitForFunction("document.querySelector('#status').textContent.includes('2 Optimalitätszertifikate')");
+        assertTrue(page.locator("#summary").innerText().contains("Kein Trainings- oder zurückgehaltener Testfall"));
+        example();
+        assertTrue(page.locator("#summary").innerText().startsWith("Lehrbeispiel:"));
+    }
+    @Test void localResultCannotBypassTheIndependentWorker() throws IOException {
+        String original = Files.readString(fixture());
+        deliverLocal(original);
+        page.waitForFunction("document.querySelector('#status').textContent.includes('2 Optimalitätszertifikate')");
+        deliverLocal(original.replaceFirst("admissible-cardinality/v1", "wrong-proof/v1"));
+        page.waitForFunction("!document.querySelector('#error').hidden");
+        assertTrue(page.locator("#result").isHidden());
+        page.evaluate("window.dispatchEvent(new CustomEvent('admissible:local-result', {detail: {ok: true}}))");
+        assertTrue(page.locator("#error").innerText().contains("Ungültiges"));
+        deliverLocal(" ".repeat(8_000_001));
+        assertTrue(page.locator("#error").innerText().contains("zu großes"));
+    }
+
     @Test void independentProofGuardsRunInTheBrowser() {
         Object result = page.evaluate("""
             () => {

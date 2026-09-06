@@ -33,10 +33,10 @@ all work of that campaign or assert that a new learning run occurred.
 
 ## Checks
 
-`AdmissibleLocalResultBrowserTest` runs the handoff and v2 file reimport through
-the real production HTTP server and worker, rejecting damaged bytes and forged
+`AdmissibleWorkbenchBrowserTest` shares one production-server/worker fixture
+for import, live handoff and v2 reimport, rejecting damaged bytes and forged
 status objects. `scripts/admissible-live-scope.test.cjs` checks compatibility,
 strict scope and unchanged mathematical guards against retained actual CI
-certificates. The original main-page no-upload test separately monitors the
-experiment popup and deliberately injects one POST to demonstrate that its
-monitor is active; it does not forbid the expression page's legitimate AST POST.
+certificates. The main-page no-upload test monitors the experiment popup and
+deliberately injects one POST to demonstrate that its monitor is active; it
+does not forbid the expression page's legitimate AST POST.
