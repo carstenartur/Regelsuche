@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Primzahlmuster · Regelsuche Workbench</title>
+    <link rel="stylesheet" href="admissible-workbench.css">
+    <script defer src="admissible-proof.js"></script>
+    <script defer src="admissible-workbench.js"></script>
+</head>
+<body>
+<header><a href="/">Regelsuche · Zur Ausdrucks-Workbench</a><span>Experiment / Zulässige Muster</span></header>
+<main>
+    <p class="eyebrow">Strategien vergleichen · Beweise selbst prüfen</p>
+    <h1>Wie dicht passen<br>mögliche Primzahlplätze?</h1>
+    <p class="intro">Ein Muster ist zulässig, wenn es für jede Primzahl eine Restklasse freilässt.
+        Erkunde die vollständigen Ausschlüsse hinter einem berechneten Maximum.</p>
+    <section aria-labelledby="load-title">
+        <h2 id="load-title">1. Experiment öffnen</h2>
+        <div class="actions">
+            <button id="example" type="button">Kleines Beispiel erkunden</button>
+            <label for="bundle">Geprüften Experimentexport laden (.json, höchstens 8 MB)</label>
+            <input id="bundle" type="file" accept=".json,application/json">
+            <button id="clear" type="button">Zurücksetzen / Abbrechen</button>
+        </div>
+        <p id="status" role="status" aria-live="polite">Bereit. Wähle das Beispiel oder einen lokalen Export.</p>
+        <p id="error" role="alert" hidden></p>
+        <p class="hint">Die Datei bleibt im Browser. Kein Upload, keine Codeausführung aus dem Import.
+            Der Browser prüft die mathematischen Zertifikate neu, nicht den gesamten Suchlauf.</p>
+    </section>
+    <div id="result" hidden>
+        <section aria-labelledby="compare-title">
+            <h2 id="compare-title">2. Ergebnis und Vergleich</h2>
+            <p id="summary"></p><p id="scope" class="notice"></p>
+            <div class="scroll" tabindex="0" role="region" aria-label="Vergleichstabelle">
+                <table><thead><tr><th>Aufgabe</th><th>Strategie</th><th>Plätze</th><th>Logische Arbeit¹</th><th>Nachweis</th></tr></thead>
+                    <tbody id="comparisons"></tbody></table>
+            </div>
+            <p class="hint">¹ Arbeitswerte und Strategieauswahl stammen aus dem Export; der Browser spielt sie nicht nach.
+                Er prüft die Zählersumme, aber bestätigt keine Laufzeitverbesserung und keine allgemeine Überlegenheit.</p>
+        </section>
+        <section aria-labelledby="proof-title">
+            <h2 id="proof-title">3. Warum ist kein größeres Muster möglich?</h2>
+            <div class="actions"><label for="run">Aufgabe / Strategie</label><select id="run"></select>
+                <button id="root" type="button">Zum Anfang</button><button id="back" type="button">Einen Schritt zurück</button></div>
+            <p id="proofStatus" role="status"></p>
+            <p id="position"></p>
+            <div id="offsets" class="offsets" aria-label="Noch mögliche Positionen"></div>
+            <p id="explanation"></p>
+            <div id="branches" class="branches"></div>
+            <p class="hint">Dies ist der geprüfte Obergrenzenbeweis, nicht die zeitliche Reihenfolge aller Suchschritte.
+                Jeder angezeigte Restklassenentzug ist eine Alternative, keine zusätzlich erfundene Beweisregel.</p>
+            <details><summary>Zulässiges Muster und Herkunft</summary><p id="witness"></p><p id="source" class="mono"></p></details>
+            <button id="tamper" type="button">Prüfer am beschädigten Lehrbeispiel testen</button>
+            <p id="tamperStatus" role="status"></p>
+        </section>
+    </div>
+    <section><h2>Was damit nicht bewiesen ist</h2>
+        <p>Zulässig bedeutet nicht, dass alle Positionen gleichzeitig mit Primzahlen besetzt sind.
+            Ein Knotenbudget-Abbruch liefert nur einen zulässigen unteren Zeugen, keinen Beweis des Maximums.</p>
+        <p>Diese Ansicht importiert vorhandene Experimente. Sie startet keine neue Java-Suche und verändert weder aktive Regeln noch deine Ausdruckssuche.</p>
+    </section>
+</main>
+</body>
+</html>
