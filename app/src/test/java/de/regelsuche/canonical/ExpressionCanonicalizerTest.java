@@ -35,8 +35,11 @@ class ExpressionCanonicalizerTest {
 
     @Test
     void associativeAndCommutativeVariantsCollapseToSameHash() {
+        // (a+b)+c == a+(b+c)
         assertEquals(canonicalizer.stableHash("(a+b)+c"), canonicalizer.stableHash("a+(b+c)"));
+        // a*b == b*a
         assertEquals(canonicalizer.stableHash("a*b"), canonicalizer.stableHash("b*a"));
+        // (a*b)*c == a*(b*c) == c*a*b
         assertEquals(canonicalizer.stableHash("(a*b)*c"), canonicalizer.stableHash("a*(b*c)"));
         assertEquals(canonicalizer.stableHash("(a*b)*c"), canonicalizer.stableHash("c*a*b"));
     }
@@ -104,6 +107,7 @@ class ExpressionCanonicalizerTest {
     void numericConstantsAreFolded() {
         assertEquals("5", canonicalizer.canonicalize("2 + 3"));
         assertEquals("12", canonicalizer.canonicalize("3 * 4"));
+        // Mixed: 2 + x + 3 → x + 5
         assertEquals(canonicalizer.canonicalize("x + 5"), canonicalizer.canonicalize("2 + x + 3"));
     }
 
@@ -175,8 +179,11 @@ class ExpressionCanonicalizerTest {
 
     @Test
     void polynomialSortedByDescendingDegree() {
+        // monomials must appear high-degree first (mathematical normal form)
         assertEquals("x ^ 2 + 2 * x + 1", canonicalizer.canonicalize("1 + 2*x + x^2"));
+        // higher-degree term sorts before lower one regardless of input order
         assertEquals("x ^ 10 + x ^ 2", canonicalizer.canonicalize("x^2 + x^10"));
+        // tie on degree → lex ascending
         assertEquals("x + y", canonicalizer.canonicalize("y + x"));
     }
 
@@ -192,12 +199,15 @@ class ExpressionCanonicalizerTest {
 
     @Test
     void defaultDivisionIsAssumptionFree() {
+        // Without an AssumptionContext, x/x must NOT collapse to 1 (would be
+        // mathematically wrong in general).
         assertNotEquals(canonicalizer.stableHash("x/x"), canonicalizer.stableHash("1"));
     }
 
     @Test
     void assumptionAwareDivisionCancellation() {
         AssumptionContext ctx = new AssumptionContext();
+        // x/x → 1  under  x ≠ 0
         assertEquals("1", canonicalizer.canonicalizeWith("x/x", ctx));
         assertTrue(ctx.snapshot().stream().anyMatch(a -> a.kind() == Assumption.Kind.NON_ZERO
             && a.expression().equals("x != 0")));
@@ -213,6 +223,7 @@ class ExpressionCanonicalizerTest {
     @Test
     void assumptionAwareFactorCancellation() {
         AssumptionContext ctx = new AssumptionContext();
+        // (a*x)/x → a  under  x ≠ 0
         assertEquals("a", canonicalizer.canonicalizeWith("(a*x)/x", ctx));
         assertTrue(ctx.snapshot().stream().anyMatch(a -> a.kind() == Assumption.Kind.NON_ZERO
             && a.expression().equals("x != 0")));
@@ -220,6 +231,8 @@ class ExpressionCanonicalizerTest {
 
     @Test
     void assumptionFingerprintSeparatesHashes() {
+        // Same input, but with vs. without assumption tracking → different hashes,
+        // so transposition entries from the two modes don't accidentally merge.
         AssumptionContext ctx = new AssumptionContext();
         String safeHash = canonicalizer.stableHash("x/x");
         String assumingHash = canonicalizer.stableHashWith("x/x", ctx);
@@ -229,6 +242,9 @@ class ExpressionCanonicalizerTest {
 
     @Test
     void assumptionFingerprintIsStable() {
+        // Same expression canonicalized with two equivalent assumption contexts
+        // must produce the same hash, regardless of the order in which the
+        // assumptions were added (assumption set, not list).
         AssumptionContext ctxA = new AssumptionContext();
         AssumptionContext ctxB = new AssumptionContext();
         canonicalizer.canonicalizeWith("x/x", ctxA);
@@ -237,18 +253,23 @@ class ExpressionCanonicalizerTest {
         canonicalizer.canonicalizeWith("x/x", ctxB);
         assertEquals(
             canonicalizer.stableHashWith("a", ctxA),
-            canonicalizer.stableHashWith("a", ctxB));
+            canonicalizer.stableHashWith("a", ctxB)
+        );
     }
 
     @Test
     void hashCollisionBaselineIsReducedByStrongCanonicalization() {
+        // The strong canonicalizer must reduce — at the very least: not
+        // increase — the number of distinct hashes produced for a set of
+        // syntactically different but algebraically equivalent expressions.
         List<String> equivalents = List.of(
             "a + b + c",
             "(a + b) + c",
             "a + (b + c)",
             "c + b + a",
             "b + (a + c)",
-            "(c + a) + b");
+            "(c + a) + b"
+        );
         Set<String> hashes = new HashSet<>();
         for (String expression : equivalents) {
             hashes.add(canonicalizer.stableHash(expression));
@@ -259,6 +280,9 @@ class ExpressionCanonicalizerTest {
 
     @Test
     void propertyTestRandomExpressionsAreStableUnderReparse() {
+        // A canonical string must be a fix-point: re-parsing then
+        // re-canonicalizing produces the same string. This protects against
+        // round-trip drift in either canonicalizer or formatter.
         RandomExpressionGenerator generator = new RandomExpressionGenerator(42L);
         List<String> samples = generator.generate(40, 3);
         for (String sample : samples) {
