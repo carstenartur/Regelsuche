@@ -4,6 +4,8 @@ Die zusätzliche Experimentansicht läuft im vorhandenen Workbench-Server unter
 `/static/admissible-workbench.html`. Sie lädt keine Erweiterungen und benötigt
 weder Python noch das Primachsenraum-Repository auf dem Server. Die Oberfläche
 bleibt von Ausdruckssuche, Regelbestand und laufenden Proof-Jobs getrennt.
+Ein optionaler lokaler Primachsenraum-Runner kann dieselben Oberflächenressourcen
+verwenden, um neue Java-/SDK-Läufe zu starten; siehe den Abschnitt unten.
 
 ## Einstieg
 
@@ -34,8 +36,33 @@ zeigt beide Strategien, ihren zulässigen Zeugen und den gemeldeten Arbeitswert.
 Im Auswahlfeld darunter kann jeder vollständige Obergrenzenbeweis unabhängig
 von der Größe oder Reihenfolge des ursprünglichen Suchlaufs erkundet werden.
 
-**Dies ist eine interaktive Ergebnis- und Beweisansicht. Sie startet noch keine
-neue Java-/SDK-Kampagne und lernt keine neue Regel im Browser.**
+## Optionaler lokaler Java-Runner
+
+Der Primachsenraum-SDK-Consumer stellt den optionalen Auftrag `liveWorkbench`
+bereit. Dieser Loopback-Server verwendet die fünf vorhandenen Viewer-Dateien
+und ergänzt seine eigene Bedienung und HTTP-Verbindung. Der Ausdrucksserver
+von Regelsuche erhält dadurch weder einen Prozessstart-Endpunkt noch eine
+Abhängigkeit vom privaten Primachsenraum-Repository. Startanleitung und
+Prozessgrenzen stehen dort in `docs/research/admissible-live-workbench.md`.
+
+Ein fertiger Lauf übergibt ein `admissible:local-result`-Ereignis mit einer
+begrenzten JSON-Zeichenkette. Dies ist kein vertrauenswürdiges Ergebnisobjekt:
+Die Ansicht löscht den vorigen Zustand und ruft denselben unabhängigen Worker
+wie beim Dateiimport auf. Beschädigte, zu große und nichttextuelle Daten werden
+abgewiesen; ein übergebener Erfolgsstatus ersetzt keinen mathematischen Beweis.
+
+Neue Aufgaben verwenden `admissible-workbench/v2` mit genau den bisherigen
+Feldern und zusätzlich `scope: "exploratory"`. Andere Scopes werden abgewiesen.
+Die Kennzeichnung überlebt Download und erneuten Import. Ein direkt übergebener
+lokaler Lauf wird auch bei v1-Daten als explorativ angezeigt, nicht als
+zurückgehaltener Testfall. Diese Kennzeichnung ist keine Herkunftssignatur.
+Die mathematische Prüfung ist in beiden Formaten gleich.
+
+Der tatsächliche SDK-Lauf, die getrennten nativen Strategievergleiche,
+HTTP-Sicherheit und Prozessgrenzen liegen im Erzeugerprojekt. Die Ansicht
+behauptet weder ein erneutes Lernen noch eine Messung sämtlicher SDK-Arbeit.
+Ohne diesen ausdrücklich gestarteten optionalen Runner bleibt sie eine reine
+Import- und Beweisansicht.
 
 ## Was tatsächlich geprüft wird
 
@@ -68,30 +95,31 @@ ganzen Import. Zusätzlich beendet die Oberfläche den Worker nach zehn Sekunden
 Bei Timeout, Fehler oder Abbruch bleibt kein zuvor bestätigtes Ergebnis aktiv.
 Eine verzögert fertig werdende Datei kann einen neueren Auftrag nicht ersetzen.
 
-Das JSON-Format `admissible-workbench/v1` ist absichtlich kompakt und kanonisch.
-Es akzeptiert keine zusätzlichen oder doppelten Felder und keine beliebig
-verschachtelten Daten. Nur ein einzelner abschließender LF ist optional;
-zusätzliche Leerzeichen oder Zeilenumbrüche werden zurückgewiesen.
-Arbeitszähler bleiben Dezimalzeichenketten, damit die JavaScript-Ganzzahlpräzision
-nicht stillschweigend Werte verändert. Importdaten werden nur als Text und
-DOM-Elemente dargestellt, nicht als HTML ausgeführt. Ist WebCrypto nicht
-verfügbar, erklärt eine Fehlermeldung den erforderlichen Zugriff über localhost
-oder HTTPS, statt einen ungeprüften Ersatz-Hash zu verwenden.
+Die JSON-Formate sind absichtlich kompakt und kanonisch. Sie akzeptieren keine
+zusätzlichen oder doppelten Felder und keine beliebig verschachtelten Daten.
+Nur ein einzelner abschließender LF ist optional; zusätzliche Leerzeichen oder
+Zeilenumbrüche werden zurückgewiesen. Arbeitszähler bleiben Dezimalzeichenketten,
+damit die JavaScript-Ganzzahlpräzision nicht stillschweigend Werte verändert.
+Importdaten werden nur als Text und DOM-Elemente dargestellt, nicht als HTML
+ausgeführt. Ist WebCrypto nicht verfügbar, erklärt eine Fehlermeldung den
+Zugriff über localhost oder HTTPS, statt einen ungeprüften Ersatz-Hash zu nutzen.
 
 ## Nachprüfen und Tests
 
 ```bash
-node --test scripts/test-admissible-proof.cjs
+node --test scripts/test-admissible-proof.cjs scripts/admissible-live-scope.test.cjs
 ./gradlew :app:e2eTest --tests de.regelsuche.e2e.AdmissibleWorkbenchBrowserTest
 ```
 
-Die 18 Node-Prüfertests benötigen keine Zusatzbibliothek. Die acht
-Playwright-Tests verwenden den in-process gestarteten Produktionsserver,
-laden den echten Worker und importieren eine komprimierte Referenz aus einem
-ausgeführten Primachsenraum-CI-Lauf. Sie prüfen Einstieg aus der Hauptansicht,
-Navigation, Tastatur, Mobilgröße, beschädigte Dateien, verspätete Antworten und
-Zurücksetzen. Sie verwenden keinen simulierten Mathematikprüfer. Desktop- und
-Mobilaufnahmen stehen danach unter `app/build/reports/admissible-workbench/`.
+Die 18 grundlegenden und fünf Scope-Node-Prüfertests benötigen keine zusätzliche
+Bibliothek. Die zehn Playwright-Tests teilen die bestehende Produktionsserver-
+und Browser-Fixture. Sie laden den echten Worker und importieren eine Referenz
+aus einem ausgeführten Primachsenraum-CI-Lauf. Sie prüfen Hauptseiten-Einstieg,
+Navigation, Tastatur, Mobilgröße, beschädigte Dateien, verspätete Antworten,
+Zurücksetzen, lokale Ergebnisübergabe und v2-Reimport. Der Upload-Monitor hängt
+an der Experimentseite, nicht an den legitimen AST-Anfragen der Hauptseite;
+ein absichtlich eingefügter POST bestätigt, dass der Monitor tatsächlich greift.
+Desktop- und Mobilaufnahmen stehen unter `app/build/reports/admissible-workbench/`.
 
 Die Herkunft der Referenz steht in
 `app/src/e2eTest/resources/admissible/README.md`. Die normale Repository-CI führt
