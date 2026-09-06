@@ -19,8 +19,8 @@ import java.util.TreeMap;
  * <p>The temporary input bridge interprets finite legacy numeric leaves under
  * their shortest-decimal convention. It does not recover source precision lost
  * before matching. Symbolic divisors are outside this assumption-free fragment.
- * Inferred rational coefficients are emitted as integer/fraction syntax only
- * when every numeric leaf round-trips without changing its decimal value.</p>
+ * Inferred coefficients prefer a finite decimal leaf only after exact
+ * decimal round-trip verification; other rationals use integer/fraction syntax.</p>
  */
 record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powers) {
     BoundedExactMonomial {
@@ -170,11 +170,7 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
     Expr toExpr() {
         Expr result = null;
         if (!coefficient.isOne() || powers.isEmpty()) {
-            result = integerLeaf(coefficient.numerator());
-            if (!coefficient.isInteger()) {
-                result = new BinaryExpr(result, BinaryOperator.DIV,
-                    integerLeaf(coefficient.denominator()));
-            }
+            result = coefficientExpression();
         }
         for (var entry : powers.entrySet()) {
             Expr factor = new VariableExpr(entry.getKey());
@@ -184,6 +180,24 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
             result = result == null ? factor : new BinaryExpr(result, BinaryOperator.MUL, factor);
         }
         return result == null ? new NumberExpr(1) : result;
+    }
+
+    private Expr coefficientExpression() {
+        // Keep the ordinary decimal surface only if it denotes exactly the
+        // rational coefficient. Nonterminating fractions never become floats.
+        try {
+            BigDecimal decimal = new BigDecimal(coefficient.numerator())
+                .divide(new BigDecimal(coefficient.denominator()));
+            double value = decimal.doubleValue();
+            if (Double.isFinite(value) && BigDecimal.valueOf(value).compareTo(decimal) == 0) {
+                return new NumberExpr(value);
+            }
+        } catch (ArithmeticException nonterminatingDecimal) {
+            // Exact BigDecimal division rejects a nonterminating decimal.
+        }
+        Expr numerator = integerLeaf(coefficient.numerator());
+        return coefficient.isInteger() ? numerator
+            : new BinaryExpr(numerator, BinaryOperator.DIV, integerLeaf(coefficient.denominator()));
     }
 
     private static NumberExpr integerLeaf(BigInteger value) {

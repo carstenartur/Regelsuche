@@ -44,8 +44,8 @@ class ExactMonomialInferenceTest {
     void rationalRootsRemainRationalInTheActualBinding() {
         assertEquals("2 / 3", binding(power(2), "4 / 9"));
         assertEquals("2 / 3 * x", binding(power(2), "(4 / 9) * x^2"));
-        assertEquals("3 / 2", binding(power(2), "9 / 4"));
-        assertEquals("1 / 10", binding(power(2), "0.01"));
+        assertEquals("1.5", binding(power(2), "9 / 4"));
+        assertEquals("0.1", binding(power(2), "0.01"));
     }
 
     @Test
@@ -110,6 +110,16 @@ class ExactMonomialInferenceTest {
         }
         assertEquals("(x + 2 / 3 * y) ^ 2", ExpressionFormatter.format(
             rule.apply(parser.parseTerm("x^2 + (4/3)*x*y + (4/9)*y^2"))));
+    }
+
+    @Test
+    void scaledSquareRetainsExactDecimalSyntaxForSearchSuccessors() {
+        Expr source = parser.parseTerm("x*x + 3*x*a + 2.25*a*a");
+        assertTrue(completeSquare().matches(source));
+        assertEquals("(x + 1.5 * a) ^ 2",
+            ExpressionFormatter.format(completeSquare().apply(source)));
+        // A nonterminating rational still requires fraction syntax.
+        assertEquals("2 / 3", binding(power(2), "4 / 9"));
     }
 
     @Test

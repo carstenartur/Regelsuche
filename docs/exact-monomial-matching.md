@@ -43,9 +43,11 @@ sind und sämtliche Variablenexponenten teilbar sind. Eine endliche binäre Such
 mit exaktem Potenzvergleich ersetzt die bisherige `Math.pow`-Näherung. Zusätzlich
 prüft der Matcher die instanziierte Bindung erneut gegen den Quellmonomialwert.
 
-Die Rückgabe in den bisherigen AST verwendet Ganzzahl- und Bruchsyntax. Jeder
-neu erzeugte numerische Blattwert muss ohne Änderung seines Dezimalwerts
-zurücklesbar sein. Ein mathematisch exaktes, im alten AST nicht darstellbares
+Die Rückgabe in den bisherigen AST bevorzugt eine endliche Dezimalzahl nur,
+wenn exakte Dezimaldivision und Rückvergleich denselben rationalen Wert
+bestätigen. So bleibt `3/2` als `1.5` darstellbar, während `2/3` Bruchsyntax
+benötigt. Jeder neu erzeugte numerische Blattwert muss ohne Änderung seines
+Dezimalwerts zurücklesbar sein. Ein mathematisch exaktes, im alten AST nicht darstellbares
 Ergebnis wird nicht gerundet, sondern als `INCONCLUSIVE` mit
 `ALGEBRAIC_BINDING_NOT_REPRESENTABLE` gekennzeichnet.
 
@@ -88,3 +90,15 @@ erzeugen. Historische Artefakte, versiegelte Aufgaben und Qualitätsgrenzen
 werden nicht nachträglich angepasst. Betroffene Experimente behalten ihre
 gebundene Implementierung oder benötigen eine ausdrücklich neue Revision.
 Die vollständige Qualifikation bezieht sich jeweils auf den konkreten Commit.
+
+## Integration der Dezimaldarstellung
+
+Der erste CI-Lauf dieses Schritts bestand die neuen Einzeltests, zeigte aber
+zwei Fehler in den bestehenden Ableitungstests. Die Rechnung war exakt,
+die erzeugte Schreibweise `(x + 3 / 2 * a)^2` verfehlte jedoch deren unverändertes
+Syntaxziel `(x + 1.5 * a)^2`. Die Produktionsbrücke wählt deshalb eine endliche
+Dezimaldarstellung nur nach exaktem Rückvergleich. Die bestehenden
+Integrationstests, ihre Zielausdrücke, Suchbudgets und Schwellen bleiben
+unverändert. Ein zusätzlicher Test prüft genau diesen Übergang mit der produktiven
+`PatternRewriteRule`, Parser und Formatter. Die bestehenden Integrationstests
+prüfen zusätzlich den tatsächlichen `AstRewriteTransformationEngine`.
