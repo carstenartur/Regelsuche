@@ -9,12 +9,14 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Request;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.zip.GZIPInputStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +34,9 @@ class AdmissibleWorkbenchBrowserTest {
     private Page page;
     private final List<String> errors = new ArrayList<>();
     private final List<String> writes = new ArrayList<>();
+    private final Consumer<Request> recordWrites = request -> {
+        if (!request.method().equals("GET")) writes.add(request.url());
+    };
     @TempDir Path temporary;
 
     @BeforeAll static void boot() throws IOException {
@@ -48,7 +53,7 @@ class AdmissibleWorkbenchBrowserTest {
         context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 1050));
         page = context.newPage();
         page.onPageError(errors::add);
-        page.onRequest(request -> { if (!request.method().equals("GET")) writes.add(request.url()); });
+        page.onRequest(recordWrites);
         page.navigate(app.baseUrl() + "/static/admissible-workbench.html");
     }
     @AfterEach void close() {
@@ -76,18 +81,35 @@ class AdmissibleWorkbenchBrowserTest {
         page.waitForFunction("document.querySelector('#status').textContent.includes('2 Optimalitätszertifikate')");
     }
 
-    @Test void opensFromMainWorkbenchWithoutDiscardingExpression() {
+    @Test void opensFromMainWorkbenchWithoutDiscardingExpression() throws IOException {
+        // The expression page legitimately POSTs AST inspections. The no-upload
+        // contract applies to the experiment document, including its popup.
+        page.offRequest(recordWrites);
+        context.onPage(experiment -> {
+            experiment.onRequest(recordWrites);
+            experiment.onPageError(errors::add);
+        });
         page.navigate(app.baseUrl());
         page.locator("input[name=expression]").fill("x + 7");
         Page experiment = page.waitForPopup(() -> page.locator("#openAdmissibleWorkbench").click());
         try {
             experiment.waitForLoadState();
-            experiment.onPageError(errors::add);
             assertTrue(experiment.url().endsWith("/static/admissible-workbench.html"));
             assertEquals(Boolean.TRUE, experiment.evaluate("window.opener === null"));
             experiment.locator("#example").click();
             experiment.waitForFunction("document.querySelector('#status').textContent.includes('1 Optimalitätszertifikate')");
+            experiment.locator("#bundle").setInputFiles(fixture());
+            experiment.waitForFunction("document.querySelector('#status').textContent.includes('2 Optimalitätszertifikate')");
+            assertEquals(2, experiment.locator("#comparisons tr").count());
             assertEquals("x + 7", page.locator("input[name=expression]").inputValue());
+
+            // Negative control: a real deliberate POST from this exact popup
+            // must be observed. Do not whitelist an API path or disable the guard.
+            assertTrue(writes.isEmpty(), "Import attempted a write: " + writes);
+            String probe = app.baseUrl() + "/static/admissible-workbench.html?upload-probe";
+            experiment.evaluate("url => fetch(url, {method: 'POST', body: 'probe'}).then(() => null)", probe);
+            assertEquals(List.of(probe), writes);
+            writes.clear(); // Remove only the asserted, intentionally injected probe.
         } finally { experiment.close(); }
     }
 
