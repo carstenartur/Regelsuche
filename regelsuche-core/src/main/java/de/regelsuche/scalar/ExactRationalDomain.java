@@ -1,11 +1,14 @@
 package de.regelsuche.scalar;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -67,6 +70,58 @@ public final class ExactRationalDomain {
                 source);
         }
         return parseBounded(source);
+    }
+
+    /**
+     * Interprets an already-existing finite legacy {@code double} leaf by the
+     * repository's shortest-decimal convention.
+     *
+     * <p>This is an explicit migration boundary, not evidence that the source
+     * literal or a previous floating-point computation was exact. Callers that
+     * possess parser-issued literal evidence must use that evidence instead.</p>
+     */
+    public static Optional<ExactRational> legacyDecimalValue(double value) {
+        if (!Double.isFinite(value)) {
+            return Optional.empty();
+        }
+        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();
+        BigInteger numerator = decimal.unscaledValue();
+        int scale = decimal.scale();
+        if (scale < 0) {
+            numerator = numerator.multiply(BigInteger.TEN.pow(-scale));
+            return Optional.of(ExactRational.integer(numerator));
+        }
+        return Optional.of(new ExactRational(
+            numerator,
+            BigInteger.TEN.pow(scale)));
+    }
+
+    /**
+     * Returns a legacy {@code double} only when its shortest-decimal
+     * interpretation is exactly {@code value}.
+     *
+     * <p>Nonterminating rationals, overflowing values and rounded decimal
+     * projections return an empty result. This method therefore cannot be used
+     * as authority for an approximate equality.</p>
+     */
+    public static OptionalDouble exactLegacyDecimalDouble(
+        ExactRational value
+    ) {
+        Objects.requireNonNull(value, "value");
+        try {
+            BigDecimal decimal = new BigDecimal(value.numerator())
+                .divide(new BigDecimal(value.denominator()));
+            double legacy = decimal.doubleValue();
+            if (!Double.isFinite(legacy)) {
+                return OptionalDouble.empty();
+            }
+            Optional<ExactRational> roundTrip = legacyDecimalValue(legacy);
+            return roundTrip.isPresent() && roundTrip.get().equals(value)
+                ? OptionalDouble.of(legacy)
+                : OptionalDouble.empty();
+        } catch (ArithmeticException nonterminatingDecimal) {
+            return OptionalDouble.empty();
+        }
     }
 
     private ExactRationalParseEvidence parseBounded(String source) {
