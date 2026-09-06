@@ -143,19 +143,19 @@ public final class SemanticDescriptionMeasurer {
         }
 <span class="fc bfc" id="L144" title="All 2 branches covered.">        if (cursor &lt; expression.length()</span>
 <span class="pc bpc" id="L145" title="1 of 2 branches missed.">                &amp;&amp; (expression.charAt(cursor) == 'e'</span>
-<span class="fc bfc" id="L146" title="All 2 branches covered.">                    || expression.charAt(cursor) == 'E')) {</span>
-<span class="fc" id="L147">            cursor++;</span>
-<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (cursor &lt; expression.length()</span>
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                    &amp;&amp; (expression.charAt(cursor) == '+'</span>
-<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                        || expression.charAt(cursor) == '-')) {</span>
-<span class="fc" id="L151">                cursor++;</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                    || expression.charAt(cursor) == 'E')) {</span>
+<span class="nc" id="L147">            cursor++;</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">            if (cursor &lt; expression.length()</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                    &amp;&amp; (expression.charAt(cursor) == '+'</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                        || expression.charAt(cursor) == '-')) {</span>
+<span class="nc" id="L151">                cursor++;</span>
             }
-<span class="fc" id="L153">            int exponentStart = cursor;</span>
-<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            while (cursor &lt; expression.length()</span>
-<span class="fc bfc" id="L155" title="All 2 branches covered.">                    &amp;&amp; Character.isDigit(expression.charAt(cursor))) {</span>
-<span class="fc" id="L156">                cursor++;</span>
+<span class="nc" id="L153">            int exponentStart = cursor;</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            while (cursor &lt; expression.length()</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                    &amp;&amp; Character.isDigit(expression.charAt(cursor))) {</span>
+<span class="nc" id="L156">                cursor++;</span>
             }
-<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            if (cursor == exponentStart) {</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">            if (cursor == exponentStart) {</span>
 <span class="nc" id="L159">                throw new IllegalArgumentException(</span>
                     &quot;invalid formatted exponent at position &quot; + index);
             }
