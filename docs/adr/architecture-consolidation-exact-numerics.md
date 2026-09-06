@@ -1,8 +1,11 @@
 # ADR: Architektur konsolidieren, beginnend mit exakter Zahlensemantik
 
-Datum: 2026-09-06  
-Status: Zielrichtung beschlossen; erster begrenzter Sicherheits-Schnitt  
-Ausgangsrevision: `4a52e933594c4eca9adb10f6f601e325bc624f2e`  
+Datum: 2026-09-06
+
+Status: Zielrichtung beschlossen; erster begrenzter Sicherheits-Schnitt
+
+Ausgangsrevision: `4a52e933594c4eca9adb10f6f601e325bc624f2e`
+
 Eigentuemer der Zahlensemantik: [#661](https://github.com/carstenartur/Regelsuche/issues/661)
 
 ## Entscheidung
