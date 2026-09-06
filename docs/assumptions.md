@@ -121,6 +121,62 @@ AssumptionEvaluatorPortfolio portfolio =
 AssumptionEvaluation evaluation = portfolio.evaluate(required, context);
 ```
 
+## Kanonisierung und Definitionsbereich
+
+Die assumption-free Kanonisierung darf nicht nur den Wert eines Ausdrucks auf
+seinem bisherigen Definitionsbereich erhalten, sondern auch nicht durch das
+vollständige Entfernen eines partiellen Teilbaums unbemerkt einen größeren
+Definitionsbereich erzeugen. Insbesondere sind daher Gleichungen wie
+
+```text
+x/x - x/x  -> 0
+(1/x)^0    -> 1
+```
+
+ohne Nebenbedingung nicht zulässig: Die linken Seiten sind bei `x = 0` nicht
+definiert, die rechten Seiten dagegen schon.
+
+`ExpressionCanonicalizer` prüft deshalb bei vollständiger Elision eines Terms
+rekursiv die strukturellen Domain-Anforderungen. Für explizite Divisionen und
+negative ganzzahlige Potenzen entsteht gegebenenfalls eine `NON_ZERO`-
+Obligation. Die dokumentierten Built-in-Funktionen werden entsprechend ihrer
+reellen Domain behandelt:
+
+| Funktion | Voraussetzung bei vollständiger Elision |
+| --- | --- |
+| `sin`, `cos`, `exp`, `abs` | keine zusätzliche Domain-Annahme |
+| `log`, `ln` | Argument `> 0` (`POSITIVE`) |
+| `sqrt` | Argument `>= 0` (`NON_NEGATIVE`) |
+| `tan` | `cos(argument) != 0` (`NON_ZERO`) |
+
+Unbekannte Funktionsnamen, mehrstellige Funktionssemantik sowie nichtganzzahlige
+oder symbolische Potenzen werden an dieser Grenze konservativ behandelt: Kann
+der Definitionsbereich nicht durch den vorhandenen Assumption-Vertrag
+beschrieben werden, wird der Teilbaum nicht vollständig wegkanonisiert.
+
+Ohne `AssumptionContext` schlägt eine bedingte Elision fehlersicher fehl. Mit
+einem Kontext darf die assumption-aware Kanonisierung die ausdrückbaren
+Obligationen in den Kontext aufnehmen und anschließend vereinfachen. Dadurch
+kann beispielsweise
+
+```text
+1/(x + 1) - 1/(x + 1) -> 0
+```
+
+nur zusammen mit `x + 1 != 0` entstehen. Ebenso darf `log(x) - log(x)` nur mit
+`x > 0` vollständig verschwinden.
+
+Nicht jede Koeffizientenzusammenfassung ist eine Elision. Bleibt der partielle
+Teilbaum erhalten, darf sein Koeffizient weiterhin exakt reduziert werden;
+`2*(1/x) - 1/x` kann daher zu `1/x` werden, ohne den Definitionsbereich zu
+vergrößern.
+
+Diese strukturelle Prüfung ersetzt keine allgemeine Beweis- oder
+Domain-Inferenz. Ob bereits bekannte oder extern bewiesene Annahmen gelten,
+bleibt Aufgabe des Assumption-Evaluator-Vertrags. Die Kanonisierung erzeugt
+beim assumption-aware Pfad lediglich die für ihre eigene bedingte
+Vereinfachung benötigten, expliziten Obligationen.
+
 ## Externe Evaluatoren
 
 SymPy, Z3, cvc5 und formale Prover können später denselben Vertrag implementieren.
