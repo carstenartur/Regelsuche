@@ -150,6 +150,7 @@ public final class ExpressionFormatter {
         int rightAdjust = switch (operator) {
             case POW -> -1;
             case DIV, SUB -> 1;
+            case MUL -> isDivision(binary.right()) ? 1 : 0;
             default -> 0;
         };
         pending.push(new FormatExpression(
@@ -160,6 +161,11 @@ public final class ExpressionFormatter {
         pending.push(new FormatExpression(
             binary.left(),
             precedence + leftAdjust));
+    }
+
+    private static boolean isDivision(Expr expression) {
+        return expression instanceof BinaryExpr binary
+            && binary.operator() == BinaryOperator.DIV;
     }
 
     private sealed interface Action
