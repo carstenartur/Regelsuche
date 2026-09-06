@@ -119,6 +119,8 @@ verify.primalityTests verify.trialDivisions verify.residueAssignments verify.res
         return {fields: f, universe: u, witness: w};
     }
     async function digest(text) {
+        requireThat(root.crypto && root.crypto.subtle && typeof root.crypto.subtle.digest === 'function',
+            'Kryptografische Prüfung nicht verfügbar. Öffne die Workbench über localhost oder HTTPS.');
         return [...new Uint8Array(await root.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))]
             .map(n => n.toString(16).padStart(2, '0')).join('');
     }
@@ -135,7 +137,8 @@ verify.primalityTests verify.trialDivisions verify.residueAssignments verify.res
         }
         const data = JSON.parse(text);
         // Canonical compact JSON also rejects duplicate object keys before any trusted rendering.
-        requireThat(JSON.stringify(data) === text.trim(), 'Nichtkanonisches JSON oder doppelte Schlüssel.');
+        const canonical = JSON.stringify(data);
+        requireThat(text === canonical || text === canonical + '\n', 'Nichtkanonisches JSON oder doppelte Schlüssel.');
         objectKeys(data, ['schema', 'sourceManifestSha256', 'selectedPolicy', 'runs']);
         requireThat(data.schema === 'admissible-workbench/v1' && typeof data.sourceManifestSha256 === 'string'
             && /^[0-9a-f]{64}$/.test(data.sourceManifestSha256), 'Unbekannter Import.');

@@ -67,9 +67,13 @@ Eine verzögert fertig werdende Datei kann einen neueren Auftrag nicht ersetzen.
 
 Das JSON-Format `admissible-workbench/v1` ist absichtlich kompakt und kanonisch.
 Es akzeptiert keine zusätzlichen oder doppelten Felder und keine beliebig
-verschachtelten Daten. Arbeitszähler bleiben Dezimalzeichenketten, damit die
-JavaScript-Ganzzahlpräzision nicht stillschweigend Werte verändert. Importdaten
-werden nur als Text und DOM-Elemente dargestellt, nicht als HTML ausgeführt.
+verschachtelten Daten. Nur ein einzelner abschließender LF ist optional;
+zusätzliche Leerzeichen oder Zeilenumbrüche werden zurückgewiesen.
+Arbeitszähler bleiben Dezimalzeichenketten, damit die JavaScript-Ganzzahlpräzision
+nicht stillschweigend Werte verändert. Importdaten werden nur als Text und
+DOM-Elemente dargestellt, nicht als HTML ausgeführt. Ist WebCrypto nicht
+verfügbar, erklärt eine Fehlermeldung den erforderlichen Zugriff über localhost
+oder HTTPS, statt einen ungeprüften Ersatz-Hash zu verwenden.
 
 ## Nachprüfen und Tests
 
@@ -78,13 +82,13 @@ node --test scripts/test-admissible-proof.cjs
 ./gradlew :app:e2eTest --tests de.regelsuche.e2e.AdmissibleWorkbenchBrowserTest
 ```
 
-Die 16 Node-Prüfertests benötigen keine Zusatzbibliothek. Die sieben
-Playwright-Tests starten den vorhandenen Produktionsserver in einem eigenen
-Prozesskontext, laden den echten Worker und importieren eine komprimierte
-Referenz aus einem ausgeführten Primachsenraum-CI-Lauf. Sie prüfen Navigation,
-Tastatur, Mobilgröße, beschädigte Dateien, verspätete Antworten und Zurücksetzen.
-Sie verwenden keinen simulierten Mathematikprüfer. Desktop- und Mobilaufnahmen
-stehen danach unter `app/build/reports/admissible-workbench/`.
+Die 18 Node-Prüfertests benötigen keine Zusatzbibliothek. Die sieben
+Playwright-Tests verwenden den in-process gestarteten Produktionsserver,
+laden den echten Worker und importieren eine komprimierte Referenz aus einem
+ausgeführten Primachsenraum-CI-Lauf. Sie prüfen Navigation, Tastatur, Mobilgröße,
+beschädigte Dateien, verspätete Antworten und Zurücksetzen. Sie verwenden
+keinen simulierten Mathematikprüfer. Desktop- und Mobilaufnahmen stehen danach
+unter `app/build/reports/admissible-workbench/`.
 
 Die Herkunft der Referenz steht in
 `app/src/e2eTest/resources/admissible/README.md`. Die normale Repository-CI führt

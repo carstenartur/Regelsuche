@@ -83,3 +83,19 @@ test('integer overflow and negative costs fail', async () => {
         await assert.rejects(checker.checkBundle(canonical(data)));
     }
 });
+
+test('missing WebCrypto is a clear domain error', async () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    try {
+        Object.defineProperty(globalThis, 'crypto', {value: undefined, configurable: true});
+        await assert.rejects(checker.checkBundle(source), /localhost oder HTTPS/);
+    } finally {
+        if (original) Object.defineProperty(globalThis, 'crypto', original);
+        else delete globalThis.crypto;
+    }
+});
+test('canonical envelope accepts only optional single LF', async () => {
+    await checker.checkBundle(source.trimEnd());
+    for (const text of [' ' + source, '\n' + source, source + '\n', source + ' ', source.trimEnd() + '\r\n'])
+        await assert.rejects(checker.checkBundle(text), /Nichtkanonisches/);
+});
