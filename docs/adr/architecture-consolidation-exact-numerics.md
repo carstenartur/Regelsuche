@@ -62,6 +62,13 @@ Einheitsfaktor behandelt werden. Der bereits rational rechnende
 `PolynomialNormalizer` konnte schliesslich einen exakten Koeffizienten beim
 Rueckweg durch `double` wieder runden.
 
+Eine weitere assumption-free Kurzschlussregel war fuer partielle Ausdruecke
+unsicher: Sobald ein Faktor zu numerischer Null wurde, konnte die
+Multiplikationskanonisierung sofort `0` liefern, ohne die uebrigen Faktoren zu
+beruecksichtigen. Damit konnte beispielsweise `0*(1/0)` denselben Suchschluessel
+wie `0` erhalten. Das ist keine gueltige Identitaet, weil der erste Ausdruck
+undefiniert ist.
+
 ## Erster Sicherheits-Schnitt: bewusst nicht die exakte AST-Migration
 
 Der erste Schnitt aendert nur bestehende numerische Randbedingungen:
@@ -132,22 +139,39 @@ multipliziert. Nichtganzzahlige oder uebergrosse Potenzexponenten werden nicht
 mehr zu `int` verengt und duerfen daher keine Potenzzusammenfassung
 autorisieren.
 
+Die bereits benoetigte Legacy-Dezimalkonvention ist nun an einer Stelle
+festgelegt: `ExactRationalDomain.legacyDecimalValue` interpretiert nur einen
+bereits vorhandenen endlichen Double-Wert nach seiner kuerzesten
+Dezimaldarstellung; `exactLegacyDecimalDouble` gibt umgekehrt nur dann einen
+Double-Wert zurueck, wenn derselbe rationale Wert nach dieser Konvention exakt
+wieder entsteht. Diese Methoden sind ausdruecklich Migrationsadapter und keine
+Evidence fuer die Exaktheit eines urspruenglichen Literals oder einer
+vorangegangenen Gleitkommarechnung. Matcher und Kanonisierung verwenden damit
+keine getrennten Kopien derselben Randsemantik mehr.
+
 `PolynomialNormalizer` bleibt die gemeinsame rationale Rechenautoritaet fuer
-seinen Polynomfragment. Seine bisherige Rueckgabe `ExactRational -> double` wird
-aber nicht mehr allein durch Endlichkeit akzeptiert. Ein neuer package-interner
-Renderer erzeugt ein numerisches Legacy-AST-Blatt nur nach exaktem rationalem
-Rueckvergleich. Wo moeglich kann er alternativ sichere ganzzahlige Bruchsyntax
-erzeugen. Ist auch diese Darstellung nicht exakt moeglich, lehnt der
-Polynomnormalisierer die Normalisierung ab, statt den Koeffizienten zu runden.
-Der allgemeine Canonicalizer behaelt in diesem Fall die einzeln exakt
+sein Polynomfragment. Seine bisherige Rueckgabe `ExactRational -> double` wird
+aber nicht mehr allein durch Endlichkeit akzeptiert. Der package-interne
+AST-Renderer erzeugt ein numerisches Legacy-AST-Blatt nur nach exaktem
+rationalem Rueckvergleich. Wo moeglich kann er alternativ sichere ganzzahlige
+Bruchsyntax erzeugen. Ist auch diese Darstellung nicht exakt moeglich, lehnt
+der Polynomnormalisierer die Normalisierung ab, statt den Koeffizienten zu
+runden. Der allgemeine Canonicalizer behaelt in diesem Fall die einzeln exakt
 darstellbaren numerischen Faktoren bzw. Summenbeitraege deterministisch bei.
+
+Nullmultiplikation ist im allgemeinen Fallback ebenfalls fail-closed. Der
+Canonicalizer wertet alle Faktoren aus und behaelt eine Null zusammen mit einem
+potenziell partiellen Faktor, statt diesen Faktor zu vernichten. Eine
+assumption-aware Vereinfachung darf weiterhin zu `0` gelangen, wenn sie die
+benoetigte Bedingung ausdruecklich in den `AssumptionContext` aufgenommen hat.
 
 Damit wird bewusst **keine** neue Zahlendarstellung eingefuehrt. Die bestehende
 `ExactRational`-Arithmetik und die vorhandenen AST-Typen werden weiterverwendet.
 Ein Fail-Closed-Fallback kann weniger mathematisch gleiche Schreibweisen
-zusammenfassen als eine zukuenftige exakte AST-Repräsentation; er darf aber
-keine verschiedenen exakten Werte mehr allein wegen einer Verengung oder
-Rundung zu demselben kanonischen Schluessel machen.
+zusammenfassen als eine zukuenftige exakte AST-Repraesentation; er darf aber
+keine verschiedenen exakten oder unterschiedlich definierten Werte allein
+wegen einer Verengung, Rundung oder Kurzschlussregel zu demselben kanonischen
+Schluessel machen.
 
 ## Noch offene mathematische Grenzen
 
@@ -190,13 +214,19 @@ ganzzahlige und 1.300 rationale Wurzelfaelle durch wiederholte Multiplikation.
 Die bestehenden Ableitungs- und Benchmarktests bleiben unveraendert und muessen
 dieselben Suchziele und Budgets weiterhin erreichen.
 
+`ExactRationalDomainTest` charakterisiert zusaetzlich den gemeinsamen
+Legacy-Adapter an endlichen Dezimalwerten, Nichtendlichkeit, terminierenden und
+nichtterminierenden Rationalen sowie an der 2^53-Grenze. Er trennt damit die
+explizite Migrationskonvention von parserausgestellter exakter Evidence.
+
 `ExpressionCanonicalizerTest` charakterisiert fuer den dritten Schnitt
 nichtpolynomiale Dezimalkoeffizienten, die `int`-Grenze, exakte
-Koeffizientensummen, fraktionale Potenzfaktoren und einen rational exakten
-Polynomkoeffizienten, der im bisherigen AST nicht als einzelner Double-Wert
-rueckwaerts dargestellt werden kann. Reparse muss weiterhin ein Fixpunkt sein;
-ein unrepresentierbarer exakter Wert darf insbesondere nicht denselben
-Suchhash wie seine naechste Double-Naeherung erhalten.
+Koeffizientensummen, fraktionale Potenzfaktoren, assumption-free undefinierte
+Nullprodukte und einen rational exakten Polynomkoeffizienten, der im bisherigen
+AST nicht als einzelner Double-Wert rueckwaerts dargestellt werden kann.
+Reparse muss weiterhin ein Fixpunkt sein; ein unrepresentierbarer exakter Wert
+darf insbesondere nicht denselben Suchhash wie seine naechste Double-Naeherung
+erhalten.
 
 Die abschliessende exakte Migration braucht darueber hinaus gemeinsame
 Regressionen fuer Erzeugung neuer Zahlen durch Umformungen, exakte Brueche,
@@ -205,8 +235,8 @@ Persistenz, Solveradapter und Replay. Verschiedene exakte Werte duerfen in
 keinem dieser exakten Verarbeitungspfade zusammenfallen.
 
 ```sh
-mvn -pl regelsuche-core -Dtest=NumericBoundaryRegressionTest,ExactMonomialInferenceTest,EquivalenceAwarePatternMatcherTest test
-./gradlew :regelsuche-core:test --tests '*NumericBoundaryRegressionTest' --tests '*ExactMonomialInferenceTest' --tests '*EquivalenceAwarePatternMatcherTest'
+mvn -pl regelsuche-core -Dtest=NumericBoundaryRegressionTest,ExactMonomialInferenceTest,EquivalenceAwarePatternMatcherTest,ExactRationalDomainTest test
+./gradlew :regelsuche-core:test --tests '*NumericBoundaryRegressionTest' --tests '*ExactMonomialInferenceTest' --tests '*EquivalenceAwarePatternMatcherTest' --tests '*ExactRationalDomainTest'
 ./gradlew :app:test --tests '*ExpressionCanonicalizerTest'
 ./gradlew --no-configuration-cache ciCheck
 ```
