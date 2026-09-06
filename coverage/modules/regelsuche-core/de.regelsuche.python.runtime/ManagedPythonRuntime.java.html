@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManagedPythonRuntime.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.python.runtime</a> &gt; <span class="el_source">ManagedPythonRuntime.java</span></div><h1>ManagedPythonRuntime.java</h1><pre class="source lang-java linenums">package de.regelsuche.python.runtime;
+
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Serialized lifecycle for trusted embedded Python adapters, without GraalPy or mathematical dependencies.
+ *
+ * &lt;p&gt;The adapter owns its fixed program, packages, capability policy and result verification. This class
+ * never evaluates source, grants guest permissions, interprets a mathematical status, or certifies output.
+ * A completed invocation is still untrusted data. One daemon platform thread enters each session.
+ * Queueing, initialization and invocation share one monotonic deadline; best-effort cancellation and
+ * resource cleanup are not a hard real-time or process-isolation guarantee.&lt;/p&gt;
+ */
+public final class ManagedPythonRuntime implements AutoCloseable {
+<span class="fc" id="L26">    public enum Failure { TIMEOUT, INTERRUPTED, CLOSED, EXECUTION, SIZE_LIMIT }</span>
+
+    /** A technical transport failure, never a mathematical counterexample. */
+    public static final class RuntimeFailure extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final Failure failure;
+
+        private RuntimeFailure(Failure failure, String message, Throwable cause) {
+<span class="fc" id="L34">            super(message, cause);</span>
+<span class="fc" id="L35">            this.failure = failure;</span>
+<span class="fc" id="L36">        }</span>
+
+<span class="fc" id="L38">        public Failure failure() { return failure; }</span>
+    }
+
+    /**
+     * Factory for a fresh, non-shared session holder. Allocate no guest resources in this method:
+     * put context construction and imports in {@link Session#initialize()}. This permits the owner to
+     * publish the holder for cancellation before initialization starts. A factory completing after
+     * retirement has its returned holder closed and can never replace a newer generation.
+     */
+    @FunctionalInterface
+    public interface SessionFactory {
+        Session create();
+    }
+
+    /**
+     * Backend-specific session. initialize/invoke run only on its platform worker. close must be
+     * thread-safe and tolerate concurrent or not-yet-started initialization and execution. In particular,
+     * resources created after cancellation must be closed, not published for reuse. Close owns only this
+     * session: it must not retire the runtime, close a shared engine or delete another session's resources.
+     */
+    public interface Session {
+        String initialize();
+        String invoke(String input);
+        void close();
+    }
+
+    /** Timings are diagnostics, excluded from any mathematical certificate by the adapter. */
+    public record Invocation(String output, String runtimeVersion, boolean coldStart,
+                             long initializationNanos, long invocationNanos) {
+<span class="fc" id="L67">        public Invocation {</span>
+<span class="fc" id="L68">            Objects.requireNonNull(output, &quot;output&quot;);</span>
+<span class="fc" id="L69">            Objects.requireNonNull(runtimeVersion, &quot;runtimeVersion&quot;);</span>
+<span class="pc bpc" id="L70" title="3 of 6 branches missed.">            if (runtimeVersion.isBlank() || initializationNanos &lt; 0 || invocationNanos &lt; 0) {</span>
+<span class="nc" id="L71">                throw new IllegalArgumentException(&quot;invalid invocation metadata&quot;);</span>
+            }
+<span class="fc" id="L73">        }</span>
+    }
+
+    private final SessionFactory factory;
+    private final int maximumInputBytes;
+    private final int maximumOutputBytes;
+    private final String threadName;
+<span class="fc" id="L80">    private final ReentrantLock gate = new ReentrantLock();</span>
+    // The gate owns generations; admission closes immediately, before cleanup waits for that gate.
+    private Generation generation;
+<span class="fc" id="L83">    private final AtomicBoolean closed = new AtomicBoolean();</span>
+    private boolean cleanupComplete;
+
+    /** Integer.MAX_VALUE delegates that data limit to a separately bounded adapter policy. */
+    public ManagedPythonRuntime(SessionFactory factory, int maximumInputBytes, int maximumOutputBytes,
+<span class="fc" id="L88">                                String threadName) {</span>
+<span class="fc" id="L89">        this.factory = Objects.requireNonNull(factory, &quot;factory&quot;);</span>
+<span class="fc bfc" id="L90" title="All 4 branches covered.">        if (maximumInputBytes &lt; 1 || maximumOutputBytes &lt; 1) {</span>
+<span class="fc" id="L91">            throw new IllegalArgumentException(&quot;positive input/output byte limits required&quot;);</span>
+        }
+<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        if (threadName == null || !threadName.matches(&quot;[A-Za-z][A-Za-z0-9-]{0,95}&quot;)) {</span>
+<span class="fc" id="L94">            throw new IllegalArgumentException(&quot;invalid platform-thread prefix&quot;);</span>
+        }
+<span class="fc" id="L96">        this.maximumInputBytes = maximumInputBytes;</span>
+<span class="fc" id="L97">        this.maximumOutputBytes = maximumOutputBytes;</span>
+<span class="fc" id="L98">        this.threadName = threadName;</span>
+<span class="fc" id="L99">    }</span>
+
+    public Invocation invoke(String input, Duration timeout) {
+<span class="fc" id="L102">        Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L103">        Objects.requireNonNull(timeout, &quot;timeout&quot;);</span>
+<span class="fc bfc" id="L104" title="All 4 branches covered.">        if (timeout.isZero() || timeout.isNegative()) {</span>
+<span class="fc" id="L105">            throw new IllegalArgumentException(&quot;positive timeout required&quot;);</span>
+        }
+        final long budget;
+<span class="fc" id="L108">        try { budget = timeout.toNanos(); }</span>
+<span class="fc" id="L109">        catch (ArithmeticException exception) {</span>
+<span class="fc" id="L110">            throw new IllegalArgumentException(&quot;timeout exceeds monotonic clock range&quot;, exception);</span>
+<span class="fc" id="L111">        }</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (closed.get()) throw failure(Failure.CLOSED, &quot;Python runtime is closed&quot;, null);</span>
+<span class="fc" id="L113">        checkSize(input, maximumInputBytes);</span>
+<span class="fc" id="L114">        long started = System.nanoTime();</span>
+<span class="fc" id="L115">        boolean acquired = false;</span>
+<span class="fc" id="L116">        Generation selected = null;</span>
+<span class="fc" id="L117">        Future&lt;Invocation&gt; task = null;</span>
+        try {
+<span class="fc" id="L119">            acquired = gate.tryLock(budget, TimeUnit.NANOSECONDS);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (!acquired) throw failure(Failure.TIMEOUT, &quot;Python runtime queue deadline exceeded&quot;, null);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (closed.get()) throw failure(Failure.CLOSED, &quot;Python runtime is closed&quot;, null);</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (remaining(started, budget) &lt;= 0) {</span>
+                // We now own the idle generation. Preserve cancellation semantics even when the
+                // deadline expired just before submission. A waiter without the gate never retires it.
+<span class="nc" id="L125">                selected = generation;</span>
+<span class="nc" id="L126">                throw new TimeoutException();</span>
+            }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (generation == null) generation = new Generation();</span>
+<span class="fc" id="L129">            selected = generation;</span>
+<span class="fc" id="L130">            Generation owned = selected;</span>
+<span class="fc" id="L131">            task = owned.executor.submit(() -&gt; owned.execute(input));</span>
+            // Recompute after submission, so thread creation/submission do not extend the deadline.
+<span class="fc" id="L133">            long left = remaining(started, budget);</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            if (left &lt;= 0) throw new TimeoutException();</span>
+<span class="fc" id="L135">            return task.get(left, TimeUnit.NANOSECONDS);</span>
+<span class="fc" id="L136">        } catch (TimeoutException exception) {</span>
+<span class="fc" id="L137">            RuntimeFailure result = failure(Failure.TIMEOUT, &quot;Python runtime deadline exceeded; session retired&quot;, exception);</span>
+<span class="fc" id="L138">            retire(selected, task, result);</span>
+<span class="fc" id="L139">            throw result;</span>
+<span class="fc" id="L140">        } catch (InterruptedException exception) {</span>
+<span class="fc" id="L141">            RuntimeFailure result = failure(Failure.INTERRUPTED, &quot;Python runtime invocation interrupted&quot;, exception);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            if (acquired) retire(selected, task, result);</span>
+<span class="fc" id="L143">            Thread.currentThread().interrupt();</span>
+<span class="fc" id="L144">            throw result;</span>
+<span class="fc" id="L145">        } catch (ExecutionException exception) {</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            RuntimeFailure result = exception.getCause() instanceof RuntimeFailure known ? known</span>
+<span class="fc" id="L147">                    : failure(Failure.EXECUTION, &quot;Python runtime execution failed; session retired&quot;, exception.getCause());</span>
+<span class="fc" id="L148">            retire(selected, task, result);</span>
+<span class="fc" id="L149">            throw result;</span>
+        } finally {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (acquired) gate.unlock();</span>
+        }
+    }
+
+    private static long remaining(long started, long budget) {
+<span class="fc" id="L156">        return budget - (System.nanoTime() - started);</span>
+    }
+
+    private static RuntimeFailure failure(Failure failure, String message, Throwable cause) {
+<span class="fc" id="L160">        return new RuntimeFailure(failure, message, cause);</span>
+    }
+
+    private static void checkSize(String data, int limit) {
+<span class="pc bpc" id="L164" title="2 of 6 branches missed.">        if (limit != Integer.MAX_VALUE &amp;&amp; (data.length() &gt; limit || data.getBytes(StandardCharsets.UTF_8).length &gt; limit)) {</span>
+<span class="fc" id="L165">            throw failure(Failure.SIZE_LIMIT, &quot;Python runtime data byte limit exceeded&quot;, null);</span>
+        }
+<span class="fc" id="L167">    }</span>
+
+    private void retire(Generation selected, Future&lt;?&gt; task, RuntimeFailure authoritative) {
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (task != null) task.cancel(true);</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (selected == null) return;</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (generation == selected) generation = null;</span>
+<span class="fc" id="L173">        try { selected.close(); }</span>
+<span class="fc" id="L174">        catch (RuntimeException cleanup) { authoritative.addSuppressed(cleanup); }</span>
+<span class="fc" id="L175">    }</span>
+
+    /** True as soon as admission closes, even when an earlier invocation is still being drained. */
+<span class="fc" id="L178">    public boolean isClosed() { return closed.get(); }</span>
+
+    /** Idempotent; closes admission first, waits for the owner, then releases its session. */
+    @Override public void close() {
+<span class="fc" id="L182">        closed.set(true);</span>
+<span class="fc" id="L183">        gate.lock();</span>
+        try {
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (cleanupComplete) return;</span>
+<span class="fc" id="L186">            cleanupComplete = true;</span>
+<span class="fc" id="L187">            Generation owned = generation;</span>
+<span class="fc" id="L188">            generation = null;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (owned != null) owned.close();</span>
+<span class="fc" id="L190">        } finally { gate.unlock(); }</span>
+<span class="fc" id="L191">    }</span>
+
+<span class="fc" id="L193">    private final class Generation {</span>
+<span class="fc" id="L194">        final ExecutorService executor = Executors.newSingleThreadExecutor(</span>
+<span class="fc" id="L195">                Thread.ofPlatform().daemon(true).name(threadName, 0).factory());</span>
+<span class="fc" id="L196">        final AtomicReference&lt;Session&gt; active = new AtomicReference&lt;&gt;();</span>
+<span class="fc" id="L197">        final AtomicBoolean retired = new AtomicBoolean();</span>
+        // Worker-confined metadata; caller holds gate across every invocation.
+        String version;
+
+        Invocation execute(String input) {
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            if (retired.get()) throw new IllegalStateException(&quot;retired Python session&quot;);</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            boolean cold = version == null;</span>
+<span class="fc" id="L204">            long initialization = 0;</span>
+<span class="fc" id="L205">            Session session = active.get();</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            if (cold) {</span>
+<span class="fc" id="L207">                long started = System.nanoTime();</span>
+<span class="fc" id="L208">                session = Objects.requireNonNull(factory.create(), &quot;session factory returned null&quot;);</span>
+<span class="fc" id="L209">                active.set(session);</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                if (retired.get()) {</span>
+<span class="fc" id="L211">                    closeActive();</span>
+<span class="fc" id="L212">                    throw new IllegalStateException(&quot;retired Python startup&quot;);</span>
+                }
+<span class="fc" id="L214">                version = Objects.requireNonNull(session.initialize(), &quot;missing runtime version&quot;);</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                if (version.isBlank()) throw new IllegalStateException(&quot;blank runtime version&quot;);</span>
+<span class="fc" id="L216">                initialization = System.nanoTime() - started;</span>
+            }
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            if (retired.get()) throw new IllegalStateException(&quot;retired Python execution&quot;);</span>
+<span class="fc" id="L219">            long started = System.nanoTime();</span>
+<span class="fc" id="L220">            String output = Objects.requireNonNull(session.invoke(input), &quot;missing Python output&quot;);</span>
+<span class="fc" id="L221">            checkSize(output, maximumOutputBytes);</span>
+<span class="fc" id="L222">            return new Invocation(output, version, cold, initialization, System.nanoTime() - started);</span>
+        }
+
+        void closeActive() {
+<span class="fc" id="L226">            Session session = active.getAndSet(null);</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            if (session != null) session.close();</span>
+<span class="fc" id="L228">        }</span>
+
+        void close() {
+<span class="fc" id="L231">            retired.set(true);</span>
+<span class="fc" id="L232">            try { closeActive(); }</span>
+<span class="fc" id="L233">            finally { executor.shutdownNow(); }</span>
+<span class="fc" id="L234">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
