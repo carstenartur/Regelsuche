@@ -6,7 +6,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
-import java.math.BigDecimal;
+import de.regelsuche.scalar.ExactRationalDomain;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,10 +23,11 @@ import java.util.TreeMap;
  * powers.
  *
  * <p>Legacy {@link NumberExpr} nodes still expose {@code double}; conversion
- * of that already-rounded value is isolated in {@link #legacyExact(double)}.
- * All normalization arithmetic itself uses the authoritative
- * {@link ExactRational} contract. Exact results are converted back only when
- * the legacy AST can represent the same rational value without rounding.</p>
+ * of that already-rounded value is isolated in the shared
+ * {@link ExactRationalDomain} migration bridge. All normalization arithmetic
+ * itself uses the authoritative {@link ExactRational} contract. Exact results
+ * are converted back only when the legacy AST can represent the same rational
+ * value without rounding.</p>
  */
 public final class PolynomialNormalizer {
     private static final int MAX_EXPANDED_TERMS = 1_000;
@@ -403,23 +404,10 @@ public final class PolynomialNormalizer {
         }
     }
 
-    /** Temporary bridge from the already-rounded legacy numeric leaf. */
+    /** Temporary convenience for canonical-package callers. */
     static ExactRational legacyExact(double value) {
-        if (!Double.isFinite(value)) {
-            return null;
-        }
-        BigDecimal decimal =
-            BigDecimal.valueOf(value).stripTrailingZeros();
-        BigInteger numerator = decimal.unscaledValue();
-        int scale = decimal.scale();
-        if (scale < 0) {
-            numerator = numerator.multiply(
-                BigInteger.TEN.pow(-scale));
-            return ExactRational.integer(numerator);
-        }
-        return new ExactRational(
-            numerator,
-            BigInteger.TEN.pow(scale));
+        return ExactRationalDomain.legacyDecimalValue(value)
+            .orElse(null);
     }
 
     /**
@@ -427,16 +415,9 @@ public final class PolynomialNormalizer {
      * when the legacy Double-backed AST cannot encode it without rounding.
      */
     static Expr exactRationalExpression(ExactRational value) {
-        try {
-            BigDecimal decimal = new BigDecimal(value.numerator())
-                .divide(new BigDecimal(value.denominator()));
-            double legacy = decimal.doubleValue();
-            ExactRational roundTrip = legacyExact(legacy);
-            if (roundTrip != null && roundTrip.equals(value)) {
-                return new NumberExpr(legacy);
-            }
-        } catch (ArithmeticException nonterminatingDecimal) {
-            // Try exact fraction syntax below.
+        var legacy = ExactRationalDomain.exactLegacyDecimalDouble(value);
+        if (legacy.isPresent()) {
+            return new NumberExpr(legacy.getAsDouble());
         }
 
         NumberExpr numerator = exactIntegerLeaf(value.numerator());
@@ -456,18 +437,11 @@ public final class PolynomialNormalizer {
     }
 
     private static NumberExpr exactIntegerLeaf(BigInteger value) {
-        double legacy = value.doubleValue();
-        if (!Double.isFinite(legacy)) {
-            return null;
-        }
-        try {
-            return BigDecimal.valueOf(legacy).toBigIntegerExact()
-                    .equals(value)
-                ? new NumberExpr(legacy)
-                : null;
-        } catch (ArithmeticException notAnInteger) {
-            return null;
-        }
+        var legacy = ExactRationalDomain.exactLegacyDecimalDouble(
+            ExactRational.integer(value));
+        return legacy.isPresent()
+            ? new NumberExpr(legacy.getAsDouble())
+            : null;
     }
 
     private static Expr withCoefficient(
