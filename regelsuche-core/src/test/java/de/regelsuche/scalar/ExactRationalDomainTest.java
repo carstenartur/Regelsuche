@@ -106,6 +106,34 @@ class ExactRationalDomainTest {
     }
 
     @Test
+    void legacyDecimalBridgeRequiresExactShortestDecimalRoundTrip() {
+        assertEquals(
+            new ExactRational(BigInteger.ONE, BigInteger.TEN),
+            ExactRationalDomain.legacyDecimalValue(0.1)
+                .orElseThrow());
+        assertEquals(
+            ExactRational.integer(BigInteger.TEN.pow(20)),
+            ExactRationalDomain.legacyDecimalValue(1.0e20)
+                .orElseThrow());
+        assertTrue(ExactRationalDomain.legacyDecimalValue(Double.NaN).isEmpty());
+        assertTrue(ExactRationalDomain.legacyDecimalValue(Double.POSITIVE_INFINITY).isEmpty());
+
+        ExactRational threeHalves = new ExactRational(
+            BigInteger.valueOf(3),
+            BigInteger.valueOf(2));
+        assertEquals(
+            1.5,
+            ExactRationalDomain.exactLegacyDecimalDouble(threeHalves)
+                .orElseThrow());
+        assertTrue(ExactRationalDomain.exactLegacyDecimalDouble(
+            new ExactRational(BigInteger.valueOf(2), BigInteger.valueOf(3)))
+            .isEmpty());
+        assertTrue(ExactRationalDomain.exactLegacyDecimalDouble(
+            ExactRational.integer(new BigInteger("9007199254740993")))
+            .isEmpty());
+    }
+
+    @Test
     void equalLexicalFormsShareValueIdentityButRetainSourceEvidence() {
         ExactRationalParseEvidence fraction =
             domain.parse("1/2");
