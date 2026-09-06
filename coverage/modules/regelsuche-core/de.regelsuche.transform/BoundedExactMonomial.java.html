@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BoundedExactMonomial.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">BoundedExactMonomial.java</span></div><h1>BoundedExactMonomial.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeMap;
+
+/**
+ * Exact coefficient arithmetic for the matcher's bounded monomial fragment.
+ *
+ * &lt;p&gt;The temporary input bridge interprets finite legacy numeric leaves under
+ * their shortest-decimal convention. It does not recover source precision lost
+ * before matching. Symbolic divisors are outside this assumption-free fragment.
+ * Inferred coefficients prefer a finite decimal leaf only after exact
+ * decimal round-trip verification; other rationals use integer/fraction syntax.&lt;/p&gt;
+ */
+record BoundedExactMonomial(ExactRational coefficient, Map&lt;String, Integer&gt; powers) {
+<span class="fc" id="L26">    BoundedExactMonomial {</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        powers = coefficient.isZero() ? Map.of()</span>
+<span class="fc" id="L28">            : Collections.unmodifiableMap(new TreeMap&lt;&gt;(powers));</span>
+<span class="fc" id="L29">    }</span>
+
+    static Optional&lt;BoundedExactMonomial&gt; from(Expr expression, Budget budget) {
+<span class="fc" id="L32">        return from(expression, budget, 0);</span>
+    }
+
+    private static Optional&lt;BoundedExactMonomial&gt; from(
+        Expr expression, Budget budget, int depth
+    ) {
+<span class="fc" id="L38">        budget.visit(depth);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            return Double.isFinite(number.value())</span>
+<span class="fc" id="L41">                ? Optional.of(new BoundedExactMonomial(decimalValue(number.value()), Map.of()))</span>
+<span class="fc" id="L42">                : Optional.empty();</span>
+        }
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L45">            return Optional.of(new BoundedExactMonomial(</span>
+<span class="fc" id="L46">                ExactRational.ONE, Map.of(variable.name(), 1)));</span>
+        }
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="fc" id="L49">            return Optional.empty();</span>
+        }
+<span class="pc bpc" id="L51" title="1 of 3 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L52">            case MUL, DIV -&gt; product(binary, budget, depth);</span>
+<span class="fc" id="L53">            case POW -&gt; power(binary, budget, depth);</span>
+<span class="nc" id="L54">            default -&gt; Optional.empty();</span>
+        };
+    }
+
+    private static Optional&lt;BoundedExactMonomial&gt; product(
+        BinaryExpr binary, Budget budget, int depth
+    ) {
+<span class="fc" id="L61">        var left = from(binary.left(), budget, depth + 1);</span>
+<span class="fc" id="L62">        var right = from(binary.right(), budget, depth + 1);</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        if (left.isEmpty() || right.isEmpty()) {</span>
+<span class="fc" id="L64">            return Optional.empty();</span>
+        }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        boolean divide = binary.operator() == BinaryOperator.DIV;</span>
+        // Even x/x and 0/x retain an undefined point. There is no assumption
+        // context here that could authorize cancelling a symbolic denominator.
+<span class="fc bfc" id="L69" title="All 6 branches covered.">        if (divide &amp;&amp; (right.get().coefficient.isZero() || !right.get().powers.isEmpty())) {</span>
+<span class="fc" id="L70">            return Optional.empty();</span>
+        }
+<span class="fc" id="L72">        return Optional.of(left.get().combine(right.get(), divide, budget));</span>
+    }
+
+    private static Optional&lt;BoundedExactMonomial&gt; power(
+        BinaryExpr binary, Budget budget, int depth
+    ) {
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (!(binary.right() instanceof NumberExpr number)) {</span>
+<span class="nc" id="L79">            return Optional.empty();</span>
+        }
+<span class="fc" id="L81">        int exponent = positiveInteger(number.value());</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (exponent &lt; 1) {</span>
+<span class="fc" id="L83">            return Optional.empty();</span>
+        }
+<span class="fc" id="L85">        return from(binary.left(), budget, depth + 1)</span>
+<span class="fc" id="L86">            .map(base -&gt; base.pow(exponent, budget));</span>
+    }
+
+    private BoundedExactMonomial combine(
+        BoundedExactMonomial other, boolean divide, Budget budget
+    ) {
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        ExactRational right = divide ? other.coefficient.reciprocal() : other.coefficient;</span>
+<span class="fc" id="L93">        budget.coefficientBits(</span>
+<span class="fc" id="L94">            (long) bits(coefficient.numerator()) + bits(right.numerator()),</span>
+<span class="fc" id="L95">            (long) bits(coefficient.denominator()) + bits(right.denominator()));</span>
+<span class="fc" id="L96">        Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;(powers);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (!divide) {</span>
+<span class="fc" id="L98">            other.powers.forEach((name, exponent) -&gt; result.merge(name, exponent,</span>
+<span class="fc" id="L99">                (first, second) -&gt; checkedExponent((long) first + second)));</span>
+        }
+<span class="fc" id="L101">        return new BoundedExactMonomial(coefficient.multiply(right), result);</span>
+    }
+
+    private BoundedExactMonomial pow(int exponent, Budget budget) {
+<span class="fc" id="L105">        budget.coefficientBits(powerBits(coefficient.numerator(), exponent),</span>
+<span class="fc" id="L106">            powerBits(coefficient.denominator(), exponent));</span>
+<span class="fc" id="L107">        Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L108">        powers.forEach((name, power) -&gt;</span>
+<span class="fc" id="L109">            result.put(name, checkedExponent((long) power * exponent)));</span>
+<span class="fc" id="L110">        return new BoundedExactMonomial(coefficient.pow(exponent), result);</span>
+    }
+
+    Optional&lt;BoundedExactMonomial&gt; exactRoot(int exponent, Budget budget) {
+<span class="fc bfc" id="L114" title="All 4 branches covered.">        if (coefficient.signum() &lt; 0 &amp;&amp; exponent % 2 == 0) {</span>
+<span class="fc" id="L115">            return Optional.empty();</span>
+        }
+<span class="fc" id="L117">        Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (var entry : powers.entrySet()) {</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            if (entry.getValue() % exponent != 0) {</span>
+<span class="fc" id="L120">                return Optional.empty();</span>
+            }
+<span class="fc" id="L122">            result.put(entry.getKey(), entry.getValue() / exponent);</span>
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        var numerator = integerRoot(coefficient.numerator().abs(), exponent, budget);</span>
+<span class="fc" id="L125">        var denominator = integerRoot(coefficient.denominator(), exponent, budget);</span>
+<span class="fc bfc" id="L126" title="All 4 branches covered.">        if (numerator.isEmpty() || denominator.isEmpty()) {</span>
+<span class="fc" id="L127">            return Optional.empty();</span>
+        }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        BigInteger signed = coefficient.signum() &lt; 0 ? numerator.get().negate() : numerator.get();</span>
+<span class="fc" id="L130">        return Optional.of(new BoundedExactMonomial(</span>
+<span class="fc" id="L131">            new ExactRational(signed, denominator.get()), result));</span>
+    }
+
+    /** No floating-point proposal can authorize a root. */
+    private static Optional&lt;BigInteger&gt; integerRoot(BigInteger value, int exponent, Budget budget) {
+<span class="fc" id="L136">        budget.visit(0);</span>
+<span class="pc bpc" id="L137" title="1 of 4 branches missed.">        if (exponent == 1 || value.compareTo(BigInteger.ONE) &lt;= 0) {</span>
+<span class="fc" id="L138">            return Optional.of(value);</span>
+        }
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (exponent &gt; value.bitLength()) {</span>
+<span class="fc" id="L141">            return Optional.empty();</span>
+        }
+<span class="fc" id="L143">        BigInteger low = BigInteger.ZERO;</span>
+<span class="fc" id="L144">        BigInteger high = BigInteger.ONE.shiftLeft((value.bitLength() + exponent - 1) / exponent);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        while (high.subtract(low).compareTo(BigInteger.ONE) &gt; 0) {</span>
+<span class="fc" id="L146">            budget.visit(0);</span>
+<span class="fc" id="L147">            BigInteger middle = low.add(high).shiftRight(1);</span>
+<span class="fc" id="L148">            int comparison = middle.pow(exponent).compareTo(value);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (comparison == 0) {</span>
+<span class="fc" id="L150">                return Optional.of(middle);</span>
+            }
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (comparison &lt; 0) {</span>
+<span class="fc" id="L153">                low = middle;</span>
+            } else {
+<span class="fc" id="L155">                high = middle;</span>
+            }
+<span class="fc" id="L157">        }</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        return low.pow(exponent).equals(value) ? Optional.of(low) : Optional.empty();</span>
+    }
+
+    boolean equivalentTo(BoundedExactMonomial other) {
+<span class="fc bfc" id="L162" title="All 4 branches covered.">        return coefficient.equals(other.coefficient) &amp;&amp; powers.equals(other.powers);</span>
+    }
+
+    boolean isConstant(double expected) {
+<span class="pc bpc" id="L166" title="1 of 4 branches missed.">        return Double.isFinite(expected) &amp;&amp; powers.isEmpty()</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            &amp;&amp; coefficient.equals(decimalValue(expected));</span>
+    }
+
+    Expr toExpr() {
+<span class="fc" id="L171">        Expr result = null;</span>
+<span class="pc bpc" id="L172" title="1 of 4 branches missed.">        if (!coefficient.isOne() || powers.isEmpty()) {</span>
+<span class="fc" id="L173">            result = coefficientExpression();</span>
+        }
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        for (var entry : powers.entrySet()) {</span>
+<span class="fc" id="L176">            Expr factor = new VariableExpr(entry.getKey());</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">            if (entry.getValue() != 1) {</span>
+<span class="fc" id="L178">                factor = new BinaryExpr(factor, BinaryOperator.POW, new NumberExpr(entry.getValue()));</span>
+            }
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            result = result == null ? factor : new BinaryExpr(result, BinaryOperator.MUL, factor);</span>
+<span class="fc" id="L181">        }</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        return result == null ? new NumberExpr(1) : result;</span>
+    }
+
+    private Expr coefficientExpression() {
+        // Keep the ordinary decimal surface only if it denotes exactly the
+        // rational coefficient. Nonterminating fractions never become floats.
+        try {
+<span class="fc" id="L189">            BigDecimal decimal = new BigDecimal(coefficient.numerator())</span>
+<span class="fc" id="L190">                .divide(new BigDecimal(coefficient.denominator()));</span>
+<span class="fc" id="L191">            double value = decimal.doubleValue();</span>
+<span class="pc bpc" id="L192" title="1 of 4 branches missed.">            if (Double.isFinite(value) &amp;&amp; BigDecimal.valueOf(value).compareTo(decimal) == 0) {</span>
+<span class="fc" id="L193">                return new NumberExpr(value);</span>
+            }
+<span class="fc" id="L195">        } catch (ArithmeticException nonterminatingDecimal) {</span>
+            // Exact BigDecimal division rejects a nonterminating decimal.
+<span class="fc" id="L197">        }</span>
+<span class="fc" id="L198">        Expr numerator = integerLeaf(coefficient.numerator());</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        return coefficient.isInteger() ? numerator</span>
+<span class="fc" id="L200">            : new BinaryExpr(numerator, BinaryOperator.DIV, integerLeaf(coefficient.denominator()));</span>
+    }
+
+    private static NumberExpr integerLeaf(BigInteger value) {
+<span class="fc" id="L204">        double legacy = value.doubleValue();</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (!Double.isFinite(legacy)</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                || !BigDecimal.valueOf(legacy).toBigIntegerExact().equals(value)) {</span>
+<span class="fc" id="L207">            throw new LimitExceeded(&quot;ALGEBRAIC_BINDING_NOT_REPRESENTABLE&quot;);</span>
+        }
+<span class="fc" id="L209">        return new NumberExpr(legacy);</span>
+    }
+
+    private static ExactRational decimalValue(double value) {
+<span class="fc" id="L213">        BigDecimal decimal = BigDecimal.valueOf(value);</span>
+<span class="fc" id="L214">        BigInteger unscaled = decimal.unscaledValue();</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        return decimal.scale() &lt; 0</span>
+<span class="fc" id="L216">            ? ExactRational.integer(unscaled.multiply(BigInteger.TEN.pow(-decimal.scale())))</span>
+<span class="fc" id="L217">            : new ExactRational(unscaled, BigInteger.TEN.pow(decimal.scale()));</span>
+    }
+
+    static int positiveInteger(double value) {
+<span class="pc bpc" id="L221" title="1 of 6 branches missed.">        return value &gt; 0 &amp;&amp; value &lt;= Integer.MAX_VALUE &amp;&amp; value == Math.rint(value)</span>
+<span class="fc" id="L222">            ? (int) value : -1;</span>
+    }
+
+    private static int checkedExponent(long value) {
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (value &gt; Integer.MAX_VALUE) {</span>
+<span class="fc" id="L227">            throw new LimitExceeded(&quot;ALGEBRAIC_EXPONENT_LIMIT&quot;);</span>
+        }
+<span class="fc" id="L229">        return (int) value;</span>
+    }
+
+    private static int bits(BigInteger value) {
+<span class="fc" id="L233">        return value.abs().bitLength();</span>
+    }
+
+    private static long powerBits(BigInteger value, int exponent) {
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        return value.abs().compareTo(BigInteger.ONE) &lt;= 0 ? 1L : (long) bits(value) * exponent;</span>
+    }
+
+    /** Shared by every inference/pre-filter in one matcher invocation. */
+<span class="fc" id="L241">    static final class Budget {</span>
+        private static final int MAX_VISITS = 10_000;
+        private static final int MAX_DEPTH = 128;
+        private static final int MAX_COEFFICIENT_BITS = 4_096;
+<span class="fc" id="L245">        private int remaining = MAX_VISITS;</span>
+
+        private void visit(int depth) {
+<span class="fc bfc" id="L248" title="All 4 branches covered.">            if (depth &gt; MAX_DEPTH || remaining-- &lt;= 0) {</span>
+<span class="fc" id="L249">                throw new LimitExceeded(&quot;ALGEBRAIC_WORK_LIMIT&quot;);</span>
+            }
+<span class="fc" id="L251">        }</span>
+
+        private void coefficientBits(long numerator, long denominator) {
+<span class="fc" id="L254">            visit(0);</span>
+<span class="fc bfc" id="L255" title="All 4 branches covered.">            if (numerator &gt; MAX_COEFFICIENT_BITS || denominator &gt; MAX_COEFFICIENT_BITS) {</span>
+<span class="fc" id="L256">                throw new LimitExceeded(&quot;ALGEBRAIC_COEFFICIENT_LIMIT&quot;);</span>
+            }
+<span class="fc" id="L258">        }</span>
+    }
+
+    static final class LimitExceeded extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        final String code;
+
+        private LimitExceeded(String code) {
+<span class="fc" id="L266">            super(code, null, false, false);</span>
+<span class="fc" id="L267">            this.code = code;</span>
+<span class="fc" id="L268">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

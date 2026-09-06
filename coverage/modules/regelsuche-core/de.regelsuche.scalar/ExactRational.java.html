@@ -176,11 +176,11 @@ public record ExactRational(
     }
 
     public ExactRational reciprocal() {
-<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (isZero()) {</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (isZero()) {</span>
 <span class="fc" id="L180">            throw new ArithmeticException(</span>
                 &quot;zero rational has no reciprocal&quot;);
         }
-<span class="nc" id="L183">        return new ExactRational(denominator, numerator);</span>
+<span class="fc" id="L183">        return new ExactRational(denominator, numerator);</span>
     }
 
     public ExactRational pow(int exponent) {
