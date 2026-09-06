@@ -182,7 +182,9 @@ public final class PythonDiscoveryDomain<C, K> {
     private String payload(Object value) { return text(value, definition.limits.maxPayloadBytes, false); }
     private String bound(String role, String material) {
         bytes(material, definition.limits.maxMessageBytes);
-        return canonical(Map.of("binding", binding, "definition", definition.canonical(), "role", role, "payload", material));
+        String wrapped = canonical(Map.of("binding", binding, "definition", definition.canonical(), "role", role, "payload", material));
+        bytes(wrapped, definition.limits.maxMessageBytes);
+        return wrapped;
     }
 
     private List<Successor<String>> successors(String state) {

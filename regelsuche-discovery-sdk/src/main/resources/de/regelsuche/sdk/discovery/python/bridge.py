@@ -47,6 +47,33 @@ def _regelsuche_canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
+
+def _regelsuche_check_depth(text):
+    """Check the structural depth before json.loads recurses; payload strings are opaque."""
+    depth = 0
+    quoted = escaped = False
+    for char in text:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif char in "[{":
+            depth += 1
+            if depth > 16:
+                raise ValueError("protocol nesting limit before parse")
+        elif char in "]}":
+            depth -= 1
+            if depth < 0:
+                raise ValueError("unbalanced protocol JSON")
+    if depth != 0 or quoted:
+        raise ValueError("incomplete protocol JSON")
+
+
 def regelsuche_bind_domain(domain):
     """Bind six deployment-owned callables; requests never name Python code."""
     handlers = {
@@ -64,6 +91,7 @@ def regelsuche_bind_domain(domain):
         if type(request) is not str or len(request) > 1_000_000 \
                 or len(request.encode("utf-8")) > 1_000_000:
             raise ValueError("request byte limit")
+        _regelsuche_check_depth(request)
         decoded = json.loads(request, object_pairs_hook=_regelsuche_unique_fields)
         if type(decoded) is not dict or set(decoded) != {
                 "protocol", "binding", "operation", "configuration", "arguments"}:
