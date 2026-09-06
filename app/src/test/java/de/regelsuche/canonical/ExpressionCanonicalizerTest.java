@@ -148,12 +148,16 @@ class ExpressionCanonicalizerTest {
                 "1/0 - 1/0",
                 "1/(x + 1) - 1/(x + 1)",
                 "x^(-1) - x^(-1)",
-                "x^0.5 - x^0.5")) {
+                "x^0.5 - x^0.5",
+                "log(x) - log(x)",
+                "sqrt(x) - sqrt(x)",
+                "tan(x) - tan(x)",
+                "f(x) - f(x)")) {
             String canonical = canonicalizer.canonicalize(source);
             assertNotEquals(
                 canonicalizer.stableHash(source),
                 canonicalizer.stableHash("0"),
-                "partial expression must not acquire the total value 0: " + source);
+                "partial or unknown expression must not become total 0: " + source);
             assertEquals(
                 canonical,
                 canonicalizer.canonicalize(canonical),
@@ -165,6 +169,9 @@ class ExpressionCanonicalizerTest {
     void definednessPreservingCoefficientReductionRemainsAvailable() {
         assertEquals("0", canonicalizer.canonicalize("x - x"));
         assertEquals("0", canonicalizer.canonicalize("sin(x) - sin(x)"));
+        assertEquals("0", canonicalizer.canonicalize("cos(x) - cos(x)"));
+        assertEquals("0", canonicalizer.canonicalize("exp(x) - exp(x)"));
+        assertEquals("0", canonicalizer.canonicalize("abs(x) - abs(x)"));
         assertEquals(
             canonicalizer.canonicalize("1/x"),
             canonicalizer.canonicalize("2*(1/x) - 1/x"));
@@ -191,6 +198,36 @@ class ExpressionCanonicalizerTest {
         assertTrue(inverseContext.snapshot().stream().anyMatch(
             assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
                 && assumption.expression().equals("x != 0")));
+
+        AssumptionContext logContext = new AssumptionContext();
+        assertEquals(
+            "0",
+            canonicalizer.canonicalizeWith(
+                "log(x) - log(x)",
+                logContext));
+        assertTrue(logContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.POSITIVE
+                && assumption.expression().equals("x > 0")));
+
+        AssumptionContext sqrtContext = new AssumptionContext();
+        assertEquals(
+            "0",
+            canonicalizer.canonicalizeWith(
+                "sqrt(x) - sqrt(x)",
+                sqrtContext));
+        assertTrue(sqrtContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_NEGATIVE
+                && assumption.expression().equals("x >= 0")));
+
+        AssumptionContext tanContext = new AssumptionContext();
+        assertEquals(
+            "0",
+            canonicalizer.canonicalizeWith(
+                "tan(x) - tan(x)",
+                tanContext));
+        assertTrue(tanContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
+                && assumption.expression().equals("cos(x) != 0")));
     }
 
     @Test
