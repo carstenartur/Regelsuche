@@ -664,27 +664,31 @@ jobs:
           URL=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq '.url')
           echo "release_url=$URL" >> "$GITHUB_OUTPUT"
 
+      # Keep Docker-owned build output untouched; see docs/release-follow-up-isolation.md.
       - name: Restore authoritative main for follow-up
         if: >-
           steps.release-state.outputs.dry_run != 'true'
           && steps.release-state.outputs.managed_release == 'true'
-        run: |
-          set -euo pipefail
-          git fetch origin main
-          git checkout -B main origin/main
-          git reset --hard origin/main
-          git clean -fdx
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: main
+          path: .release-follow-up
 
       - name: Prepare next development metadata
         id: next-development
         if: >-
           steps.release-state.outputs.dry_run != 'true'
           && steps.release-state.outputs.managed_release == 'true'
+        working-directory: .release-follow-up
         env:
           RELEASE_VERSION: ${{ steps.release-state.outputs.release_version }}
           NEXT_VERSION: ${{ steps.release-state.outputs.next_version }}
         run: |
           set -euo pipefail
+          test -d .git
+          test "$(git rev-parse --show-toplevel)" = "$(pwd -P)"
+          test -z "$(git status --porcelain --untracked-files=all)"
           CURRENT=$(sed -n 's/^version=//p' release.properties | head -n 1 | tr -d '[:space:]')
           if [[ "$CURRENT" == "$NEXT_VERSION" ]]; then
             echo "required=false" >> "$GITHUB_OUTPUT"
@@ -703,6 +707,7 @@ jobs:
         if: steps.next-development.outputs.required == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
+          path: .release-follow-up
           branch: release/prepare-next-${{ steps.release-state.outputs.next_version }}
           base: main
           delete-branch: false
