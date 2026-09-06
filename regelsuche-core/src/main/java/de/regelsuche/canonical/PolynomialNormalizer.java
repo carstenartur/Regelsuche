@@ -25,7 +25,8 @@ import java.util.TreeMap;
  * <p>Legacy {@link NumberExpr} nodes still expose {@code double}; conversion
  * of that already-rounded value is isolated in {@link #legacyExact(double)}.
  * All normalization arithmetic itself uses the authoritative
- * {@link ExactRational} contract.</p>
+ * {@link ExactRational} contract. Exact results are converted back only when
+ * the legacy AST can represent the same rational value without rounding.</p>
  */
 public final class PolynomialNormalizer {
     private static final int MAX_EXPANDED_TERMS = 1_000;
@@ -402,7 +403,8 @@ public final class PolynomialNormalizer {
         }
     }
 
-    private static ExactRational legacyExact(double value) {
+    /** Temporary bridge from the already-rounded legacy numeric leaf. */
+    static ExactRational legacyExact(double value) {
         if (!Double.isFinite(value)) {
             return null;
         }
@@ -420,33 +422,72 @@ public final class PolynomialNormalizer {
             BigInteger.TEN.pow(scale));
     }
 
+    /**
+     * Returns an AST expression for exactly the same rational, or {@code null}
+     * when the legacy Double-backed AST cannot encode it without rounding.
+     */
+    static Expr exactRationalExpression(ExactRational value) {
+        try {
+            BigDecimal decimal = new BigDecimal(value.numerator())
+                .divide(new BigDecimal(value.denominator()));
+            double legacy = decimal.doubleValue();
+            ExactRational roundTrip = legacyExact(legacy);
+            if (roundTrip != null && roundTrip.equals(value)) {
+                return new NumberExpr(legacy);
+            }
+        } catch (ArithmeticException nonterminatingDecimal) {
+            // Try exact fraction syntax below.
+        }
+
+        NumberExpr numerator = exactIntegerLeaf(value.numerator());
+        if (numerator == null) {
+            return null;
+        }
+        if (value.isInteger()) {
+            return numerator;
+        }
+        NumberExpr denominator = exactIntegerLeaf(value.denominator());
+        return denominator == null
+            ? null
+            : new BinaryExpr(
+                numerator,
+                BinaryOperator.DIV,
+                denominator);
+    }
+
+    private static NumberExpr exactIntegerLeaf(BigInteger value) {
+        double legacy = value.doubleValue();
+        if (!Double.isFinite(legacy)) {
+            return null;
+        }
+        try {
+            return BigDecimal.valueOf(legacy).toBigIntegerExact()
+                    .equals(value)
+                ? new NumberExpr(legacy)
+                : null;
+        } catch (ArithmeticException notAnInteger) {
+            return null;
+        }
+    }
+
     private static Expr withCoefficient(
         ExactRational coefficient,
         Expr term
     ) {
         if (term instanceof NumberExpr number
                 && number.value() == 1) {
-            Double value = toFiniteDouble(coefficient);
-            return value == null
-                ? null
-                : new NumberExpr(value);
+            return exactRationalExpression(coefficient);
         }
         if (coefficient.isOne()) {
             return term;
         }
-        Double value = toFiniteDouble(coefficient);
-        return value == null
+        Expr exactCoefficient = exactRationalExpression(coefficient);
+        return exactCoefficient == null
             ? null
             : new BinaryExpr(
-                new NumberExpr(value),
+                exactCoefficient,
                 BinaryOperator.MUL,
                 term);
-    }
-
-    private static Double toFiniteDouble(ExactRational value) {
-        double result = value.numerator().doubleValue()
-            / value.denominator().doubleValue();
-        return Double.isFinite(result) ? result : null;
     }
 
     private static Expr leftAssociate(
