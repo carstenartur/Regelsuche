@@ -92,15 +92,10 @@ class MavenDocumentationContractTest {
             root.resolve("docs/invalid.md"),
             "[missing](missing.md)\n[escape](../../outside.md)\n"
         );
-        Files.writeString(
-            root.resolve("docs/README.legacy.md"),
-            "[historical](missing.md)\n  $$\n"
-        );
 
         List<Finding> findings = verifyRepository(root);
 
-        assertEquals(3, findings.size(), render(findings));
-        assertEquals("indented display math `$$`", findings.get(0).message());
+        assertEquals(2, findings.size(), render(findings));
         assertTrue(findings.stream().anyMatch(finding ->
             finding.message().startsWith("missing local target:")));
         assertTrue(findings.stream().anyMatch(finding ->
@@ -152,9 +147,6 @@ class MavenDocumentationContractTest {
         List<Finding> findings = new ArrayList<>();
         for (int line : indentedDisplayMath(text.lines().toList())) {
             findings.add(new Finding(file, line, "indented display math `$$`"));
-        }
-        if (file.getFileName().toString().equals("README.legacy.md")) {
-            return List.copyOf(findings);
         }
 
         String visible = maskFencedCode(text);
