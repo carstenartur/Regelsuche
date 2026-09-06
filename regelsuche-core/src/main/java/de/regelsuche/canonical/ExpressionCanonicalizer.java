@@ -159,8 +159,14 @@ public class ExpressionCanonicalizer {
             }
         }
 
-        List<TermBucket> ordered = buckets.values().stream()
-            .filter(bucket -> !bucket.coefficient().isZero())
+        List<TermBucket> retained = new ArrayList<>();
+        for (TermBucket bucket : buckets.values()) {
+            if (!bucket.coefficient().isZero()
+                    || !canElideWithoutDomainLoss(bucket.term(), context)) {
+                retained.add(bucket);
+            }
+        }
+        List<TermBucket> ordered = retained.stream()
             .sorted(ExpressionCanonicalizer::compareMonomials)
             .toList();
         if (ordered.isEmpty()) {
@@ -169,6 +175,13 @@ public class ExpressionCanonicalizer {
 
         List<SignedTerm> rendered = new ArrayList<>();
         for (TermBucket bucket : ordered) {
+            if (bucket.coefficient().isZero()) {
+                if (!appendContributions(rendered, bucket)) {
+                    return expression;
+                }
+                continue;
+            }
+
             Expr combined = withCoefficient(
                 bucket.term(), bucket.coefficient().abs());
             if (combined != null) {
@@ -180,14 +193,8 @@ public class ExpressionCanonicalizer {
             // Exact arithmetic may produce a value that the legacy Double AST
             // cannot represent. Preserve the original exact contributions
             // deterministically instead of rounding the combined coefficient.
-            for (ExactRational contribution : bucket.contributions()) {
-                Expr fallback = withCoefficient(
-                    bucket.term(), contribution.abs());
-                if (fallback == null) {
-                    return expression;
-                }
-                rendered.add(new SignedTerm(
-                    contribution.signum(), fallback));
+            if (!appendContributions(rendered, bucket)) {
+                return expression;
             }
         }
 
@@ -213,6 +220,22 @@ public class ExpressionCanonicalizer {
             }
         }
         return result == null ? new NumberExpr(0) : result;
+    }
+
+    private boolean appendContributions(
+        List<SignedTerm> rendered,
+        TermBucket bucket
+    ) {
+        for (ExactRational contribution : bucket.contributions()) {
+            Expr fallback = withCoefficient(
+                bucket.term(), contribution.abs());
+            if (fallback == null) {
+                return false;
+            }
+            rendered.add(new SignedTerm(
+                contribution.signum(), fallback));
+        }
+        return true;
     }
 
     private Expr canonicalizeMultiplication(BinaryExpr expression, AssumptionContext context) {
@@ -278,7 +301,9 @@ public class ExpressionCanonicalizer {
         Expr base = canonicalize(expression.left(), context);
         Expr exponent = canonicalize(expression.right(), context);
         if (isNumber(exponent, 0)) {
-            return new NumberExpr(1);
+            return canElideWithoutDomainLoss(base, context)
+                ? new NumberExpr(1)
+                : new BinaryExpr(base, BinaryOperator.POW, exponent);
         }
         if (isNumber(exponent, 1)) {
             return base;
@@ -350,6 +375,122 @@ public class ExpressionCanonicalizer {
             return new NumberExpr(1);
         }
         return leftAssociate(remaining, BinaryOperator.MUL);
+    }
+
+    /**
+     * Returns whether {@code expression} may disappear from the canonical AST
+     * without enlarging its documented real-domain semantics. Partial
+     * operators are inspected recursively. If all required guards are
+     * representable and an {@link AssumptionContext} is available, they are
+     * recorded before the elision is allowed.
+     */
+    private boolean canElideWithoutDomainLoss(
+        Expr expression,
+        AssumptionContext context
+    ) {
+        List<Assumption> requirements = new ArrayList<>();
+        if (!collectElisionRequirements(expression, requirements)) {
+            return false;
+        }
+        if (requirements.isEmpty()) {
+            return true;
+        }
+        if (context == null) {
+            return false;
+        }
+        context.addAll(requirements);
+        return true;
+    }
+
+    private boolean collectElisionRequirements(
+        Expr expression,
+        List<Assumption> requirements
+    ) {
+        if (expression instanceof NumberExpr
+                || expression instanceof VariableExpr) {
+            return true;
+        }
+        if (expression instanceof FunctionExpr function) {
+            return collectFunctionElisionRequirements(
+                function, requirements);
+        }
+        if (!(expression instanceof BinaryExpr binary)) {
+            return false;
+        }
+        if (!collectElisionRequirements(binary.left(), requirements)
+                || !collectElisionRequirements(binary.right(), requirements)) {
+            return false;
+        }
+        if (binary.operator() == BinaryOperator.DIV) {
+            return requireNonZeroForElision(
+                binary.right(), requirements);
+        }
+        if (binary.operator() == BinaryOperator.POW) {
+            return collectPowerElisionRequirements(
+                binary.left(), binary.right(), requirements);
+        }
+        return true;
+    }
+
+    private boolean collectFunctionElisionRequirements(
+        FunctionExpr function,
+        List<Assumption> requirements
+    ) {
+        for (Expr argument : function.arguments()) {
+            if (!collectElisionRequirements(argument, requirements)) {
+                return false;
+            }
+        }
+        if (function.arguments().size() != 1) {
+            return false;
+        }
+        Expr argument = function.argument();
+        String argumentText = ExpressionFormatter.format(argument);
+        return switch (function.name()) {
+            case "sin", "cos", "exp", "abs" -> true;
+            case "log", "ln" -> {
+                requirements.add(Assumption.positive(argumentText));
+                yield true;
+            }
+            case "sqrt" -> {
+                requirements.add(Assumption.nonNegative(argumentText));
+                yield true;
+            }
+            case "tan" -> {
+                requirements.add(Assumption.nonZero(
+                    "cos(" + argumentText + ")"));
+                yield true;
+            }
+            default -> false;
+        };
+    }
+
+    private boolean collectPowerElisionRequirements(
+        Expr base,
+        Expr exponent,
+        List<Assumption> requirements
+    ) {
+        if (!(exponent instanceof NumberExpr number)) {
+            return false;
+        }
+        double value = number.value();
+        if (!Double.isFinite(value) || value != Math.rint(value)) {
+            return false;
+        }
+        return value >= 0
+            || requireNonZeroForElision(base, requirements);
+    }
+
+    private boolean requireNonZeroForElision(
+        Expr expression,
+        List<Assumption> requirements
+    ) {
+        if (expression instanceof NumberExpr number) {
+            return number.value() != 0.0d;
+        }
+        requirements.add(Assumption.nonZero(
+            ExpressionFormatter.format(expression)));
+        return true;
     }
 
     /**
@@ -450,7 +591,7 @@ public class ExpressionCanonicalizer {
             return term;
         }
         Expr numeric = PolynomialNormalizer.exactRationalExpression(
-            coefficient);
+                coefficient);
         return numeric == null
             ? null
             : new BinaryExpr(numeric, BinaryOperator.MUL, term);
