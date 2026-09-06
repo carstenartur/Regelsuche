@@ -379,14 +379,10 @@ public class ExpressionCanonicalizer {
 
     /**
      * Returns whether {@code expression} may disappear from the canonical AST
-     * without enlarging its structural domain of definition. Explicitly
-     * partial operators are inspected recursively. If all required guards are
+     * without enlarging its documented real-domain semantics. Partial
+     * operators are inspected recursively. If all required guards are
      * representable and an {@link AssumptionContext} is available, they are
      * recorded before the elision is allowed.
-     *
-     * <p>Function nodes remain opaque formal operators here. Their arguments
-     * are checked recursively, while function-specific domains belong to the
-     * domain-aware rule layer rather than this structural canonicalizer.</p>
      */
     private boolean canElideWithoutDomainLoss(
         Expr expression,
@@ -415,12 +411,8 @@ public class ExpressionCanonicalizer {
             return true;
         }
         if (expression instanceof FunctionExpr function) {
-            for (Expr argument : function.arguments()) {
-                if (!collectElisionRequirements(argument, requirements)) {
-                    return false;
-                }
-            }
-            return true;
+            return collectFunctionElisionRequirements(
+                function, requirements);
         }
         if (!(expression instanceof BinaryExpr binary)) {
             return false;
@@ -438,6 +430,39 @@ public class ExpressionCanonicalizer {
                 binary.left(), binary.right(), requirements);
         }
         return true;
+    }
+
+    private boolean collectFunctionElisionRequirements(
+        FunctionExpr function,
+        List<Assumption> requirements
+    ) {
+        for (Expr argument : function.arguments()) {
+            if (!collectElisionRequirements(argument, requirements)) {
+                return false;
+            }
+        }
+        if (function.arguments().size() != 1) {
+            return false;
+        }
+        Expr argument = function.argument();
+        String argumentText = ExpressionFormatter.format(argument);
+        return switch (function.name()) {
+            case "sin", "cos", "exp", "abs" -> true;
+            case "log", "ln" -> {
+                requirements.add(Assumption.positive(argumentText));
+                yield true;
+            }
+            case "sqrt" -> {
+                requirements.add(Assumption.nonNegative(argumentText));
+                yield true;
+            }
+            case "tan" -> {
+                requirements.add(Assumption.nonZero(
+                    "cos(" + argumentText + ")"));
+                yield true;
+            }
+            default -> false;
+        };
     }
 
     private boolean collectPowerElisionRequirements(
@@ -566,7 +591,7 @@ public class ExpressionCanonicalizer {
             return term;
         }
         Expr numeric = PolynomialNormalizer.exactRationalExpression(
-            coefficient);
+                coefficient);
         return numeric == null
             ? null
             : new BinaryExpr(numeric, BinaryOperator.MUL, term);
