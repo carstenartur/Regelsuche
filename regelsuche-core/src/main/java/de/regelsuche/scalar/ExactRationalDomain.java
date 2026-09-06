@@ -32,6 +32,7 @@ public final class ExactRationalDomain {
             MAX_DIGITS,
             MAX_DECIMAL_SCALE);
 
+    private static final int MAX_LEGACY_BRIDGE_BITS = 4_096;
     private static final Pattern INTEGER =
         Pattern.compile("[+-]?[0-9]+");
     private static final Pattern FRACTION = Pattern.compile(
@@ -100,14 +101,19 @@ public final class ExactRationalDomain {
      * Returns a legacy {@code double} only when its shortest-decimal
      * interpretation is exactly {@code value}.
      *
-     * <p>Nonterminating rationals, overflowing values and rounded decimal
-     * projections return an empty result. This method therefore cannot be used
-     * as authority for an approximate equality.</p>
+     * <p>Nonterminating rationals, overflowing values, oversized migration
+     * inputs and rounded decimal projections return an empty result. This
+     * method therefore cannot be used as authority for an approximate
+     * equality.</p>
      */
     public static OptionalDouble exactLegacyDecimalDouble(
         ExactRational value
     ) {
         Objects.requireNonNull(value, "value");
+        if (value.numerator().abs().bitLength() > MAX_LEGACY_BRIDGE_BITS
+                || value.denominator().bitLength() > MAX_LEGACY_BRIDGE_BITS) {
+            return OptionalDouble.empty();
+        }
         try {
             BigDecimal decimal = new BigDecimal(value.numerator())
                 .divide(new BigDecimal(value.denominator()));
