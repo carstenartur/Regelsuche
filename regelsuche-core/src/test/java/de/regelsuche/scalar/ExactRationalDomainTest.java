@@ -131,6 +131,9 @@ class ExactRationalDomainTest {
         assertTrue(ExactRationalDomain.exactLegacyDecimalDouble(
             ExactRational.integer(new BigInteger("9007199254740993")))
             .isEmpty());
+        assertTrue(ExactRationalDomain.exactLegacyDecimalDouble(
+            ExactRational.integer(BigInteger.ONE.shiftLeft(5_000)))
+            .isEmpty());
     }
 
     @Test
