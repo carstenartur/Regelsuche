@@ -2,6 +2,7 @@ package de.regelsuche.parse;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import de.regelsuche.ast.Expr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,15 @@ class ExpressionParserTest {
         assertEquals(
             "a - b - c",
             ExpressionFormatter.format(parser.parseTerm("(a-b)-c")));
+    }
+
+    @Test
+    void formatsQuotientFactorsWithoutChangingProductGrouping() {
+        Expr original = parser.parseTerm("0*(1/0)");
+        String formatted = ExpressionFormatter.format(original);
+
+        assertEquals("0 * (1 / 0)", formatted);
+        assertEquals(original, parser.parseTerm(formatted));
     }
 
     @Test
