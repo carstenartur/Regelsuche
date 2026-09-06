@@ -147,38 +147,44 @@ public final class ExpressionFormatter {
         }
 
 <span class="fc bfc" id="L149" title="All 2 branches covered.">        int leftAdjust = operator == BinaryOperator.POW ? 1 : 0;</span>
-<span class="fc bfc" id="L150" title="All 3 branches covered.">        int rightAdjust = switch (operator) {</span>
+<span class="fc bfc" id="L150" title="All 4 branches covered.">        int rightAdjust = switch (operator) {</span>
 <span class="fc" id="L151">            case POW -&gt; -1;</span>
 <span class="fc" id="L152">            case DIV, SUB -&gt; 1;</span>
-<span class="fc" id="L153">            default -&gt; 0;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            case MUL -&gt; isDivision(binary.right()) ? 1 : 0;</span>
+<span class="fc" id="L154">            default -&gt; 0;</span>
         };
-<span class="fc" id="L155">        pending.push(new FormatExpression(</span>
-<span class="fc" id="L156">            binary.right(),</span>
+<span class="fc" id="L156">        pending.push(new FormatExpression(</span>
+<span class="fc" id="L157">            binary.right(),</span>
             precedence + rightAdjust));
-<span class="fc" id="L158">        pending.push(new AppendText(</span>
-<span class="fc" id="L159">            &quot; &quot; + operator.symbol() + &quot; &quot;));</span>
-<span class="fc" id="L160">        pending.push(new FormatExpression(</span>
-<span class="fc" id="L161">            binary.left(),</span>
+<span class="fc" id="L159">        pending.push(new AppendText(</span>
+<span class="fc" id="L160">            &quot; &quot; + operator.symbol() + &quot; &quot;));</span>
+<span class="fc" id="L161">        pending.push(new FormatExpression(</span>
+<span class="fc" id="L162">            binary.left(),</span>
             precedence + leftAdjust));
-<span class="fc" id="L163">    }</span>
+<span class="fc" id="L164">    }</span>
+
+    private static boolean isDivision(Expr expression) {
+<span class="fc" id="L167">        return expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L168" title="All 4 branches covered.">            &amp;&amp; binary.operator() == BinaryOperator.DIV;</span>
+    }
 
     private sealed interface Action
             permits AppendText, FormatExpression {
     }
 
     private record AppendText(String value) implements Action {
-<span class="fc" id="L170">        private AppendText {</span>
-<span class="fc" id="L171">            Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="fc" id="L172">        }</span>
+<span class="fc" id="L176">        private AppendText {</span>
+<span class="fc" id="L177">            Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L178">        }</span>
     }
 
     private record FormatExpression(
         Expr expression,
         int parentPrecedence
     ) implements Action {
-<span class="fc" id="L179">        private FormatExpression {</span>
-<span class="fc" id="L180">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L181">        }</span>
+<span class="fc" id="L185">        private FormatExpression {</span>
+<span class="fc" id="L186">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L187">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
