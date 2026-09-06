@@ -7,8 +7,11 @@ bleibt von Ausdruckssuche, Regelbestand und laufenden Proof-Jobs getrennt.
 
 ## Einstieg
 
-Starte die normale Workbench mit `serve --host 127.0.0.1 --port 8080` und öffne
-`http://127.0.0.1:8080/static/admissible-workbench.html`.
+Starte die normale Workbench mit `serve --host 127.0.0.1 --port 8080`.
+Unter den Demos führt **Primzahlmuster und Optimalitätsbeweise erkunden** zur
+Experimentansicht. Der Link öffnet sie mit `noopener` in einer neuen Ansicht,
+damit der eingegebene Ausdruck und die bestehende Sitzung erhalten bleiben.
+Direkter Einstieg: `http://127.0.0.1:8080/static/admissible-workbench.html`.
 
 Mit **Kleines Beispiel erkunden** wird das Maximum vier im Fenster 0..8
 nachgerechnet. Die Ansicht zeigt zunächst alle neun Positionen, dann den
@@ -82,13 +85,13 @@ node --test scripts/test-admissible-proof.cjs
 ./gradlew :app:e2eTest --tests de.regelsuche.e2e.AdmissibleWorkbenchBrowserTest
 ```
 
-Die 18 Node-Prüfertests benötigen keine Zusatzbibliothek. Die sieben
+Die 18 Node-Prüfertests benötigen keine Zusatzbibliothek. Die acht
 Playwright-Tests verwenden den in-process gestarteten Produktionsserver,
 laden den echten Worker und importieren eine komprimierte Referenz aus einem
-ausgeführten Primachsenraum-CI-Lauf. Sie prüfen Navigation, Tastatur, Mobilgröße,
-beschädigte Dateien, verspätete Antworten und Zurücksetzen. Sie verwenden
-keinen simulierten Mathematikprüfer. Desktop- und Mobilaufnahmen stehen danach
-unter `app/build/reports/admissible-workbench/`.
+ausgeführten Primachsenraum-CI-Lauf. Sie prüfen Einstieg aus der Hauptansicht,
+Navigation, Tastatur, Mobilgröße, beschädigte Dateien, verspätete Antworten und
+Zurücksetzen. Sie verwenden keinen simulierten Mathematikprüfer. Desktop- und
+Mobilaufnahmen stehen danach unter `app/build/reports/admissible-workbench/`.
 
 Die Herkunft der Referenz steht in
 `app/src/e2eTest/resources/admissible/README.md`. Die normale Repository-CI führt

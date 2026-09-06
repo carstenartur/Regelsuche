@@ -76,6 +76,21 @@ class AdmissibleWorkbenchBrowserTest {
         page.waitForFunction("document.querySelector('#status').textContent.includes('2 Optimalitätszertifikate')");
     }
 
+    @Test void opensFromMainWorkbenchWithoutDiscardingExpression() {
+        page.navigate(app.baseUrl());
+        page.locator("input[name=expression]").fill("x + 7");
+        Page experiment = page.waitForPopup(() -> page.locator("#openAdmissibleWorkbench").click());
+        try {
+            experiment.waitForLoadState();
+            experiment.onPageError(errors::add);
+            assertTrue(experiment.url().endsWith("/static/admissible-workbench.html"));
+            assertEquals(Boolean.TRUE, experiment.evaluate("window.opener === null"));
+            experiment.locator("#example").click();
+            experiment.waitForFunction("document.querySelector('#status').textContent.includes('1 Optimalitätszertifikate')");
+            assertEquals("x + 7", page.locator("input[name=expression]").inputValue());
+        } finally { experiment.close(); }
+    }
+
     @Test void exploreAllSmallAlternativesAndReturn() {
         example();
         assertEquals(9, page.locator("#offsets span").count());
