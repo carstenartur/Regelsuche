@@ -19,7 +19,7 @@
         byId('status').textContent = 'Kein bestätigtes Ergebnis.';
         byId('error').textContent = message; byId('error').hidden = false;
     }
-    function launch(message, ticket) {
+    function launch(message, ticket, exploratory = false) {
         if (ticket !== generation) return;
         try {
             worker = new Worker(new URL('admissible-worker.js', document.baseURI));
@@ -30,6 +30,7 @@
                 worker.terminate(); worker = null; clearTimeout(timer); timer = null;
                 if (!event.data.ok) { fail(event.data.message); return; }
                 result = event.data.result;
+                result.exploratory = exploratory || result.exploratory === true;
                 showResult();
             };
             worker.onerror = () => { if (ticket === generation) fail('Prüfmodul nicht verfügbar. Öffne die Seite über den lokalen Workbench-Server.'); };
@@ -40,6 +41,7 @@
         const complete = result.runs.filter(r => r.status === 'OPTIMAL').length;
         byId('status').textContent = `${complete} Optimalitätszertifikate im Browser nachgerechnet.`;
         byId('summary').textContent = result.example ? 'Lehrbeispiel: Im Fenster 0 bis 8 passen höchstens vier zulässige Plätze.'
+            : result.exploratory ? `Neue explorative Aufgabe · Fixierte Vergleichsstrategie: ${result.selectedPolicy}. Kein Trainings- oder zurückgehaltener Testfall.`
             : `Ausgewählte Strategie laut Export: ${result.selectedPolicy}. ${result.runs.length / 2} zurückgehaltene Aufgaben im Vergleich.`;
         byId('scope').textContent = result.example
             ? 'Konstruiertes kleines Beweisbeispiel, kein gemessener SDK-Lauf. Grüne Positionen gehören zum zulässigen Muster.'
@@ -115,6 +117,15 @@
         } catch (_) {
             byId('tamperStatus').textContent = 'Wie erwartet abgewiesen: Der erforderliche Wurzelzweig fehlt. Das geladene Experiment wurde nicht verändert.';
         }
+    });
+    // Optional same-document runner adapter. It supplies bytes, never a trusted
+    // result/status. The ordinary bounded independent worker verifies them again.
+    window.addEventListener('admissible:local-result', event => {
+        clearWork(); byId('bundle').value = '';
+        if (typeof event.detail !== 'string' || new TextEncoder().encode(event.detail).length > AdmissibleProof.MAX_BYTES) {
+            fail('Ungültiges oder zu großes Ergebnis des lokalen Runners.'); return;
+        }
+        launch({kind: 'bundle', text: event.detail}, generation, true);
     });
     window.addEventListener('pagehide', clearWork);
 })();

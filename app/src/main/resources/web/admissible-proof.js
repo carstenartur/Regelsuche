@@ -139,8 +139,11 @@ verify.primalityTests verify.trialDivisions verify.residueAssignments verify.res
         // Canonical compact JSON also rejects duplicate object keys before any trusted rendering.
         const canonical = JSON.stringify(data);
         requireThat(text === canonical || text === canonical + '\n', 'Nichtkanonisches JSON oder doppelte Schlüssel.');
-        objectKeys(data, ['schema', 'sourceManifestSha256', 'selectedPolicy', 'runs']);
-        requireThat(data.schema === 'admissible-workbench/v1' && typeof data.sourceManifestSha256 === 'string'
+        const exploratory = data !== null && typeof data === 'object' && data.schema === 'admissible-workbench/v2';
+        objectKeys(data, exploratory ? ['schema', 'scope', 'sourceManifestSha256', 'selectedPolicy', 'runs']
+            : ['schema', 'sourceManifestSha256', 'selectedPolicy', 'runs']);
+        if (exploratory) requireThat(data.scope === 'exploratory', 'Unbekannter Untersuchungsumfang.');
+        requireThat((data.schema === 'admissible-workbench/v1' || exploratory) && typeof data.sourceManifestSha256 === 'string'
             && /^[0-9a-f]{64}$/.test(data.sourceManifestSha256), 'Unbekannter Import.');
         requireThat(typeof data.selectedPolicy === 'string' && /^(legacy|first|linear-[014]-[014]-(large|small))$/.test(data.selectedPolicy), 'Ungültige ausgewählte Regel.');
         requireThat(Array.isArray(data.runs) && data.runs.length > 0 && data.runs.length <= MAX_RUNS, 'Ungültige Anzahl Läufe.');
@@ -175,7 +178,8 @@ verify.primalityTests verify.trialDivisions verify.residueAssignments verify.res
             if (run.status === 'OPTIMAL' && partner.status === 'OPTIMAL')
                 requireThat(run.witness.length === partner.witness.length, 'Widersprüchliche Maxima.');
         }
-        return {sourceManifestSha256: data.sourceManifestSha256, selectedPolicy: data.selectedPolicy, runs};
+        return {sourceManifestSha256: data.sourceManifestSha256, selectedPolicy: data.selectedPolicy,
+            ...(exploratory ? {exploratory: true} : {}), runs};
     }
     function step(model, key) {
         const mask = BigInt('0x' + key), size = count(mask), p = new Map(model.nodes).get(key);
