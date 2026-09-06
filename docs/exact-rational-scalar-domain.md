@@ -14,9 +14,9 @@ source lexeme -> bounded parser -> canonical ExactRational
 sign and GCD, represents zero as `0/1`, and provides exact arithmetic with
 cross-cancellation. The historical mathematical-algorithms `Rational` type is a
 compatibility facade; its legacy `fromDouble` entry point is approximate input
-and cannot authorize an exact source-language claim. `PolynomialNormalizer`
-also uses `ExactRational` internally, while its conversion from an existing
-`NumberExpr.value()` remains an explicit legacy boundary.
+and cannot authorize an exact source-language claim. `PolynomialNormalizer` and
+bounded matcher arithmetic also use `ExactRational` rather than maintaining a
+second coefficient model.
 
 ## Accepted syntax and limits
 
@@ -70,11 +70,34 @@ limits, canonical reduction, value ID, and certificate. Non-exact outcomes
 expose no exact value or hashes; a truncated raw-length failure is verified only
 as bounded fail-closed failure shape.
 
+## Legacy numeric migration boundary
+
+The ordinary syntax AST is still `NumberExpr(double)`. Code that receives only
+such an already-created leaf therefore cannot recover parser source precision.
+To avoid several subtly different adapters during the migration,
+`ExactRationalDomain` defines one explicit shortest-decimal bridge:
+
+- `legacyDecimalValue(double)` accepts only finite values and interprets the
+  existing leaf via `BigDecimal.valueOf(double)` semantics;
+- `exactLegacyDecimalDouble(ExactRational)` returns a Double value only if that
+  same shortest-decimal interpretation round-trips to the identical rational.
+
+These methods do **not** certify the original source text and do not turn the
+result of a floating-point calculation into exact mathematical evidence. A
+consumer holding `ExactParsedTerm` must use its parser-issued literal evidence
+instead. Nonterminating rationals, overflow and rounded return projections fail
+closed. The adapter exists only until exact scalar identity has crossed the
+remaining syntax/value boundaries under #661.
+
 ## Integration boundary
 
-This slice does not reinterpret existing AST numbers or enable rational factor
-synthesis. The next layer must preserve exact number lexemes, clear denominators,
-bind the integer synthesis certificate, and verify final AST reconstruction.
+This slice still does not make `NumberExpr` the authoritative exact scalar or
+permit approximate values to authorize exact equality. Matcher inference and
+canonicalization may use the shared legacy bridge only after accepting that the
+source precision could already have been lost. The next layers must migrate
+semantic value identity, numeric patterns, caches, E-Graph insertion,
+serialization and remaining numeric producers to explicit exact/approximate
+contracts while preserving occurrence identity separately.
 
 ## Verification
 

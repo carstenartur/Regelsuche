@@ -112,6 +112,72 @@ class ExpressionCanonicalizerTest {
     }
 
     @Test
+    void nonPolynomialDecimalCoefficientsNeverNarrowToIntegers() {
+        assertEquals("0.5 * sin(x)", canonicalizer.canonicalize("0.5*sin(x)"));
+        assertEquals("sin(x)", canonicalizer.canonicalize("0.5*sin(x) + 0.5*sin(x)"));
+        assertEquals("2 * sin(x)", canonicalizer.canonicalize("1.5*sin(x) + 0.5*sin(x)"));
+
+        assertNotEquals(canonicalizer.stableHash("0.5*sin(x)"), canonicalizer.stableHash("0"));
+        assertNotEquals(canonicalizer.stableHash("1.5*sin(x)"), canonicalizer.stableHash("sin(x)"));
+        assertNotEquals(
+            canonicalizer.stableHash("2147483648*sin(x)"),
+            canonicalizer.stableHash("2147483647*sin(x)"));
+    }
+
+    @Test
+    void assumptionFreeZeroProductsDoNotEraseUndefinedFactors() {
+        String undefined = "0*(1/0)";
+        String nested = "2 + 0*(1/0)";
+
+        assertNotEquals(canonicalizer.stableHash(undefined), canonicalizer.stableHash("0"));
+        assertNotEquals(canonicalizer.stableHash(nested), canonicalizer.stableHash("2"));
+        assertEquals(
+            canonicalizer.canonicalize(undefined),
+            canonicalizer.canonicalize(canonicalizer.canonicalize(undefined)));
+
+        AssumptionContext context = new AssumptionContext();
+        assertEquals("0", canonicalizer.canonicalizeWith("0*(x/x)", context));
+        assertTrue(context.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO));
+    }
+
+    @Test
+    void unrepresentableExactCoefficientSumFallsBackWithoutRounding() {
+        String source = "sin(x) + 0.00000000000000001*sin(x)";
+        String canonical = canonicalizer.canonicalize(source);
+
+        assertNotEquals(canonicalizer.stableHash(source), canonicalizer.stableHash("sin(x)"));
+        assertEquals(canonical, canonicalizer.canonicalize(canonical));
+    }
+
+    @Test
+    void fractionalPowersAreNeverNarrowedWhenProductsAreCollected() {
+        for (String exponent : List.of("0.5", "1.5")) {
+            String source = "sin(x)^" + exponent + " * sin(x)^" + exponent;
+            String canonical = canonicalizer.canonicalize(source);
+            assertEquals(canonical, canonicalizer.canonicalize(canonical));
+            assertNotEquals(canonicalizer.stableHash(source), canonicalizer.stableHash("1"));
+            assertNotEquals(canonicalizer.stableHash(source), canonicalizer.stableHash("sin(x)^2"));
+        }
+    }
+
+    @Test
+    void exactPolynomialCoefficientDoesNotRoundBackIntoLegacyAst() {
+        String source = "0.123456789012345 * 0.123456789012345 * x";
+        double rounded = 0.123456789012345d * 0.123456789012345d;
+        String roundedExpression = Double.toString(rounded) + " * x";
+
+        assertTrue(new PolynomialNormalizer()
+            .normalize(parser.parseTerm(source)).isEmpty(),
+            "unrepresentable exact coefficient must make normalization decline");
+        assertNotEquals(canonicalizer.stableHash(source), canonicalizer.stableHash(roundedExpression));
+        String canonical = canonicalizer.canonicalize(source);
+        assertEquals(canonical, canonicalizer.canonicalize(canonical));
+
+        assertEquals("0.02 * x", canonicalizer.canonicalize("0.1 * 0.2 * x"));
+    }
+
+    @Test
     void polynomialSortedByDescendingDegree() {
         // monomials must appear high-degree first (mathematical normal form)
         assertEquals("x ^ 2 + 2 * x + 1", canonicalizer.canonicalize("1 + 2*x + x^2"));

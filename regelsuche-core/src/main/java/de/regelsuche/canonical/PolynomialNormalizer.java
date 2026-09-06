@@ -6,7 +6,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
-import java.math.BigDecimal;
+import de.regelsuche.scalar.ExactRationalDomain;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,9 +23,11 @@ import java.util.TreeMap;
  * powers.
  *
  * <p>Legacy {@link NumberExpr} nodes still expose {@code double}; conversion
- * of that already-rounded value is isolated in {@link #legacyExact(double)}.
- * All normalization arithmetic itself uses the authoritative
- * {@link ExactRational} contract.</p>
+ * of that already-rounded value is isolated in the shared
+ * {@link ExactRationalDomain} migration bridge. All normalization arithmetic
+ * itself uses the authoritative {@link ExactRational} contract. Exact results
+ * are converted back only when the legacy AST can represent the same rational
+ * value without rounding.</p>
  */
 public final class PolynomialNormalizer {
     private static final int MAX_EXPANDED_TERMS = 1_000;
@@ -402,22 +404,44 @@ public final class PolynomialNormalizer {
         }
     }
 
-    private static ExactRational legacyExact(double value) {
-        if (!Double.isFinite(value)) {
+    /** Temporary convenience for canonical-package callers. */
+    static ExactRational legacyExact(double value) {
+        return ExactRationalDomain.legacyDecimalValue(value)
+            .orElse(null);
+    }
+
+    /**
+     * Returns an AST expression for exactly the same rational, or {@code null}
+     * when the legacy Double-backed AST cannot encode it without rounding.
+     */
+    static Expr exactRationalExpression(ExactRational value) {
+        var legacy = ExactRationalDomain.exactLegacyDecimalDouble(value);
+        if (legacy.isPresent()) {
+            return new NumberExpr(legacy.getAsDouble());
+        }
+
+        NumberExpr numerator = exactIntegerLeaf(value.numerator());
+        if (numerator == null) {
             return null;
         }
-        BigDecimal decimal =
-            BigDecimal.valueOf(value).stripTrailingZeros();
-        BigInteger numerator = decimal.unscaledValue();
-        int scale = decimal.scale();
-        if (scale < 0) {
-            numerator = numerator.multiply(
-                BigInteger.TEN.pow(-scale));
-            return ExactRational.integer(numerator);
+        if (value.isInteger()) {
+            return numerator;
         }
-        return new ExactRational(
-            numerator,
-            BigInteger.TEN.pow(scale));
+        NumberExpr denominator = exactIntegerLeaf(value.denominator());
+        return denominator == null
+            ? null
+            : new BinaryExpr(
+                numerator,
+                BinaryOperator.DIV,
+                denominator);
+    }
+
+    private static NumberExpr exactIntegerLeaf(BigInteger value) {
+        var legacy = ExactRationalDomain.exactLegacyDecimalDouble(
+            ExactRational.integer(value));
+        return legacy.isPresent()
+            ? new NumberExpr(legacy.getAsDouble())
+            : null;
     }
 
     private static Expr withCoefficient(
@@ -426,27 +450,18 @@ public final class PolynomialNormalizer {
     ) {
         if (term instanceof NumberExpr number
                 && number.value() == 1) {
-            Double value = toFiniteDouble(coefficient);
-            return value == null
-                ? null
-                : new NumberExpr(value);
+            return exactRationalExpression(coefficient);
         }
         if (coefficient.isOne()) {
             return term;
         }
-        Double value = toFiniteDouble(coefficient);
-        return value == null
+        Expr exactCoefficient = exactRationalExpression(coefficient);
+        return exactCoefficient == null
             ? null
             : new BinaryExpr(
-                new NumberExpr(value),
+                exactCoefficient,
                 BinaryOperator.MUL,
                 term);
-    }
-
-    private static Double toFiniteDouble(ExactRational value) {
-        double result = value.numerator().doubleValue()
-            / value.denominator().doubleValue();
-        return Double.isFinite(result) ? result : null;
     }
 
     private static Expr leftAssociate(

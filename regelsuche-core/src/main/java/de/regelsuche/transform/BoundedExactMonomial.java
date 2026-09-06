@@ -6,7 +6,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
-import java.math.BigDecimal;
+import de.regelsuche.scalar.ExactRationalDomain;
 import java.math.BigInteger;
 import java.util.Collections;
 import java.util.Map;
@@ -37,9 +37,8 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
     ) {
         budget.visit(depth);
         if (expression instanceof NumberExpr number) {
-            return Double.isFinite(number.value())
-                ? Optional.of(new BoundedExactMonomial(decimalValue(number.value()), Map.of()))
-                : Optional.empty();
+            return ExactRationalDomain.legacyDecimalValue(number.value())
+                .map(value -> new BoundedExactMonomial(value, Map.of()));
         }
         if (expression instanceof VariableExpr variable) {
             return Optional.of(new BoundedExactMonomial(
@@ -163,8 +162,10 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
     }
 
     boolean isConstant(double expected) {
-        return Double.isFinite(expected) && powers.isEmpty()
-            && coefficient.equals(decimalValue(expected));
+        return powers.isEmpty()
+            && ExactRationalDomain.legacyDecimalValue(expected)
+                .map(coefficient::equals)
+                .orElse(false);
     }
 
     Expr toExpr() {
@@ -183,17 +184,9 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
     }
 
     private Expr coefficientExpression() {
-        // Keep the ordinary decimal surface only if it denotes exactly the
-        // rational coefficient. Nonterminating fractions never become floats.
-        try {
-            BigDecimal decimal = new BigDecimal(coefficient.numerator())
-                .divide(new BigDecimal(coefficient.denominator()));
-            double value = decimal.doubleValue();
-            if (Double.isFinite(value) && BigDecimal.valueOf(value).compareTo(decimal) == 0) {
-                return new NumberExpr(value);
-            }
-        } catch (ArithmeticException nonterminatingDecimal) {
-            // Exact BigDecimal division rejects a nonterminating decimal.
+        var decimal = ExactRationalDomain.exactLegacyDecimalDouble(coefficient);
+        if (decimal.isPresent()) {
+            return new NumberExpr(decimal.getAsDouble());
         }
         Expr numerator = integerLeaf(coefficient.numerator());
         return coefficient.isInteger() ? numerator
@@ -201,20 +194,12 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
     }
 
     private static NumberExpr integerLeaf(BigInteger value) {
-        double legacy = value.doubleValue();
-        if (!Double.isFinite(legacy)
-                || !BigDecimal.valueOf(legacy).toBigIntegerExact().equals(value)) {
+        var legacy = ExactRationalDomain.exactLegacyDecimalDouble(
+            ExactRational.integer(value));
+        if (legacy.isEmpty()) {
             throw new LimitExceeded("ALGEBRAIC_BINDING_NOT_REPRESENTABLE");
         }
-        return new NumberExpr(legacy);
-    }
-
-    private static ExactRational decimalValue(double value) {
-        BigDecimal decimal = BigDecimal.valueOf(value);
-        BigInteger unscaled = decimal.unscaledValue();
-        return decimal.scale() < 0
-            ? ExactRational.integer(unscaled.multiply(BigInteger.TEN.pow(-decimal.scale())))
-            : new ExactRational(unscaled, BigInteger.TEN.pow(decimal.scale()));
+        return new NumberExpr(legacy.getAsDouble());
     }
 
     static int positiveInteger(double value) {

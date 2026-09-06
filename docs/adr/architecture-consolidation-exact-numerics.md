@@ -2,7 +2,7 @@
 
 Datum: 2026-09-06
 
-Status: laufende Konsolidierung; erster und zweiter begrenzter Schnitt
+Status: laufende Konsolidierung; drei begrenzte Sicherheitsschnitte
 
 Ausgangsrevision: `4a52e933594c4eca9adb10f6f601e325bc624f2e`
 
@@ -50,6 +50,24 @@ algebraische Monomial-Inferenz nutzte dieselbe Art von Toleranz sowie
 Gleitkomma-Wurzeln und konnte dadurch beispielsweise eine gerundete `sqrt(2)`-
 Naeherung als exakte Bindung behandeln. Symbolische Division konnte ausserdem
 `x/x` ohne Nichtnull-Annahme wie die Konstante `1` erscheinen lassen.
+
+Die allgemeine Kanonisierung besass daneben eine unabhaengige numerische
+Verengung: ausserhalb des Polynompfads wurden Faktoren und Summenkoeffizienten
+mit `(int) numberExpr.value()` verarbeitet. Dadurch konnten etwa
+`0.5*sin(x)` und `0` denselben Suchhash erhalten, `1.5*sin(x)` und `sin(x)`
+ebenfalls zusammenfallen und Werte oberhalb der `int`-Grenze saturieren.
+Beim Einsammeln gleicher Faktoren wurden auch nichtganzzahlige Potenzen auf
+`int` verengt; zwei Faktoren `sin(x)^0.5` konnten dadurch sogar wie der
+Einheitsfaktor behandelt werden. Der bereits rational rechnende
+`PolynomialNormalizer` konnte schliesslich einen exakten Koeffizienten beim
+Rueckweg durch `double` wieder runden.
+
+Eine weitere assumption-free Kurzschlussregel war fuer partielle Ausdruecke
+unsicher: Sobald ein Faktor zu numerischer Null wurde, konnte die
+Multiplikationskanonisierung sofort `0` liefern, ohne die uebrigen Faktoren zu
+beruecksichtigen. Damit konnte beispielsweise `0*(1/0)` denselben Suchschluessel
+wie `0` erhalten. Das ist keine gueltige Identitaet, weil der erste Ausdruck
+undefiniert ist.
 
 ## Erster Sicherheits-Schnitt: bewusst nicht die exakte AST-Migration
 
@@ -110,14 +128,61 @@ darstellbare Bindungen liefern `INCONCLUSIVE` mit typisiertem Grund und
 unveraenderten Caller-Bindings; Negation darf diesen Zustand nicht zu einem
 Treffer machen. Diese Grenzen sind kein vollstaendiges CPU-/Sucharbeits-Ledger.
 
+## Dritter Schnitt: exakte Kanonisierung im Legacy-AST
+
+Der dritte Schnitt beseitigt die numerischen `int`-Verengungen aus der
+allgemeinen `ExpressionCanonicalizer`-Koeffizientenlogik. Endliche bestehende
+`NumberExpr`-Blaetter werden an dieser temporaeren Grenze nach derselben
+kuerzesten Dezimalkonvention in `ExactRational` projiziert. Summen- und
+Produktkoeffizienten werden anschliessend rational exakt addiert bzw.
+multipliziert. Nichtganzzahlige oder uebergrosse Potenzexponenten werden nicht
+mehr zu `int` verengt und duerfen daher keine Potenzzusammenfassung
+autorisieren.
+
+Die bereits benoetigte Legacy-Dezimalkonvention ist nun an einer Stelle
+festgelegt: `ExactRationalDomain.legacyDecimalValue` interpretiert nur einen
+bereits vorhandenen endlichen Double-Wert nach seiner kuerzesten
+Dezimaldarstellung; `exactLegacyDecimalDouble` gibt umgekehrt nur dann einen
+Double-Wert zurueck, wenn derselbe rationale Wert nach dieser Konvention exakt
+wieder entsteht. Diese Methoden sind ausdruecklich Migrationsadapter und keine
+Evidence fuer die Exaktheit eines urspruenglichen Literals oder einer
+vorangegangenen Gleitkommarechnung. Matcher und Kanonisierung verwenden damit
+keine getrennten Kopien derselben Randsemantik mehr.
+
+`PolynomialNormalizer` bleibt die gemeinsame rationale Rechenautoritaet fuer
+sein Polynomfragment. Seine bisherige Rueckgabe `ExactRational -> double` wird
+aber nicht mehr allein durch Endlichkeit akzeptiert. Der package-interne
+AST-Renderer erzeugt ein numerisches Legacy-AST-Blatt nur nach exaktem
+rationalem Rueckvergleich. Wo moeglich kann er alternativ sichere ganzzahlige
+Bruchsyntax erzeugen. Ist auch diese Darstellung nicht exakt moeglich, lehnt
+der Polynomnormalisierer die Normalisierung ab, statt den Koeffizienten zu
+runden. Der allgemeine Canonicalizer behaelt in diesem Fall die einzeln exakt
+darstellbaren numerischen Faktoren bzw. Summenbeitraege deterministisch bei.
+
+Nullmultiplikation ist im allgemeinen Fallback ebenfalls fail-closed. Der
+Canonicalizer wertet alle Faktoren aus und behaelt eine Null zusammen mit einem
+potenziell partiellen Faktor, statt diesen Faktor zu vernichten. Eine
+assumption-aware Vereinfachung darf weiterhin zu `0` gelangen, wenn sie die
+benoetigte Bedingung ausdruecklich in den `AssumptionContext` aufgenommen hat.
+
+Damit wird bewusst **keine** neue Zahlendarstellung eingefuehrt. Die bestehende
+`ExactRational`-Arithmetik und die vorhandenen AST-Typen werden weiterverwendet.
+Ein Fail-Closed-Fallback kann weniger mathematisch gleiche Schreibweisen
+zusammenfassen als eine zukuenftige exakte AST-Repraesentation; er darf aber
+keine verschiedenen exakten oder unterschiedlich definierten Werte allein
+wegen einer Verengung, Rundung oder Kurzschlussregel zu demselben kanonischen
+Schluessel machen.
+
 ## Noch offene mathematische Grenzen
 
-`NumberExpr`, `PatternExpr.LiteralNumber` und die allgemeine Wertprojektion
-bleiben Double-basiert. Der zweite Schnitt macht nur die deklarierte
-Monomial-Koeffizientenrechnung und Wurzelinferenz rational exakt; bereits vor
-dieser Grenze verlorene Quelltextpraezision kann er nicht rekonstruieren.
-Numerisches Falten, allgemeine Kanonisierung, Suchidentitaet, E-Graph,
-Serialisierung und weitere Adapter sind damit noch nicht insgesamt exakt.
+`NumberExpr`, `PatternExpr.LiteralNumber` und die allgemeine Syntaxoberflaeche
+bleiben Double-basiert. Der zweite Schnitt macht die deklarierte
+Monomial-Koeffizientenrechnung und Wurzelinferenz rational exakt; der dritte
+Schnitt entfernt zusaetzliche Verengungen im Canonicalizer und sichert den
+Polynom-Rueckweg. Bereits vor diesen Grenzen verlorene Quelltextpraezision kann
+keiner dieser Adapter rekonstruieren. Allgemeine Wertidentitaet, E-Graph,
+Serialisierung, Persistenz, Solveradapter und weitere numerische Erzeuger sind
+damit noch nicht insgesamt exakt.
 
 Die Migration muss den vorhandenen exakten Werttyp weiterverwenden. Sie darf
 keinen weiteren Zahlen-Sidecar und keine dauerhafte `value(): double`-Fassade
@@ -126,11 +191,12 @@ bleiben fuer Darstellung und Herkunft erhalten, aber der Wert darf nicht nur
 ueber diesen Begleiter exakt sein. Naeherungswerte brauchen einen ausdruecklich
 anderen Vertrag und duerfen keine exakte Gleichheit autorisieren.
 
-Ein geaendertes Format kann Ausdrucksbytes und daraus abgeleitete Identitaeten
-veraendern. Historische Ergebnisdateien, versiegelte Qualifikationen und
-Schwellen werden nicht automatisch aktualisiert, um die neue Implementierung
-bestehen zu lassen. Betroffene Studien benoetigen eine ausdrueckliche
-Versionsentscheidung oder ihre archivierte Implementierung.
+Ein geaendertes Format oder ein korrigierter kanonischer Schluessel kann
+Ausdrucksbytes und daraus abgeleitete Identitaeten veraendern. Historische
+Ergebnisdateien, versiegelte Qualifikationen und Schwellen werden nicht
+automatisch aktualisiert, um die neue Implementierung bestehen zu lassen.
+Betroffene Studien benoetigen eine ausdrueckliche Versionsentscheidung oder
+ihre archivierte Implementierung.
 
 ## Abnahme und Regressionen
 
@@ -148,6 +214,20 @@ ganzzahlige und 1.300 rationale Wurzelfaelle durch wiederholte Multiplikation.
 Die bestehenden Ableitungs- und Benchmarktests bleiben unveraendert und muessen
 dieselben Suchziele und Budgets weiterhin erreichen.
 
+`ExactRationalDomainTest` charakterisiert zusaetzlich den gemeinsamen
+Legacy-Adapter an endlichen Dezimalwerten, Nichtendlichkeit, terminierenden und
+nichtterminierenden Rationalen sowie an der 2^53-Grenze. Er trennt damit die
+explizite Migrationskonvention von parserausgestellter exakter Evidence.
+
+`ExpressionCanonicalizerTest` charakterisiert fuer den dritten Schnitt
+nichtpolynomiale Dezimalkoeffizienten, die `int`-Grenze, exakte
+Koeffizientensummen, fraktionale Potenzfaktoren, assumption-free undefinierte
+Nullprodukte und einen rational exakten Polynomkoeffizienten, der im bisherigen
+AST nicht als einzelner Double-Wert rueckwaerts dargestellt werden kann.
+Reparse muss weiterhin ein Fixpunkt sein; ein unrepresentierbarer exakter Wert
+darf insbesondere nicht denselben Suchhash wie seine naechste Double-Naeherung
+erhalten.
+
 Die abschliessende exakte Migration braucht darueber hinaus gemeinsame
 Regressionen fuer Erzeugung neuer Zahlen durch Umformungen, exakte Brueche,
 Patterninstanziierung, Canonicalizer, Suchcache, E-Graph, Serialisierung,
@@ -155,8 +235,9 @@ Persistenz, Solveradapter und Replay. Verschiedene exakte Werte duerfen in
 keinem dieser exakten Verarbeitungspfade zusammenfallen.
 
 ```sh
-mvn -pl regelsuche-core -Dtest=NumericBoundaryRegressionTest,ExactMonomialInferenceTest,EquivalenceAwarePatternMatcherTest test
-./gradlew :regelsuche-core:test --tests '*NumericBoundaryRegressionTest' --tests '*ExactMonomialInferenceTest' --tests '*EquivalenceAwarePatternMatcherTest'
+mvn -pl regelsuche-core -Dtest=NumericBoundaryRegressionTest,ExactMonomialInferenceTest,EquivalenceAwarePatternMatcherTest,ExactRationalDomainTest test
+./gradlew :regelsuche-core:test --tests '*NumericBoundaryRegressionTest' --tests '*ExactMonomialInferenceTest' --tests '*EquivalenceAwarePatternMatcherTest' --tests '*ExactRationalDomainTest'
+./gradlew :app:test --tests '*ExpressionCanonicalizerTest'
 ./gradlew --no-configuration-cache ciCheck
 ```
 
