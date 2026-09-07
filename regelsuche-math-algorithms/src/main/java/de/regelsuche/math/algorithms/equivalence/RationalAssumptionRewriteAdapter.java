@@ -1,6 +1,8 @@
 package de.regelsuche.math.algorithms.equivalence;
 
+import de.regelsuche.ast.Expr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.HypothesisTransformationEngine;
 import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
@@ -44,6 +46,7 @@ public final class RationalAssumptionRewriteAdapter {
     private final RationalNormalizationHypothesisOperator formationOperator;
     private final RationalFunctionNormalFormEquivalenceService equivalence;
     private final ExpressionCanonicalizer canonicalizer;
+    private final ExpressionParser parser = new ExpressionParser();
     private final TransformationEngine evaluationEngine;
 
     public RationalAssumptionRewriteAdapter() {
@@ -201,15 +204,18 @@ public final class RationalAssumptionRewriteAdapter {
         }
         BudgetLedger ledger = new BudgetLedger(budget);
         ArrayDeque<SearchNode> queue = new ArrayDeque<>();
-        Set<String> visited = new LinkedHashSet<>();
+        // This discovery contract requires constructing the target syntax.
+        // Numeric value identity would merge 7 / 1 with 7 before the cleanup
+        // primitive has been executed and recorded in the retained path.
+        Set<Expr> visited = new LinkedHashSet<>();
         queue.add(new SearchNode(task.source(), List.of(), 0));
-        visited.add(canonicalizer.stableHash(task.source()));
-        String target = canonicalizer.canonicalize(task.target());
+        visited.add(parser.parseTerm(task.source()));
+        Expr target = parser.parseTerm(task.target());
 
         while (!queue.isEmpty() && ledger.canExplore()) {
             SearchNode node = queue.removeFirst();
             ledger.exploreState();
-            if (canonicalizer.canonicalize(node.expression()).equals(target)) {
+            if (parser.parseTerm(node.expression()).equals(target)) {
                 return success(task, node, ledger);
             }
             if (node.depth() >= budget.maxDepth()) {
@@ -236,9 +242,8 @@ public final class RationalAssumptionRewriteAdapter {
                         != RationalFunctionNormalFormEquivalenceService.Status.CONFIRMED) {
                     continue;
                 }
-                String hash = canonicalizer.stableHash(
-                    candidate.transformedExpression());
-                if (!visited.add(hash)) {
+                Expr syntax = parser.parseTerm(candidate.transformedExpression());
+                if (!visited.add(syntax)) {
                     continue;
                 }
                 List<SearchStep> path = new ArrayList<>(node.steps());

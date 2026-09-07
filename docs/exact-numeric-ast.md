@@ -36,6 +36,11 @@ explizit ab. Primitive Faltung erzeugt solche nicht wieder einlesbaren Ergebniss
 nicht; die String-Kanonisierung behält dann den ursprünglichen Ausdruck bei.
 Syntaxvorkommen bleiben unabhängig adressierbar. `0/0` wird nicht zu einem Zahlenwert reduziert.
 
+Explizite Syntaxziele behalten einen strukturellen Zielvergleich und eine dazu
+passende Besuchsidentität. Der rationale Suchadapter muss daher auch den letzten
+Schritt `7 / 1 -> 7` ausführen und im Pfad sowie im Budget erfassen; gleiche
+Zahlenwerte allein erfüllen dieses Konstruktionsziel nicht.
+
 JSON serialisiert rationale Werte als kanonischen Text, zum Beispiel
 `{"value":"9007199254740993/7"}` für ein `NumberExpr`. Damit brauchen auch
 JSON-Verbraucher keine große Zahl durch einen Gleitkommatyp zu transportieren.
