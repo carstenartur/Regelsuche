@@ -131,15 +131,25 @@ Definitionsbereich erzeugen. Insbesondere sind daher Gleichungen wie
 ```text
 x/x - x/x  -> 0
 (1/x)^0    -> 1
+x^0        -> 1
 ```
 
-ohne Nebenbedingung nicht zulässig: Die linken Seiten sind bei `x = 0` nicht
-definiert, die rechten Seiten dagegen schon.
+ohne passende Nebenbedingung nicht zulässig. Die ersten beiden linken Seiten
+sind bei `x = 0` nicht definiert. Für Potenz null gilt zusätzlich der im Projekt
+bereits verwendete fail-closed Vertrag, dass `0^0` nicht als `1` angenommen
+wird. Daher darf `A^0 -> 1` nur erfolgen, wenn `A` definiert und ungleich null
+ist. `2^0 -> 1` ist damit assumption-free zulässig; `x^0` bleibt dagegen ohne
+Kontext erhalten und kann assumption-aware nur zusammen mit `x != 0` zu `1`
+werden. `0^0` bleibt fail-closed erhalten.
 
 `ExpressionCanonicalizer` prüft deshalb bei vollständiger Elision eines Terms
 rekursiv die strukturellen Domain-Anforderungen. Für explizite Divisionen und
 negative ganzzahlige Potenzen entsteht gegebenenfalls eine `NON_ZERO`-
-Obligation. Die dokumentierten Built-in-Funktionen werden entsprechend ihrer
+Obligation. Bei Potenz null kommt für die vollständig entfernte Basis zusätzlich
+die `NON_ZERO`-Obligation der Basis selbst hinzu. Der assumption-free
+`PolynomialNormalizer` behandelt Exponent null nicht als formale
+Polynomidentität, damit auch verschachtelte Formen wie `x^0 + y` diese Prüfung
+nicht umgehen. Die dokumentierten Built-in-Funktionen werden entsprechend ihrer
 reellen Domain behandelt:
 
 | Funktion | Voraussetzung bei vollständiger Elision |
