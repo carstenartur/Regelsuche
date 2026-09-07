@@ -683,6 +683,9 @@ public final class FactorizationVerifier {
             PolynomialEvidence.append(
                 result,
                 Integer.toString(reducedDegree));
+            PolynomialEvidence.append(
+                result,
+                Integer.toString(checkpoints.size()));
             checkpoints.forEach(checkpoint ->
                 PolynomialEvidence.append(
                     result,
@@ -798,6 +801,10 @@ public final class FactorizationVerifier {
             PolynomialEvidence.append(result, outcome().name());
             PolynomialEvidence.append(result, proofMethod().name());
             PolynomialEvidence.append(result, detailCode());
+            PolynomialEvidence.append(
+                result,
+                Integer.toString(
+                    normalizedPrimitiveCoefficients().size()));
             normalizedPrimitiveCoefficients().forEach(coefficient ->
                 PolynomialEvidence.append(
                     result,
@@ -805,6 +812,9 @@ public final class FactorizationVerifier {
             PolynomialEvidence.append(
                 result,
                 Integer.toString(degree()));
+            PolynomialEvidence.append(
+                result,
+                Integer.toString(primeAttempts().size()));
             primeAttempts().forEach(attempt ->
                 PolynomialEvidence.append(
                     result,
@@ -875,8 +885,52 @@ public final class FactorizationVerifier {
                     throw new IllegalArgumentException(
                         "certified trace requires a proof method");
                 }
+                if (!normalizedPrimitiveCoefficients.isEmpty()
+                        && (degree
+                            != normalizedPrimitiveCoefficients.size() - 1
+                            || normalizedPrimitiveCoefficients.getLast()
+                                .signum() <= 0
+                            || coefficientContent(
+                                normalizedPrimitiveCoefficients)
+                                .compareTo(BigInteger.ONE) != 0)) {
+                    throw new IllegalArgumentException(
+                        "trace polynomial must be primitive and canonical");
+                }
+                boolean modularCertificate = outcome
+                        == IndependentIrreducibilityOutcome.CERTIFIED
+                    && proofMethod
+                        == IrreducibilityProofMethod.MODULAR_RABIN;
+                if ((selectedPrime > 0) != modularCertificate
+                        || modularCertificate
+                            && (primeAttempts.isEmpty()
+                                || primeAttempts.getLast().prime()
+                                    != selectedPrime
+                                || primeAttempts.getLast().outcome()
+                                    != PrimeAttemptOutcome
+                                        .IRREDUCIBLE_WITNESS)) {
+                    throw new IllegalArgumentException(
+                        "selected prime must identify the retained witness");
+                }
+                if (proofMethod == IrreducibilityProofMethod.LINEAR_DEGREE
+                        && (outcome
+                            != IndependentIrreducibilityOutcome.CERTIFIED
+                            || degree != 1
+                            || !primeAttempts.isEmpty())) {
+                    throw new IllegalArgumentException(
+                        "linear evidence must certify exactly degree one");
+                }
             }
         }
+    }
+
+    private static BigInteger coefficientContent(
+        List<BigInteger> coefficients
+    ) {
+        BigInteger result = BigInteger.ZERO;
+        for (BigInteger coefficient : coefficients) {
+            result = result.gcd(coefficient.abs());
+        }
+        return result;
     }
 
     /** Issuer-owned exact decomposition evidence. */

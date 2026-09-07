@@ -400,6 +400,9 @@ final class IndependentOriginalDomainIrreducibility {
         List<BigInteger> coefficients
     ) {
         StringBuilder material = new StringBuilder(METHOD_ID);
+        PolynomialEvidence.append(
+            material,
+            Integer.toString(coefficients.size()));
         coefficients.forEach(coefficient ->
             PolynomialEvidence.append(
                 material,
@@ -410,6 +413,9 @@ final class IndependentOriginalDomainIrreducibility {
     private static String residueHash(int prime, int[] polynomial) {
         StringBuilder material = new StringBuilder(METHOD_ID);
         PolynomialEvidence.append(material, Integer.toString(prime));
+        PolynomialEvidence.append(
+            material,
+            Integer.toString(polynomial.length));
         for (int coefficient : polynomial) {
             PolynomialEvidence.append(
                 material,
@@ -435,6 +441,9 @@ final class IndependentOriginalDomainIrreducibility {
         PolynomialEvidence.append(
             material,
             Integer.toString(reducedDegree));
+        PolynomialEvidence.append(
+            material,
+            Integer.toString(checkpoints.size()));
         checkpoints.forEach(checkpoint ->
             PolynomialEvidence.append(
                 material,
@@ -467,11 +476,17 @@ final class IndependentOriginalDomainIrreducibility {
         PolynomialEvidence.append(material, outcome.name());
         PolynomialEvidence.append(material, proofMethod.name());
         PolynomialEvidence.append(material, detailCode);
+        PolynomialEvidence.append(
+            material,
+            Integer.toString(retainedNormalized.size()));
         retainedNormalized.forEach(coefficient ->
             PolynomialEvidence.append(
                 material,
                 coefficient.toString()));
         PolynomialEvidence.append(material, Integer.toString(degree));
+        PolynomialEvidence.append(
+            material,
+            Integer.toString(retainedAttempts.size()));
         retainedAttempts.forEach(attempt ->
             PolynomialEvidence.append(
                 material,
