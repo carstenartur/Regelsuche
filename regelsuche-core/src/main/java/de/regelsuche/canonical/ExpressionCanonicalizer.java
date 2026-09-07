@@ -470,15 +470,36 @@ public class ExpressionCanonicalizer {
         Expr exponent,
         List<Assumption> requirements
     ) {
-        if (!(exponent instanceof NumberExpr number)) {
-            return false;
-        }
-        double value = number.value();
-        if (!Double.isFinite(value) || value != Math.rint(value)) {
+        Double value = signedIntegerLiteralValue(exponent);
+        if (value == null) {
             return false;
         }
         return value >= 0
             || requireNonZeroForElision(base, requirements);
+    }
+
+    /**
+     * Returns an integral numeric exponent represented by the legacy AST.
+     * Negative literals are parsed as {@code 0 - n}, so recognize that exact
+     * parser shape without broadening this guard into a general evaluator.
+     */
+    private Double signedIntegerLiteralValue(Expr expression) {
+        if (expression instanceof NumberExpr number) {
+            double value = number.value();
+            return Double.isFinite(value) && value == Math.rint(value)
+                ? value
+                : null;
+        }
+        if (expression instanceof BinaryExpr binary
+                && binary.operator() == BinaryOperator.SUB
+                && isNumber(binary.left(), 0)
+                && binary.right() instanceof NumberExpr number) {
+            double magnitude = number.value();
+            return Double.isFinite(magnitude) && magnitude == Math.rint(magnitude)
+                ? -magnitude
+                : null;
+        }
+        return null;
     }
 
     private boolean requireNonZeroForElision(
