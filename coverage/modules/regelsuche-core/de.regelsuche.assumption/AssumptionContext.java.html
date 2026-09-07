@@ -26,13 +26,13 @@ import java.util.Set;
 <span class="fc" id="L26">    }</span>
 
     public void addAll(List&lt;Assumption&gt; additions) {
-<span class="nc bnc" id="L29" title="All 2 branches missed.">        if (additions == null) {</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (additions == null) {</span>
 <span class="nc" id="L30">            return;</span>
         }
-<span class="nc bnc" id="L32" title="All 2 branches missed.">        for (Assumption assumption : additions) {</span>
-<span class="nc" id="L33">            add(assumption);</span>
-<span class="nc" id="L34">        }</span>
-<span class="nc" id="L35">    }</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (Assumption assumption : additions) {</span>
+<span class="fc" id="L33">            add(assumption);</span>
+<span class="fc" id="L34">        }</span>
+<span class="fc" id="L35">    }</span>
 
     /** @return immutable snapshot of the accumulated assumptions. */
     public List&lt;Assumption&gt; snapshot() {
@@ -40,7 +40,7 @@ import java.util.Set;
     }
 
     public boolean isEmpty() {
-<span class="nc" id="L43">        return assumptions.isEmpty();</span>
+<span class="fc" id="L43">        return assumptions.isEmpty();</span>
     }
 
     @Override

@@ -159,8 +159,8 @@ public final class PolynomialNormalizer {
 <span class="fc" id="L159">                        entry.getKey(),</span>
 <span class="fc" id="L160">                        entry.getValue(),</span>
                         Math::addExact);
-<span class="nc" id="L162">                } catch (ArithmeticException exception) {</span>
-<span class="nc" id="L163">                    return null;</span>
+<span class="fc" id="L162">                } catch (ArithmeticException exception) {</span>
+<span class="fc" id="L163">                    return null;</span>
 <span class="fc" id="L164">                }</span>
 <span class="fc" id="L165">            }</span>
 <span class="pc bpc" id="L166" title="1 of 2 branches missed.">            result.values().removeIf(value -&gt; value == 0);</span>
@@ -184,8 +184,8 @@ public final class PolynomialNormalizer {
 <span class="nc" id="L184">            return new Monomial(result);</span>
         }
 
-        private int degree() {
-<span class="fc" id="L188">            int degree = 0;</span>
+        private long degree() {
+<span class="fc" id="L188">            long degree = 0;</span>
 <span class="fc bfc" id="L189" title="All 2 branches covered.">            for (int exponent : powers.values()) {</span>
 <span class="fc" id="L190">                degree += exponent;</span>
 <span class="fc" id="L191">            }</span>
@@ -233,7 +233,7 @@ public final class PolynomialNormalizer {
         private static final Comparator&lt;
 <span class="fc" id="L234">            Map.Entry&lt;Monomial, ExactRational&gt;&gt; TERM_ORDER =</span>
                 Comparator
-<span class="fc" id="L236">                    .&lt;Map.Entry&lt;Monomial, ExactRational&gt;&gt;comparingInt(</span>
+<span class="fc" id="L236">                    .&lt;Map.Entry&lt;Monomial, ExactRational&gt;&gt;comparingLong(</span>
 <span class="fc" id="L237">                        entry -&gt; entry.getKey().degree())</span>
 <span class="fc" id="L238">                    .reversed()</span>
 <span class="fc" id="L239">                    .thenComparing(</span>
@@ -298,8 +298,8 @@ public final class PolynomialNormalizer {
 <span class="fc bfc" id="L298" title="All 2 branches covered.">                        : other.terms.entrySet()) {</span>
 <span class="fc" id="L299">                    Monomial monomial = left.getKey().multiply(</span>
 <span class="fc" id="L300">                        right.getKey());</span>
-<span class="pc bpc" id="L301" title="1 of 2 branches missed.">                    if (monomial == null) {</span>
-<span class="nc" id="L302">                        return null;</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                    if (monomial == null) {</span>
+<span class="fc" id="L302">                        return null;</span>
                     }
 <span class="fc" id="L304">                    ExactRational coefficient =</span>
 <span class="fc" id="L305">                        left.getValue().multiply(right.getValue());</span>
