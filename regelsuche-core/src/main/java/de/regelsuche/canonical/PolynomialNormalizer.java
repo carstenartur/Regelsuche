@@ -112,6 +112,13 @@ public final class PolynomialNormalizer {
             return null;
         }
         int exponentValue = (int) number.value();
+        // In expression semantics A^0 removes A and is therefore only sound
+        // after A is known to be defined and non-zero. Leave this case to the
+        // assumption-aware expression canonicalizer instead of folding it as
+        // a formal-polynomial identity here.
+        if (exponentValue == 0) {
+            return null;
+        }
         Polynomial basePolynomial = toPolynomial(base);
         if (basePolynomial == null) {
             return null;

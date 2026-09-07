@@ -121,6 +121,72 @@ AssumptionEvaluatorPortfolio portfolio =
 AssumptionEvaluation evaluation = portfolio.evaluate(required, context);
 ```
 
+## Kanonisierung und Definitionsbereich
+
+Die assumption-free Kanonisierung darf nicht nur den Wert eines Ausdrucks auf
+seinem bisherigen Definitionsbereich erhalten, sondern auch nicht durch das
+vollständige Entfernen eines partiellen Teilbaums unbemerkt einen größeren
+Definitionsbereich erzeugen. Insbesondere sind daher Gleichungen wie
+
+```text
+x/x - x/x  -> 0
+(1/x)^0    -> 1
+x^0        -> 1
+```
+
+ohne passende Nebenbedingung nicht zulässig. Die ersten beiden linken Seiten
+sind bei `x = 0` nicht definiert. Für Potenz null gilt zusätzlich der im Projekt
+bereits verwendete fail-closed Vertrag, dass `0^0` nicht als `1` angenommen
+wird. Daher darf `A^0 -> 1` nur erfolgen, wenn `A` definiert und ungleich null
+ist. `2^0 -> 1` ist damit assumption-free zulässig; `x^0` bleibt dagegen ohne
+Kontext erhalten und kann assumption-aware nur zusammen mit `x != 0` zu `1`
+werden. `0^0` bleibt fail-closed erhalten.
+
+`ExpressionCanonicalizer` prüft deshalb bei vollständiger Elision eines Terms
+rekursiv die strukturellen Domain-Anforderungen. Für explizite Divisionen und
+negative ganzzahlige Potenzen entsteht gegebenenfalls eine `NON_ZERO`-
+Obligation. Bei Potenz null kommt für die vollständig entfernte Basis zusätzlich
+die `NON_ZERO`-Obligation der Basis selbst hinzu. Der assumption-free
+`PolynomialNormalizer` behandelt Exponent null nicht als formale
+Polynomidentität, damit auch verschachtelte Formen wie `x^0 + y` diese Prüfung
+nicht umgehen. Die dokumentierten Built-in-Funktionen werden entsprechend ihrer
+reellen Domain behandelt:
+
+| Funktion | Voraussetzung bei vollständiger Elision |
+| --- | --- |
+| `sin`, `cos`, `exp`, `abs` | keine zusätzliche Domain-Annahme |
+| `log`, `ln` | Argument `> 0` (`POSITIVE`) |
+| `sqrt` | Argument `>= 0` (`NON_NEGATIVE`) |
+| `tan` | `cos(argument) != 0` (`NON_ZERO`) |
+
+Unbekannte Funktionsnamen, mehrstellige Funktionssemantik sowie nichtganzzahlige
+oder symbolische Potenzen werden an dieser Grenze konservativ behandelt: Kann
+der Definitionsbereich nicht durch den vorhandenen Assumption-Vertrag
+beschrieben werden, wird der Teilbaum nicht vollständig wegkanonisiert.
+
+Ohne `AssumptionContext` schlägt eine bedingte Elision fehlersicher fehl. Mit
+einem Kontext darf die assumption-aware Kanonisierung die ausdrückbaren
+Obligationen in den Kontext aufnehmen und anschließend vereinfachen. Dadurch
+kann beispielsweise
+
+```text
+1/(x + 1) - 1/(x + 1) -> 0
+```
+
+nur zusammen mit `x + 1 != 0` entstehen. Ebenso darf `log(x) - log(x)` nur mit
+`x > 0` vollständig verschwinden.
+
+Nicht jede Koeffizientenzusammenfassung ist eine Elision. Bleibt der partielle
+Teilbaum erhalten, darf sein Koeffizient weiterhin exakt reduziert werden;
+`2*(1/x) - 1/x` kann daher zu `1/x` werden, ohne den Definitionsbereich zu
+vergrößern.
+
+Diese strukturelle Prüfung ersetzt keine allgemeine Beweis- oder
+Domain-Inferenz. Ob bereits bekannte oder extern bewiesene Annahmen gelten,
+bleibt Aufgabe des Assumption-Evaluator-Vertrags. Die Kanonisierung erzeugt
+beim assumption-aware Pfad lediglich die für ihre eigene bedingte
+Vereinfachung benötigten, expliziten Obligationen.
+
 ## Externe Evaluatoren
 
 SymPy, Z3, cvc5 und formale Prover können später denselben Vertrag implementieren.
