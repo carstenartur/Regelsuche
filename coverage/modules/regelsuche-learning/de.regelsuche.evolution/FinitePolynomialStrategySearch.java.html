@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FinitePolynomialStrategySearch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">FinitePolynomialStrategySearch.java</span></div><h1>FinitePolynomialStrategySearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanCandidateEvidenceVerifier.VerifiedCandidateEvidence;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayArtifactVerifier.LoadedArtifact;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayConfirmationVerifier.ConfirmedReplay;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayVerifier.ReplayReceipt;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
+import de.regelsuche.parse.ExactExpressionFormatter;
+import de.regelsuche.parse.ExactParsedTerm;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.ExplorationLimits;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.PathBudget;
+import de.regelsuche.search.program.RewriteProgram;
+import de.regelsuche.search.program.RewriteProgramInterpreter;
+import de.regelsuche.search.program.RewritePrograms;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Bounded TRAIN-only enumeration of finite polynomial template sequences.
+ * This is an experimental selector, not evolution, a new expression interpreter,
+ * learned grammar, production promotion, or a flagship FINAL TEST protocol.
+ */
+<span class="fc" id="L36">public final class FinitePolynomialStrategySearch {</span>
+    public static final String REVISION = &quot;regelsuche.finite-polynomial-strategy-search/v1&quot;;
+<span class="fc" id="L38">    private static final SchematicProofPlan.Limits PLAN_LIMITS =</span>
+        new SchematicProofPlan.Limits(8, 8, 4, 200_000);
+<span class="fc" id="L40">    private static final ExplorationLimits EXECUTION_LIMITS = new ExplorationLimits(16, 8, 3);</span>
+
+    /** The {@code @v} slot uses only the single parser-issued input variable name. */
+    public record Template(String id, String expression, List&lt;HoleDomain&gt; domains) {
+<span class="fc" id="L44">        public Template {</span>
+<span class="fc" id="L45">            id = SchematicProofPlan.requireId(id, &quot;template id&quot;);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">            if (id.length() &gt; 64) { throw new IllegalArgumentException(&quot;template id exceeds 64 characters&quot;); }</span>
+<span class="fc" id="L47">            expression = text(expression);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (!expression.contains(&quot;@v&quot;)) {</span>
+<span class="fc" id="L49">                throw new IllegalArgumentException(&quot;template must declare the variable slot @v&quot;);</span>
+            }
+<span class="fc" id="L51">            domains = List.copyOf(domains).stream()</span>
+<span class="fc" id="L52">                .sorted(Comparator.comparing(HoleDomain::holeId)).toList();</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">            if (domains.isEmpty() || domains.size() &gt; 4</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                    || domains.stream().map(HoleDomain::holeId).distinct().count() != domains.size()) {</span>
+<span class="nc" id="L55">                throw new IllegalArgumentException(&quot;require one to four unique finite holes&quot;);</span>
+            }
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (assignments(domains) &gt; 256) {</span>
+<span class="fc" id="L58">                throw new IllegalArgumentException(&quot;template exceeds 256 assignments&quot;);</span>
+            }
+<span class="fc" id="L60">        }</span>
+
+<span class="fc" id="L62">        long assignmentCount() { return assignments(domains); }</span>
+<span class="fc" id="L63">        String instantiateVariable(String variable) { return expression.replace(&quot;@v&quot;, variable); }</span>
+    }
+
+    /** All trials use the same non-resettable within-trial limits. */
+    public record Grammar(List&lt;Template&gt; templates, int maxSequenceLength,
+                          long maxAssignmentEvaluationsPerTrial, long maxTheoryPathWork) {
+<span class="fc" id="L69">        public Grammar {</span>
+<span class="fc" id="L70">            templates = List.copyOf(templates).stream().sorted(Comparator.comparing(Template::id)).toList();</span>
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">            if (templates.isEmpty() || templates.size() &gt; 4</span>
+<span class="pc bpc" id="L72" title="4 of 14 branches missed.">                    || templates.stream().map(Template::id).distinct().count() != templates.size()</span>
+                    || maxSequenceLength &lt; 1 || maxSequenceLength &gt; 3
+                    || maxAssignmentEvaluationsPerTrial &lt; 0 || maxAssignmentEvaluationsPerTrial &gt; 10_000
+                    || maxTheoryPathWork &lt; 0 || maxTheoryPathWork &gt; 1_000_000) {
+<span class="fc" id="L76">                throw new IllegalArgumentException(&quot;invalid finite strategy grammar or budget&quot;);</span>
+            }
+<span class="fc" id="L78">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L81">            return new JsonWriter().beginObject().property(&quot;revision&quot;, REVISION)</span>
+<span class="fc" id="L82">                .property(&quot;resolverRevision&quot;, ExactFinitePolynomialPlanResolver.REVISION_HASH)</span>
+<span class="fc" id="L83">                .property(&quot;candidateVerifierRevision&quot;, ExactFinitePolynomialPlanCandidateEvidenceVerifier.REVISION_HASH)</span>
+<span class="fc" id="L84">                .property(&quot;programRevision&quot;, BudgetedRewriteProgramExecution.REVISION)</span>
+<span class="fc" id="L85">                .property(&quot;viewId&quot;, ExactParsedUnivariatePolynomialView.VIEW_ID)</span>
+<span class="fc" id="L86">                .property(&quot;inputPolicy&quot;, &quot;4096_CHARS_128_OPERATORS_EXACT_UNIVARIATE_DEFAULT_VIEW_V1&quot;)</span>
+<span class="fc" id="L87">                .property(&quot;preparation&quot;, &quot;ONE_GENERATION_ONE_RECEIPT_REPLAY_ONE_CONFIRMATION_REPLAY&quot;)</span>
+<span class="fc" id="L88">                .object(&quot;planLimits&quot;, value -&gt; value.property(&quot;steps&quot;, PLAN_LIMITS.maxSteps())</span>
+<span class="fc" id="L89">                    .property(&quot;holes&quot;, PLAN_LIMITS.maxHoles()).property(&quot;obligations&quot;, PLAN_LIMITS.maxObligations())</span>
+<span class="fc" id="L90">                    .property(&quot;canonicalBytes&quot;, PLAN_LIMITS.maxCanonicalBytes()))</span>
+<span class="fc" id="L91">                .object(&quot;executionLimits&quot;, value -&gt; value.property(&quot;nodeVisits&quot;, EXECUTION_LIMITS.maxNodeVisits())</span>
+<span class="fc" id="L92">                    .property(&quot;pathExtensions&quot;, EXECUTION_LIMITS.maxPathExtensions())</span>
+<span class="fc" id="L93">                    .property(&quot;pathSteps&quot;, EXECUTION_LIMITS.maxPathSteps()))</span>
+<span class="fc" id="L94">                .property(&quot;objective&quot;, &quot;EXACT_UNIVARIATE_NONCONSTANT_ROOT_FACTORS_V1&quot;)</span>
+<span class="fc" id="L95">                .property(&quot;selection&quot;, &quot;MAX_TRAIN_HITS_MIN_INCOMPLETE_ASSIGNMENTS_PATH_WORK_LENGTH_IDS_V1&quot;)</span>
+<span class="fc" id="L96">                .property(&quot;candidateSelection&quot;, &quot;LOWEST_RETAINED_CANDIDATE_HASH;NO_RETRY_ON_IDENTITY&quot;)</span>
+<span class="fc" id="L97">                .property(&quot;retainedSolutionLimit&quot;, 2)</span>
+<span class="fc" id="L98">                .property(&quot;maxSequenceLength&quot;, maxSequenceLength)</span>
+<span class="fc" id="L99">                .property(&quot;maxAssignmentEvaluationsPerTrial&quot;, maxAssignmentEvaluationsPerTrial)</span>
+<span class="fc" id="L100">                .property(&quot;maxTheoryPathWork&quot;, maxTheoryPathWork)</span>
+<span class="fc" id="L101">                .array(&quot;templates&quot;, array -&gt; templates.forEach(template -&gt; array.objectValue(item -&gt; {</span>
+<span class="fc" id="L102">                    item.property(&quot;id&quot;, template.id()).property(&quot;expression&quot;, template.expression());</span>
+<span class="fc" id="L103">                    item.array(&quot;domains&quot;, values -&gt; template.domains().forEach(domain -&gt;</span>
+<span class="fc" id="L104">                        values.objectValue(value -&gt; value.property(&quot;id&quot;, domain.holeId())</span>
+<span class="fc" id="L105">                            .property(&quot;kind&quot;, domain.kind().name())</span>
+<span class="fc" id="L106">                            .array(&quot;values&quot;, scalars -&gt; domain.values().forEach(scalar -&gt;</span>
+<span class="fc" id="L107">                                scalars.value(scalar.canonicalText()))))));</span>
+<span class="fc" id="L108">                }))).endObject().toString();</span>
+        }
+
+<span class="fc" id="L111">        public String contentHash() { return SchematicProofPlan.hash(toCanonicalJson()); }</span>
+    }
+
+    public record TrainingInput(String id, String expression) {
+<span class="fc" id="L115">        public TrainingInput {</span>
+<span class="fc" id="L116">            id = SchematicProofPlan.requireId(id, &quot;training input id&quot;);</span>
+<span class="fc" id="L117">            expression = text(expression);</span>
+<span class="fc" id="L118">        }</span>
+    }
+
+<span class="fc" id="L121">    public enum Outcome {</span>
+<span class="fc" id="L122">        OBJECTIVE_REACHED, OBJECTIVE_MISS, COMPLETE_NO_SOLUTION, NO_CHANGE, ALREADY_SATISFIED,</span>
+<span class="fc" id="L123">        ASSIGNMENT_BUDGET_INCONCLUSIVE, PATH_BUDGET_INCONCLUSIVE</span>
+    }
+
+    /** Retains the real generated run, checked receipt, replay and selected evidence. */
+    public record Attempt(String templateId, SchematicProofPlan plan, ExactFinitePolynomialPlanRun run,
+                          ReplayReceipt receipt, ConfirmedReplay confirmation,
+                          Optional&lt;VerifiedCandidateEvidence&gt; candidate) {
+<span class="fc" id="L130">        public Attempt {</span>
+<span class="fc" id="L131">            Objects.requireNonNull(templateId, &quot;templateId&quot;);</span>
+<span class="fc" id="L132">            Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L133">            Objects.requireNonNull(run, &quot;run&quot;);</span>
+<span class="fc" id="L134">            Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc" id="L135">            Objects.requireNonNull(confirmation, &quot;confirmation&quot;);</span>
+<span class="fc" id="L136">            Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L137">        }</span>
+        public long assignmentEvaluations() {
+            // One generation, one receipt replay, one independently loaded confirmation replay.
+<span class="fc" id="L140">            return Math.multiplyExact(2L + confirmation.exactReplayExecutions(),</span>
+<span class="fc" id="L141">                run.solverResult().evaluatedAssignments());</span>
+        }
+    }
+
+    /** Raw dimensions stay separate; assignment counts are not all CPU/native work. */
+    public record Trial(String grammarHash, List&lt;String&gt; sequence, String input, String inputAlphaPolynomialHash,
+                        Outcome outcome, List&lt;Attempt&gt; attempts,
+                        Optional&lt;BudgetedRewriteProgramExecution&gt; execution,
+                        long assignmentEvaluations, long objectiveViewWork,
+                        long requiredNextAssignmentEvaluations) {
+<span class="fc" id="L151">        public Trial {</span>
+<span class="fc" id="L152">            sequence = List.copyOf(sequence);</span>
+<span class="fc" id="L153">            attempts = List.copyOf(attempts);</span>
+<span class="fc" id="L154">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="fc" id="L155">        }</span>
+        public long pathWork() {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            return execution.filter(value -&gt; !value.candidates().isEmpty())</span>
+<span class="fc" id="L158">                .map(value -&gt; value.candidates().getFirst().mathematicalWorkUnits()).orElse(0L);</span>
+        }
+        public boolean incomplete() {
+<span class="fc bfc" id="L161" title="All 4 branches covered.">            return outcome == Outcome.ASSIGNMENT_BUDGET_INCONCLUSIVE</span>
+                || outcome == Outcome.PATH_BUDGET_INCONCLUSIVE;
+        }
+        public String toCanonicalJson() {
+<span class="fc" id="L165">            return new JsonWriter().beginObject().property(&quot;revision&quot;, REVISION)</span>
+<span class="fc" id="L166">                .property(&quot;grammarHash&quot;, grammarHash)</span>
+<span class="fc" id="L167">                .array(&quot;sequence&quot;, array -&gt; sequence.forEach(array::value))</span>
+<span class="fc" id="L168">                .property(&quot;input&quot;, input).property(&quot;inputAlphaPolynomialHash&quot;, inputAlphaPolynomialHash)</span>
+<span class="fc" id="L169">                .property(&quot;outcome&quot;, outcome.name()).property(&quot;assignmentEvaluations&quot;, assignmentEvaluations)</span>
+<span class="fc" id="L170">                .property(&quot;objectiveViewWork&quot;, objectiveViewWork)</span>
+<span class="fc" id="L171">                .property(&quot;requiredNextAssignmentEvaluations&quot;, requiredNextAssignmentEvaluations)</span>
+<span class="fc" id="L172">                .property(&quot;programExecutionHash&quot;, execution.map(BudgetedRewriteProgramExecution::contentHash).orElse(&quot;&quot;))</span>
+<span class="fc" id="L173">                .array(&quot;attempts&quot;, array -&gt; attempts.forEach(attempt -&gt; array.objectValue(value -&gt;</span>
+<span class="fc" id="L174">                    value.property(&quot;templateId&quot;, attempt.templateId()).property(&quot;planHash&quot;, attempt.plan().contentHash())</span>
+<span class="fc" id="L175">                        .property(&quot;planRunHash&quot;, attempt.run().contentHash())</span>
+<span class="fc" id="L176">                        .property(&quot;runStatus&quot;, attempt.run().status().name())</span>
+<span class="fc" id="L177">                        .property(&quot;receiptHash&quot;, attempt.receipt().contentHash())</span>
+<span class="fc" id="L178">                        .property(&quot;confirmationHash&quot;, attempt.confirmation().confirmationHash())</span>
+<span class="fc" id="L179">                        .property(&quot;candidateHash&quot;, attempt.candidate().map(VerifiedCandidateEvidence::evidenceHash).orElse(&quot;&quot;))</span>
+<span class="fc" id="L180">                        .property(&quot;assignmentEvaluations&quot;, attempt.assignmentEvaluations()))))</span>
+<span class="fc" id="L181">                .endObject().toString();</span>
+        }
+<span class="fc" id="L183">        public String contentHash() { return SchematicProofPlan.hash(toCanonicalJson()); }</span>
+    }
+
+<span class="fc" id="L186">    public record TrainingRow(String inputId, Trial trial) {}</span>
+    public record Score(List&lt;String&gt; sequence, int hits, int incomplete,
+                        long assignmentEvaluations, long pathWork) {
+<span class="fc" id="L189">        public Score { sequence = List.copyOf(sequence); }</span>
+    }
+
+    /** Only a completed train() call can issue a selection. No held-out setter exists. */
+    public static final class FrozenSelection {
+        private final Grammar grammar;
+        private final List&lt;TrainingRow&gt; rows;
+        private final List&lt;Score&gt; scores;
+        private final List&lt;String&gt; trainingIdentities;
+        private final long inputViewWork;
+        private final String contentHash;
+
+        private FrozenSelection(Grammar grammar, List&lt;TrainingRow&gt; rows,
+<span class="fc" id="L202">                                List&lt;Score&gt; scores, List&lt;String&gt; identities, long inputViewWork) {</span>
+<span class="fc" id="L203">            this.grammar = grammar;</span>
+<span class="fc" id="L204">            this.rows = List.copyOf(rows);</span>
+<span class="fc" id="L205">            this.scores = List.copyOf(scores);</span>
+<span class="fc" id="L206">            this.trainingIdentities = List.copyOf(identities);</span>
+<span class="fc" id="L207">            this.inputViewWork = inputViewWork;</span>
+<span class="fc" id="L208">            this.contentHash = SchematicProofPlan.hash(toCanonicalJson());</span>
+<span class="fc" id="L209">        }</span>
+<span class="fc" id="L210">        public Grammar grammar() { return grammar; }</span>
+<span class="fc" id="L211">        public List&lt;TrainingRow&gt; rows() { return rows; }</span>
+<span class="fc" id="L212">        public List&lt;Score&gt; scores() { return scores; }</span>
+        public Optional&lt;List&lt;String&gt;&gt; selectedSequence() {
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            return scores.getFirst().hits() == 0 ? Optional.empty() : Optional.of(scores.getFirst().sequence());</span>
+        }
+<span class="fc" id="L216">        public String contentHash() { return contentHash; }</span>
+        public long totalTrainingAssignmentEvaluations() {
+<span class="fc" id="L218">            return rows.stream().mapToLong(row -&gt; row.trial().assignmentEvaluations())</span>
+<span class="fc" id="L219">                .reduce(0L, Math::addExact);</span>
+        }
+        public String toCanonicalJson() {
+<span class="fc" id="L222">            return new JsonWriter().beginObject().property(&quot;revision&quot;, REVISION)</span>
+<span class="fc" id="L223">                .property(&quot;state&quot;, &quot;TRAIN_COMPLETE_SELECTION_FROZEN&quot;)</span>
+<span class="fc" id="L224">                .property(&quot;grammarHash&quot;, grammar.contentHash()).property(&quot;inputViewWork&quot;, inputViewWork)</span>
+<span class="fc" id="L225">                .property(&quot;totalTrainingAssignmentEvaluations&quot;, totalTrainingAssignmentEvaluations())</span>
+<span class="fc" id="L226">                .array(&quot;selectedSequence&quot;, array -&gt; selectedSequence().orElse(List.of()).forEach(array::value))</span>
+<span class="fc" id="L227">                .array(&quot;trainingIdentities&quot;, array -&gt; trainingIdentities.forEach(array::value))</span>
+<span class="fc" id="L228">                .array(&quot;rows&quot;, array -&gt; rows.forEach(row -&gt; array.objectValue(value -&gt;</span>
+<span class="fc" id="L229">                    value.property(&quot;inputId&quot;, row.inputId()).property(&quot;trialHash&quot;, row.trial().contentHash()))))</span>
+<span class="fc" id="L230">                .array(&quot;scores&quot;, array -&gt; scores.forEach(score -&gt; array.objectValue(value -&gt;</span>
+<span class="fc" id="L231">                    value.array(&quot;sequence&quot;, ids -&gt; score.sequence().forEach(ids::value))</span>
+<span class="fc" id="L232">                        .property(&quot;hits&quot;, score.hits()).property(&quot;incomplete&quot;, score.incomplete())</span>
+<span class="fc" id="L233">                        .property(&quot;assignmentEvaluations&quot;, score.assignmentEvaluations())</span>
+<span class="fc" id="L234">                        .property(&quot;pathWork&quot;, score.pathWork())))).endObject().toString();</span>
+        }
+    }
+
+<span class="fc" id="L238">    public record Application(String selectionHash, Trial trial, long inputViewWork) {</span>
+        public String contentHash() {
+<span class="fc" id="L240">            return SchematicProofPlan.hash(new JsonWriter().beginObject().property(&quot;revision&quot;, REVISION)</span>
+<span class="fc" id="L241">                .property(&quot;selectionHash&quot;, selectionHash).property(&quot;trialHash&quot;, trial.contentHash())</span>
+<span class="fc" id="L242">                .property(&quot;inputViewWork&quot;, inputViewWork).endObject().toString());</span>
+        }
+    }
+
+    public FrozenSelection train(Grammar grammar, List&lt;TrainingInput&gt; inputs) {
+<span class="fc" id="L247">        Objects.requireNonNull(grammar, &quot;grammar&quot;);</span>
+<span class="fc" id="L248">        List&lt;TrainingInput&gt; training = List.copyOf(inputs).stream()</span>
+<span class="fc" id="L249">            .sorted(Comparator.comparing(TrainingInput::id)).toList();</span>
+<span class="pc bpc" id="L250" title="1 of 4 branches missed.">        if (training.isEmpty() || training.size() &gt; 16</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">                || training.stream().map(TrainingInput::id).distinct().count() != training.size()) {</span>
+<span class="fc" id="L252">            throw new IllegalArgumentException(&quot;require one to sixteen unique TRAIN input IDs&quot;);</span>
+        }
+<span class="fc" id="L254">        List&lt;List&lt;Template&gt;&gt; sequences = enumerate(grammar);</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        if (Math.multiplyExact(sequences.size(), training.size()) &gt; 512) {</span>
+<span class="fc" id="L256">            throw new IllegalArgumentException(&quot;TRAIN matrix exceeds 512 complete trials&quot;);</span>
+        }
+        // Validate every input and its exact/alpha duplicate boundary before any solving.
+<span class="fc" id="L259">        List&lt;InputAnalysis&gt; analyzed = training.stream().map(value -&gt; analyze(value.expression())).toList();</span>
+<span class="fc" id="L260">        List&lt;String&gt; identities = analyzed.stream().map(InputAnalysis::alphaHash).toList();</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (new HashSet&lt;&gt;(identities).size() != identities.size()) {</span>
+<span class="fc" id="L262">            throw new IllegalArgumentException(&quot;duplicate alpha-equivalent TRAIN polynomials&quot;);</span>
+        }
+<span class="fc" id="L264">        List&lt;TrainingRow&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L265">        List&lt;Score&gt; scores = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        for (List&lt;Template&gt; sequence : sequences) {</span>
+<span class="fc" id="L267">            int hits = 0;</span>
+<span class="fc" id="L268">            int incomplete = 0;</span>
+<span class="fc" id="L269">            long assignments = 0;</span>
+<span class="fc" id="L270">            long work = 0;</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            for (int index = 0; index &lt; training.size(); index++) {</span>
+<span class="fc" id="L272">                Trial trial = evaluate(grammar, sequence, analyzed.get(index));</span>
+<span class="fc" id="L273">                rows.add(new TrainingRow(training.get(index).id(), trial));</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">                if (trial.outcome() == Outcome.OBJECTIVE_REACHED) { hits++; }</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">                if (trial.incomplete()) { incomplete++; }</span>
+<span class="fc" id="L276">                assignments = Math.addExact(assignments, trial.assignmentEvaluations());</span>
+<span class="fc" id="L277">                work = Math.addExact(work, trial.pathWork());</span>
+            }
+<span class="fc" id="L279">            scores.add(new Score(ids(sequence), hits, incomplete, assignments, work));</span>
+<span class="fc" id="L280">        }</span>
+<span class="fc" id="L281">        scores.sort(Comparator.comparingInt(Score::hits).reversed()</span>
+<span class="fc" id="L282">            .thenComparingInt(Score::incomplete).thenComparingLong(Score::assignmentEvaluations)</span>
+<span class="fc" id="L283">            .thenComparingLong(Score::pathWork).thenComparingInt(value -&gt; value.sequence().size())</span>
+<span class="fc" id="L284">            .thenComparing(value -&gt; String.join(&quot;/&quot;, value.sequence())));</span>
+<span class="fc" id="L285">        return new FrozenSelection(grammar, rows, scores, identities,</span>
+<span class="fc" id="L286">            analyzed.stream().mapToLong(InputAnalysis::viewWork).reduce(0L, Math::addExact));</span>
+    }
+
+    /** Fresh coefficient solving with a frozen sequence; never retrains on this input. */
+    public Application apply(FrozenSelection selection, String expression) {
+<span class="fc" id="L291">        Objects.requireNonNull(selection, &quot;selection&quot;);</span>
+<span class="fc" id="L292">        List&lt;String&gt; selected = selection.selectedSequence().orElseThrow(() -&gt;</span>
+<span class="fc" id="L293">            new IllegalStateException(&quot;no successful TRAIN strategy was selected&quot;));</span>
+<span class="fc" id="L294">        InputAnalysis input = analyze(expression);</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        if (selection.trainingIdentities.contains(input.alphaHash())) {</span>
+<span class="fc" id="L296">            throw new IllegalArgumentException(&quot;application repeats a TRAIN polynomial, including alpha renaming&quot;);</span>
+        }
+<span class="fc" id="L298">        List&lt;Template&gt; sequence = selected.stream().map(id -&gt; selection.grammar.templates().stream()</span>
+<span class="fc" id="L299">            .filter(template -&gt; template.id().equals(id)).findFirst().orElseThrow()).toList();</span>
+<span class="fc" id="L300">        return new Application(selection.contentHash(), evaluate(selection.grammar, sequence, input), input.viewWork());</span>
+    }
+
+    private Trial evaluate(Grammar grammar, List&lt;Template&gt; sequence, InputAnalysis input) {
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (input.alreadyFactored()) {</span>
+<span class="fc" id="L305">            return new Trial(grammar.contentHash(), ids(sequence), input.syntax(), input.alphaHash(),</span>
+<span class="fc" id="L306">                Outcome.ALREADY_SATISFIED, List.of(), Optional.empty(), 0, 0, 0);</span>
+        }
+<span class="fc" id="L308">        List&lt;Attempt&gt; attempts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L309">        List&lt;RewriteProgram&gt; nodes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L310">        String current = input.syntax();</span>
+<span class="fc" id="L311">        long assignments = 0;</span>
+<span class="fc" id="L312">        long pathWork = 0;</span>
+<span class="fc" id="L313">        long requiredNext = 0;</span>
+<span class="fc" id="L314">        Outcome outcome = Outcome.OBJECTIVE_MISS;</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        for (Template template : sequence) {</span>
+<span class="fc" id="L316">            requiredNext = Math.multiplyExact(3L, template.assignmentCount());</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            if (requiredNext &gt; grammar.maxAssignmentEvaluationsPerTrial() - assignments) {</span>
+<span class="fc" id="L318">                outcome = Outcome.ASSIGNMENT_BUDGET_INCONCLUSIVE;</span>
+<span class="fc" id="L319">                break;</span>
+            }
+<span class="fc" id="L321">            Attempt attempt = prepare(template, current, input.variable());</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">            if (attempt.assignmentEvaluations() != requiredNext) {</span>
+<span class="nc" id="L323">                throw new IllegalStateException(&quot;preparation replay count differs from admitted work contract&quot;);</span>
+            }
+<span class="fc" id="L325">            attempts.add(attempt);</span>
+<span class="fc" id="L326">            assignments = Math.addExact(assignments, attempt.assignmentEvaluations());</span>
+<span class="fc" id="L327">            requiredNext = 0;</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">            if (attempt.candidate().isEmpty()) {</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">                outcome = attempt.run().candidates().isEmpty() ? Outcome.COMPLETE_NO_SOLUTION : Outcome.NO_CHANGE;</span>
+<span class="fc" id="L330">                break;</span>
+            }
+<span class="fc" id="L332">            VerifiedCandidateEvidence candidate = attempt.candidate().orElseThrow();</span>
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">            if (candidate.data().sourceExpression().equals(candidate.data().transformedExpression())) {</span>
+<span class="nc" id="L334">                outcome = Outcome.NO_CHANGE;</span>
+<span class="nc" id="L335">                break;</span>
+            }
+<span class="fc" id="L337">            nodes.add(RewritePrograms.budgetedSource(&quot;step-&quot; + nodes.size(),</span>
+                new VerifiedFinitePolynomialCandidateSource(candidate)));
+<span class="fc" id="L339">            long required = candidate.data().canonicalWork().totalWorkUnits();</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">            if (required &gt; grammar.maxTheoryPathWork() - pathWork) {</span>
+<span class="fc" id="L341">                outcome = Outcome.PATH_BUDGET_INCONCLUSIVE;</span>
+<span class="fc" id="L342">                break;</span>
+            }
+<span class="fc" id="L344">            pathWork = Math.addExact(pathWork, required);</span>
+<span class="fc" id="L345">            current = candidate.data().transformedExpression();</span>
+<span class="fc" id="L346">        }</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        Optional&lt;BudgetedRewriteProgramExecution&gt; execution = nodes.isEmpty() ? Optional.empty()</span>
+<span class="fc" id="L348">            : Optional.of(new RewriteProgramInterpreter().executeBudgeted(</span>
+<span class="fc" id="L349">                new RewriteProgram.Sequence(RewriteProgram.NodeMetadata.named(&quot;strategy&quot;), nodes),</span>
+<span class="fc" id="L350">                input.syntax(), new PathBudget(0, grammar.maxTheoryPathWork()), EXECUTION_LIMITS));</span>
+<span class="pc bpc" id="L351" title="1 of 6 branches missed.">        if (execution.isPresent() &amp;&amp; !execution.orElseThrow().complete()</span>
+                &amp;&amp; outcome != Outcome.PATH_BUDGET_INCONCLUSIVE) {
+<span class="nc" id="L353">            throw new IllegalStateException(&quot;unexpected incomplete execution of admitted finite strategy&quot;);</span>
+        }
+<span class="fc" id="L355">        long objectiveWork = 0;</span>
+<span class="pc bpc" id="L356" title="1 of 4 branches missed.">        if (outcome == Outcome.OBJECTIVE_MISS &amp;&amp; nodes.size() == sequence.size()) {</span>
+<span class="fc" id="L357">            BudgetedRewriteProgramExecution executed = execution.orElseThrow();</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            if (executed.candidates().size() != 1</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">                    || !executed.candidates().getFirst().transformedExpression().equals(current)) {</span>
+<span class="nc" id="L360">                throw new IllegalStateException(&quot;verified sequence did not replay its selected endpoint&quot;);</span>
+            }
+<span class="fc" id="L362">            Objective objective = factored(current);</span>
+<span class="fc" id="L363">            objectiveWork = objective.viewWork();</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">            if (objective.reached()) { outcome = Outcome.OBJECTIVE_REACHED; }</span>
+        }
+<span class="fc" id="L366">        return new Trial(grammar.contentHash(), ids(sequence), input.syntax(), input.alphaHash(), outcome,</span>
+            attempts, execution, assignments, objectiveWork, requiredNext);
+    }
+
+    private Attempt prepare(Template template, String source, String variable) {
+<span class="fc" id="L371">        String ansatz = template.instantiateVariable(variable);</span>
+<span class="fc" id="L372">        var resolver = new ExactFinitePolynomialPlanResolver();</span>
+<span class="fc" id="L373">        var plan = resolver.createPlan(&quot;strategy-&quot; + template.id(), source, ansatz,</span>
+<span class="fc" id="L374">            template.domains(), 2, PLAN_LIMITS);</span>
+<span class="fc" id="L375">        var run = resolver.resolve(plan, source, ansatz, template.domains(), 2);</span>
+<span class="fc" id="L376">        ReplayReceipt receipt = new ExactFinitePolynomialPlanReplayVerifier()</span>
+<span class="fc" id="L377">            .verify(plan, source, ansatz, template.domains(), 2, run);</span>
+<span class="fc" id="L378">        var byteVerifier = new ExactFinitePolynomialPlanReplayArtifactVerifier();</span>
+<span class="fc" id="L379">        var receiptReference = byteVerifier.describeReceipt(receipt);</span>
+<span class="fc" id="L380">        byte[] receiptBytes = receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L381">        var checkedReceipt = byteVerifier.verifyReceipt(receiptReference,</span>
+<span class="fc" id="L382">            ignored -&gt; new LoadedArtifact(receiptReference.artifactId(), receiptBytes));</span>
+<span class="fc" id="L383">        var receiptArtifact = new ExactFinitePolynomialPlanReplayReceiptArtifactVerifier().verify(checkedReceipt);</span>
+<span class="fc" id="L384">        var runReference = byteVerifier.describePlanRun(run);</span>
+<span class="fc" id="L385">        byte[] runBytes = run.toCanonicalJson().getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L386">        var checkedRun = byteVerifier.verifyPlanRun(runReference,</span>
+<span class="fc" id="L387">            ignored -&gt; new LoadedArtifact(runReference.artifactId(), runBytes));</span>
+<span class="fc" id="L388">        ConfirmedReplay confirmation = new ExactFinitePolynomialPlanReplayConfirmationVerifier().verify(</span>
+<span class="fc" id="L389">            receiptArtifact, checkedRun, run, plan, source, ansatz, template.domains(), 2);</span>
+<span class="fc" id="L390">        Optional&lt;VerifiedCandidateEvidence&gt; selected = run.candidates().stream()</span>
+<span class="fc" id="L391">            .min(Comparator.comparing(ExactFinitePolynomialResolvedCandidate::contentHash))</span>
+<span class="fc" id="L392">            .filter(candidate -&gt; !run.solverResult().sourceExpression()</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">                .equals(candidate.solution().instantiatedExpression()))</span>
+<span class="fc" id="L394">            .map(candidate -&gt; new ExactFinitePolynomialPlanCandidateEvidenceVerifier().verify(</span>
+<span class="fc" id="L395">                confirmation, plan, run, candidate.contentHash()));</span>
+<span class="fc" id="L396">        return new Attempt(template.id(), plan, run, receipt, confirmation, selected);</span>
+    }
+
+<span class="fc" id="L399">    private record InputAnalysis(String syntax, String variable, String alphaHash, long viewWork, boolean alreadyFactored) {}</span>
+<span class="fc" id="L400">    private record Objective(boolean reached, long viewWork) {}</span>
+
+    private static InputAnalysis analyze(String expression) {
+<span class="fc" id="L403">        ExactParsedTerm parsed = new ExpressionParser().parseExactTerm(text(expression));</span>
+<span class="fc" id="L404">        var analysis = new ExactParsedUnivariatePolynomialView().analyze(parsed);</span>
+<span class="fc" id="L405">        SparsePolynomial&lt;ExactRational&gt; polynomial = analysis.polynomial().orElseThrow(() -&gt;</span>
+<span class="fc" id="L406">            new IllegalArgumentException(&quot;unsupported/inconclusive polynomial input: &quot; + analysis.detailCode()));</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        if (polynomial.isConstant()) { throw new IllegalArgumentException(&quot;input must be nonconstant univariate&quot;); }</span>
+        // Coefficients/exponents, not binary64 values or variable names, define split identity.
+<span class="fc" id="L409">        JsonWriter alpha = new JsonWriter().beginObject().property(&quot;kind&quot;, &quot;exact-univariate-alpha/v1&quot;)</span>
+<span class="fc" id="L410">            .array(&quot;terms&quot;, array -&gt; polynomial.terms().forEach((monomial, coefficient) -&gt;</span>
+<span class="fc" id="L411">                array.objectValue(value -&gt; value.property(&quot;exponent&quot;, monomial.exponent(0))</span>
+<span class="fc" id="L412">                    .property(&quot;coefficient&quot;, coefficient.canonicalText()))));</span>
+<span class="fc" id="L413">        Objective initialObjective = factored(expression);</span>
+<span class="fc" id="L414">        return new InputAnalysis(ExactExpressionFormatter.format(parsed.expression(), parsed),</span>
+<span class="fc" id="L415">            polynomial.ring().variables().getFirst().id(),</span>
+<span class="fc" id="L416">            SchematicProofPlan.hash(alpha.endObject().toString()),</span>
+<span class="fc" id="L417">            Math.addExact(analysis.work().totalWorkUnits(), initialObjective.viewWork()), initialObjective.reached());</span>
+    }
+
+    private static Objective factored(String expression) {
+<span class="fc" id="L421">        ExactParsedTerm parsed = new ExpressionParser().parseExactTerm(text(expression));</span>
+<span class="pc bpc" id="L422" title="1 of 4 branches missed.">        if (!(parsed.expression() instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.MUL) {</span>
+<span class="fc" id="L423">            return new Objective(false, 0);</span>
+        }
+<span class="fc" id="L425">        var view = new ExactParsedUnivariatePolynomialView();</span>
+<span class="fc" id="L426">        var parser = new ExpressionParser();</span>
+<span class="fc" id="L427">        var left = view.analyze(parser.parseExactTerm(ExactExpressionFormatter.format(binary.left(), parsed)));</span>
+<span class="fc" id="L428">        var right = view.analyze(parser.parseExactTerm(ExactExpressionFormatter.format(binary.right(), parsed)));</span>
+<span class="pc bpc" id="L429" title="2 of 4 branches missed.">        if (left.polynomial().isEmpty() || right.polynomial().isEmpty()) {</span>
+<span class="nc" id="L430">            throw new IllegalStateException(&quot;objective cannot classify a verified factor within its exact bounds&quot;);</span>
+        }
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        return new Objective(!left.polynomial().orElseThrow().isConstant()</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">            &amp;&amp; !right.polynomial().orElseThrow().isConstant(),</span>
+<span class="fc" id="L434">            Math.addExact(left.work().totalWorkUnits(), right.work().totalWorkUnits()));</span>
+    }
+
+    private static List&lt;List&lt;Template&gt;&gt; enumerate(Grammar grammar) {
+<span class="fc" id="L438">        List&lt;List&lt;Template&gt;&gt; all = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L439">        List&lt;List&lt;Template&gt;&gt; frontier = List.of(List.of());</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        for (int depth = 0; depth &lt; grammar.maxSequenceLength(); depth++) {</span>
+<span class="fc" id="L441">            List&lt;List&lt;Template&gt;&gt; next = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L442" title="All 2 branches covered.">            for (List&lt;Template&gt; prefix : frontier) {</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">                for (Template template : grammar.templates()) {</span>
+<span class="fc" id="L444">                    List&lt;Template&gt; word = new ArrayList&lt;&gt;(prefix);</span>
+<span class="fc" id="L445">                    word.add(template);</span>
+<span class="fc" id="L446">                    next.add(List.copyOf(word));</span>
+<span class="fc" id="L447">                }</span>
+<span class="fc" id="L448">            }</span>
+<span class="fc" id="L449">            all.addAll(next);</span>
+<span class="fc" id="L450">            frontier = next;</span>
+        }
+<span class="fc" id="L452">        return List.copyOf(all);</span>
+    }
+
+    private static List&lt;String&gt; ids(List&lt;Template&gt; templates) {
+<span class="fc" id="L456">        return templates.stream().map(Template::id).toList();</span>
+    }
+    private static long assignments(List&lt;HoleDomain&gt; domains) {
+<span class="fc" id="L459">        long count = 1;</span>
+<span class="fc bfc" id="L460" title="All 2 branches covered.">        for (HoleDomain domain : domains) { count = Math.multiplyExact(count, domain.values().size()); }</span>
+<span class="fc" id="L461">        return count;</span>
+    }
+    private static String text(String value) {
+<span class="pc bpc" id="L464" title="3 of 6 branches missed.">        if (value == null || value.isBlank() || value.length() &gt; 4096</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">                || !StandardCharsets.UTF_8.newEncoder().canEncode(value)</span>
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">                || value.chars().anyMatch(Character::isISOControl)</span>
+<span class="fc bfc" id="L467" title="All 4 branches covered.">                || value.chars().filter(c -&gt; &quot;+-*/^(),&quot;.indexOf(c) &gt;= 0).count() &gt; 128) {</span>
+<span class="fc" id="L468">            throw new IllegalArgumentException(&quot;invalid or over-limit strategy text&quot;);</span>
+        }
+<span class="fc" id="L470">        return value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

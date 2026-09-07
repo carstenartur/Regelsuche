@@ -127,8 +127,15 @@ historische Studie bleibt in #750.
 
 ## Integration mit realen endlichen Polynomplänen
 
-`VerifiedFinitePolynomialProgramCompositionTest` im Learning-Modul verbindet
-nun alle bestehenden Grenzen, ohne mathematische Sources zu simulieren:
+`VerifiedFinitePolynomialCandidateSourceTest` im Learning-Modul verbindet
+Einzelquellen und komponierte Programme in einer gemeinsamen Suite mit
+13 Testmethoden. Alle drei bisherigen Einzelquellentests und alle zehn
+Kompositionstests bleiben erhalten. Sie nutzen dieselbe parametrische
+Evidenzvorbereitung statt zwei Kopien der Resolver-/Replay-/Byte-Prüfkette.
+Jeder Aufruf führt die vollständige Prüfung erneut aus; Ergebnisse werden
+nicht vorab berechnet oder zwischengespeichert. Die bisherigen Zeitlimits
+bleiben erhalten (10 Sekunden für Einzelquellen, 20 für Komposition).
+Mathematische Sources werden nicht simuliert:
 
 ```text
 festgelegter Ansatz und endliche Koeffizientendomänen
@@ -201,8 +208,7 @@ eine vollständige Ergebnismenge umdeuten.
 
 ```bash
 ./gradlew :regelsuche-learning:test \
-  --tests '*VerifiedFinitePolynomialCandidateSourceTest' \
-  --tests '*VerifiedFinitePolynomialProgramCompositionTest'
+  --tests '*VerifiedFinitePolynomialCandidateSourceTest'
 ```
 
 Die Zweischrittkette und ihre Ansatzgrammatik sind handgeschriebene

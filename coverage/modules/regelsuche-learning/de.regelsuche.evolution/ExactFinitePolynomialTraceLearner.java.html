@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactFinitePolynomialTraceLearner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExactFinitePolynomialTraceLearner.java</span></div><h1>ExactFinitePolynomialTraceLearner.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.evolution.ExactFinitePolynomialPlanCandidateEvidenceVerifier.VerifiedCandidateEvidence;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
+import de.regelsuche.parse.ExactExpressionFormatter;
+import de.regelsuche.parse.ExactParsedTerm;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.ExactTheoryPath;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Learns a frozen sequence of finite coefficient ansatz templates from selected,
+ * verifier-backed training paths. It does not learn a search controller, prove
+ * the generalized templates, or authorize their execution as transformations.
+ * Every later instantiation must pass the existing solver and evidence pipeline.
+ */
+<span class="fc" id="L35">public final class ExactFinitePolynomialTraceLearner {</span>
+    public static final String REVISION = &quot;regelsuche.exact-finite-polynomial-trace-learner/v1&quot;;
+    private static final String VARIABLE = &quot;${variable}&quot;;
+    private static final int MAX_EXPRESSION_CHARS = 16_384;
+    private static final int MAX_STRUCTURAL_TOKENS = 128;
+    private static final int MAX_AST_NODES = 256;
+<span class="fc" id="L41">    private static final ExactParsedUnivariatePolynomialView.Budget IDENTITY_BUDGET =</span>
+        new ExactParsedUnivariatePolynomialView.Budget(64, 4096, MAX_AST_NODES, 50_000);
+
+    /** Policy is fixed before training; it is never enlarged after a reuse miss. */
+    public record Limits(int minimumTraces, int maximumTraces, int maximumSteps,
+                         int maximumHoles, int minimumCoefficient, int maximumCoefficient,
+                         long maximumAssignmentsPerStep) {
+<span class="fc" id="L48">        public Limits {</span>
+<span class="fc" id="L49">            long width = (long) maximumCoefficient - minimumCoefficient + 1;</span>
+<span class="pc bpc" id="L50" title="9 of 22 branches missed.">            if (minimumTraces &lt; 2 || maximumTraces &lt; minimumTraces || maximumTraces &gt; 32</span>
+                    || maximumSteps &lt; 1 || maximumSteps &gt; 8 || maximumHoles &lt; 1 || maximumHoles &gt; 12
+                    || width &lt; 1 || width &gt; 128 || maximumAssignmentsPerStep &lt; 1
+                    || maximumAssignmentsPerStep &gt; 100_000) {
+<span class="fc" id="L54">                throw new IllegalArgumentException(&quot;invalid finite trace-learning limits&quot;);</span>
+            }
+<span class="fc" id="L56">        }</span>
+    }
+
+    /** The learner checks the selected path against every verifier-owned step. */
+    public record TrainingTrace(BudgetedRewriteProgramExecution execution, String selectedPathHash,
+                                List&lt;VerifiedCandidateEvidence&gt; evidence) {
+<span class="fc" id="L62">        public TrainingTrace {</span>
+<span class="fc" id="L63">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="fc" id="L64">            Objects.requireNonNull(selectedPathHash, &quot;selectedPathHash&quot;);</span>
+<span class="fc" id="L65">            Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc bfc" id="L66" title="All 4 branches covered.">            if (evidence.isEmpty() || evidence.size() &gt; 8) {</span>
+<span class="fc" id="L67">                throw new IllegalArgumentException(&quot;training trace step limit&quot;);</span>
+            }
+<span class="fc" id="L69">            evidence = List.copyOf(evidence);</span>
+<span class="fc" id="L70">        }</span>
+    }
+
+    /** Non-authorizing inputs for the existing ExactFinitePolynomialPlanResolver. */
+    public record Instantiation(String sourceExpression, String ansatzTemplate,
+                                List&lt;HoleDomain&gt; holeDomains) {
+<span class="fc" id="L76">        public Instantiation { holeDomains = List.copyOf(holeDomains); }</span>
+    }
+
+    public record Stage(String sourceShape, String ansatzTemplate, List&lt;HoleDomain&gt; holeDomains) {
+<span class="fc" id="L80">        public Stage { holeDomains = List.copyOf(holeDomains); }</span>
+    }
+
+    /** Only learn() can issue a learned plan. No target or TEST outcome is an input. */
+    public static final class LearnedPlan {
+        private final Limits limits;
+        private final List&lt;Stage&gt; stages;
+        private final List&lt;String&gt; trainingRoots;
+        private final List&lt;String&gt; trainingInputIdentities;
+        private final long trainingIdentityWorkUnits;
+        private final String canonicalJson;
+        private final String contentHash;
+
+        private LearnedPlan(Limits limits, List&lt;Stage&gt; stages, List&lt;String&gt; trainingRoots,
+<span class="fc" id="L94">                            List&lt;String&gt; trainingInputIdentities, long trainingIdentityWorkUnits) {</span>
+<span class="fc" id="L95">            this.limits = limits;</span>
+<span class="fc" id="L96">            this.stages = List.copyOf(stages);</span>
+<span class="fc" id="L97">            this.trainingRoots = List.copyOf(trainingRoots);</span>
+<span class="fc" id="L98">            this.trainingInputIdentities = List.copyOf(trainingInputIdentities);</span>
+<span class="fc" id="L99">            this.trainingIdentityWorkUnits = trainingIdentityWorkUnits;</span>
+<span class="fc" id="L100">            this.canonicalJson = render(limits, stages, trainingRoots,</span>
+                this.trainingInputIdentities, trainingIdentityWorkUnits);
+<span class="fc" id="L102">            this.contentHash = SchematicProofPlan.hash(canonicalJson);</span>
+<span class="fc" id="L103">        }</span>
+
+<span class="fc" id="L105">        public List&lt;Stage&gt; stages() { return stages; }</span>
+<span class="fc" id="L106">        public List&lt;String&gt; trainingRoots() { return trainingRoots; }</span>
+<span class="fc" id="L107">        public List&lt;String&gt; trainingInputIdentities() { return trainingInputIdentities; }</span>
+        /** Diagnostic exact-view work only, not total training or learning cost. */
+<span class="fc" id="L109">        public long trainingIdentityWorkUnits() { return trainingIdentityWorkUnits; }</span>
+<span class="nc" id="L110">        public Limits limits() { return limits; }</span>
+<span class="fc" id="L111">        public String toCanonicalJson() { return canonicalJson; }</span>
+<span class="fc" id="L112">        public String contentHash() { return contentHash; }</span>
+
+        /**
+         * Exact syntactic applicability only. Empty means a shape mismatch, not
+         * mathematical impossibility. Unsupported syntax/limits throw explicitly.
+         * @param stageIndex zero-based index into {@link #stages()}
+         * @throws IllegalArgumentException if the stage index is outside the learned plan
+         */
+        public Optional&lt;Instantiation&gt; instantiate(int stageIndex, String expression) {
+<span class="fc bfc" id="L121" title="All 4 branches covered.">            if (stageIndex &lt; 0 || stageIndex &gt;= stages.size()) {</span>
+<span class="fc" id="L122">                throw new IllegalArgumentException(&quot;stageIndex must be in 0..&quot; + (stages.size() - 1) + &quot;: &quot; + stageIndex);</span>
+            }
+<span class="fc" id="L124">            Stage stage = stages.get(stageIndex);</span>
+<span class="fc" id="L125">            Parsed parsed = parse(expression);</span>
+<span class="fc bfc" id="L126" title="All 4 branches covered.">            if (stageIndex == 0 &amp;&amp; trainingInputIdentities.contains(inputSignature(parsed).identity())) {</span>
+<span class="fc" id="L127">                throw new IllegalArgumentException(&quot;training-equivalent input is not held-out reuse&quot;);</span>
+            }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            if (!stage.sourceShape().equals(shape(parsed, parsed.term().expression(), false))) {</span>
+<span class="fc" id="L130">                return Optional.empty();</span>
+            }
+<span class="fc" id="L132">            String template = stage.ansatzTemplate().replace(VARIABLE, parsed.variable());</span>
+<span class="fc" id="L133">            return Optional.of(new Instantiation(</span>
+<span class="fc" id="L134">                ExactExpressionFormatter.format(parsed.term().expression(), parsed.term()),</span>
+<span class="fc" id="L135">                template, stage.holeDomains()));</span>
+        }
+    }
+
+    public LearnedPlan learn(List&lt;TrainingTrace&gt; training, Limits limits) {
+<span class="fc" id="L140">        Objects.requireNonNull(training, &quot;training&quot;);</span>
+<span class="fc" id="L141">        Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">        if (training.size() &lt; limits.minimumTraces() || training.size() &gt; limits.maximumTraces()) {</span>
+<span class="fc" id="L143">            throw new IllegalArgumentException(&quot;insufficient or oversized training support&quot;);</span>
+        }
+<span class="fc" id="L145">        List&lt;CheckedTrace&gt; traces = training.stream().map(trace -&gt; check(trace, limits))</span>
+<span class="fc" id="L146">            .sorted(Comparator.comparing(CheckedTrace::root)).toList();</span>
+<span class="fc" id="L147">        Set&lt;String&gt; sourceIdentities = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L148">        long identityWork = 0;</span>
+<span class="fc" id="L149">        int stepCount = traces.getFirst().path().steps().size();</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (CheckedTrace trace : traces) {</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (trace.path().steps().size() != stepCount) {</span>
+<span class="fc" id="L152">                throw new IllegalArgumentException(&quot;training paths have different step counts&quot;);</span>
+            }
+<span class="fc" id="L154">            Parsed source = parse(trace.path().sourceExpression());</span>
+<span class="fc" id="L155">            InputSignature signature = inputSignature(source);</span>
+<span class="fc" id="L156">            identityWork = Math.addExact(identityWork, signature.workUnits());</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (!sourceIdentities.add(signature.identity())) {</span>
+<span class="fc" id="L158">                throw new IllegalArgumentException(&quot;duplicate, alpha-renamed or equivalent training input&quot;);</span>
+            }
+<span class="fc" id="L160">        }</span>
+<span class="fc" id="L161">        List&lt;Stage&gt; stages = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        for (int index = 0; index &lt; stepCount; index++) {</span>
+<span class="fc" id="L163">            final int step = index;</span>
+<span class="fc" id="L164">            List&lt;Parsed&gt; inputs = traces.stream().map(trace -&gt; parse(</span>
+<span class="fc" id="L165">                trace.path().steps().get(step).transition().sourceExpression())).toList();</span>
+<span class="fc" id="L166">            List&lt;Parsed&gt; outputs = traces.stream().map(trace -&gt; parse(</span>
+<span class="fc" id="L167">                trace.path().steps().get(step).transition().transformedExpression())).toList();</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            for (int row = 0; row &lt; inputs.size(); row++) {</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                if (!inputs.get(row).variable().equals(outputs.get(row).variable())) {</span>
+<span class="nc" id="L170">                    throw new IllegalArgumentException(&quot;step changes its variable identity&quot;);</span>
+                }
+            }
+<span class="fc" id="L173">            String inputShape = shape(inputs.getFirst(), inputs.getFirst().term().expression(), false);</span>
+<span class="fc bfc" id="L174" title="All 4 branches covered.">            if (inputs.stream().anyMatch(input -&gt; !inputShape.equals(</span>
+<span class="fc" id="L175">                    shape(input, input.term().expression(), false)))) {</span>
+<span class="fc" id="L176">                throw new IllegalArgumentException(&quot;training sources have different syntax shapes&quot;);</span>
+            }
+<span class="fc" id="L178">            Generalization context = new Generalization(limits);</span>
+<span class="fc" id="L179">            String template = generalize(outputs, outputs.stream().map(p -&gt; p.term().expression()).toList(),</span>
+                false, context);
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (context.domains.isEmpty()) {</span>
+<span class="nc" id="L182">                throw new IllegalArgumentException(&quot;no varying coefficient: stage would memorize a fixed form&quot;);</span>
+            }
+<span class="fc" id="L184">            stages.add(new Stage(inputShape, template, context.domains));</span>
+        }
+<span class="fc" id="L186">        return new LearnedPlan(limits, stages, traces.stream().map(CheckedTrace::root).toList(),</span>
+<span class="fc" id="L187">            sourceIdentities.stream().sorted().toList(), identityWork);</span>
+    }
+
+    private static CheckedTrace check(TrainingTrace trace, Limits limits) {
+<span class="fc" id="L191">        Objects.requireNonNull(trace, &quot;trace&quot;);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (!trace.execution().complete()) {</span>
+<span class="fc" id="L193">            throw new IllegalArgumentException(&quot;incomplete training execution&quot;);</span>
+        }
+<span class="fc" id="L195">        ExactTheoryPath path = trace.execution().candidates().stream()</span>
+<span class="fc" id="L196">            .filter(p -&gt; p.contentHash().equals(trace.selectedPathHash())).findFirst()</span>
+<span class="fc" id="L197">            .orElseThrow(() -&gt; new IllegalArgumentException(&quot;selected path is absent&quot;));</span>
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">        if (path.steps().size() &gt; limits.maximumSteps() || path.steps().size() != trace.evidence().size()) {</span>
+<span class="nc" id="L199">            throw new IllegalArgumentException(&quot;path/evidence step mismatch&quot;);</span>
+        }
+<span class="fc" id="L201">        JsonWriter root = new JsonWriter().beginObject()</span>
+<span class="fc" id="L202">            .property(&quot;execution&quot;, trace.execution().contentHash()).property(&quot;path&quot;, path.contentHash());</span>
+<span class="fc" id="L203">        List&lt;String&gt; roots = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        for (int index = 0; index &lt; path.steps().size(); index++) {</span>
+<span class="fc" id="L205">            var step = path.steps().get(index);</span>
+<span class="fc" id="L206">            VerifiedCandidateEvidence evidence = trace.evidence().get(index);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            if (evidence.data().runStatus() != ExactFinitePolynomialPlanRun.Status.COMPLETE_WITH_RESOLUTIONS) {</span>
+<span class="fc" id="L208">                throw new IllegalArgumentException(&quot;truncated training solver evidence&quot;);</span>
+            }
+<span class="fc" id="L210">            var source = new VerifiedFinitePolynomialCandidateSource(evidence);</span>
+<span class="fc" id="L211">            var execution = step.sourceExecution();</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            if (!source.identity().equals(execution.sourceIdentity())</span>
+<span class="fc" id="L213">                    || !source.transform(execution.inputExpression(), execution.availableMathematicalWorkUnits())</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                        .equals(execution.sourceResult())</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                    || !execution.candidates().contains(step.transition())</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                    || !evidence.data().transformedExpression().equals(step.transition().transformedExpression())) {</span>
+<span class="fc" id="L217">                throw new IllegalArgumentException(&quot;training step is not bound to its verified evidence&quot;);</span>
+            }
+<span class="fc" id="L219">            roots.add(evidence.evidenceHash());</span>
+        }
+<span class="fc" id="L221">        return new CheckedTrace(path, SchematicProofPlan.hash(root.stringArray(&quot;evidence&quot;, roots).endObject().toString()));</span>
+    }
+
+    /** Numeric column reuse preserves repeated-coefficient relations across all rows. */
+    private static String generalize(List&lt;Parsed&gt; rows, List&lt;Expr&gt; nodes, boolean exponent,
+                                     Generalization context) {
+<span class="fc" id="L227">        Expr first = nodes.getFirst();</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (nodes.stream().allMatch(node -&gt; node instanceof NumberExpr)) {</span>
+<span class="fc" id="L229">            List&lt;BigInteger&gt; values = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            for (int i = 0; i &lt; nodes.size(); i++) { values.add(integer(rows.get(i), (NumberExpr) nodes.get(i))); }</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (values.stream().distinct().count() == 1) { return values.getFirst().toString(); }</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            if (exponent) { throw new IllegalArgumentException(&quot;varying exponent is not a coefficient hole&quot;); }</span>
+<span class="fc" id="L233">            return &quot;${&quot; + context.hole(values) + &quot;}&quot;;</span>
+        }
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (nodes.stream().allMatch(node -&gt; node instanceof VariableExpr)) { return VARIABLE; }</span>
+<span class="pc bpc" id="L236" title="1 of 4 branches missed.">        if (!(first instanceof BinaryExpr binary) || nodes.stream().anyMatch(node -&gt;</span>
+<span class="pc bpc" id="L237" title="1 of 4 branches missed.">                !(node instanceof BinaryExpr other) || other.operator() != binary.operator())) {</span>
+<span class="fc" id="L238">            throw new IllegalArgumentException(&quot;training outputs have different operator structure&quot;);</span>
+        }
+<span class="fc" id="L240">        List&lt;Expr&gt; left = nodes.stream().map(node -&gt; ((BinaryExpr) node).left()).toList();</span>
+<span class="fc" id="L241">        List&lt;Expr&gt; right = nodes.stream().map(node -&gt; ((BinaryExpr) node).right()).toList();</span>
+<span class="fc" id="L242">        return &quot;(&quot; + generalize(rows, left, false, context) + &quot; &quot; + binary.operator().symbol() + &quot; &quot;</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            + generalize(rows, right, binary.operator() == BinaryOperator.POW, context) + &quot;)&quot;;</span>
+    }
+
+    private static final class Generalization {
+        private final Limits limits;
+<span class="fc" id="L248">        private final Map&lt;List&lt;BigInteger&gt;, String&gt; columns = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L249">        private final List&lt;HoleDomain&gt; domains = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L250">        private long assignments = 1;</span>
+<span class="fc" id="L251">        private Generalization(Limits limits) { this.limits = limits; }</span>
+        private String hole(List&lt;BigInteger&gt; values) {
+<span class="fc" id="L253">            String existing = columns.get(values);</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            if (existing != null) { return existing; }</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (domains.size() &gt;= limits.maximumHoles()) { throw new IllegalArgumentException(&quot;coefficient hole limit&quot;); }</span>
+<span class="pc bpc" id="L256" title="1 of 4 branches missed.">            if (values.stream().anyMatch(value -&gt; value.compareTo(BigInteger.valueOf(limits.minimumCoefficient())) &lt; 0</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">                    || value.compareTo(BigInteger.valueOf(limits.maximumCoefficient())) &gt; 0)) {</span>
+<span class="fc" id="L258">                throw new IllegalArgumentException(&quot;training coefficient outside frozen finite domain&quot;);</span>
+            }
+<span class="fc" id="L260">            long width = (long) limits.maximumCoefficient() - limits.minimumCoefficient() + 1;</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            if (assignments &gt; limits.maximumAssignmentsPerStep() / width) {</span>
+<span class="fc" id="L262">                throw new IllegalArgumentException(&quot;learned template assignment limit&quot;);</span>
+            }
+<span class="fc" id="L264">            assignments *= width;</span>
+<span class="fc" id="L265">            String id = &quot;coefficient-&quot; + domains.size();</span>
+<span class="fc" id="L266">            columns.put(List.copyOf(values), id);</span>
+<span class="fc" id="L267">            domains.add(HoleDomain.integerRange(id, limits.minimumCoefficient(), limits.maximumCoefficient()));</span>
+<span class="fc" id="L268">            return id;</span>
+        }
+    }
+
+    private static Parsed parse(String expression) {
+<span class="fc" id="L273">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="pc bpc" id="L274" title="1 of 4 branches missed.">        if (expression.isBlank() || expression.length() &gt; MAX_EXPRESSION_CHARS) {</span>
+<span class="fc" id="L275">            throw new IllegalArgumentException(&quot;trace learner expression length limit&quot;);</span>
+        }
+<span class="fc" id="L277">        int structural = 0;</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        for (int i = 0; i &lt; expression.length(); i++) {</span>
+<span class="fc bfc" id="L279" title="All 4 branches covered.">            if (&quot;+-*/^(),&quot;.indexOf(expression.charAt(i)) &gt;= 0 &amp;&amp; ++structural &gt; MAX_STRUCTURAL_TOKENS) {</span>
+<span class="fc" id="L280">                throw new IllegalArgumentException(&quot;trace learner expression structural limit&quot;);</span>
+            }
+        }
+<span class="fc" id="L283">        ExactParsedTerm term = new ExpressionParser().parseExactTerm(expression);</span>
+<span class="fc" id="L284">        Set&lt;String&gt; variables = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L285">        validate(term.expression(), term, variables, new int[1]);</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        if (variables.size() != 1) { throw new IllegalArgumentException(&quot;exactly one variable is required&quot;); }</span>
+<span class="fc" id="L287">        return new Parsed(term, variables.iterator().next());</span>
+    }
+
+    private static void validate(Expr node, ExactParsedTerm term, Set&lt;String&gt; variables, int[] visits) {
+<span class="fc bfc" id="L291" title="All 2 branches covered.">        if (++visits[0] &gt; MAX_AST_NODES) { throw new IllegalArgumentException(&quot;trace learner AST limit&quot;); }</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (node instanceof NumberExpr number) {</span>
+<span class="fc" id="L293">            integer(new Parsed(term, &quot;&quot;), number);</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        } else if (node instanceof VariableExpr variable) {</span>
+<span class="fc" id="L295">            variables.add(variable.name());</span>
+<span class="fc bfc" id="L296" title="All 4 branches covered.">        } else if (node instanceof BinaryExpr binary &amp;&amp; binary.operator() != BinaryOperator.DIV) {</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                if (!(binary.right() instanceof NumberExpr power)) { throw new IllegalArgumentException(&quot;literal exponent required&quot;); }</span>
+<span class="fc" id="L299">                BigInteger value = integer(new Parsed(term, &quot;&quot;), power);</span>
+<span class="pc bpc" id="L300" title="2 of 4 branches missed.">                if (value.signum() &lt; 0 || value.compareTo(BigInteger.valueOf(32)) &gt; 0) {</span>
+<span class="nc" id="L301">                    throw new IllegalArgumentException(&quot;unsupported exponent&quot;);</span>
+                }
+            }
+<span class="fc" id="L304">            validate(binary.left(), term, variables, visits);</span>
+<span class="fc" id="L305">            validate(binary.right(), term, variables, visits);</span>
+<span class="fc" id="L306">        } else { throw new IllegalArgumentException(&quot;unsupported polynomial syntax in trace learner&quot;); }</span>
+<span class="fc" id="L307">    }</span>
+
+    private static BigInteger integer(Parsed parsed, NumberExpr number) {
+        // ExactParsedTerm validates every literal. Only its synthetic unary-minus
+        // zero may lack literal evidence; no caller-supplied AST is accepted here.
+<span class="fc" id="L312">        ExactRational value = parsed.term().literalFor(number)</span>
+<span class="fc" id="L313">            .map(ExactParsedTerm.LiteralOccurrence::exactValue).orElse(ExactRational.ZERO);</span>
+<span class="pc bpc" id="L314" title="1 of 4 branches missed.">        if (!value.isInteger() || value.numerator().bitLength() &gt; 512) {</span>
+<span class="fc" id="L315">            throw new IllegalArgumentException(&quot;bounded integer coefficients required&quot;);</span>
+        }
+<span class="fc" id="L317">        return value.numerator();</span>
+    }
+
+    private static String shape(Parsed row, Expr node, boolean exponent) {
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (node instanceof NumberExpr number) {</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">            return exponent ? integer(row, number).toString() : &quot;#&quot;;</span>
+        }
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (node instanceof VariableExpr) { return VARIABLE; }</span>
+<span class="fc" id="L325">        BinaryExpr binary = (BinaryExpr) node;</span>
+<span class="fc" id="L326">        return &quot;(&quot; + shape(row, binary.left(), false) + &quot; &quot; + binary.operator().symbol()</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">            + &quot; &quot; + shape(row, binary.right(), binary.operator() == BinaryOperator.POW) + &quot;)&quot;;</span>
+    }
+
+    /** Variable-blind exact coefficients: syntax variants cannot inflate TRAIN support. */
+    private static InputSignature inputSignature(Parsed parsed) {
+<span class="fc" id="L332">        var analysis = new ExactParsedUnivariatePolynomialView(IDENTITY_BUDGET).analyze(parsed.term());</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        if (!analysis.supported()) {</span>
+<span class="fc" id="L334">            throw new IllegalArgumentException(&quot;training identity &quot; + analysis.status()</span>
+<span class="fc" id="L335">                + &quot;: &quot; + analysis.detailCode());</span>
+        }
+<span class="fc" id="L337">        var polynomial = analysis.polynomial().orElseThrow();</span>
+<span class="fc" id="L338">        String canonical = new JsonWriter().beginObject()</span>
+<span class="fc" id="L339">            .property(&quot;schema&quot;, &quot;regelsuche.trace-input-polynomial/v1&quot;)</span>
+<span class="fc" id="L340">            .property(&quot;domain&quot;, polynomial.ring().coefficientDomain().id())</span>
+<span class="fc" id="L341">            .array(&quot;terms&quot;, writer -&gt; polynomial.terms().entrySet().stream()</span>
+<span class="fc" id="L342">                .sorted(Comparator.comparingInt(entry -&gt; entry.getKey().exponent(0)))</span>
+<span class="fc" id="L343">                .forEach(entry -&gt; writer.objectValue(term -&gt; term</span>
+<span class="fc" id="L344">                    .property(&quot;exponent&quot;, entry.getKey().exponent(0))</span>
+<span class="fc" id="L345">                    .property(&quot;coefficient&quot;, entry.getValue().canonicalText()))))</span>
+<span class="fc" id="L346">            .endObject().toString();</span>
+<span class="fc" id="L347">        return new InputSignature(SchematicProofPlan.hash(canonical), analysis.work().totalWorkUnits());</span>
+    }
+
+    private static String render(Limits limits, List&lt;Stage&gt; stages, List&lt;String&gt; roots,
+                                 List&lt;String&gt; inputIdentities, long identityWork) {
+<span class="fc" id="L352">        return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L353">            .property(&quot;authority&quot;, &quot;NON_EXECUTABLE_REQUIRES_FRESH_VERIFICATION&quot;)</span>
+<span class="fc" id="L354">            .property(&quot;resolverRevision&quot;, ExactFinitePolynomialPlanResolver.REVISION_HASH)</span>
+<span class="fc" id="L355">            .property(&quot;verifierRevision&quot;, ExactFinitePolynomialPlanCandidateEvidenceVerifier.REVISION_HASH)</span>
+<span class="fc" id="L356">            .property(&quot;sourceRevision&quot;, VerifiedFinitePolynomialCandidateSource.REVISION_HASH)</span>
+<span class="fc" id="L357">            .property(&quot;programRevision&quot;, BudgetedRewriteProgramExecution.REVISION)</span>
+<span class="fc" id="L358">            .property(&quot;identityViewRevision&quot;, ExactParsedUnivariatePolynomialView.VIEW_ID)</span>
+<span class="fc" id="L359">            .property(&quot;identityViewBudget&quot;, IDENTITY_BUDGET.canonicalMaterial())</span>
+<span class="fc" id="L360">            .property(&quot;trainingIdentityWorkUnits&quot;, identityWork)</span>
+<span class="fc" id="L361">            .stringArray(&quot;trainingInputIdentities&quot;, inputIdentities)</span>
+<span class="fc" id="L362">            .object(&quot;limits&quot;, w -&gt; w.property(&quot;minimumTraces&quot;, limits.minimumTraces())</span>
+<span class="fc" id="L363">                .property(&quot;maximumTraces&quot;, limits.maximumTraces()).property(&quot;maximumSteps&quot;, limits.maximumSteps())</span>
+<span class="fc" id="L364">                .property(&quot;maximumHoles&quot;, limits.maximumHoles()).property(&quot;minimumCoefficient&quot;, limits.minimumCoefficient())</span>
+<span class="fc" id="L365">                .property(&quot;maximumCoefficient&quot;, limits.maximumCoefficient())</span>
+<span class="fc" id="L366">                .property(&quot;maximumAssignmentsPerStep&quot;, limits.maximumAssignmentsPerStep()))</span>
+<span class="fc" id="L367">            .stringArray(&quot;trainingRoots&quot;, roots)</span>
+<span class="fc" id="L368">            .array(&quot;stages&quot;, w -&gt; stages.forEach(stage -&gt; w.objectValue(s -&gt; s</span>
+<span class="fc" id="L369">                .property(&quot;sourceShape&quot;, stage.sourceShape()).property(&quot;ansatzTemplate&quot;, stage.ansatzTemplate())</span>
+<span class="fc" id="L370">                .stringArray(&quot;coefficientHoles&quot;, stage.holeDomains().stream().map(HoleDomain::holeId).toList()))))</span>
+<span class="fc" id="L371">            .endObject().toString();</span>
+    }
+
+<span class="fc" id="L374">    private record InputSignature(String identity, long workUnits) {}</span>
+<span class="fc" id="L375">    private record Parsed(ExactParsedTerm term, String variable) {}</span>
+<span class="fc" id="L376">    private record CheckedTrace(ExactTheoryPath path, String root) {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

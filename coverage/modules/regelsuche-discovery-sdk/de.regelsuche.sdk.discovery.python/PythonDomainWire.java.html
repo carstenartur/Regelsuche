@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PythonDomainWire.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.discovery.python</a> &gt; <span class="el_source">PythonDomainWire.java</span></div><h1>PythonDomainWire.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.discovery.python;
+
+import de.regelsuche.json.JsonReader;
+import de.regelsuche.json.JsonWriter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Narrow canonical data protocol, not a Python-expression parser. */
+final class PythonDomainWire {
+    private PythonDomainWire() { }
+
+    static Map&lt;String, Object&gt; read(String text, int maxBytes) {
+<span class="fc" id="L18">        bytes(text, maxBytes);</span>
+        // Bound recursion BEFORE the existing JSON reader sees guest data.
+<span class="fc" id="L20">        int depth = 0;</span>
+<span class="fc" id="L21">        boolean quoted = false, escaped = false;</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L23">            char c = text.charAt(i);</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">            if (quoted) {</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">                if (escaped) escaped = false;</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">                else if (c == '\\') escaped = true;</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">                else if (c == '&quot;') quoted = false;</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            } else if (c == '&quot;') quoted = true;</span>
+<span class="fc bfc" id="L29" title="All 6 branches covered.">            else if (c == '[' || c == '{') require(++depth &lt;= 16, &quot;JSON nesting limit&quot;);</span>
+<span class="pc bpc" id="L30" title="1 of 6 branches missed.">            else if (c == ']' || c == '}') require(--depth &gt;= 0, &quot;unbalanced JSON&quot;);</span>
+        }
+<span class="pc bpc" id="L32" title="2 of 4 branches missed.">        require(depth == 0 &amp;&amp; !quoted, &quot;incomplete JSON&quot;);</span>
+<span class="fc" id="L33">        Map&lt;String, Object&gt; object = new JsonReader(text).readObject();</span>
+        // This also rejects permissive reader spellings (unknown escapes,
+        // leading signs/zeroes, raw controls), floats, null and trailing space.
+<span class="fc" id="L36">        require(text.equals(canonical(object)), &quot;noncanonical callback JSON&quot;);</span>
+<span class="fc" id="L37">        return object;</span>
+    }
+
+    static String canonical(Map&lt;String, ?&gt; object) {
+<span class="fc" id="L41">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L42">        properties(writer, object, 0);</span>
+<span class="fc" id="L43">        return writer.endObject().toString();</span>
+    }
+
+    private static void properties(JsonWriter writer, Map&lt;String, ?&gt; object, int depth) {
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        require(depth &lt;= 16, &quot;JSON nesting limit&quot;);</span>
+<span class="fc" id="L48">        new TreeMap&lt;&gt;(object).forEach((key, value) -&gt; {</span>
+<span class="fc" id="L49">            require(key.matches(&quot;[A-Za-z][A-Za-z0-9]*&quot;), &quot;protocol field name&quot;);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (value instanceof String string) { validUnicode(string); writer.property(key, string); }</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            else if (value instanceof Integer integer) writer.property(key, integer);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            else if (value instanceof Boolean bool) writer.property(key, bool);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            else if (value instanceof Map&lt;?, ?&gt; map) writer.object(key, w -&gt; properties(w, object(map), depth + 1));</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            else if (value instanceof List&lt;?&gt; list) writer.array(key, w -&gt; elements(w, list, depth + 1));</span>
+<span class="fc" id="L55">            else throw new IllegalArgumentException(&quot;unsupported protocol value&quot;);</span>
+<span class="fc" id="L56">        });</span>
+<span class="fc" id="L57">    }</span>
+
+    private static void elements(JsonWriter writer, List&lt;?&gt; list, int depth) {
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        require(depth &lt;= 16, &quot;JSON nesting limit&quot;);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (Object value : list) {</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (value instanceof String string) { validUnicode(string); writer.value(string); }</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            else if (value instanceof Integer integer) writer.value(integer);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            else if (value instanceof Boolean bool) writer.value(bool);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            else if (value instanceof Map&lt;?, ?&gt; map) writer.objectValue(w -&gt; properties(w, object(map), depth + 1));</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            else if (value instanceof List&lt;?&gt; nested) writer.arrayValue(w -&gt; elements(w, nested, depth + 1));</span>
+<span class="nc" id="L67">            else throw new IllegalArgumentException(&quot;unsupported protocol value&quot;);</span>
+<span class="fc" id="L68">        }</span>
+<span class="fc" id="L69">    }</span>
+
+    static Map&lt;String, Object&gt; object(Object value) {
+<span class="fc" id="L72">        require(value instanceof Map&lt;?, ?&gt;, &quot;object required&quot;);</span>
+<span class="fc" id="L73">        Map&lt;String, Object&gt; copy = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L74">        ((Map&lt;?, ?&gt;) value).forEach((key, item) -&gt; {</span>
+<span class="fc" id="L75">            require(key instanceof String, &quot;string field required&quot;);</span>
+<span class="fc" id="L76">            copy.put((String) key, item);</span>
+<span class="fc" id="L77">        });</span>
+<span class="fc" id="L78">        return copy;</span>
+    }
+
+    static void fields(Map&lt;String, ?&gt; object, String... keys) {
+<span class="fc" id="L82">        require(object.keySet().equals(java.util.Set.of(keys)), &quot;callback field set&quot;);</span>
+<span class="fc" id="L83">    }</span>
+
+    static int integer(Object value, int minimum, int maximum) {
+<span class="fc" id="L86">        require(value instanceof Integer, &quot;bounded integer required&quot;);</span>
+<span class="fc" id="L87">        int integer = (Integer) value;</span>
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">        require(integer &gt;= minimum &amp;&amp; integer &lt;= maximum, &quot;integer range&quot;);</span>
+<span class="fc" id="L89">        return integer;</span>
+    }
+
+    static boolean bool(Object value) {
+<span class="fc" id="L93">        require(value instanceof Boolean, &quot;boolean required&quot;);</span>
+<span class="fc" id="L94">        return (Boolean) value;</span>
+    }
+
+    static String text(Object value, int maxBytes, boolean emptyAllowed) {
+<span class="fc" id="L98">        require(value instanceof String, &quot;string required&quot;);</span>
+<span class="fc" id="L99">        String string = (String) value;</span>
+<span class="fc" id="L100">        bytes(string, maxBytes);</span>
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">        require(emptyAllowed || !string.isBlank(), &quot;empty payload&quot;);</span>
+<span class="fc" id="L102">        return string;</span>
+    }
+
+    static List&lt;?&gt; list(Object value, int maximum) {
+<span class="fc" id="L106">        require(value instanceof List&lt;?&gt;, &quot;array required&quot;);</span>
+<span class="fc" id="L107">        List&lt;?&gt; list = (List&lt;?&gt;) value;</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        require(list.size() &lt;= maximum, &quot;array count limit&quot;);</span>
+<span class="fc" id="L109">        return list;</span>
+    }
+
+    static int bytes(String text, int maximum) {
+<span class="pc bpc" id="L113" title="1 of 4 branches missed.">        require(text != null &amp;&amp; text.length() &lt;= maximum, &quot;payload size limit&quot;);</span>
+<span class="fc" id="L114">        validUnicode(text);</span>
+<span class="fc" id="L115">        int bytes = text.getBytes(StandardCharsets.UTF_8).length;</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        require(bytes &lt;= maximum, &quot;UTF-8 payload size limit&quot;);</span>
+<span class="fc" id="L117">        return bytes;</span>
+    }
+
+    static void validUnicode(String text) {
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L122">            char c = text.charAt(i);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (Character.isHighSurrogate(c)) {</span>
+<span class="pc bpc" id="L124" title="1 of 4 branches missed.">                require(++i &lt; text.length() &amp;&amp; Character.isLowSurrogate(text.charAt(i)), &quot;unpaired surrogate&quot;);</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            } else require(!Character.isLowSurrogate(c), &quot;unpaired surrogate&quot;);</span>
+        }
+<span class="fc" id="L127">    }</span>
+
+    static String sha256(String text) {
+<span class="fc" id="L130">        validUnicode(text);</span>
+        try {
+<span class="fc" id="L132">            return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L133">                    .digest(text.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L134">        } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
+    }
+
+    static void require(boolean condition, String message) {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (!condition) throw new IllegalArgumentException(message);</span>
+<span class="fc" id="L139">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
