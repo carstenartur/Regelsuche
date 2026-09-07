@@ -31,7 +31,7 @@ class IndependentOriginalDomainIrreducibilityTest {
 
     @Test
     void certifiesAnIntegerPolynomialAfterRetainingADegreeLosingPrime() {
-        SparsePolynomial<BigInteger> source = integer(1, 1, 2);
+        SparsePolynomial<BigInteger> source = integer(-2, -2, -4);
 
         FactorizationVerifier.Report<BigInteger> report =
             FactorizationVerifier.execute(
