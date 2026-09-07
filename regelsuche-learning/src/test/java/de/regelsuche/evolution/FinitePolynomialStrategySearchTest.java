@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.evolution.FinitePolynomialStrategySearch.FrozenSelection;
 import de.regelsuche.evolution.FinitePolynomialStrategySearch.Grammar;
 import de.regelsuche.evolution.FinitePolynomialStrategySearch.Outcome;
-import de.regelsuche.evolution.FinitePolynomialStrategySearch.Template;
+
 import de.regelsuche.evolution.FinitePolynomialStrategySearch.TrainingInput;
 import de.regelsuche.evolution.FinitePolynomialStrategySearch.Trial;
 import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
@@ -75,7 +75,7 @@ class FinitePolynomialStrategySearchTest {
 
     @Test
     void differentTrainingDataCanSelectADifferentSchema() {
-        Template scaled = new Template("scaled", "${scale}*@v*(@v+${shift})",
+        FinitePolynomialTemplate scaled = FinitePolynomialTemplate.declared("scaled", "${scale}*@v*(@v+${shift})",
             List.of(HoleDomain.integerRange("scale", 2, 3), HoleDomain.integerRange("shift", 1, 3)));
         Grammar grammar = new Grammar(List.of(factors(), scaled), 1, 2000, 1000);
         var monic = search.train(grammar, List.of(new TrainingInput("monic", "x^2+3*x+2")));
@@ -158,7 +158,7 @@ class FinitePolynomialStrategySearchTest {
     @Test
     void multiplyingByAConstantOrAnAlgebraicallyConstantFactorGetsNoCredit() {
         for (String prefix : List.of("${unit}", "(@v-@v+${unit})")) {
-            var fake = new Template("fake", prefix + "*(@v^2+2*@v+1)", List.of(HoleDomain.integerRange("unit", 1, 1)));
+            var fake = FinitePolynomialTemplate.declared("fake", prefix + "*(@v^2+2*@v+1)", List.of(HoleDomain.integerRange("unit", 1, 1)));
             var selection = search.train(new Grammar(List.of(fake), 1, 30, 100),
                 List.of(new TrainingInput("polynomial", "x^2+2*x+1")));
             assertTrue(selection.selectedSequence().isEmpty());
@@ -168,7 +168,7 @@ class FinitePolynomialStrategySearchTest {
 
     @Test
     void retainedSolverTruncationIsNotErasedBySuccessfulSelectedExecution() {
-        var padded = new Template("padded", "(@v+${left}+${pad}-${pad})*(@v+${right})",
+        var padded = FinitePolynomialTemplate.declared("padded", "(@v+${left}+${pad}-${pad})*(@v+${right})",
             List.of(HoleDomain.integerRange("left", 1, 2), HoleDomain.integerRange("right", 1, 2),
                 HoleDomain.integerRange("pad", 0, 2)));
         var selection = search.train(new Grammar(List.of(padded), 1, 100, 100),
@@ -212,9 +212,11 @@ class FinitePolynomialStrategySearchTest {
         assertThrows(IllegalArgumentException.class, () -> new Grammar(List.of(factors(), factors()), 2, 1000, 1000));
         assertThrows(IllegalArgumentException.class, () -> new Grammar(List.of(factors()), 4, 1000, 1000));
         assertThrows(IllegalArgumentException.class, () -> new Grammar(List.of(factors()), 1, -1, 1000));
-        assertThrows(IllegalArgumentException.class, () -> new Template("bad", "x+${bad}", List.of(HoleDomain.signs("bad"))));
-        assertThrows(IllegalArgumentException.class, () -> new Template("large", "@v+${left}+${right}",
-            List.of(HoleDomain.integerRange("left", 1, 128), HoleDomain.integerRange("right", 1, 128))));
+        assertThrows(IllegalArgumentException.class, () -> FinitePolynomialTemplate.declared("bad", "x+${bad}", List.of(HoleDomain.signs("bad"))));
+        assertThrows(IllegalArgumentException.class, () -> new Grammar(List.of(
+            FinitePolynomialTemplate.declared("large", "@v+${left}+${right}",
+                List.of(HoleDomain.integerRange("left", 1, 128), HoleDomain.integerRange("right", 1, 128)))),
+            1, 1000, 1000));
         for (String input : List.of("sin(x)", "x+y", "x/y", "1", "x\uD800", "(".repeat(200)+"x"+")".repeat(200))) {
             assertThrows(IllegalArgumentException.class, () -> search.train(grammar(), List.of(new TrainingInput("bad-input", input))));
         }
@@ -223,8 +225,8 @@ class FinitePolynomialStrategySearchTest {
 
     @Test
     void finiteMatrixCeilingIsCheckedBeforeAnySolverWork() {
-        List<Template> templates = new ArrayList<>();
-        for (int i = 0; i < 4; i++) templates.add(new Template("template-"+i,
+        List<FinitePolynomialTemplate> templates = new ArrayList<>();
+        for (int i = 0; i < 4; i++) templates.add(FinitePolynomialTemplate.declared("template-"+i,
             factors().expression(), factors().domains()));
         List<TrainingInput> inputs = new ArrayList<>();
         for (int i = 0; i < 7; i++) inputs.add(new TrainingInput("input-"+i, "x^2+"+i));
@@ -249,12 +251,12 @@ class FinitePolynomialStrategySearchTest {
         return selection.rows().stream().filter(row -> row.inputId().equals(inputId)
             && row.trial().sequence().equals(sequence)).findFirst().orElseThrow().trial();
     }
-    private static Template factors() {
-        return new Template("factors", "(@v+${left})*(@v+${right})",
+    private static FinitePolynomialTemplate factors() {
+        return FinitePolynomialTemplate.declared("factors", "(@v+${left})*(@v+${right})",
             List.of(HoleDomain.integerRange("left", -6, 6), HoleDomain.integerRange("right", -6, 6)));
     }
     private static Grammar grammar() {
-        var completion = new Template("completion", "(@v+${shift})^2+${constant}",
+        var completion = FinitePolynomialTemplate.declared("completion", "(@v+${shift})^2+${constant}",
             List.of(HoleDomain.integerRange("shift", -4, 4), HoleDomain.integerRange("constant", -6, 6)));
         return new Grammar(List.of(completion, factors()), 2, 2000, 1000);
     }

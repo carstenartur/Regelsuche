@@ -87,6 +87,14 @@ Prüfung stehen im [Autonomous Discovery Walkthrough](docs/autonomous-discovery-
 Das ist projektinterne, symbolisch geprüfte Wiederverwendung — **keine
 Behauptung externer mathematischer Neuheit**.
 
+Ein weiterer begrenzter Lernpfad verbindet inzwischen
+[aus verifizierten Polynomspuren abgeleitete Vorlagen](docs/trace-derived-polynomial-plans.md)
+mit einer [Auswahl auf getrennten Trainingsaufgaben](docs/finite-polynomial-strategy-selection.md).
+Jede spätere Anwendung löst ihre Koeffizienten neu und prüft die erzeugten
+Schritte erneut. Die gemeinsamen Vorlagen bewahren Herkunft, Anwendbarkeit und
+Trainingsausschlüsse. Die Beispiele derselben quadratischen Familie belegen
+noch keine Übertragung auf andere Familien oder einen allgemeinen Effizienzgewinn.
+
 ## Workbench statt Konsolenausgabe
 
 Browser-E2E-Tests prüfen die sichtbaren Abläufe und erzeugen dieselben

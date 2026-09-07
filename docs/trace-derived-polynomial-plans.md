@@ -83,11 +83,12 @@ Summandenreihenfolge, Ausmultiplizieren, Faktorisierung oder sich aufhebende
 Terme denselben mathematischen Input mehrfach als Lernbeleg zählen lassen.
 Sie ist kein Nachweis unterschiedlicher mathematischer Familien.
 
-Die erste Wiederverwendungsstufe prüft diese eingefrorenen Identitäten vor der
-Syntaxauswahl. Eine zum Training äquivalente Eingabe wird ausdrücklich
-abgewiesen statt als neuer Holdout oder bloßer Shape-Miss gewertet. Spätere
-Stufen prüfen weiterhin ihre jeweilige Syntax; der API-Einstieg ist kein
-allgemeiner, unabhängig autorisierter Studien- oder Promotionscontroller.
+Jede Wiederverwendungsstufe prüft die eingefrorenen Identitäten aller in der
+Formation beobachteten Zustände vor der Syntaxauswahl, einschließlich Quellen
+und Ausgaben jedes verifizierten Schritts. Eine dazu äquivalente Eingabe wird
+ausdrücklich abgewiesen statt als neuer Holdout oder bloßer Shape-Miss gewertet.
+Wurzelidentitäten und vollständige Zustandsmenge bleiben getrennt verfügbar.
+Der API-Einstieg ist kein allgemeiner Studien- oder Promotionscontroller.
 
 Die Identitätsprojektion besitzt ein festes Budget für Grad 64, 4096
 Koeffizientenbits, 256 Knoten und 50.000 Arithmetikoperationen. Erschöpfung
@@ -145,7 +146,7 @@ Im vollständigen JDK-25-Checkout:
 ./gradlew --no-configuration-cache ciCheck
 ```
 
-Die 22 Testmethoden decken Ableitung, zwei neue Koeffizienteninstanzen,
+Die 23 Testmethoden decken Ableitung, zwei neue Koeffizienteninstanzen,
 Lückenwiederverwendung, Reihenfolgeunabhängigkeit, manipulierte/fehlende Evidenz,
 Duplikate, unvollständige Spuren, endliche Arbeitsgrenzen, negative Ergebnisse,
 Form-/Domänengrenzen und große exakt unterscheidbare Ganzzahlen ab. Hinzu kommen
@@ -172,10 +173,23 @@ werden durch diese Änderung beansprucht.
 
 ## Verhältnis zur Strategieauswahl
 
-Die separat entwickelte Strategieauswahl in PR #930 vergleicht Folgen aus einer
-vorgegebenen endlichen Grammatik. Dieser Lerner ergänzt die andere Seite:
-Er bildet neue parametrisierte Vorlagen aus bereits geprüften Spuren, trifft
-aber keine optimale Auswahl zwischen ihnen und behauptet keinen gemeinsamen
-Ende-zu-Ende-Erfolg mit dem Selektor. Es wird keine zweite Solver-/Interpreter-
-Implementierung eingeführt. Eine spätere Anbindung muss Trainingsherkunft,
-Anwendbarkeit, Koeffizientendomänen und gesamte Arbeitsbudgets erhalten.
+Die [Strategieauswahl](finite-polynomial-strategy-selection.md) nimmt die
+`FinitePolynomialTemplate`-Objekte aus `LearnedPlan.stages()` direkt an. Der
+gemeinsame Vertrag verwendet `@v` als Variablenslot und bindet die vollständigen
+Koeffizientendomänen, die gelernte Quellform, Herkunft und Formationsidentitäten.
+Die gemeinsame exakte Polynomprojektion verhindert inkompatible Hashschemata
+zwischen Formation, Selektor-TRAIN und Anwendung. Lerner und Selektor tragen
+dafür jeweils Revision v2.
+
+Elf zusätzliche Tests in `TraceDerivedPolynomialStrategyTest` prüfen die
+vollständige Verbindung mit getrennten Formations-, Auswahl- und Anwendungspolynomen.
+Sie behalten alle zwölf Selektorzeilen, neue Kandidatenevidenz und die kumulativen
+Belegungs-/Pfadbudgets. Überlappende oder nur anders geschriebene Formationszustände
+werden auch bei null Solverbudget abgewiesen. Die Sperre umfasst nicht ausgewählte
+Vorlagen. Formfehler, endliche Solvermisserfolge und Budgetabbrüche bleiben
+verschiedene Ergebnisse. Ein geänderter Herkunfts- oder Domänenvertrag ändert
+die eingefrorene Identität, auch bei gleichem sichtbaren Vorlagennamen.
+
+Dies verbindet beide Bausteine in einem begrenzten Entwicklungsfall derselben
+quadratischen Familie. Unabhängige Kontrollen, vollständige Kostenbilanz,
+familienfremde Übertragung und Produktionspromotion bleiben unter #874/#750 offen.
