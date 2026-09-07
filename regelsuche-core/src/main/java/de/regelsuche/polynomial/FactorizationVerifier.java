@@ -198,14 +198,12 @@ public final class FactorizationVerifier {
         if (request.evidenceRequirement()
                 == FactorizationRequest.EvidenceRequirement
                     .INDEPENDENT_COMPLETE) {
-            return failure(
-                raw.engineId(),
-                Status.UNSUPPORTED_REQUEST,
-                "INDEPENDENT_COMPLETENESS_VERIFIER_REQUIRED",
+            return independentlyVerifyCandidates(
+                request,
+                raw,
+                candidates,
                 combined,
-                claim,
-                raw.engineResultHash(),
-                request);
+                claim);
         }
         return success(
             raw.engineId(),
@@ -330,6 +328,89 @@ public final class FactorizationVerifier {
             evidence.selectedPrime(),
             evidence.work(),
             evidence.traceHash());
+    }
+
+    private static <C> Report<C> independentlyVerifyCandidates(
+        FactorizationRequest<C> request,
+        FactorizationEngine.EngineResult<C> raw,
+        List<VerifiedCandidate<C>> candidates,
+        PolynomialWorkLedger completedWork,
+        ClaimStrength backendClaim
+    ) {
+        long remaining = request.maxWorkUnits()
+            - completedWork.totalWorkUnits();
+        IndependentFactorizationCompleteness.Result evidence =
+            IndependentFactorizationCompleteness.verify(
+                request,
+                candidates,
+                remaining);
+        IndependentCompletenessTrace trace =
+            IndependentCompletenessTrace.issue(
+                evidence,
+                FactorizationVerifier::issueIndependentTrace);
+        PolynomialWorkLedger combined = merge(
+            completedWork,
+            evidence.work());
+        return switch (evidence.outcome()) {
+            case CERTIFIED -> report(
+                raw.engineId(),
+                Status.COMPLETE_FACTORIZATION,
+                evidence.detailCode(),
+                combined,
+                ClaimStrength.INDEPENDENTLY_CERTIFIED_COMPLETE,
+                List.of(candidates.get(
+                    evidence.selectedCandidateIndex())),
+                raw.engineResultHash(),
+                request,
+                Optional.empty(),
+                Optional.of(trace));
+            case NO_REMAINDER_ONE_CANDIDATE,
+                    FACTOR_CERTIFICATE_INCONCLUSIVE,
+                    WORK_BUDGET_EXHAUSTED -> report(
+                raw.engineId(),
+                Status.BUDGET_INCONCLUSIVE,
+                evidence.detailCode(),
+                combined,
+                backendClaim,
+                List.of(),
+                raw.engineResultHash(),
+                request,
+                Optional.empty(),
+                Optional.of(trace));
+            case UNSUPPORTED_DOMAIN -> report(
+                raw.engineId(),
+                Status.UNSUPPORTED_DOMAIN,
+                evidence.detailCode(),
+                combined,
+                backendClaim,
+                List.of(),
+                raw.engineResultHash(),
+                request,
+                Optional.empty(),
+                Optional.of(trace));
+            case UNSUPPORTED_SHAPE -> report(
+                raw.engineId(),
+                Status.UNSUPPORTED_REQUEST,
+                evidence.detailCode(),
+                combined,
+                backendClaim,
+                List.of(),
+                raw.engineResultHash(),
+                request,
+                Optional.empty(),
+                Optional.of(trace));
+            case TECHNICAL_FAILURE -> report(
+                raw.engineId(),
+                Status.TECHNICAL_FAILURE,
+                evidence.detailCode(),
+                combined,
+                backendClaim,
+                List.of(),
+                raw.engineResultHash(),
+                request,
+                Optional.empty(),
+                Optional.of(trace));
+        };
     }
 
     private static <C> VerificationOutcome<C> verifyProposal(
@@ -495,6 +576,35 @@ public final class FactorizationVerifier {
         FactorizationRequest<C> request,
         Optional<IndependentIrreducibilityTrace> independentTrace
     ) {
+        return report(
+            engineId,
+            status,
+            detailCode,
+            work,
+            claimStrength,
+            candidates,
+            engineResultHash,
+            request,
+            independentTrace,
+            Optional.empty());
+    }
+
+    private static <C> Report<C> report(
+        String engineId,
+        Status status,
+        String detailCode,
+        PolynomialWorkLedger work,
+        ClaimStrength claimStrength,
+        List<VerifiedCandidate<C>> candidates,
+        String engineResultHash,
+        FactorizationRequest<C> request,
+        Optional<IndependentIrreducibilityTrace> independentTrace,
+        Optional<IndependentCompletenessTrace> completenessTrace
+    ) {
+        validateTraceBindings(
+            request,
+            independentTrace,
+            completenessTrace);
         String verificationHash = reportHash(
             engineId,
             status,
@@ -504,7 +614,8 @@ public final class FactorizationVerifier {
             candidates,
             engineResultHash,
             request,
-            independentTrace);
+            independentTrace,
+            completenessTrace);
         return new Report<>(
             engineId,
             status,
@@ -514,7 +625,8 @@ public final class FactorizationVerifier {
             candidates,
             engineResultHash,
             verificationHash,
-            independentTrace);
+            independentTrace,
+            completenessTrace);
     }
 
     private static <C> String reportHash(
@@ -526,7 +638,8 @@ public final class FactorizationVerifier {
         List<VerifiedCandidate<C>> candidates,
         String engineResultHash,
         FactorizationRequest<C> request,
-        Optional<IndependentIrreducibilityTrace> independentTrace
+        Optional<IndependentIrreducibilityTrace> independentTrace,
+        Optional<IndependentCompletenessTrace> completenessTrace
     ) {
         StringBuilder material = new StringBuilder(VERIFIER_ID);
         PolynomialEvidence.append(material, engineId);
@@ -550,6 +663,10 @@ public final class FactorizationVerifier {
             PolynomialEvidence.append(
                 material,
                 trace.canonicalMaterial()));
+        completenessTrace.ifPresent(trace ->
+            PolynomialEvidence.append(
+                material,
+                trace.canonicalMaterial()));
         return PolynomialEvidence.sha256(material.toString());
     }
 
@@ -565,6 +682,117 @@ public final class FactorizationVerifier {
     private static boolean validHash(String value) {
         return value != null
             && value.matches("sha256:[0-9a-f]{64}");
+    }
+
+    private static void requireEvidence(
+        boolean condition,
+        String message
+    ) {
+        if (!condition) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
+    private static <C> void validateReportEvidence(
+        Status status,
+        ClaimStrength claimStrength,
+        List<VerifiedCandidate<C>> candidates,
+        Optional<IndependentIrreducibilityTrace> irreducibilityTrace,
+        Optional<IndependentCompletenessTrace> completenessTrace
+    ) {
+        validateCompleteReport(
+            status,
+            claimStrength,
+            candidates,
+            completenessTrace);
+        validateIrreducibleReport(
+            status,
+            claimStrength,
+            irreducibilityTrace);
+    }
+
+    private static void validateTraceBindings(
+        FactorizationRequest<?> request,
+        Optional<IndependentIrreducibilityTrace> irreducibilityTrace,
+        Optional<IndependentCompletenessTrace> completenessTrace
+    ) {
+        if (irreducibilityTrace.isEmpty()
+                && completenessTrace.isEmpty()) {
+            return;
+        }
+        String requestHash = PolynomialEvidence.sha256(
+            request.canonicalMaterial());
+        String sourceHash = PolynomialEvidence.sha256(
+            request.source().canonicalMaterial());
+        irreducibilityTrace.ifPresent(trace -> {
+            requireEvidence(
+                trace.requestHash().equals(requestHash),
+                "irreducibility trace request hash mismatch");
+            requireEvidence(
+                trace.sourceHash().equals(sourceHash),
+                "irreducibility trace source hash mismatch");
+        });
+        completenessTrace.ifPresent(trace -> {
+            requireEvidence(
+                trace.requestHash().equals(requestHash),
+                "completeness trace request hash mismatch");
+            requireEvidence(
+                trace.sourceHash().equals(sourceHash),
+                "completeness trace source hash mismatch");
+        });
+    }
+
+    private static <C> void validateCompleteReport(
+        Status status,
+        ClaimStrength claimStrength,
+        List<VerifiedCandidate<C>> candidates,
+        Optional<IndependentCompletenessTrace> completenessTrace
+    ) {
+        if (status != Status.COMPLETE_FACTORIZATION) {
+            requireEvidence(
+                completenessTrace.filter(
+                    IndependentCompletenessTrace::certified).isEmpty(),
+                "certified completeness trace requires complete status");
+            return;
+        }
+        requireEvidence(
+            claimStrength
+                == ClaimStrength.INDEPENDENTLY_CERTIFIED_COMPLETE,
+            "complete factorization requires independent evidence");
+        IndependentCompletenessTrace trace = completenessTrace
+            .filter(IndependentCompletenessTrace::certified)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "complete factorization requires a certified trace"));
+        requireEvidence(
+            candidates.size() == 1,
+            "complete report must expose exactly one candidate");
+        requireEvidence(
+            trace.selectedCandidateCertificateHash().orElseThrow()
+                .equals(candidates.getFirst()
+                    .verificationCertificateHash()),
+            "complete report must expose its certified candidate");
+    }
+
+    private static void validateIrreducibleReport(
+        Status status,
+        ClaimStrength claimStrength,
+        Optional<IndependentIrreducibilityTrace> irreducibilityTrace
+    ) {
+        if (status != Status.IRREDUCIBLE) {
+            requireEvidence(
+                irreducibilityTrace.filter(
+                    IndependentIrreducibilityTrace::certified).isEmpty(),
+                "certified trace requires irreducible status");
+            return;
+        }
+        requireEvidence(
+            claimStrength
+                == ClaimStrength.INDEPENDENTLY_CERTIFIED_IRREDUCIBLE,
+            "irreducibility requires independent evidence");
+        requireEvidence(
+            irreducibilityTrace.filter(
+                IndependentIrreducibilityTrace::certified).isPresent(),
+            "irreducibility requires a certified trace");
     }
 
     public enum Status {
@@ -1063,7 +1291,8 @@ public final class FactorizationVerifier {
             List<VerifiedCandidate<C>> candidates,
             String engineResultHash,
             String verificationHash,
-            Optional<IndependentIrreducibilityTrace> independentTrace
+            Optional<IndependentIrreducibilityTrace> independentTrace,
+            Optional<IndependentCompletenessTrace> completenessTrace
         ) {
             state = new State<>(
                 engineId,
@@ -1074,7 +1303,8 @@ public final class FactorizationVerifier {
                 candidates,
                 engineResultHash,
                 verificationHash,
-                independentTrace);
+                independentTrace,
+                completenessTrace);
         }
 
         public String engineId() {
@@ -1114,6 +1344,11 @@ public final class FactorizationVerifier {
             return state.independentTrace();
         }
 
+        public Optional<IndependentCompletenessTrace>
+                independentCompletenessTrace() {
+            return state.completenessTrace();
+        }
+
         public boolean successful() {
             return status() == Status.PARTIAL_FACTORIZATION
                 || status() == Status.COMPLETE_FACTORIZATION;
@@ -1145,7 +1380,8 @@ public final class FactorizationVerifier {
             List<VerifiedCandidate<C>> candidates,
             String engineResultHash,
             String verificationHash,
-            Optional<IndependentIrreducibilityTrace> independentTrace
+            Optional<IndependentIrreducibilityTrace> independentTrace,
+            Optional<IndependentCompletenessTrace> completenessTrace
         ) {
             private State {
                 if (engineId == null
@@ -1156,6 +1392,7 @@ public final class FactorizationVerifier {
                         || work == null
                         || claimStrength == null
                         || independentTrace == null
+                        || completenessTrace == null
                         || verificationHash == null
                         || !verificationHash.matches(
                             "sha256:[0-9a-f]{64}")) {
@@ -1165,6 +1402,13 @@ public final class FactorizationVerifier {
                 candidates = List.copyOf(candidates);
                 independentTrace = independentTrace.map(
                     Objects::requireNonNull);
+                completenessTrace = completenessTrace.map(
+                    Objects::requireNonNull);
+                if (independentTrace.isPresent()
+                        && completenessTrace.isPresent()) {
+                    throw new IllegalArgumentException(
+                        "factorization report cannot mix independent traces");
+                }
                 boolean success =
                     status == Status.PARTIAL_FACTORIZATION
                         || status == Status.COMPLETE_FACTORIZATION;
@@ -1172,34 +1416,12 @@ public final class FactorizationVerifier {
                     throw new IllegalArgumentException(
                         "factorization report candidate/status mismatch");
                 }
-                if (status == Status.COMPLETE_FACTORIZATION
-                        && claimStrength
-                            != ClaimStrength
-                                .INDEPENDENTLY_CERTIFIED_COMPLETE) {
-                    throw new IllegalArgumentException(
-                        "complete factorization requires independent evidence");
-                }
-                if (status == Status.IRREDUCIBLE
-                        && claimStrength
-                            != ClaimStrength
-                                .INDEPENDENTLY_CERTIFIED_IRREDUCIBLE) {
-                    throw new IllegalArgumentException(
-                        "irreducibility requires independent evidence");
-                }
-                if (status == Status.IRREDUCIBLE
-                        && independentTrace.filter(
-                            IndependentIrreducibilityTrace::certified)
-                            .isEmpty()) {
-                    throw new IllegalArgumentException(
-                        "irreducibility requires a certified trace");
-                }
-                if (status != Status.IRREDUCIBLE
-                        && independentTrace.filter(
-                            IndependentIrreducibilityTrace::certified)
-                            .isPresent()) {
-                    throw new IllegalArgumentException(
-                        "certified trace requires irreducible status");
-                }
+                validateReportEvidence(
+                    status,
+                    claimStrength,
+                    candidates,
+                    independentTrace,
+                    completenessTrace);
                 if (engineResultHash == null
                         || !engineResultHash.isEmpty()
                         && !engineResultHash.matches(

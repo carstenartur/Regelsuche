@@ -35,7 +35,7 @@ Verantwortung gestaltet.
 | Exaktes Faktorenrendering mit Reparse-/Ringrekonstruktion am Wurzelvorkommen | implementiert |
 | Verschachtelte occurrence-preserving Suchintegration | noch offen |
 | Unabhängiger begrenzter Originaldomänen-Irreduzibilitätsnachweis | implementiert |
-| Unabhängige Vollständigkeitszertifikate für Faktorzerlegungen | noch offen |
+| Unabhängige begrenzte Vollständigkeitszertifikate für Faktorzerlegungen | implementiert |
 | LLL-/van-Hoeij-Rekombination für größere Fälle | noch offen |
 | Automatische Integration der allgemeinen Engine in Suche und Workbench | noch offen |
 
@@ -43,9 +43,11 @@ Die native Engine liefert damit eine vollständige **Backend-Zerlegung** im
 begrenzten unterstützten Fragment. Regelsuche rekonstruiert jedes ausgegebene
 Produkt exakt. Für das ursprüngliche univariate Polynom kann der allgemeine
 `FactorizationVerifier` auf ausdrückliche Anforderung inzwischen einen eigenen
-begrenzten Irreduzibilitätsnachweis führen. Die unabhängige Zertifizierung aller
-ausgegebenen Faktoren und damit einer vollständigen Zerlegung bleibt offen;
-Backend-Claims werden dafür nicht hochgestuft.
+begrenzten Irreduzibilitätsnachweis führen. Bei einer vorgeschlagenen Zerlegung
+prüft er zusätzlich Rest-Eins und jeden unterschiedlichen nichtkonstanten
+Faktor mit demselben unabhängigen Verfahren. Nur eine vollständig erfolgreiche
+Kampagne autorisiert `COMPLETE_FACTORIZATION`; Backend-Claims werden dafür
+nicht hochgestuft.
 
 ## Gesamtfluss
 
@@ -73,6 +75,9 @@ NativeUnivariateFactorizationEngine für Z[x] oder Q[x]
   -> untrusted Proposal / BackendClaim / Work Ledger
   -> FactorizationVerifier
   -> exakte Produktrückprüfung und verifier-ausgestellte Evidence
+  -> bei INDEPENDENT_COMPLETE
+       -> Engine-Miss: unabhängiger Nachweis der Originalquelle
+       -> Proposal: Rest-Eins plus unabhängiger Nachweis jedes Faktors
 
 Verifier-issued candidate am Wurzelvorkommen
   -> vorautorisierte Quell-/Literal-Evidence-Prüfung
@@ -258,9 +263,7 @@ Struktur- oder Arbeitsbudgets einführen.
 Ein Backend-Claim erfüllt `INDEPENDENT_COMPLETE` niemals allein. Eine Engine
 darf für einen solchen Request weiterhin untrusted Vorschläge oder einen
 begrenzten Miss liefern. Nur der zentrale Verifier kann daraus mit einem
-algorithmisch unabhängigen Nachweis einen autorisierten Status erzeugen. Für
-Faktorvorschläge bleibt `INDEPENDENT_COMPLETE` bis zur separaten
-Vollständigkeitszertifizierung fail-closed.
+algorithmisch unabhängigen Nachweis einen autorisierten Status erzeugen.
 
 ## Allgemeine univariate Darstellung
 
@@ -516,12 +519,41 @@ normalisierte Zwischenkoeffizienten sind zusätzliche feste Obergrenzen; die
 engeren Requestgrenzen und das bereits von der Engine belastete Gesamtbudget
 gelten weiterhin.
 
-Dieser Abschnitt zertifiziert bewusst nur die Irreduzibilität der
-Originalquelle. Die unabhängige Irreduzibilität aller ausgegebenen Faktoren,
-exakte Rest-Eins und vollständige Zerlegung werden in einem eigenen
-Ausbauschritt autorisiert. Ein bloßer Engine-Miss oder
-`BACKEND_CLAIMED_IRREDUCIBLE` bleibt ohne die beschriebene Prüferspur
-unzureichend.
+Bei einem Engine-Miss gilt diese Spur ausschließlich für die Originalquelle.
+Ein bloßer Miss oder `BACKEND_CLAIMED_IRREDUCIBLE` bleibt ohne die beschriebene
+Prüferspur unzureichend.
+
+## Unabhängiger Vollständigkeitsnachweis für Zerlegungen
+
+Liefert die Engine Faktorvorschläge für einen `INDEPENDENT_COMPLETE`-Request,
+beginnt die Vollständigkeitskampagne erst nach der exakten Produktrückprüfung.
+Sie verarbeitet die kanonisch geordneten Vorschläge und Faktoren
+deterministisch unter dem noch verbleibenden Request-Budget:
+
+1. Der ungelöste Rest muss exakt eins sein.
+2. Jeder unterschiedliche nichtkonstante Faktor wird unabhängig normalisiert.
+3. Lineare Faktoren erhalten den direkten Grad-Eins-Nachweis; höhere Faktoren
+   benötigen einen eigenen gradtreuen Rabin-/Frobenius-Zeugen.
+4. Multiplizitäten werden durch die bereits geprüfte Produktrückrechnung
+   gebunden; derselbe kanonisch zusammengefasste Faktor wird nur einmal
+   zertifiziert.
+5. Erst wenn alle Faktoren eines Vorschlags zertifiziert sind, stellt der
+   Verifier `INDEPENDENTLY_CERTIFIED_COMPLETE` und
+   `COMPLETE_FACTORIZATION` aus.
+
+Die issuer-owned `IndependentCompletenessTrace` bindet Originalrequest und
+Quelle, jeden geprüften Kandidaten, dessen verifier-ausgestellten
+Kandidatenhash, Reststatus, Faktoranzahl, Faktorhashes, Multiplizitäten,
+sämtliche eingebetteten Irreduzibilitätsspuren, die deterministische Auswahl,
+das getrennte Work Ledger und den Kampagnenhash. Ein Backend kann weder diese
+Spur noch den positiven Report konstruieren.
+
+Ein Vorschlag mit ungelöstem Rest, ein Faktor ohne Zeugen im festen
+Primzahlenpräfix oder ein erschöpftes Budget bleibt `BUDGET_INCONCLUSIVE`.
+Nicht unterstützte Domänen oder Formen bleiben explizit unsupported. Damit ist
+die Vollständigkeitszertifizierung ebenso hinreichend und begrenzt wie der
+zugrunde liegende Faktor-Irreduzibilitätsnachweis; sie ist keine universelle
+Entscheidungsprozedur.
 
 ## Untrusted Engine-SPI und unabhängiger Verifier
 
@@ -608,6 +640,8 @@ independent-irreducibility.normalization.content-gcd
 independent-irreducibility.prime-reduction
 independent-irreducibility.frobenius-multiplications
 independent-irreducibility.gcd-remainder-steps
+independent-completeness.candidate-checks
+independent-completeness.factor-dispatches
 transform.source-evidence-text-validation
 render.inspected-polynomial-terms
 transform.exact-reparse-input-code-units
@@ -714,13 +748,10 @@ Issue #763 verfolgt nach dem exakten Wurzel-Transformationspfad insbesondere:
 3. den eingefrorenen Vergleich von keiner Faktorisierung, On-Demand-Ausführung
    und verifier-gebundenem Cache unter gleicher sichtbarer Information und
    kanonischer Arbeit;
-4. die vorhandene unabhängige Originalquellen-Irreduzibilität auf jeden
-   ausgegebenen nichtkonstanten Faktor anwenden und daraus eine gebundene
-   Vollständigkeitsevidence für Zerlegungen in `Z[x]` und `Q[x]` bilden;
-5. stärkere Rekombination, zunächst LLL-/van-Hoeij-artig, für Fälle mit vielen
+4. stärkere Rekombination, zunächst LLL-/van-Hoeij-artig, für Fälle mit vielen
    modularen Faktoren;
-6. breitere gehaltene und adversarielle Korpora mit abgestuften Budgets;
-7. spätere multivariate und algebraische Koeffizientendomänen hinter
+5. breitere gehaltene und adversarielle Korpora mit abgestuften Budgets;
+6. spätere multivariate und algebraische Koeffizientendomänen hinter
    demselben Domain-, Ring-, Engine- und Verifiervertrag.
 
 ## Prüfung aus dem Checkout
@@ -764,10 +795,11 @@ mvn --batch-mode --no-transfer-progress -Pfull verify
 Der implementierte Stand belegt eine erweiterbare exakte
 Faktorisierungsarchitektur, eine begrenzte native allgemeine univariate Engine
 für `Z[x]` und `Q[x]`, vollständige interne Modular-, Lift- und
-Rekombinationsinvarianten, exakte Produktrückprüfung sowie einen exakt
+Rekombinationsinvarianten, exakte Produktrückprüfung, begrenzte unabhängige
+Irreduzibilitäts- und Vollständigkeitszertifikate sowie einen exakt
 rekonstruierten Ausdruckstransformationspfad für das Wurzelvorkommen.
 
-Er belegt noch keine algorithmisch unabhängige Vollständigkeit oder
-Irreduzibilität in `Z[x]` beziehungsweise `Q[x]`, keine multivariate
-Faktorisierung, keinen qualifizierten Suchvorteil und keine universelle
-Überlegenheit gegenüber etablierten Computer-Algebra-Systemen.
+Er belegt keine entscheidungsvollständige Irreduzibilitäts- oder
+Vollständigkeitsprozedur für alle Polynome in `Z[x]` beziehungsweise `Q[x]`,
+keine multivariate Faktorisierung, keinen qualifizierten Suchvorteil und keine
+universelle Überlegenheit gegenüber etablierten Computer-Algebra-Systemen.

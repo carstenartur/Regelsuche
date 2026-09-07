@@ -9,6 +9,7 @@ import de.regelsuche.polynomial.ExactRationalField;
 import de.regelsuche.polynomial.FactorizationEngine;
 import de.regelsuche.polynomial.FactorizationRequest;
 import de.regelsuche.polynomial.FactorizationVerifier;
+import de.regelsuche.polynomial.IndependentCompletenessTrace;
 import de.regelsuche.polynomial.PolynomialFactor;
 import de.regelsuche.polynomial.PolynomialRing;
 import de.regelsuche.polynomial.PolynomialVariable;
@@ -197,6 +198,47 @@ class NativeUnivariateFactorizationEngineTest {
             trace.primeAttempts().stream()
                 .map(FactorizationVerifier.PrimeAttempt::outcome)
                 .toList());
+        assertTrue(report.work().totalWorkUnits() <= WORK);
+    }
+
+    @Test
+    void independentlyCertifiesACompleteNativeFactorizationOnRequest() {
+        SparsePolynomial<BigInteger> xMinusOne = integer(-1, 1);
+        SparsePolynomial<BigInteger> xSquaredPlusOne =
+            integer(1, 0, 1);
+        SparsePolynomial<BigInteger> source = xMinusOne.pow(2)
+            .multiply(xSquaredPlusOne)
+            .scale(BigInteger.valueOf(6));
+        FactorizationRequest<BigInteger> independent =
+            FactorizationRequest.independentComplete(
+                source,
+                LIMITS,
+                CANDIDATES,
+                WORK);
+
+        FactorizationVerifier.Report<BigInteger> report =
+            FactorizationVerifier.execute(
+                NativeUnivariateFactorizationEngine.boundedIntegers(),
+                independent);
+
+        assertEquals(
+            FactorizationVerifier.Status.COMPLETE_FACTORIZATION,
+            report.status());
+        assertEquals(
+            FactorizationVerifier.ClaimStrength
+                .INDEPENDENTLY_CERTIFIED_COMPLETE,
+            report.claimStrength());
+        IndependentCompletenessTrace trace =
+            report.independentCompletenessTrace().orElseThrow();
+        assertTrue(trace.certified());
+        assertEquals(1, trace.candidateAttempts().size());
+        assertEquals(
+            2,
+            trace.candidateAttempts().getFirst()
+                .factorAttempts().size());
+        assertTrue(trace.candidateAttempts().getFirst()
+            .factorAttempts().stream().allMatch(attempt ->
+                attempt.irreducibilityTrace().certified()));
         assertTrue(report.work().totalWorkUnits() <= WORK);
     }
 
