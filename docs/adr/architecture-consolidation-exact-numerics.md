@@ -139,6 +139,16 @@ multipliziert. Nichtganzzahlige oder uebergrosse Potenzexponenten werden nicht
 mehr zu `int` verengt und duerfen daher keine Potenzzusammenfassung
 autorisieren.
 
+Auch die Summe einzeln unterstuetzter positiver Integerexponenten wird vor
+der Addition auf die `int`-Grenze geprueft. Wuerde sie diese Grenze
+ueberschreiten, behaelt der allgemeine Canonicalizer das urspruengliche Produkt.
+So kann `x^2147483647 * x^2147483647 * x * x` weder durch Ueberlauf zu `1`
+werden noch einen falschen kanonischen Schluessel erhalten. Dieser konservative
+Fallback kann weniger aequivalente Faktorfolgen zusammenfassen; er erweitert
+den unterstuetzten Exponentenbereich nicht. Die Summe der Grade verschiedener
+Variablen wird dagegen in beiden Sortierpfaden als `long` berechnet, damit
+hohe multivariate Grade weiterhin vor niedrigeren Graden stehen.
+
 Die bereits benoetigte Legacy-Dezimalkonvention ist nun an einer Stelle
 festgelegt: `ExactRationalDomain.legacyDecimalValue` interpretiert nur einen
 bereits vorhandenen endlichen Double-Wert nach seiner kuerzesten
@@ -206,6 +216,11 @@ endliche Double-Bitmuster, direkte Literalbedingungen in allen drei Profilen,
 eine reale `PatternRewriteRule` mit Replay/Wertprojektion, fraktionale und
 uebergrosse Integerexponenten sowie begrenztes AC-Matching mit unveraenderten
 Caller-Bindings und explizitem `INCONCLUSIVE`.
+
+`PolynomialNormalizerTest` prueft zusaetzlich Exponentensummen an und ueber
+der Integergrenze fuer Variablen, Funktionen und Quotienten. Die Regressionen
+sichern unveraenderte Faktoren, Hashtrennung, Format-/Parse-Fixpunkte sowie
+die Gradreihenfolge im Polynompfad und im allgemeinen Additionsfallback ab.
 
 `ExactMonomialInferenceTest` prueft irrationale Wurzeln, rationale Bindungen,
 exakte Dezimalprodukte, symbolische Nenner, Grenzfaelle, Replay und die skalierte

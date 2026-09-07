@@ -184,8 +184,8 @@ public final class PolynomialNormalizer {
             return new Monomial(result);
         }
 
-        private int degree() {
-            int degree = 0;
+        private long degree() {
+            long degree = 0;
             for (int exponent : powers.values()) {
                 degree += exponent;
             }
@@ -233,7 +233,7 @@ public final class PolynomialNormalizer {
         private static final Comparator<
             Map.Entry<Monomial, ExactRational>> TERM_ORDER =
                 Comparator
-                    .<Map.Entry<Monomial, ExactRational>>comparingInt(
+                    .<Map.Entry<Monomial, ExactRational>>comparingLong(
                         entry -> entry.getKey().degree())
                     .reversed()
                     .thenComparing(
