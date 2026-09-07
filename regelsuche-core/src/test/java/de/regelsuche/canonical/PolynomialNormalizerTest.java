@@ -49,6 +49,13 @@ class PolynomialNormalizerTest {
         assertTrue(normalizer.normalize(parse("sin(x) + x")).isEmpty());
     }
 
+    @Test
+    void zeroPowersRemainOutsideAssumptionFreePolynomialNormalization() {
+        assertTrue(normalizer.normalize(parse("x^0")).isEmpty());
+        assertTrue(normalizer.normalize(parse("0^0")).isEmpty());
+        assertTrue(normalizer.normalize(parse("x^0 + y")).isEmpty());
+    }
+
     private String normalize(String expression) {
         return ExpressionFormatter.format(normalizer.normalize(parse(expression)).orElseThrow());
     }
