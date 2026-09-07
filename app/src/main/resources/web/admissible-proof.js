@@ -93,7 +93,8 @@ verify.primalityTests verify.trialDivisions verify.residueAssignments verify.res
             for (const residue of residues.slice(1)) { tick(); todo.push(mask & ~residue); }
         }
         requireThat(seen.size === nodes.size, 'Nicht erreichbare Beweisknoten.');
-        return {universe: u, witness: w, root: rootMask.toString(16), nodes: [...nodes], checkedNodes: seen.size};
+        // Worker structured cloning preserves this index for direct navigation lookups.
+        return {universe: u, witness: w, root: rootMask.toString(16), nodes, checkedNodes: seen.size};
     }
     function parseReceipt(text, tick) {
         requireThat(typeof text === 'string' && text.length <= 20000 && text.endsWith('\n'), 'Ungültiges Arbeitsprotokoll.');
@@ -166,7 +167,7 @@ verify.primalityTests verify.trialDivisions verify.residueAssignments verify.res
             } else {
                 requireThat(run.proof === null && f.proofSha256 === 'NONE', 'Budgetabbruch darf keinen Optimalitätsbeweis tragen.');
                 proof = {universe: receipt.universe, witness: receipt.witness,
-                    root: ((1n << BigInt(receipt.universe.length)) - 1n).toString(16), nodes: [], checkedNodes: 0};
+                    root: ((1n << BigInt(receipt.universe.length)) - 1n).toString(16), nodes: new Map(), checkedNodes: 0};
             }
             runs.push({...proof, case: run.case, role: run.role, policy: f.policy,
                 status: f.status, cost: f.cost, visited: f['search.visited'], maximumNodes: f.maximumNodes});
@@ -182,7 +183,7 @@ verify.primalityTests verify.trialDivisions verify.residueAssignments verify.res
             ...(exploratory ? {exploratory: true} : {}), runs};
     }
     function step(model, key) {
-        const mask = BigInt('0x' + key), size = count(mask), p = new Map(model.nodes).get(key);
+        const mask = BigInt('0x' + key), size = count(mask), p = model.nodes.get(key);
         const values = model.universe.filter((_, i) => (mask & (1n << BigInt(i))) !== 0n);
         if (size <= model.witness.length) return {size, values, terminal: 'bound', children: []};
         if (!p) return {size, values, terminal: 'unproved', children: []};

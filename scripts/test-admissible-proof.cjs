@@ -12,7 +12,7 @@ const canonical = data => JSON.stringify(data) + '\n';
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 
 test('exact small proof and all child alternatives', () => {
-    const proof = checker.parseProof(checker.example);
+    const proof = structuredClone(checker.parseProof(checker.example));
     assert.equal(proof.checkedNodes, 2);
     const first = checker.step(proof, proof.root);
     assert.equal(first.prime, 2);
@@ -22,10 +22,13 @@ test('exact small proof and all child alternatives', () => {
     assert.equal(checker.step(proof, second.children[0].mask).terminal, 'bound');
 });
 test('actual CI certificates imported, old and selected', async () => {
-    const result = await checker.checkBundle(source);
+    const result = structuredClone(await checker.checkBundle(source));
     assert.equal(result.runs.length, 2);
     assert.equal(result.selectedPolicy, 'first');
     assert.ok(result.runs.every(r => r.status === 'OPTIMAL' && r.witness.length === 28));
+    for (const run of result.runs) {
+        assert.ok(checker.step(run, run.root).children.length > 0);
+    }
 });
 test('missing root is rejected', () => assert.throws(() => checker.parseProof(checker.example.replace('1ff:2\n', ''))));
 test('missing descendant is rejected', () => assert.throws(() => checker.parseProof(checker.example.replace('155:3\n', ''))));
@@ -72,8 +75,11 @@ test('budget-exhausted record carries only a checked lower witness', async () =>
             .replace(/proofSha256=[0-9a-f]{64}/, 'proofSha256=NONE');
         run.proof = null;
     }
-    const result = await checker.checkBundle(canonical(data));
+    const result = structuredClone(await checker.checkBundle(canonical(data)));
     assert.ok(result.runs.every(r => r.status === 'BUDGET_EXHAUSTED' && r.checkedNodes === 0));
+    for (const run of result.runs) {
+        assert.equal(checker.step(run, run.root).terminal, 'unproved');
+    }
     data.runs[0].proof = checker.example;
     await assert.rejects(checker.checkBundle(canonical(data)));
 });
